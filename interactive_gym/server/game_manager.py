@@ -118,7 +118,7 @@ class GameManager:
 
             # If this is a multiplayer Pyodide game, create coordinator state
             if self.scene.pyodide_multiplayer and self.pyodide_coordinator:
-                num_players = len(game.policy_mapping)  # Number of agents in the game
+                num_players = len(self.scene.policy_mapping)  # Number of agents in the game
                 self.pyodide_coordinator.create_game(game_id, num_players)
                 logger.info(
                     f"Created multiplayer Pyodide game state for {game_id} "
@@ -166,12 +166,14 @@ class GameManager:
         self, subject_id: SubjectID
     ) -> remote_game.RemoteGameV2:
         """Add a subject to a game and return it."""
+        logger.info(f"add_subject_to_game called for {subject_id}. Current waiting_games: {self.waiting_games}")
         if not self.waiting_games:
             logger.info("No games waiting for players. Creating a new game.")
             self._create_game()
+            logger.info(f"Created game. waiting_games now: {self.waiting_games}")
 
         game: remote_game.RemoteGameV2 = self.games[self.waiting_games[0]]
-        logger.info(f"Adding subject {subject_id} to game {game.game_id}")
+        logger.info(f"Adding subject {subject_id} to game {game.game_id}. Game has {len(game.human_players)} players, needs {len(self.scene.policy_mapping)}")
         with game.lock:
             self.subject_games[subject_id] = game.game_id
             self.subject_rooms[subject_id] = game.game_id
@@ -211,14 +213,17 @@ class GameManager:
                 )
 
             # If the game is ready to start, we'll remove it from WAITING_GAMES.
-            if game.is_ready_to_start():
+            is_ready = game.is_ready_to_start()
+            logger.info(f"Game {game.game_id} ready to start: {is_ready}. Available slots: {game.get_available_human_agent_ids()}")
+            if is_ready:
+                logger.info(f"Removing game {game.game_id} from waiting_games")
                 self.waiting_games.remove(game.game_id)
                 assert game.game_id not in self.waiting_games
 
-            if game.is_ready_to_start():
+            if is_ready:
                 self.start_game(game)
             else:
-                self.send_participant_to_waiting_room(game, subject_id)
+                self.send_participant_to_waiting_room(subject_id)
 
         return game
 
@@ -235,7 +240,7 @@ class GameManager:
             "waiting_room",
             {
                 "cur_num_players": game.cur_num_human_players(),
-                "players_needed": len(game.get_available_human_player_ids()),
+                "players_needed": len(game.get_available_human_agent_ids()),
                 "ms_remaining": remaining_wait_time,
             },
             room=subject_id,
@@ -374,6 +379,7 @@ class GameManager:
             "start_game",
             {
                 "scene_metadata": self.scene.scene_metadata,
+                "game_id": game.game_id,
                 # "experiment_config": self.experiment_config.to_dict(),
             },
             room=game.game_id,

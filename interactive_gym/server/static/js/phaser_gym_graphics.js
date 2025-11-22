@@ -262,7 +262,9 @@ class GymScene extends Phaser.Scene {
 
         // Draw the initial state, if anything
         if (stateBuffer.length > 0) {
+            console.log("Drawing initial state!")
             this.state = stateBuffer.shift(); // get the oldest state from the buffer
+            console.log("State:", this.state)
             this.drawState()
         }
     };
@@ -291,30 +293,47 @@ class GymScene extends Phaser.Scene {
                 currentObservations = {};
                 clearStateBuffer();
                 this.removeAllObjects();
-                [currentObservations, infos, render_state] = await this.pyodide_remote_game.reset();
+                const resetResult = await this.pyodide_remote_game.reset();
+
+                // Handle null return (shouldn't happen for reset, but be safe)
+                if (resetResult === null) {
+                    this.isProcessingPyodide = false;
+                    return;
+                }
+
+                [currentObservations, infos, render_state] = resetResult;
+                console.log("[MultiplayerPyodide] Reset result:", resetResult);
                 remoteGameLogger.logData(
                     {
                         observations: currentObservations,
-                        infos: infos, 
-                        episode_num: this.pyodide_remote_game.num_episodes, 
+                        infos: infos,
+                        episode_num: this.pyodide_remote_game.num_episodes,
                         t: this.pyodide_remote_game.step_num
                     });
             } else {
                 const actions = await this.buildPyodideActionDict();
                 previousSubmittedActions = actions;
-                [currentObservations, rewards, terminateds, truncateds, infos, render_state] = await this.pyodide_remote_game.step(actions);
+                const stepResult = await this.pyodide_remote_game.step(actions);
+
+                // Handle null return (e.g., waiting for multiplayer sync)
+                if (stepResult === null) {
+                    this.isProcessingPyodide = false;
+                    return;
+                }
+
+                [currentObservations, rewards, terminateds, truncateds, infos, render_state] = stepResult;
                 remoteGameLogger.logData(
                     {
-                        observations: currentObservations, 
-                        actions: actions, 
-                        rewards: rewards, 
-                        terminateds: terminateds, 
-                        truncateds: truncateds, 
-                        infos: infos, 
-                        episode_num: this.pyodide_remote_game.num_episodes, 
+                        observations: currentObservations,
+                        actions: actions,
+                        rewards: rewards,
+                        terminateds: terminateds,
+                        truncateds: truncateds,
+                        infos: infos,
+                        episode_num: this.pyodide_remote_game.num_episodes,
                         t: this.pyodide_remote_game.step_num
                     });
-            }             
+            }
             addStateToBuffer(render_state);
         }
         this.isProcessingPyodide = false;
@@ -323,24 +342,29 @@ class GymScene extends Phaser.Scene {
     async buildPyodideActionDict() {
         let actions = {};
 
-        // Identify which policy corresponds to the human by checking for the human value in policy_mapping
-        let human_policy_agent_id = Object.keys(
-            this.scene_metadata.policy_mapping
-        ).find(
-                key => this.scene_metadata.policy_mapping[key] == "human"
-        );
+        // In multiplayer mode, only collect keyboard input for THIS player's agent
+        let isMultiplayer = this.pyodide_remote_game && this.pyodide_remote_game.myPlayerId !== undefined;
+        let myPlayerId = isMultiplayer ? String(this.pyodide_remote_game.myPlayerId) : null;
 
-        // Get the human action and populate the actions dictionary with corresponding agent id key
-        if (human_policy_agent_id !== undefined) {
-            actions[human_policy_agent_id] = this.getHumanAction();
-        }
-
-        // Loop over the policy mapping and populate the actions dictionary with bot actions
+        // Loop over all agents in the policy mapping
         for (let [agentID, policy] of Object.entries(this.scene_metadata.policy_mapping)) {
-            if (agentID == human_policy_agent_id) {
-                continue;
+            if (policy == "human") {
+                // In multiplayer, only get keyboard input for MY player
+                if (isMultiplayer) {
+                    if (agentID == myPlayerId) {
+                        actions[agentID] = this.getHumanAction();
+                    } else {
+                        // Other human players - use default action (will be replaced by server)
+                        actions[agentID] = this.scene_metadata.default_action || 0;
+                    }
+                } else {
+                    // Single player - get keyboard input for this human
+                    actions[agentID] = this.getHumanAction();
+                }
+            } else {
+                // Bot agent
+                actions[agentID] = this.getBotAction(agentID);
             }
-            actions[agentID] = this.getBotAction(agentID);
         }
 
         return actions;

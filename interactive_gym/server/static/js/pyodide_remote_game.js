@@ -339,7 +339,7 @@ function convertProxyToObject(obj) {
 
 
 // Helper function to convert all `undefined` values in an object to `null`
-function convertUndefinedToNull(obj) {
+export function convertUndefinedToNull(obj) {
     if (typeof obj !== 'object' || obj === null) {
         // Return the value as is if it's not an object or is already null
         return obj;

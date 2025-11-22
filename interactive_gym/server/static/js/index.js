@@ -2,6 +2,7 @@ import * as ui_utils from './ui_utils.js';
 import {startUnityScene, terminateUnityScene, shutdownUnityGame, preloadUnityGame} from './unity_utils.js';
 import {graphics_start, graphics_end, addStateToBuffer, getRemoteGameData, pressedKeys} from './phaser_gym_graphics.js';
 import {RemoteGame} from './pyodide_remote_game.js';
+import {MultiplayerPyodideGame} from './pyodide_multiplayer_game.js';
 
 window.socket = io();
 var socket = window.socket;
@@ -132,17 +133,23 @@ socket.on('start_game', function(data) {
     let scene_metadata = data.scene_metadata
     // let experiment_config = data.experiment_config
 
+    // Set game_id on multiplayer game instance if present
+    if (data.game_id && pyodideRemoteGame) {
+        pyodideRemoteGame.gameId = data.game_id;
+        console.log(`[MultiplayerPyodide] Set game_id: ${data.game_id}`);
+    }
+
     // Hide the sceneBody and any waiting room messages or errors
     if (scene_metadata.in_game_scene_body != undefined) {
         $("#sceneBody").html(scene_metadata.in_game_scene_body);
         $("#sceneBody").show();
     } else {
-        $("#sceneBody").hide(); 
+        $("#sceneBody").hide();
     }
     $("#waitroomText").hide();
     $('#errorText').hide()
 
-    // Show the game container 
+    // Show the game container
     $("#gameContainer").show();
 
     // Initialize game
@@ -672,12 +679,17 @@ $(function() {
 async function initializePyodideRemoteGame(data) {
     // Only initialize a new RemoteGame if we don't already have one
     if (pyodideRemoteGame === null || data.restart_pyodide === true) {
-        pyodideRemoteGame = new RemoteGame(data);
+        // Create MultiplayerPyodideGame if multiplayer, otherwise RemoteGame
+        if (data.pyodide_multiplayer === true) {
+            console.log("Initializing MultiplayerPyodideGame");
+            pyodideRemoteGame = new MultiplayerPyodideGame(data);
+        } else {
+            pyodideRemoteGame = new RemoteGame(data);
+        }
     } else {
         console.log("Not initializing a new RemoteGame because one already exists");
         await pyodideRemoteGame.reinitialize_environment(data);
     }
-    // pyodideRemoteGame = new RemoteGame(data);
 };
 
 var checkPyodideDone;

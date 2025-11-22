@@ -63,7 +63,7 @@ class PyodideGameCoordinator:
         self.lock = threading.Lock()
 
         # Configuration
-        self.verification_frequency = 30  # Verify every N frames
+        self.verification_frequency = 300  # Verify every N frames (reduced from 30)
         self.action_timeout = 5.0  # Seconds to wait for actions
         self.max_games = 1000  # Prevent memory exhaustion
 
@@ -150,6 +150,7 @@ class PyodideGameCoordinator:
                              {
                                  'is_host': True,
                                  'player_id': player_id,
+                                 'game_id': game_id,
                                  'game_seed': game.rng_seed,
                                  'num_players': game.num_expected_players
                              },
@@ -164,6 +165,8 @@ class PyodideGameCoordinator:
                 self.sio.emit('pyodide_host_elected',
                              {
                                  'is_host': False,
+                                 'player_id': player_id,
+                                 'game_id': game_id,
                                  'host_id': game.host_player_id,
                                  'game_seed': game.rng_seed,
                                  'num_players': game.num_expected_players
@@ -184,6 +187,7 @@ class PyodideGameCoordinator:
         game = self.games[game_id]
         game.is_active = True
 
+        logger.info(f"Emitting pyodide_game_ready to room {game_id} with players {list(game.players.keys())}")
         self.sio.emit('pyodide_game_ready',
                      {'game_id': game_id, 'players': list(game.players.keys())},
                      room=game_id)
@@ -221,13 +225,20 @@ class PyodideGameCoordinator:
                 return
 
             # Verify frame number matches (detect client ahead/behind)
-            if frame_number != game.frame_number:
+            frame_diff = abs(frame_number - game.frame_number)
+            if frame_diff > 2:  # Allow up to 2 frames of lag
                 logger.warning(
                     f"Frame mismatch in game {game_id}: "
                     f"player {player_id} sent frame {frame_number}, "
-                    f"expected {game.frame_number}"
+                    f"expected {game.frame_number} (diff: {frame_diff})"
                 )
                 return
+            elif frame_diff > 0:
+                logger.debug(
+                    f"Minor frame lag in game {game_id}: "
+                    f"player {player_id} at frame {frame_number}, "
+                    f"server at {game.frame_number}"
+                )
 
             # Store action
             game.pending_actions[player_id] = action

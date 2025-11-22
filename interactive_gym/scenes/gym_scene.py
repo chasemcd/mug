@@ -352,6 +352,7 @@ class GymScene(scene.Scene):
         scene_body_filepath: str = NotProvided,
         in_game_scene_body: str = NotProvided,
         in_game_scene_body_filepath: str = NotProvided,
+        waitroom_timeout: int = NotProvided,
         waitroom_timeout_redirect_url: str = NotProvided,
         game_page_html_fn: Callable = NotProvided,
     ):
@@ -367,6 +368,8 @@ class GymScene(scene.Scene):
         :type in_game_scene_body: str, optional
         :param in_game_scene_body_filepath: Path to a file containing in-game HTML body content, defaults to NotProvided
         :type in_game_scene_body_filepath: str, optional
+        :param waitroom_timeout: Timeout for waitroom in milliseconds, defaults to NotProvided
+        :type waitroom_timeout: int, optional
         :param waitroom_timeout_redirect_url: URL to redirect to if waitroom times out, defaults to NotProvided
         :type waitroom_timeout_redirect_url: str, optional
         :param game_page_html_fn: Function to generate custom game page HTML, defaults to NotProvided
@@ -380,8 +383,8 @@ class GymScene(scene.Scene):
         if waitroom_timeout_redirect_url is not NotProvided:
             self.waitroom_timeout_redirect_url = waitroom_timeout_redirect_url
 
-        # if append_subject_id_to_redirect is not NotProvided:
-        #     self.append_subject_id_to_redirect = append_subject_id_to_redirect
+        if waitroom_timeout is not NotProvided:
+            self.waitroom_timeout = waitroom_timeout
 
         if game_page_html_fn is not NotProvided:
             self.game_page_html_fn = game_page_html_fn

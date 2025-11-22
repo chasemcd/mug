@@ -154,6 +154,14 @@ def register_subject(data):
     flask.session["subject_id"] = subject_id
     SESSION_ID_TO_SUBJECT_ID[sid] = subject_id
     logger.info(f"Registered session ID {sid} with subject {subject_id}")
+
+    # Send server session ID to client
+    flask_socketio.emit(
+        "server_session_id",
+        {"session_id": SERVER_SESSION_ID},
+        room=sid,
+    )
+
     participant_stager = STAGERS[subject_id]
     participant_stager.start(socketio, room=sid)
 
@@ -199,16 +207,22 @@ def advance_scene(data):
         f"Advanced to scene: {current_scene.scene_id}. Metadata export: {current_scene.should_export_metadata}"
     )
     if isinstance(current_scene, gym_scene.GymScene):
-        logger.info(
-            f"Instantiating game manager for scene {current_scene.scene_id}"
-        )
-        game_manager = gm.GameManager(
-            scene=current_scene,
-            experiment_config=CONFIG,
-            sio=socketio,
-            pyodide_coordinator=PYODIDE_COORDINATOR
-        )
-        GAME_MANAGERS[current_scene.scene_id] = game_manager
+        # Only create a GameManager if one doesn't already exist for this scene
+        if current_scene.scene_id not in GAME_MANAGERS:
+            logger.info(
+                f"Instantiating game manager for scene {current_scene.scene_id}"
+            )
+            game_manager = gm.GameManager(
+                scene=current_scene,
+                experiment_config=CONFIG,
+                sio=socketio,
+                pyodide_coordinator=PYODIDE_COORDINATOR
+            )
+            GAME_MANAGERS[current_scene.scene_id] = game_manager
+        else:
+            logger.info(
+                f"Game manager already exists for scene {current_scene.scene_id}, reusing it"
+            )
 
     if current_scene.should_export_metadata:
         current_scene.export_metadata(subject_id)
@@ -218,7 +232,7 @@ def advance_scene(data):
 def join_game(data):
 
     subject_id = get_subject_id_from_session_id(flask.request.sid)
-    client_session_id = data.get("server_session_id")
+    client_session_id = data.get("session_id")  # Client sends "session_id"
 
     # Validate session
     # if not is_valid_session(client_session_id, subject_id, "join_game"):
@@ -349,13 +363,18 @@ def send_pressed_keys(data):
     # return
     # sess_id = flask.request.sid
     subject_id = get_subject_id_from_session_id(flask.request.sid)
-    subject_id = flask.session.get("subject_id")
-    # print(subject_id, sess_id, STAGERS)
+    # Fallback to flask.session if needed
+    if subject_id is None:
+        subject_id = flask.session.get("subject_id")
+
+    # Skip if no subject_id (can happen in Pyodide games that don't use pressed keys)
+    if subject_id is None:
+        return
 
     # # TODO(chase): figure out why we're getting a different session ID here...
     participant_stager = STAGERS.get(subject_id, None)
     if participant_stager is None:
-        logger.error(
+        logger.warning(
             f"Pressed keys requested for {subject_id} but they don't have a Stager."
         )
         return
@@ -654,10 +673,10 @@ def on_pyodide_player_action(data):
     action = data.get("action")
     frame_number = data.get("frame_number")
 
-    logger.debug(
-        f"Received action from player {player_id} in game {game_id} "
-        f"for frame {frame_number}: {action}"
-    )
+    # logger.debug(
+    #     f"Received action from player {player_id} in game {game_id} "
+    #     f"for frame {frame_number}: {action}"
+    # )
 
     PYODIDE_COORDINATOR.receive_action(
         game_id=game_id,
