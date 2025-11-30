@@ -670,23 +670,34 @@ def temp_object_creation(obj: grid_object.GridObj):
 class InteractiveGymOvercooked(OvercookedRewardEnv):
     def get_state(self) -> dict:
         """
-        Dummy serialization for testing - returns empty dict.
-        This validates the sync mechanism works without actual state transfer.
+        Serialize the entire environment state using pickle and base64 encoding.
 
-        :return: Empty dictionary (dummy implementation)
+        This captures the complete state of the environment including all internal
+        attributes, allowing for perfect state restoration on another client.
+
+        :return: Dictionary with base64-encoded pickled state
         :rtype: dict
         """
-        return {}
+        pickled = pickle.dumps(self)
+        encoded = base64.b64encode(pickled).decode('utf-8')
+        return {'pickled_state': encoded}
 
     def set_state(self, state: dict) -> None:
         """
-        Dummy deserialization for testing - does nothing.
-        This validates the sync mechanism works without actual state transfer.
+        Restore the environment state from a pickled representation.
 
-        :param state: Dictionary (ignored in dummy implementation)
+        This replaces all attributes of the current instance with those from
+        the deserialized state, effectively synchronizing this environment
+        with the state from another client.
+
+        :param state: Dictionary containing base64-encoded pickled state
         :type state: dict
         """
-        pass
+        encoded = state['pickled_state']
+        pickled = base64.b64decode(encoded.encode('utf-8'))
+        restored = pickle.loads(pickled)
+        # Replace all attributes with restored state
+        self.__dict__.update(restored.__dict__)
 
     def render(self):
         return self.env_to_render_fn()

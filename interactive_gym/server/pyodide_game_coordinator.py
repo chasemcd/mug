@@ -394,6 +394,39 @@ class PyodideGameCoordinator:
 
         logger.info(f"Game {game_id}: Initiated resync from host {game.host_player_id}")
 
+    def handle_resync_request(
+        self,
+        game_id: str,
+        requesting_player_id: str | int,
+        frame_number: int
+    ):
+        """
+        Handle a resync request from a client that has fallen behind.
+
+        This is triggered when a client's action queue grows too large,
+        indicating it cannot keep up. We request state from host and
+        send it to the requesting client.
+
+        Args:
+            game_id: Game identifier
+            requesting_player_id: Player who requested resync
+            frame_number: Frame number of requesting client
+        """
+        with self.lock:
+            if game_id not in self.games:
+                logger.warning(f"Resync request for non-existent game {game_id}")
+                return
+
+            game = self.games[game_id]
+
+            logger.info(
+                f"Game {game_id}: Player {requesting_player_id} requested resync "
+                f"at frame {frame_number}"
+            )
+
+            # Use existing desync handler to request state from host
+            self._handle_desync(game_id, frame_number)
+
     def receive_full_state(self, game_id: str, full_state: dict):
         """
         Receive full state from host and broadcast to clients for resync.

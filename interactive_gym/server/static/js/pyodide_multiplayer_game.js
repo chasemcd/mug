@@ -30,6 +30,10 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         this.lastExecutedActions = {};      // { player_id: last_action } for fallback
         // Note: No queue size limit - we never drop actions to maintain sync
 
+        // Queue-based resync threshold (triggers state sync if queue grows too large)
+        this.queueResyncThreshold = config.queue_resync_threshold || 50;  // Trigger resync if queue > 50
+        this.resyncRequested = false;  // Prevent multiple resync requests
+
         // Action population settings
         this.actionPopulationMethod = config.action_population_method || 'previous_submitted_action';
         this.defaultAction = config.default_action || 0;
@@ -37,9 +41,8 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         // Policy mapping (needed to know which agents are human)
         this.policyMapping = config.policy_mapping || {};
 
-        // State verification (hybrid fallback)
-        this.stateVerificationEnabled = config.state_verification_enabled !== false;  // Default true
-        this.verificationFrequency = config.verification_frequency || 300;  // Every 300 frames (~10s at 30fps)
+        // Periodic state sync (null = disabled, number = frames between syncs)
+        this.stateSyncFrequencyFrames = config.state_sync_frequency_frames;  // null to disable, or number of frames
         this.frameNumber = 0;
 
         // Data logging (only host logs)
@@ -116,8 +119,12 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
             const queue = this.otherPlayerActionQueues[player_id];
             queue.push({ action, frame_number });
 
-            // Log warning if queue is getting large (client is behind)
-            if (queue.length > 30) {
+            // Check if queue exceeds threshold - trigger resync if so
+            if (queue.length > this.queueResyncThreshold && !this.resyncRequested) {
+                console.warn(`[MultiplayerPyodide] Queue for player ${player_id} exceeded threshold (${queue.length} > ${this.queueResyncThreshold}), requesting state resync`);
+                this.resyncRequested = true;
+                this.requestStateResync();
+            } else if (queue.length > 30) {
                 console.warn(`[MultiplayerPyodide] Queue for player ${player_id} is large (${queue.length}), this client may be running slower`);
             }
 
@@ -126,7 +133,7 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
 
         // State verification request (hybrid fallback)
         socket.on('pyodide_verify_state', (data) => {
-            if (this.stateVerificationEnabled) {
+            if (this.stateSyncFrequencyFrames !== null) {
                 this.verifyState(data.frame_number);
             }
         });
@@ -157,6 +164,7 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
 
                 this.isPaused = false;
                 this.state = "ready";
+                this.resyncRequested = false;  // Allow future resyncs
                 console.log(`[MultiplayerPyodide] State resynced from host, now at frame ${this.frameNumber}`);
             }
         });
@@ -174,6 +182,7 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
                 // Host can also resume after sending state
                 this.isPaused = false;
                 this.state = "ready";
+                this.resyncRequested = false;  // Allow future resyncs
                 // Clear action queues for fresh start
                 for (const playerId in this.otherPlayerActionQueues) {
                     this.otherPlayerActionQueues[playerId] = [];
@@ -181,6 +190,26 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
                 this.lastExecutedActions = {};
                 console.log(`[MultiplayerPyodide] Host resuming at frame ${this.frameNumber}`);
             }
+        });
+    }
+
+    /**
+     * Request a state resync from the host when queue grows too large.
+     * This client is falling behind and needs to catch up via full state transfer.
+     */
+    requestStateResync() {
+        console.warn(`[MultiplayerPyodide] Requesting state resync - this client is behind`);
+
+        // Pause this client
+        this.isPaused = true;
+        this.state = "paused";
+
+        // Request resync from server (which will ask host for state)
+        socket.emit('pyodide_request_resync', {
+            game_id: this.gameId,
+            player_id: this.myPlayerId,
+            frame_number: this.frameNumber,
+            reason: 'queue_overflow'
         });
     }
 
@@ -420,8 +449,8 @@ obs, infos, render_state
         // 4. Increment frame
         this.frameNumber++;
 
-        // 5. Optionally trigger state verification (hybrid fallback)
-        if (this.stateVerificationEnabled && this.frameNumber % this.verificationFrequency === 0) {
+        // 5. Optionally trigger periodic state sync
+        if (this.stateSyncFrequencyFrames !== null && this.frameNumber % this.stateSyncFrequencyFrames === 0) {
             this.triggerStateVerification();
         }
 

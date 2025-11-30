@@ -757,6 +757,47 @@ def on_pyodide_send_full_state(data):
     )
 
 
+@socketio.on("pyodide_request_resync")
+def on_pyodide_request_resync(data):
+    """
+    Handle resync request from a client that has fallen behind.
+
+    This is triggered when a client's action queue grows too large,
+    indicating it cannot keep up with the game pace and needs a
+    full state transfer from the host to catch up.
+
+    Args:
+        data: {
+            'game_id': str,
+            'player_id': str | int,
+            'frame_number': int,
+            'reason': str (e.g., 'queue_overflow')
+        }
+    """
+    global PYODIDE_COORDINATOR
+
+    if PYODIDE_COORDINATOR is None:
+        logger.error("Pyodide coordinator not initialized")
+        return
+
+    game_id = data.get("game_id")
+    player_id = data.get("player_id")
+    frame_number = data.get("frame_number")
+    reason = data.get("reason", "unknown")
+
+    logger.warning(
+        f"Resync requested by player {player_id} in game {game_id} "
+        f"at frame {frame_number} (reason: {reason})"
+    )
+
+    # Trigger the desync handling which requests state from host
+    PYODIDE_COORDINATOR.handle_resync_request(
+        game_id=game_id,
+        requesting_player_id=player_id,
+        frame_number=frame_number
+    )
+
+
 @socketio.on("pyodide_log_data")
 def on_pyodide_log_data(data):
     """
