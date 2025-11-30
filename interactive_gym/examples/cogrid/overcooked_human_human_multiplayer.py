@@ -4,10 +4,15 @@ Overcooked Human-Human Multiplayer (Client-Side with Pyodide)
 This example demonstrates multiplayer Pyodide experiments where:
 - Two human participants play together in real-time
 - Each client runs their own Pyodide environment in the browser
-- Server coordinates action synchronization
-- Deterministic execution via seeded RNG ensures perfect synchronization
+- Action Queue synchronization: actions are sent immediately and queued on other clients
+- No blocking/waiting: games run independently at full speed
+- Fallback to previous action or default when queue is empty
+- Optional state verification (hybrid fallback) for desync detection
 - Only the host logs data (avoids duplicates)
-- State verification detects and recovers from desyncs
+
+Sync Architecture:
+- Primary: Action Queue (each player's action is broadcast to others and queued)
+- Fallback: State Verification (periodic hash comparison with full state resync if needed)
 
 Usage:
     python -m interactive_gym.examples.cogrid.overcooked_human_human_multiplayer
@@ -70,13 +75,14 @@ if __name__ == "__main__":
     print("  2. Both participants will be placed in a waiting room")
     print("  3. Once both joined, the game will start automatically")
     print("  4. Each participant plays in their own browser with Pyodide")
-    print("  5. Server coordinates actions for perfect synchronization")
+    print("  5. Games run independently - no waiting for other player's input")
     print("  6. Only one participant (host) logs data to avoid duplicates")
-    print("\nFeatures:")
-    print("  ✓ Zero server-side computation (environments run in browsers)")
-    print("  ✓ Deterministic AI via seeded RNG")
-    print("  ✓ State verification every 30 frames")
-    print("  ✓ Automatic desync recovery")
+    print("\nSync Architecture:")
+    print("  ✓ Action Queue: Actions broadcast immediately and queued")
+    print("  ✓ No blocking: Games run at full speed independently")
+    print("  ✓ Fallback: Use previous action when queue is empty")
+    print("  ✓ State verification every 300 frames (~10s at 30fps)")
+    print("  ✓ Automatic desync recovery via full state transfer")
     print("  ✓ Host migration on disconnection")
     print("="*70 + "\n")
 

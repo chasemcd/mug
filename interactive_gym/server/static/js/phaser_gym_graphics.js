@@ -315,7 +315,7 @@ class GymScene extends Phaser.Scene {
                 previousSubmittedActions = actions;
                 const stepResult = await this.pyodide_remote_game.step(actions);
 
-                // Handle null return (e.g., waiting for multiplayer sync)
+                // Handle null return (e.g., game paused for resync)
                 if (stepResult === null) {
                     this.isProcessingPyodide = false;
                     return;

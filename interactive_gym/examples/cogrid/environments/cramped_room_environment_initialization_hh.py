@@ -1,4 +1,6 @@
+import base64
 import functools
+import pickle
 import random
 from typing import Any
 
@@ -666,18 +668,25 @@ def temp_object_creation(obj: grid_object.GridObj):
 
 
 class InteractiveGymOvercooked(OvercookedRewardEnv):
+    def get_state(self) -> dict:
+        """
+        Dummy serialization for testing - returns empty dict.
+        This validates the sync mechanism works without actual state transfer.
 
+        :return: Empty dictionary (dummy implementation)
+        :rtype: dict
+        """
+        return {}
 
+    def set_state(self, state: dict) -> None:
+        """
+        Dummy deserialization for testing - does nothing.
+        This validates the sync mechanism works without actual state transfer.
 
-
-    def get_state(self):
-        return {
-            "grid": self.grid,
-            "agents"
-        }
-    
-    def set_state(self, state):
-        ...
+        :param state: Dictionary (ignored in dummy implementation)
+        :type state: dict
+        """
+        pass
 
     def render(self):
         return self.env_to_render_fn()

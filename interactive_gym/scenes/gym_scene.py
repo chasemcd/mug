@@ -51,6 +51,8 @@ class GymScene(scene.Scene):
         assets_dir (str): Directory containing assets.
         assets_to_preload (list[str]): List of assets to preload.
         animation_configs (list): Configurations for animations.
+        state_verification_enabled (bool): Enable periodic state hash verification for multiplayer sync.
+        verification_frequency (int): Frames between state verifications (e.g., 300 = ~10s at 30fps).
     """
 
     DEFAULT_IG_PACKAGE = "interactive-gym==0.0.7"
@@ -120,6 +122,10 @@ class GymScene(scene.Scene):
         self.on_game_step_code: str = ""
         self.packages_to_install: list[str] = [GymScene.DEFAULT_IG_PACKAGE]
         self.restart_pyodide: bool = False
+
+        # Multiplayer sync settings (for pyodide_multiplayer=True)
+        self.state_verification_enabled: bool = True  # Enable periodic state hash verification
+        self.verification_frequency: int = 300  # Frames between state verifications (~10s at 30fps)
 
     def environment(
         self,
@@ -428,6 +434,8 @@ class GymScene(scene.Scene):
         on_game_step_code: str = NotProvided,
         packages_to_install: list[str] = NotProvided,
         restart_pyodide: bool = NotProvided,
+        state_verification_enabled: bool = NotProvided,
+        verification_frequency: int = NotProvided,
     ):
         """Configure Pyodide-related settings for the GymScene.
 
@@ -446,6 +454,10 @@ class GymScene(scene.Scene):
         :type packages_to_install: list[str], optional
         :param restart_pyodide: Whether to restart the Pyodide environment, defaults to NotProvided
         :type restart_pyodide: bool, optional
+        :param state_verification_enabled: Enable periodic state hash verification for multiplayer sync (hybrid fallback), defaults to NotProvided
+        :type state_verification_enabled: bool, optional
+        :param verification_frequency: Frames between state verifications (e.g., 300 = ~10s at 30fps), defaults to NotProvided
+        :type verification_frequency: int, optional
         :return: The GymScene instance (self)
         :rtype: GymScene
         """
@@ -481,6 +493,14 @@ class GymScene(scene.Scene):
 
         if on_game_step_code is not NotProvided:
             self.on_game_step_code = on_game_step_code
+
+        if state_verification_enabled is not NotProvided:
+            assert isinstance(state_verification_enabled, bool)
+            self.state_verification_enabled = state_verification_enabled
+
+        if verification_frequency is not NotProvided:
+            assert isinstance(verification_frequency, int) and verification_frequency > 0
+            self.verification_frequency = verification_frequency
 
         return self
 

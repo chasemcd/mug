@@ -25,14 +25,21 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         this.gameId = config.game_id;
         this.gameSeed = null;
 
-        // Action synchronization
-        this.pendingMyAction = null;
-        this.allActionsReady = false;
-        this.allActions = null;
-        this.actionPromiseResolve = null;
+        // Action queue synchronization (Option B)
+        this.otherPlayerActionQueues = {};  // { player_id: [{action, frame_number}, ...] }
+        this.lastExecutedActions = {};      // { player_id: last_action } for fallback
+        // Note: No queue size limit - we never drop actions to maintain sync
 
-        // State verification
-        this.verificationFrequency = 30;
+        // Action population settings
+        this.actionPopulationMethod = config.action_population_method || 'previous_submitted_action';
+        this.defaultAction = config.default_action || 0;
+
+        // Policy mapping (needed to know which agents are human)
+        this.policyMapping = config.policy_mapping || {};
+
+        // State verification (hybrid fallback)
+        this.stateVerificationEnabled = config.state_verification_enabled !== false;  // Default true
+        this.verificationFrequency = config.verification_frequency || 300;  // Every 300 frames (~10s at 30fps)
         this.frameNumber = 0;
 
         // Data logging (only host logs)
@@ -86,32 +93,42 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         socket.on('pyodide_game_ready', (data) => {
             console.log(`[MultiplayerPyodide] Game ${data.game_id} ready with players:`, data.players);
             this.isPaused = false;
-        });
 
-        // Actions ready from server
-        socket.on('pyodide_actions_ready', (data) => {
-            this.allActions = data.actions;
-            this.allActionsReady = true;
-
-            // Verify we're on the expected frame (should match what we sent)
-            if (this.frameNumber !== data.frame_number) {
-                console.warn(
-                    `[MultiplayerPyodide] Frame mismatch: Client at ${this.frameNumber}, ` +
-                    `server broadcast for ${data.frame_number}. This may indicate timing issues.`
-                );
-            }
-
-            console.debug(`[MultiplayerPyodide] Frame ${data.frame_number}: Actions ready`, data.actions);
-
-            if (this.actionPromiseResolve) {
-                this.actionPromiseResolve(data.actions);
-                this.actionPromiseResolve = null;
+            // Initialize action queues for other players
+            for (const playerId of data.players) {
+                if (playerId != this.myPlayerId) {
+                    this.otherPlayerActionQueues[playerId] = [];
+                    console.log(`[MultiplayerPyodide] Initialized action queue for player ${playerId}`);
+                }
             }
         });
 
-        // State verification request
+        // Receive other player's action (Action Queue - Option B)
+        socket.on('pyodide_other_player_action', (data) => {
+            const { player_id, action, frame_number } = data;
+
+            // Initialize queue if needed
+            if (!this.otherPlayerActionQueues[player_id]) {
+                this.otherPlayerActionQueues[player_id] = [];
+            }
+
+            // Add to queue (FIFO) - never drop actions to maintain sync
+            const queue = this.otherPlayerActionQueues[player_id];
+            queue.push({ action, frame_number });
+
+            // Log warning if queue is getting large (client is behind)
+            if (queue.length > 30) {
+                console.warn(`[MultiplayerPyodide] Queue for player ${player_id} is large (${queue.length}), this client may be running slower`);
+            }
+
+            console.debug(`[MultiplayerPyodide] Queued action ${action} from player ${player_id} for frame ${frame_number} (queue size: ${queue.length})`);
+        });
+
+        // State verification request (hybrid fallback)
         socket.on('pyodide_verify_state', (data) => {
-            this.verifyState(data.frame_number);
+            if (this.stateVerificationEnabled) {
+                this.verifyState(data.frame_number);
+            }
         });
 
         // Pause for resync
@@ -132,10 +149,11 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
                 console.log(`[MultiplayerPyodide] Applying full state from host...`);
                 await this.applyFullState(data.state);
 
-                // Clear action buffers
-                this.allActionsReady = false;
-                this.allActions = null;
-                this.actionPromiseResolve = null;
+                // Clear action queues for fresh start
+                for (const playerId in this.otherPlayerActionQueues) {
+                    this.otherPlayerActionQueues[playerId] = [];
+                }
+                this.lastExecutedActions = {};
 
                 this.isPaused = false;
                 this.state = "ready";
@@ -156,10 +174,11 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
                 // Host can also resume after sending state
                 this.isPaused = false;
                 this.state = "ready";
-                // Clear action buffers for fresh start
-                this.allActionsReady = false;
-                this.allActions = null;
-                this.actionPromiseResolve = null;
+                // Clear action queues for fresh start
+                for (const playerId in this.otherPlayerActionQueues) {
+                    this.otherPlayerActionQueues[playerId] = [];
+                }
+                this.lastExecutedActions = {};
                 console.log(`[MultiplayerPyodide] Host resuming at frame ${this.frameNumber}`);
             }
         });
@@ -321,13 +340,13 @@ obs, infos, render_state
 
     async step(allActionsDict) {
         /**
-         * Step environment in multiplayer mode
+         * Step environment in multiplayer mode (Action Queue approach)
          *
          * Process:
-         * 1. Extract and send MY action to server
-         * 2. Wait for all player actions
-         * 3. Step environment with all actions
-         * 4. Verify state if needed
+         * 1. Build final action dict (my action + queue actions for others)
+         * 2. Send MY action to server (for other clients' queues)
+         * 3. Step environment immediately (no waiting!)
+         * 4. Optionally verify state (hybrid fallback)
          * 5. Log data if host
          */
 
@@ -347,15 +366,38 @@ obs, infos, render_state
             return null;
         }
 
-        // Extract only MY action from the dict (key should match myPlayerId)
-        let myAction = allActionsDict[this.myPlayerId];
+        // 1. Build final action dict with queue lookups for other players
+        const finalActions = {};
 
-        if (myAction === undefined) {
-            console.error(`[MultiplayerPyodide] No action found for player ${this.myPlayerId} in actions:`, allActionsDict);
-            myAction = 0;  // Default action
+        for (const [agentId, policy] of Object.entries(this.policyMapping)) {
+            const agentIdStr = String(agentId);
+            const myPlayerIdStr = String(this.myPlayerId);
+
+            if (agentIdStr === myPlayerIdStr) {
+                // My action - from input
+                finalActions[agentId] = allActionsDict[agentId];
+                if (finalActions[agentId] === undefined || finalActions[agentId] === null) {
+                    finalActions[agentId] = this.defaultAction;
+                }
+            } else if (policy === 'human') {
+                // Other human player - pop from queue
+                finalActions[agentId] = this.getOtherPlayerAction(agentId);
+            } else {
+                // Bot - from allActionsDict (already computed by phaser_gym_graphics)
+                finalActions[agentId] = allActionsDict[agentId];
+                if (finalActions[agentId] === undefined || finalActions[agentId] === null) {
+                    finalActions[agentId] = this.defaultAction;
+                }
+            }
         }
 
-        // 1. Send my action to server
+        // Track last executed actions for fallback
+        for (const [agentId, action] of Object.entries(finalActions)) {
+            this.lastExecutedActions[agentId] = action;
+        }
+
+        // 2. Send MY action to server (for other clients to queue)
+        const myAction = finalActions[this.myPlayerId];
         socket.emit('pyodide_player_action', {
             game_id: this.gameId,
             player_id: this.myPlayerId,
@@ -364,19 +406,10 @@ obs, infos, render_state
             timestamp: Date.now()
         });
 
-        console.debug(`[MultiplayerPyodide] Frame ${this.frameNumber}: Sent my action (player ${this.myPlayerId}): ${myAction}`);
+        console.debug(`[MultiplayerPyodide] Frame ${this.frameNumber}: Stepping with actions`, finalActions);
 
-        // 2. Wait for all player actions from server
-        const allActions = await this.waitForAllActions();
-
-        // Handle timeout
-        if (allActions === null) {
-            console.error('[MultiplayerPyodide] Failed to receive coordinated actions, skipping frame');
-            return null;
-        }
-
-        // 3. Step environment with all actions (deterministic)
-        const stepResult = await this.stepWithActions(allActions);
+        // 3. Step environment immediately with complete actions (no waiting!)
+        const stepResult = await this.stepWithActions(finalActions);
 
         if (!stepResult) {
             return null;
@@ -387,12 +420,17 @@ obs, infos, render_state
         // 4. Increment frame
         this.frameNumber++;
 
-        // 5. If host, log data
+        // 5. Optionally trigger state verification (hybrid fallback)
+        if (this.stateVerificationEnabled && this.frameNumber % this.verificationFrequency === 0) {
+            this.triggerStateVerification();
+        }
+
+        // 6. If host, log data
         if (this.shouldLogData) {
             this.logFrameData({
                 frame: this.frameNumber,
                 observations: obs,
-                actions: allActions,
+                actions: finalActions,
                 rewards: rewards,
                 terminateds: terminateds,
                 truncateds: truncateds,
@@ -400,7 +438,7 @@ obs, infos, render_state
             });
         }
 
-        // 6. Check if episode is complete
+        // 7. Check if episode is complete
         const all_terminated = Array.from(terminateds.values()).every(value => value === true);
         const all_truncated = Array.from(truncateds.values()).every(value => value === true);
 
@@ -412,6 +450,48 @@ obs, infos, render_state
         return [obs, rewards, terminateds, truncateds, infos, render_state];
     }
 
+    /**
+     * Get action for another player from their action queue.
+     * Falls back to action_population_method if queue is empty.
+     */
+    getOtherPlayerAction(playerId) {
+        const playerIdStr = String(playerId);
+        const queue = this.otherPlayerActionQueues[playerIdStr];
+
+        if (queue && queue.length > 0) {
+            // Pop oldest action from queue (FIFO)
+            const { action } = queue.shift();
+            console.debug(`[MultiplayerPyodide] Popped action ${action} from player ${playerId}'s queue (remaining: ${queue.length})`);
+            return action;
+        } else {
+            // Queue empty - use fallback based on action_population_method
+            console.debug(`[MultiplayerPyodide] Queue empty for player ${playerId}, using fallback (${this.actionPopulationMethod})`);
+
+            if (this.actionPopulationMethod === 'previous_submitted_action') {
+                const lastAction = this.lastExecutedActions[playerIdStr];
+                return lastAction !== undefined ? lastAction : this.defaultAction;
+            } else {
+                return this.defaultAction;
+            }
+        }
+    }
+
+    /**
+     * Trigger state verification for hybrid sync.
+     * Sends state hash to server for comparison with other clients.
+     */
+    async triggerStateVerification() {
+        console.log(`[MultiplayerPyodide] Triggering state verification at frame ${this.frameNumber}`);
+        const stateHash = await this.computeStateHash();
+        socket.emit('pyodide_state_hash', {
+            game_id: this.gameId,
+            player_id: this.myPlayerId,
+            hash: stateHash,
+            frame_number: this.frameNumber
+        });
+    }
+
+    // Keep waitForAllActions for backwards compatibility but it's no longer used
     waitForAllActions() {
         /**
          * Wait for server to broadcast all player actions

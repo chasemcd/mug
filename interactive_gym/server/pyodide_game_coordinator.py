@@ -202,16 +202,16 @@ class PyodideGameCoordinator:
         frame_number: int
     ):
         """
-        Collect action from a player.
+        Receive action from a player and broadcast to others immediately.
 
-        When all players have submitted actions for this frame,
-        broadcast to all players so they can step simultaneously.
+        Action Queue approach: No waiting for all players. Each action is
+        immediately relayed to other clients who queue it for their next step.
 
         Args:
             game_id: Game identifier
             player_id: Player who sent the action
             action: The action value (int, dict, etc.)
-            frame_number: Frame number (for sync verification)
+            frame_number: Frame number (for logging/debugging)
         """
         with self.lock:
             if game_id not in self.games:
@@ -224,41 +224,37 @@ class PyodideGameCoordinator:
                 logger.warning(f"Action received for inactive game {game_id}")
                 return
 
-            # Verify frame number matches (detect client ahead/behind)
-            frame_diff = abs(frame_number - game.frame_number)
-            if frame_diff > 2:  # Allow up to 2 frames of lag
-                logger.warning(
-                    f"Frame mismatch in game {game_id}: "
-                    f"player {player_id} sent frame {frame_number}, "
-                    f"expected {game.frame_number} (diff: {frame_diff})"
-                )
-                return
-            elif frame_diff > 0:
-                logger.debug(
-                    f"Minor frame lag in game {game_id}: "
-                    f"player {player_id} at frame {frame_number}, "
-                    f"server at {game.frame_number}"
-                )
-
-            # Store action
+            # Track last known action from this player (for debugging)
             game.pending_actions[player_id] = action
 
+            # Log frame info for debugging (no longer used for sync)
             logger.debug(
-                f"Game {game_id} frame {frame_number}: "
-                f"Received action from player {player_id} "
-                f"({len(game.pending_actions)}/{len(game.players)} ready)"
+                f"Game {game_id}: Received action {action} from player {player_id} "
+                f"at frame {frame_number}"
             )
 
-            # Check if all players submitted actions
-            if len(game.pending_actions) == len(game.players):
-                self._broadcast_actions(game_id)
+            # Broadcast to ALL OTHER players immediately (Action Queue approach)
+            for other_player_id, socket_id in game.players.items():
+                if other_player_id != player_id:
+                    self.sio.emit('pyodide_other_player_action', {
+                        'player_id': player_id,
+                        'action': action,
+                        'frame_number': frame_number,
+                        'timestamp': time.time()
+                    }, room=socket_id)
 
+            logger.debug(
+                f"Game {game_id}: Relayed action from player {player_id} "
+                f"to {len(game.players) - 1} other player(s)"
+            )
+
+    # Keep _broadcast_actions for backwards compatibility but it's no longer used
     def _broadcast_actions(self, game_id: str):
         """
-        Broadcast collected actions to all players.
+        [DEPRECATED] Broadcast collected actions to all players.
 
-        This is the critical synchronization point - all clients receive
-        the same action dict and step their environments identically.
+        This was used in the lock-step approach. Now using Action Queue approach
+        where actions are relayed immediately in receive_action().
         """
         game = self.games[game_id]
 

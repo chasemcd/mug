@@ -474,8 +474,11 @@ cramped_room_human_human = (
     .pyodide(
         run_through_pyodide=True,
         multiplayer=True,  # Enable multiplayer Pyodide coordination
-        environment_initialization_code_filepath="interactive_gym/examples/cogrid/environments/cramped_room_environment_initialization.py",
+        environment_initialization_code_filepath="interactive_gym/examples/cogrid/environments/cramped_room_environment_initialization_hh.py",
         packages_to_install=["numpy", "cogrid==0.0.15", "opencv-python"],
+        # Multiplayer sync settings (Action Queue with optional State Verification fallback)
+        state_verification_enabled=True,  # Enable periodic state hash verification
+        verification_frequency=300,  # Verify state every 300 frames (~10s at 30fps)
     )
 )
 
