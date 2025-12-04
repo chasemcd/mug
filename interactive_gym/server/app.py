@@ -954,46 +954,79 @@ def on_pyodide_save_episode_data(data):
 
 
 @socketio.on("disconnect")
-def on_pyodide_disconnect():
+def on_disconnect():
     """
-    Handle player disconnection from Pyodide multiplayer game.
+    Handle player disconnection.
 
-    If host disconnects, elect new host and trigger resync.
+    For Pyodide multiplayer games: If host disconnects, elect new host and trigger resync.
+    For regular games: Notify remaining players and clean up the game.
     If all players disconnect, remove game.
     """
     global PYODIDE_COORDINATOR
 
-    if PYODIDE_COORDINATOR is None:
-        return
-
     subject_id = get_subject_id_from_session_id(flask.request.sid)
+    logger.info(f"Disconnect event received for socket {flask.request.sid}, subject_id: {subject_id}")
 
     if subject_id is None:
+        logger.info("No subject_id found for disconnecting socket")
         return
 
     participant_stager = STAGERS.get(subject_id, None)
     if participant_stager is None:
+        logger.info(f"No stager found for subject {subject_id}")
         return
 
     current_scene = participant_stager.current_scene
+    logger.info(f"Subject {subject_id} disconnected, current scene: {current_scene.scene_id if current_scene else 'None'}")
 
-    # Check if this is a Pyodide multiplayer scene
-    # TODO(chase): Add proper detection for multiplayer Pyodide scenes
-    # For now, we'll attempt to remove the player from any active games
+    # Handle Pyodide multiplayer games
+    if PYODIDE_COORDINATOR is not None:
+        # Iterate through all games to find this player
+        for game_id, game_state in list(PYODIDE_COORDINATOR.games.items()):
+            for player_id, socket_id in game_state.players.items():
+                if socket_id == flask.request.sid:
+                    logger.info(
+                        f"Player {player_id} (subject {subject_id}) disconnected "
+                        f"from Pyodide game {game_id}"
+                    )
+                    PYODIDE_COORDINATOR.remove_player(
+                        game_id=game_id,
+                        player_id=player_id
+                    )
+                    # Pyodide coordinator handles notification and cleanup
+                    # Don't proceed to GameManager since game is already cleaned up
+                    return
 
-    # Iterate through all games to find this player
-    for game_id, game_state in list(PYODIDE_COORDINATOR.games.items()):
-        for player_id, socket_id in game_state.players.items():
-            if socket_id == flask.request.sid:
-                logger.info(
-                    f"Player {player_id} (subject {subject_id}) disconnected "
-                    f"from Pyodide game {game_id}"
-                )
-                PYODIDE_COORDINATOR.remove_player(
-                    game_id=game_id,
-                    player_id=player_id
-                )
-                return
+    # Handle regular (non-Pyodide) games via GameManager
+    # First try the current scene's game manager
+    game_manager = GAME_MANAGERS.get(current_scene.scene_id, None) if current_scene else None
+
+    # If not found or subject not in that game, search all game managers
+    if game_manager is None or not game_manager.subject_in_game(subject_id):
+        logger.info(f"Subject {subject_id} not found in current scene's game manager, searching all managers...")
+        for scene_id, gm in GAME_MANAGERS.items():
+            if gm.subject_in_game(subject_id):
+                game_manager = gm
+                logger.info(f"Found subject {subject_id} in game manager for scene {scene_id}")
+                break
+
+    if game_manager is None:
+        logger.info(
+            f"Subject {subject_id} disconnected but no game manager found"
+        )
+        return
+
+    # Check if the subject is in a game
+    if not game_manager.subject_in_game(subject_id):
+        logger.info(
+            f"Subject {subject_id} disconnected with no corresponding game."
+        )
+        return
+
+    logger.info(
+        f"Subject {subject_id} disconnected from game, triggering leave_game."
+    )
+    game_manager.leave_game(subject_id=subject_id)
 
 
 def run(config):

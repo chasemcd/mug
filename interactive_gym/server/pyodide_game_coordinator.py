@@ -480,16 +480,18 @@ class PyodideGameCoordinator:
             logger.debug(f"Accepted data from host {player_id} in game {game_id}")
             return data
 
-    def remove_player(self, game_id: str, player_id: str | int):
+    def remove_player(self, game_id: str, player_id: str | int, notify_others: bool = True):
         """
         Handle player disconnection.
 
         If host disconnects, elect new host and trigger resync.
         If all players disconnect, remove game.
+        Notifies remaining players that the game has ended.
 
         Args:
             game_id: Game identifier
             player_id: Player who disconnected
+            notify_others: Whether to notify remaining players (default True)
         """
         with self.lock:
             if game_id not in self.games:
@@ -501,6 +503,13 @@ class PyodideGameCoordinator:
                 return
 
             was_host = (player_id == game.host_player_id)
+
+            # Get remaining player sockets before removing the disconnected player
+            remaining_player_sockets = [
+                socket_id for pid, socket_id in game.players.items()
+                if pid != player_id
+            ]
+
             del game.players[player_id]
 
             logger.info(
@@ -508,14 +517,29 @@ class PyodideGameCoordinator:
                 f"({'host' if was_host else 'client'})"
             )
 
-            # If host disconnected, elect new host
-            if was_host and len(game.players) > 0:
-                self._elect_new_host(game_id)
+            # Notify remaining players that the game has ended due to disconnection
+            if notify_others and len(remaining_player_sockets) > 0:
+                logger.info(
+                    f"Notifying {len(remaining_player_sockets)} remaining players "
+                    f"about disconnection in game {game_id}"
+                )
+                for socket_id in remaining_player_sockets:
+                    self.sio.emit(
+                        'end_game',
+                        {
+                            'message': 'You were matched with a partner but your game ended because the other player disconnected.'
+                        },
+                        room=socket_id
+                    )
 
             # If no players left, remove game
             if len(game.players) == 0:
                 del self.games[game_id]
                 logger.info(f"Removed empty game {game_id}")
+            # If there are remaining players, also remove the game since we ended it
+            elif notify_others:
+                del self.games[game_id]
+                logger.info(f"Removed game {game_id} after player disconnection")
 
     def _elect_new_host(self, game_id: str):
         """

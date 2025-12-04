@@ -260,6 +260,20 @@ socket.on("single_player_waiting_room_failure", function(data) {
 })
 
 
+socket.on("waiting_room_player_left", function(data) {
+    // Clear the waitroom countdown interval
+    if (waitroomInterval) {
+        clearInterval(waitroomInterval);
+    }
+
+    var message = data.message || "Another player left the waiting room. You will be redirected shortly...";
+    $("#waitroomText").text(message);
+    console.log("Leaving game due to player leaving waiting room...")
+    socket.emit("leave_game", {session_id: window.sessionId})
+    socket.emit('end_game_request_redirect', {waitroom_timeout: true})
+})
+
+
 
 function updateWaitroomText(data, timer) {
     var minutes = parseInt(timer / 60, 10);
@@ -392,7 +406,7 @@ socket.on('end_game', function(data) {
 });
 
 
-socket.on('end_game_redirect', function(data) {
+socket.on('end_game_request_redirect', function(data) {
     console.log("received redirect")
     setTimeout(function() {
         // Redirect to the specified URL after the timeout

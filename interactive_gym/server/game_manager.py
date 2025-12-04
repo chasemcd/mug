@@ -223,7 +223,8 @@ class GameManager:
             if is_ready:
                 self.start_game(game)
             else:
-                self.send_participant_to_waiting_room(subject_id)
+                # Broadcast to all players in the room so everyone sees updated count
+                self.broadcast_waiting_room_status(game.game_id)
 
         return game
 
@@ -244,6 +245,32 @@ class GameManager:
                 "ms_remaining": remaining_wait_time,
             },
             room=subject_id,
+        )
+
+    def broadcast_waiting_room_status(self, game_id: GameID):
+        """Broadcast waiting room status to all players in the game room."""
+        game = self.games.get(game_id)
+        if game is None or game_id not in self.waiting_games:
+            return
+
+        remaining_wait_time = (
+            self.waitroom_timeouts[game_id] - time.time()
+        ) * 1000
+
+        logger.info(
+            f"Broadcasting waiting room status for game {game_id}: "
+            f"{game.cur_num_human_players()} players, "
+            f"{len(game.get_available_human_agent_ids())} needed"
+        )
+
+        self.sio.emit(
+            "waiting_room",
+            {
+                "cur_num_players": game.cur_num_human_players(),
+                "players_needed": len(game.get_available_human_agent_ids()),
+                "ms_remaining": remaining_wait_time,
+            },
+            room=game_id,
         )
 
     def get_subject_game(
@@ -302,15 +329,24 @@ class GameManager:
             elif not game_was_active:
                 exit_status = utils.GameExitStatus.InactiveWithOtherPlayers
                 logger.info(
-                    f"Subject {subject_id} left game {game.game_id} with exit status {exit_status}. Keeping remaining players in the waiting room."
+                    f"Subject {subject_id} left game {game.game_id} with exit status {exit_status}. "
+                    f"Notifying remaining players and ending lobby."
                 )
 
-                # If the game isn't already a waiting game, add it back (e.g., participant left in simulated waiting room.)
-                if game.game_id not in self.waiting_games:
-                    logger.info(
-                        f"Adding {game.game_id} back to WAITING GAMES since a subject left."
-                    )
-                    self.waiting_games.append(game.game_id)
+                # Notify remaining players that someone left and end the lobby
+                self.sio.emit(
+                    "waiting_room_player_left",
+                    {
+                        "message": "Another player left the waiting room. You will be redirected shortly..."
+                    },
+                    room=game.game_id,
+                )
+
+                # Give clients a moment to receive the message before cleanup
+                eventlet.sleep(0.1)
+
+                # Cleanup the game since we're ending the lobby
+                self.cleanup_game(game_id)
 
             elif game_was_active and not game_is_empty:
                 exit_status = utils.GameExitStatus.ActiveWithOtherPlayers
@@ -318,36 +354,30 @@ class GameManager:
                     f"Subject {subject_id} left game {game.game_id} with exit status {exit_status}. Cleaning up."
                 )
 
+                # Emit end_game to remaining players BEFORE cleanup
+                # so they receive the message before the room is closed
                 self.sio.emit(
                     "end_game",
-                    (
-                        {
-                            "message": "You were matched with a partner but your game ended because the other player disconnected."
-                        }
-                    ),
+                    {
+                        "message": "You were matched with a partner but your game ended because the other player disconnected."
+                    },
                     room=game.game_id,
                 )
+
+                # Give clients a moment to receive the message before cleanup
+                eventlet.sleep(0.1)
 
                 self.cleanup_game(game_id)
 
             else:
                 raise NotImplementedError("Something went wrong on exit!")
 
-            if exit_status in [
-                utils.GameExitStatus.ActiveNoPlayers,
-                utils.GameExitStatus.ActiveWithOtherPlayers,
-            ]:
+            # For ActiveNoPlayers, trigger callback (no players to notify)
+            if exit_status == utils.GameExitStatus.ActiveNoPlayers:
                 if self.scene.callback is not None:
                     self.scene.callback.on_game_end(game)
-
-                self.sio.emit(
-                    "end_game",
-                    {},
-                    room=game_id,
-                )
-
-            else:
-                self.sio.emit("end_lobby", room=game_id)
+            # Note: ActiveWithOtherPlayers already emits end_game with message above
+            # and calls cleanup_game, so no additional emit needed here
 
         return exit_status
 
