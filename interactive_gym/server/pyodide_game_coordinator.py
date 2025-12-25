@@ -31,6 +31,7 @@ class PyodideGameState:
     game_id: str
     host_player_id: str | int | None
     players: Dict[str | int, str]  # player_id -> socket_id
+    player_subjects: Dict[str | int, str]  # player_id -> subject_id (participant name)
     pending_actions: Dict[str | int, Any]
     frame_number: int
     action_ready_event: threading.Event
@@ -41,7 +42,6 @@ class PyodideGameState:
     num_expected_players: int
     action_timeout_seconds: float
     created_at: float
-    accumulated_frame_data: list = dataclasses.field(default_factory=list)  # Frame data from host
 
 
 class PyodideGameCoordinator:
@@ -99,6 +99,7 @@ class PyodideGameCoordinator:
                 game_id=game_id,
                 host_player_id=None,  # Will be set when first player joins
                 players={},
+                player_subjects={},  # player_id -> subject_id mapping
                 pending_actions={},
                 frame_number=0,
                 action_ready_event=threading.Event(),
@@ -121,7 +122,13 @@ class PyodideGameCoordinator:
 
             return game_state
 
-    def add_player(self, game_id: str, player_id: str | int, socket_id: str):
+    def add_player(
+        self,
+        game_id: str,
+        player_id: str | int,
+        socket_id: str,
+        subject_id: str | None = None
+    ):
         """
         Add a player to the game and elect host if needed.
 
@@ -133,6 +140,7 @@ class PyodideGameCoordinator:
             game_id: Game identifier
             player_id: Player identifier (0, 1, 2, ...)
             socket_id: Player's socket connection ID
+            subject_id: Subject/participant identifier (for data logging)
         """
         with self.lock:
             if game_id not in self.games:
@@ -141,6 +149,8 @@ class PyodideGameCoordinator:
 
             game = self.games[game_id]
             game.players[player_id] = socket_id
+            if subject_id is not None:
+                game.player_subjects[player_id] = subject_id
 
             # First player becomes host
             if game.host_player_id is None:
@@ -189,7 +199,11 @@ class PyodideGameCoordinator:
 
         logger.info(f"Emitting pyodide_game_ready to room {game_id} with players {list(game.players.keys())}")
         self.sio.emit('pyodide_game_ready',
-                     {'game_id': game_id, 'players': list(game.players.keys())},
+                     {
+                         'game_id': game_id,
+                         'players': list(game.players.keys()),
+                         'player_subjects': game.player_subjects,  # player_id -> subject_id mapping
+                     },
                      room=game_id)
 
         logger.info(f"Game {game_id} started with {len(game.players)} players")
@@ -372,12 +386,10 @@ class PyodideGameCoordinator:
         Handle desynchronization by requesting resync from host.
 
         Process:
-        1. Pause all clients
-        2. Request full state from host
-        3. Host sends serialized state
-        4. Broadcast state to non-host clients
-        5. Clients restore state
-        6. Resume game
+        1. Request full state from host
+        2. Host sends serialized state
+        3. Broadcast state to non-host clients
+        4. Clients apply state (snapping to correct state without pausing)
         """
         game = self.games[game_id]
 
@@ -386,11 +398,6 @@ class PyodideGameCoordinator:
         self.sio.emit('pyodide_request_full_state',
                      {'frame_number': frame_number},
                      room=host_socket)
-
-        # Notify all players to pause and wait for resync
-        self.sio.emit('pyodide_pause_for_resync',
-                     {'frame_number': frame_number},
-                     room=game_id)
 
         logger.info(f"Game {game_id}: Initiated resync from host {game.host_player_id}")
 
@@ -445,40 +452,6 @@ class PyodideGameCoordinator:
                              room=socket_id)
 
         logger.info(f"Game {game_id}: Resynced all clients from host")
-
-    def log_data(self, game_id: str, player_id: str | int, data: dict):
-        """
-        Route data logging - only accept data from host player.
-
-        This prevents duplicate data logging. Non-host players send data
-        but it's rejected by this function.
-
-        Args:
-            game_id: Game identifier
-            player_id: Player attempting to log data
-            data: Data to log
-
-        Returns:
-            The data if from host, None if from non-host (rejected)
-        """
-        with self.lock:
-            if game_id not in self.games:
-                logger.warning(f"Data log for non-existent game {game_id}")
-                return None
-
-            game = self.games[game_id]
-
-            # Only log data from host
-            if player_id != game.host_player_id:
-                logger.debug(
-                    f"Rejected data from non-host player {player_id} "
-                    f"in game {game_id}"
-                )
-                return None
-
-            # Host data - accept for logging
-            logger.debug(f"Accepted data from host {player_id} in game {game_id}")
-            return data
 
     def remove_player(self, game_id: str, player_id: str | int, notify_others: bool = True):
         """

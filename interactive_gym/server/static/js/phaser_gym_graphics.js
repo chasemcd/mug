@@ -61,7 +61,8 @@ class RemoteGameDataLogger {
             infos: {},
             episode_num: [],
             t: [],
-            timestamp: []
+            timestamp: [],
+            player_subjects: null  // Set once when available (player_id -> subject_id mapping)
         };
     }
 
@@ -102,12 +103,16 @@ class RemoteGameDataLogger {
 
         if (gameData.episode_num !== undefined) {
             this.data.episode_num.push(gameData.episode_num);
-        } 
+        }
         if (gameData.t !== undefined) {
             this.data.t.push(gameData.t);
         }
 
-        
+        // Store player_subjects mapping (only needs to be set once, not per-frame)
+        if (gameData.player_subjects !== undefined && this.data.player_subjects === null) {
+            this.data.player_subjects = gameData.player_subjects;
+        }
+
         // Always add the current timestamp
         this.data.timestamp.push(Date.now());
     }
@@ -126,7 +131,8 @@ class RemoteGameDataLogger {
             infos: {},
             episode_num: [],
             t: [],
-            timestamp: []
+            timestamp: [],
+            player_subjects: null
         };
     }
 }
@@ -308,7 +314,8 @@ class GymScene extends Phaser.Scene {
                         observations: currentObservations,
                         infos: infos,
                         episode_num: this.pyodide_remote_game.num_episodes,
-                        t: this.pyodide_remote_game.step_num
+                        t: this.pyodide_remote_game.step_num,
+                        player_subjects: this.pyodide_remote_game.playerSubjects
                     });
             } else {
                 const actions = await this.buildPyodideActionDict();
@@ -331,7 +338,8 @@ class GymScene extends Phaser.Scene {
                         truncateds: truncateds,
                         infos: infos,
                         episode_num: this.pyodide_remote_game.num_episodes,
-                        t: this.pyodide_remote_game.step_num
+                        t: this.pyodide_remote_game.step_num,
+                        player_subjects: this.pyodide_remote_game.playerSubjects
                     });
             }
             addStateToBuffer(render_state);

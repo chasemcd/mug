@@ -195,10 +195,11 @@ class GameManager:
                 self.pyodide_coordinator.add_player(
                     game_id=game.game_id,
                     player_id=player_id,
-                    socket_id=flask.request.sid
+                    socket_id=flask.request.sid,
+                    subject_id=subject_id  # Pass subject_id for data logging
                 )
                 logger.info(
-                    f"Added player {player_id} to Pyodide coordinator for game {game.game_id}"
+                    f"Added player {player_id} (subject: {subject_id}) to Pyodide coordinator for game {game.game_id}"
                 )
 
             if self.scene.game_page_html_fn is not None:

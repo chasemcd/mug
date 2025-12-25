@@ -48,8 +48,12 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         // Data logging (only host logs)
         this.shouldLogData = false;
 
-        // Game state tracking
-        this.isPaused = false;
+        // Player-to-subject mapping (player_id -> subject_id)
+        // Populated when game starts via pyodide_game_ready event
+        this.playerSubjects = {};
+
+        // Episode completion tracking
+        this.episodeComplete = false;
 
         this.setupMultiplayerHandlers();
     }
@@ -95,7 +99,10 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         // Game ready to start
         socket.on('pyodide_game_ready', (data) => {
             console.log(`[MultiplayerPyodide] Game ${data.game_id} ready with players:`, data.players);
-            this.isPaused = false;
+
+            // Store player-to-subject mapping for data logging
+            this.playerSubjects = data.player_subjects || {};
+            console.log(`[MultiplayerPyodide] Player-subject mapping:`, this.playerSubjects);
 
             // Initialize action queues for other players
             for (const playerId of data.players) {
@@ -138,18 +145,6 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
             }
         });
 
-        // Pause for resync
-        socket.on('pyodide_pause_for_resync', (data) => {
-            console.warn(`[MultiplayerPyodide] Desync detected at frame ${data.frame_number}, pausing for resync...`);
-            this.isPaused = true;
-            this.state = "paused";
-            // Clear any pending action promises to prevent deadlock
-            if (this.actionPromiseResolve) {
-                this.actionPromiseResolve(null);
-                this.actionPromiseResolve = null;
-            }
-        });
-
         // Apply full state (non-host only)
         socket.on('pyodide_apply_full_state', async (data) => {
             if (!this.isHost) {
@@ -161,9 +156,6 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
                     this.otherPlayerActionQueues[playerId] = [];
                 }
                 this.lastExecutedActions = {};
-
-                this.isPaused = false;
-                this.state = "ready";
                 this.resyncRequested = false;  // Allow future resyncs
                 console.log(`[MultiplayerPyodide] State resynced from host, now at frame ${this.frameNumber}`);
             }
@@ -179,16 +171,13 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
                     state: fullState
                 });
 
-                // Host can also resume after sending state
-                this.isPaused = false;
-                this.state = "ready";
                 this.resyncRequested = false;  // Allow future resyncs
                 // Clear action queues for fresh start
                 for (const playerId in this.otherPlayerActionQueues) {
                     this.otherPlayerActionQueues[playerId] = [];
                 }
                 this.lastExecutedActions = {};
-                console.log(`[MultiplayerPyodide] Host resuming at frame ${this.frameNumber}`);
+                console.log(`[MultiplayerPyodide] Host sent state at frame ${this.frameNumber}`);
             }
         });
     }
@@ -196,13 +185,10 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
     /**
      * Request a state resync from the host when queue grows too large.
      * This client is falling behind and needs to catch up via full state transfer.
+     * Client continues running and will snap to correct state when it arrives.
      */
     requestStateResync() {
         console.warn(`[MultiplayerPyodide] Requesting state resync - this client is behind`);
-
-        // Pause this client
-        this.isPaused = true;
-        this.state = "paused";
 
         // Request resync from server (which will ask host for state)
         socket.emit('pyodide_request_resync', {
@@ -358,6 +344,7 @@ obs, infos, render_state
         this.step_num = 0;
         this.frameNumber = 0;
         this.shouldReset = false;
+        this.episodeComplete = false;  // Reset episode completion flag
 
         // Initialize cumulative rewards
         for (let key of obs.keys()) {
@@ -378,11 +365,6 @@ obs, infos, render_state
          * 4. Optionally verify state (hybrid fallback)
          * 5. Log data if host
          */
-
-        if (this.isPaused) {
-            console.warn('[MultiplayerPyodide] Game paused, waiting for resync...');
-            return null;
-        }
 
         // Don't step until multiplayer setup is complete
         if (this.myPlayerId === null || this.myPlayerId === undefined) {
@@ -463,17 +445,22 @@ obs, infos, render_state
                 rewards: rewards,
                 terminateds: terminateds,
                 truncateds: truncateds,
-                infos: infos
+                infos: infos,
+                player_subjects: this.playerSubjects  // Include player->subject mapping in every frame
             });
         }
 
-        // 7. Check if episode is complete
+        // 7. Check if episode is complete (only trigger once)
         const all_terminated = Array.from(terminateds.values()).every(value => value === true);
         const all_truncated = Array.from(truncateds.values()).every(value => value === true);
 
-        if ((all_terminated || all_truncated) && this.shouldLogData) {
-            console.log('[MultiplayerPyodide] Episode complete, saving accumulated data');
-            this.saveEpisodeData();
+        if ((all_terminated || all_truncated) && !this.episodeComplete) {
+            this.episodeComplete = true;
+            console.log('[MultiplayerPyodide] Episode complete');
+
+            // Signal scene termination to server
+            // Data is saved via remoteGameLogger and sent at scene termination via emit_remote_game_data
+            this.signalEpisodeComplete();
         }
 
         return [obs, rewards, terminateds, truncateds, infos, render_state];
@@ -763,49 +750,33 @@ if 'numpy_rng_state' in state_obj:
         console.log('[MultiplayerPyodide] Applied full state from host');
     }
 
-    logFrameData(data) {
+    logFrameData(_data) {
         /**
-         * Send data to server for logging (host only)
+         * No-op: Data logging is handled by remoteGameLogger in processPyodideGame().
+         * Data is accumulated locally and sent to server at scene termination
+         * via emit_remote_game_data.
          */
-        if (!this.shouldLogData) {
-            return;
-        }
-
-        socket.emit('pyodide_log_data', {
-            game_id: this.gameId,
-            player_id: this.myPlayerId,
-            data: data,
-            frame_number: this.frameNumber
-        });
     }
 
-    saveEpisodeData() {
+    signalEpisodeComplete() {
         /**
-         * Trigger server to save accumulated episode data (host only)
+         * Mark the game as done when episode completes.
          *
-         * Called when episode completes to save all accumulated frame
-         * data to CSV file.
+         * This sets state to "done" which causes isDone() to return true.
+         * The existing checkPyodideDone interval in index.js will pick this up
+         * and trigger the advance_scene flow, which properly calls deactivate()
+         * on the scene and emits terminate_scene with full metadata.
+         * That in turn calls terminateGymScene() which saves data via emit_remote_game_data.
          */
-        if (!this.shouldLogData) {
-            return;
+        this.num_episodes += 1;
+
+        if (this.num_episodes >= this.max_episodes) {
+            this.state = "done";
+            console.log(`[MultiplayerPyodide] Game complete (${this.num_episodes}/${this.max_episodes} episodes)`);
+        } else {
+            this.shouldReset = true;
+            console.log(`[MultiplayerPyodide] Episode ${this.num_episodes}/${this.max_episodes} complete, will reset`);
         }
-
-        // Get scene_id and subject_id from config
-        const scene_id = this.config.scene_id || 'unknown_scene';
-        const subject_id = window.subjectId || 'unknown_subject';
-
-        socket.emit('pyodide_save_episode_data', {
-            game_id: this.gameId,
-            player_id: this.myPlayerId,
-            scene_id: scene_id,
-            subject_id: subject_id,
-            interactiveGymGlobals: this.interactive_gym_globals || {}
-        });
-
-        console.log(
-            `[MultiplayerPyodide] Requested save for episode in scene ${scene_id}, ` +
-            `subject ${subject_id}`
-        );
     }
 
     convertRGBArrayToImage(rgbArray) {

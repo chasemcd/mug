@@ -652,7 +652,7 @@ function terminateStaticScene(data) {
 function terminateGymScene(data) {
     ui_utils.disableKeyListener();
     graphics_end();
-
+    
     let remoteGameData = getRemoteGameData();
     const binaryData = msgpack.encode(remoteGameData);
     socket.emit("emit_remote_game_data", {data: binaryData, scene_id: data.scene_id, session_id: window.sessionId, interactiveGymGlobals: window.interactiveGymGlobals});
