@@ -104,9 +104,6 @@ slime_scene = (
     )
 )
 
-# slime_scene.action_mapping = ACTION_MAPPING
-
-
 stager = stager.Stager(
     scenes=[
         start_scene,
