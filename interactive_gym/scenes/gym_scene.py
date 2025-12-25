@@ -110,7 +110,7 @@ class GymScene(scene.Scene):
         self.scene_header: str = None
         self.scene_body: str = None
         self.waitroom_timeout_redirect_url: str = None
-        self.waitroom_timeout: int = 1000
+        self.waitroom_timeout: int = 120000
         self.game_page_html_fn: Callable = None
         self.reset_timeout: int = 3000
         self.reset_freeze_s: int = 0
