@@ -96,6 +96,7 @@ class GymScene(scene.Scene):
         self.env_to_state_fn: Callable | None = None
         self.preload_specs: list[dict[str, str | int | float]] | None = None
         self.hud_text_fn: Callable | None = None
+        self.hud_display_mode: str = "individual"  # "team" (sum all rewards) or "individual" (player's own reward)
         self.location_representation: str = "relative"  # "relative" or "pixels"
         self.game_width: int | None = 600
         self.game_height: int | None = 400
@@ -161,6 +162,7 @@ class GymScene(scene.Scene):
         env_to_state_fn: Callable = NotProvided,
         preload_specs: list[dict[str, str | float | int]] = NotProvided,
         hud_text_fn: Callable = NotProvided,
+        hud_display_mode: str = NotProvided,
         location_representation: str = NotProvided,
         game_width: int = NotProvided,
         game_height: int = NotProvided,
@@ -180,6 +182,8 @@ class GymScene(scene.Scene):
         :type preload_specs: list[dict[str, str  |  float  |  int]], optional
         :param hud_text_fn: Function to generate HUD text, defaults to NotProvided
         :type hud_text_fn: Callable, optional
+        :param hud_display_mode: How to display score in HUD - "team" (sum all rewards) or "individual" (player's own), defaults to NotProvided
+        :type hud_display_mode: str, optional
         :param location_representation: How locations are represented ('relative' or 'pixels'), defaults to NotProvided
         :type location_representation: str, optional
         :param game_width: Width of the game screen in pixels, defaults to NotProvided
@@ -204,6 +208,11 @@ class GymScene(scene.Scene):
 
         if hud_text_fn is not NotProvided:
             self.hud_text_fn = hud_text_fn
+
+        if hud_display_mode is not NotProvided:
+            assert hud_display_mode in ["team", "individual"], \
+                "hud_display_mode must be 'team' or 'individual'"
+            self.hud_display_mode = hud_display_mode
 
         if preload_specs is not NotProvided:
             self.preload_specs = preload_specs

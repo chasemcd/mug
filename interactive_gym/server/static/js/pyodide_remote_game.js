@@ -307,10 +307,23 @@ obs, rewards, terminateds, truncateds, infos, render_state
     };
 
     getHUDText() {
-        let score = Object.values(this.cumulative_rewards)[0];
+        // Calculate score based on hud_display_mode
+        // "team" (default): sum of all player rewards (cooperative games)
+        // "individual": player's own reward (multiplayer) or sum (single-player fallback)
+        const displayMode = this.config.hud_display_mode || "team";
+        let score;
+
+        if (displayMode === "individual" && this.myPlayerId !== undefined) {
+            // Multiplayer individual mode: show this player's reward
+            score = this.cumulative_rewards[this.myPlayerId] || 0;
+        } else {
+            // Team mode or single-player: sum all rewards
+            score = Object.values(this.cumulative_rewards).reduce((a, b) => a + b, 0);
+        }
+
         let time_left = (this.max_steps - this.step_num) / this.config.fps;
 
-        let formatted_score = score.toString().padStart(2, '0');
+        let formatted_score = Math.round(score).toString().padStart(2, '0');
         let formatted_time_left = time_left.toFixed(1).toString().padStart(5, '0');
 
         let hud_text = `Score: ${formatted_score} | Time left: ${formatted_time_left}s`;
