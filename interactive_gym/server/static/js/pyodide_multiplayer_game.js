@@ -372,9 +372,13 @@ obs, infos, render_state
         this.shouldReset = false;
         this.episodeComplete = false;  // Reset episode completion flag
 
-        // Initialize cumulative rewards
+        // Initialize or reset cumulative rewards based on hud_score_carry_over setting
+        // Convert keys to strings for consistent lookup (Python may send int or string keys)
+        const carryOver = this.config.hud_score_carry_over || false;
         for (let key of obs.keys()) {
-            this.cumulative_rewards[key] = 0;
+            if (!carryOver || this.cumulative_rewards[key] === undefined) {
+                this.cumulative_rewards[key] = 0;
+            }
         }
 
         // Show and update HUD locally (stays in sync when environments are in sync)
@@ -610,9 +614,9 @@ obs, rewards, terminateds, truncateds, infos, render_state
         let [obs, rewards, terminateds, truncateds, infos, render_state] =
             await this.pyodide.toPy(result).toJs();
 
-        // Update cumulative rewards
+        // Update cumulative rewards (convert keys to strings for consistency)
         for (let [key, value] of rewards.entries()) {
-            this.cumulative_rewards[key] = (this.cumulative_rewards[key] || 0) + value;
+            this.cumulative_rewards[key] += value;
         }
 
         this.step_num++;

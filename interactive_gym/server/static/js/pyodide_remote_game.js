@@ -182,9 +182,13 @@ obs, infos, render_state
         this.step_num = 0;
         this.shouldReset = false;
 
-        // Iterate over the keys of obs and set cumulative rewards to be 0 for each ID
+        // Initialize or reset cumulative rewards based on hud_score_carry_over setting
+        // Convert keys to strings for consistent lookup (Python may send int or string keys)
+        const carryOver = this.config.hud_score_carry_over || false;
         for (let key of obs.keys()) {
-            this.cumulative_rewards[key] = 0;
+            if (!carryOver || this.cumulative_rewards[key] === undefined) {
+                this.cumulative_rewards[key] = 0;
+            }
         }
 
         ui_utils.showHUD();
@@ -232,7 +236,7 @@ obs, rewards, terminateds, truncateds, infos, render_state
 
         // Convert everything from python objects to JS objects
         let [obs, rewards, terminateds, truncateds, infos, render_state] = await this.pyodide.toPy(result).toJs();
-        
+
         for (let [key, value] of rewards.entries()) {
             this.cumulative_rewards[key] += value;
         }
@@ -308,18 +312,9 @@ obs, rewards, terminateds, truncateds, infos, render_state
 
     getHUDText() {
         // Calculate score based on hud_display_mode
-        // "team" (default): sum of all player rewards (cooperative games)
-        // "individual": player's own reward (multiplayer) or sum (single-player fallback)
-        const displayMode = this.config.hud_display_mode || "team";
         let score;
 
-        if (displayMode === "individual" && this.myPlayerId !== undefined) {
-            // Multiplayer individual mode: show this player's reward
-            score = this.cumulative_rewards[this.myPlayerId] || 0;
-        } else {
-            // Team mode or single-player: sum all rewards
-            score = Object.values(this.cumulative_rewards).reduce((a, b) => a + b, 0);
-        }
+        score = this.cumulative_rewards[this.myPlayerId]
 
         let time_left = (this.max_steps - this.step_num) / this.config.fps;
 

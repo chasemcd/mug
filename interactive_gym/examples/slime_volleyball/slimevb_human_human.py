@@ -73,6 +73,7 @@ slime_scene = (
         fps=30,
         game_width=600,
         game_height=250,
+        hud_score_carry_over=True,
     )
     .gameplay(
         default_action=NOOP,
@@ -103,7 +104,7 @@ slime_scene = (
             "slimevb==0.0.4",
             "opencv-python",
         ],
-        state_sync_frequency_frames=6,
+        state_sync_frequency_frames=20,
         queue_resync_threshold=50,
     )
 )
