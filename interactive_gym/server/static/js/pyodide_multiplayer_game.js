@@ -320,13 +320,14 @@ print(f"[Python] Seeded RNG with {${seed}}")
          * Reset environment with re-seeding for episode consistency
          */
         this.shouldReset = false;
-        console.log("[MultiplayerPyodide] Resetting environment. Player:", this.myPlayerId, "Game:", this.gameId);
+        console.log("[MultiplayerPyodide] Resetting environment. Player:", this.myPlayerId, "Game:", this.gameId, "Seed:", this.gameSeed);
 
         // Re-seed for deterministic resets
         if (this.gameSeed !== null) {
             await this.seedPythonEnvironment(this.gameSeed);
             seeded_random.resetMultiplayerRNG();
         }
+
 
         const startTime = performance.now();
         const result = await this.pyodide.runPythonAsync(`
