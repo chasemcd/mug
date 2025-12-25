@@ -418,11 +418,6 @@ coordination_ring_options_scene_0 = copy.deepcopy(
     cramped_room_options_scene_0
 ).scene(scene_id="coordination_ring_options_scene_0", experiment_config={})
 
-
-# ============================================================================
-# MULTIPLAYER HUMAN-HUMAN SCENES (using new multiplayer Pyodide support)
-# ============================================================================
-
 HUMAN_HUMAN_POLICY_MAPPING = {
     0: configuration_constants.PolicyTypes.Human,
     1: configuration_constants.PolicyTypes.Human,
