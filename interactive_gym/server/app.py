@@ -11,6 +11,8 @@ import pandas as pd
 import os
 import flatten_dict
 import json
+import socket
+import urllib.request
 
 import flask
 import flask_socketio
@@ -909,6 +911,31 @@ def run(config):
     logger.info("Initialized Pyodide multiplayer coordinator")
 
     atexit.register(on_exit)
+
+
+
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        local_ip = s.getsockname()[0]
+        s.close()
+    except Exception:
+        local_ip = "unavailable"
+
+    try:
+        public_ip = urllib.request.urlopen("https://api.ipify.org", timeout=3).read().decode()
+    except Exception:
+        public_ip = "unavailable"
+
+    print("\n" + "="*70)
+    print(f"Experiment {config.experiment_id}")
+    print("="*70)
+    print(f"\nServer starting on:")
+    print(f"  Local:   http://localhost:{config.port}")
+    print(f"  Network: http://{local_ip}:{config.port}")
+    print(f"  Public (if accessible):  http://{public_ip}:{config.port}")
+    print("="*70 + "\n")
+
 
     socketio.run(
         app,
