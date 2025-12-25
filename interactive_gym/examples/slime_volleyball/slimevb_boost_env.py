@@ -199,5 +199,5 @@ class SlimeVBEnvIG(slimevolley_boost_env.SlimeVolleyBoostEnv):
 
 
 env = SlimeVBEnvIG(
-    config={"human_inputs": False}, render_mode="interactive-gym"
+    config={"human_inputs": False, "seed": 42}, render_mode="interactive-gym"
 )
