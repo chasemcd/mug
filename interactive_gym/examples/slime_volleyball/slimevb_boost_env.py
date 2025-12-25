@@ -3,11 +3,7 @@ from slime_volleyball.core import constants as slimevb_constants
 import math
 from interactive_gym.configurations.object_contexts import Line, Circle, Polygon
 
-import dataclasses
-
-
 Y_OFFSET = 0.018
-
 
 def to_x(x):
     return x / slimevb_constants.REF_W + 0.5
