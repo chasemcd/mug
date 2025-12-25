@@ -686,6 +686,31 @@ def on_pyodide_player_action(data):
     )
 
 
+@socketio.on("pyodide_hud_update")
+def on_pyodide_hud_update(data):
+    """
+    Receive HUD text from host and broadcast to all players in the game.
+
+    This ensures HUD stays synchronized across all clients, even after
+    state resyncs where local HUD computation might diverge.
+
+    Args:
+        data: {
+            'game_id': str,
+            'hud_text': str
+        }
+    """
+    game_id = data.get("game_id")
+    hud_text = data.get("hud_text")
+
+    # Broadcast to all players in the game room (including sender for consistency)
+    socketio.emit(
+        "pyodide_hud_sync",
+        {"hud_text": hud_text},
+        room=game_id
+    )
+
+
 @socketio.on("pyodide_state_hash")
 def on_pyodide_state_hash(data):
     """

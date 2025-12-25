@@ -12,6 +12,7 @@
 import * as pyodide_remote_game from './pyodide_remote_game.js';
 import { convertUndefinedToNull } from './pyodide_remote_game.js';
 import * as seeded_random from './seeded_random.js';
+import * as ui_utils from './ui_utils.js';
 
 export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
     constructor(config) {
@@ -171,6 +172,9 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
                     state: fullState
                 });
 
+                // Broadcast HUD to ensure it's synced after state resync
+                this.broadcastHUD();
+
                 this.resyncRequested = false;  // Allow future resyncs
                 // Clear action queues for fresh start
                 for (const playerId in this.otherPlayerActionQueues) {
@@ -179,6 +183,27 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
                 this.lastExecutedActions = {};
                 console.log(`[MultiplayerPyodide] Host sent state at frame ${this.frameNumber}`);
             }
+        });
+
+        // Receive synchronized HUD text from host (via server broadcast)
+        socket.on('pyodide_hud_sync', (data) => {
+            ui_utils.updateHUDText(data.hud_text);
+        });
+    }
+
+    /**
+     * Broadcast HUD text to all players (host only).
+     * Called after reset and each step to keep HUD synchronized.
+     */
+    broadcastHUD() {
+        if (!this.isHost) {
+            return;
+        }
+
+        const hudText = this.getHUDText();
+        socket.emit('pyodide_hud_update', {
+            game_id: this.gameId,
+            hud_text: hudText
         });
     }
 
@@ -350,6 +375,10 @@ obs, infos, render_state
         for (let key of obs.keys()) {
             this.cumulative_rewards[key] = 0;
         }
+
+        // Show and update HUD locally (stays in sync when environments are in sync)
+        ui_utils.showHUD();
+        ui_utils.updateHUDText(this.getHUDText());
 
         return [obs, infos, render_state];
     }
@@ -586,6 +615,9 @@ obs, rewards, terminateds, truncateds, infos, render_state
         }
 
         this.step_num++;
+
+        // Update HUD
+        ui_utils.updateHUDText(this.getHUDText());
 
         // Handle RGB array rendering if needed
         let game_image_base64 = null;
