@@ -89,7 +89,7 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
             if (this.myPlayerId === data.new_host_id) {
                 this.isHost = true;
                 this.shouldLogData = true;
-                console.log(`[MultiplayerPyodide] Promoted to host!`);
+                console.debug(`[MultiplayerPyodide] Promoted to host!`);
             }
 
             if (!wasHost && this.isHost) {
@@ -657,28 +657,36 @@ obs, rewards, terminateds, truncateds, infos, render_state
 
     async computeStateHash() {
         /**
-         * Compute SHA256 hash of current game state
+         * Compute SHA256 hash of current game state using JavaScript crypto.
+         * Uses env.get_state() for the environment state (same data used for full sync).
          */
-        const hashData = await this.pyodide.runPythonAsync(`
-import hashlib
+        // Get env state from Python (reuses the get_state() method)
+        const envState = await this.pyodide.runPythonAsync(`
 import json
-import numpy as np
-
-# Get current state information
-state_dict = {
-    'step': env.t if hasattr(env, 't') else ${this.step_num},
-    'frame': ${this.frameNumber},
-    'cumulative_rewards': {k: float(v) for k, v in ${this.pyodide.toPy(this.cumulative_rewards)}.items()},
-    'rng_state': str(np.random.get_state()[1][:5].tolist()),  # Include RNG state
-}
-
-# Create deterministic string
-state_str = json.dumps(state_dict, sort_keys=True)
-hash_val = hashlib.sha256(state_str.encode()).hexdigest()
-hash_val
+env.get_state()
         `);
 
-        return hashData;
+        // Build state dict in JavaScript
+        const stateDict = {
+            env_state: envState.toJs({ dict_converter: Object.fromEntries }),
+            frame: this.frameNumber,
+            step: this.step_num,
+            cumulative_rewards: this.cumulative_rewards,
+        };
+
+        // Create deterministic JSON string (sort keys for consistency)
+        const stateStr = JSON.stringify(stateDict, Object.keys(stateDict).sort());
+
+        // Hash in JavaScript using SubtleCrypto (hardware-accelerated)
+        const hashBuffer = await crypto.subtle.digest(
+            'SHA-256',
+            new TextEncoder().encode(stateStr)
+        );
+
+        // Convert to hex string
+        return Array.from(new Uint8Array(hashBuffer))
+            .map(b => b.toString(16).padStart(2, '0'))
+            .join('');
     }
 
     async getFullState() {

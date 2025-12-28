@@ -268,9 +268,7 @@ class GymScene extends Phaser.Scene {
 
         // Draw the initial state, if anything
         if (stateBuffer.length > 0) {
-            console.log("Drawing initial state!")
             this.state = stateBuffer.shift(); // get the oldest state from the buffer
-            console.log("State:", this.state)
             this.drawState()
         }
     };
@@ -308,7 +306,7 @@ class GymScene extends Phaser.Scene {
                 }
 
                 [currentObservations, infos, render_state] = resetResult;
-                console.log("[MultiplayerPyodide] Reset result:", resetResult);
+                console.debug("[MultiplayerPyodide] Reset result:", resetResult);
                 remoteGameLogger.logData(
                     {
                         observations: currentObservations,
@@ -520,7 +518,7 @@ class GymScene extends Phaser.Scene {
 
         // Retrieve the list of object contexts
         if (this.state == null || this.state == undefined) {
-            console.log("No state to render.");
+            console.debug("No state to render.");
             return;
         }
 
@@ -557,7 +555,7 @@ class GymScene extends Phaser.Scene {
             img.src = url;
 
             img.onload = () => {
-                console.log("Image loaded successfully:", img.width, img.height);
+                console.debug("Image loaded successfully:", img.width, img.height);
 
                 // Create a temporary canvas to ensure it's WebGL-compatible
                 const canvas = document.createElement("canvas");

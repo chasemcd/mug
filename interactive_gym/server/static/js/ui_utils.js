@@ -1,6 +1,9 @@
 import * as pgg  from './phaser_gym_graphics.js';
 
-var socket = io();
+var socket = io({
+    transports: ['websocket'],
+    upgrade: false
+});
 
 
 // HUD

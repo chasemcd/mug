@@ -4,7 +4,10 @@ import {graphics_start, graphics_end, addStateToBuffer, getRemoteGameData, press
 import {RemoteGame} from './pyodide_remote_game.js';
 import {MultiplayerPyodideGame} from './pyodide_multiplayer_game.js';
 
-window.socket = io();
+window.socket = io({
+    transports: ['websocket'],
+    upgrade: false
+});
 var socket = window.socket;
 
 var latencyMeasurements = [];
@@ -80,11 +83,11 @@ setInterval(sendPing, 1000);
 
 function pyodideReadyIfUsing() {
     if (pyodideRemoteGame == null) {
-        console.log("pyodideRemoteGame is null")
+        console.debug("pyodideRemoteGame is null")
         return true;
     }
 
-    console.log("Pyodide Ready:",pyodideRemoteGame.pyodideReady)
+    console.debug("Pyodide Ready:",pyodideRemoteGame.pyodideReady)
     return pyodideRemoteGame.pyodideReady;
 }
 
@@ -93,7 +96,7 @@ $(function() {
     $('#startButton').click( () => {
         $("#startButton").hide();
         $("#startButton").attr("disabled", true);
-        console.log("joining game in session", window.sessionId)
+        console.debug("Joining game in session", window.sessionId)
         socket.emit("join_game", {session_id: window.sessionId});
 
     })
@@ -104,7 +107,7 @@ socket.on('server_session_id', function(data) {
 });
 
 socket.on('connect', function() {
-    console.log("connecting")
+    console.debug("connecting")
     // Emit an event to the server with the subject_id
     socket.emit('register_subject', { subject_id: subjectName });
     $("#invalidSession").hide();
@@ -136,7 +139,7 @@ socket.on('start_game', function(data) {
     // Set game_id on multiplayer game instance if present
     if (data.game_id && pyodideRemoteGame) {
         pyodideRemoteGame.gameId = data.game_id;
-        console.log(`[MultiplayerPyodide] Set game_id: ${data.game_id}`);
+        console.debug(`[MultiplayerPyodide] Set game_id: ${data.game_id}`);
     }
 
     // Hide the sceneBody and any waiting room messages or errors
