@@ -128,11 +128,11 @@ class GymScene(scene.Scene):
         self.state_sync_frequency_frames: int | None = 300  # Frames between periodic state syncs (~10s at 30fps), None to disable
         self.queue_resync_threshold: int = 50  # Trigger resync if action queue exceeds this size
 
-        # Player pairing settings (for multiplayer games)
-        # Pairings are always tracked automatically after each game.
-        # wait_for_known_partner controls whether to require the same partner in this scene.
-        self.wait_for_known_partner: bool = False  # If True, wait for existing partner; if False, use FIFO matching
-        self.partner_wait_timeout: int = 60000  # ms to wait for known partner before timeout
+        # Player group settings (for multiplayer games)
+        # Groups are always tracked automatically after each game completes.
+        # wait_for_known_group controls whether to require the same group members in this scene.
+        self.wait_for_known_group: bool = False  # If True, wait for existing group; if False, use FIFO matching
+        self.group_wait_timeout: int = 60000  # ms to wait for known group members before timeout
 
     def environment(
         self,
@@ -518,38 +518,53 @@ class GymScene(scene.Scene):
 
         return self
 
+    def player_grouping(
+        self,
+        wait_for_known_group: bool = NotProvided,
+        group_wait_timeout: int = NotProvided,
+    ):
+        """Configure player grouping behavior for multiplayer games.
+
+        Player groups are always tracked automatically after each game completes.
+        This method controls whether this scene requires the same group members or
+        allows new matches. Supports groups of any size (2 or more players).
+
+        :param wait_for_known_group: If True, players with existing groups will wait
+            for all their known group members. If False, players enter the FIFO queue
+            and may be matched with new players (which updates their stored group).
+            Defaults to NotProvided
+        :type wait_for_known_group: bool, optional
+        :param group_wait_timeout: Maximum time (ms) to wait for known group members.
+            After timeout, player is redirected to waitroom_timeout_redirect_url.
+            Defaults to NotProvided
+        :type group_wait_timeout: int, optional
+        :return: The GymScene instance (self)
+        :rtype: GymScene
+        """
+        if wait_for_known_group is not NotProvided:
+            assert isinstance(wait_for_known_group, bool)
+            self.wait_for_known_group = wait_for_known_group
+
+        if group_wait_timeout is not NotProvided:
+            assert isinstance(group_wait_timeout, int) and group_wait_timeout > 0
+            self.group_wait_timeout = group_wait_timeout
+
+        return self
+
+    # Backwards compatibility alias
     def player_pairing(
         self,
         wait_for_known_partner: bool = NotProvided,
         partner_wait_timeout: int = NotProvided,
     ):
-        """Configure player pairing behavior for multiplayer games.
+        """Deprecated: Use player_grouping() instead.
 
-        Player pairings are always tracked automatically after each game completes.
-        This method controls whether this scene requires the same partner or allows
-        new matches.
-
-        :param wait_for_known_partner: If True, players with existing pairings will wait
-            for their known partner. If False, players enter the FIFO queue and may be
-            matched with a new partner (which updates their stored pairing).
-            Defaults to NotProvided
-        :type wait_for_known_partner: bool, optional
-        :param partner_wait_timeout: Maximum time (ms) to wait for a known partner.
-            After timeout, player is redirected to waitroom_timeout_redirect_url.
-            Defaults to NotProvided
-        :type partner_wait_timeout: int, optional
-        :return: The GymScene instance (self)
-        :rtype: GymScene
+        This method is kept for backwards compatibility.
         """
-        if wait_for_known_partner is not NotProvided:
-            assert isinstance(wait_for_known_partner, bool)
-            self.wait_for_known_partner = wait_for_known_partner
-
-        if partner_wait_timeout is not NotProvided:
-            assert isinstance(partner_wait_timeout, int) and partner_wait_timeout > 0
-            self.partner_wait_timeout = partner_wait_timeout
-
-        return self
+        return self.player_grouping(
+            wait_for_known_group=wait_for_known_partner,
+            group_wait_timeout=partner_wait_timeout,
+        )
 
     @property
     def simulate_waiting_room(self) -> bool:
