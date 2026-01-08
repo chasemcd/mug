@@ -150,9 +150,7 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         socket.on('pyodide_apply_full_state', async (data) => {
             if (!this.isHost) {
                 console.log(`[MultiplayerPyodide] Applying full state from host...`);
-                // Decode MessagePack if compressed, otherwise use raw state
-                const state = data.compressed ? msgpack.decode(new Uint8Array(data.state)) : data.state;
-                await this.applyFullState(state);
+                await this.applyFullState(data.state);
 
                 // Clear action queues for fresh start
                 for (const playerId in this.otherPlayerActionQueues) {
@@ -169,12 +167,9 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
             if (this.isHost) {
                 console.log(`[MultiplayerPyodide] Providing full state for resync at frame ${data.frame_number}`);
                 const fullState = await this.getFullState();
-                // Use MessagePack for compact binary encoding
-                const encodedState = msgpack.encode(fullState);
                 socket.emit('pyodide_send_full_state', {
                     game_id: this.gameId,
-                    state: encodedState,
-                    compressed: true
+                    state: fullState
                 });
 
                 // Broadcast HUD to ensure it's synced after state resync
@@ -502,7 +497,8 @@ obs, infos, render_state
             this.signalEpisodeComplete();
         }
 
-        return [obs, rewards, terminateds, truncateds, infos, render_state];
+        // Return finalActions alongside step results so caller can log synchronized actions
+        return [obs, rewards, terminateds, truncateds, infos, render_state, finalActions];
     }
 
     /**

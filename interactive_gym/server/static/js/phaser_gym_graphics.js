@@ -326,11 +326,19 @@ class GymScene extends Phaser.Scene {
                     return;
                 }
 
-                [currentObservations, rewards, terminateds, truncateds, infos, render_state] = stepResult;
+                // stepResult may include synchronized actions (7th element) from multiplayer games
+                let syncedActions;
+                if (stepResult.length >= 7) {
+                    [currentObservations, rewards, terminateds, truncateds, infos, render_state, syncedActions] = stepResult;
+                } else {
+                    [currentObservations, rewards, terminateds, truncateds, infos, render_state] = stepResult;
+                    syncedActions = actions;  // Fallback to local actions for single-player
+                }
+
                 remoteGameLogger.logData(
                     {
                         observations: currentObservations,
-                        actions: actions,
+                        actions: syncedActions,  // Use synchronized actions for accurate logging
                         rewards: rewards,
                         terminateds: terminateds,
                         truncateds: truncateds,
