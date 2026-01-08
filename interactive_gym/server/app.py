@@ -27,6 +27,7 @@ from interactive_gym.scenes import stager
 from interactive_gym.server import game_manager as gm
 from interactive_gym.scenes import unity_scene
 from interactive_gym.server import pyodide_game_coordinator
+from interactive_gym.server import player_pairing_manager
 
 
 def setup_logger(name, log_file, level=logging.INFO):
@@ -73,6 +74,9 @@ GAME_MANAGERS: dict[SceneID, gm.GameManager] = utils.ThreadSafeDict()
 
 # Pyodide multiplayer game coordinator
 PYODIDE_COORDINATOR: pyodide_game_coordinator.PyodideGameCoordinator | None = None
+
+# Player pairing manager for tracking player relationships across scenes
+PAIRING_MANAGER: player_pairing_manager.PlayerPairingManager | None = None
 
 # Mapping of users to locks associated with the ID. Enforces user-level serialization
 USER_LOCKS = utils.ThreadSafeDict()
@@ -208,6 +212,10 @@ def advance_scene(data):
     logger.info(
         f"Advanced to scene: {current_scene.scene_id}. Metadata export: {current_scene.should_export_metadata}"
     )
+
+    # Update the subject's current scene in the pairing manager
+    if PAIRING_MANAGER:
+        PAIRING_MANAGER.update_subject_scene(subject_id, current_scene.scene_id)
     if isinstance(current_scene, gym_scene.GymScene):
         # Only create a GameManager if one doesn't already exist for this scene
         if current_scene.scene_id not in GAME_MANAGERS:
@@ -218,7 +226,8 @@ def advance_scene(data):
                 scene=current_scene,
                 experiment_config=CONFIG,
                 sio=socketio,
-                pyodide_coordinator=PYODIDE_COORDINATOR
+                pyodide_coordinator=PYODIDE_COORDINATOR,
+                pairing_manager=PAIRING_MANAGER,
             )
             GAME_MANAGERS[current_scene.scene_id] = game_manager
         else:
@@ -833,8 +842,12 @@ def on_disconnect():
     For Pyodide multiplayer games: If host disconnects, elect new host and trigger resync.
     For regular games: Notify remaining players and clean up the game.
     If all players disconnect, remove game.
+
+    Scene-aware disconnect handling:
+    - Only notify partners if they're in the same active game
+    - If player is in a different scene (e.g., survey), remove quietly without notification
     """
-    global PYODIDE_COORDINATOR
+    global PYODIDE_COORDINATOR, PAIRING_MANAGER
 
     subject_id = get_subject_id_from_session_id(flask.request.sid)
     logger.info(f"Disconnect event received for socket {flask.request.sid}, subject_id: {subject_id}")
@@ -846,10 +859,23 @@ def on_disconnect():
     participant_stager = STAGERS.get(subject_id, None)
     if participant_stager is None:
         logger.info(f"No stager found for subject {subject_id}")
+        # Still clean up pairing manager
+        if PAIRING_MANAGER:
+            PAIRING_MANAGER.cleanup_subject(subject_id)
         return
 
     current_scene = participant_stager.current_scene
     logger.info(f"Subject {subject_id} disconnected, current scene: {current_scene.scene_id if current_scene else 'None'}")
+
+    # Check if this is a GymScene and if player is in an active game
+    is_in_active_gym_scene = False
+    if isinstance(current_scene, gym_scene.GymScene):
+        game_manager = GAME_MANAGERS.get(current_scene.scene_id, None)
+        if game_manager and game_manager.is_subject_in_active_game(subject_id):
+            is_in_active_gym_scene = True
+        # Also check if player is in a partner waitroom
+        if game_manager:
+            game_manager.remove_from_partner_waitroom(subject_id)
 
     # Handle Pyodide multiplayer games
     if PYODIDE_COORDINATOR is not None:
@@ -861,12 +887,15 @@ def on_disconnect():
                         f"Player {player_id} (subject {subject_id}) disconnected "
                         f"from Pyodide game {game_id}"
                     )
+                    # Only notify others if player was in an active game scene
                     PYODIDE_COORDINATOR.remove_player(
                         game_id=game_id,
-                        player_id=player_id
+                        player_id=player_id,
+                        notify_others=is_in_active_gym_scene
                     )
-                    # Pyodide coordinator handles notification and cleanup
-                    # Don't proceed to GameManager since game is already cleaned up
+                    # Clean up pairing manager
+                    if PAIRING_MANAGER:
+                        PAIRING_MANAGER.cleanup_subject(subject_id)
                     return
 
     # Handle regular (non-Pyodide) games via GameManager
@@ -876,9 +905,9 @@ def on_disconnect():
     # If not found or subject not in that game, search all game managers
     if game_manager is None or not game_manager.subject_in_game(subject_id):
         logger.info(f"Subject {subject_id} not found in current scene's game manager, searching all managers...")
-        for scene_id, gm in GAME_MANAGERS.items():
-            if gm.subject_in_game(subject_id):
-                game_manager = gm
+        for scene_id, gm_instance in GAME_MANAGERS.items():
+            if gm_instance.subject_in_game(subject_id):
+                game_manager = gm_instance
                 logger.info(f"Found subject {subject_id} in game manager for scene {scene_id}")
                 break
 
@@ -886,6 +915,9 @@ def on_disconnect():
         logger.info(
             f"Subject {subject_id} disconnected but no game manager found"
         )
+        # Clean up pairing manager
+        if PAIRING_MANAGER:
+            PAIRING_MANAGER.cleanup_subject(subject_id)
         return
 
     # Check if the subject is in a game
@@ -893,22 +925,42 @@ def on_disconnect():
         logger.info(
             f"Subject {subject_id} disconnected with no corresponding game."
         )
+        # Clean up pairing manager
+        if PAIRING_MANAGER:
+            PAIRING_MANAGER.cleanup_subject(subject_id)
         return
 
-    logger.info(
-        f"Subject {subject_id} disconnected from game, triggering leave_game."
-    )
-    game_manager.leave_game(subject_id=subject_id)
+    # Determine whether to notify partners or remove quietly
+    if is_in_active_gym_scene:
+        logger.info(
+            f"Subject {subject_id} disconnected from active game, triggering leave_game."
+        )
+        game_manager.leave_game(subject_id=subject_id)
+    else:
+        # Subject is not in an active game scene (e.g., in a survey)
+        # Remove quietly without notifying partners
+        logger.info(
+            f"Subject {subject_id} disconnected from non-active scene, removing quietly."
+        )
+        game_manager.remove_subject_quietly(subject_id)
+
+    # Clean up pairing manager
+    if PAIRING_MANAGER:
+        PAIRING_MANAGER.cleanup_subject(subject_id)
 
 
 def run(config):
-    global app, CONFIG, logger, GENERIC_STAGER, PYODIDE_COORDINATOR
+    global app, CONFIG, logger, GENERIC_STAGER, PYODIDE_COORDINATOR, PAIRING_MANAGER
     CONFIG = config
     GENERIC_STAGER = config.stager
 
     # Initialize Pyodide coordinator
     PYODIDE_COORDINATOR = pyodide_game_coordinator.PyodideGameCoordinator(socketio)
     logger.info("Initialized Pyodide multiplayer coordinator")
+
+    # Initialize player pairing manager
+    PAIRING_MANAGER = player_pairing_manager.PlayerPairingManager()
+    logger.info("Initialized player pairing manager")
 
     atexit.register(on_exit)
 

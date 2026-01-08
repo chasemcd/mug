@@ -128,6 +128,12 @@ class GymScene(scene.Scene):
         self.state_sync_frequency_frames: int | None = 300  # Frames between periodic state syncs (~10s at 30fps), None to disable
         self.queue_resync_threshold: int = 50  # Trigger resync if action queue exceeds this size
 
+        # Player pairing settings (for multiplayer games)
+        # Pairings are always tracked automatically after each game.
+        # wait_for_known_partner controls whether to require the same partner in this scene.
+        self.wait_for_known_partner: bool = False  # If True, wait for existing partner; if False, use FIFO matching
+        self.partner_wait_timeout: int = 60000  # ms to wait for known partner before timeout
+
     def environment(
         self,
         env_creator: Callable = NotProvided,
@@ -509,6 +515,39 @@ class GymScene(scene.Scene):
         if queue_resync_threshold is not NotProvided:
             assert isinstance(queue_resync_threshold, int) and queue_resync_threshold > 0
             self.queue_resync_threshold = queue_resync_threshold
+
+        return self
+
+    def player_pairing(
+        self,
+        wait_for_known_partner: bool = NotProvided,
+        partner_wait_timeout: int = NotProvided,
+    ):
+        """Configure player pairing behavior for multiplayer games.
+
+        Player pairings are always tracked automatically after each game completes.
+        This method controls whether this scene requires the same partner or allows
+        new matches.
+
+        :param wait_for_known_partner: If True, players with existing pairings will wait
+            for their known partner. If False, players enter the FIFO queue and may be
+            matched with a new partner (which updates their stored pairing).
+            Defaults to NotProvided
+        :type wait_for_known_partner: bool, optional
+        :param partner_wait_timeout: Maximum time (ms) to wait for a known partner.
+            After timeout, player is redirected to waitroom_timeout_redirect_url.
+            Defaults to NotProvided
+        :type partner_wait_timeout: int, optional
+        :return: The GymScene instance (self)
+        :rtype: GymScene
+        """
+        if wait_for_known_partner is not NotProvided:
+            assert isinstance(wait_for_known_partner, bool)
+            self.wait_for_known_partner = wait_for_known_partner
+
+        if partner_wait_timeout is not NotProvided:
+            assert isinstance(partner_wait_timeout, int) and partner_wait_timeout > 0
+            self.partner_wait_timeout = partner_wait_timeout
 
         return self
 

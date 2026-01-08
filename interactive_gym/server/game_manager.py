@@ -31,7 +31,7 @@ from interactive_gym.configurations import (
     configuration_constants,
     remote_config,
 )
-from interactive_gym.server import remote_game, utils, pyodide_game_coordinator
+from interactive_gym.server import remote_game, utils, pyodide_game_coordinator, player_pairing_manager
 from interactive_gym.scenes import stager, gym_scene, scene
 import flask_socketio
 
@@ -48,12 +48,14 @@ class GameManager:
         experiment_config: remote_config.RemoteConfig,
         sio: flask_socketio.SocketIO,
         pyodide_coordinator: pyodide_game_coordinator.PyodideGameCoordinator | None = None,
+        pairing_manager: player_pairing_manager.PlayerPairingManager | None = None,
     ):
         assert isinstance(scene, gym_scene.GymScene)
         self.scene = scene
         self.experiment_config = experiment_config
         self.sio = sio
         self.pyodide_coordinator = pyodide_coordinator
+        self.pairing_manager = pairing_manager
 
         # Data structure to save subjects by their socket id
         self.subject = utils.ThreadSafeDict()
@@ -79,6 +81,11 @@ class GameManager:
         # holds reset events so we only continue in game loop when triggered
         # this is not used when running with Pyodide
         self.reset_events = utils.ThreadSafeDict()
+
+        # Partner waitrooms: pairing_id -> list of subject_ids waiting together
+        self.partner_waitrooms: dict[str, list[SubjectID]] = utils.ThreadSafeDict()
+        # Track when each subject started waiting for their partner
+        self.partner_wait_start_times: dict[SubjectID, float] = utils.ThreadSafeDict()
 
     def subject_in_game(self, subject_id: SubjectID) -> bool:
         return subject_id in self.subject_games
@@ -164,9 +171,170 @@ class GameManager:
 
     def add_subject_to_game(
         self, subject_id: SubjectID
-    ) -> remote_game.RemoteGameV2:
-        """Add a subject to a game and return it."""
+    ) -> remote_game.RemoteGameV2 | None:
+        """Add a subject to a game and return it.
+
+        If wait_for_known_partner is enabled and the subject has a known partner,
+        they will be added to a partner-specific waitroom. Returns None if waiting
+        for partner.
+        """
         logger.info(f"add_subject_to_game called for {subject_id}. Current waiting_games: {self.waiting_games}")
+
+        # Check if we should wait for a known partner
+        if self.scene.wait_for_known_partner and self.pairing_manager:
+            partners = self.pairing_manager.get_partners(subject_id)
+            if partners:
+                logger.info(f"Subject {subject_id} has known partners: {partners}. Using partner waitroom.")
+                return self._join_or_wait_for_partner(subject_id, partners)
+
+        # Standard FIFO matching
+        return self._add_to_fifo_queue(subject_id)
+
+    def _join_or_wait_for_partner(
+        self,
+        subject_id: SubjectID,
+        partners: list[SubjectID]
+    ) -> remote_game.RemoteGameV2 | None:
+        """Handle matching with known partners.
+
+        Returns the game if all partners have arrived, None if still waiting.
+        """
+        pairing_id = self.pairing_manager.get_pairing_id(subject_id)
+        if not pairing_id:
+            logger.warning(f"Subject {subject_id} has partners but no pairing_id. Falling back to FIFO.")
+            return self._add_to_fifo_queue(subject_id)
+
+        # Get all members of this pairing
+        all_pairing_members = self.pairing_manager.get_all_pairing_members(subject_id)
+        num_players_needed = len([
+            policy for policy in self.scene.policy_mapping.values()
+            if policy == configuration_constants.PolicyTypes.Human
+        ])
+
+        # Check if partner(s) are already waiting
+        if pairing_id in self.partner_waitrooms:
+            waiting_subjects = self.partner_waitrooms[pairing_id]
+
+            # Add this subject to the waitroom
+            if subject_id not in waiting_subjects:
+                waiting_subjects.append(subject_id)
+                self.partner_wait_start_times[subject_id] = time.time()
+                logger.info(f"Subject {subject_id} joined partner waitroom {pairing_id}. "
+                           f"Now {len(waiting_subjects)}/{num_players_needed} players waiting.")
+
+            # Check if all partners have arrived
+            if len(waiting_subjects) >= num_players_needed:
+                logger.info(f"All partners arrived for pairing {pairing_id}. Creating game.")
+                # Clear the partner waitroom
+                del self.partner_waitrooms[pairing_id]
+                for sid in waiting_subjects:
+                    if sid in self.partner_wait_start_times:
+                        del self.partner_wait_start_times[sid]
+                # Create game for these specific partners
+                return self._create_game_for_partners(waiting_subjects)
+            else:
+                # Still waiting for more partners
+                self._broadcast_partner_waiting_status(subject_id, pairing_id, waiting_subjects, num_players_needed)
+                return None
+        else:
+            # Start a new partner waitroom
+            self.partner_waitrooms[pairing_id] = [subject_id]
+            self.partner_wait_start_times[subject_id] = time.time()
+            logger.info(f"Subject {subject_id} started partner waitroom {pairing_id}. "
+                       f"Waiting for {num_players_needed - 1} more partner(s).")
+            self._broadcast_partner_waiting_status(subject_id, pairing_id, [subject_id], num_players_needed)
+            return None
+
+    def _broadcast_partner_waiting_status(
+        self,
+        subject_id: SubjectID,
+        pairing_id: str,
+        waiting_subjects: list[SubjectID],
+        num_players_needed: int
+    ):
+        """Broadcast waiting status to subjects waiting for their partner."""
+        partner_wait_timeout = self.scene.partner_wait_timeout
+        start_time = self.partner_wait_start_times.get(subject_id, time.time())
+        elapsed_ms = (time.time() - start_time) * 1000
+        remaining_ms = max(0, partner_wait_timeout - elapsed_ms)
+
+        self.sio.emit(
+            "waiting_for_partner",
+            {
+                "message": "Waiting for your partner from the previous game...",
+                "cur_num_players": len(waiting_subjects),
+                "players_needed": num_players_needed - len(waiting_subjects),
+                "ms_remaining": remaining_ms,
+            },
+            room=flask.request.sid,
+        )
+
+    def _create_game_for_partners(
+        self,
+        subject_ids: list[SubjectID]
+    ) -> remote_game.RemoteGameV2:
+        """Create a game for a specific group of partners."""
+        # Create a new game
+        self._create_game()
+        game: remote_game.RemoteGameV2 = self.games[self.waiting_games[-1]]
+
+        # Add each partner to the game
+        for subject_id in subject_ids:
+            self._add_subject_to_specific_game(subject_id, game)
+
+        # The game should now be ready
+        if game.is_ready_to_start():
+            self.waiting_games.remove(game.game_id)
+            self.start_game(game)
+
+        return game
+
+    def _add_subject_to_specific_game(
+        self,
+        subject_id: SubjectID,
+        game: remote_game.RemoteGameV2
+    ):
+        """Add a subject to a specific game (used for partner matching)."""
+        with game.lock:
+            self.subject_games[subject_id] = game.game_id
+            self.subject_rooms[subject_id] = game.game_id
+            self.reset_events[game.game_id][subject_id] = eventlet.event.Event()
+            # Note: join_room needs the request context, so we emit to the subject
+            # and they'll join the room on their end via start_game
+
+            available_human_agent_ids = game.get_available_human_agent_ids()
+            player_id = None
+            if not available_human_agent_ids:
+                logger.warning(
+                    f"No available human agent IDs for game {game.game_id}. Adding as a spectator."
+                )
+            else:
+                player_id = random.choice(available_human_agent_ids)
+                game.add_player(player_id, subject_id)
+
+            # If multiplayer Pyodide, add player to coordinator
+            if self.scene.pyodide_multiplayer and self.pyodide_coordinator and player_id is not None:
+                # Get the socket_id for this subject from the pairing manager
+                # For now, we'll need to handle this separately
+                logger.info(
+                    f"Added player {player_id} (subject: {subject_id}) to game {game.game_id}"
+                )
+
+            if self.scene.game_page_html_fn is not None:
+                self.sio.emit(
+                    "update_game_page_text",
+                    {
+                        "game_page_text": self.scene.game_page_html_fn(
+                            game, subject_id
+                        )
+                    },
+                    room=subject_id,
+                )
+
+    def _add_to_fifo_queue(
+        self, subject_id: SubjectID
+    ) -> remote_game.RemoteGameV2:
+        """Add a subject to the standard FIFO matching queue."""
         if not self.waiting_games:
             logger.info("No games waiting for players. Creating a new game.")
             self._create_game()
@@ -656,8 +824,23 @@ class GameManager:
         )
 
     def cleanup_game(self, game_id: GameID):
-        """End a game."""
+        """End a game and persist player pairings."""
         game = self.games[game_id]
+
+        # Always record player pairings when a game ends
+        # This allows future scenes to either require the same partner or allow new matches
+        if self.pairing_manager:
+            subject_ids = list(game.human_players.values())
+            # Filter out "Available" placeholders
+            real_subjects = [
+                sid for sid in subject_ids
+                if sid != utils.Available and sid is not None
+            ]
+            if len(real_subjects) > 1:
+                self.pairing_manager.create_pairing(real_subjects, self.scene.scene_id)
+                logger.info(
+                    f"Created/updated pairing for subjects {real_subjects} from scene {self.scene.scene_id}"
+                )
 
         if self.scene.callback is not None:
             self.scene.callback.on_game_end(game)
@@ -673,3 +856,128 @@ class GameManager:
         """End all games, but make sure we trigger the ending callbacks."""
         for game in self.games.values():
             self.cleanup_game(game.game_id)
+
+    def remove_subject_quietly(self, subject_id: SubjectID) -> bool:
+        """Remove a subject from their game without notifying other players.
+
+        Used when a player disconnects from a non-active scene (e.g., during a survey)
+        so their partner doesn't receive a disconnect notification.
+
+        Returns True if subject was removed, False if not found.
+        """
+        game_id = self.subject_games.get(subject_id)
+        if game_id is None:
+            return False
+
+        game = self.games.get(game_id)
+        if game is None:
+            return False
+
+        with game.lock:
+            # Just remove the subject without any notifications
+            game.remove_human_player(subject_id)
+
+            if subject_id in self.subject_games:
+                del self.subject_games[subject_id]
+            if subject_id in self.subject_rooms:
+                del self.subject_rooms[subject_id]
+
+            flask_socketio.leave_room(game_id)
+
+            # If game is now empty, clean it up quietly
+            if game.cur_num_human_players() == 0:
+                game.tear_down()
+                self._remove_game(game_id)
+
+        logger.info(f"Quietly removed subject {subject_id} from game {game_id}")
+        return True
+
+    def remove_from_partner_waitroom(self, subject_id: SubjectID) -> bool:
+        """Remove a subject from a partner waitroom if they're waiting.
+
+        Returns True if subject was in a partner waitroom, False otherwise.
+        """
+        # Find if subject is in any partner waitroom
+        for pairing_id, waiting_subjects in list(self.partner_waitrooms.items()):
+            if subject_id in waiting_subjects:
+                waiting_subjects.remove(subject_id)
+                if subject_id in self.partner_wait_start_times:
+                    del self.partner_wait_start_times[subject_id]
+
+                # If waitroom is now empty, remove it
+                if not waiting_subjects:
+                    del self.partner_waitrooms[pairing_id]
+                else:
+                    # Notify remaining subjects that partner left
+                    for remaining_sid in waiting_subjects:
+                        self.sio.emit(
+                            "waiting_room_player_left",
+                            {
+                                "message": "Your partner disconnected. You will be redirected shortly..."
+                            },
+                            room=remaining_sid,
+                        )
+
+                logger.info(f"Removed subject {subject_id} from partner waitroom {pairing_id}")
+                return True
+
+        return False
+
+    def check_partner_wait_timeouts(self) -> list[SubjectID]:
+        """Check for subjects who have exceeded their partner wait timeout.
+
+        Returns list of subject IDs that timed out.
+        """
+        timed_out = []
+        current_time = time.time()
+        timeout_seconds = self.scene.partner_wait_timeout / 1000
+
+        for subject_id, start_time in list(self.partner_wait_start_times.items()):
+            if current_time - start_time > timeout_seconds:
+                timed_out.append(subject_id)
+
+        return timed_out
+
+    def handle_partner_wait_timeout(self, subject_id: SubjectID):
+        """Handle a partner wait timeout by removing from waitroom and redirecting."""
+        # Remove from partner waitroom
+        self.remove_from_partner_waitroom(subject_id)
+
+        # Redirect to timeout URL
+        redirect_url = self.scene.waitroom_timeout_redirect_url
+        if redirect_url:
+            self.sio.emit(
+                "request_redirect",
+                {"redirect_url": redirect_url},
+                room=subject_id,
+            )
+            logger.info(f"Redirecting timed-out subject {subject_id} to {redirect_url}")
+        else:
+            # No redirect URL configured, emit error
+            self.sio.emit(
+                "end_game",
+                {"message": "Partner did not arrive in time. Please try again later."},
+                room=subject_id,
+            )
+            logger.info(f"Subject {subject_id} timed out waiting for partner, no redirect URL configured")
+
+    def is_subject_in_active_game(self, subject_id: SubjectID) -> bool:
+        """Check if a subject is currently in an active game.
+
+        Used for disconnect handling to determine whether to notify partners.
+        """
+        game_id = self.subject_games.get(subject_id)
+        if game_id is None:
+            return False
+
+        game = self.games.get(game_id)
+        if game is None:
+            return False
+
+        return (
+            game_id in self.active_games
+            and game.status in [
+                remote_game.GameStatus.Active,
+                remote_game.GameStatus.Reset,
+            ]
+        )

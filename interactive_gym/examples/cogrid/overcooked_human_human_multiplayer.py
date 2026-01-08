@@ -34,13 +34,30 @@ from interactive_gym.scenes import stager
 from interactive_gym.examples.cogrid.scenes import (
     scenes as oc_scenes,
 )
+from interactive_gym.scenes import static_scene
 
 from interactive_gym.configurations import experiment_config
+
+
+
+hh_start_scene = (
+    static_scene.StartScene()
+    .scene(
+        scene_id="overcooked_hh_start_scene",
+        experiment_config={},
+        should_export_metadata=True,
+    )
+    .display(
+        scene_header="Welcome",
+        scene_body_filepath="interactive_gym/server/static/templates/overcooked_hh_instructions.html",
+    )
+)
+
 
 # Create stager with multiplayer scenes
 stager = stager.Stager(
     scenes=[
-        oc_scenes.start_scene,
+        hh_start_scene,
         # oc_scenes.tutorial_gym_scene,
         # For multiplayer, all players must be on the same scene
         # Using RandomizeOrder creates different scenes per player

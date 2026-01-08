@@ -321,7 +321,11 @@ obs, rewards, terminateds, truncateds, infos, render_state
         let formatted_score = Math.round(score).toString().padStart(2, '0');
         let formatted_time_left = time_left.toFixed(1).toString().padStart(5, '0');
 
-        let hud_text = `Score: ${formatted_score} | Time left: ${formatted_time_left}s`;
+        // Round number is 1-indexed for display
+        let current_round = this.num_episodes + 1;
+        let total_rounds = this.max_episodes;
+
+        let hud_text = `Round: ${current_round}/${total_rounds} | Score: ${formatted_score} | Time left: ${formatted_time_left}s`;
 
         return hud_text
     };
