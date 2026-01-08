@@ -66,10 +66,10 @@ stager = stager.Stager(
     scenes=[
         start_scene,
         control_scene,
-        # scenes.tutorial_gym_scene,
-        # controllable_scenes.tutorial_with_bot_scene,
-        # controllable_scenes.control_tutorial_scene,
-        # controllable_scenes.end_tutorial_static_scene,
+        scenes.tutorial_gym_scene,
+        controllable_scenes.tutorial_with_bot_scene,
+        controllable_scenes.control_tutorial_scene,
+        controllable_scenes.end_tutorial_static_scene,
         scene.RepeatScene(
             [choice_scene],
             n=3,
