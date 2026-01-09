@@ -658,8 +658,11 @@ obs, rewards, terminateds, truncateds, infos, render_state
 
     async computeStateHash() {
         /**
-         * Compute SHA256 hash of current game state using JavaScript crypto.
+         * Compute hash of current game state using JavaScript crypto.
          * Uses env.get_state() for the environment state (same data used for full sync).
+         *
+         * Falls back to a simple hash function if crypto.subtle is unavailable
+         * (which happens on non-HTTPS connections).
          */
         // Get env state from Python (reuses the get_state() method)
         const envState = await this.pyodide.runPythonAsync(`
@@ -678,16 +681,42 @@ env.get_state()
         // Create deterministic JSON string (sort keys for consistency)
         const stateStr = JSON.stringify(stateDict, Object.keys(stateDict).sort());
 
-        // Hash in JavaScript using SubtleCrypto (hardware-accelerated)
-        const hashBuffer = await crypto.subtle.digest(
-            'SHA-256',
-            new TextEncoder().encode(stateStr)
-        );
+        // Use SubtleCrypto if available (requires HTTPS or localhost)
+        // Otherwise fall back to simple hash function
+        if (crypto && crypto.subtle) {
+            const hashBuffer = await crypto.subtle.digest(
+                'SHA-256',
+                new TextEncoder().encode(stateStr)
+            );
+            // Convert to hex string
+            return Array.from(new Uint8Array(hashBuffer))
+                .map(b => b.toString(16).padStart(2, '0'))
+                .join('');
+        } else {
+            // Fallback: Simple hash function for non-secure contexts (HTTP)
+            // This is less secure but functional for sync verification
+            return this._simpleHash(stateStr);
+        }
+    }
 
-        // Convert to hex string
-        return Array.from(new Uint8Array(hashBuffer))
-            .map(b => b.toString(16).padStart(2, '0'))
-            .join('');
+    _simpleHash(str) {
+        /**
+         * Simple string hash function for use when crypto.subtle is unavailable.
+         * Based on cyrb53 - a fast, high-quality 53-bit hash.
+         * Not cryptographically secure, but sufficient for sync verification.
+         */
+        let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+        for (let i = 0, ch; i < str.length; i++) {
+            ch = str.charCodeAt(i);
+            h1 = Math.imul(h1 ^ ch, 2654435761);
+            h2 = Math.imul(h2 ^ ch, 1597334677);
+        }
+        h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507);
+        h1 ^= Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+        h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507);
+        h2 ^= Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+        // Return as hex string (similar format to SHA256 output)
+        return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(16).padStart(16, '0');
     }
 
     async getFullState() {
