@@ -29,11 +29,6 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         // Action queue synchronization (Option B)
         this.otherPlayerActionQueues = {};  // { player_id: [{action, frame_number}, ...] }
         this.lastExecutedActions = {};      // { player_id: last_action } for fallback
-        // Note: No queue size limit - we never drop actions to maintain sync
-
-        // Queue-based resync threshold (triggers state sync if queue grows too large)
-        this.queueResyncThreshold = config.queue_resync_threshold || 50;  // Trigger resync if queue > 50
-        this.resyncRequested = false;  // Prevent multiple resync requests
 
         // Action population settings
         this.actionPopulationMethod = config.action_population_method || 'previous_submitted_action';
@@ -42,8 +37,8 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         // Policy mapping (needed to know which agents are human)
         this.policyMapping = config.policy_mapping || {};
 
-        // Periodic state sync (null = disabled, number = frames between syncs)
-        this.stateSyncFrequencyFrames = config.state_sync_frequency_frames;  // null to disable, or number of frames
+        // State broadcast interval (frames between syncs) - used for both server-authoritative and host-based modes
+        this.stateBroadcastInterval = config.state_broadcast_interval || 30;
         this.frameNumber = 0;
 
         // Data logging (only host logs)
@@ -55,6 +50,10 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
 
         // Episode completion tracking
         this.episodeComplete = false;
+
+        // Server-authoritative mode (set when game starts)
+        // When true, server broadcasts authoritative state periodically
+        this.serverAuthoritative = false;
 
         this.setupMultiplayerHandlers();
     }
@@ -105,6 +104,12 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
             this.playerSubjects = data.player_subjects || {};
             console.log(`[MultiplayerPyodide] Player-subject mapping:`, this.playerSubjects);
 
+            // Check if server is authoritative
+            this.serverAuthoritative = data.server_authoritative || false;
+            if (this.serverAuthoritative) {
+                console.log(`[MultiplayerPyodide] Server-authoritative mode enabled`);
+            }
+
             // Initialize action queues for other players
             for (const playerId of data.players) {
                 if (playerId != this.myPlayerId) {
@@ -127,23 +132,22 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
             const queue = this.otherPlayerActionQueues[player_id];
             queue.push({ action, frame_number });
 
-            // Check if queue exceeds threshold - trigger resync if so
-            if (queue.length > this.queueResyncThreshold && !this.resyncRequested) {
-                console.warn(`[MultiplayerPyodide] Queue for player ${player_id} exceeded threshold (${queue.length} > ${this.queueResyncThreshold}), requesting state resync`);
-                this.resyncRequested = true;
-                this.requestStateResync();
-            } else if (queue.length > 30) {
+            // Log warning if queue is growing large (client may be running slower)
+            if (queue.length > 30) {
                 console.warn(`[MultiplayerPyodide] Queue for player ${player_id} is large (${queue.length}), this client may be running slower`);
             }
 
             console.debug(`[MultiplayerPyodide] Queued action ${action} from player ${player_id} for frame ${frame_number} (queue size: ${queue.length})`);
         });
 
-        // State verification request (hybrid fallback)
+        // State verification request (host-based mode only)
+        // In server-authoritative mode, skip hash computation - server broadcasts state directly
         socket.on('pyodide_verify_state', (data) => {
-            if (this.stateSyncFrequencyFrames !== null) {
-                this.verifyState(data.frame_number);
+            if (this.serverAuthoritative) {
+                console.debug(`[MultiplayerPyodide] Ignoring state verification request (server-authoritative mode)`);
+                return;
             }
+            this.verifyState(data.frame_number);
         });
 
         // Apply full state (non-host only)
@@ -157,7 +161,6 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
                     this.otherPlayerActionQueues[playerId] = [];
                 }
                 this.lastExecutedActions = {};
-                this.resyncRequested = false;  // Allow future resyncs
                 console.log(`[MultiplayerPyodide] State resynced from host, now at frame ${this.frameNumber}`);
             }
         });
@@ -175,7 +178,6 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
                 // Broadcast HUD to ensure it's synced after state resync
                 this.broadcastHUD();
 
-                this.resyncRequested = false;  // Allow future resyncs
                 // Clear action queues for fresh start
                 for (const playerId in this.otherPlayerActionQueues) {
                     this.otherPlayerActionQueues[playerId] = [];
@@ -188,6 +190,34 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         // Receive synchronized HUD text from host (via server broadcast)
         socket.on('pyodide_hud_sync', (data) => {
             ui_utils.updateHUDText(data.hud_text);
+        });
+
+        // Server-authoritative state broadcast (Option B: Frame-Aligned Stepper)
+        // Server periodically broadcasts authoritative state for verification/correction
+        socket.on('server_authoritative_state', async (data) => {
+            if (!this.serverAuthoritative) {
+                return;  // Ignore if not in server-authoritative mode
+            }
+
+            const { game_id, state } = data;
+            if (game_id !== this.gameId) {
+                return;  // Not for this game
+            }
+
+            console.log(`[MultiplayerPyodide] Received authoritative state at frame ${state.frame_number}`);
+
+            // Check if we're significantly out of sync
+            const frameDiff = Math.abs(this.frameNumber - state.frame_number);
+            if (frameDiff > 5) {
+                console.warn(`[MultiplayerPyodide] Frame drift detected: client=${this.frameNumber}, server=${state.frame_number}`);
+                await this.applyServerState(state);
+            } else {
+                // Small drift is normal - just update cumulative rewards for HUD accuracy
+                if (state.cumulative_rewards) {
+                    this.cumulative_rewards = state.cumulative_rewards;
+                    ui_utils.updateHUDText(this.getHUDText());
+                }
+            }
         });
     }
 
@@ -204,23 +234,6 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         socket.emit('pyodide_hud_update', {
             game_id: this.gameId,
             hud_text: hudText
-        });
-    }
-
-    /**
-     * Request a state resync from the host when queue grows too large.
-     * This client is falling behind and needs to catch up via full state transfer.
-     * Client continues running and will snap to correct state when it arrives.
-     */
-    requestStateResync() {
-        console.warn(`[MultiplayerPyodide] Requesting state resync - this client is behind`);
-
-        // Request resync from server (which will ask host for state)
-        socket.emit('pyodide_request_resync', {
-            game_id: this.gameId,
-            player_id: this.myPlayerId,
-            frame_number: this.frameNumber,
-            reason: 'queue_overflow'
         });
     }
 
@@ -465,8 +478,9 @@ obs, infos, render_state
         // 4. Increment frame
         this.frameNumber++;
 
-        // 5. Optionally trigger periodic state sync
-        if (this.stateSyncFrequencyFrames !== null && this.frameNumber % this.stateSyncFrequencyFrames === 0) {
+        // 5. Trigger periodic state verification (host-based mode only)
+        // In server-authoritative mode, the server handles broadcasting
+        if (!this.serverAuthoritative && this.stateBroadcastInterval > 0 && this.frameNumber % this.stateBroadcastInterval === 0) {
             this.triggerStateVerification();
         }
 
@@ -823,6 +837,57 @@ if 'numpy_rng_state' in state_obj:
         }
 
         console.log('[MultiplayerPyodide] Applied full state from host');
+    }
+
+    async applyServerState(state) {
+        /**
+         * Apply authoritative state from server (server-authoritative mode).
+         *
+         * Similar to applyFullState but uses server's state format.
+         * Called when client detects significant frame drift from server.
+         */
+        console.log(`[MultiplayerPyodide] Applying server authoritative state (server frame: ${state.frame_number}, client frame: ${this.frameNumber})`);
+
+        // If server provides env_state, apply it
+        if (state.env_state) {
+            await this.pyodide.runPythonAsync(`
+import numpy as np
+
+env_state = ${this.pyodide.toPy(state.env_state)}
+
+try:
+    env.set_state(env_state)
+    print("[Python] ✓ Applied server authoritative state via set_state()")
+except Exception as e:
+    print(f"[Python] Error applying server state: {e}")
+    raise
+            `);
+        }
+
+        // Sync JavaScript-side state
+        if (state.episode_num !== undefined) {
+            this.num_episodes = state.episode_num;
+        }
+        if (state.step_num !== undefined) {
+            this.step_num = state.step_num;
+        }
+        if (state.frame_number !== undefined) {
+            this.frameNumber = state.frame_number;
+        }
+        if (state.cumulative_rewards) {
+            this.cumulative_rewards = state.cumulative_rewards;
+        }
+
+        // Clear action queues to start fresh from new state
+        for (const playerId in this.otherPlayerActionQueues) {
+            this.otherPlayerActionQueues[playerId] = [];
+        }
+        this.lastExecutedActions = {};
+
+        // Update HUD
+        ui_utils.updateHUDText(this.getHUDText());
+
+        console.log(`[MultiplayerPyodide] Server state applied, now at frame ${this.frameNumber}`);
     }
 
     logFrameData(_data) {

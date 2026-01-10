@@ -127,10 +127,23 @@ class GameManager:
             # If this is a multiplayer Pyodide game, create coordinator state
             if self.scene.pyodide_multiplayer and self.pyodide_coordinator:
                 num_players = len(self.scene.policy_mapping)  # Number of agents in the game
-                self.pyodide_coordinator.create_game(game_id, num_players)
+
+                # Get server-authoritative config from scene
+                server_authoritative = getattr(self.scene, 'server_authoritative', False)
+                state_broadcast_interval = getattr(self.scene, 'state_broadcast_interval', 30)
+                environment_code = getattr(self.scene, 'environment_initialization_code', None)
+
+                self.pyodide_coordinator.create_game(
+                    game_id=game_id,
+                    num_players=num_players,
+                    server_authoritative=server_authoritative,
+                    environment_code=environment_code,
+                    state_broadcast_interval=state_broadcast_interval,
+                )
                 logger.info(
                     f"Created multiplayer Pyodide game state for {game_id} "
                     f"with {num_players} players"
+                    f"{' (server-authoritative)' if server_authoritative else ''}"
                 )
 
         except Exception as e:

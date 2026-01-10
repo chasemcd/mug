@@ -55,7 +55,7 @@ class GymScene(scene.Scene):
         queue_resync_threshold (int): Trigger state resync if action queue exceeds this size (default 50).
     """
 
-    DEFAULT_IG_PACKAGE = "interactive-gym==0.0.7"
+    DEFAULT_IG_PACKAGE = "interactive-gym==0.0.8"
 
     def __init__(
         self,
@@ -125,8 +125,16 @@ class GymScene(scene.Scene):
         self.restart_pyodide: bool = False
 
         # Multiplayer sync settings (for pyodide_multiplayer=True)
-        self.state_sync_frequency_frames: int | None = 300  # Frames between periodic state syncs (~10s at 30fps), None to disable
-        self.queue_resync_threshold: int = 50  # Trigger resync if action queue exceeds this size
+        # state_broadcast_interval: Frames between state broadcasts/syncs
+        # - In server-authoritative mode: server broadcasts authoritative state at this interval
+        # - In host-based mode: clients verify state hashes at this interval
+        # Set to None to disable periodic sync (not recommended)
+        self.state_broadcast_interval: int = 30  # Frames between broadcasts (~1s at 30fps)
+
+        # Server-authoritative multiplayer settings
+        # When enabled, server runs a parallel Python environment that steps in sync with clients
+        # and broadcasts authoritative state periodically, eliminating host dependency
+        self.server_authoritative: bool = False
 
         # Player group settings (for multiplayer games)
         # Groups are always tracked automatically after each game completes.
@@ -447,8 +455,8 @@ class GymScene(scene.Scene):
         on_game_step_code: str = NotProvided,
         packages_to_install: list[str] = NotProvided,
         restart_pyodide: bool = NotProvided,
-        state_sync_frequency_frames: int | None = NotProvided,
-        queue_resync_threshold: int = NotProvided,
+        server_authoritative: bool = NotProvided,
+        state_broadcast_interval: int = NotProvided,
     ):
         """Configure Pyodide-related settings for the GymScene.
 
@@ -467,10 +475,14 @@ class GymScene(scene.Scene):
         :type packages_to_install: list[str], optional
         :param restart_pyodide: Whether to restart the Pyodide environment, defaults to NotProvided
         :type restart_pyodide: bool, optional
-        :param state_sync_frequency_frames: Frames between periodic state syncs (e.g., 300 = ~10s at 30fps). None disables periodic sync, defaults to NotProvided
-        :type state_sync_frequency_frames: int | None, optional
-        :param queue_resync_threshold: Trigger state resync if action queue exceeds this size (default 50), defaults to NotProvided
-        :type queue_resync_threshold: int, optional
+        :param server_authoritative: If True, server runs a parallel Python environment that steps
+            in sync with clients and broadcasts authoritative state periodically. This eliminates
+            host dependency and provides faster resyncs. Requires multiplayer=True. defaults to NotProvided
+        :type server_authoritative: bool, optional
+        :param state_broadcast_interval: Frames between state broadcasts/syncs. In server-authoritative
+            mode, server broadcasts authoritative state at this interval. In host-based mode, clients
+            verify state hashes at this interval. Default is 30 (~1 sec at 30fps). defaults to NotProvided
+        :type state_broadcast_interval: int, optional
         :return: The GymScene instance (self)
         :rtype: GymScene
         """
@@ -507,14 +519,13 @@ class GymScene(scene.Scene):
         if on_game_step_code is not NotProvided:
             self.on_game_step_code = on_game_step_code
 
-        if state_sync_frequency_frames is not NotProvided:
-            if state_sync_frequency_frames is not None:
-                assert isinstance(state_sync_frequency_frames, int) and state_sync_frequency_frames > 0
-            self.state_sync_frequency_frames = state_sync_frequency_frames
+        if server_authoritative is not NotProvided:
+            assert isinstance(server_authoritative, bool)
+            self.server_authoritative = server_authoritative
 
-        if queue_resync_threshold is not NotProvided:
-            assert isinstance(queue_resync_threshold, int) and queue_resync_threshold > 0
-            self.queue_resync_threshold = queue_resync_threshold
+        if state_broadcast_interval is not NotProvided:
+            assert isinstance(state_broadcast_interval, int) and state_broadcast_interval > 0
+            self.state_broadcast_interval = state_broadcast_interval
 
         return self
 

@@ -43,6 +43,13 @@ class PyodideGameState:
     action_timeout_seconds: float
     created_at: float
 
+    # State broadcast/sync interval (frames between state verification or server broadcasts)
+    state_broadcast_interval: int = 30
+
+    # Server-authoritative mode fields
+    server_authoritative: bool = False
+    server_runner: Any = None  # ServerGameRunner instance when enabled
+
 
 class PyodideGameCoordinator:
     """
@@ -63,7 +70,6 @@ class PyodideGameCoordinator:
         self.lock = threading.Lock()
 
         # Configuration
-        self.verification_frequency = 300  # Verify every N frames (reduced from 30)
         self.action_timeout = 5.0  # Seconds to wait for actions
         self.max_games = 1000  # Prevent memory exhaustion
 
@@ -74,13 +80,23 @@ class PyodideGameCoordinator:
 
         logger.info("PyodideGameCoordinator initialized")
 
-    def create_game(self, game_id: str, num_players: int) -> PyodideGameState:
+    def create_game(
+        self,
+        game_id: str,
+        num_players: int,
+        server_authoritative: bool = False,
+        environment_code: str | None = None,
+        state_broadcast_interval: int = 30,
+    ) -> PyodideGameState:
         """
         Initialize a new Pyodide multiplayer game.
 
         Args:
             game_id: Unique identifier for the game
             num_players: Expected number of human players
+            server_authoritative: If True, server runs parallel env for state sync
+            environment_code: Python code to initialize environment (required if server_authoritative)
+            state_broadcast_interval: Frames between server state broadcasts
 
         Returns:
             PyodideGameState object
@@ -104,13 +120,31 @@ class PyodideGameCoordinator:
                 frame_number=0,
                 action_ready_event=threading.Event(),
                 state_hashes={},
-                verification_frame=self.verification_frequency,
+                verification_frame=state_broadcast_interval,  # First verification after this many frames
                 is_active=False,
                 rng_seed=rng_seed,
                 num_expected_players=num_players,
                 action_timeout_seconds=self.action_timeout,
-                created_at=time.time()
+                created_at=time.time(),
+                state_broadcast_interval=state_broadcast_interval,
+                server_authoritative=server_authoritative,
             )
+
+            # Create server runner if server_authoritative mode enabled
+            if server_authoritative and environment_code:
+                from interactive_gym.server.server_game_runner import ServerGameRunner
+
+                game_state.server_runner = ServerGameRunner(
+                    game_id=game_id,
+                    environment_code=environment_code,
+                    num_players=num_players,
+                    state_broadcast_interval=state_broadcast_interval,
+                    sio=self.sio,
+                )
+                logger.info(
+                    f"Created ServerGameRunner for game {game_id} "
+                    f"(broadcast every {state_broadcast_interval} frames)"
+                )
 
             self.games[game_id] = game_state
             self.total_games_created += 1
@@ -118,6 +152,7 @@ class PyodideGameCoordinator:
             logger.info(
                 f"Created Pyodide game {game_id} for {num_players} players "
                 f"with seed {rng_seed}"
+                f"{' (server-authoritative)' if server_authoritative else ''}"
             )
 
             return game_state
@@ -197,16 +232,44 @@ class PyodideGameCoordinator:
         game = self.games[game_id]
         game.is_active = True
 
-        logger.info(f"Emitting pyodide_game_ready to room {game_id} with players {list(game.players.keys())}")
+        # Initialize server runner if enabled
+        if game.server_authoritative and game.server_runner:
+            # Add all players to the server runner
+            for player_id in game.players.keys():
+                game.server_runner.add_player(player_id)
+
+            # Initialize with same seed as clients
+            success = game.server_runner.initialize_environment(game.rng_seed)
+            if success:
+                logger.info(
+                    f"Server runner initialized for game {game_id} "
+                    f"with seed {game.rng_seed}"
+                )
+            else:
+                logger.error(
+                    f"Failed to initialize server runner for game {game_id}, "
+                    f"falling back to host-based sync"
+                )
+                game.server_authoritative = False
+                game.server_runner = None
+
+        logger.info(
+            f"Emitting pyodide_game_ready to room {game_id} with players {list(game.players.keys())}, "
+            f"server_authoritative={game.server_authoritative}"
+        )
         self.sio.emit('pyodide_game_ready',
                      {
                          'game_id': game_id,
                          'players': list(game.players.keys()),
                          'player_subjects': game.player_subjects,  # player_id -> subject_id mapping
+                         'server_authoritative': game.server_authoritative,  # Tell clients if server is authoritative
                      },
                      room=game_id)
 
-        logger.info(f"Game {game_id} started with {len(game.players)} players")
+        logger.info(
+            f"Game {game_id} started with {len(game.players)} players"
+            f"{' (server-authoritative)' if game.server_authoritative else ' (host-based)'}"
+        )
 
     def receive_action(
         self,
@@ -220,6 +283,9 @@ class PyodideGameCoordinator:
 
         Action Queue approach: No waiting for all players. Each action is
         immediately relayed to other clients who queue it for their next step.
+
+        If server_authoritative mode is enabled, also feeds the action to
+        the server runner which steps when all actions for a frame are received.
 
         Args:
             game_id: Game identifier
@@ -262,6 +328,25 @@ class PyodideGameCoordinator:
                 f"to {len(game.players) - 1} other player(s)"
             )
 
+            # Feed action to server runner if enabled (frame-aligned stepper)
+            if game.server_authoritative and game.server_runner:
+                all_received = game.server_runner.receive_action(
+                    player_id, action, frame_number
+                )
+
+                if all_received:
+                    # Step the server environment
+                    result = game.server_runner.step_frame(frame_number)
+
+                    if result:
+                        # Broadcast state if it's time
+                        if result.get("should_broadcast"):
+                            game.server_runner.broadcast_state()
+
+                        # Handle episode end
+                        if result.get("episode_done"):
+                            game.server_runner.handle_episode_end()
+
     # Keep _broadcast_actions for backwards compatibility but it's no longer used
     def _broadcast_actions(self, game_id: str):
         """
@@ -303,14 +388,23 @@ class PyodideGameCoordinator:
         Request state hash from all players for verification.
 
         Verification detects desyncs early before they cascade.
+        Only used in host-based mode; server-authoritative mode broadcasts state directly.
         """
         game = self.games[game_id]
+
+        # Skip state verification in server-authoritative mode
+        # Server broadcasts authoritative state instead of requesting hashes
+        if game.server_authoritative:
+            logger.debug(
+                f"Game {game_id}: Skipping state verification (server-authoritative mode)"
+            )
+            return
 
         self.sio.emit('pyodide_verify_state',
                      {'frame_number': game.frame_number},
                      room=game_id)
 
-        game.verification_frame = game.frame_number + self.verification_frequency
+        game.verification_frame = game.frame_number + game.state_broadcast_interval
         # Note: We don't clear state_hashes here anymore since we track by frame number.
         # Old frames are cleaned up in _cleanup_old_frame_hashes() after verification.
 
@@ -329,6 +423,8 @@ class PyodideGameCoordinator:
         Hashes are grouped by frame number to ensure we only compare
         hashes from the same frame across all players.
 
+        Only used in host-based mode; server-authoritative mode ignores hashes.
+
         Args:
             game_id: Game identifier
             player_id: Player who sent the hash
@@ -340,6 +436,15 @@ class PyodideGameCoordinator:
                 return
 
             game = self.games[game_id]
+
+            # Skip hash processing in server-authoritative mode
+            # Server broadcasts authoritative state instead of verifying client hashes
+            if game.server_authoritative:
+                logger.debug(
+                    f"Game {game_id}: Ignoring state hash from player {player_id} "
+                    f"(server-authoritative mode)"
+                )
+                return
 
             # Initialize hash dict for this frame if needed
             if frame_number not in game.state_hashes:
@@ -426,56 +531,35 @@ class PyodideGameCoordinator:
 
     def _handle_desync(self, game_id: str, frame_number: int):
         """
-        Handle desynchronization by requesting resync from host.
+        Handle desynchronization by requesting resync.
 
-        Process:
+        If server_authoritative mode is enabled, broadcast server state directly.
+        Otherwise, request full state from host.
+
+        Process (host-based):
         1. Request full state from host
         2. Host sends serialized state
         3. Broadcast state to non-host clients
         4. Clients apply state (snapping to correct state without pausing)
+
+        Process (server-authoritative):
+        1. Broadcast server state directly to all clients
         """
         game = self.games[game_id]
 
-        # Request full state from host
+        # If server-authoritative, broadcast server state directly
+        if game.server_authoritative and game.server_runner:
+            game.server_runner.broadcast_state()
+            logger.info(f"Game {game_id}: Broadcast server state for resync")
+            return
+
+        # Fall back to host-based resync
         host_socket = game.players[game.host_player_id]
         self.sio.emit('pyodide_request_full_state',
                      {'frame_number': frame_number},
                      room=host_socket)
 
         logger.info(f"Game {game_id}: Initiated resync from host {game.host_player_id}")
-
-    def handle_resync_request(
-        self,
-        game_id: str,
-        requesting_player_id: str | int,
-        frame_number: int
-    ):
-        """
-        Handle a resync request from a client that has fallen behind.
-
-        This is triggered when a client's action queue grows too large,
-        indicating it cannot keep up. We request state from host and
-        send it to the requesting client.
-
-        Args:
-            game_id: Game identifier
-            requesting_player_id: Player who requested resync
-            frame_number: Frame number of requesting client
-        """
-        with self.lock:
-            if game_id not in self.games:
-                logger.warning(f"Resync request for non-existent game {game_id}")
-                return
-
-            game = self.games[game_id]
-
-            logger.info(
-                f"Game {game_id}: Player {requesting_player_id} requested resync "
-                f"at frame {frame_number}"
-            )
-
-            # Use existing desync handler to request state from host
-            self._handle_desync(game_id, frame_number)
 
     def receive_full_state(self, game_id: str, full_state: dict):
         """
@@ -550,10 +634,16 @@ class PyodideGameCoordinator:
 
             # If no players left, remove game
             if len(game.players) == 0:
+                # Stop server runner if it exists
+                if game.server_runner:
+                    game.server_runner.stop()
                 del self.games[game_id]
                 logger.info(f"Removed empty game {game_id}")
             # If there are remaining players, also remove the game since we ended it
             elif notify_others:
+                # Stop server runner if it exists
+                if game.server_runner:
+                    game.server_runner.stop()
                 del self.games[game_id]
                 logger.info(f"Removed game {game_id} after player disconnection")
 

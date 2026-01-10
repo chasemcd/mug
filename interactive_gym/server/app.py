@@ -731,6 +731,9 @@ def on_pyodide_state_hash(data):
     The coordinator collects hashes from all players and verifies
     they match (detecting desyncs).
 
+    In server-authoritative mode, state hashes are ignored since
+    the server broadcasts authoritative state instead.
+
     Args:
         data: {
             'game_id': str,
@@ -749,6 +752,15 @@ def on_pyodide_state_hash(data):
     player_id = data.get("player_id")
     state_hash = data.get("hash")
     frame_number = data.get("frame_number")
+
+    # Skip early if game is in server-authoritative mode
+    game = PYODIDE_COORDINATOR.games.get(game_id)
+    if game and game.server_authoritative:
+        logger.debug(
+            f"Ignoring state hash from player {player_id} in game {game_id} "
+            f"(server-authoritative mode)"
+        )
+        return
 
     logger.debug(
         f"Received state hash from player {player_id} in game {game_id} "
@@ -791,47 +803,6 @@ def on_pyodide_send_full_state(data):
     PYODIDE_COORDINATOR.receive_full_state(
         game_id=game_id,
         full_state=full_state
-    )
-
-
-@socketio.on("pyodide_request_resync")
-def on_pyodide_request_resync(data):
-    """
-    Handle resync request from a client that has fallen behind.
-
-    This is triggered when a client's action queue grows too large,
-    indicating it cannot keep up with the game pace and needs a
-    full state transfer from the host to catch up.
-
-    Args:
-        data: {
-            'game_id': str,
-            'player_id': str | int,
-            'frame_number': int,
-            'reason': str (e.g., 'queue_overflow')
-        }
-    """
-    global PYODIDE_COORDINATOR
-
-    if PYODIDE_COORDINATOR is None:
-        logger.error("Pyodide coordinator not initialized")
-        return
-
-    game_id = data.get("game_id")
-    player_id = data.get("player_id")
-    frame_number = data.get("frame_number")
-    reason = data.get("reason", "unknown")
-
-    logger.warning(
-        f"Resync requested by player {player_id} in game {game_id} "
-        f"at frame {frame_number} (reason: {reason})"
-    )
-
-    # Trigger the desync handling which requests state from host
-    PYODIDE_COORDINATOR.handle_resync_request(
-        game_id=game_id,
-        requesting_player_id=player_id,
-        frame_number=frame_number
     )
 
 

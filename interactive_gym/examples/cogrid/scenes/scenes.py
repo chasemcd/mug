@@ -472,8 +472,8 @@ cramped_room_human_human = (
         environment_initialization_code_filepath="interactive_gym/examples/cogrid/environments/cramped_room_environment_initialization_hh.py",
         packages_to_install=["numpy", "cogrid==0.0.15", "opencv-python"],
         # Multiplayer sync settings (Action Queue with queue-based resync)
-        state_sync_frequency_frames=300,  # Sync state every 300 frames (~10s at 30fps), None to disable
-        queue_resync_threshold=50,  # Trigger resync if action queue exceeds 50 items
+        state_broadcast_interval=150,  # Sync state every 300 frames (~10s at 30fps), None to disable
+        server_authoritative=True,  # Server-authoritative mode
     )
 )
 
