@@ -55,7 +55,7 @@ class GymScene(scene.Scene):
         queue_resync_threshold (int): Trigger state resync if action queue exceeds this size (default 50).
     """
 
-    DEFAULT_IG_PACKAGE = "interactive-gym==0.0.8"
+    DEFAULT_IG_PACKAGE = "interactive-gym==0.1.0"
 
     def __init__(
         self,
