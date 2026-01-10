@@ -35,7 +35,7 @@ class PyodideGameState:
     pending_actions: Dict[str | int, Any]
     frame_number: int
     action_ready_event: threading.Event
-    state_hashes: Dict[str | int, str]
+    state_hashes: Dict[int, Dict[str | int, str]]  # frame_number -> {player_id -> hash}
     verification_frame: int  # Next frame to verify
     is_active: bool
     rng_seed: int  # Shared seed for deterministic AI
@@ -311,7 +311,8 @@ class PyodideGameCoordinator:
                      room=game_id)
 
         game.verification_frame = game.frame_number + self.verification_frequency
-        game.state_hashes.clear()
+        # Note: We don't clear state_hashes here anymore since we track by frame number.
+        # Old frames are cleaned up in _cleanup_old_frame_hashes() after verification.
 
         logger.debug(f"Game {game_id}: Requested state verification at frame {game.frame_number}")
 
@@ -325,6 +326,9 @@ class PyodideGameCoordinator:
         """
         Collect and verify state hashes from players.
 
+        Hashes are grouped by frame number to ensure we only compare
+        hashes from the same frame across all players.
+
         Args:
             game_id: Game identifier
             player_id: Player who sent the hash
@@ -336,27 +340,43 @@ class PyodideGameCoordinator:
                 return
 
             game = self.games[game_id]
-            game.state_hashes[player_id] = state_hash
+
+            # Initialize hash dict for this frame if needed
+            if frame_number not in game.state_hashes:
+                game.state_hashes[frame_number] = {}
+
+            # Store hash for this player at this frame
+            game.state_hashes[frame_number][player_id] = state_hash
+
+            frame_hashes = game.state_hashes[frame_number]
 
             logger.debug(
                 f"Game {game_id} frame {frame_number}: "
                 f"Received hash from player {player_id} "
-                f"({len(game.state_hashes)}/{len(game.players)} received)"
+                f"({len(frame_hashes)}/{len(game.players)} received for this frame)"
             )
 
-            # Once all hashes received, verify
-            if len(game.state_hashes) == len(game.players):
+            # Once all hashes received for this frame, verify
+            if len(frame_hashes) == len(game.players):
                 self._verify_synchronization(game_id, frame_number)
+                # Clean up old frame hashes to prevent memory growth
+                self._cleanup_old_frame_hashes(game, frame_number)
 
     def _verify_synchronization(self, game_id: str, frame_number: int):
         """
-        Check if all players have matching state hashes.
+        Check if all players have matching state hashes for a specific frame.
 
         If hashes don't match, desync has occurred and we need to resync.
         """
         game = self.games[game_id]
 
-        hashes = list(game.state_hashes.values())
+        # Get hashes for this specific frame
+        frame_hashes = game.state_hashes.get(frame_number, {})
+        if not frame_hashes:
+            logger.warning(f"Game {game_id}: No hashes found for frame {frame_number}")
+            return
+
+        hashes = list(frame_hashes.values())
         unique_hashes = set(hashes)
 
         if len(unique_hashes) == 1:
@@ -376,10 +396,33 @@ class PyodideGameCoordinator:
             )
 
             # Log which players have which hashes
-            for player_id, hash_val in game.state_hashes.items():
+            for player_id, hash_val in frame_hashes.items():
                 logger.error(f"  Player {player_id}: {hash_val[:16]}...")
 
             self._handle_desync(game_id, frame_number)
+
+    def _cleanup_old_frame_hashes(self, game: PyodideGameState, current_frame: int):
+        """
+        Remove hash data for old frames to prevent memory growth.
+
+        Keeps only recent frames in case of delayed hash arrivals.
+        """
+        # Keep hashes for frames within last 100 frames
+        frames_to_keep = 100
+        min_frame_to_keep = current_frame - frames_to_keep
+
+        frames_to_remove = [
+            frame for frame in game.state_hashes.keys()
+            if frame < min_frame_to_keep
+        ]
+
+        for frame in frames_to_remove:
+            del game.state_hashes[frame]
+
+        if frames_to_remove:
+            logger.debug(
+                f"Game {game.game_id}: Cleaned up hashes for {len(frames_to_remove)} old frames"
+            )
 
     def _handle_desync(self, game_id: str, frame_number: int):
         """
