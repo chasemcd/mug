@@ -254,58 +254,77 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
 
     async validateStateSync() {
         /**
-         * Verify that the environment implements required state sync methods
+         * Ensure environment has state sync methods.
+         * If the environment doesn't implement get_state/set_state, inject default
+         * pickle-based implementations that serialize the entire environment.
          */
         console.log("[MultiplayerPyodide] Validating environment state sync API...");
 
-        const validationResult = await this.pyodide.runPythonAsync(`
+        const result = await this.pyodide.runPythonAsync(`
+import pickle
+import base64
+
 # Check if environment has required methods for state synchronization
 has_get_state = hasattr(env, 'get_state') and callable(getattr(env, 'get_state'))
 has_set_state = hasattr(env, 'set_state') and callable(getattr(env, 'set_state'))
 
-result = {
+env_type = type(env).__name__
+env_module = type(env).__module__
+
+# If methods are missing, inject default pickle-based implementations
+if not has_get_state or not has_set_state:
+    print(f"[Python] Environment {env_type} missing state sync methods, injecting defaults...")
+
+    def _default_get_state(self):
+        """
+        Default pickle-based state serialization.
+        Temporarily sets class module to '__main__' for cross-environment compatibility.
+        """
+        original_module = self.__class__.__module__
+        self.__class__.__module__ = '__main__'
+        try:
+            pickled = pickle.dumps(self)
+        finally:
+            self.__class__.__module__ = original_module
+        encoded = base64.b64encode(pickled).decode('utf-8')
+        return {'pickled_state': encoded}
+
+    def _default_set_state(self, state):
+        """
+        Default pickle-based state deserialization.
+        Unpickles and updates this environment's __dict__.
+        """
+        if 'pickled_state' not in state:
+            print("[Python] Warning: No pickled_state in state dict")
+            return
+        encoded = state['pickled_state']
+        pickled = base64.b64decode(encoded.encode('utf-8'))
+        restored = pickle.loads(pickled)
+        self.__dict__.update(restored.__dict__)
+
+    # Bind methods to the environment instance
+    import types
+    if not has_get_state:
+        env.get_state = types.MethodType(_default_get_state, env)
+        print(f"[Python] ✓ Injected default get_state() for {env_type}")
+
+    if not has_set_state:
+        env.set_state = types.MethodType(_default_set_state, env)
+        print(f"[Python] ✓ Injected default set_state() for {env_type}")
+
+    has_get_state = True
+    has_set_state = True
+
+{
     'has_get_state': has_get_state,
     'has_set_state': has_set_state,
-    'env_type': type(env).__name__,
-    'env_module': type(env).__module__,
+    'env_type': env_type,
+    'env_module': env_module,
 }
-
-result
         `);
 
-        const result = await this.pyodide.toPy(validationResult).toJs();
-        const hasGetState = result.get('has_get_state');
-        const hasSetState = result.get('has_set_state');
-        const envType = result.get('env_type');
-        const envModule = result.get('env_module');
-
-        if (!hasGetState || !hasSetState) {
-            const missingMethods = [];
-            if (!hasGetState) missingMethods.push('get_state()');
-            if (!hasSetState) missingMethods.push('set_state()');
-
-            const errorMsg =
-                `\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-                `❌ Multiplayer State Sync API Error\n` +
-                `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
-                `Environment: ${envType} (${envModule})\n\n` +
-                `Missing required methods: ${missingMethods.join(', ')}\n\n` +
-                `For multiplayer synchronization, environments must implement:\n\n` +
-                `  def get_state(self) -> dict:\n` +
-                `      \"\"\"Return JSON-serializable state dict\"\"\"\n` +
-                `      return {...}  # Complete environment state\n\n` +
-                `  def set_state(self, state: dict) -> None:\n` +
-                `      \"\"\"Restore environment from state dict\"\"\"\n` +
-                `      # Restore all environment variables from state\n\n` +
-                `See documentation: docs/multiplayer_state_sync_api.md\n` +
-                `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-
-            console.error(errorMsg);
-            throw new Error(
-                `Environment ${envType} is missing required methods for multiplayer: ` +
-                `${missingMethods.join(', ')}. See console for details.`
-            );
-        }
+        const resultMap = result.toJs();
+        const envType = resultMap.get('env_type');
 
         console.log(`[MultiplayerPyodide] ✓ Environment ${envType} supports state synchronization`);
     }

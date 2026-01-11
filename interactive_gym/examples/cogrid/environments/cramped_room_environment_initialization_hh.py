@@ -1,6 +1,4 @@
-import base64
 import functools
-import pickle
 import random
 from typing import Any
 
@@ -668,37 +666,6 @@ def temp_object_creation(obj: grid_object.GridObj):
 
 
 class InteractiveGymOvercooked(OvercookedRewardEnv):
-    def get_state(self) -> dict:
-        """
-        Serialize the entire environment state using pickle and base64 encoding.
-
-        This captures the complete state of the environment including all internal
-        attributes, allowing for perfect state restoration on another client.
-
-        :return: Dictionary with base64-encoded pickled state
-        :rtype: dict
-        """
-        pickled = pickle.dumps(self)
-        encoded = base64.b64encode(pickled).decode('utf-8')
-        return {'pickled_state': encoded}
-
-    def set_state(self, state: dict) -> None:
-        """
-        Restore the environment state from a pickled representation.
-
-        This replaces all attributes of the current instance with those from
-        the deserialized state, effectively synchronizing this environment
-        with the state from another client.
-
-        :param state: Dictionary containing base64-encoded pickled state
-        :type state: dict
-        """
-        encoded = state['pickled_state']
-        pickled = base64.b64decode(encoded.encode('utf-8'))
-        restored = pickle.loads(pickled)
-        # Replace all attributes with restored state
-        self.__dict__.update(restored.__dict__)
-
     def render(self):
         return self.env_to_render_fn()
 

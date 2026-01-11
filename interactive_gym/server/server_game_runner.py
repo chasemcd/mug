@@ -13,7 +13,9 @@ Key properties:
 
 from __future__ import annotations
 
+import base64
 import logging
+import pickle
 import threading
 from typing import Any, Dict
 
@@ -71,13 +73,17 @@ class ServerGameRunner:
         """
         self.rng_seed = rng_seed
 
-        # Use this module as the namespace so pickle can find dynamically defined classes
-        # This solves the "Can't pickle <class '__main__.ClassName'>" error
-        import interactive_gym.server.server_game_runner as this_module
-        env_globals = {
-            "__name__": this_module.__name__,
-            "__module__": this_module.__name__,
-        }
+        # Use __main__ as namespace to match Pyodide client behavior
+        # Classes defined here will have __module__ = '__main__'
+        # The get_state() method should pickle with __main__ module reference
+        # so both server and client can find the class when unpickling
+        import sys
+        env_globals = {"__name__": "__main__"}
+
+        # Store reference to __main__ module for class registration
+        if "__main__" not in sys.modules:
+            import types
+            sys.modules["__main__"] = types.ModuleType("__main__")
 
         try:
             # Set up numpy seed before execution
@@ -102,14 +108,12 @@ random.seed({rng_seed})
 
             self.env = env_globals["env"]
 
-            # Register any classes defined in the exec'd code into this module's namespace
-            # This allows pickle to find them by their __module__ attribute
+            # Register classes into __main__ module so pickle can find them
+            main_module = sys.modules["__main__"]
             for name, obj in env_globals.items():
                 if isinstance(obj, type) and not name.startswith('_'):
-                    # Set the class's module to this module so pickle can find it
-                    obj.__module__ = this_module.__name__
-                    setattr(this_module, name, obj)
-                    logger.debug(f"[ServerGameRunner] Registered class {name} for pickling")
+                    setattr(main_module, name, obj)
+                    logger.debug(f"[ServerGameRunner] Registered class {name} in __main__ for pickling")
 
             # Disable rendering on server to avoid unnecessary computations
             # The server only needs to step the environment, not render it
@@ -275,12 +279,13 @@ random.seed({rng_seed})
         """
         Get full authoritative state for broadcast.
 
-        Note: env_state requires the environment's get_state() to return
-        JSON-serializable data. If get_state() fails (e.g., due to pickle
-        issues with dynamically-defined classes), we still broadcast basic
-        state (frame_number, cumulative_rewards) which is sufficient for
-        keeping clients in sync on score display. Full state resync will
-        rely on client-side state in that case.
+        Uses the environment's get_state() if available, otherwise falls back
+        to default pickle-based serialization. The state is base64-encoded
+        pickle data that can be unpickled on the Pyodide client.
+
+        If state serialization fails, we still broadcast basic state
+        (frame_number, cumulative_rewards) which is sufficient for keeping
+        clients in sync on score display.
         """
         state = {
             "episode_num": self.episode_num,
@@ -289,24 +294,26 @@ random.seed({rng_seed})
             "cumulative_rewards": self.cumulative_rewards.copy(),
         }
 
-        # Include environment state if available
-        # This is optional - basic sync still works without it
-        if hasattr(self.env, "get_state"):
-            try:
+        # Include environment state
+        # Use env.get_state() if available, otherwise use default pickle method
+        try:
+            if hasattr(self.env, "get_state"):
                 env_state = self.env.get_state()
-                # Verify it's JSON-serializable
-                import json
-                json.dumps(env_state)
-                state["env_state"] = env_state
-            except Exception as e:
-                # Log once per game to avoid spam
-                if not getattr(self, "_env_state_warning_logged", False):
-                    logger.warning(
-                        f"[ServerGameRunner] Cannot include env_state in broadcast: {e}. "
-                        f"Basic state sync (frame, rewards) will still work. "
-                        f"For full state sync, ensure env.get_state() returns JSON-serializable data."
-                    )
-                    self._env_state_warning_logged = True
+            else:
+                env_state = self._default_get_env_state()
+
+            # Verify it's JSON-serializable (for socket.io transmission)
+            import json
+            json.dumps(env_state)
+            state["env_state"] = env_state
+        except Exception as e:
+            # Log once per game to avoid spam
+            if not getattr(self, "_env_state_warning_logged", False):
+                logger.warning(
+                    f"[ServerGameRunner] Cannot include env_state in broadcast: {e}. "
+                    f"Basic state sync (frame, rewards) will still work."
+                )
+                self._env_state_warning_logged = True
 
         return state
 
@@ -363,6 +370,48 @@ random.seed({rng_seed})
         ]
         for f in frames_to_remove:
             del self.pending_actions[f]
+
+    def _default_get_env_state(self) -> dict:
+        """
+        Default pickle-based state serialization.
+
+        Used when the environment doesn't implement its own get_state() method.
+        Temporarily sets the class module to '__main__' before pickling so that
+        the Pyodide client (which also uses '__main__') can unpickle it.
+
+        Returns a dict with 'pickled_state' containing base64-encoded pickle data.
+        """
+        if self.env is None:
+            return {}
+
+        # Temporarily set module to __main__ for pickling compatibility
+        # Both server and Pyodide client use __main__ namespace
+        original_module = self.env.__class__.__module__
+        self.env.__class__.__module__ = '__main__'
+        try:
+            pickled = pickle.dumps(self.env)
+        finally:
+            # Restore original module
+            self.env.__class__.__module__ = original_module
+
+        encoded = base64.b64encode(pickled).decode('utf-8')
+        return {'pickled_state': encoded}
+
+    def _default_set_env_state(self, state: dict) -> None:
+        """
+        Default pickle-based state deserialization.
+
+        Used when the environment doesn't implement its own set_state() method.
+        Unpickles the state and updates the environment's __dict__.
+        """
+        if 'pickled_state' not in state:
+            logger.warning("[ServerGameRunner] No pickled_state in state dict")
+            return
+
+        encoded = state['pickled_state']
+        pickled = base64.b64decode(encoded.encode('utf-8'))
+        restored = pickle.loads(pickled)
+        self.env.__dict__.update(restored.__dict__)
 
     def stop(self):
         """Clean up resources."""
