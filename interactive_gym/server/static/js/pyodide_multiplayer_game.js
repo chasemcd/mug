@@ -967,7 +967,7 @@ import base64
 
 # Use get_state if available, otherwise use default pickle serialization
 if hasattr(env, 'get_state') and callable(getattr(env, 'get_state')):
-    env.get_state()
+    _env_state_result = env.get_state()
 else:
     # Default pickle-based serialization
     original_module = env.__class__.__module__
@@ -976,7 +976,9 @@ else:
         pickled = pickle.dumps(env)
     finally:
         env.__class__.__module__ = original_module
-    {'pickled_state': base64.b64encode(pickled).decode('utf-8')}
+    _env_state_result = {'pickled_state': base64.b64encode(pickled).decode('utf-8')}
+
+_env_state_result
         `);
 
         // Build state dict in JavaScript
