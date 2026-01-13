@@ -67,3 +67,56 @@ export function disableKeyListener() {
         $(document).off('keyup');
         pressedKeys = {};
 }
+
+// Episode Transition Overlay
+
+/**
+ * Show the episode transition overlay with "waiting" message.
+ * Call this when waiting for the server to send the next episode state.
+ */
+export function showEpisodeWaiting(message = "Next round will begin shortly...") {
+    $('#episodeTransitionText').text(message);
+    $('#episodeCountdown').text('');
+    $('#episodeTransitionOverlay').addClass('visible');
+}
+
+/**
+ * Show countdown before episode starts.
+ * Returns a promise that resolves when countdown completes.
+ *
+ * @param {number} seconds - Number of seconds to count down
+ * @param {string} message - Message to show above countdown
+ * @returns {Promise} Resolves when countdown completes
+ */
+export function showEpisodeCountdown(seconds = 3, message = "Get ready!") {
+    return new Promise((resolve) => {
+        $('#episodeTransitionText').text(message);
+        $('#episodeTransitionOverlay').addClass('visible');
+
+        let remaining = seconds;
+        $('#episodeCountdown').text(remaining);
+
+        const countdownInterval = setInterval(() => {
+            remaining--;
+            if (remaining > 0) {
+                $('#episodeCountdown').text(remaining);
+            } else {
+                clearInterval(countdownInterval);
+                $('#episodeCountdown').text('GO!');
+
+                // Brief delay to show "GO!" before hiding
+                setTimeout(() => {
+                    hideEpisodeOverlay();
+                    resolve();
+                }, 500);
+            }
+        }, 1000);
+    });
+}
+
+/**
+ * Hide the episode transition overlay.
+ */
+export function hideEpisodeOverlay() {
+    $('#episodeTransitionOverlay').removeClass('visible');
+}

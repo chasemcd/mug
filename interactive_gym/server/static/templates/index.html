@@ -138,6 +138,49 @@
             border-radius: 10px;
             padding: 20px;
             background-color: #ecf0f1;
+            position: relative;
+        }
+
+        /* Episode transition overlay */
+        #episodeTransitionOverlay {
+            display: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.75);
+            z-index: 100;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            border-radius: 8px;
+        }
+
+        #episodeTransitionOverlay.visible {
+            display: flex;
+        }
+
+        #episodeTransitionText {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 18px;
+            color: #ffffff;
+            text-align: center;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+
+        #episodeCountdown {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 72px;
+            color: #3498db;
+            text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.5);
+            animation: pulse 1s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
         }
 
         #startButton {
@@ -170,7 +213,13 @@
         <div id="errorText"></div>
         <div id="hudText"></div>
 
-        <div id="gameContainer"></div>
+        <div id="gameContainer">
+            <!-- Episode transition overlay -->
+            <div id="episodeTransitionOverlay">
+                <div id="episodeTransitionText">Next round will begin shortly...</div>
+                <div id="episodeCountdown"></div>
+            </div>
+        </div>
 
         <!-- Centered container for the start button -->
         <div class="centered-container">

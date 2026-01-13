@@ -104,8 +104,8 @@ slime_scene = (
             "slimevb==0.0.4",
             "opencv-python",
         ],
-        state_sync_frequency_frames=20,
-        queue_resync_threshold=50,
+        state_broadcast_interval=30,  # Sync state every 300 frames (~10s at 30fps), None to disable
+        server_authoritative=True,  # Server-authoritative mode
     )
 )
 

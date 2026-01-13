@@ -55,6 +55,21 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         // When true, server broadcasts authoritative state periodically
         this.serverAuthoritative = false;
 
+        // Episode start synchronization (server-authoritative mode)
+        // Client waits for server_episode_start before beginning each episode
+        this.waitingForEpisodeStart = false;
+        this.episodeStartResolve = null;
+        this.pendingEpisodeState = null;
+
+        // Diagnostics for lag tracking
+        this.diagnostics = {
+            lastStepTime: 0,
+            stepTimes: [],          // Rolling window of step execution times
+            queueSizeHistory: [],   // Track queue sizes over time
+            lastDiagnosticsLog: 0,
+            diagnosticsInterval: 5000,  // Log diagnostics every 5 seconds
+        };
+
         this.setupMultiplayerHandlers();
     }
 
@@ -219,6 +234,31 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
                 }
             }
         });
+
+        // Server episode start (server-authoritative mode)
+        // Server broadcasts this at the start of each episode so all clients begin from identical state
+        socket.on('server_episode_start', async (data) => {
+            if (!this.serverAuthoritative) {
+                return;  // Ignore if not in server-authoritative mode
+            }
+
+            const { game_id, state } = data;
+            if (game_id !== this.gameId) {
+                return;  // Not for this game
+            }
+
+            console.log(`[MultiplayerPyodide] Received server_episode_start for episode ${state.episode_num}`);
+
+            // Store the state for when reset() is called
+            this.pendingEpisodeState = state;
+
+            // If we're waiting for the episode start, resolve the promise
+            if (this.waitingForEpisodeStart && this.episodeStartResolve) {
+                this.episodeStartResolve(state);
+                this.episodeStartResolve = null;
+                this.waitingForEpisodeStart = false;
+            }
+        });
     }
 
     /**
@@ -349,17 +389,138 @@ print(f"[Python] Seeded RNG with {${seed}}")
 
     async reset() {
         /**
-         * Reset environment with re-seeding for episode consistency
+         * Reset environment with re-seeding for episode consistency.
+         *
+         * In server-authoritative mode:
+         * 1. Show "waiting" overlay if this is not the first episode
+         * 2. Wait for server_episode_start event with authoritative state
+         * 3. Apply the server state to ensure identical starting conditions
+         * 4. Show countdown before starting (if not first episode)
+         * 5. Then proceed with local reset/render
+         *
+         * This ensures all clients start each episode from the exact same state.
          */
         this.shouldReset = false;
         console.log("[MultiplayerPyodide] Resetting environment. Player:", this.myPlayerId, "Game:", this.gameId, "Seed:", this.gameSeed);
+
+        // In server-authoritative mode, wait for server to broadcast episode start state
+        if (this.serverAuthoritative) {
+            // Check if this is a subsequent episode (not the first one)
+            const isSubsequentEpisode = this.num_episodes > 0;
+
+            // Show waiting message for subsequent episodes
+            if (isSubsequentEpisode) {
+                ui_utils.showEpisodeWaiting("Next round will begin shortly...");
+            }
+
+            console.log("[MultiplayerPyodide] Waiting for server episode start state...");
+
+            // Check if we already have pending state (server sent it before we called reset)
+            let serverState = this.pendingEpisodeState;
+
+            if (!serverState) {
+                // Wait for the server to send the episode start state
+                serverState = await this.waitForEpisodeStart();
+            }
+
+            // Clear pending state
+            this.pendingEpisodeState = null;
+
+            if (serverState) {
+                console.log(`[MultiplayerPyodide] Applying server episode state (episode ${serverState.episode_num})`);
+
+                // Apply the authoritative state from server
+                await this.applyServerState(serverState);
+
+                // Now do local reset to get render state (env state already applied)
+                const result = await this.pyodide.runPythonAsync(`
+import numpy as np
+
+# Get current obs from environment (state already set by applyServerState)
+# Just need to get observations and render without resetting
+obs = {}
+for agent_id in env.agent_ids if hasattr(env, 'agent_ids') else env.possible_agents if hasattr(env, 'possible_agents') else [0]:
+    if hasattr(env, 'observation_space'):
+        obs[agent_id] = env.observation_space.sample()  # Placeholder, will be overwritten
+
+# Actually get obs from a step with no-op or from last obs
+# Since we set_state, the env should be in correct state
+# We need to render to get display state
+render_state = env.render()
+
+# Try to get actual observations
+if hasattr(env, 'get_obs'):
+    obs = env.get_obs()
+elif hasattr(env, '_get_obs'):
+    obs = env._get_obs()
+else:
+    # Fallback: do a reset to get obs (state will be overwritten but that's ok for display)
+    obs, infos = env.reset(seed=${this.gameSeed || 'None'})
+
+if not isinstance(obs, dict):
+    obs = obs.reshape(-1).astype(np.float32)
+elif isinstance(obs, dict) and isinstance([*obs.values()][0], dict):
+    obs = {k: {kk: vv.reshape(-1).astype(np.float32) for kk, vv in v.items()} for k, v in obs.items()}
+elif isinstance(obs, dict):
+    obs = {k: v.reshape(-1).astype(np.float32) for k, v in obs.items()}
+
+if not isinstance(obs, dict):
+    obs = {"human": obs}
+
+infos = {}
+obs, infos, render_state
+                `);
+
+                let [obs, infos, render_state] = await this.pyodide.toPy(result).toJs();
+
+                // Handle RGB array rendering if needed
+                let game_image_binary = null;
+                if (Array.isArray(render_state) && Array.isArray(render_state[0])) {
+                    game_image_binary = this.convertRGBArrayToImage(render_state);
+                }
+
+                render_state = {
+                    "game_state_objects": game_image_binary ? null : render_state.map(item => convertUndefinedToNull(item)),
+                    "game_image_base64": game_image_binary,
+                    "step": this.step_num,
+                };
+
+                // State is already synced from server
+                this.step_num = serverState.step_num || 0;
+                this.frameNumber = serverState.frame_number || 0;
+                this.shouldReset = false;
+                this.episodeComplete = false;
+
+                // Use server's cumulative rewards
+                if (serverState.cumulative_rewards) {
+                    this.cumulative_rewards = serverState.cumulative_rewards;
+                }
+
+                // Show and update HUD
+                ui_utils.showHUD();
+                ui_utils.updateHUDText(this.getHUDText());
+
+                // Show countdown for subsequent episodes before starting
+                // Use inherited method (which checks isSubsequentEpisode internally)
+                await this.showEpisodeTransition();
+
+                console.log(`[MultiplayerPyodide] Reset complete from server state (episode ${serverState.episode_num})`);
+                return [obs, infos, render_state];
+            } else {
+                // No server state received (timeout or error) - hide overlay and fall through to normal reset
+                ui_utils.hideEpisodeOverlay();
+            }
+        }
+
+        // Non-server-authoritative mode or fallback: do normal reset
+        // Show episode transition for subsequent episodes
+        await this.showEpisodeTransition();
 
         // Re-seed for deterministic resets
         if (this.gameSeed !== null) {
             await this.seedPythonEnvironment(this.gameSeed);
             seeded_random.resetMultiplayerRNG();
         }
-
 
         const startTime = performance.now();
         const result = await this.pyodide.runPythonAsync(`
@@ -418,6 +579,34 @@ obs, infos, render_state
         ui_utils.updateHUDText(this.getHUDText());
 
         return [obs, infos, render_state];
+    }
+
+    /**
+     * Wait for the server to send the episode start state.
+     * Returns a promise that resolves when server_episode_start is received.
+     */
+    waitForEpisodeStart(timeoutMs = 10000) {
+        return new Promise((resolve, reject) => {
+            this.waitingForEpisodeStart = true;
+            this.episodeStartResolve = resolve;
+
+            // Timeout to prevent hanging forever
+            const timeout = setTimeout(() => {
+                if (this.waitingForEpisodeStart) {
+                    console.warn(`[MultiplayerPyodide] Timeout waiting for server episode start`);
+                    this.waitingForEpisodeStart = false;
+                    this.episodeStartResolve = null;
+                    resolve(null);  // Resolve with null to allow fallback
+                }
+            }, timeoutMs);
+
+            // Store timeout so we can clear it if resolved
+            const originalResolve = this.episodeStartResolve;
+            this.episodeStartResolve = (state) => {
+                clearTimeout(timeout);
+                originalResolve(state);
+            };
+        });
     }
 
     async step(allActionsDict) {
@@ -486,6 +675,7 @@ obs, infos, render_state
         console.debug(`[MultiplayerPyodide] Frame ${this.frameNumber}: Stepping with actions`, finalActions);
 
         // 3. Step environment immediately with complete actions (no waiting!)
+        const stepStartTime = performance.now();
         const stepResult = await this.stepWithActions(finalActions);
 
         if (!stepResult) {
@@ -494,8 +684,14 @@ obs, infos, render_state
 
         const [obs, rewards, terminateds, truncateds, infos, render_state] = stepResult;
 
+        // Track step timing for diagnostics
+        this.trackStepTime(stepStartTime);
+
         // 4. Increment frame
         this.frameNumber++;
+
+        // Log diagnostics periodically
+        this.logDiagnostics();
 
         // 5. Trigger periodic state verification (host-based mode only)
         // In server-authoritative mode, the server handles broadcasting
@@ -557,6 +753,72 @@ obs, infos, render_state
             } else {
                 return this.defaultAction;
             }
+        }
+    }
+
+    /**
+     * Log diagnostics about performance and synchronization.
+     * Helps identify lag sources (queue buildup, slow steps, etc.)
+     */
+    logDiagnostics() {
+        const now = Date.now();
+        if (now - this.diagnostics.lastDiagnosticsLog < this.diagnostics.diagnosticsInterval) {
+            return;  // Not time yet
+        }
+        this.diagnostics.lastDiagnosticsLog = now;
+
+        // Calculate queue sizes
+        const queueSizes = {};
+        let totalQueueSize = 0;
+        for (const [playerId, queue] of Object.entries(this.otherPlayerActionQueues)) {
+            queueSizes[playerId] = queue.length;
+            totalQueueSize += queue.length;
+        }
+
+        // Calculate average step time
+        const stepTimes = this.diagnostics.stepTimes;
+        const avgStepTime = stepTimes.length > 0
+            ? (stepTimes.reduce((a, b) => a + b, 0) / stepTimes.length).toFixed(1)
+            : 'N/A';
+        const maxStepTime = stepTimes.length > 0
+            ? Math.max(...stepTimes).toFixed(1)
+            : 'N/A';
+
+        // Log summary
+        console.log(
+            `[Diagnostics] Frame: ${this.frameNumber} | ` +
+            `Step avg: ${avgStepTime}ms, max: ${maxStepTime}ms | ` +
+            `Queue total: ${totalQueueSize} | ` +
+            `Queues: ${JSON.stringify(queueSizes)}`
+        );
+
+        // Warn if queues are growing (indicates one client is behind)
+        if (totalQueueSize > 10) {
+            console.warn(
+                `[Diagnostics] ⚠️ Queue buildup detected (${totalQueueSize} actions). ` +
+                `This client may be running faster than others, or network delays are occurring.`
+            );
+        }
+
+        // Clear rolling window for next interval
+        this.diagnostics.stepTimes = [];
+    }
+
+    /**
+     * Track step execution time for diagnostics.
+     */
+    trackStepTime(startTime) {
+        const elapsed = performance.now() - startTime;
+        this.diagnostics.stepTimes.push(elapsed);
+
+        // Keep only last 100 measurements
+        if (this.diagnostics.stepTimes.length > 100) {
+            this.diagnostics.stepTimes.shift();
+        }
+
+        // Warn if step is taking too long
+        if (elapsed > 100) {
+            console.warn(`[Diagnostics] Slow step: ${elapsed.toFixed(1)}ms (frame ${this.frameNumber})`);
         }
     }
 
@@ -697,10 +959,24 @@ obs, rewards, terminateds, truncateds, infos, render_state
          * Falls back to a simple hash function if crypto.subtle is unavailable
          * (which happens on non-HTTPS connections).
          */
-        // Get env state from Python (reuses the get_state() method)
+        // Get env state from Python (uses get_state if available, otherwise default pickle method)
         const envState = await this.pyodide.runPythonAsync(`
 import json
-env.get_state()
+import pickle
+import base64
+
+# Use get_state if available, otherwise use default pickle serialization
+if hasattr(env, 'get_state') and callable(getattr(env, 'get_state')):
+    env.get_state()
+else:
+    # Default pickle-based serialization
+    original_module = env.__class__.__module__
+    env.__class__.__module__ = '__main__'
+    try:
+        pickled = pickle.dumps(env)
+    finally:
+        env.__class__.__module__ = original_module
+    {'pickled_state': base64.b64encode(pickled).decode('utf-8')}
         `);
 
         // Build state dict in JavaScript
@@ -756,30 +1032,41 @@ env.get_state()
         /**
          * Serialize complete environment state (host only)
          *
-         * Requires environment to implement get_state() method that returns
-         * a JSON-serializable dict containing complete state.
+         * Uses env.get_state() if available, otherwise uses default pickle-based
+         * serialization. The result must be JSON-serializable.
          */
         const fullState = await this.pyodide.runPythonAsync(`
 import numpy as np
+import json
+import pickle
+import base64
 
-# Get environment state (must be JSON-serializable)
-# This call will raise an error if get_state() is not implemented properly
+# Get environment state (use get_state if available, otherwise default pickle)
 try:
-    env_state = env.get_state()
+    if hasattr(env, 'get_state') and callable(getattr(env, 'get_state')):
+        env_state = env.get_state()
+    else:
+        # Default pickle-based serialization
+        original_module = env.__class__.__module__
+        env.__class__.__module__ = '__main__'
+        try:
+            pickled = pickle.dumps(env)
+        finally:
+            env.__class__.__module__ = original_module
+        env_state = {'pickled_state': base64.b64encode(pickled).decode('utf-8')}
 except Exception as e:
-    print(f"[Python] Error calling env.get_state(): {e}")
+    print(f"[Python] Error getting env state: {e}")
     raise RuntimeError(
-        f"env.get_state() failed: {e}\\n"
-        "Environment must return a JSON-serializable dict containing complete state."
+        f"Failed to get environment state: {e}\\n"
+        "Environment must be pickle-serializable or implement get_state() returning JSON-serializable dict."
     )
 
 # Validate that state is JSON-serializable
-import json
 try:
     json.dumps(env_state)
 except (TypeError, ValueError) as e:
     raise ValueError(
-        f"env.get_state() returned non-JSON-serializable data: {e}\\n"
+        f"Environment state is not JSON-serializable: {e}\\n"
         "State must contain only primitive types (int, float, str, bool, list, dict)"
     )
 
@@ -810,25 +1097,33 @@ state_dict
         /**
          * Restore state from host's serialized data (non-host only)
          *
-         * Requires environment to implement set_state() method that accepts
-         * the dict returned by get_state() and fully restores the environment.
+         * Uses env.set_state() if available, otherwise uses default pickle-based
+         * deserialization if the state contains pickled_state.
          */
         await this.pyodide.runPythonAsync(`
 import numpy as np
+import pickle
+import base64
 
 state_obj = ${this.pyodide.toPy(state)}
 
 # Restore environment state (most important!)
 if 'env_state' in state_obj:
-    try:
-        env.set_state(state_obj['env_state'])
+    env_state = state_obj['env_state']
+
+    # Use set_state if available, otherwise use default pickle deserialization
+    if hasattr(env, 'set_state') and callable(getattr(env, 'set_state')):
+        env.set_state(env_state)
         print("[Python] ✓ Restored environment state via set_state()")
-    except Exception as e:
-        print(f"[Python] Error calling env.set_state(): {e}")
-        raise RuntimeError(
-            f"env.set_state() failed: {e}\\n"
-            "Environment must accept the dict from get_state() and fully restore state."
-        )
+    elif 'pickled_state' in env_state:
+        # Default pickle-based deserialization
+        encoded = env_state['pickled_state']
+        pickled = base64.b64decode(encoded.encode('utf-8'))
+        restored = pickle.loads(pickled)
+        env.__dict__.update(restored.__dict__)
+        print("[Python] ✓ Restored environment state via pickle deserialization")
+    else:
+        print("[Python] Warning: Cannot restore env state - no set_state method and no pickled_state")
 else:
     print("[Python] Warning: No env_state in sync data")
 
@@ -871,15 +1166,24 @@ if 'numpy_rng_state' in state_obj:
         if (state.env_state) {
             await this.pyodide.runPythonAsync(`
 import numpy as np
+import pickle
+import base64
 
 env_state = ${this.pyodide.toPy(state.env_state)}
 
-try:
+# Use set_state if available, otherwise use default pickle deserialization
+if hasattr(env, 'set_state') and callable(getattr(env, 'set_state')):
     env.set_state(env_state)
     print("[Python] ✓ Applied server authoritative state via set_state()")
-except Exception as e:
-    print(f"[Python] Error applying server state: {e}")
-    raise
+elif 'pickled_state' in env_state:
+    # Default pickle-based deserialization
+    encoded = env_state['pickled_state']
+    pickled = base64.b64decode(encoded.encode('utf-8'))
+    restored = pickle.loads(pickled)
+    env.__dict__.update(restored.__dict__)
+    print("[Python] ✓ Applied server authoritative state via pickle deserialization")
+else:
+    print("[Python] Warning: Cannot apply server state - no set_state method and no pickled_state")
             `);
         }
 

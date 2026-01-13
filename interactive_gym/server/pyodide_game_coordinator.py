@@ -50,6 +50,11 @@ class PyodideGameState:
     server_authoritative: bool = False
     server_runner: Any = None  # ServerGameRunner instance when enabled
 
+    # Diagnostics for lag tracking
+    last_action_times: Dict[str | int, float] = dataclasses.field(default_factory=dict)  # player_id -> last action timestamp
+    action_delays: Dict[str | int, list] = dataclasses.field(default_factory=dict)  # player_id -> recent delays
+    last_diagnostics_log: float = 0.0
+
 
 class PyodideGameCoordinator:
     """
@@ -266,6 +271,14 @@ class PyodideGameCoordinator:
                      },
                      room=game_id)
 
+        # Broadcast initial episode state so clients can sync before starting
+        # Clients wait for this server_episode_start event before beginning the game loop
+        if game.server_authoritative and game.server_runner:
+            game.server_runner.broadcast_state(event_type="server_episode_start")
+            logger.info(
+                f"Broadcast initial episode state for game {game_id}"
+            )
+
         logger.info(
             f"Game {game_id} started with {len(game.players)} players"
             f"{' (server-authoritative)' if game.server_authoritative else ' (host-based)'}"
@@ -276,7 +289,8 @@ class PyodideGameCoordinator:
         game_id: str,
         player_id: str | int,
         action: Any,
-        frame_number: int
+        frame_number: int,
+        client_timestamp: float | None = None
     ):
         """
         Receive action from a player and broadcast to others immediately.
@@ -292,6 +306,7 @@ class PyodideGameCoordinator:
             player_id: Player who sent the action
             action: The action value (int, dict, etc.)
             frame_number: Frame number (for logging/debugging)
+            client_timestamp: Client-side timestamp when action was sent (for lag tracking)
         """
         with self.lock:
             if game_id not in self.games:
@@ -303,6 +318,27 @@ class PyodideGameCoordinator:
             if not game.is_active:
                 logger.warning(f"Action received for inactive game {game_id}")
                 return
+
+            # Track timing for diagnostics
+            now = time.time()
+            player_id_str = str(player_id)
+
+            # Calculate inter-action delay for this player
+            if player_id_str in game.last_action_times:
+                delay = now - game.last_action_times[player_id_str]
+                if player_id_str not in game.action_delays:
+                    game.action_delays[player_id_str] = []
+                game.action_delays[player_id_str].append(delay)
+                # Keep only last 50 measurements
+                if len(game.action_delays[player_id_str]) > 50:
+                    game.action_delays[player_id_str].pop(0)
+
+            game.last_action_times[player_id_str] = now
+
+            # Log diagnostics periodically (every 5 seconds)
+            if now - game.last_diagnostics_log > 5.0:
+                self._log_game_diagnostics(game)
+                game.last_diagnostics_log = now
 
             # Track last known action from this player (for debugging)
             game.pending_actions[player_id] = action
@@ -690,6 +726,54 @@ class PyodideGameCoordinator:
 
         # Trigger resync from new host
         self._handle_desync(game_id, game.frame_number)
+
+    def _log_game_diagnostics(self, game: PyodideGameState):
+        """
+        Log diagnostics for a game to help identify lag sources.
+
+        Tracks:
+        - Inter-action delay per player (time between actions from same player)
+        - Frame number disparity between server runner and clients
+        """
+        diagnostics = []
+
+        # Calculate average inter-action delay per player
+        for player_id, delays in game.action_delays.items():
+            if delays:
+                avg_delay = sum(delays) / len(delays)
+                max_delay = max(delays)
+                min_delay = min(delays)
+                diagnostics.append(
+                    f"Player {player_id}: avg={avg_delay*1000:.1f}ms, "
+                    f"max={max_delay*1000:.1f}ms, min={min_delay*1000:.1f}ms"
+                )
+
+        # Server runner frame info
+        if game.server_runner and game.server_runner.is_initialized:
+            diagnostics.append(f"Server frame: {game.server_runner.frame_number}")
+
+        if diagnostics:
+            logger.info(
+                f"[Diagnostics] Game {game.game_id} - " +
+                " | ".join(diagnostics)
+            )
+
+        # Warn if there's significant disparity in action rates
+        if len(game.action_delays) >= 2:
+            avg_delays = {
+                pid: sum(delays) / len(delays) if delays else 0
+                for pid, delays in game.action_delays.items()
+            }
+            if avg_delays:
+                min_avg = min(avg_delays.values())
+                max_avg = max(avg_delays.values())
+                if min_avg > 0 and max_avg / min_avg > 1.5:
+                    logger.warning(
+                        f"[Diagnostics] Game {game.game_id}: Action rate disparity detected! "
+                        f"Fastest player: {min_avg*1000:.1f}ms avg, "
+                        f"Slowest player: {max_avg*1000:.1f}ms avg. "
+                        f"This may cause queue buildup and lag."
+                    )
 
     def get_stats(self) -> dict:
         """Get coordinator statistics for monitoring/debugging."""

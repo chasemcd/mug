@@ -105,9 +105,40 @@ env
         this.pyodideReady = true;
     }
 
+    /**
+     * Show episode transition UI (waiting message and countdown).
+     * Called at the start of reset() for subsequent episodes.
+     *
+     * @param {string} waitingMessage - Message to show while waiting (optional)
+     * @returns {Promise} Resolves when countdown completes
+     */
+    async showEpisodeTransition(waitingMessage = null) {
+        // Check if this is a subsequent episode (not the first one)
+        const isSubsequentEpisode = this.num_episodes > 0;
+
+        if (!isSubsequentEpisode) {
+            // First episode - just ensure overlay is hidden
+            ui_utils.hideEpisodeOverlay();
+            return;
+        }
+
+        // Show waiting message if provided
+        if (waitingMessage) {
+            ui_utils.showEpisodeWaiting(waitingMessage);
+        }
+
+        // Show countdown before starting
+        const episodeNum = this.num_episodes + 1;
+        await ui_utils.showEpisodeCountdown(3, `Round ${episodeNum} starting!`);
+    }
+
     async reset() {
         this.shouldReset = false;
         console.log("Resetting the environment");
+
+        // Show episode transition for subsequent episodes
+        await this.showEpisodeTransition();
+
         const startTime = performance.now();
         const result = await this.pyodide.runPythonAsync(`
 import numpy as np

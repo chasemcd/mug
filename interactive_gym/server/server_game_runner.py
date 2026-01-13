@@ -317,9 +317,13 @@ random.seed({rng_seed})
 
         return state
 
-    def broadcast_state(self):
+    def broadcast_state(self, event_type: str = "server_authoritative_state"):
         """
         Broadcast authoritative state to all clients.
+
+        Args:
+            event_type: Socket event name to emit. Use "server_authoritative_state"
+                       for periodic updates and "server_episode_start" for episode begins.
         """
         if self.sio is None:
             return
@@ -327,7 +331,7 @@ random.seed({rng_seed})
         state = self.get_authoritative_state()
 
         self.sio.emit(
-            "server_authoritative_state",
+            event_type,
             {
                 "game_id": self.game_id,
                 "state": state,
@@ -336,15 +340,19 @@ random.seed({rng_seed})
         )
 
         logger.debug(
-            f"[ServerGameRunner] Broadcast state at frame {self.frame_number}"
+            f"[ServerGameRunner] Broadcast {event_type} at frame {self.frame_number}"
         )
 
     def handle_episode_end(self):
         """
-        Handle episode completion - reset environment.
+        Handle episode completion - reset environment and broadcast new episode state.
+
+        Clients wait for the server_episode_start event before beginning the new episode,
+        ensuring all clients start from the exact same state at the same time.
         """
         self.episode_num += 1
         self.step_num = 0
+        self.frame_number = 0
 
         # Re-seed RNG for deterministic reset
         if self.rng_seed is not None:
@@ -355,8 +363,12 @@ random.seed({rng_seed})
 
         obs, info = self.env.reset(seed=self.rng_seed)
 
-        # Broadcast state after reset
-        self.broadcast_state()
+        # Clear pending actions for fresh episode
+        self.pending_actions.clear()
+
+        # Broadcast state after reset with special event type
+        # Clients wait for this before starting the new episode
+        self.broadcast_state(event_type="server_episode_start")
 
         logger.info(
             f"[ServerGameRunner] Episode {self.episode_num} started for {self.game_id}"
