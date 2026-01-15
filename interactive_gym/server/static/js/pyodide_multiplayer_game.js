@@ -67,7 +67,15 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
             stepTimes: [],          // Rolling window of step execution times
             queueSizeHistory: [],   // Track queue sizes over time
             lastDiagnosticsLog: 0,
+            lastDiagnosticsFrame: 0,  // Frame number at last diagnostics log
             diagnosticsInterval: 5000,  // Log diagnostics every 5 seconds
+            // Track fallback usage per player
+            fallbackCount: {},      // player_id -> count of fallback actions used
+            queueHitCount: {},      // player_id -> count of actions from queue
+            // State sync metrics
+            lastSyncFrame: 0,
+            syncCount: 0,
+            frameDriftHistory: [],  // Track frame drift at each sync
         };
 
         this.setupMultiplayerHandlers();
@@ -136,6 +144,11 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
 
         // Receive other player's action (Action Queue - Option B)
         socket.on('pyodide_other_player_action', (data) => {
+            // Don't queue actions if game is done (prevents queue buildup at game end)
+            if (this.state === "done") {
+                return;
+            }
+
             const { player_id, action, frame_number } = data;
 
             // Initialize queue if needed
@@ -219,12 +232,50 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
                 return;  // Not for this game
             }
 
-            console.log(`[MultiplayerPyodide] Received authoritative state at frame ${state.frame_number}`);
+            // Calculate sync metrics
+            const frameDiff = this.frameNumber - state.frame_number;  // Positive = client ahead
+            this.diagnostics.syncCount++;
+            this.diagnostics.frameDriftHistory.push(frameDiff);
+            if (this.diagnostics.frameDriftHistory.length > 20) {
+                this.diagnostics.frameDriftHistory.shift();
+            }
+
+            // Gather queue state for logging
+            const queueSizes = {};
+            let totalQueueSize = 0;
+            for (const [playerId, queue] of Object.entries(this.otherPlayerActionQueues)) {
+                queueSizes[playerId] = queue.length;
+                totalQueueSize += queue.length;
+            }
+
+            // Calculate step time stats
+            const stepTimes = this.diagnostics.stepTimes;
+            const avgStepTime = stepTimes.length > 0
+                ? (stepTimes.reduce((a, b) => a + b, 0) / stepTimes.length).toFixed(1)
+                : 'N/A';
+
+            // Calculate fallback rate
+            let totalFallbacks = 0;
+            let totalQueueHits = 0;
+            for (const count of Object.values(this.diagnostics.fallbackCount)) totalFallbacks += count;
+            for (const count of Object.values(this.diagnostics.queueHitCount)) totalQueueHits += count;
+            const totalActions = totalFallbacks + totalQueueHits;
+            const fallbackRate = totalActions > 0 ? ((totalFallbacks / totalActions) * 100).toFixed(1) : '0.0';
+
+            // Log comprehensive sync info
+            console.log(
+                `[Sync #${this.diagnostics.syncCount}] ` +
+                `Server: ${state.frame_number} | Client: ${this.frameNumber} | Drift: ${frameDiff > 0 ? '+' : ''}${frameDiff} | ` +
+                `Queues: ${totalQueueSize} ${JSON.stringify(queueSizes)} | ` +
+                `Step: ${avgStepTime}ms | Fallback: ${fallbackRate}%`
+            );
 
             // Check if we're significantly out of sync
-            const frameDiff = Math.abs(this.frameNumber - state.frame_number);
-            if (frameDiff > 5) {
-                console.warn(`[MultiplayerPyodide] Frame drift detected: client=${this.frameNumber}, server=${state.frame_number}`);
+            if (Math.abs(frameDiff) > 5) {
+                console.warn(
+                    `[Sync] ⚠️ Large drift detected! Applying server state. ` +
+                    `Queue pre-sync: ${totalQueueSize}`
+                );
                 await this.applyServerState(state);
             } else {
                 // Small drift is normal - just update cumulative rewards for HUD accuracy
@@ -233,6 +284,8 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
                     ui_utils.updateHUDText(this.getHUDText());
                 }
             }
+
+            this.diagnostics.lastSyncFrame = state.frame_number;
         });
 
         // Server episode start (server-authoritative mode)
@@ -401,7 +454,20 @@ print(f"[Python] Seeded RNG with {${seed}}")
          * This ensures all clients start each episode from the exact same state.
          */
         this.shouldReset = false;
-        console.log("[MultiplayerPyodide] Resetting environment. Player:", this.myPlayerId, "Game:", this.gameId, "Seed:", this.gameSeed);
+        console.log(`[Episode] Starting reset for episode ${this.num_episodes + 1}. Player: ${this.myPlayerId}, Game: ${this.gameId}`);
+
+        // Clear action queues at the start of reset to discard stale actions from previous episode
+        for (const playerId in this.otherPlayerActionQueues) {
+            this.otherPlayerActionQueues[playerId] = [];
+        }
+        this.lastExecutedActions = {};
+
+        // Reset per-episode diagnostics
+        this.diagnostics.syncCount = 0;
+        this.diagnostics.frameDriftHistory = [];
+        this.diagnostics.fallbackCount = {};
+        this.diagnostics.queueHitCount = {};
+        this.diagnostics.stepTimes = [];
 
         // In server-authoritative mode, wait for server to broadcast episode start state
         if (this.serverAuthoritative) {
@@ -663,14 +729,18 @@ obs, infos, render_state
         }
 
         // 2. Send MY action to server (for other clients to queue)
-        const myAction = finalActions[this.myPlayerId];
-        socket.emit('pyodide_player_action', {
-            game_id: this.gameId,
-            player_id: this.myPlayerId,
-            action: myAction,
-            frame_number: this.frameNumber,
-            timestamp: Date.now()
-        });
+        // Don't send actions during episode transitions to prevent queue buildup
+        const inEpisodeTransition = this.episodeComplete || this.waitingForEpisodeStart || this.shouldReset;
+        if (!inEpisodeTransition) {
+            const myAction = finalActions[this.myPlayerId];
+            socket.emit('pyodide_player_action', {
+                game_id: this.gameId,
+                player_id: this.myPlayerId,
+                action: myAction,
+                frame_number: this.frameNumber,
+                timestamp: Date.now()
+            });
+        }
 
         console.debug(`[MultiplayerPyodide] Frame ${this.frameNumber}: Stepping with actions`, finalActions);
 
@@ -719,7 +789,20 @@ obs, infos, render_state
 
         if ((all_terminated || all_truncated) && !this.episodeComplete) {
             this.episodeComplete = true;
-            console.log('[MultiplayerPyodide] Episode complete');
+
+            // Log episode summary
+            const queueSizes = {};
+            let totalQueueSize = 0;
+            for (const [playerId, queue] of Object.entries(this.otherPlayerActionQueues)) {
+                queueSizes[playerId] = queue.length;
+                totalQueueSize += queue.length;
+            }
+            console.log(
+                `[Episode] Complete at frame ${this.frameNumber} | ` +
+                `Rewards: ${JSON.stringify(this.cumulative_rewards)} | ` +
+                `Final queues: ${totalQueueSize} ${JSON.stringify(queueSizes)} | ` +
+                `Syncs: ${this.diagnostics.syncCount}`
+            );
 
             // Signal scene termination to server
             // Data is saved via remoteGameLogger and sent at scene termination via emit_remote_game_data
@@ -741,11 +824,13 @@ obs, infos, render_state
         if (queue && queue.length > 0) {
             // Pop oldest action from queue (FIFO)
             const { action } = queue.shift();
-            console.debug(`[MultiplayerPyodide] Popped action ${action} from player ${playerId}'s queue (remaining: ${queue.length})`);
+            // Track queue hit
+            this.diagnostics.queueHitCount[playerIdStr] = (this.diagnostics.queueHitCount[playerIdStr] || 0) + 1;
             return action;
         } else {
             // Queue empty - use fallback based on action_population_method
-            console.debug(`[MultiplayerPyodide] Queue empty for player ${playerId}, using fallback (${this.actionPopulationMethod})`);
+            // Track fallback usage
+            this.diagnostics.fallbackCount[playerIdStr] = (this.diagnostics.fallbackCount[playerIdStr] || 0) + 1;
 
             if (this.actionPopulationMethod === 'previous_submitted_action') {
                 const lastAction = this.lastExecutedActions[playerIdStr];
@@ -765,7 +850,13 @@ obs, infos, render_state
         if (now - this.diagnostics.lastDiagnosticsLog < this.diagnostics.diagnosticsInterval) {
             return;  // Not time yet
         }
-        this.diagnostics.lastDiagnosticsLog = now;
+
+        // Skip first interval (initialization) - just record baseline
+        if (this.diagnostics.lastDiagnosticsLog === 0) {
+            this.diagnostics.lastDiagnosticsLog = now;
+            this.diagnostics.lastDiagnosticsFrame = this.frameNumber;
+            return;
+        }
 
         // Calculate queue sizes
         const queueSizes = {};
@@ -775,7 +866,7 @@ obs, infos, render_state
             totalQueueSize += queue.length;
         }
 
-        // Calculate average step time
+        // Calculate step time stats
         const stepTimes = this.diagnostics.stepTimes;
         const avgStepTime = stepTimes.length > 0
             ? (stepTimes.reduce((a, b) => a + b, 0) / stepTimes.length).toFixed(1)
@@ -784,24 +875,59 @@ obs, infos, render_state
             ? Math.max(...stepTimes).toFixed(1)
             : 'N/A';
 
-        // Log summary
+        // Calculate fallback rate per player and total
+        const fallbackRates = {};
+        let totalFallbacks = 0;
+        let totalQueueHits = 0;
+        for (const [playerId, count] of Object.entries(this.diagnostics.fallbackCount)) {
+            const hits = this.diagnostics.queueHitCount[playerId] || 0;
+            const total = count + hits;
+            fallbackRates[playerId] = total > 0 ? ((count / total) * 100).toFixed(0) + '%' : '0%';
+            totalFallbacks += count;
+        }
+        for (const count of Object.values(this.diagnostics.queueHitCount)) totalQueueHits += count;
+        const totalActions = totalFallbacks + totalQueueHits;
+        const overallFallbackRate = totalActions > 0 ? ((totalFallbacks / totalActions) * 100).toFixed(1) : '0.0';
+
+        // Calculate effective FPS from actual frame delta (more accurate than stepTimes.length)
+        const targetFPS = this.config.fps || 10;
+        const intervalMs = now - this.diagnostics.lastDiagnosticsLog;
+        const framesDelta = this.frameNumber - this.diagnostics.lastDiagnosticsFrame;
+        const effectiveFPS = intervalMs > 0 ? ((framesDelta / intervalMs) * 1000).toFixed(1) : 'N/A';
+
+        // Log comprehensive summary
         console.log(
-            `[Diagnostics] Frame: ${this.frameNumber} | ` +
-            `Step avg: ${avgStepTime}ms, max: ${maxStepTime}ms | ` +
-            `Queue total: ${totalQueueSize} | ` +
-            `Queues: ${JSON.stringify(queueSizes)}`
+            `[Perf] Frame: ${this.frameNumber} | ` +
+            `FPS: ${effectiveFPS}/${targetFPS} | ` +
+            `Step: ${avgStepTime}ms avg, ${maxStepTime}ms max | ` +
+            `Queues: ${totalQueueSize} ${JSON.stringify(queueSizes)} | ` +
+            `Fallback: ${overallFallbackRate}% ${JSON.stringify(fallbackRates)}`
         );
 
         // Warn if queues are growing (indicates one client is behind)
         if (totalQueueSize > 10) {
             console.warn(
-                `[Diagnostics] ⚠️ Queue buildup detected (${totalQueueSize} actions). ` +
-                `This client may be running faster than others, or network delays are occurring.`
+                `[Perf] ⚠️ Queue buildup: ${totalQueueSize} actions. ` +
+                `Client may be faster than partner or network delays occurring.`
             );
         }
 
-        // Clear rolling window for next interval
+        // Warn if fallback rate is high
+        if (parseFloat(overallFallbackRate) > 20) {
+            console.warn(
+                `[Perf] ⚠️ High fallback rate: ${overallFallbackRate}%. ` +
+                `Partner actions arriving late - possible network lag or slow partner.`
+            );
+        }
+
+        // Clear rolling windows for next interval
         this.diagnostics.stepTimes = [];
+        // Reset fallback/hit counts for next interval (to see current rate, not cumulative)
+        this.diagnostics.fallbackCount = {};
+        this.diagnostics.queueHitCount = {};
+        // Update tracking for next FPS calculation
+        this.diagnostics.lastDiagnosticsLog = now;
+        this.diagnostics.lastDiagnosticsFrame = this.frameNumber;
     }
 
     /**
@@ -814,11 +940,6 @@ obs, infos, render_state
         // Keep only last 100 measurements
         if (this.diagnostics.stepTimes.length > 100) {
             this.diagnostics.stepTimes.shift();
-        }
-
-        // Warn if step is taking too long
-        if (elapsed > 100) {
-            console.warn(`[Diagnostics] Slow step: ${elapsed.toFixed(1)}ms (frame ${this.frameNumber})`);
         }
     }
 
