@@ -19,6 +19,15 @@ from typing import Any, Dict
 
 logger = logging.getLogger(__name__)
 
+# Ensure this module's logger has a handler so messages are visible
+if not logger.handlers:
+    handler = logging.StreamHandler()
+    handler.setFormatter(logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    ))
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
+
 
 class ServerGameRunner:
     """
