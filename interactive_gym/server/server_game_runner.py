@@ -13,9 +13,7 @@ Key properties:
 
 from __future__ import annotations
 
-import base64
 import logging
-import pickle
 import threading
 from typing import Any, Dict
 
@@ -279,13 +277,13 @@ random.seed({rng_seed})
         """
         Get full authoritative state for broadcast.
 
-        Uses the environment's get_state() if available, otherwise falls back
-        to default pickle-based serialization. The state is base64-encoded
-        pickle data that can be unpickled on the Pyodide client.
+        Requires the environment to implement get_state() returning a
+        JSON-serializable dict. This is necessary for deterministic hash
+        comparison between server (CPython) and client (Pyodide).
 
         If state serialization fails, we still broadcast basic state
         (frame_number, cumulative_rewards) which is sufficient for keeping
-        clients in sync on score display.
+        clients in sync on score display, but state corrections won't work.
         """
         import time
         start_time = time.time()
@@ -298,24 +296,25 @@ random.seed({rng_seed})
             "server_timestamp": time.time() * 1000,  # ms timestamp for staleness tracking
         }
 
-        # Include environment state
-        # Use env.get_state() if available, otherwise use default pickle method
-        env_state_included = False
-        serialization_method = "none"
-        env_state_size = 0
+        # Include environment state - requires get_state() method
+        if not hasattr(self.env, "get_state"):
+            logger.error(
+                f"[ServerGameRunner] Environment does not implement get_state(). "
+                f"State synchronization will NOT work. "
+                f"Please implement get_state() and set_state() methods that return/accept "
+                f"JSON-serializable dicts with primitive types only."
+            )
+            return state
+
         try:
+            import json
+            import hashlib
+
             serialize_start = time.time()
-            if hasattr(self.env, "get_state"):
-                env_state = self.env.get_state()
-                serialization_method = "get_state"
-            else:
-                env_state = self._default_get_env_state()
-                serialization_method = "pickle"
+            env_state = self.env.get_state()
             serialize_time_ms = (time.time() - serialize_start) * 1000
 
             # Verify it's JSON-serializable (for socket.io transmission)
-            import json
-            import hashlib
             json_start = time.time()
             json_str = json.dumps(env_state, sort_keys=True)
             json_time_ms = (time.time() - json_start) * 1000
@@ -327,12 +326,11 @@ random.seed({rng_seed})
 
             state["env_state"] = env_state
             state["state_hash"] = state_hash
-            env_state_included = True
 
             total_time_ms = (time.time() - start_time) * 1000
             logger.info(
                 f"[ServerGameRunner] State serialization: frame={self.frame_number}, "
-                f"method={serialization_method}, size={env_state_size/1024:.1f}KB, "
+                f"size={env_state_size/1024:.1f}KB, "
                 f"serialize={serialize_time_ms:.1f}ms, json={json_time_ms:.1f}ms, total={total_time_ms:.1f}ms, "
                 f"hash={state_hash}"
             )
@@ -340,7 +338,8 @@ random.seed({rng_seed})
             # Log warning - this is important because without env_state, clients can't sync positions
             logger.warning(
                 f"[ServerGameRunner] Cannot include env_state in broadcast: {e}. "
-                f"Clients will NOT be able to sync game state (positions, etc)."
+                f"Clients will NOT be able to sync game state (positions, etc). "
+                f"Ensure get_state() returns a JSON-serializable dict."
             )
 
         return state
@@ -410,48 +409,6 @@ random.seed({rng_seed})
         ]
         for f in frames_to_remove:
             del self.pending_actions[f]
-
-    def _default_get_env_state(self) -> dict:
-        """
-        Default pickle-based state serialization.
-
-        Used when the environment doesn't implement its own get_state() method.
-        Temporarily sets the class module to '__main__' before pickling so that
-        the Pyodide client (which also uses '__main__') can unpickle it.
-
-        Returns a dict with 'pickled_state' containing base64-encoded pickle data.
-        """
-        if self.env is None:
-            return {}
-
-        # Temporarily set module to __main__ for pickling compatibility
-        # Both server and Pyodide client use __main__ namespace
-        original_module = self.env.__class__.__module__
-        self.env.__class__.__module__ = '__main__'
-        try:
-            pickled = pickle.dumps(self.env)
-        finally:
-            # Restore original module
-            self.env.__class__.__module__ = original_module
-
-        encoded = base64.b64encode(pickled).decode('utf-8')
-        return {'pickled_state': encoded}
-
-    def _default_set_env_state(self, state: dict) -> None:
-        """
-        Default pickle-based state deserialization.
-
-        Used when the environment doesn't implement its own set_state() method.
-        Unpickles the state and updates the environment's __dict__.
-        """
-        if 'pickled_state' not in state:
-            logger.warning("[ServerGameRunner] No pickled_state in state dict")
-            return
-
-        encoded = state['pickled_state']
-        pickled = base64.b64decode(encoded.encode('utf-8'))
-        restored = pickle.loads(pickled)
-        self.env.__dict__.update(restored.__dict__)
 
     def stop(self):
         """Clean up resources."""

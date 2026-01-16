@@ -320,9 +320,8 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
                 `Latency: ${typeof networkLatency === 'number' ? networkLatency.toFixed(0) + 'ms' : networkLatency}`
             );
 
-            // Frame-aligned hash comparison: compare server's hash at frame N with
-            // client's recorded hash at frame N (from history)
             if (hasEnvState) {
+                // DETERMINISTIC STATE (custom get_state): Use hash comparison
                 const serverHash = state.state_hash || null;
                 const serverFrame = state.frame_number;
                 let clientHash = null;
@@ -502,15 +501,17 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
 
     async validateStateSync() {
         /**
-         * Ensure environment has state sync methods.
-         * If the environment doesn't implement get_state/set_state, inject default
-         * pickle-based implementations that serialize the entire environment.
+         * Validate that the environment implements required state sync methods.
+         *
+         * For multiplayer synchronization, environments MUST implement:
+         * - get_state(): Returns a JSON-serializable dict with primitive types
+         * - set_state(state): Restores environment from a state dict
+         *
+         * This enables deterministic hash comparison between server (CPython)
+         * and client (Pyodide) for detecting state divergence.
          */
 
         const result = await this.pyodide.runPythonAsync(`
-import pickle
-import base64
-
 # Check if environment has required methods for state synchronization
 has_get_state = hasattr(env, 'get_state') and callable(getattr(env, 'get_state'))
 has_set_state = hasattr(env, 'set_state') and callable(getattr(env, 'set_state'))
@@ -518,49 +519,17 @@ has_set_state = hasattr(env, 'set_state') and callable(getattr(env, 'set_state')
 env_type = type(env).__name__
 env_module = type(env).__module__
 
-# If methods are missing, inject default pickle-based implementations
 if not has_get_state or not has_set_state:
-    print(f"[Python] Environment {env_type} missing state sync methods, injecting defaults...")
-
-    def _default_get_state(self):
-        """
-        Default pickle-based state serialization.
-        Temporarily sets class module to '__main__' for cross-environment compatibility.
-        """
-        original_module = self.__class__.__module__
-        self.__class__.__module__ = '__main__'
-        try:
-            pickled = pickle.dumps(self)
-        finally:
-            self.__class__.__module__ = original_module
-        encoded = base64.b64encode(pickled).decode('utf-8')
-        return {'pickled_state': encoded}
-
-    def _default_set_state(self, state):
-        """
-        Default pickle-based state deserialization.
-        Unpickles and updates this environment's __dict__.
-        """
-        if 'pickled_state' not in state:
-            print("[Python] Warning: No pickled_state in state dict")
-            return
-        encoded = state['pickled_state']
-        pickled = base64.b64decode(encoded.encode('utf-8'))
-        restored = pickle.loads(pickled)
-        self.__dict__.update(restored.__dict__)
-
-    # Bind methods to the environment instance
-    import types
+    missing = []
     if not has_get_state:
-        env.get_state = types.MethodType(_default_get_state, env)
-        print(f"[Python] ✓ Injected default get_state() for {env_type}")
-
+        missing.append("get_state()")
     if not has_set_state:
-        env.set_state = types.MethodType(_default_set_state, env)
-        print(f"[Python] ✓ Injected default set_state() for {env_type}")
-
-    has_get_state = True
-    has_set_state = True
+        missing.append("set_state()")
+    print(f"[Python] ⚠️ Environment {env_type} is missing required methods: {', '.join(missing)}")
+    print(f"[Python] ⚠️ State synchronization will NOT work without these methods.")
+    print(f"[Python] ⚠️ Please implement get_state() and set_state() that return/accept JSON-serializable dicts.")
+else:
+    print(f"[Python] ✓ Environment {env_type} has get_state() and set_state() methods")
 
 {
     'has_get_state': has_get_state,
@@ -1289,25 +1258,22 @@ obs, rewards, terminateds, truncateds, infos, render_state
          * Compute MD5 hash of env_state only (matches server's state_hash).
          * This is used for quick comparison to avoid unnecessary state corrections.
          * Returns first 16 chars of MD5 hash to match server format.
+         *
+         * Requires the environment to implement get_state() returning a
+         * JSON-serializable dict.
          */
         const hashResult = await this.pyodide.runPythonAsync(`
 import json
 import hashlib
-import pickle
-import base64
 
-# Get env state (same method as server)
-if hasattr(env, 'get_state') and callable(getattr(env, 'get_state')):
-    _env_state_for_hash = env.get_state()
-else:
-    # Default pickle-based serialization
-    original_module = env.__class__.__module__
-    env.__class__.__module__ = '__main__'
-    try:
-        pickled = pickle.dumps(env)
-    finally:
-        env.__class__.__module__ = original_module
-    _env_state_for_hash = {'pickled_state': base64.b64encode(pickled).decode('utf-8')}
+if not hasattr(env, 'get_state') or not callable(getattr(env, 'get_state')):
+    raise RuntimeError(
+        "Environment does not implement get_state(). "
+        "State synchronization requires get_state() and set_state() methods "
+        "that return/accept JSON-serializable dicts with primitive types only."
+    )
+
+_env_state_for_hash = env.get_state()
 
 # Compute MD5 hash matching server's format (sort_keys=True for consistency)
 _json_str = json.dumps(_env_state_for_hash, sort_keys=True)
@@ -1324,27 +1290,21 @@ _hash
          *
          * Falls back to a simple hash function if crypto.subtle is unavailable
          * (which happens on non-HTTPS connections).
+         *
+         * Requires the environment to implement get_state() returning a
+         * JSON-serializable dict.
          */
-        // Get env state from Python (uses get_state if available, otherwise default pickle method)
         const envState = await this.pyodide.runPythonAsync(`
 import json
-import pickle
-import base64
 
-# Use get_state if available, otherwise use default pickle serialization
-if hasattr(env, 'get_state') and callable(getattr(env, 'get_state')):
-    _env_state_result = env.get_state()
-else:
-    # Default pickle-based serialization
-    original_module = env.__class__.__module__
-    env.__class__.__module__ = '__main__'
-    try:
-        pickled = pickle.dumps(env)
-    finally:
-        env.__class__.__module__ = original_module
-    _env_state_result = {'pickled_state': base64.b64encode(pickled).decode('utf-8')}
+if not hasattr(env, 'get_state') or not callable(getattr(env, 'get_state')):
+    raise RuntimeError(
+        "Environment does not implement get_state(). "
+        "State synchronization requires get_state() and set_state() methods "
+        "that return/accept JSON-serializable dicts with primitive types only."
+    )
 
-_env_state_result
+env.get_state()
         `);
 
         // Build state dict in JavaScript
@@ -1400,34 +1360,21 @@ _env_state_result
         /**
          * Serialize complete environment state (host only)
          *
-         * Uses env.get_state() if available, otherwise uses default pickle-based
-         * serialization. The result must be JSON-serializable.
+         * Requires the environment to implement get_state() returning a
+         * JSON-serializable dict.
          */
         const fullState = await this.pyodide.runPythonAsync(`
 import numpy as np
 import json
-import pickle
-import base64
 
-# Get environment state (use get_state if available, otherwise default pickle)
-try:
-    if hasattr(env, 'get_state') and callable(getattr(env, 'get_state')):
-        env_state = env.get_state()
-    else:
-        # Default pickle-based serialization
-        original_module = env.__class__.__module__
-        env.__class__.__module__ = '__main__'
-        try:
-            pickled = pickle.dumps(env)
-        finally:
-            env.__class__.__module__ = original_module
-        env_state = {'pickled_state': base64.b64encode(pickled).decode('utf-8')}
-except Exception as e:
-    print(f"[Python] Error getting env state: {e}")
+if not hasattr(env, 'get_state') or not callable(getattr(env, 'get_state')):
     raise RuntimeError(
-        f"Failed to get environment state: {e}\\n"
-        "Environment must be pickle-serializable or implement get_state() returning JSON-serializable dict."
+        "Environment does not implement get_state(). "
+        "State synchronization requires get_state() and set_state() methods "
+        "that return/accept JSON-serializable dicts with primitive types only."
     )
+
+env_state = env.get_state()
 
 # Validate that state is JSON-serializable
 try:
@@ -1465,13 +1412,11 @@ state_dict
         /**
          * Restore state from host's serialized data (non-host only)
          *
-         * Uses env.set_state() if available, otherwise uses default pickle-based
-         * deserialization if the state contains pickled_state.
+         * Requires the environment to implement set_state() that accepts a
+         * JSON-serializable dict.
          */
         await this.pyodide.runPythonAsync(`
 import numpy as np
-import pickle
-import base64
 
 state_obj = ${this.pyodide.toPy(state)}
 
@@ -1479,19 +1424,15 @@ state_obj = ${this.pyodide.toPy(state)}
 if 'env_state' in state_obj:
     env_state = state_obj['env_state']
 
-    # Use set_state if available, otherwise use default pickle deserialization
-    if hasattr(env, 'set_state') and callable(getattr(env, 'set_state')):
-        env.set_state(env_state)
-        print("[Python] ✓ Restored environment state via set_state()")
-    elif 'pickled_state' in env_state:
-        # Default pickle-based deserialization
-        encoded = env_state['pickled_state']
-        pickled = base64.b64decode(encoded.encode('utf-8'))
-        restored = pickle.loads(pickled)
-        env.__dict__.update(restored.__dict__)
-        print("[Python] ✓ Restored environment state via pickle deserialization")
-    else:
-        print("[Python] Warning: Cannot restore env state - no set_state method and no pickled_state")
+    if not hasattr(env, 'set_state') or not callable(getattr(env, 'set_state')):
+        raise RuntimeError(
+            "Environment does not implement set_state(). "
+            "State synchronization requires get_state() and set_state() methods "
+            "that return/accept JSON-serializable dicts with primitive types only."
+        )
+
+    env.set_state(env_state)
+    print("[Python] ✓ Restored environment state via set_state()")
 else:
     print("[Python] Warning: No env_state in sync data")
 
@@ -1527,6 +1468,9 @@ if 'numpy_rng_state' in state_obj:
          *
          * Similar to applyFullState but uses server's state format.
          * Called when client detects significant frame drift from server.
+         *
+         * Requires the environment to implement set_state() that accepts a
+         * JSON-serializable dict.
          */
         const applyTiming = {
             start: performance.now(),
@@ -1541,8 +1485,6 @@ if 'numpy_rng_state' in state_obj:
             applyTiming.pythonStart = performance.now();
             await this.pyodide.runPythonAsync(`
 import numpy as np
-import pickle
-import base64
 import time
 
 _apply_start = time.time()
@@ -1551,25 +1493,19 @@ env_state = ${this.pyodide.toPy(state.env_state)}
 
 _convert_time = (time.time() - _apply_start) * 1000
 
-# Use set_state if available, otherwise use default pickle deserialization
+if not hasattr(env, 'set_state') or not callable(getattr(env, 'set_state')):
+    raise RuntimeError(
+        "Environment does not implement set_state(). "
+        "State synchronization requires get_state() and set_state() methods "
+        "that return/accept JSON-serializable dicts with primitive types only."
+    )
+
 _deser_start = time.time()
-if hasattr(env, 'set_state') and callable(getattr(env, 'set_state')):
-    env.set_state(env_state)
-    _method = "set_state"
-elif 'pickled_state' in env_state:
-    # Default pickle-based deserialization
-    encoded = env_state['pickled_state']
-    pickled = base64.b64decode(encoded.encode('utf-8'))
-    restored = pickle.loads(pickled)
-    env.__dict__.update(restored.__dict__)
-    _method = "pickle"
-else:
-    print("[Python] Warning: Cannot apply server state - no set_state method and no pickled_state")
-    _method = "none"
+env.set_state(env_state)
 _deser_time = (time.time() - _deser_start) * 1000
 
 _total_time = (time.time() - _apply_start) * 1000
-print(f"[Python] State applied via {_method}: convert={_convert_time:.1f}ms, deserialize={_deser_time:.1f}ms, total={_total_time:.1f}ms")
+print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, deserialize={_deser_time:.1f}ms, total={_total_time:.1f}ms")
             `);
             applyTiming.pythonEnd = performance.now();
         }
