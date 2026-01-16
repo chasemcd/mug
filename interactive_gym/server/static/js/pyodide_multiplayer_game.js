@@ -88,6 +88,11 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
             skippedFrames: 0,        // Count of frames skipped for throttling
         };
 
+        // State hash history for frame-aligned comparison
+        // Maps frame_number -> state_hash (computed after stepping to that frame)
+        this.stateHashHistory = new Map();
+        this.stateHashHistoryMaxSize = 60;  // Keep ~6 seconds at 10 FPS
+
         this.setupMultiplayerHandlers();
     }
 
@@ -315,40 +320,84 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
                 `Latency: ${typeof networkLatency === 'number' ? networkLatency.toFixed(0) + 'ms' : networkLatency}`
             );
 
-            // Only apply state if there's actual divergence (not just frame drift)
-            // Compare state hashes to avoid unnecessary corrections
+            // Frame-aligned hash comparison: compare server's hash at frame N with
+            // client's recorded hash at frame N (from history)
             if (hasEnvState) {
                 const serverHash = state.state_hash || null;
+                const serverFrame = state.frame_number;
                 let clientHash = null;
                 let needsCorrection = true;  // Default to correcting if we can't compare
+                let comparisonResult = 'no_comparison';
 
-                // Compute client's current state hash for comparison
-                if (serverHash) {
-                    try {
-                        const hashStartTime = performance.now();
-                        clientHash = await this.computeQuickStateHash();
-                        const hashTime = performance.now() - hashStartTime;
+                // Look up client's hash at the SAME frame as server
+                if (serverHash && serverFrame !== undefined) {
+                    clientHash = this.getStateHashForFrame(serverFrame);
 
-                        // Compare hashes - if they match, states are identical, no correction needed
+                    if (clientHash !== null) {
+                        // We have a hash for this frame - compare them
                         needsCorrection = (clientHash !== serverHash);
+                        comparisonResult = needsCorrection ? 'mismatch' : 'match';
 
                         if (!needsCorrection) {
                             console.log(
-                                `[Sync] States match (hash=${serverHash.substring(0, 8)}), skipping correction. ` +
-                                `Frame drift: ${frameDiff}, hash time: ${hashTime.toFixed(1)}ms`
+                                `[Sync] States match at frame ${serverFrame} (hash=${serverHash.substring(0, 8)}), skipping correction. ` +
+                                `Current frame: ${this.frameNumber}, drift: ${frameDiff}`
                             );
-                            // Just sync frame number and rewards without full state apply
-                            if (state.frame_number !== undefined) {
-                                this.frameNumber = state.frame_number;
-                            }
+                            // States are in sync - just update rewards display (don't reset frame number)
                             if (state.cumulative_rewards) {
                                 this.cumulative_rewards = state.cumulative_rewards;
                                 ui_utils.updateHUDText(this.getHUDText());
                             }
                         }
-                    } catch (e) {
-                        console.warn(`[Sync] Hash comparison failed: ${e}, will apply correction`);
-                        needsCorrection = true;
+                    } else {
+                        // Frame too old (not in history) or hash not yet recorded
+                        comparisonResult = 'no_history';
+
+                        // Check if history is empty (e.g., at start of episode)
+                        if (this.stateHashHistory.size === 0) {
+                            console.log(
+                                `[Sync] Hash history empty (likely start of episode). ` +
+                                `Skipping correction, will compare on next sync.`
+                            );
+                            // Don't correct - just let the game continue and compare next time
+                            needsCorrection = false;
+                            // Update rewards display
+                            if (state.cumulative_rewards) {
+                                this.cumulative_rewards = state.cumulative_rewards;
+                                ui_utils.updateHUDText(this.getHUDText());
+                            }
+                        } else {
+                            const historyKeys = Array.from(this.stateHashHistory.keys());
+                            const oldestFrame = Math.min(...historyKeys);
+                            const newestFrame = Math.max(...historyKeys);
+
+                            if (serverFrame > newestFrame) {
+                                // Server is ahead of our history - hash not recorded yet (unlikely but possible)
+                                console.log(
+                                    `[Sync] Server frame ${serverFrame} ahead of history (newest: ${newestFrame}). ` +
+                                    `Hash not recorded yet, skipping correction.`
+                                );
+                                needsCorrection = false;
+                                if (state.cumulative_rewards) {
+                                    this.cumulative_rewards = state.cumulative_rewards;
+                                    ui_utils.updateHUDText(this.getHUDText());
+                                }
+                            } else if (serverFrame < oldestFrame) {
+                                // Server frame is older than our history - we're too far ahead
+                                console.warn(
+                                    `[Sync] Server frame ${serverFrame} older than history (oldest: ${oldestFrame}). ` +
+                                    `Client too far ahead, applying correction.`
+                                );
+                                needsCorrection = true;
+                            } else {
+                                // Frame is in range but missing - shouldn't happen
+                                console.warn(
+                                    `[Sync] Hash missing for frame ${serverFrame} (range: ${oldestFrame}-${newestFrame}). ` +
+                                    `Forcing correction.`
+                                );
+                                needsCorrection = true;
+                            }
+                        }
                     }
                 }
 
@@ -361,13 +410,17 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
                     await this.applyServerState(state);
                     const applyTime = performance.now() - applyStartTime;
 
+                    // Clear hash history since we've reset state
+                    this.stateHashHistory.clear();
+
                     // Log detailed sync application info
                     console.log(
-                        `[Sync] Applied correction: ` +
+                        `[Sync] Applied correction (${comparisonResult}): ` +
                         `frame ${preSyncFrame} → ${this.frameNumber} | ` +
                         `apply=${applyTime.toFixed(1)}ms | ` +
                         `latency=${typeof networkLatency === 'number' ? networkLatency.toFixed(0) + 'ms' : networkLatency} | ` +
-                        `serverHash=${serverHash ? serverHash.substring(0, 8) : 'N/A'}, clientHash=${clientHash ? clientHash.substring(0, 8) : 'N/A'}`
+                        `serverHash=${serverHash ? serverHash.substring(0, 8) : 'N/A'}, ` +
+                        `clientHash@${serverFrame}=${clientHash ? clientHash.substring(0, 8) : 'N/A'}`
                     );
 
                     if (Math.abs(frameDiff) > 5) {
@@ -566,6 +619,9 @@ print(f"[Python] Seeded RNG with {${seed}}")
         this.diagnostics.fallbackCount = {};
         this.diagnostics.queueHitCount = {};
         this.diagnostics.stepTimes = [];
+
+        // Clear state hash history for fresh episode
+        this.stateHashHistory.clear();
 
         // In server-authoritative mode, wait for server to broadcast episode start state
         if (this.serverAuthoritative) {
@@ -872,6 +928,12 @@ obs, infos, render_state
 
         // 4. Increment frame
         this.frameNumber++;
+
+        // Record state hash for this frame (for frame-aligned comparison with server)
+        // Do this asynchronously to avoid blocking the game loop
+        if (this.serverAuthoritative) {
+            this.recordStateHashForFrame(this.frameNumber);
+        }
 
         // Log diagnostics periodically
         this.logDiagnostics();
@@ -1180,6 +1242,44 @@ obs, rewards, terminateds, truncateds, infos, render_state
             hash: stateHash,
             frame_number: frameNumber
         });
+    }
+
+    /**
+     * Record state hash for a given frame number.
+     * Called after each step to build history for frame-aligned comparison.
+     * Runs asynchronously to avoid blocking the game loop.
+     */
+    async recordStateHashForFrame(frameNumber) {
+        try {
+            const hash = await this.computeQuickStateHash();
+            this.stateHashHistory.set(frameNumber, hash);
+
+            // Prune old entries to prevent unbounded growth
+            if (this.stateHashHistory.size > this.stateHashHistoryMaxSize) {
+                // Delete oldest entries (Map maintains insertion order)
+                const keysToDelete = [];
+                for (const key of this.stateHashHistory.keys()) {
+                    if (this.stateHashHistory.size - keysToDelete.length <= this.stateHashHistoryMaxSize) {
+                        break;
+                    }
+                    keysToDelete.push(key);
+                }
+                for (const key of keysToDelete) {
+                    this.stateHashHistory.delete(key);
+                }
+            }
+        } catch (e) {
+            // Don't let hash computation errors break the game
+            console.warn(`[StateHash] Failed to record hash for frame ${frameNumber}: ${e}`);
+        }
+    }
+
+    /**
+     * Get the state hash that was recorded for a specific frame.
+     * Returns null if hash for that frame is not in history (too old or not yet recorded).
+     */
+    getStateHashForFrame(frameNumber) {
+        return this.stateHashHistory.get(frameNumber) || null;
     }
 
     async computeQuickStateHash() {
