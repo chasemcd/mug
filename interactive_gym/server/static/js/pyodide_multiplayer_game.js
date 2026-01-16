@@ -362,6 +362,10 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
                                 this.cumulative_rewards = state.cumulative_rewards;
                                 ui_utils.updateHUDText(this.getHUDText());
                             }
+                            // Update server step tracking (critical for throttling)
+                            if (state.step_num !== undefined) {
+                                this.lastKnownServerStepNum = state.step_num;
+                            }
                         }
                     } else {
                         // Frame too old (not in history) or hash not yet recorded
@@ -380,6 +384,10 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
                                 this.cumulative_rewards = state.cumulative_rewards;
                                 ui_utils.updateHUDText(this.getHUDText());
                             }
+                            // Update server step tracking (critical for throttling)
+                            if (state.step_num !== undefined) {
+                                this.lastKnownServerStepNum = state.step_num;
+                            }
                         } else {
                             const historyKeys = Array.from(this.stateHashHistory.keys());
                             const oldestFrame = Math.min(...historyKeys);
@@ -395,6 +403,10 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
                                 if (state.cumulative_rewards) {
                                     this.cumulative_rewards = state.cumulative_rewards;
                                     ui_utils.updateHUDText(this.getHUDText());
+                                }
+                                // Update server step tracking (critical for throttling)
+                                if (state.step_num !== undefined) {
+                                    this.lastKnownServerStepNum = state.step_num;
                                 }
                             } else if (serverFrame < oldestFrame) {
                                 // Server frame is older than our history - we're too far ahead
@@ -479,6 +491,10 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
                         }
                         // Sync action counts to prevent accumulating small differences
                         this.actionCounts = JSON.parse(JSON.stringify(serverActionCounts));
+                        // Update server step tracking (critical for throttling)
+                        if (state.step_num !== undefined) {
+                            this.lastKnownServerStepNum = state.step_num;
+                        }
                         // Don't apply state correction - continue with local state
                         this.diagnostics.lastSyncFrame = state.frame_number;
                         this.diagnostics.lastSyncTime = Date.now();
@@ -541,6 +557,12 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
                     this.cumulative_rewards = state.cumulative_rewards;
                     ui_utils.updateHUDText(this.getHUDText());
                 }
+            }
+
+            // Always update server step tracking when we receive a sync (critical for throttling)
+            // This ensures throttling works even when we skip corrections
+            if (state.step_num !== undefined) {
+                this.lastKnownServerStepNum = state.step_num;
             }
 
             this.diagnostics.lastSyncFrame = state.frame_number;
@@ -935,6 +957,28 @@ obs, infos, render_state
         if (this.gameId === null || this.gameId === undefined) {
             console.warn('[MultiplayerPyodide] Waiting for game ID assignment...');
             return null;
+        }
+
+        // Server-authoritative throttling: Don't get too far ahead of the server.
+        // The server only steps when it receives actions from ALL players, so a fast
+        // client can accumulate extra local steps. We pause if we're too far ahead.
+        if (this.serverAuthoritative && this.lastKnownServerStepNum > 0) {
+            const stepsAhead = this.frameNumber - this.lastKnownServerStepNum;
+            if (stepsAhead >= this.maxStepsAheadOfServer) {
+                // We're too far ahead - wait for server to catch up
+                const maxWaitMs = 200;  // Max wait before giving up
+                const pollIntervalMs = 10;
+                let waited = 0;
+
+                while (waited < maxWaitMs && (this.frameNumber - this.lastKnownServerStepNum) >= this.maxStepsAheadOfServer) {
+                    await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
+                    waited += pollIntervalMs;
+                }
+
+                if (waited >= maxWaitMs) {
+                    console.warn(`[Throttle] Waited ${waited}ms but still ${this.frameNumber - this.lastKnownServerStepNum} steps ahead of server (frame ${this.frameNumber}, server at ${this.lastKnownServerStepNum})`);
+                }
+            }
         }
 
         // Action synchronization for server-authoritative mode:
