@@ -122,6 +122,7 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         // Game ready to start
         socket.on('pyodide_game_ready', (data) => {
             console.log(`[MultiplayerPyodide] Game ${data.game_id} ready with players:`, data.players);
+            console.log(`[MultiplayerPyodide] pyodide_game_ready data:`, JSON.stringify(data));
 
             // Store player-to-subject mapping for data logging
             this.playerSubjects = data.player_subjects || {};
@@ -129,8 +130,11 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
 
             // Check if server is authoritative
             this.serverAuthoritative = data.server_authoritative || false;
+            console.log(`[MultiplayerPyodide] Server-authoritative mode: ${this.serverAuthoritative} (from data: ${data.server_authoritative})`);
             if (this.serverAuthoritative) {
-                console.log(`[MultiplayerPyodide] Server-authoritative mode enabled`);
+                console.log(`[MultiplayerPyodide] Server-authoritative mode enabled - will receive server_authoritative_state events`);
+            } else {
+                console.log(`[MultiplayerPyodide] Host-based mode - will send state hashes for verification`);
             }
 
             // Initialize action queues for other players
@@ -221,12 +225,16 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         // Server-authoritative state broadcast (Option B: Frame-Aligned Stepper)
         // Server periodically broadcasts authoritative state for verification/correction
         socket.on('server_authoritative_state', async (data) => {
+            console.log(`[MultiplayerPyodide] Received server_authoritative_state event (serverAuthoritative=${this.serverAuthoritative}, gameId=${this.gameId})`);
+
             if (!this.serverAuthoritative) {
+                console.log(`[MultiplayerPyodide] Ignoring server_authoritative_state - not in server-authoritative mode`);
                 return;  // Ignore if not in server-authoritative mode
             }
 
             const { game_id, state } = data;
             if (game_id !== this.gameId) {
+                console.log(`[MultiplayerPyodide] Ignoring server_authoritative_state - game_id mismatch (received: ${game_id}, expected: ${this.gameId})`);
                 return;  // Not for this game
             }
 

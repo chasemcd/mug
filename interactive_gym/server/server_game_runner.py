@@ -339,8 +339,8 @@ random.seed({rng_seed})
             room=self.game_id,
         )
 
-        logger.debug(
-            f"[ServerGameRunner] Broadcast {event_type} at frame {self.frame_number}"
+        logger.info(
+            f"[ServerGameRunner] Broadcast {event_type} to room {self.game_id} at frame {self.frame_number}"
         )
 
     def handle_episode_end(self):
