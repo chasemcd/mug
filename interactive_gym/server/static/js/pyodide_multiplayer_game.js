@@ -618,33 +618,30 @@ print(f"[Python] Seeded RNG with {${seed}}")
             if (serverState) {
                 console.log(`[MultiplayerPyodide] Applying server episode state (episode ${serverState.episode_num})`);
 
-                // Apply the authoritative state from server
-                await this.applyServerState(serverState);
-
-                // Now do local reset to get render state (env state already applied)
+                // Do a local reset FIRST to initialize internal structures (like env_agents),
+                // THEN apply set_state() to sync with server's state.
+                // This ensures env.get_obs() works correctly (relies on env_agents being populated).
+                // NOTE: We do NOT call applyServerState() here because it would try to call
+                // set_state() on an uninitialized env, causing errors in environments like cogrid
+                // where get_obs() relies on env_agents being set up during reset().
                 const result = await this.pyodide.runPythonAsync(`
 import numpy as np
 
-# Get current obs from environment (state already set by applyServerState)
-# Just need to get observations and render without resetting
-obs = {}
-for agent_id in env.agent_ids if hasattr(env, 'agent_ids') else env.possible_agents if hasattr(env, 'possible_agents') else [0]:
-    if hasattr(env, 'observation_space'):
-        obs[agent_id] = env.observation_space.sample()  # Placeholder, will be overwritten
+# First reset to initialize internal structures (env_agents, etc.)
+obs, infos = env.reset(seed=${this.gameSeed || 'None'})
 
-# Actually get obs from a step with no-op or from last obs
-# Since we set_state, the env should be in correct state
-# We need to render to get display state
-render_state = env.render()
+# Now apply server state to overwrite with authoritative values
+env_state = ${this.pyodide.toPy(serverState.env_state)}
+env.set_state(env_state)
 
-# Try to get actual observations
+# Re-get observations after state is applied (internal structures now initialized)
 if hasattr(env, 'get_obs'):
     obs = env.get_obs()
 elif hasattr(env, '_get_obs'):
     obs = env._get_obs()
-else:
-    # Fallback: do a reset to get obs (state will be overwritten but that's ok for display)
-    obs, infos = env.reset(seed=${this.gameSeed || 'None'})
+
+# Render with the correct state
+render_state = env.render()
 
 if not isinstance(obs, dict):
     obs = obs.reshape(-1).astype(np.float32)
@@ -656,7 +653,6 @@ elif isinstance(obs, dict):
 if not isinstance(obs, dict):
     obs = {"human": obs}
 
-infos = {}
 obs, infos, render_state
                 `);
 
