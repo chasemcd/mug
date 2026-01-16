@@ -62,6 +62,10 @@ class ServerGameRunner:
         # Default action for fallback
         self.default_action = 0
 
+        # Action tracking for sync verification
+        self.action_sequence: list[dict] = []  # List of {frame: N, actions: {player: action}}
+        self.action_counts: Dict[str, Dict[int, int]] = {}  # {player_id: {action: count}}
+
     def initialize_environment(self, rng_seed: int) -> bool:
         """
         Initialize environment from code string.
@@ -237,6 +241,26 @@ random.seed({rng_seed})
 
             obs, rewards, terminateds, truncateds, infos = self.env.step(env_actions)
 
+            # Debug: Log each step to understand action count vs frame number
+            logger.debug(
+                f"[ServerGameRunner] STEP: frame_number={frame_number}, "
+                f"step_num={self.step_num}, action_sequence_len={len(self.action_sequence)}"
+            )
+
+            # Track action sequence and counts for sync verification
+            self.action_sequence.append({
+                "frame": frame_number,
+                "actions": {str(k): int(v) for k, v in env_actions.items()}
+            })
+
+            # Update action counts per player
+            for player_id, action in env_actions.items():
+                pid_str = str(player_id)
+                if pid_str not in self.action_counts:
+                    self.action_counts[pid_str] = {}
+                action_int = int(action)
+                self.action_counts[pid_str][action_int] = self.action_counts[pid_str].get(action_int, 0) + 1
+
             # Update cumulative rewards
             for player_id, reward in rewards.items():
                 pid_str = str(player_id)
@@ -294,6 +318,10 @@ random.seed({rng_seed})
             "frame_number": self.frame_number,
             "cumulative_rewards": self.cumulative_rewards.copy(),
             "server_timestamp": time.time() * 1000,  # ms timestamp for staleness tracking
+            # Action tracking for sync verification
+            "action_counts": {k: dict(v) for k, v in self.action_counts.items()},
+            "action_sequence_hash": self._compute_action_sequence_hash(),
+            "total_actions": len(self.action_sequence),
         }
 
         # Include environment state - requires get_state() method
@@ -344,6 +372,13 @@ random.seed({rng_seed})
 
         return state
 
+    def _compute_action_sequence_hash(self) -> str:
+        """Compute hash of action sequence for quick comparison."""
+        import hashlib
+        import json
+        seq_str = json.dumps(self.action_sequence, sort_keys=True)
+        return hashlib.md5(seq_str.encode()).hexdigest()[:16]
+
     def broadcast_state(self, event_type: str = "server_authoritative_state"):
         """
         Broadcast authoritative state to all clients.
@@ -392,6 +427,10 @@ random.seed({rng_seed})
 
         # Clear pending actions for fresh episode
         self.pending_actions.clear()
+
+        # Clear action tracking for new episode
+        self.action_sequence = []
+        self.action_counts = {}
 
         # Broadcast state after reset with special event type
         # Clients wait for this before starting the new episode

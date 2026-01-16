@@ -93,6 +93,10 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         this.stateHashHistory = new Map();
         this.stateHashHistoryMaxSize = 60;  // Keep ~6 seconds at 10 FPS
 
+        // Action tracking for sync verification
+        this.actionSequence = [];  // [{frame: N, actions: {player: action}}]
+        this.actionCounts = {};    // {playerId: {action: count}}
+
         this.setupMultiplayerHandlers();
     }
 
@@ -401,6 +405,63 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
                 }
 
                 if (needsCorrection) {
+                    // ===== ACTION VERIFICATION =====
+                    // Compare action tracking to diagnose root cause of divergence
+                    const serverActionCounts = state.action_counts || {};
+                    const serverSeqHash = state.action_sequence_hash || '';
+                    const clientSeqHash = this.computeActionSequenceHash();
+                    const serverTotalActions = state.total_actions || 0;
+                    const clientTotalActions = this.actionSequence.length;
+
+                    // Check sequence hash (order matters)
+                    const sequenceMatches = (serverSeqHash === clientSeqHash);
+
+                    // Check action counts (order doesn't matter)
+                    let countsMatch = true;
+                    let countDiffs = [];
+                    for (const [playerId, serverCounts] of Object.entries(serverActionCounts)) {
+                        const clientCounts = this.actionCounts[playerId] || {};
+                        for (const [action, serverCount] of Object.entries(serverCounts)) {
+                            const clientCount = clientCounts[action] || 0;
+                            if (serverCount !== clientCount) {
+                                countsMatch = false;
+                                countDiffs.push(`P${playerId} action ${action}: server=${serverCount} client=${clientCount}`);
+                            }
+                        }
+                        // Also check for actions client has that server doesn't
+                        for (const [action, clientCount] of Object.entries(clientCounts)) {
+                            if (!(action in serverCounts)) {
+                                countsMatch = false;
+                                countDiffs.push(`P${playerId} action ${action}: server=0 client=${clientCount}`);
+                            }
+                        }
+                    }
+                    // Check for players client has that server doesn't
+                    for (const playerId of Object.keys(this.actionCounts)) {
+                        if (!(playerId in serverActionCounts)) {
+                            countsMatch = false;
+                            countDiffs.push(`P${playerId}: server=missing client=present`);
+                        }
+                    }
+
+                    console.log(`[Sync Verify] Frame ${serverFrame}:`);
+                    console.log(`  Total actions: server=${serverTotalActions} client=${clientTotalActions}`);
+                    console.log(`  Sequence hash: ${sequenceMatches ? 'MATCH' : 'DIFFER'} (server=${serverSeqHash.substring(0, 8)} client=${clientSeqHash.substring(0, 8)})`);
+                    console.log(`  Action counts: ${countsMatch ? 'MATCH' : 'DIFFER'}`);
+                    if (!countsMatch) {
+                        console.log(`  Count differences: ${countDiffs.join(', ')}`);
+                    }
+
+                    // Diagnostic conclusion
+                    if (countsMatch && sequenceMatches) {
+                        console.log(`  → Same actions, same order (non-determinism in env step)`);
+                    } else if (countsMatch && !sequenceMatches) {
+                        console.log(`  → Same actions executed, different order (likely timing issue)`);
+                    } else {
+                        console.log(`  → Different actions executed (action sync issue)`);
+                    }
+                    // ===== END ACTION VERIFICATION =====
+
                     // Track pre-sync state for debugging
                     const preSyncFrame = this.frameNumber;
 
@@ -411,6 +472,23 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
 
                     // Clear hash history since we've reset state
                     this.stateHashHistory.clear();
+
+                    // Sync action tracking with server to prevent divergence accumulation
+                    // We need to rebuild our action sequence to match server's count
+                    // Since we don't have the full sequence, we just sync the counts and total
+                    if (state.action_counts) {
+                        this.actionCounts = JSON.parse(JSON.stringify(state.action_counts));
+                    }
+                    // Rebuild action sequence with correct length (details don't matter for count comparison)
+                    const serverTotal = state.total_actions || 0;
+                    if (this.actionSequence.length !== serverTotal) {
+                        // Trim or pad to match server's total
+                        if (this.actionSequence.length > serverTotal) {
+                            this.actionSequence = this.actionSequence.slice(0, serverTotal);
+                        }
+                        // Note: If client has fewer, we can't recover the missing entries,
+                        // but counts are synced so next comparison will work
+                    }
 
                     // Log detailed sync application info
                     console.log(
@@ -581,6 +659,10 @@ print(f"[Python] Seeded RNG with {${seed}}")
             this.otherPlayerActionQueues[playerId] = [];
         }
         this.lastExecutedActions = {};
+
+        // Clear action tracking for sync verification
+        this.actionSequence = [];
+        this.actionCounts = {};
 
         // Reset per-episode diagnostics
         this.diagnostics.syncCount = 0;
@@ -867,6 +949,21 @@ obs, infos, render_state
         // Track last executed actions for fallback
         for (const [agentId, action] of Object.entries(finalActions)) {
             this.lastExecutedActions[agentId] = action;
+        }
+
+        // Track action sequence and counts for sync verification
+        this.actionSequence.push({
+            frame: this.frameNumber,
+            actions: {...finalActions}  // Clone to avoid mutation
+        });
+
+        // Update action counts
+        for (const [playerId, action] of Object.entries(finalActions)) {
+            if (!this.actionCounts[playerId]) {
+                this.actionCounts[playerId] = {};
+            }
+            const actionKey = String(action);
+            this.actionCounts[playerId][actionKey] = (this.actionCounts[playerId][actionKey] || 0) + 1;
         }
 
         // 2. Send MY action to server (for other clients to queue)
@@ -1355,6 +1452,14 @@ env.get_state()
         h2 ^= Math.imul(h1 ^ (h1 >>> 13), 3266489909);
         // Return as hex string (similar format to SHA256 output)
         return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(16).padStart(16, '0');
+    }
+
+    /**
+     * Compute hash of action sequence for comparison with server.
+     */
+    computeActionSequenceHash() {
+        const str = JSON.stringify(this.actionSequence);
+        return this._simpleHash(str);
     }
 
     async getFullState() {
