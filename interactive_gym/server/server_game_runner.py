@@ -296,24 +296,31 @@ random.seed({rng_seed})
 
         # Include environment state
         # Use env.get_state() if available, otherwise use default pickle method
+        env_state_included = False
         try:
             if hasattr(self.env, "get_state"):
                 env_state = self.env.get_state()
+                logger.debug(f"[ServerGameRunner] Using env.get_state() for state serialization")
             else:
                 env_state = self._default_get_env_state()
+                logger.debug(f"[ServerGameRunner] Using default pickle for state serialization")
 
             # Verify it's JSON-serializable (for socket.io transmission)
             import json
             json.dumps(env_state)
             state["env_state"] = env_state
+            env_state_included = True
         except Exception as e:
-            # Log once per game to avoid spam
-            if not getattr(self, "_env_state_warning_logged", False):
-                logger.warning(
-                    f"[ServerGameRunner] Cannot include env_state in broadcast: {e}. "
-                    f"Basic state sync (frame, rewards) will still work."
-                )
-                self._env_state_warning_logged = True
+            # Log warning - this is important because without env_state, clients can't sync positions
+            logger.warning(
+                f"[ServerGameRunner] Cannot include env_state in broadcast: {e}. "
+                f"Clients will NOT be able to sync game state (positions, etc)."
+            )
+
+        logger.debug(
+            f"[ServerGameRunner] get_authoritative_state: frame={self.frame_number}, "
+            f"env_state={'included' if env_state_included else 'MISSING'}"
+        )
 
         return state
 

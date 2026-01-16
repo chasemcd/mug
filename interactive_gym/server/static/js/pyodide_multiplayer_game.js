@@ -295,6 +295,9 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
                 ? ((framesSinceLastSync / timeSinceLastSync) * 1000).toFixed(1)
                 : 'N/A';
 
+            // Check if env_state is present (needed for actual state sync)
+            const hasEnvState = state.env_state !== undefined && state.env_state !== null;
+
             // Log comprehensive sync info (matches [Perf] format)
             console.log(
                 `[Sync #${this.diagnostics.syncCount}] ` +
@@ -302,18 +305,25 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
                 `FPS: ${effectiveFPS}/${targetFPS} | ` +
                 `Step: ${avgStepTime}ms avg, ${maxStepTime}ms max | ` +
                 `Queues: ${totalQueueSize} ${JSON.stringify(queueSizes)} | ` +
-                `Fallback: ${fallbackRate}% ${JSON.stringify(fallbackRates)}`
+                `Fallback: ${fallbackRate}% ${JSON.stringify(fallbackRates)} | ` +
+                `EnvState: ${hasEnvState ? 'yes' : 'NO'}`
             );
 
-            // Check if we're significantly out of sync
-            if (Math.abs(frameDiff) > 5) {
-                console.warn(
-                    `[Sync] ⚠️ Large drift detected! Applying server state. ` +
-                    `Queue pre-sync: ${totalQueueSize}`
-                );
+            // Always apply the authoritative state to ensure clients stay in sync
+            // Even small frame drift can result in different game states due to action timing
+            if (hasEnvState) {
+                // Apply server state to correct any divergence
                 await this.applyServerState(state);
+
+                if (Math.abs(frameDiff) > 5) {
+                    console.warn(
+                        `[Sync] ⚠️ Large drift detected (${frameDiff} frames). ` +
+                        `Queue pre-sync: ${totalQueueSize}`
+                    );
+                }
             } else {
-                // Small drift is normal - just update cumulative rewards for HUD accuracy
+                // No env_state available - just sync rewards/frame number
+                console.warn(`[Sync] No env_state in server broadcast - state correction not possible`);
                 if (state.cumulative_rewards) {
                     this.cumulative_rewards = state.cumulative_rewards;
                     ui_utils.updateHUDText(this.getHUDText());
