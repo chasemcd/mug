@@ -463,13 +463,29 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
                         console.log(`  Count differences: ${countDiffs.join(', ')}`);
                     }
 
-                    // Diagnostic conclusion
+                    // Diagnostic conclusion and action decision
                     if (countsMatch && sequenceMatches) {
                         console.log(`  → Same actions, same order (non-determinism in env step)`);
+                        // True non-determinism - need to correct
                     } else if (countsMatch && !sequenceMatches) {
-                        console.log(`  → Same actions executed, different order (likely timing issue)`);
+                        console.log(`  → Same actions executed, different order (timing issue - SKIPPING correction)`);
+                        // Same actions in different order due to timing. For deterministic envs,
+                        // the final state should be the same. Skip the correction to avoid
+                        // constant state resets that cause jittery gameplay.
+                        // Just sync the frame number and rewards, but keep local state.
+                        if (state.cumulative_rewards) {
+                            this.cumulative_rewards = state.cumulative_rewards;
+                            ui_utils.updateHUDText(this.getHUDText());
+                        }
+                        // Sync action counts to prevent accumulating small differences
+                        this.actionCounts = JSON.parse(JSON.stringify(serverActionCounts));
+                        // Don't apply state correction - continue with local state
+                        this.diagnostics.lastSyncFrame = state.frame_number;
+                        this.diagnostics.lastSyncTime = Date.now();
+                        return;
                     } else {
                         console.log(`  → Different actions executed (action sync issue)`);
+                        // Action mismatch - need to correct
                     }
                     // ===== END ACTION VERIFICATION =====
 
