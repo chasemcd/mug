@@ -959,28 +959,6 @@ obs, infos, render_state
             return null;
         }
 
-        // Server-authoritative throttling: Don't get too far ahead of the server.
-        // The server only steps when it receives actions from ALL players, so a fast
-        // client can accumulate extra local steps. We pause if we're too far ahead.
-        if (this.serverAuthoritative && this.lastKnownServerStepNum > 0) {
-            const stepsAhead = this.frameNumber - this.lastKnownServerStepNum;
-            if (stepsAhead >= this.maxStepsAheadOfServer) {
-                // We're too far ahead - wait for server to catch up
-                const maxWaitMs = 200;  // Max wait before giving up
-                const pollIntervalMs = 10;
-                let waited = 0;
-
-                while (waited < maxWaitMs && (this.frameNumber - this.lastKnownServerStepNum) >= this.maxStepsAheadOfServer) {
-                    await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
-                    waited += pollIntervalMs;
-                }
-
-                if (waited >= maxWaitMs) {
-                    console.warn(`[Throttle] Waited ${waited}ms but still ${this.frameNumber - this.lastKnownServerStepNum} steps ahead of server (frame ${this.frameNumber}, server at ${this.lastKnownServerStepNum})`);
-                }
-            }
-        }
-
         // Action synchronization for server-authoritative mode:
         // We check if we have actions from other players. If not, we wait briefly.
         // But we DON'T block indefinitely - that kills FPS.
