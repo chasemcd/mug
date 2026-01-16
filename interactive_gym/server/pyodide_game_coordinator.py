@@ -290,7 +290,8 @@ class PyodideGameCoordinator:
         player_id: str | int,
         action: Any,
         frame_number: int,
-        client_timestamp: float | None = None
+        client_timestamp: float | None = None,
+        sync_epoch: int | None = None
     ):
         """
         Receive action from a player and broadcast to others immediately.
@@ -307,6 +308,7 @@ class PyodideGameCoordinator:
             action: The action value (int, dict, etc.)
             frame_number: Frame number (for logging/debugging)
             client_timestamp: Client-side timestamp when action was sent (for lag tracking)
+            sync_epoch: Sync epoch from client to prevent stale action matching
         """
         with self.lock:
             if game_id not in self.games:
@@ -367,7 +369,7 @@ class PyodideGameCoordinator:
             # Feed action to server runner if enabled (frame-aligned stepper)
             if game.server_authoritative and game.server_runner:
                 all_received = game.server_runner.receive_action(
-                    player_id, action, frame_number
+                    player_id, action, frame_number, sync_epoch
                 )
 
                 if all_received:

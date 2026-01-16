@@ -862,6 +862,7 @@ def on_pyodide_player_action(data):
     player_id = data.get("player_id")
     action = data.get("action")
     frame_number = data.get("frame_number")
+    sync_epoch = data.get("sync_epoch")  # May be None for backwards compatibility
 
     # logger.debug(
     #     f"Received action from player {player_id} in game {game_id} "
@@ -872,7 +873,8 @@ def on_pyodide_player_action(data):
         game_id=game_id,
         player_id=player_id,
         action=action,
-        frame_number=frame_number
+        frame_number=frame_number,
+        sync_epoch=sync_epoch
     )
 
 

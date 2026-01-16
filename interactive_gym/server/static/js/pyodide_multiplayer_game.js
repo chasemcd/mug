@@ -97,6 +97,10 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         this.actionSequence = [];  // [{frame: N, actions: {player: action}}]
         this.actionCounts = {};    // {playerId: {action: count}}
 
+        // Sync epoch - received from server, included in actions to prevent stale action matching.
+        // Actions with old epoch are rejected by server after a state broadcast.
+        this.syncEpoch = 0;
+
         this.setupMultiplayerHandlers();
     }
 
@@ -768,6 +772,11 @@ obs, infos, render_state
                     this.cumulative_rewards = serverState.cumulative_rewards;
                 }
 
+                // Sync epoch is critical for preventing stale action matching
+                if (serverState.sync_epoch !== undefined) {
+                    this.syncEpoch = serverState.sync_epoch;
+                }
+
                 // Show and update HUD
                 ui_utils.showHUD();
                 ui_utils.updateHUDText(this.getHUDText());
@@ -976,7 +985,8 @@ obs, infos, render_state
                 player_id: this.myPlayerId,
                 action: myAction,
                 frame_number: this.frameNumber,
-                timestamp: Date.now()
+                timestamp: Date.now(),
+                sync_epoch: this.syncEpoch  // Include epoch to prevent stale action matching
             });
         }
 
@@ -1629,6 +1639,10 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
         }
         if (state.cumulative_rewards) {
             this.cumulative_rewards = state.cumulative_rewards;
+        }
+        // Update sync epoch - critical for preventing stale action matching
+        if (state.sync_epoch !== undefined) {
+            this.syncEpoch = state.sync_epoch;
         }
 
         // Trigger a re-render to show the corrected state

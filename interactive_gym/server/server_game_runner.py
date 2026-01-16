@@ -66,6 +66,11 @@ class ServerGameRunner:
         self.action_sequence: list[dict] = []  # List of {frame: N, actions: {player: action}}
         self.action_counts: Dict[str, Dict[int, int]] = {}  # {player_id: {action: count}}
 
+        # Sync epoch counter - incremented on each state broadcast.
+        # Clients include this in their actions; server ignores actions from old epochs.
+        # This prevents stale actions (sent before client received sync) from causing extra steps.
+        self.sync_epoch = 0
+
     def initialize_environment(self, rng_seed: int) -> bool:
         """
         Initialize environment from code string.
@@ -162,17 +167,34 @@ random.seed({rng_seed})
         self,
         player_id: str | int,
         action: Any,
-        frame_number: int
+        frame_number: int,
+        sync_epoch: int | None = None
     ) -> bool:
         """
         Receive an action from a player.
 
         Returns True if this action completed the frame (all players submitted).
+
+        Args:
+            player_id: Player sending the action
+            action: The action value
+            frame_number: Frame number from client
+            sync_epoch: Sync epoch from client. If provided and doesn't match
+                       current server epoch, action is ignored (stale action
+                       from before a sync).
         """
         if not self.is_initialized:
             return False
 
         player_id_str = str(player_id)
+
+        # Validate sync epoch if provided
+        if sync_epoch is not None and sync_epoch != self.sync_epoch:
+            logger.debug(
+                f"[ServerGameRunner] Ignoring stale action from player {player_id} "
+                f"(client epoch {sync_epoch} != server epoch {self.sync_epoch})"
+            )
+            return False
 
         with self.action_lock:
             # Initialize frame action dict if needed
@@ -318,6 +340,8 @@ random.seed({rng_seed})
             "frame_number": self.frame_number,
             "cumulative_rewards": self.cumulative_rewards.copy(),
             "server_timestamp": time.time() * 1000,  # ms timestamp for staleness tracking
+            # Sync epoch - clients must include this in actions to prevent stale action matching
+            "sync_epoch": self.sync_epoch,
             # Action tracking for sync verification
             "action_counts": {k: dict(v) for k, v in self.action_counts.items()},
             "action_sequence_hash": self._compute_action_sequence_hash(),
@@ -390,6 +414,9 @@ random.seed({rng_seed})
         if self.sio is None:
             return
 
+        # Increment sync epoch BEFORE getting state so clients receive the new epoch
+        self.sync_epoch += 1
+
         state = self.get_authoritative_state()
 
         self.sio.emit(
@@ -402,8 +429,20 @@ random.seed({rng_seed})
         )
 
         logger.info(
-            f"[ServerGameRunner] Broadcast {event_type} to room {self.game_id} at frame {self.frame_number}"
+            f"[ServerGameRunner] Broadcast {event_type} to room {self.game_id} "
+            f"at frame {self.frame_number}, epoch {self.sync_epoch}"
         )
+
+        # Clear ALL pending actions after sync.
+        # With sync epochs, clients will include the new epoch in their actions,
+        # and any actions with the old epoch will be rejected. Clearing pending
+        # actions ensures we don't accumulate stale data.
+        if self.pending_actions:
+            cleared_count = len(self.pending_actions)
+            self.pending_actions.clear()
+            logger.debug(
+                f"[ServerGameRunner] Cleared {cleared_count} pending action frames after broadcast"
+            )
 
     def handle_episode_end(self):
         """
