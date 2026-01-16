@@ -108,12 +108,28 @@ socket.on('server_session_id', function(data) {
 
 socket.on('connect', function() {
     console.debug("connecting")
-    // Emit an event to the server with the subject_id
-    socket.emit('register_subject', { subject_id: subjectName });
+    // Emit an event to the server with the subject_id and current interactiveGymGlobals
+    // This allows session restoration if reconnecting
+    socket.emit('register_subject', {
+        subject_id: subjectName,
+        interactiveGymGlobals: window.interactiveGymGlobals || {}
+    });
     $("#invalidSession").hide();
     $('#hudText').hide()
+});
 
+// Handle session restoration from server
+socket.on('session_restored', function(data) {
+    console.log("Session restored from server:", data);
 
+    // Restore interactiveGymGlobals from server (server state is authoritative)
+    if (data.interactiveGymGlobals) {
+        window.interactiveGymGlobals = data.interactiveGymGlobals;
+        console.log("Restored interactiveGymGlobals:", window.interactiveGymGlobals);
+    }
+
+    // The server will re-activate the appropriate scene via activate_scene event
+    // No additional client action needed here
 });
 
 
@@ -454,11 +470,14 @@ socket.on("activate_scene", function(data) {
 
 
 socket.on("terminate_scene", function(data) {
+    // Sync globals to server before terminating scene
+    socket.emit("sync_globals", {interactiveGymGlobals: window.interactiveGymGlobals});
+
     if (data.element_ids && data.element_ids.length > 0) {
         let retrievedData = getData(data.element_ids);
         socket.emit("static_scene_data_emission", {data: retrievedData, scene_id: data.scene_id, session_id: window.sessionId, interactiveGymGlobals: window.interactiveGymGlobals});
     }
-    
+
     terminateScene(data);
     console.log("Terminating scene", data.scene_id);
 });
@@ -655,7 +674,10 @@ function terminateStaticScene(data) {
 function terminateGymScene(data) {
     ui_utils.disableKeyListener();
     graphics_end();
-    
+
+    // Sync globals to server before emitting game data
+    socket.emit("sync_globals", {interactiveGymGlobals: window.interactiveGymGlobals});
+
     let remoteGameData = getRemoteGameData();
     const binaryData = msgpack.encode(remoteGameData);
     socket.emit("emit_remote_game_data", {data: binaryData, scene_id: data.scene_id, session_id: window.sessionId, interactiveGymGlobals: window.interactiveGymGlobals});

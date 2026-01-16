@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import atexit
+import dataclasses
 import logging
 import os
 import secrets
 import threading
+import time
 import uuid
 import msgpack
 import pandas as pd
@@ -28,6 +30,23 @@ from interactive_gym.server import game_manager as gm
 from interactive_gym.scenes import unity_scene
 from interactive_gym.server import pyodide_game_coordinator
 from interactive_gym.server import player_pairing_manager
+
+
+@dataclasses.dataclass
+class ParticipantSession:
+    """
+    Stores session state for a participant to enable session restoration
+    after disconnection/page refresh.
+    """
+
+    subject_id: str
+    stager_state: dict | None  # Serialized stager state (current_scene_index, etc.)
+    interactive_gym_globals: dict  # Client-side metadata (interactiveGymGlobals)
+    current_scene_id: str | None  # ID of the current scene
+    socket_id: str | None  # Current socket ID if connected
+    is_connected: bool  # Whether currently connected
+    created_at: float = dataclasses.field(default_factory=time.time)
+    last_updated_at: float = dataclasses.field(default_factory=time.time)
 
 
 def setup_logger(name, log_file, level=logging.INFO):
@@ -86,6 +105,10 @@ USER_LOCKS = utils.ThreadSafeDict()
 # Session ID to participant ID map
 SESSION_ID_TO_SUBJECT_ID = utils.ThreadSafeDict()
 
+# Participant session storage for session restoration after disconnect
+# Maps subject_id -> ParticipantSession
+PARTICIPANT_SESSIONS: dict[SubjectID, ParticipantSession] = utils.ThreadSafeDict()
+
 
 def get_subject_id_from_session_id(session_id: str) -> SubjectID:
     subject_id = SESSION_ID_TO_SUBJECT_ID.get(session_id, None)
@@ -132,7 +155,7 @@ def index(*args):
 
 @app.route("/<subject_id>")
 def user_index(subject_id):
-    global STAGERS, SESSION_ID_TO_SUBJECT_ID, SUBJECTS
+    global STAGERS, SESSION_ID_TO_SUBJECT_ID, SUBJECTS, PARTICIPANT_SESSIONS
 
     if subject_id in PROCESSED_SUBJECT_NAMES:
         return (
@@ -142,8 +165,31 @@ def user_index(subject_id):
 
     SUBJECTS[subject_id] = threading.Lock()
 
-    participant_stager = GENERIC_STAGER.build_instance()
-    STAGERS[subject_id] = participant_stager
+    # Check if this is a returning participant with a saved session
+    existing_session = PARTICIPANT_SESSIONS.get(subject_id)
+    if existing_session is not None and existing_session.stager_state is not None:
+        # Returning participant - restore their stager from saved state
+        logger.info(
+            f"Returning participant detected: {subject_id}, "
+            f"restoring session from scene index {existing_session.stager_state.get('current_scene_index')}"
+        )
+        participant_stager = GENERIC_STAGER.build_instance()
+        participant_stager.set_state(existing_session.stager_state)
+        STAGERS[subject_id] = participant_stager
+    else:
+        # New participant - create fresh stager
+        participant_stager = GENERIC_STAGER.build_instance()
+        STAGERS[subject_id] = participant_stager
+
+        # Create initial session entry
+        PARTICIPANT_SESSIONS[subject_id] = ParticipantSession(
+            subject_id=subject_id,
+            stager_state=None,
+            interactive_gym_globals={"subjectName": subject_id},
+            current_scene_id=None,
+            socket_id=None,
+            is_connected=False,
+        )
 
     return flask.render_template(
         "index.html",
@@ -154,13 +200,20 @@ def user_index(subject_id):
 
 @socketio.on("register_subject")
 def register_subject(data):
-    global SESSION_ID_TO_SUBJECT_ID
-    """Ties the subject name in the URL to the flask request sid"""
+    global SESSION_ID_TO_SUBJECT_ID, PARTICIPANT_SESSIONS
+    """
+    Ties the subject name in the URL to the flask request sid.
+
+    Also handles session restoration for returning participants.
+    """
     subject_id = data["subject_id"]
     sid = flask.request.sid
     flask.session["subject_id"] = subject_id
     SESSION_ID_TO_SUBJECT_ID[sid] = subject_id
     logger.info(f"Registered session ID {sid} with subject {subject_id}")
+
+    # Get client-sent interactiveGymGlobals (if any)
+    client_globals = data.get("interactiveGymGlobals", {})
 
     # Send server session ID to client
     flask_socketio.emit(
@@ -169,10 +222,84 @@ def register_subject(data):
         room=sid,
     )
 
-    participant_stager = STAGERS[subject_id]
-    participant_stager.start(socketio, room=sid)
+    participant_stager = STAGERS.get(subject_id)
+    if participant_stager is None:
+        logger.error(f"No stager found for subject {subject_id} during registration")
+        return
+
+    # Check if this is a session restoration
+    existing_session = PARTICIPANT_SESSIONS.get(subject_id)
+    is_restored_session = (
+        existing_session is not None
+        and existing_session.stager_state is not None
+    )
+
+    if is_restored_session:
+        # Returning participant - merge globals (server wins for conflicts)
+        # Start with client globals, then overlay server-stored globals
+        merged_globals = {**client_globals, **existing_session.interactive_gym_globals}
+
+        # Update session state
+        existing_session.socket_id = sid
+        existing_session.is_connected = True
+        existing_session.last_updated_at = time.time()
+        existing_session.interactive_gym_globals = merged_globals
+
+        logger.info(
+            f"Session restored for {subject_id}, "
+            f"scene index: {existing_session.stager_state.get('current_scene_index')}"
+        )
+
+        # Send session_restored event with server globals
+        flask_socketio.emit(
+            "session_restored",
+            {
+                "interactiveGymGlobals": merged_globals,
+                "scene_id": existing_session.current_scene_id,
+                "is_restored": True,
+            },
+            room=sid,
+        )
+
+        # Resume the stager at the current scene (instead of starting fresh)
+        participant_stager.resume(socketio, room=sid)
+    else:
+        # New participant - normal start flow
+        # Update session with client globals and connection info
+        if existing_session is not None:
+            existing_session.socket_id = sid
+            existing_session.is_connected = True
+            existing_session.last_updated_at = time.time()
+            # Merge client globals into the session
+            existing_session.interactive_gym_globals.update(client_globals)
+
+        participant_stager.start(socketio, room=sid)
 
     participant_stager.current_scene.export_metadata(subject_id)
+
+
+@socketio.on("sync_globals")
+def sync_globals(data):
+    """
+    Receive and store interactiveGymGlobals from the client.
+
+    This is called periodically by the client to keep the server-side
+    session state in sync with client-side globals.
+    """
+    global PARTICIPANT_SESSIONS
+
+    subject_id = get_subject_id_from_session_id(flask.request.sid)
+    if subject_id is None:
+        return
+
+    client_globals = data.get("interactiveGymGlobals", {})
+    session = PARTICIPANT_SESSIONS.get(subject_id)
+
+    if session is not None:
+        # Update the stored globals with client values
+        session.interactive_gym_globals.update(client_globals)
+        session.last_updated_at = time.time()
+        logger.debug(f"Synced globals for {subject_id}: {list(client_globals.keys())}")
 
 
 # @socketio.on("connect")
@@ -549,11 +676,20 @@ def on_exit():
 @socketio.on("static_scene_data_emission")
 def data_emission(data):
     """Save the static scene data to a csv file."""
+    global PARTICIPANT_SESSIONS
+
+    subject_id = get_subject_id_from_session_id(flask.request.sid)
+
+    # Sync interactiveGymGlobals to session for persistence
+    client_globals = data.get("interactiveGymGlobals", {})
+    session = PARTICIPANT_SESSIONS.get(subject_id)
+    if session is not None and client_globals:
+        session.interactive_gym_globals.update(client_globals)
+        session.last_updated_at = time.time()
 
     if not CONFIG.save_experiment_data:
         return
 
-    subject_id = get_subject_id_from_session_id(flask.request.sid)
     # Save to a csv in data/{scene_id}/{subject_id}.csv
     # Save the static scene data to a csv file.
     scene_id = data.get("scene_id")
@@ -588,11 +724,19 @@ def data_emission(data):
 
 @socketio.on("emit_remote_game_data")
 def receive_remote_game_data(data):
+    global PARTICIPANT_SESSIONS
+
+    subject_id = get_subject_id_from_session_id(flask.request.sid)
+
+    # Sync interactiveGymGlobals to session for persistence
+    client_globals = data.get("interactiveGymGlobals", {})
+    session = PARTICIPANT_SESSIONS.get(subject_id)
+    if session is not None and client_globals:
+        session.interactive_gym_globals.update(client_globals)
+        session.last_updated_at = time.time()
 
     if not CONFIG.save_experiment_data:
         return
-
-    subject_id = get_subject_id_from_session_id(flask.request.sid)
 
     # Decode the msgpack data
     decoded_data = msgpack.unpackb(data["data"])
@@ -818,8 +962,12 @@ def on_disconnect():
     Scene-aware disconnect handling:
     - Only notify group members if they're in the same active game
     - If player is in a different scene (e.g., survey), remove quietly without notification
+
+    Session persistence:
+    - Saves stager state and interactiveGymGlobals to PARTICIPANT_SESSIONS
+    - Allows session restoration if participant reconnects with same URL
     """
-    global PYODIDE_COORDINATOR, GROUP_MANAGER
+    global PYODIDE_COORDINATOR, GROUP_MANAGER, PARTICIPANT_SESSIONS
 
     subject_id = get_subject_id_from_session_id(flask.request.sid)
     logger.info(f"Disconnect event received for socket {flask.request.sid}, subject_id: {subject_id}")
@@ -838,6 +986,20 @@ def on_disconnect():
 
     current_scene = participant_stager.current_scene
     logger.info(f"Subject {subject_id} disconnected, current scene: {current_scene.scene_id if current_scene else 'None'}")
+
+    # Save session state for potential reconnection
+    session = PARTICIPANT_SESSIONS.get(subject_id)
+    if session is not None:
+        session.stager_state = participant_stager.get_state()
+        session.current_scene_id = current_scene.scene_id if current_scene else None
+        session.socket_id = None
+        session.is_connected = False
+        session.last_updated_at = time.time()
+        logger.info(
+            f"Saved session state for {subject_id}: "
+            f"scene_index={session.stager_state.get('current_scene_index')}, "
+            f"scene_id={session.current_scene_id}"
+        )
 
     # Check if this is a GymScene and if player is in an active game
     is_in_active_gym_scene = False
