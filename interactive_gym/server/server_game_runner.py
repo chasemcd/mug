@@ -194,13 +194,14 @@ random.seed({rng_seed})
                        from before a sync).
         """
         if not self.is_initialized:
+            logger.warning(f"[ServerGameRunner] Not initialized, ignoring action from {player_id}")
             return False
 
         player_id_str = str(player_id)
 
         # Validate sync epoch if provided
         if sync_epoch is not None and sync_epoch != self.sync_epoch:
-            logger.debug(
+            logger.info(
                 f"[ServerGameRunner] Ignoring stale action from player {player_id} "
                 f"(client epoch {sync_epoch} != server epoch {self.sync_epoch})"
             )
@@ -210,6 +211,13 @@ random.seed({rng_seed})
             # Store the action for this player (overwrites any previous pending action)
             # We only keep ONE pending action per player - the most recent one
             self.pending_actions_for_step[player_id_str] = action
+
+            # Log action receipt at INFO level for debugging
+            logger.info(
+                f"[ServerGameRunner] Received action from player {player_id_str}: "
+                f"pending={list(self.pending_actions_for_step.keys())}, "
+                f"need={list(self.player_ids)}, epoch={sync_epoch}"
+            )
 
             # Check if we have one action from each player
             have_all = len(self.pending_actions_for_step) >= len(self.player_ids)
@@ -259,6 +267,10 @@ random.seed({rng_seed})
 
             # Clear pending actions for next step
             self.pending_actions_for_step.clear()
+
+            logger.info(
+                f"[ServerGameRunner] Stepping with actions: {actions}, step_num={self.step_num}"
+            )
 
         # Step environment (outside lock to avoid blocking)
         try:
