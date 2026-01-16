@@ -678,7 +678,7 @@ class InteractiveGymOvercooked(OvercookedRewardEnv):
         """
         state = {
             "t": int(self.t),
-            "current_layout_id": int(self.current_layout_id) if hasattr(self, 'current_layout_id') else 0,
+            "current_layout_id": str(self.current_layout_id) if hasattr(self, 'current_layout_id') else "",
         }
 
         # Serialize agent state

@@ -615,7 +615,7 @@ print(f"[Python] Seeded RNG with {${seed}}")
             // Clear pending state
             this.pendingEpisodeState = null;
 
-            if (serverState) {
+            if (serverState && serverState.env_state) {
                 console.log(`[MultiplayerPyodide] Applying server episode state (episode ${serverState.episode_num})`);
 
                 // Do a local reset FIRST to initialize internal structures (like env_agents),
@@ -624,14 +624,19 @@ print(f"[Python] Seeded RNG with {${seed}}")
                 // NOTE: We do NOT call applyServerState() here because it would try to call
                 // set_state() on an uninitialized env, causing errors in environments like cogrid
                 // where get_obs() relies on env_agents being set up during reset().
+
+                // Convert env_state to JSON string for safe passing to Python
+                const envStateJson = JSON.stringify(serverState.env_state);
+
                 const result = await this.pyodide.runPythonAsync(`
 import numpy as np
+import json
 
 # First reset to initialize internal structures (env_agents, etc.)
 obs, infos = env.reset(seed=${this.gameSeed || 'None'})
 
 # Now apply server state to overwrite with authoritative values
-env_state = ${this.pyodide.toPy(serverState.env_state)}
+env_state = json.loads('''${envStateJson.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}''')
 env.set_state(env_state)
 
 # Re-get observations after state is applied (internal structures now initialized)
