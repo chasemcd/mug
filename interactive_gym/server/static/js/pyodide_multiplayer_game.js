@@ -1708,11 +1708,17 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
             `frame: ${oldFrame} → ${this.frameNumber}`
         );
 
-        // Clear action queues to start fresh from new state
-        for (const playerId in this.otherPlayerActionQueues) {
-            this.otherPlayerActionQueues[playerId] = [];
-        }
-        this.lastExecutedActions = {};
+        // DO NOT clear action queues on periodic sync corrections.
+        // Actions in the queue are still valid - they were sent by the other player
+        // and need to be processed. Clearing them would cause us to use fallback
+        // actions while the other player thinks they already sent real ones.
+        //
+        // We only clear queues on episode start (in reset()), when both players
+        // are synchronized and starting fresh.
+        //
+        // However, we may need to trim queue if we moved backwards in frame number
+        // (e.g., server is behind where we were). But typically the server is
+        // authoritative and we should just continue from where server says.
 
         // Update HUD
         ui_utils.updateHUDText(this.getHUDText());

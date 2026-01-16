@@ -468,20 +468,25 @@ random.seed({rng_seed})
             f"at frame {self.frame_number}, epoch {self.sync_epoch}"
         )
 
-        # Clear ALL pending actions after sync.
-        # With sync epochs, clients will include the new epoch in their actions,
-        # and any actions with the old epoch will be rejected. Clearing pending
-        # actions ensures we don't accumulate stale data.
-        with self.action_lock:
-            if self.pending_actions_for_step:
-                cleared_count = len(self.pending_actions_for_step)
-                self.pending_actions_for_step.clear()
-                logger.debug(
-                    f"[ServerGameRunner] Cleared {cleared_count} pending actions after broadcast"
-                )
-            # Also clear legacy pending_actions if any
-            if self.pending_actions:
-                self.pending_actions.clear()
+        # Only clear pending actions on episode start (when epoch increments).
+        # For periodic syncs, we DON'T clear because:
+        # 1. Epoch doesn't change, so clients don't need to resend with new epoch
+        # 2. Clearing would lose actions that clients already sent for next frame
+        # 3. This would cause server to wait indefinitely while clients think they already sent
+        #
+        # On episode start, clients wait for server_episode_start before stepping,
+        # so clearing is safe (they'll send fresh actions after receiving the event).
+        if event_type == "server_episode_start":
+            with self.action_lock:
+                if self.pending_actions_for_step:
+                    cleared_count = len(self.pending_actions_for_step)
+                    self.pending_actions_for_step.clear()
+                    logger.debug(
+                        f"[ServerGameRunner] Cleared {cleared_count} pending actions after episode start"
+                    )
+                # Also clear legacy pending_actions if any
+                if self.pending_actions:
+                    self.pending_actions.clear()
 
     def handle_episode_end(self):
         """
