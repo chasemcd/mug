@@ -51,10 +51,15 @@ class ServerGameRunner:
         self.is_initialized = False
         self.rng_seed: int | None = None
 
-        # Action collection for current frame
-        # frame_number -> {player_id: action}
-        self.pending_actions: Dict[int, Dict[str, Any]] = {}
+        # Action collection for current server step
+        # Instead of matching by client frame number (which drift apart),
+        # we collect the NEXT action from each player and step when all are received.
+        # {player_id: action} - one pending action per player for the next step
+        self.pending_actions_for_step: Dict[str, Any] = {}
         self.action_lock = threading.Lock()
+
+        # Legacy frame-based pending actions (kept for cleanup compatibility)
+        self.pending_actions: Dict[int, Dict[str, Any]] = {}
 
         # Track expected players
         self.player_ids: set = set()
@@ -173,12 +178,17 @@ random.seed({rng_seed})
         """
         Receive an action from a player.
 
-        Returns True if this action completed the frame (all players submitted).
+        Returns True if this action completed the current step (all players submitted).
+
+        The server steps based on ACTION ARRIVAL ORDER, not client frame numbers.
+        When one action is received from each player, the server steps using those
+        actions. This ensures the server keeps stepping even when clients have
+        slightly different frame numbers due to network latency.
 
         Args:
             player_id: Player sending the action
             action: The action value
-            frame_number: Frame number from client
+            frame_number: Frame number from client (logged for debugging, not used for matching)
             sync_epoch: Sync epoch from client. If provided and doesn't match
                        current server epoch, action is ignored (stale action
                        from before a sync).
@@ -197,58 +207,58 @@ random.seed({rng_seed})
             return False
 
         with self.action_lock:
-            # Initialize frame action dict if needed
-            if frame_number not in self.pending_actions:
-                self.pending_actions[frame_number] = {}
+            # Store the action for this player (overwrites any previous pending action)
+            # We only keep ONE pending action per player - the most recent one
+            self.pending_actions_for_step[player_id_str] = action
 
-            # Store action
-            self.pending_actions[frame_number][player_id_str] = action
-
-            # Check if we have all actions for this frame
-            frame_actions = self.pending_actions[frame_number]
-            have_all = len(frame_actions) >= len(self.player_ids)
+            # Check if we have one action from each player
+            have_all = len(self.pending_actions_for_step) >= len(self.player_ids)
 
             if have_all:
                 logger.debug(
                     f"[ServerGameRunner] Game {self.game_id}: "
-                    f"All actions received for frame {frame_number}"
+                    f"All actions received for server step {self.step_num} "
+                    f"(client frame {frame_number})"
                 )
 
             return have_all
 
     def step_frame(self, frame_number: int) -> Dict[str, Any] | None:
         """
-        Step the environment for a specific frame.
+        Step the environment using collected actions.
 
         Call this after receive_action returns True.
         Returns step results and whether to broadcast state.
+
+        Note: frame_number is now just for logging - the server uses its own
+        step_num as the authoritative frame counter.
         """
         if not self.is_initialized:
             return None
 
         with self.action_lock:
-            if frame_number not in self.pending_actions:
+            # Use actions collected from all players (arrival-order based)
+            if len(self.pending_actions_for_step) < len(self.player_ids):
                 logger.warning(
-                    f"[ServerGameRunner] No actions for frame {frame_number}"
+                    f"[ServerGameRunner] Not enough actions for step "
+                    f"(have {len(self.pending_actions_for_step)}, need {len(self.player_ids)})"
                 )
                 return None
-
-            frame_actions = self.pending_actions[frame_number]
 
             # Build action dict with proper types
             actions = {}
             for player_id in self.player_ids:
-                if player_id in frame_actions:
-                    actions[player_id] = frame_actions[player_id]
+                if player_id in self.pending_actions_for_step:
+                    actions[player_id] = self.pending_actions_for_step[player_id]
                 else:
-                    # Fallback to default
+                    # Fallback to default (shouldn't happen if have_all was true)
                     actions[player_id] = self.default_action
                     logger.debug(
                         f"[ServerGameRunner] Using default action for player {player_id}"
                     )
 
-            # Clean up old frames
-            self._cleanup_old_frames(frame_number)
+            # Clear pending actions for next step
+            self.pending_actions_for_step.clear()
 
         # Step environment (outside lock to avoid blocking)
         try:
@@ -437,12 +447,16 @@ random.seed({rng_seed})
         # With sync epochs, clients will include the new epoch in their actions,
         # and any actions with the old epoch will be rejected. Clearing pending
         # actions ensures we don't accumulate stale data.
-        if self.pending_actions:
-            cleared_count = len(self.pending_actions)
-            self.pending_actions.clear()
-            logger.debug(
-                f"[ServerGameRunner] Cleared {cleared_count} pending action frames after broadcast"
-            )
+        with self.action_lock:
+            if self.pending_actions_for_step:
+                cleared_count = len(self.pending_actions_for_step)
+                self.pending_actions_for_step.clear()
+                logger.debug(
+                    f"[ServerGameRunner] Cleared {cleared_count} pending actions after broadcast"
+                )
+            # Also clear legacy pending_actions if any
+            if self.pending_actions:
+                self.pending_actions.clear()
 
     def handle_episode_end(self):
         """
@@ -465,7 +479,9 @@ random.seed({rng_seed})
         obs, info = self.env.reset(seed=self.rng_seed)
 
         # Clear pending actions for fresh episode
-        self.pending_actions.clear()
+        with self.action_lock:
+            self.pending_actions_for_step.clear()
+            self.pending_actions.clear()  # Legacy
 
         # Clear action tracking for new episode
         self.action_sequence = []
