@@ -315,19 +315,26 @@ random.seed({rng_seed})
 
             # Verify it's JSON-serializable (for socket.io transmission)
             import json
+            import hashlib
             json_start = time.time()
-            json_str = json.dumps(env_state)
+            json_str = json.dumps(env_state, sort_keys=True)
             json_time_ms = (time.time() - json_start) * 1000
             env_state_size = len(json_str)
 
+            # Compute a hash of the state for quick comparison
+            # Clients can compare hashes before full deserialization
+            state_hash = hashlib.md5(json_str.encode()).hexdigest()[:16]
+
             state["env_state"] = env_state
+            state["state_hash"] = state_hash
             env_state_included = True
 
             total_time_ms = (time.time() - start_time) * 1000
             logger.info(
                 f"[ServerGameRunner] State serialization: frame={self.frame_number}, "
                 f"method={serialization_method}, size={env_state_size/1024:.1f}KB, "
-                f"serialize={serialize_time_ms:.1f}ms, json={json_time_ms:.1f}ms, total={total_time_ms:.1f}ms"
+                f"serialize={serialize_time_ms:.1f}ms, json={json_time_ms:.1f}ms, total={total_time_ms:.1f}ms, "
+                f"hash={state_hash}"
             )
         except Exception as e:
             # Log warning - this is important because without env_state, clients can't sync positions

@@ -315,30 +315,67 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
                 `Latency: ${typeof networkLatency === 'number' ? networkLatency.toFixed(0) + 'ms' : networkLatency}`
             );
 
-            // Always apply the authoritative state to ensure clients stay in sync
-            // Even small frame drift can result in different game states due to action timing
+            // Only apply state if there's actual divergence (not just frame drift)
+            // Compare state hashes to avoid unnecessary corrections
             if (hasEnvState) {
-                // Track pre-sync state for debugging
-                const preSyncFrame = this.frameNumber;
+                const serverHash = state.state_hash || null;
+                let clientHash = null;
+                let needsCorrection = true;  // Default to correcting if we can't compare
 
-                // Apply server state to correct any divergence
-                const applyStartTime = performance.now();
-                await this.applyServerState(state);
-                const applyTime = performance.now() - applyStartTime;
+                // Compute client's current state hash for comparison
+                if (serverHash) {
+                    try {
+                        const hashStartTime = performance.now();
+                        clientHash = await this.computeQuickStateHash();
+                        const hashTime = performance.now() - hashStartTime;
 
-                // Log detailed sync application info
-                console.log(
-                    `[Sync] Applied state: ` +
-                    `frame ${preSyncFrame} → ${this.frameNumber} | ` +
-                    `apply=${applyTime.toFixed(1)}ms | ` +
-                    `latency=${typeof networkLatency === 'number' ? networkLatency.toFixed(0) + 'ms' : networkLatency}`
-                );
+                        // Compare hashes - if they match, states are identical, no correction needed
+                        needsCorrection = (clientHash !== serverHash);
 
-                if (Math.abs(frameDiff) > 5) {
-                    console.warn(
-                        `[Sync] ⚠️ Large drift detected (${frameDiff} frames). ` +
-                        `Queue pre-sync: ${totalQueueSize}`
+                        if (!needsCorrection) {
+                            console.log(
+                                `[Sync] States match (hash=${serverHash.substring(0, 8)}), skipping correction. ` +
+                                `Frame drift: ${frameDiff}, hash time: ${hashTime.toFixed(1)}ms`
+                            );
+                            // Just sync frame number and rewards without full state apply
+                            if (state.frame_number !== undefined) {
+                                this.frameNumber = state.frame_number;
+                            }
+                            if (state.cumulative_rewards) {
+                                this.cumulative_rewards = state.cumulative_rewards;
+                                ui_utils.updateHUDText(this.getHUDText());
+                            }
+                        }
+                    } catch (e) {
+                        console.warn(`[Sync] Hash comparison failed: ${e}, will apply correction`);
+                        needsCorrection = true;
+                    }
+                }
+
+                if (needsCorrection) {
+                    // Track pre-sync state for debugging
+                    const preSyncFrame = this.frameNumber;
+
+                    // Apply server state to correct divergence
+                    const applyStartTime = performance.now();
+                    await this.applyServerState(state);
+                    const applyTime = performance.now() - applyStartTime;
+
+                    // Log detailed sync application info
+                    console.log(
+                        `[Sync] Applied correction: ` +
+                        `frame ${preSyncFrame} → ${this.frameNumber} | ` +
+                        `apply=${applyTime.toFixed(1)}ms | ` +
+                        `latency=${typeof networkLatency === 'number' ? networkLatency.toFixed(0) + 'ms' : networkLatency} | ` +
+                        `serverHash=${serverHash ? serverHash.substring(0, 8) : 'N/A'}, clientHash=${clientHash ? clientHash.substring(0, 8) : 'N/A'}`
                     );
+
+                    if (Math.abs(frameDiff) > 5) {
+                        console.warn(
+                            `[Sync] ⚠️ Large drift detected (${frameDiff} frames). ` +
+                            `Queue pre-sync: ${totalQueueSize}`
+                        );
+                    }
                 }
             } else {
                 // No env_state available - just sync rewards/frame number
@@ -1143,6 +1180,39 @@ obs, rewards, terminateds, truncateds, infos, render_state
             hash: stateHash,
             frame_number: frameNumber
         });
+    }
+
+    async computeQuickStateHash() {
+        /**
+         * Compute MD5 hash of env_state only (matches server's state_hash).
+         * This is used for quick comparison to avoid unnecessary state corrections.
+         * Returns first 16 chars of MD5 hash to match server format.
+         */
+        const hashResult = await this.pyodide.runPythonAsync(`
+import json
+import hashlib
+import pickle
+import base64
+
+# Get env state (same method as server)
+if hasattr(env, 'get_state') and callable(getattr(env, 'get_state')):
+    _env_state_for_hash = env.get_state()
+else:
+    # Default pickle-based serialization
+    original_module = env.__class__.__module__
+    env.__class__.__module__ = '__main__'
+    try:
+        pickled = pickle.dumps(env)
+    finally:
+        env.__class__.__module__ = original_module
+    _env_state_for_hash = {'pickled_state': base64.b64encode(pickled).decode('utf-8')}
+
+# Compute MD5 hash matching server's format (sort_keys=True for consistency)
+_json_str = json.dumps(_env_state_for_hash, sort_keys=True)
+_hash = hashlib.md5(_json_str.encode()).hexdigest()[:16]
+_hash
+        `);
+        return hashResult;
     }
 
     async computeStateHash() {
