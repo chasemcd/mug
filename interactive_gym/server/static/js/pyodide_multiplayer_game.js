@@ -108,6 +108,26 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         this.lastKnownServerStepNum = 0;
         this.maxStepsAheadOfServer = 5;  // Don't get more than 5 steps ahead of server
 
+        // =========================================================================
+        // Client Prediction + Rollback (real-time server mode)
+        // =========================================================================
+
+        // Input buffer for rollback/replay
+        // Stores inputs for each frame so we can replay with corrected partner actions
+        // Each entry: {frame, myAction, partnerActions, timestamp}
+        this.inputBuffer = [];
+        this.inputBufferMaxSize = config.input_buffer_size || 300;  // ~10 sec at 30fps
+
+        // Confirmed state (last server-verified state)
+        this.confirmedFrame = 0;
+
+        // Partner action tracking for prediction
+        // In real-time mode, we predict partner actions when not available
+        this.partnerLastActions = {};  // {player_id: last_action}
+
+        // Real-time mode flag (set from server when game starts)
+        this.realtimeMode = false;
+
         this.setupMultiplayerHandlers();
     }
 
@@ -159,9 +179,13 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
 
             // Check if server is authoritative
             this.serverAuthoritative = data.server_authoritative || false;
-            console.log(`[MultiplayerPyodide] Server-authoritative mode: ${this.serverAuthoritative} (from data: ${data.server_authoritative})`);
+            this.realtimeMode = data.realtime_mode !== false;  // Default true for server-authoritative
+            console.log(`[MultiplayerPyodide] Server-authoritative mode: ${this.serverAuthoritative}, realtime: ${this.realtimeMode}`);
             if (this.serverAuthoritative) {
                 console.log(`[MultiplayerPyodide] Server-authoritative mode enabled - will receive server_authoritative_state events`);
+                if (this.realtimeMode) {
+                    console.log(`[MultiplayerPyodide] Real-time mode: client prediction + rollback enabled`);
+                }
             } else {
                 console.log(`[MultiplayerPyodide] Host-based mode - will send state hashes for verification`);
             }
@@ -335,6 +359,16 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
                 `Latency: ${typeof networkLatency === 'number' ? networkLatency.toFixed(0) + 'ms' : networkLatency}`
             );
 
+            // Real-time mode: use rollback + replay for smooth reconciliation
+            if (this.realtimeMode && hasEnvState) {
+                await this.reconcileWithServer(state);
+                // Update tracking
+                this.diagnostics.lastSyncFrame = state.frame_number;
+                this.diagnostics.lastSyncTime = Date.now();
+                return;
+            }
+
+            // Legacy frame-aligned mode: existing hash comparison + apply logic
             if (hasEnvState) {
                 // DETERMINISTIC STATE (custom get_state): Use hash comparison
                 const serverHash = state.state_hash || null;
@@ -1068,6 +1102,27 @@ obs, infos, render_state
             this.lastExecutedActions[agentId] = action;
         }
 
+        // Store in input buffer for potential rollback/replay (real-time mode)
+        if (this.realtimeMode && this.serverAuthoritative) {
+            const myAction = finalActions[this.myPlayerId];
+            const partnerActions = {};
+            for (const [agentId, action] of Object.entries(finalActions)) {
+                if (String(agentId) !== String(this.myPlayerId)) {
+                    partnerActions[agentId] = action;
+                }
+            }
+            this.inputBuffer.push({
+                frame: this.frameNumber,
+                myAction: myAction,
+                partnerActions: partnerActions,
+                timestamp: Date.now()
+            });
+            // Trim buffer
+            while (this.inputBuffer.length > this.inputBufferMaxSize) {
+                this.inputBuffer.shift();
+            }
+        }
+
         // Track action sequence and counts for sync verification
         this.actionSequence.push({
             frame: this.frameNumber,
@@ -1188,6 +1243,8 @@ obs, infos, render_state
             const { action } = queue.shift();
             // Track queue hit
             this.diagnostics.queueHitCount[playerIdStr] = (this.diagnostics.queueHitCount[playerIdStr] || 0) + 1;
+            // Update partner last action for prediction
+            this.partnerLastActions[playerIdStr] = action;
             return action;
         } else {
             // Queue empty - use fallback based on action_population_method
@@ -1195,7 +1252,9 @@ obs, infos, render_state
             this.diagnostics.fallbackCount[playerIdStr] = (this.diagnostics.fallbackCount[playerIdStr] || 0) + 1;
 
             if (this.actionPopulationMethod === 'previous_submitted_action') {
-                const lastAction = this.lastExecutedActions[playerIdStr];
+                // Use partner's last known action if available
+                const lastAction = this.partnerLastActions[playerIdStr]
+                    ?? this.lastExecutedActions[playerIdStr];
                 return lastAction !== undefined ? lastAction : this.defaultAction;
             } else {
                 return this.defaultAction;
@@ -1805,6 +1864,204 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
         ui_utils.updateHUDText(this.getHUDText());
 
         console.log(`[MultiplayerPyodide] Server state applied, now at frame ${this.frameNumber}`);
+    }
+
+    async reconcileWithServer(serverState) {
+        /**
+         * Reconcile client state with server's authoritative state.
+         *
+         * In real-time mode, uses rollback + replay:
+         * 1. Compare hash at server's frame
+         * 2. If match: just update confirmedFrame, continue
+         * 3. If mismatch: apply server state, correct input buffer, replay
+         *
+         * Returns true if reconciliation was performed, false if already in sync.
+         */
+        const serverFrame = serverState.frame_number;
+        const serverHash = serverState.state_hash;
+        const preSyncFrame = this.frameNumber;
+
+        // Look up client's hash at server's frame
+        const clientHash = this.getStateHashForFrame(serverFrame);
+
+        // Check if we're in sync
+        if (clientHash && serverHash && clientHash === serverHash) {
+            // States match - just update tracking
+            this.confirmedFrame = serverFrame;
+            this.pruneInputBuffer(serverFrame);
+
+            // Update server step tracking
+            if (serverState.step_num !== undefined) {
+                this.lastKnownServerStepNum = serverState.step_num;
+            }
+            // Sync cumulative rewards
+            if (serverState.cumulative_rewards) {
+                this.cumulative_rewards = serverState.cumulative_rewards;
+                ui_utils.updateHUDText(this.getHUDText());
+            }
+
+            console.log(
+                `[Reconcile] States match at frame ${serverFrame} ` +
+                `(hash=${serverHash.substring(0, 8)}), client ahead by ${preSyncFrame - serverFrame}`
+            );
+            return false;  // No reconciliation needed
+        }
+
+        // States don't match - need to rollback and replay
+        const framesToReplay = preSyncFrame - serverFrame;
+
+        console.log(
+            `[Reconcile] Mismatch at frame ${serverFrame}, ` +
+            `client at ${preSyncFrame}, need to replay ${framesToReplay} frames`
+        );
+
+        // Decide on reconciliation strategy based on drift
+        if (framesToReplay <= 0) {
+            // Client is behind or at server - just apply state, no replay
+            await this.applyServerState(serverState);
+            this.confirmedFrame = serverFrame;
+            this.inputBuffer = [];  // Clear buffer - stale
+            return true;
+        }
+
+        if (framesToReplay > 30) {
+            // Large drift - just snap to server state (replay would take too long)
+            console.warn(`[Reconcile] Large drift (${framesToReplay} frames), snapping to server`);
+            await this.applyServerState(serverState);
+            this.confirmedFrame = serverFrame;
+            this.inputBuffer = [];
+            this.stateHashHistory.clear();
+            return true;
+        }
+
+        // Moderate drift - apply server state, correct inputs, and replay
+        await this.applyServerState(serverState);
+        this.confirmedFrame = serverFrame;
+
+        // Correct input buffer with server's input history
+        const serverInputs = serverState.input_history || [];
+        this.correctInputBuffer(serverInputs);
+
+        // Replay frames
+        if (framesToReplay > 0) {
+            await this.replayFrames(serverFrame, framesToReplay);
+        }
+
+        // Clear hash history (replayed states have new hashes)
+        this.stateHashHistory.clear();
+
+        // Prune old inputs
+        this.pruneInputBuffer(serverFrame);
+
+        return true;
+    }
+
+    correctInputBuffer(serverInputs) {
+        /**
+         * Update input buffer with actual partner actions from server.
+         *
+         * The server's input_history contains the actions that were actually
+         * used for each frame. We update our predictions with the real values
+         * so replay uses correct actions.
+         */
+        const serverInputMap = new Map();
+        for (const inp of serverInputs) {
+            serverInputMap.set(inp.frame, inp.actions);
+        }
+
+        for (const localInput of this.inputBuffer) {
+            const serverActions = serverInputMap.get(localInput.frame);
+            if (serverActions) {
+                // Update partner actions with server's actual values
+                const correctedPartnerActions = {};
+                for (const [playerId, action] of Object.entries(localInput.partnerActions)) {
+                    const serverAction = serverActions[String(playerId)];
+                    correctedPartnerActions[playerId] = serverAction !== undefined
+                        ? serverAction
+                        : action;  // Keep prediction if server doesn't have it
+                }
+                localInput.correctedPartnerActions = correctedPartnerActions;
+            }
+        }
+    }
+
+    async replayFrames(startFrame, numFrames) {
+        /**
+         * Fast-forward through frames using buffered inputs.
+         *
+         * Replays without rendering to catch up quickly.
+         * Uses corrected partner actions if available from server history.
+         */
+        console.log(`[Replay] Starting replay of ${numFrames} frames from ${startFrame}`);
+        const replayStart = performance.now();
+
+        for (let i = 0; i < numFrames; i++) {
+            const frame = startFrame + i;
+            const input = this.inputBuffer.find(inp => inp.frame === frame);
+
+            if (!input) {
+                console.warn(`[Replay] Missing input for frame ${frame}, stopping replay`);
+                break;
+            }
+
+            // Build action dict
+            const actions = {};
+            actions[this.myPlayerId] = input.myAction;
+
+            // Use corrected partner actions if available
+            const partnerActions = input.correctedPartnerActions || input.partnerActions;
+            for (const [playerId, action] of Object.entries(partnerActions)) {
+                actions[playerId] = action;
+            }
+
+            // Step without rendering
+            await this.stepNoRender(actions);
+            this.frameNumber++;
+        }
+
+        // Render final state
+        try {
+            await this.pyodide.runPythonAsync(`env.render()`);
+        } catch (e) {
+            console.warn(`[Replay] Render failed: ${e}`);
+        }
+
+        const replayTime = performance.now() - replayStart;
+        console.log(
+            `[Replay] Completed ${numFrames} frames in ${replayTime.toFixed(1)}ms ` +
+            `(${(replayTime / numFrames).toFixed(1)}ms/frame)`
+        );
+    }
+
+    async stepNoRender(actions) {
+        /**
+         * Step environment without rendering.
+         *
+         * Used during rollback replay to quickly catch up.
+         */
+        const pyActions = JSON.stringify(actions);
+
+        await this.pyodide.runPythonAsync(`
+import json
+_actions_json = '''${pyActions}'''
+_actions = json.loads(_actions_json)
+_actions = {int(k) if k.lstrip('-').isdigit() else k: v for k, v in _actions.items()}
+obs, rewards, terminateds, truncateds, infos = env.step(_actions)
+        `);
+
+        this.step_num++;
+    }
+
+    pruneInputBuffer(confirmedFrame) {
+        /**
+         * Remove inputs older than confirmed frame (no longer needed for replay).
+         */
+        const oldLength = this.inputBuffer.length;
+        this.inputBuffer = this.inputBuffer.filter(inp => inp.frame >= confirmedFrame);
+        const pruned = oldLength - this.inputBuffer.length;
+        if (pruned > 0) {
+            console.log(`[InputBuffer] Pruned ${pruned} old inputs, ${this.inputBuffer.length} remaining`);
+        }
     }
 
     logFrameData(_data) {

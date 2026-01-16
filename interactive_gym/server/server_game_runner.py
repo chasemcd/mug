@@ -1,23 +1,40 @@
 """
-Server Game Runner - Frame-Aligned Authoritative Environment
+Server Game Runner - Real-Time Authoritative Environment
 
-Runs a Python environment on the server that steps in sync with client frames.
-Unlike a timer-based approach, this steps ONLY when all player actions for a
-frame have been received, ensuring perfect synchronization.
+Runs a Python environment on the server with two modes:
+1. Frame-aligned (legacy): Steps only when all player actions received
+2. Real-time (new): Steps on a timer at target FPS, using latest/predicted actions
+
+Real-time mode enables smooth multiplayer with client prediction + rollback:
+- Server never blocks waiting for slow players
+- Uses "sticky" actions (last received) or configured fallback
+- Broadcasts authoritative state periodically for client reconciliation
+- Includes input history so clients can replay with correct actions
 
 Key properties:
-- Deterministic: Steps exactly when clients step
-- No drift: Server frame always matches client consensus
-- On-demand: No background loop, steps on action events
+- Low latency: Server runs independently of client action timing
+- Smooth: No pauses when one player is idle/slow
+- Authoritative: Server state is ground truth for all clients
 """
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 import threading
-from typing import Any, Dict
+import time
+from collections import deque
+from typing import Any, Deque, Dict
 
 logger = logging.getLogger(__name__)
+
+
+@dataclasses.dataclass
+class InputFrame:
+    """Record of actions used for a single server frame."""
+    frame: int
+    actions: Dict[str, int]  # player_id -> action
+    timestamp: float
 
 # Ensure this module's logger has a handler so messages are visible
 if not logger.handlers:
@@ -31,10 +48,17 @@ if not logger.handlers:
 
 class ServerGameRunner:
     """
-    Frame-aligned authoritative game environment.
+    Authoritative game environment with real-time and frame-aligned modes.
 
-    Steps only when all player actions are received for the current frame.
-    Broadcasts authoritative state periodically.
+    Real-time mode (realtime_mode=True):
+        - Steps on a timer at target FPS
+        - Uses "sticky" last-received action per player
+        - Falls back to configured action_population_method when no action received
+        - Never blocks waiting for slow players
+
+    Frame-aligned mode (realtime_mode=False, legacy):
+        - Steps only when all player actions received
+        - Ensures perfect sync but can block on slow players
     """
 
     def __init__(
@@ -44,12 +68,26 @@ class ServerGameRunner:
         num_players: int,
         state_broadcast_interval: int = 30,
         sio=None,
+        # New config-driven settings
+        fps: int = 30,
+        default_action: int = 0,
+        action_population_method: str = "previous_submitted_action",
+        realtime_mode: bool = True,
+        input_buffer_size: int = 300,
     ):
         self.game_id = game_id
         self.environment_code = environment_code
         self.num_players = num_players
         self.state_broadcast_interval = state_broadcast_interval
         self.sio = sio
+
+        # Config-driven settings
+        self.target_fps = fps
+        self.frame_interval_s = 1.0 / fps
+        self.default_action = default_action
+        self.action_population_method = action_population_method
+        self.realtime_mode = realtime_mode
+        self.input_buffer_size = input_buffer_size
 
         # Environment state
         self.env = None
@@ -60,30 +98,38 @@ class ServerGameRunner:
         self.is_initialized = False
         self.rng_seed: int | None = None
 
-        # Action collection for current server step
-        # Instead of matching by client frame number (which drift apart),
-        # we collect the NEXT action from each player and step when all are received.
-        # {player_id: action} - one pending action per player for the next step
-        self.pending_actions_for_step: Dict[str, Any] = {}
+        # Action tracking (used in both modes)
         self.action_lock = threading.Lock()
 
-        # Legacy frame-based pending actions (kept for cleanup compatibility)
-        self.pending_actions: Dict[int, Dict[str, Any]] = {}
+        # Real-time mode: "sticky" actions - last received action per player
+        # Persists until replaced by new action from that player
+        self.current_actions: Dict[str, int] = {}
+
+        # For action_population_method="previous_submitted_action"
+        # Tracks the last action each player actually submitted
+        self.last_submitted_actions: Dict[str, int] = {}
+
+        # Input history for client replay verification (real-time mode)
+        self.input_history: Deque[InputFrame] = deque(maxlen=input_buffer_size)
+
+        # Frame-aligned mode: pending actions for current step
+        self.pending_actions_for_step: Dict[str, Any] = {}
+        self.pending_actions: Dict[int, Dict[str, Any]] = {}  # Legacy
 
         # Track expected players
         self.player_ids: set = set()
 
-        # Default action for fallback
-        self.default_action = 0
-
         # Action tracking for sync verification
-        self.action_sequence: list[dict] = []  # List of {frame: N, actions: {player: action}}
-        self.action_counts: Dict[str, Dict[int, int]] = {}  # {player_id: {action: count}}
+        self.action_sequence: list[dict] = []
+        self.action_counts: Dict[str, Dict[int, int]] = {}
 
-        # Sync epoch counter - incremented on each state broadcast.
-        # Clients include this in their actions; server ignores actions from old epochs.
-        # This prevents stale actions (sent before client received sync) from causing extra steps.
+        # Sync epoch counter - incremented on episode start
         self.sync_epoch = 0
+
+        # Real-time mode: timer control
+        self.running = False
+        self.last_tick_time = 0.0
+        self._tick_greenlet = None
 
     def initialize_environment(self, rng_seed: int) -> bool:
         """
@@ -176,6 +222,194 @@ random.seed({rng_seed})
             f"[ServerGameRunner] Added player {player_id}, "
             f"now have {len(self.player_ids)} players"
         )
+
+    # =========================================================================
+    # Real-time mode methods
+    # =========================================================================
+
+    def start_realtime(self):
+        """Start the real-time game loop using eventlet."""
+        if not self.is_initialized:
+            logger.error("[ServerGameRunner] Cannot start - not initialized")
+            return
+
+        if not self.realtime_mode:
+            logger.debug("[ServerGameRunner] Real-time mode disabled, not starting timer")
+            return
+
+        self.running = True
+        self.last_tick_time = time.time()
+        self._schedule_next_tick()
+        logger.info(
+            f"[ServerGameRunner] Started real-time loop for {self.game_id} "
+            f"at {self.target_fps} FPS"
+        )
+
+    def stop_realtime(self):
+        """Stop the real-time game loop."""
+        self.running = False
+        if self._tick_greenlet:
+            try:
+                self._tick_greenlet.cancel()
+            except Exception:
+                pass
+            self._tick_greenlet = None
+        logger.debug(f"[ServerGameRunner] Stopped real-time loop for {self.game_id}")
+
+    def _schedule_next_tick(self):
+        """Schedule the next tick using eventlet."""
+        if not self.running:
+            return
+
+        import eventlet
+        now = time.time()
+        elapsed = now - self.last_tick_time
+        delay = max(0, self.frame_interval_s - elapsed)
+        self._tick_greenlet = eventlet.spawn_after(delay, self._tick)
+
+    def _tick(self):
+        """Called every frame_interval_s. Steps the game unconditionally."""
+        if not self.running or not self.is_initialized:
+            return
+
+        now = time.time()
+        self.last_tick_time = now
+
+        # Build action dict using configured fallback strategy
+        actions = {}
+        for player_id in self.player_ids:
+            actions[player_id] = self._get_action_for_player(player_id)
+
+        # Record input for this frame (for client replay verification)
+        self.input_history.append(InputFrame(
+            frame=self.frame_number,
+            actions={str(k): int(v) for k, v in actions.items()},
+            timestamp=now
+        ))
+
+        # Step environment
+        try:
+            env_actions = {int(k) if str(k).isdigit() else k: v for k, v in actions.items()}
+            obs, rewards, terminateds, truncateds, infos = self.env.step(env_actions)
+
+            # Update cumulative rewards
+            for player_id, reward in rewards.items():
+                pid_str = str(player_id)
+                if pid_str in self.cumulative_rewards:
+                    self.cumulative_rewards[pid_str] += reward
+
+            # Track action sequence
+            self.action_sequence.append({
+                "frame": self.frame_number,
+                "actions": {str(k): int(v) for k, v in env_actions.items()}
+            })
+
+            # Update action counts per player
+            for player_id, action in env_actions.items():
+                pid_str = str(player_id)
+                if pid_str not in self.action_counts:
+                    self.action_counts[pid_str] = {}
+                action_int = int(action)
+                self.action_counts[pid_str][action_int] = \
+                    self.action_counts[pid_str].get(action_int, 0) + 1
+
+            self.frame_number += 1
+            self.step_num += 1
+
+            # Check for episode end
+            episode_done = terminateds.get("__all__", False) or truncateds.get("__all__", False)
+            if episode_done:
+                self._handle_episode_end_realtime()
+            elif self.frame_number % self.state_broadcast_interval == 0:
+                self.broadcast_state()
+
+        except Exception as e:
+            logger.error(f"[ServerGameRunner] Error in tick: {e}")
+            import traceback
+            traceback.print_exc()
+
+        # Schedule next tick
+        self._schedule_next_tick()
+
+    def _get_action_for_player(self, player_id: str) -> int:
+        """Get action for player using configured fallback strategy."""
+        player_id_str = str(player_id)
+
+        # Check if we have a sticky action from this player
+        if player_id_str in self.current_actions:
+            return self.current_actions[player_id_str]
+
+        # No action received - use configured fallback
+        if self.action_population_method == "previous_submitted_action":
+            return self.last_submitted_actions.get(player_id_str, self.default_action)
+        else:
+            return self.default_action
+
+    def _handle_episode_end_realtime(self):
+        """Handle episode completion in real-time mode."""
+        self.episode_num += 1
+        self.frame_number = 0
+        self.step_num = 0
+
+        # Re-seed RNG
+        if self.rng_seed is not None:
+            import numpy as np
+            import random
+            np.random.seed(self.rng_seed)
+            random.seed(self.rng_seed)
+
+        self.env.reset(seed=self.rng_seed)
+
+        # Clear action tracking
+        self.current_actions.clear()
+        self.input_history.clear()
+        self.action_sequence = []
+        self.action_counts = {}
+        self.sync_epoch += 1
+
+        # Broadcast episode start
+        self.broadcast_state(event_type="server_episode_start")
+        logger.info(f"[ServerGameRunner] Episode {self.episode_num} started (real-time)")
+
+    def receive_action_realtime(
+        self,
+        player_id: str | int,
+        action: Any,
+        client_frame: int,
+        sync_epoch: int | None = None
+    ):
+        """
+        Receive action in real-time mode. Updates sticky action, doesn't trigger step.
+
+        The timer-based _tick() method handles stepping independently.
+        """
+        if not self.is_initialized:
+            return
+
+        player_id_str = str(player_id)
+
+        # Validate sync epoch if provided (reject stale actions after episode reset)
+        if sync_epoch is not None and sync_epoch != self.sync_epoch:
+            logger.debug(
+                f"[ServerGameRunner] Ignoring stale action from {player_id_str} "
+                f"(epoch {sync_epoch} != {self.sync_epoch})"
+            )
+            return
+
+        with self.action_lock:
+            # Update sticky action
+            self.current_actions[player_id_str] = action
+            # Track for previous_submitted_action fallback
+            self.last_submitted_actions[player_id_str] = action
+
+        logger.debug(
+            f"[ServerGameRunner] Received action from {player_id_str}: "
+            f"action={action}, client_frame={client_frame}"
+        )
+
+    # =========================================================================
+    # Frame-aligned mode methods (legacy)
+    # =========================================================================
 
     def receive_action(
         self,
@@ -379,6 +613,15 @@ random.seed({rng_seed})
             "total_actions": len(self.action_sequence),
         }
 
+        # Include recent input history for client replay (real-time mode)
+        # Clients use this to correct their predictions when reconciling
+        if self.realtime_mode and self.input_history:
+            recent_inputs = [
+                {"frame": inp.frame, "actions": inp.actions, "timestamp": inp.timestamp}
+                for inp in list(self.input_history)[-60:]  # Last ~2 sec at 30fps
+            ]
+            state["input_history"] = recent_inputs
+
         # Include environment state - requires get_state() method
         if not hasattr(self.env, "get_state"):
             logger.error(
@@ -536,6 +779,7 @@ random.seed({rng_seed})
 
     def stop(self):
         """Clean up resources."""
+        self.stop_realtime()  # Stop real-time loop if running
         self.is_initialized = False
         self.env = None
         logger.info(f"[ServerGameRunner] Stopped game {self.game_id}")

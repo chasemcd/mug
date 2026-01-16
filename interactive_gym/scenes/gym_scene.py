@@ -136,6 +136,15 @@ class GymScene(scene.Scene):
         # and broadcasts authoritative state periodically, eliminating host dependency
         self.server_authoritative: bool = False
 
+        # Real-time mode (for server-authoritative)
+        # When True, server steps on a timer (not blocked by slow players)
+        # Clients use prediction + rollback for smooth gameplay
+        self.realtime_mode: bool = True
+
+        # Input buffer size for rollback/replay (real-time mode)
+        # Number of frames of input history to keep for potential replay
+        self.input_buffer_size: int = 300  # ~10 sec at 30fps
+
         # Player group settings (for multiplayer games)
         # Groups are always tracked automatically after each game completes.
         # wait_for_known_group controls whether to require the same group members in this scene.
@@ -457,6 +466,8 @@ class GymScene(scene.Scene):
         restart_pyodide: bool = NotProvided,
         server_authoritative: bool = NotProvided,
         state_broadcast_interval: int = NotProvided,
+        realtime_mode: bool = NotProvided,
+        input_buffer_size: int = NotProvided,
     ):
         """Configure Pyodide-related settings for the GymScene.
 
@@ -483,6 +494,14 @@ class GymScene(scene.Scene):
             mode, server broadcasts authoritative state at this interval. In host-based mode, clients
             verify state hashes at this interval. Default is 30 (~1 sec at 30fps). defaults to NotProvided
         :type state_broadcast_interval: int, optional
+        :param realtime_mode: If True (default), server steps on a timer at target FPS rather than
+            waiting for all player actions. Enables smooth gameplay with client prediction + rollback.
+            If False, server waits for all actions before stepping (legacy frame-aligned mode).
+            Only applies when server_authoritative=True. defaults to NotProvided
+        :type realtime_mode: bool, optional
+        :param input_buffer_size: Number of frames of input history to keep for potential rollback/replay.
+            Default is 300 (~10 sec at 30fps). Only used in real-time mode. defaults to NotProvided
+        :type input_buffer_size: int, optional
         :return: The GymScene instance (self)
         :rtype: GymScene
         """
@@ -526,6 +545,14 @@ class GymScene(scene.Scene):
         if state_broadcast_interval is not NotProvided:
             assert isinstance(state_broadcast_interval, int) and state_broadcast_interval > 0
             self.state_broadcast_interval = state_broadcast_interval
+
+        if realtime_mode is not NotProvided:
+            assert isinstance(realtime_mode, bool)
+            self.realtime_mode = realtime_mode
+
+        if input_buffer_size is not NotProvided:
+            assert isinstance(input_buffer_size, int) and input_buffer_size > 0
+            self.input_buffer_size = input_buffer_size
 
         return self
 

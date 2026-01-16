@@ -49,6 +49,7 @@ class PyodideGameState:
     # Server-authoritative mode fields
     server_authoritative: bool = False
     server_runner: Any = None  # ServerGameRunner instance when enabled
+    realtime_mode: bool = True  # Real-time (timer-based) vs frame-aligned stepping
 
     # Diagnostics for lag tracking
     last_action_times: Dict[str | int, float] = dataclasses.field(default_factory=dict)  # player_id -> last action timestamp
@@ -92,6 +93,12 @@ class PyodideGameCoordinator:
         server_authoritative: bool = False,
         environment_code: str | None = None,
         state_broadcast_interval: int = 30,
+        # New config options for real-time mode
+        fps: int = 30,
+        default_action: int = 0,
+        action_population_method: str = "previous_submitted_action",
+        realtime_mode: bool = True,
+        input_buffer_size: int = 300,
     ) -> PyodideGameState:
         """
         Initialize a new Pyodide multiplayer game.
@@ -133,6 +140,7 @@ class PyodideGameCoordinator:
                 created_at=time.time(),
                 state_broadcast_interval=state_broadcast_interval,
                 server_authoritative=server_authoritative,
+                realtime_mode=realtime_mode,
             )
 
             # Create server runner if server_authoritative mode enabled
@@ -145,10 +153,17 @@ class PyodideGameCoordinator:
                     num_players=num_players,
                     state_broadcast_interval=state_broadcast_interval,
                     sio=self.sio,
+                    # New config options
+                    fps=fps,
+                    default_action=default_action,
+                    action_population_method=action_population_method,
+                    realtime_mode=realtime_mode,
+                    input_buffer_size=input_buffer_size,
                 )
+                mode_str = "real-time" if realtime_mode else "frame-aligned"
                 logger.info(
                     f"Created ServerGameRunner for game {game_id} "
-                    f"(broadcast every {state_broadcast_interval} frames)"
+                    f"({mode_str} mode, {fps} FPS, broadcast every {state_broadcast_interval} frames)"
                 )
 
             self.games[game_id] = game_state
@@ -250,6 +265,9 @@ class PyodideGameCoordinator:
                     f"Server runner initialized for game {game_id} "
                     f"with seed {game.rng_seed}"
                 )
+                # Start real-time loop if enabled
+                if game.realtime_mode:
+                    game.server_runner.start_realtime()
             else:
                 logger.error(
                     f"Failed to initialize server runner for game {game_id}, "
@@ -268,6 +286,7 @@ class PyodideGameCoordinator:
                          'players': list(game.players.keys()),
                          'player_subjects': game.player_subjects,  # player_id -> subject_id mapping
                          'server_authoritative': game.server_authoritative,  # Tell clients if server is authoritative
+                         'realtime_mode': game.realtime_mode,  # Tell clients if real-time mode (prediction + rollback)
                      },
                      room=game_id)
 
@@ -366,24 +385,31 @@ class PyodideGameCoordinator:
                 f"to {len(game.players) - 1} other player(s)"
             )
 
-            # Feed action to server runner if enabled (frame-aligned stepper)
+            # Feed action to server runner if enabled
             if game.server_authoritative and game.server_runner:
-                all_received = game.server_runner.receive_action(
-                    player_id, action, frame_number, sync_epoch
-                )
+                if game.realtime_mode:
+                    # Real-time mode: just update sticky action, timer handles stepping
+                    game.server_runner.receive_action_realtime(
+                        player_id, action, frame_number, sync_epoch
+                    )
+                else:
+                    # Frame-aligned mode: step when all actions received
+                    all_received = game.server_runner.receive_action(
+                        player_id, action, frame_number, sync_epoch
+                    )
 
-                if all_received:
-                    # Step the server environment
-                    result = game.server_runner.step_frame(frame_number)
+                    if all_received:
+                        # Step the server environment
+                        result = game.server_runner.step_frame(frame_number)
 
-                    if result:
-                        # Broadcast state if it's time
-                        if result.get("should_broadcast"):
-                            game.server_runner.broadcast_state()
+                        if result:
+                            # Broadcast state if it's time
+                            if result.get("should_broadcast"):
+                                game.server_runner.broadcast_state()
 
-                        # Handle episode end
-                        if result.get("episode_done"):
-                            game.server_runner.handle_episode_end()
+                            # Handle episode end
+                            if result.get("episode_done"):
+                                game.server_runner.handle_episode_end()
 
     # Keep _broadcast_actions for backwards compatibility but it's no longer used
     def _broadcast_actions(self, game_id: str):

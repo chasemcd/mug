@@ -132,6 +132,11 @@ class GameManager:
                 server_authoritative = getattr(self.scene, 'server_authoritative', False)
                 state_broadcast_interval = getattr(self.scene, 'state_broadcast_interval', 30)
                 environment_code = getattr(self.scene, 'environment_initialization_code', None)
+                fps = getattr(self.scene, 'fps', 30)
+                default_action = getattr(self.scene, 'default_action', 0) or 0
+                action_population_method = getattr(self.scene, 'action_population_method', 'previous_submitted_action')
+                realtime_mode = getattr(self.scene, 'realtime_mode', True)
+                input_buffer_size = getattr(self.scene, 'input_buffer_size', 300)
 
                 self.pyodide_coordinator.create_game(
                     game_id=game_id,
@@ -139,6 +144,11 @@ class GameManager:
                     server_authoritative=server_authoritative,
                     environment_code=environment_code,
                     state_broadcast_interval=state_broadcast_interval,
+                    fps=fps,
+                    default_action=default_action,
+                    action_population_method=action_population_method,
+                    realtime_mode=realtime_mode,
+                    input_buffer_size=input_buffer_size,
                 )
                 logger.info(
                     f"Created multiplayer Pyodide game state for {game_id} "
