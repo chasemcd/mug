@@ -287,40 +287,54 @@ random.seed({rng_seed})
         (frame_number, cumulative_rewards) which is sufficient for keeping
         clients in sync on score display.
         """
+        import time
+        start_time = time.time()
+
         state = {
             "episode_num": self.episode_num,
             "step_num": self.step_num,
             "frame_number": self.frame_number,
             "cumulative_rewards": self.cumulative_rewards.copy(),
+            "server_timestamp": time.time() * 1000,  # ms timestamp for staleness tracking
         }
 
         # Include environment state
         # Use env.get_state() if available, otherwise use default pickle method
         env_state_included = False
+        serialization_method = "none"
+        env_state_size = 0
         try:
+            serialize_start = time.time()
             if hasattr(self.env, "get_state"):
                 env_state = self.env.get_state()
-                logger.debug(f"[ServerGameRunner] Using env.get_state() for state serialization")
+                serialization_method = "get_state"
             else:
                 env_state = self._default_get_env_state()
-                logger.debug(f"[ServerGameRunner] Using default pickle for state serialization")
+                serialization_method = "pickle"
+            serialize_time_ms = (time.time() - serialize_start) * 1000
 
             # Verify it's JSON-serializable (for socket.io transmission)
             import json
-            json.dumps(env_state)
+            json_start = time.time()
+            json_str = json.dumps(env_state)
+            json_time_ms = (time.time() - json_start) * 1000
+            env_state_size = len(json_str)
+
             state["env_state"] = env_state
             env_state_included = True
+
+            total_time_ms = (time.time() - start_time) * 1000
+            logger.info(
+                f"[ServerGameRunner] State serialization: frame={self.frame_number}, "
+                f"method={serialization_method}, size={env_state_size/1024:.1f}KB, "
+                f"serialize={serialize_time_ms:.1f}ms, json={json_time_ms:.1f}ms, total={total_time_ms:.1f}ms"
+            )
         except Exception as e:
             # Log warning - this is important because without env_state, clients can't sync positions
             logger.warning(
                 f"[ServerGameRunner] Cannot include env_state in broadcast: {e}. "
                 f"Clients will NOT be able to sync game state (positions, etc)."
             )
-
-        logger.debug(
-            f"[ServerGameRunner] get_authoritative_state: frame={self.frame_number}, "
-            f"env_state={'included' if env_state_included else 'MISSING'}"
-        )
 
         return state
 

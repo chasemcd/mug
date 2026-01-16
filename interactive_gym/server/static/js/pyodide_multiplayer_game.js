@@ -298,6 +298,11 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
             // Check if env_state is present (needed for actual state sync)
             const hasEnvState = state.env_state !== undefined && state.env_state !== null;
 
+            // Calculate staleness - how old is this state compared to when we received it?
+            const receiveTime = Date.now();
+            const serverTimestamp = state.server_timestamp || 0;
+            const networkLatency = serverTimestamp > 0 ? receiveTime - serverTimestamp : 'N/A';
+
             // Log comprehensive sync info (matches [Perf] format)
             console.log(
                 `[Sync #${this.diagnostics.syncCount}] ` +
@@ -306,14 +311,28 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
                 `Step: ${avgStepTime}ms avg, ${maxStepTime}ms max | ` +
                 `Queues: ${totalQueueSize} ${JSON.stringify(queueSizes)} | ` +
                 `Fallback: ${fallbackRate}% ${JSON.stringify(fallbackRates)} | ` +
-                `EnvState: ${hasEnvState ? 'yes' : 'NO'}`
+                `EnvState: ${hasEnvState ? 'yes' : 'NO'} | ` +
+                `Latency: ${typeof networkLatency === 'number' ? networkLatency.toFixed(0) + 'ms' : networkLatency}`
             );
 
             // Always apply the authoritative state to ensure clients stay in sync
             // Even small frame drift can result in different game states due to action timing
             if (hasEnvState) {
+                // Track pre-sync state for debugging
+                const preSyncFrame = this.frameNumber;
+
                 // Apply server state to correct any divergence
+                const applyStartTime = performance.now();
                 await this.applyServerState(state);
+                const applyTime = performance.now() - applyStartTime;
+
+                // Log detailed sync application info
+                console.log(
+                    `[Sync] Applied state: ` +
+                    `frame ${preSyncFrame} → ${this.frameNumber} | ` +
+                    `apply=${applyTime.toFixed(1)}ms | ` +
+                    `latency=${typeof networkLatency === 'number' ? networkLatency.toFixed(0) + 'ms' : networkLatency}`
+                );
 
                 if (Math.abs(frameDiff) > 5) {
                     console.warn(
@@ -1337,34 +1356,54 @@ if 'numpy_rng_state' in state_obj:
          * Similar to applyFullState but uses server's state format.
          * Called when client detects significant frame drift from server.
          */
-        console.log(`[MultiplayerPyodide] Applying server authoritative state (server frame: ${state.frame_number}, client frame: ${this.frameNumber})`);
+        const applyTiming = {
+            start: performance.now(),
+            pythonStart: 0,
+            pythonEnd: 0,
+            renderStart: 0,
+            renderEnd: 0,
+        };
 
         // If server provides env_state, apply it
         if (state.env_state) {
+            applyTiming.pythonStart = performance.now();
             await this.pyodide.runPythonAsync(`
 import numpy as np
 import pickle
 import base64
+import time
+
+_apply_start = time.time()
 
 env_state = ${this.pyodide.toPy(state.env_state)}
 
+_convert_time = (time.time() - _apply_start) * 1000
+
 # Use set_state if available, otherwise use default pickle deserialization
+_deser_start = time.time()
 if hasattr(env, 'set_state') and callable(getattr(env, 'set_state')):
     env.set_state(env_state)
-    print("[Python] ✓ Applied server authoritative state via set_state()")
+    _method = "set_state"
 elif 'pickled_state' in env_state:
     # Default pickle-based deserialization
     encoded = env_state['pickled_state']
     pickled = base64.b64decode(encoded.encode('utf-8'))
     restored = pickle.loads(pickled)
     env.__dict__.update(restored.__dict__)
-    print("[Python] ✓ Applied server authoritative state via pickle deserialization")
+    _method = "pickle"
 else:
     print("[Python] Warning: Cannot apply server state - no set_state method and no pickled_state")
+    _method = "none"
+_deser_time = (time.time() - _deser_start) * 1000
+
+_total_time = (time.time() - _apply_start) * 1000
+print(f"[Python] State applied via {_method}: convert={_convert_time:.1f}ms, deserialize={_deser_time:.1f}ms, total={_total_time:.1f}ms")
             `);
+            applyTiming.pythonEnd = performance.now();
         }
 
         // Sync JavaScript-side state
+        const oldFrame = this.frameNumber;
         if (state.episode_num !== undefined) {
             this.num_episodes = state.episode_num;
         }
@@ -1377,6 +1416,27 @@ else:
         if (state.cumulative_rewards) {
             this.cumulative_rewards = state.cumulative_rewards;
         }
+
+        // Trigger a re-render to show the corrected state
+        applyTiming.renderStart = performance.now();
+        try {
+            await this.pyodide.runPythonAsync(`env.render()`);
+            // The render state will be picked up on the next frame
+            applyTiming.renderEnd = performance.now();
+        } catch (e) {
+            applyTiming.renderEnd = performance.now();
+            console.warn(`[applyServerState] Render failed: ${e}`);
+        }
+
+        const totalTime = performance.now() - applyTiming.start;
+        const pythonTime = applyTiming.pythonEnd - applyTiming.pythonStart;
+        const renderTime = applyTiming.renderEnd - applyTiming.renderStart;
+
+        console.log(
+            `[applyServerState] Timing: total=${totalTime.toFixed(1)}ms, ` +
+            `python=${pythonTime.toFixed(1)}ms, render=${renderTime.toFixed(1)}ms, ` +
+            `frame: ${oldFrame} → ${this.frameNumber}`
+        );
 
         // Clear action queues to start fresh from new state
         for (const playerId in this.otherPlayerActionQueues) {
