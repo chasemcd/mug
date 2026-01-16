@@ -74,6 +74,7 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
             queueHitCount: {},      // player_id -> count of actions from queue
             // State sync metrics
             lastSyncFrame: 0,
+            lastSyncTime: 0,        // Timestamp of last sync for FPS calculation
             syncCount: 0,
             frameDriftHistory: [],  // Track frame drift at each sync
         };
@@ -111,11 +112,10 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
             if (this.myPlayerId === data.new_host_id) {
                 this.isHost = true;
                 this.shouldLogData = true;
-                console.debug(`[MultiplayerPyodide] Promoted to host!`);
             }
 
             if (!wasHost && this.isHost) {
-                console.warn(`[MultiplayerPyodide] Now responsible for data logging`);
+                console.log(`[MultiplayerPyodide] Promoted to host, now responsible for data logging`);
             }
         });
 
@@ -161,19 +161,17 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
             queue.push({ action, frame_number });
 
             // Log warning if queue is growing large (client may be running slower)
-            if (queue.length > 30) {
+            // Only warn once every 30 frames to avoid spam
+            if (queue.length > 30 && queue.length % 30 === 0) {
                 console.warn(`[MultiplayerPyodide] Queue for player ${player_id} is large (${queue.length}), this client may be running slower`);
             }
-
-            console.debug(`[MultiplayerPyodide] Queued action ${action} from player ${player_id} for frame ${frame_number} (queue size: ${queue.length})`);
         });
 
         // State verification request (host-based mode only)
         // In server-authoritative mode, skip hash computation - server broadcasts state directly
         socket.on('pyodide_verify_state', (data) => {
             if (this.serverAuthoritative) {
-                console.debug(`[MultiplayerPyodide] Ignoring state verification request (server-authoritative mode)`);
-                return;
+                return;  // Server handles state broadcast directly
             }
             this.verifyState(data.frame_number);
         });
@@ -253,21 +251,41 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
             const avgStepTime = stepTimes.length > 0
                 ? (stepTimes.reduce((a, b) => a + b, 0) / stepTimes.length).toFixed(1)
                 : 'N/A';
+            const maxStepTime = stepTimes.length > 0
+                ? Math.max(...stepTimes).toFixed(1)
+                : 'N/A';
 
-            // Calculate fallback rate
+            // Calculate fallback rate per player and total
+            const fallbackRates = {};
             let totalFallbacks = 0;
             let totalQueueHits = 0;
-            for (const count of Object.values(this.diagnostics.fallbackCount)) totalFallbacks += count;
+            for (const [playerId, count] of Object.entries(this.diagnostics.fallbackCount)) {
+                const hits = this.diagnostics.queueHitCount[playerId] || 0;
+                const total = count + hits;
+                fallbackRates[playerId] = total > 0 ? ((count / total) * 100).toFixed(0) + '%' : '0%';
+                totalFallbacks += count;
+            }
             for (const count of Object.values(this.diagnostics.queueHitCount)) totalQueueHits += count;
             const totalActions = totalFallbacks + totalQueueHits;
             const fallbackRate = totalActions > 0 ? ((totalFallbacks / totalActions) * 100).toFixed(1) : '0.0';
 
-            // Log comprehensive sync info
+            // Calculate FPS since last sync using actual timestamps
+            const now = Date.now();
+            const targetFPS = this.config.fps || 10;
+            const framesSinceLastSync = this.frameNumber - this.diagnostics.lastSyncFrame;
+            const timeSinceLastSync = now - this.diagnostics.lastSyncTime;
+            const effectiveFPS = framesSinceLastSync > 0 && this.diagnostics.lastSyncTime > 0 && timeSinceLastSync > 0
+                ? ((framesSinceLastSync / timeSinceLastSync) * 1000).toFixed(1)
+                : 'N/A';
+
+            // Log comprehensive sync info (matches [Perf] format)
             console.log(
                 `[Sync #${this.diagnostics.syncCount}] ` +
                 `Server: ${state.frame_number} | Client: ${this.frameNumber} | Drift: ${frameDiff > 0 ? '+' : ''}${frameDiff} | ` +
+                `FPS: ${effectiveFPS}/${targetFPS} | ` +
+                `Step: ${avgStepTime}ms avg, ${maxStepTime}ms max | ` +
                 `Queues: ${totalQueueSize} ${JSON.stringify(queueSizes)} | ` +
-                `Step: ${avgStepTime}ms | Fallback: ${fallbackRate}%`
+                `Fallback: ${fallbackRate}% ${JSON.stringify(fallbackRates)}`
             );
 
             // Check if we're significantly out of sync
@@ -286,6 +304,7 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
             }
 
             this.diagnostics.lastSyncFrame = state.frame_number;
+            this.diagnostics.lastSyncTime = now;
         });
 
         // Server episode start (server-authoritative mode)
@@ -351,7 +370,6 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
          * If the environment doesn't implement get_state/set_state, inject default
          * pickle-based implementations that serialize the entire environment.
          */
-        console.log("[MultiplayerPyodide] Validating environment state sync API...");
 
         const result = await this.pyodide.runPythonAsync(`
 import pickle
@@ -416,17 +434,14 @@ if not has_get_state or not has_set_state:
 }
         `);
 
-        const resultMap = result.toJs();
-        const envType = resultMap.get('env_type');
-
-        console.log(`[MultiplayerPyodide] ✓ Environment ${envType} supports state synchronization`);
+        // State sync validation complete - just need to call toJs() to release the proxy
+        void result.toJs();
     }
 
     async seedPythonEnvironment(seed) {
         /**
          * Seed Python's random number generators for determinism
          */
-        console.log(`[MultiplayerPyodide] Seeding Python environment with seed: ${seed}`);
 
         await this.pyodide.runPythonAsync(`
 import numpy as np
@@ -742,8 +757,6 @@ obs, infos, render_state
             });
         }
 
-        console.debug(`[MultiplayerPyodide] Frame ${this.frameNumber}: Stepping with actions`, finalActions);
-
         // 3. Step environment immediately with complete actions (no waiting!)
         const stepStartTime = performance.now();
         const stepResult = await this.stepWithActions(finalActions);
@@ -948,7 +961,6 @@ obs, infos, render_state
      * Sends state hash to server for comparison with other clients.
      */
     async triggerStateVerification() {
-        console.log(`[MultiplayerPyodide] Triggering state verification at frame ${this.frameNumber}`);
         const stateHash = await this.computeStateHash();
         socket.emit('pyodide_state_hash', {
             game_id: this.gameId,
@@ -1068,8 +1080,6 @@ obs, rewards, terminateds, truncateds, infos, render_state
             hash: stateHash,
             frame_number: frameNumber
         });
-
-        console.debug(`[MultiplayerPyodide] Frame ${frameNumber}: Sent state hash ${stateHash.slice(0, 8)}...`);
     }
 
     async computeStateHash() {
