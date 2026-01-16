@@ -944,10 +944,25 @@ obs, infos, render_state
         //
         // We wait up to maxWaitMs for actions to arrive. If timeout, we proceed with fallback
         // (this handles disconnections/lag gracefully).
+        //
+        // Additionally, if the queue is large (we're running faster than partner), we add
+        // extra delay to let them catch up and prevent unbounded queue growth.
         if (this.serverAuthoritative) {
             const maxWaitMs = 100;  // Reasonable timeout for network latency
             const pollIntervalMs = 5;
             let waited = 0;
+
+            // Check queue size and add throttling if we're running too fast
+            // This prevents unbounded queue growth when one client is faster
+            const totalQueueSize = Object.values(this.otherPlayerActionQueues)
+                .reduce((sum, queue) => sum + queue.length, 0);
+
+            if (totalQueueSize > 10) {
+                // We're accumulating actions faster than consuming - slow down
+                // Add proportional delay based on queue size
+                const throttleDelayMs = Math.min((totalQueueSize - 10) * 5, 50);
+                await new Promise(resolve => setTimeout(resolve, throttleDelayMs));
+            }
 
             while (waited < maxWaitMs) {
                 // Check if we have at least one action queued from each other player
@@ -1724,17 +1739,30 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
             `frame: ${oldFrame} → ${this.frameNumber}`
         );
 
-        // DO NOT clear action queues on periodic sync corrections.
-        // Actions in the queue are still valid - they were sent by the other player
-        // and need to be processed. Clearing them would cause us to use fallback
-        // actions while the other player thinks they already sent real ones.
+        // Handle action queues after state correction.
+        // If we went BACKWARDS in frame number, the actions in our queue are for
+        // "future" frames that we'll re-execute. But the other player will ALSO
+        // re-send actions for those frames after they receive this same sync.
+        // This causes duplicate actions in the queue → unbounded growth.
         //
-        // We only clear queues on episode start (in reset()), when both players
-        // are synchronized and starting fresh.
+        // Solution: When going backwards, clear the queue. The other player will
+        // re-send actions after they also receive the sync and reset.
         //
-        // However, we may need to trim queue if we moved backwards in frame number
-        // (e.g., server is behind where we were). But typically the server is
-        // authoritative and we should just continue from where server says.
+        // When going forwards or staying same, keep the queue - those actions
+        // are still valid and needed.
+        if (this.frameNumber < oldFrame) {
+            console.log(
+                `[applyServerState] Frame went backwards (${oldFrame} → ${this.frameNumber}), ` +
+                `clearing action queues to prevent duplicates`
+            );
+            for (const playerId in this.otherPlayerActionQueues) {
+                const oldQueueSize = this.otherPlayerActionQueues[playerId].length;
+                this.otherPlayerActionQueues[playerId] = [];
+                if (oldQueueSize > 0) {
+                    console.log(`  Cleared ${oldQueueSize} actions from player ${playerId}'s queue`);
+                }
+            }
+        }
 
         // Update HUD
         ui_utils.updateHUDText(this.getHUDText());
