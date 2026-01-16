@@ -205,10 +205,32 @@ def register_subject(data):
     Ties the subject name in the URL to the flask request sid.
 
     Also handles session restoration for returning participants.
+    Prevents multiple simultaneous connections from the same participant.
     """
     subject_id = data["subject_id"]
     sid = flask.request.sid
     flask.session["subject_id"] = subject_id
+
+    # Check for existing active connection from this participant
+    existing_session = PARTICIPANT_SESSIONS.get(subject_id)
+    if existing_session is not None and existing_session.is_connected:
+        old_socket_id = existing_session.socket_id
+        if old_socket_id and old_socket_id != sid:
+            logger.warning(
+                f"Participant {subject_id} already has active connection {old_socket_id}. "
+                f"Rejecting new connection {sid}."
+            )
+            # Emit error to the new connection and reject it
+            flask_socketio.emit(
+                "duplicate_session",
+                {
+                    "message": "You already have an active session open in another tab or window. "
+                               "Please close this tab and return to your existing session."
+                },
+                room=sid,
+            )
+            return
+
     SESSION_ID_TO_SUBJECT_ID[sid] = subject_id
     logger.info(f"Registered session ID {sid} with subject {subject_id}")
 
@@ -324,7 +346,7 @@ def sync_globals(data):
 
 @socketio.on("advance_scene")
 def advance_scene(data):
-    global GAME_MANAGERS
+    global GAME_MANAGERS, PARTICIPANT_SESSIONS
     """Advance the scene to the next one."""
     subject_id = get_subject_id_from_session_id(flask.request.sid)
 
@@ -340,6 +362,18 @@ def advance_scene(data):
     logger.info(
         f"Advanced to scene: {current_scene.scene_id}. Metadata export: {current_scene.should_export_metadata}"
     )
+
+    # Update session state with new scene position for session restoration
+    session = PARTICIPANT_SESSIONS.get(subject_id)
+    if session is not None:
+        session.stager_state = participant_stager.get_state()
+        session.current_scene_id = current_scene.scene_id if current_scene else None
+        session.last_updated_at = time.time()
+        logger.debug(
+            f"Updated session state for {subject_id} after advance: "
+            f"scene_index={session.stager_state.get('current_scene_index')}, "
+            f"scene_id={session.current_scene_id}"
+        )
 
     # Update the subject's current scene in the group manager
     if GROUP_MANAGER:

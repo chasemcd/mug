@@ -128,10 +128,43 @@ socket.on('session_restored', function(data) {
         console.log("Restored interactiveGymGlobals:", window.interactiveGymGlobals);
     }
 
+    // Reset UI state to ensure clean slate before scene activation
+    // Hide all buttons - the scene activation will show the appropriate ones
+    $("#startButton").hide();
+    $("#startButton").attr("disabled", true);
+    $("#advanceButton").hide();
+    $("#advanceButton").attr("disabled", true);
+    $("#redirectButton").hide();
+    $("#waitroomText").hide();
+    $("#errorText").hide();
+    $("#gameContainer").hide();
+
     // The server will re-activate the appropriate scene via activate_scene event
-    // No additional client action needed here
 });
 
+
+// Handle duplicate session (participant already connected in another tab)
+socket.on('duplicate_session', function(data) {
+    console.error("Duplicate session detected:", data.message);
+
+    // Hide all interactive elements
+    $("#startButton").hide();
+    $("#advanceButton").hide();
+    $("#redirectButton").hide();
+    $("#gameContainer").hide();
+    $("#waitroomText").hide();
+
+    // Show error message
+    $("#sceneHeader").html("Session Already Active");
+    $("#sceneHeader").show();
+    $("#sceneBody").html(
+        "<p style='color: red; font-weight: bold;'>" + data.message + "</p>"
+    );
+    $("#sceneBody").show();
+
+    // Disconnect the socket to prevent further attempts
+    socket.disconnect();
+});
 
 socket.on('invalid_session', function(data) {
     alert(data.message);
@@ -561,6 +594,11 @@ function activateScene(data) {
 function startStaticScene(data) {
     // In the Static and Start scenes, we only show
     // the advanceButton, sceneHeader, and sceneBody
+    // Hide other buttons that shouldn't be visible
+    $("#startButton").hide();
+    $("#startButton").attr("disabled", true);
+    $("#redirectButton").hide();
+
     $("#sceneHeader").show();
     $("#sceneSubHeader").show();
 
@@ -575,6 +613,12 @@ function startStaticScene(data) {
 };
 
 function startEndScene(data) {
+    // Hide buttons that shouldn't be visible in EndScene
+    $("#startButton").hide();
+    $("#startButton").attr("disabled", true);
+    $("#advanceButton").hide();
+    $("#advanceButton").attr("disabled", true);
+    $("#redirectButton").hide();
 
     $("#sceneHeader").show();
     $("#sceneSubHeader").show();
@@ -584,8 +628,6 @@ function startEndScene(data) {
     $("#sceneSubHeader").html(data.scene_subheader);
 
     $("#sceneBody").html(data.scene_body);
-    $("#redirectButton").hide();
-    $("#advanceButton").hide();
 
     if (data.url !== undefined && data.url !== null) {
         $("#redirectButton").show();
@@ -633,6 +675,11 @@ function startGymScene(data) {
 
 
     // Next, we display the startButton, header, and body
+    // Hide other buttons that shouldn't be visible in GymScene
+    $("#advanceButton").hide();
+    $("#advanceButton").attr("disabled", true);
+    $("#redirectButton").hide();
+
     $("#sceneHeader").show();
     $("#sceneSubHeader").show();
     $("#sceneBody").show();
