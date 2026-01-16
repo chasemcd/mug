@@ -937,59 +937,74 @@ obs, infos, render_state
             return null;
         }
 
-        // Action synchronization: Wait until we have at least one action from each other player
-        // before stepping. This ensures the server will also be able to step (since it waits
-        // for all players' actions). Without this, fast clients step ahead using fallback actions
-        // while the server waits, causing action count divergence.
+        // Action synchronization for server-authoritative mode:
+        // We check if we have actions from other players. If not, we wait briefly.
+        // But we DON'T block indefinitely - that kills FPS.
         //
-        // We wait up to maxWaitMs for actions to arrive. If timeout, we proceed with fallback
-        // (this handles disconnections/lag gracefully).
+        // The key insight: The server waits for ALL players before stepping.
+        // So if we step with a fallback action, the server will get our real action
+        // and step correctly. The only issue is if we use fallback TOO OFTEN,
+        // causing action count divergence. But occasional fallback is fine.
         //
-        // Additionally, if the queue is large (we're running faster than partner), we add
-        // extra delay to let them catch up and prevent unbounded queue growth.
+        // Strategy: Quick check (no wait) if we have actions. If not, brief wait.
+        // If still no actions after brief wait, proceed with fallback.
         if (this.serverAuthoritative) {
-            const maxWaitMs = 100;  // Reasonable timeout for network latency
-            const pollIntervalMs = 5;
-            let waited = 0;
+            // First, check if we already have all actions (common case - no wait needed)
+            let haveAllActions = true;
+            for (const [agentId, policy] of Object.entries(this.policyMapping)) {
+                const agentIdStr = String(agentId);
+                const myPlayerIdStr = String(this.myPlayerId);
 
-            // Check queue size and add throttling if we're running too fast
-            // This prevents unbounded queue growth when one client is faster
-            const totalQueueSize = Object.values(this.otherPlayerActionQueues)
-                .reduce((sum, queue) => sum + queue.length, 0);
+                if (agentIdStr === myPlayerIdStr || policy !== 'human') {
+                    continue;
+                }
 
-            if (totalQueueSize > 10) {
-                // We're accumulating actions faster than consuming - slow down
-                // Add proportional delay based on queue size
-                const throttleDelayMs = Math.min((totalQueueSize - 10) * 5, 50);
-                await new Promise(resolve => setTimeout(resolve, throttleDelayMs));
+                const queue = this.otherPlayerActionQueues[agentIdStr] || [];
+                if (queue.length === 0) {
+                    haveAllActions = false;
+                    break;
+                }
             }
 
-            while (waited < maxWaitMs) {
-                // Check if we have at least one action queued from each other player
-                let haveAllActions = true;
-                for (const [agentId, policy] of Object.entries(this.policyMapping)) {
-                    const agentIdStr = String(agentId);
-                    const myPlayerIdStr = String(this.myPlayerId);
+            // Only wait if we don't have actions yet
+            if (!haveAllActions) {
+                const maxWaitMs = 50;  // Brief wait - don't block too long
+                const pollIntervalMs = 5;
+                let waited = 0;
 
-                    // Skip my own player and bots
-                    if (agentIdStr === myPlayerIdStr || policy !== 'human') {
-                        continue;
+                while (waited < maxWaitMs) {
+                    await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
+                    waited += pollIntervalMs;
+
+                    // Re-check if actions arrived
+                    haveAllActions = true;
+                    for (const [agentId, policy] of Object.entries(this.policyMapping)) {
+                        const agentIdStr = String(agentId);
+                        const myPlayerIdStr = String(this.myPlayerId);
+
+                        if (agentIdStr === myPlayerIdStr || policy !== 'human') {
+                            continue;
+                        }
+
+                        const queue = this.otherPlayerActionQueues[agentIdStr] || [];
+                        if (queue.length === 0) {
+                            haveAllActions = false;
+                            break;
+                        }
                     }
 
-                    // Check if we have an action from this other human player
-                    const queue = this.otherPlayerActionQueues[agentIdStr] || [];
-                    if (queue.length === 0) {
-                        haveAllActions = false;
+                    if (haveAllActions) {
                         break;
                     }
                 }
+            }
 
-                if (haveAllActions) {
-                    break;  // We have actions from all other players, proceed
-                }
-
-                await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
-                waited += pollIntervalMs;
+            // Throttle if queue is building up (we're faster than partner)
+            const totalQueueSize = Object.values(this.otherPlayerActionQueues)
+                .reduce((sum, queue) => sum + queue.length, 0);
+            if (totalQueueSize > 10) {
+                const throttleDelayMs = Math.min((totalQueueSize - 10) * 3, 30);
+                await new Promise(resolve => setTimeout(resolve, throttleDelayMs));
             }
         } else if (this.throttle.enabled) {
             // Non-server-authoritative mode: use simpler throttling
