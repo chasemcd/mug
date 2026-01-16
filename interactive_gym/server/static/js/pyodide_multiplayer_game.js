@@ -79,6 +79,15 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
             frameDriftHistory: [],  // Track frame drift at each sync
         };
 
+        // Adaptive throttling to match slower client
+        this.throttle = {
+            enabled: true,           // Enable adaptive throttling
+            queueThreshold: 5,       // Start throttling when queue exceeds this
+            maxDelayMs: 50,          // Maximum delay to add per step
+            delayPerQueuedAction: 3, // ms delay per queued action above threshold
+            skippedFrames: 0,        // Count of frames skipped for throttling
+        };
+
         this.setupMultiplayerHandlers();
     }
 
@@ -721,6 +730,24 @@ obs, infos, render_state
             return null;
         }
 
+        // Adaptive throttling: slow down if we're ahead of partner
+        // This prevents queue buildup on the slower client's side
+        if (this.throttle.enabled) {
+            const totalQueueSize = Object.values(this.otherPlayerActionQueues)
+                .reduce((sum, queue) => sum + queue.length, 0);
+
+            if (totalQueueSize > this.throttle.queueThreshold) {
+                const excessActions = totalQueueSize - this.throttle.queueThreshold;
+                const delayMs = Math.min(
+                    excessActions * this.throttle.delayPerQueuedAction,
+                    this.throttle.maxDelayMs
+                );
+
+                // Add delay to let slower client catch up
+                await new Promise(resolve => setTimeout(resolve, delayMs));
+            }
+        }
+
         // 1. Build final action dict with queue lookups for other players
         const finalActions = {};
 
@@ -925,11 +952,11 @@ obs, infos, render_state
             `Fallback: ${overallFallbackRate}% ${JSON.stringify(fallbackRates)}`
         );
 
-        // Warn if queues are growing (indicates one client is behind)
-        if (totalQueueSize > 10) {
+        // Warn if queues are growing significantly (indicates throttling may not be keeping up)
+        if (totalQueueSize > 15) {
             console.warn(
-                `[Perf] ⚠️ Queue buildup: ${totalQueueSize} actions. ` +
-                `Client may be faster than partner or network delays occurring.`
+                `[Perf] ⚠️ Queue buildup: ${totalQueueSize} actions (throttling active). ` +
+                `Partner may be significantly slower or network delays occurring.`
             );
         }
 
