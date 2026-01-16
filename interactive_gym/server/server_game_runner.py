@@ -210,7 +210,7 @@ random.seed({rng_seed})
 
         # Validate sync epoch if provided
         if sync_epoch is not None and sync_epoch != self.sync_epoch:
-            logger.info(
+            logger.debug(
                 f"[ServerGameRunner] Ignoring stale action from player {player_id} "
                 f"(client epoch {sync_epoch} != server epoch {self.sync_epoch})"
             )
@@ -221,8 +221,8 @@ random.seed({rng_seed})
             # We only keep ONE pending action per player - the most recent one
             self.pending_actions_for_step[player_id_str] = action
 
-            # Log action receipt at INFO level for debugging
-            logger.info(
+            # Log action receipt at DEBUG level (too frequent for INFO)
+            logger.debug(
                 f"[ServerGameRunner] Received action from player {player_id_str}: "
                 f"pending={list(self.pending_actions_for_step.keys())}, "
                 f"need={list(self.player_ids)}, epoch={sync_epoch}"
@@ -277,7 +277,7 @@ random.seed({rng_seed})
             # Clear pending actions for next step
             self.pending_actions_for_step.clear()
 
-            logger.info(
+            logger.debug(
                 f"[ServerGameRunner] Stepping with actions: {actions}, step_num={self.step_num}"
             )
 
@@ -411,7 +411,7 @@ random.seed({rng_seed})
             state["state_hash"] = state_hash
 
             total_time_ms = (time.time() - start_time) * 1000
-            logger.info(
+            logger.debug(
                 f"[ServerGameRunner] State serialization: frame={self.frame_number}, "
                 f"size={env_state_size/1024:.1f}KB, "
                 f"serialize={serialize_time_ms:.1f}ms, json={json_time_ms:.1f}ms, total={total_time_ms:.1f}ms, "
@@ -463,7 +463,7 @@ random.seed({rng_seed})
             room=self.game_id,
         )
 
-        logger.info(
+        logger.debug(
             f"[ServerGameRunner] Broadcast {event_type} to room {self.game_id} "
             f"at frame {self.frame_number}, epoch {self.sync_epoch}"
         )
