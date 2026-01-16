@@ -926,14 +926,16 @@ obs, infos, render_state
         // Track step timing for diagnostics
         this.trackStepTime(stepStartTime);
 
-        // 4. Increment frame
-        this.frameNumber++;
-
-        // Record state hash for this frame (for frame-aligned comparison with server)
-        // Do this asynchronously to avoid blocking the game loop
+        // Record state hash for this frame SYNCHRONOUSLY (must complete before next step)
+        // IMPORTANT: Record BEFORE incrementing frameNumber to match server's frame numbering.
+        // Server sets frame_number = N after stepping with frame N actions.
+        // Client should also associate the post-step state with frame N (not N+1).
         if (this.serverAuthoritative) {
-            this.recordStateHashForFrame(this.frameNumber);
+            await this.recordStateHashForFrame(this.frameNumber);
         }
+
+        // 4. Increment frame (AFTER recording hash)
+        this.frameNumber++;
 
         // Log diagnostics periodically
         this.logDiagnostics();
