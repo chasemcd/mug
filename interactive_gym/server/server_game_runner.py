@@ -445,8 +445,12 @@ random.seed({rng_seed})
         if self.sio is None:
             return
 
-        # Increment sync epoch BEFORE getting state so clients receive the new epoch
-        self.sync_epoch += 1
+        # Only increment sync epoch on episode start broadcasts.
+        # The epoch mechanism prevents stale actions after state resets, but we don't
+        # want to reject actions between periodic syncs (that would block the server
+        # from ever stepping since clients can't update their epoch fast enough).
+        if event_type == "server_episode_start":
+            self.sync_epoch += 1
 
         state = self.get_authoritative_state()
 
