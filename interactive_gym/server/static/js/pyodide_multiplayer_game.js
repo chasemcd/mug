@@ -730,21 +730,20 @@ obs, infos, render_state
             return null;
         }
 
-        // Adaptive throttling: slow down if we're ahead of partner
-        // This prevents queue buildup on the slower client's side
+        // Adaptive throttling: slow down if we're the FAST client (partner's actions are accumulating in our queue)
+        // Large queue = partner is sending faster than we consume = we're SLOW, don't throttle
+        // Empty queue = we're consuming faster than partner sends = we're FAST, should throttle
+        //
+        // Wait for at least one action in queue before stepping (with timeout)
+        // This naturally paces the fast client to match the slow client's action rate
         if (this.throttle.enabled) {
             const totalQueueSize = Object.values(this.otherPlayerActionQueues)
                 .reduce((sum, queue) => sum + queue.length, 0);
 
-            if (totalQueueSize > this.throttle.queueThreshold) {
-                const excessActions = totalQueueSize - this.throttle.queueThreshold;
-                const delayMs = Math.min(
-                    excessActions * this.throttle.delayPerQueuedAction,
-                    this.throttle.maxDelayMs
-                );
-
-                // Add delay to let slower client catch up
-                await new Promise(resolve => setTimeout(resolve, delayMs));
+            // Only throttle if queue is EMPTY or very small (we're faster than partner)
+            if (totalQueueSize === 0) {
+                // Wait briefly for an action to arrive before using fallback
+                await new Promise(resolve => setTimeout(resolve, this.throttle.maxDelayMs));
             }
         }
 
