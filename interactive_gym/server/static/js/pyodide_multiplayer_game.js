@@ -101,6 +101,13 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         // Actions with old epoch are rejected by server after a state broadcast.
         this.syncEpoch = 0;
 
+        // Server step tracking - prevents client from getting too far ahead of server.
+        // The server only steps when it receives actions from ALL players, so a fast client
+        // can accumulate extra local steps. We track the last known server step count and
+        // pause if we get too far ahead.
+        this.lastKnownServerStepNum = 0;
+        this.maxStepsAheadOfServer = 5;  // Don't get more than 5 steps ahead of server
+
         this.setupMultiplayerHandlers();
     }
 
@@ -764,6 +771,7 @@ obs, infos, render_state
                 // State is already synced from server
                 this.step_num = serverState.step_num || 0;
                 this.frameNumber = serverState.frame_number || 0;
+                this.lastKnownServerStepNum = serverState.step_num || 0;  // Track server step count
                 this.shouldReset = false;
                 this.episodeComplete = false;
 
@@ -913,19 +921,51 @@ obs, infos, render_state
             return null;
         }
 
-        // Adaptive throttling: slow down if we're the FAST client (partner's actions are accumulating in our queue)
-        // Large queue = partner is sending faster than we consume = we're SLOW, don't throttle
-        // Empty queue = we're consuming faster than partner sends = we're FAST, should throttle
+        // Action synchronization: Wait until we have at least one action from each other player
+        // before stepping. This ensures the server will also be able to step (since it waits
+        // for all players' actions). Without this, fast clients step ahead using fallback actions
+        // while the server waits, causing action count divergence.
         //
-        // Wait for at least one action in queue before stepping (with timeout)
-        // This naturally paces the fast client to match the slow client's action rate
-        if (this.throttle.enabled) {
+        // We wait up to maxWaitMs for actions to arrive. If timeout, we proceed with fallback
+        // (this handles disconnections/lag gracefully).
+        if (this.serverAuthoritative) {
+            const maxWaitMs = 100;  // Reasonable timeout for network latency
+            const pollIntervalMs = 5;
+            let waited = 0;
+
+            while (waited < maxWaitMs) {
+                // Check if we have at least one action queued from each other player
+                let haveAllActions = true;
+                for (const [agentId, policy] of Object.entries(this.policyMapping)) {
+                    const agentIdStr = String(agentId);
+                    const myPlayerIdStr = String(this.myPlayerId);
+
+                    // Skip my own player and bots
+                    if (agentIdStr === myPlayerIdStr || policy !== 'human') {
+                        continue;
+                    }
+
+                    // Check if we have an action from this other human player
+                    const queue = this.otherPlayerActionQueues[agentIdStr] || [];
+                    if (queue.length === 0) {
+                        haveAllActions = false;
+                        break;
+                    }
+                }
+
+                if (haveAllActions) {
+                    break;  // We have actions from all other players, proceed
+                }
+
+                await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
+                waited += pollIntervalMs;
+            }
+        } else if (this.throttle.enabled) {
+            // Non-server-authoritative mode: use simpler throttling
             const totalQueueSize = Object.values(this.otherPlayerActionQueues)
                 .reduce((sum, queue) => sum + queue.length, 0);
 
-            // Only throttle if queue is EMPTY or very small (we're faster than partner)
             if (totalQueueSize === 0) {
-                // Wait briefly for an action to arrive before using fallback
                 await new Promise(resolve => setTimeout(resolve, this.throttle.maxDelayMs));
             }
         }
@@ -1633,6 +1673,8 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
         }
         if (state.step_num !== undefined) {
             this.step_num = state.step_num;
+            // Track server step count to prevent client from getting too far ahead
+            this.lastKnownServerStepNum = state.step_num;
         }
         if (state.frame_number !== undefined) {
             this.frameNumber = state.frame_number;
