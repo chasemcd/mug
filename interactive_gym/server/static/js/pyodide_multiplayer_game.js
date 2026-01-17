@@ -2410,6 +2410,11 @@ env.step(_replay_actions)
         // NOTE: Do NOT close WebRTC connection here - it persists across episodes
         // WebRTC is only closed when the game session ends (in destroy/cleanup)
 
+        // Reset P2P input sender for new episode
+        if (this.p2pInputSender) {
+            this.p2pInputSender.reset();
+        }
+
         console.log('[GGPO] State cleared for new episode (P2P connection preserved)');
     }
 
@@ -2485,12 +2490,13 @@ env.step(_replay_actions)
         this.webrtcManager.onDataChannelClose = () => {
             console.log('[MultiplayerPyodide] P2P DataChannel CLOSED');
             this.p2pConnected = false;
+            this._stopPingInterval();
         };
 
         this.webrtcManager.onConnectionFailed = () => {
             console.error('[MultiplayerPyodide] P2P connection FAILED');
             this.p2pConnected = false;
-            // For Phase 1, just log - fallback to SocketIO is existing behavior
+            this._stopPingInterval();
         };
 
         // Start the connection (role determined by player ID comparison)
@@ -2634,6 +2640,37 @@ env.step(_replay_actions)
         if (this.frameNumber % 60 === 0) {
             const avgRtt = this.connectionHealth?.rttTracker.getAverageRTT();
             console.log(`[P2P] RTT: ${rtt.toFixed(1)}ms (avg: ${avgRtt?.toFixed(1) ?? 'N/A'}ms)`);
+        }
+    }
+
+    _startPingInterval() {
+        /**
+         * Start periodic ping for RTT measurement.
+         * Pings every 500ms while P2P connection is active.
+         */
+        if (this.pingIntervalId) {
+            clearInterval(this.pingIntervalId);
+        }
+
+        this.pingIntervalId = setInterval(() => {
+            if (this.webrtcManager?.isReady() && this.connectionHealth) {
+                const ping = encodePing();
+                this.webrtcManager.send(ping);
+                this.connectionHealth.rttTracker.lastPingTime = performance.now();
+            }
+        }, 500);  // Every 500ms
+
+        console.log('[P2P] Started ping interval (500ms)');
+    }
+
+    _stopPingInterval() {
+        /**
+         * Stop the ping interval.
+         */
+        if (this.pingIntervalId) {
+            clearInterval(this.pingIntervalId);
+            this.pingIntervalId = null;
+            console.log('[P2P] Stopped ping interval');
         }
     }
 }
