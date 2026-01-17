@@ -835,6 +835,33 @@ def receive_remote_game_data(data):
 #####################################
 
 
+@socketio.on('webrtc_signal')
+def handle_webrtc_signal(data):
+    """
+    Relay WebRTC signaling messages between peers.
+
+    Routes SDP offers/answers and ICE candidates through the server
+    since peers cannot communicate directly until WebRTC is established.
+    """
+    if PYODIDE_COORDINATOR is None:
+        logger.warning("WebRTC signal received but no coordinator")
+        return
+
+    game_id = data.get('game_id')
+    target_player_id = data.get('target_player_id')
+    signal_type = data.get('type')
+    payload = data.get('payload')
+    sender_socket_id = flask.request.sid
+
+    PYODIDE_COORDINATOR.handle_webrtc_signal(
+        game_id=game_id,
+        target_player_id=target_player_id,
+        signal_type=signal_type,
+        payload=payload,
+        sender_socket_id=sender_socket_id
+    )
+
+
 @socketio.on("pyodide_player_action")
 def on_pyodide_player_action(data):
     """
