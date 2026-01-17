@@ -1232,6 +1232,9 @@ obs, infos, render_state
             }
         }
 
+        // Check P2P health for fallback awareness
+        this._checkP2PHealth();
+
         // 4. Increment frame (AFTER recording hash)
         this.frameNumber++;
 
@@ -2518,12 +2521,26 @@ env.step(_replay_actions)
             console.log('[MultiplayerPyodide] P2P DataChannel CLOSED');
             this.p2pConnected = false;
             this._stopPingInterval();
+
+            // Track fallback when DataChannel closes
+            if (!this.p2pMetrics.p2pFallbackTriggered) {
+                this.p2pMetrics.p2pFallbackTriggered = true;
+                this.p2pMetrics.p2pFallbackFrame = this.frameNumber;
+                console.warn(`[P2P Fallback] DataChannel closed at frame ${this.frameNumber}. SocketIO continues as fallback.`);
+            }
         };
 
         this.webrtcManager.onConnectionFailed = () => {
             console.error('[MultiplayerPyodide] P2P connection FAILED');
             this.p2pConnected = false;
             this._stopPingInterval();
+
+            // Track fallback when connection fails
+            if (!this.p2pMetrics.p2pFallbackTriggered) {
+                this.p2pMetrics.p2pFallbackTriggered = true;
+                this.p2pMetrics.p2pFallbackFrame = this.frameNumber;
+                console.warn(`[P2P Fallback] Connection failed at frame ${this.frameNumber}. SocketIO continues as fallback.`);
+            }
         };
 
         // Start the connection (role determined by player ID comparison)
@@ -2701,6 +2718,33 @@ env.step(_replay_actions)
             clearInterval(this.pingIntervalId);
             this.pingIntervalId = null;
             console.log('[P2P] Stopped ping interval');
+        }
+    }
+
+    /**
+     * Check P2P connection health and trigger fallback awareness if degraded.
+     * Note: Actual fallback is implicit (SocketIO always active), this just tracks state.
+     */
+    _checkP2PHealth() {
+        if (!this.connectionHealth || !this.p2pConnected) {
+            return;
+        }
+
+        const health = this.connectionHealth.getHealthStatus();
+
+        // Criteria for degraded P2P (fallback recommended)
+        const isDegraded =
+            health.status === 'critical' ||
+            (health.latency && health.latency > 300);
+
+        if (isDegraded && !this.p2pMetrics.p2pFallbackTriggered) {
+            this.p2pMetrics.p2pFallbackTriggered = true;
+            this.p2pMetrics.p2pFallbackFrame = this.frameNumber;
+            console.warn(
+                `[P2P Fallback] Connection degraded at frame ${this.frameNumber}. ` +
+                `Latency: ${health.latency?.toFixed(1) ?? 'N/A'}ms, Status: ${health.status}. ` +
+                `SocketIO continues as fallback.`
+            );
         }
     }
 }
