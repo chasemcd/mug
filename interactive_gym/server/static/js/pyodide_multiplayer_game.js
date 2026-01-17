@@ -2423,29 +2423,62 @@ env.step(_replay_actions)
     _handleP2PMessage(data) {
         /**
          * Handle incoming P2P DataChannel messages.
-         * For Phase 1, only handles test messages. Phase 2 will add input handling.
+         * Routes to appropriate handler based on message type.
          */
-        try {
-            // Handle both string and ArrayBuffer data
-            let message;
-            if (typeof data === 'string') {
-                message = JSON.parse(data);
-            } else if (data instanceof ArrayBuffer) {
-                const decoder = new TextDecoder();
-                message = JSON.parse(decoder.decode(data));
-            } else {
-                console.warn('[MultiplayerPyodide] Unknown P2P message type:', typeof data);
-                return;
-            }
 
-            if (message.type === 'test') {
-                const latency = Date.now() - message.timestamp;
-                console.log(`[MultiplayerPyodide] Received P2P test from player ${message.from}, latency: ${latency}ms`);
-            } else {
-                console.log('[MultiplayerPyodide] Received P2P message:', message.type);
+        // Handle ArrayBuffer (binary protocol)
+        if (data instanceof ArrayBuffer) {
+            this._handleBinaryMessage(data);
+            return;
+        }
+
+        // Handle string (JSON - legacy test messages)
+        if (typeof data === 'string') {
+            try {
+                const message = JSON.parse(data);
+                this._handleJsonMessage(message);
+            } catch (e) {
+                console.error('[P2P] Failed to parse JSON message:', e);
             }
-        } catch (e) {
-            console.error('[MultiplayerPyodide] Failed to parse P2P message:', e);
+            return;
+        }
+
+        console.warn('[P2P] Unknown message data type:', typeof data);
+    }
+
+    _handleBinaryMessage(buffer) {
+        /**
+         * Route binary messages by type byte.
+         */
+        const messageType = getMessageType(buffer);
+
+        switch (messageType) {
+            case P2P_MSG_INPUT:
+                this._handleInputPacket(buffer);
+                break;
+            case P2P_MSG_PING:
+                this._handlePing(buffer);
+                break;
+            case P2P_MSG_PONG:
+                this._handlePong(buffer);
+                break;
+            case P2P_MSG_KEEPALIVE:
+                // Just receiving it confirms connection is alive
+                break;
+            default:
+                console.warn('[P2P] Unknown binary message type:', messageType);
+        }
+    }
+
+    _handleJsonMessage(message) {
+        /**
+         * Handle JSON messages (test messages from Phase 1).
+         */
+        if (message.type === 'test') {
+            const latency = Date.now() - message.timestamp;
+            console.log(`[P2P] Received test from player ${message.from}, latency: ${latency}ms`);
+        } else {
+            console.log('[P2P] Received JSON message:', message.type);
         }
     }
 }
