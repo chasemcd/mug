@@ -170,19 +170,12 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
             const { player_id, action, frame_number } = data;
 
             // Store in frame-indexed input buffer for GGPO
+            // frame_number is the TARGET frame (sender's frame + INPUT_DELAY)
             this.storeRemoteInput(player_id, action, frame_number);
 
-            // Legacy: also add to queue for compatibility during transition
-            if (!this.otherPlayerActionQueues[player_id]) {
-                this.otherPlayerActionQueues[player_id] = [];
-            }
-            const queue = this.otherPlayerActionQueues[player_id];
-            queue.push({ action, frame_number });
-
-            // Log warning if queue is growing large
-            if (queue.length > 30 && queue.length % 30 === 0) {
-                console.warn(`[MultiplayerPyodide] Queue for player ${player_id} is large (${queue.length})`);
-            }
+            // Also update lastConfirmedActions immediately so we always have
+            // the latest action for prediction/fallback
+            this.lastConfirmedActions[String(player_id)] = action;
         });
 
         // Server-authoritative state broadcast
@@ -205,14 +198,6 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
                 this.diagnostics.frameDriftHistory.shift();
             }
 
-            // Gather queue state for logging
-            const queueSizes = {};
-            let totalQueueSize = 0;
-            for (const [playerId, queue] of Object.entries(this.otherPlayerActionQueues)) {
-                queueSizes[playerId] = queue.length;
-                totalQueueSize += queue.length;
-            }
-
             // Calculate step time stats
             const stepTimes = this.diagnostics.stepTimes;
             const avgStepTime = stepTimes.length > 0
@@ -221,14 +206,6 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
             const maxStepTime = stepTimes.length > 0
                 ? Math.max(...stepTimes).toFixed(1)
                 : 'N/A';
-
-            // Calculate fallback rate
-            let totalFallbacks = 0;
-            let totalQueueHits = 0;
-            for (const count of Object.values(this.diagnostics.fallbackCount)) totalFallbacks += count;
-            for (const count of Object.values(this.diagnostics.queueHitCount)) totalQueueHits += count;
-            const totalActions = totalFallbacks + totalQueueHits;
-            const fallbackRate = totalActions > 0 ? ((totalFallbacks / totalActions) * 100).toFixed(1) : '0.0';
 
             // Calculate FPS since last sync
             const now = Date.now();
@@ -249,8 +226,8 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
                 `Server: ${state.frame_number} | Client: ${this.frameNumber} | Drift: ${frameDiff > 0 ? '+' : ''}${frameDiff} | ` +
                 `FPS: ${effectiveFPS}/${targetFPS} | ` +
                 `Step: ${avgStepTime}ms avg, ${maxStepTime}ms max | ` +
-                `Queues: ${totalQueueSize} | ` +
-                `Fallback: ${fallbackRate}% | ` +
+                `InputBuf: ${this.inputBuffer.size} | ` +
+                `Predictions: ${this.predictedFrames.size} | ` +
                 `Latency: ${typeof networkLatency === 'number' ? networkLatency.toFixed(0) + 'ms' : networkLatency}`
             );
 
@@ -846,6 +823,9 @@ obs, infos, render_state
         // 4. Increment frame (AFTER recording hash)
         this.frameNumber++;
 
+        // Prune old input buffer entries to prevent unbounded growth
+        this.pruneInputBuffer();
+
         // GGPO: Check for pending rollback (late input arrived)
         if (this.pendingRollbackFrame !== null && this.pendingRollbackFrame !== undefined) {
             const rollbackFrame = this.pendingRollbackFrame;
@@ -873,16 +853,11 @@ obs, infos, render_state
             this.episodeComplete = true;
 
             // Log episode summary
-            const queueSizes = {};
-            let totalQueueSize = 0;
-            for (const [playerId, queue] of Object.entries(this.otherPlayerActionQueues)) {
-                queueSizes[playerId] = queue.length;
-                totalQueueSize += queue.length;
-            }
             console.log(
                 `[Episode] Complete at frame ${this.frameNumber} | ` +
                 `Rewards: ${JSON.stringify(this.cumulative_rewards)} | ` +
-                `Final queues: ${totalQueueSize} ${JSON.stringify(queueSizes)} | ` +
+                `InputBuf: ${this.inputBuffer.size} | ` +
+                `Rollbacks: ${this.rollbackCount} | ` +
                 `Syncs: ${this.diagnostics.syncCount}`
             );
 
@@ -944,13 +919,8 @@ obs, infos, render_state
             return;
         }
 
-        // Calculate queue sizes
-        const queueSizes = {};
-        let totalQueueSize = 0;
-        for (const [playerId, queue] of Object.entries(this.otherPlayerActionQueues)) {
-            queueSizes[playerId] = queue.length;
-            totalQueueSize += queue.length;
-        }
+        // Calculate input buffer size (GGPO)
+        const inputBufferSize = this.inputBuffer.size;
 
         // Calculate step time stats
         const stepTimes = this.diagnostics.stepTimes;
@@ -961,19 +931,8 @@ obs, infos, render_state
             ? Math.max(...stepTimes).toFixed(1)
             : 'N/A';
 
-        // Calculate fallback rate per player and total
-        const fallbackRates = {};
-        let totalFallbacks = 0;
-        let totalQueueHits = 0;
-        for (const [playerId, count] of Object.entries(this.diagnostics.fallbackCount)) {
-            const hits = this.diagnostics.queueHitCount[playerId] || 0;
-            const total = count + hits;
-            fallbackRates[playerId] = total > 0 ? ((count / total) * 100).toFixed(0) + '%' : '0%';
-            totalFallbacks += count;
-        }
-        for (const count of Object.values(this.diagnostics.queueHitCount)) totalQueueHits += count;
-        const totalActions = totalFallbacks + totalQueueHits;
-        const overallFallbackRate = totalActions > 0 ? ((totalFallbacks / totalActions) * 100).toFixed(1) : '0.0';
+        // Calculate prediction rate (frames where we used prediction)
+        const predictionCount = this.predictedFrames.size;
 
         // Calculate effective FPS from actual frame delta (more accurate than stepTimes.length)
         const targetFPS = this.config.fps || 10;
@@ -986,31 +945,13 @@ obs, infos, render_state
             `[Perf] Frame: ${this.frameNumber} | ` +
             `FPS: ${effectiveFPS}/${targetFPS} | ` +
             `Step: ${avgStepTime}ms avg, ${maxStepTime}ms max | ` +
-            `Queues: ${totalQueueSize} ${JSON.stringify(queueSizes)} | ` +
-            `Fallback: ${overallFallbackRate}% ${JSON.stringify(fallbackRates)}`
+            `InputBuffer: ${inputBufferSize} | ` +
+            `Predictions: ${predictionCount} | ` +
+            `Rollbacks: ${this.rollbackCount}`
         );
-
-        // Warn if queues are growing significantly (indicates throttling may not be keeping up)
-        if (totalQueueSize > 15) {
-            console.warn(
-                `[Perf] ⚠️ Queue buildup: ${totalQueueSize} actions (throttling active). ` +
-                `Partner may be significantly slower or network delays occurring.`
-            );
-        }
-
-        // Warn if fallback rate is high
-        if (parseFloat(overallFallbackRate) > 20) {
-            console.warn(
-                `[Perf] ⚠️ High fallback rate: ${overallFallbackRate}%. ` +
-                `Partner actions arriving late - possible network lag or slow partner.`
-            );
-        }
 
         // Clear rolling windows for next interval
         this.diagnostics.stepTimes = [];
-        // Reset fallback/hit counts for next interval (to see current rate, not cumulative)
-        this.diagnostics.fallbackCount = {};
-        this.diagnostics.queueHitCount = {};
         // Update tracking for next FPS calculation
         this.diagnostics.lastDiagnosticsLog = now;
         this.diagnostics.lastDiagnosticsFrame = this.frameNumber;
@@ -1501,20 +1442,48 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
      * Get inputs for a specific frame.
      * Returns {playerId: action} dict with confirmed inputs where available,
      * predictions where not.
+     *
+     * IMPORTANT: With input delay, the other player's inputs are tagged for
+     * future frames. If we don't have an input for the exact frame, we look
+     * for the closest earlier input, or fall back to lastConfirmedActions.
      */
     getInputsForFrame(frameNumber, playerIds) {
         const inputs = {};
-        const frameInputs = this.inputBuffer.get(frameNumber);
         let usedPrediction = false;
 
         for (const playerId of playerIds) {
             const playerIdStr = String(playerId);
+            let foundInput = false;
 
+            // First, check for exact frame match
+            const frameInputs = this.inputBuffer.get(frameNumber);
             if (frameInputs && frameInputs.has(playerIdStr)) {
-                // Have confirmed input
                 inputs[playerIdStr] = frameInputs.get(playerIdStr);
-            } else {
-                // Need to predict
+                foundInput = true;
+            }
+
+            // If no exact match, look for the closest earlier input we haven't used yet
+            // This handles the case where the other player is ahead
+            if (!foundInput) {
+                // Find the closest input at or before this frame
+                let bestFrame = -1;
+                for (const frame of this.inputBuffer.keys()) {
+                    const fi = this.inputBuffer.get(frame);
+                    if (fi && fi.has(playerIdStr) && frame <= frameNumber && frame > bestFrame) {
+                        bestFrame = frame;
+                    }
+                }
+
+                if (bestFrame >= 0) {
+                    inputs[playerIdStr] = this.inputBuffer.get(bestFrame).get(playerIdStr);
+                    foundInput = true;
+                    // Update lastConfirmedActions with this
+                    this.lastConfirmedActions[playerIdStr] = inputs[playerIdStr];
+                }
+            }
+
+            // If still no input, use prediction (lastConfirmedActions or default)
+            if (!foundInput) {
                 inputs[playerIdStr] = this.getPredictedAction(playerIdStr, frameNumber);
                 usedPrediction = true;
             }
@@ -1675,17 +1644,30 @@ env.step(_replay_actions)
 
     /**
      * Prune old entries from input buffer.
+     * Removes frames we've already passed to prevent unbounded growth.
      */
     pruneInputBuffer() {
-        if (this.inputBuffer.size > this.inputBufferMaxSize) {
-            const keysToDelete = [];
-            for (const key of this.inputBuffer.keys()) {
-                if (this.inputBuffer.size - keysToDelete.length <= this.inputBufferMaxSize) {
-                    break;
-                }
+        // Remove entries for frames we've already simulated
+        // Keep a small buffer behind for potential rollback
+        const pruneThreshold = this.frameNumber - 10;
+        const keysToDelete = [];
+
+        for (const key of this.inputBuffer.keys()) {
+            if (key < pruneThreshold) {
                 keysToDelete.push(key);
             }
-            for (const key of keysToDelete) {
+        }
+
+        for (const key of keysToDelete) {
+            this.inputBuffer.delete(key);
+            this.predictedFrames.delete(key);
+        }
+
+        // Also enforce max size limit
+        if (this.inputBuffer.size > this.inputBufferMaxSize) {
+            const sortedKeys = Array.from(this.inputBuffer.keys()).sort((a, b) => a - b);
+            const toRemove = sortedKeys.slice(0, this.inputBuffer.size - this.inputBufferMaxSize);
+            for (const key of toRemove) {
                 this.inputBuffer.delete(key);
                 this.predictedFrames.delete(key);
             }
