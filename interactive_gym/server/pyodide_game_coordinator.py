@@ -51,6 +51,11 @@ class PyodideGameState:
     action_delays: Dict[str | int, list] = dataclasses.field(default_factory=dict)
     last_diagnostics_log: float = 0.0
 
+    # WebRTC TURN configuration
+    turn_username: str | None = None
+    turn_credential: str | None = None
+    force_turn_relay: bool = False
+
 
 class PyodideGameCoordinator:
     """
@@ -96,6 +101,10 @@ class PyodideGameCoordinator:
         input_buffer_size: int = 300,
         max_episodes: int = 1,
         max_steps: int = 10000,
+        # WebRTC TURN configuration
+        turn_username: str | None = None,
+        turn_credential: str | None = None,
+        force_turn_relay: bool = False,
     ) -> PyodideGameState:
         """
         Initialize a new Pyodide multiplayer game.
@@ -133,6 +142,9 @@ class PyodideGameCoordinator:
                 created_at=time.time(),
                 state_broadcast_interval=state_broadcast_interval,
                 server_authoritative=server_authoritative,
+                turn_username=turn_username,
+                turn_credential=turn_credential,
+                force_turn_relay=force_turn_relay,
             )
 
             # Create server runner if server_authoritative mode enabled
@@ -278,6 +290,12 @@ class PyodideGameCoordinator:
                          'players': list(game.players.keys()),
                          'player_subjects': game.player_subjects,
                          'server_authoritative': game.server_authoritative,
+                         # Include TURN config only if credentials are provided
+                         'turn_config': {
+                             'username': game.turn_username,
+                             'credential': game.turn_credential,
+                             'force_relay': game.force_turn_relay,
+                         } if game.turn_username else None,
                      },
                      room=game_id)
 
