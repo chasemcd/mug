@@ -10,17 +10,17 @@ See: .planning/PROJECT.md
 ## Current Position
 
 Phase: 1 of 5 (WebRTC Foundation)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-01-16 - Project roadmap created
+Plan: 1 of 2 complete
+Status: In progress
+Last activity: 2026-01-17 - Completed 01-01-PLAN.md (WebRTC Signaling)
 
-Progress: [----------] 0%
+Progress: [#---------] 10%
 
 ## Phase Overview
 
 | Phase | Name | Requirements | Status |
 |-------|------|--------------|--------|
-| 1 | WebRTC Foundation | WEBRTC-01, WEBRTC-02 | Not started |
+| 1 | WebRTC Foundation | WEBRTC-01, WEBRTC-02 | In progress (1/2) |
 | 2 | P2P Transport Layer | GGPO-02, GGPO-03 | Not started |
 | 3 | GGPO P2P Integration | GGPO-01, NPLAY-01 | Not started |
 | 4 | TURN and Resilience | WEBRTC-03, WEBRTC-04 | Not started |
@@ -29,14 +29,14 @@ Progress: [----------] 0%
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 0
-- Average duration: -
+- Total plans completed: 1
+- Average duration: 2 min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| - | - | - | - |
+| 1 | 1 | 2 min | 2 min |
 
 ## Accumulated Context
 
@@ -48,12 +48,16 @@ Progress: [----------] 0%
 - `interactive_gym/scenes/gym_scene.py` - Add P2P mode configuration
 
 **New (to create):**
-- `interactive_gym/server/static/js/webrtc_manager.js` - WebRTC connection lifecycle
+- `interactive_gym/server/static/js/webrtc_manager.js` - WebRTC connection lifecycle (CREATED in 01-01)
 - `interactive_gym/server/static/js/p2p_transport.js` - Message protocol over DataChannel
 
 ### Decisions
 
-(None yet)
+| Plan | Decision | Rationale |
+|------|----------|-----------|
+| 01-01 | Native WebRTC API (no wrapper libraries) | Full control, no external dependencies, simple-peer unmaintained |
+| 01-01 | Deterministic initiator: lower player ID creates offer | Prevents race conditions in role assignment |
+| 01-01 | DataChannel unreliable/unordered | GGPO handles packet loss via prediction and rollback |
 
 ### Pending Todos
 
@@ -68,6 +72,6 @@ Progress: [----------] 0%
 
 ## Session Continuity
 
-Last session: 2026-01-16
-Stopped at: Roadmap creation complete
-Resume with: `/gsd:plan-phase 1`
+Last session: 2026-01-17
+Stopped at: Completed 01-01-PLAN.md
+Resume file: .planning/phases/01-webrtc-foundation/01-02-PLAN.md
