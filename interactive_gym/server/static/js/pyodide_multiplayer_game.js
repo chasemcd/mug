@@ -412,7 +412,6 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         this.partnerLastActions = {};  // {player_id: last_action}
 
         // P2P sync state (for non-server-authoritative mode)
-        this.isHost = false;  // Set when pyodide_host_elected is received
         this.p2pSyncInterval = 30;  // Frames between P2P state hash broadcasts
         this.lastP2PSyncFrame = 0;  // Last frame we sent/received P2P sync
         this.p2pHashMismatches = 0;  // Count of hash mismatches detected
@@ -451,16 +450,15 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
          */
 
         // Player initialization (receive player ID and game seed)
-        socket.on('pyodide_host_elected', (data) => {
+        socket.on('pyodide_player_assigned', (data) => {
             this.myPlayerId = data.player_id;
             this.gameId = data.game_id;
             this.gameSeed = data.game_seed;
-            this.isHost = data.is_host;  // Host is responsible for P2P sync broadcasts
 
             // Initialize seeded RNG for AI policies
             if (this.gameSeed) {
                 seeded_random.initMultiplayerRNG(this.gameSeed);
-                console.log(`[MultiplayerPyodide] Player ${this.myPlayerId} in game ${this.gameId} initialized with seed ${this.gameSeed} (host: ${this.isHost})`);
+                console.log(`[MultiplayerPyodide] Player ${this.myPlayerId} assigned to game ${this.gameId} with seed ${this.gameSeed}`);
             }
         });
 
