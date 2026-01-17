@@ -44,9 +44,9 @@ Plans:
 5. Connection health is monitored (packet loss rate, latency)
 
 Plans:
-- [ ] 02-01-PLAN.md -- Binary message encoding/decoding (input packets, ping/pong)
-- [ ] 02-02-PLAN.md -- P2P message receiving (RTTTracker, ConnectionHealthMonitor, handlers)
-- [ ] 02-03-PLAN.md -- P2P input sending with redundancy and ping interval
+- [x] 02-01-PLAN.md -- Binary message encoding/decoding (input packets, ping/pong)
+- [x] 02-02-PLAN.md -- P2P message receiving (RTTTracker, ConnectionHealthMonitor, handlers)
+- [x] 02-03-PLAN.md -- P2P input sending with redundancy and ping interval
 
 ---
 
@@ -105,8 +105,8 @@ Plans:
 
 | Phase | Status | Completed |
 |-------|--------|-----------|
-| 1 - WebRTC Foundation | Complete | 2026-01-16 |
-| 2 - P2P Transport Layer | Planned | - |
+| 1 - WebRTC Foundation | Complete ✓ | 2026-01-16 |
+| 2 - P2P Transport Layer | Complete ✓ | 2026-01-17 |
 | 3 - GGPO P2P Integration | Not started | - |
 | 4 - TURN and Resilience | Not started | - |
 | 5 - Validation and Cleanup | Not started | - |
