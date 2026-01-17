@@ -421,6 +421,10 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         this.p2pConnected = false;
         this.p2pPeerId = null;  // The other player's ID
 
+        // Player ID mapping for binary protocol (string ID <-> numeric index)
+        this.playerIdToIndex = {};  // "agent_left" -> 0, "agent_right" -> 1
+        this.indexToPlayerId = {};  // 0 -> "agent_left", 1 -> "agent_right"
+
         // P2P input sending
         this.p2pInputSender = null;
         this.connectionHealth = null;
@@ -474,6 +478,15 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         // Game ready to start
         socket.on('pyodide_game_ready', (data) => {
             console.log(`[MultiplayerPyodide] Game ${data.game_id} ready with players:`, data.players);
+
+            // Build player ID <-> index mapping for binary protocol
+            // Sort players to ensure deterministic index assignment across clients
+            const sortedPlayers = [...data.players].sort();
+            sortedPlayers.forEach((playerId, index) => {
+                this.playerIdToIndex[playerId] = index;
+                this.indexToPlayerId[index] = playerId;
+            });
+            console.log('[MultiplayerPyodide] Player ID mapping:', this.playerIdToIndex);
 
             // Store TURN configuration for P2P
             this.turnConfig = data.turn_config || null;
@@ -2554,10 +2567,11 @@ env.step(_replay_actions)
             console.log('[MultiplayerPyodide] P2P DataChannel OPEN');
             this.p2pConnected = true;
 
-            // Initialize P2P input sending
+            // Initialize P2P input sending (use numeric index for binary protocol)
+            const myPlayerIndex = this.playerIdToIndex[this.myPlayerId];
             this.p2pInputSender = new P2PInputSender(
                 this.webrtcManager,
-                this.myPlayerId,
+                myPlayerIndex,
                 3  // redundancy count
             );
 
@@ -2750,9 +2764,16 @@ env.step(_replay_actions)
             return;
         }
 
+        // Convert numeric player index back to string player ID
+        const playerId = this.indexToPlayerId[packet.playerId];
+        if (!playerId) {
+            console.warn(`[P2P] Unknown player index: ${packet.playerId}`);
+            return;
+        }
+
         // Store all inputs from the packet (handles redundancy - duplicates are ignored by storeRemoteInput)
         for (const input of packet.inputs) {
-            this.storeRemoteInput(packet.playerId, input.action, input.frame);
+            this.storeRemoteInput(playerId, input.action, input.frame);
         }
 
         // Track P2P input reception for metrics
