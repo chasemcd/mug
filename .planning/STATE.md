@@ -10,11 +10,11 @@ See: .planning/PROJECT.md
 ## Current Position
 
 Phase: 5 of 5 (Validation and Cleanup)
-Plan: 1 of 3 complete
+Plan: 2 of 3 complete
 Status: In progress
-Last activity: 2026-01-17 - Completed 05-01-PLAN.md (host concept removal)
+Last activity: 2026-01-17 - Completed 05-02-PLAN.md (P2P-first input sending and research metrics)
 
-Progress: [########+-] 82%
+Progress: [#########-] 91%
 
 ## Phase Overview
 
@@ -29,7 +29,7 @@ Progress: [########+-] 82%
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 9
+- Total plans completed: 10
 - Average duration: ~5 min
 
 **By Phase:**
@@ -40,7 +40,7 @@ Progress: [########+-] 82%
 | 2 | 3 | ~6 min | ~2 min |
 | 3 | 1 | ~5 min | ~5 min |
 | 4 | 2 | ~10 min | ~5 min |
-| 5 | 1 | ~2.5 min | ~2.5 min |
+| 5 | 2 | ~5.5 min | ~2.75 min |
 
 ## Accumulated Context
 
@@ -68,7 +68,7 @@ Progress: [########+-] 82%
 
 **Modified in Phase 5:**
 - `interactive_gym/server/pyodide_game_coordinator.py` - Removed host_player_id, renamed event to pyodide_player_assigned
-- `interactive_gym/server/static/js/pyodide_multiplayer_game.js` - Removed isHost, renamed handler to pyodide_player_assigned
+- `interactive_gym/server/static/js/pyodide_multiplayer_game.js` - Removed isHost, renamed handler to pyodide_player_assigned, P2P-first input routing, sessionMetrics, exportSessionMetrics()
 
 ### Decisions
 
@@ -96,6 +96,10 @@ Progress: [########+-] 82%
 | 04-02 | TURN config conditional in socket event | Only include when credentials provided |
 | 04-02 | webrtc() follows fluent chaining pattern | Consistency with existing config methods |
 | 05-01 | pyodide_player_assigned as single event name | Descriptive name reflecting symmetric peer assignment |
+| 05-02 | P2P-first not dual-path | Eliminates server relay when P2P healthy, reducing bandwidth |
+| 05-02 | p2pHealthy includes fallback flag | Prevents oscillation back to P2P once fallback triggered |
+| 05-02 | Rollback events stored as array | Full history enables post-hoc analysis of rollback patterns |
+| 05-02 | exportSessionMetrics() at episode end | Immediate visibility for debugging; future: emit to server |
 
 ### Pending Todos
 
@@ -113,5 +117,5 @@ Progress: [########+-] 82%
 ## Session Continuity
 
 Last session: 2026-01-17
-Stopped at: Completed 05-01-PLAN.md (host concept removal)
-Resume with: Continue with 05-02-PLAN.md
+Stopped at: Completed 05-02-PLAN.md (P2P-first input sending and research metrics)
+Resume with: Continue with 05-03-PLAN.md (determinism validation)
