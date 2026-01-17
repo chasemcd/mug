@@ -74,6 +74,7 @@ Plans:
 **Goal:** Connections succeed even when direct P2P fails due to NAT configurations, with proper detection and logging.
 **Depends on:** Phase 3
 **Requirements:** WEBRTC-03, WEBRTC-04
+**Plans:** 1 plan
 
 **Success Criteria:**
 1. TURN server credentials are configured and used when ICE direct connection fails
@@ -82,7 +83,8 @@ Plans:
 4. Gameplay works correctly over TURN relay with acceptable latency
 5. Connection quality degradation triggers appropriate warnings/fallbacks
 
-**Plans:** (created by /gsd:plan-phase)
+Plans:
+- [ ] 04-01-PLAN.md -- TURN configuration, connection type detection, quality monitoring, ICE recovery
 
 ---
 
