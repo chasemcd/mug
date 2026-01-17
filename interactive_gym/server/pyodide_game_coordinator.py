@@ -29,31 +29,26 @@ class PyodideGameState:
     """State for a single Pyodide multiplayer game."""
 
     game_id: str
-    host_player_id: str | int | None
+    host_player_id: str | int | None  # First player to join (used for logging)
     players: Dict[str | int, str]  # player_id -> socket_id
     player_subjects: Dict[str | int, str]  # player_id -> subject_id (participant name)
-    pending_actions: Dict[str | int, Any]
     frame_number: int
-    action_ready_event: threading.Event
-    state_hashes: Dict[int, Dict[str | int, str]]  # frame_number -> {player_id -> hash}
-    verification_frame: int  # Next frame to verify
     is_active: bool
     rng_seed: int  # Shared seed for deterministic AI
     num_expected_players: int
     action_timeout_seconds: float
     created_at: float
 
-    # State broadcast/sync interval (frames between state verification or server broadcasts)
+    # State broadcast/sync interval (frames between server broadcasts)
     state_broadcast_interval: int = 30
 
     # Server-authoritative mode fields
     server_authoritative: bool = False
     server_runner: Any = None  # ServerGameRunner instance when enabled
-    realtime_mode: bool = True  # Real-time (timer-based) vs frame-aligned stepping
 
     # Diagnostics for lag tracking
-    last_action_times: Dict[str | int, float] = dataclasses.field(default_factory=dict)  # player_id -> last action timestamp
-    action_delays: Dict[str | int, list] = dataclasses.field(default_factory=dict)  # player_id -> recent delays
+    last_action_times: Dict[str | int, float] = dataclasses.field(default_factory=dict)
+    action_delays: Dict[str | int, list] = dataclasses.field(default_factory=dict)
     last_diagnostics_log: float = 0.0
 
 
@@ -130,11 +125,7 @@ class PyodideGameCoordinator:
                 host_player_id=None,  # Will be set when first player joins
                 players={},
                 player_subjects={},  # player_id -> subject_id mapping
-                pending_actions={},
                 frame_number=0,
-                action_ready_event=threading.Event(),
-                state_hashes={},
-                verification_frame=state_broadcast_interval,  # First verification after this many frames
                 is_active=False,
                 rng_seed=rng_seed,
                 num_expected_players=num_players,
@@ -142,7 +133,6 @@ class PyodideGameCoordinator:
                 created_at=time.time(),
                 state_broadcast_interval=state_broadcast_interval,
                 server_authoritative=server_authoritative,
-                realtime_mode=realtime_mode,
             )
 
             # Create server runner if server_authoritative mode enabled
@@ -269,13 +259,11 @@ class PyodideGameCoordinator:
                     f"Server runner initialized for game {game_id} "
                     f"with seed {game.rng_seed}"
                 )
-                # Start real-time loop if enabled
-                if game.realtime_mode:
-                    game.server_runner.start_realtime()
+                # Start real-time loop
+                game.server_runner.start_realtime()
             else:
                 logger.error(
-                    f"Failed to initialize server runner for game {game_id}, "
-                    f"falling back to host-based sync"
+                    f"Failed to initialize server runner for game {game_id}"
                 )
                 game.server_authoritative = False
                 game.server_runner = None
@@ -288,9 +276,8 @@ class PyodideGameCoordinator:
                      {
                          'game_id': game_id,
                          'players': list(game.players.keys()),
-                         'player_subjects': game.player_subjects,  # player_id -> subject_id mapping
-                         'server_authoritative': game.server_authoritative,  # Tell clients if server is authoritative
-                         'realtime_mode': game.realtime_mode,  # Tell clients if real-time mode (prediction + rollback)
+                         'player_subjects': game.player_subjects,
+                         'server_authoritative': game.server_authoritative,
                      },
                      room=game_id)
 
@@ -389,264 +376,11 @@ class PyodideGameCoordinator:
                 f"to {len(game.players) - 1} other player(s)"
             )
 
-            # Feed action to server runner if enabled
+            # Feed action to server runner
             if game.server_authoritative and game.server_runner:
-                if game.realtime_mode:
-                    # Real-time mode: just update sticky action, timer handles stepping
-                    game.server_runner.receive_action_realtime(
-                        player_id, action, frame_number, sync_epoch
-                    )
-                else:
-                    # Frame-aligned mode: step when all actions received
-                    all_received = game.server_runner.receive_action(
-                        player_id, action, frame_number, sync_epoch
-                    )
-
-                    if all_received:
-                        # Step the server environment
-                        result = game.server_runner.step_frame(frame_number)
-
-                        if result:
-                            # Broadcast state if it's time
-                            if result.get("should_broadcast"):
-                                game.server_runner.broadcast_state()
-
-                            # Handle episode end
-                            if result.get("episode_done"):
-                                game.server_runner.handle_episode_end()
-
-    # Keep _broadcast_actions for backwards compatibility but it's no longer used
-    def _broadcast_actions(self, game_id: str):
-        """
-        [DEPRECATED] Broadcast collected actions to all players.
-
-        This was used in the lock-step approach. Now using Action Queue approach
-        where actions are relayed immediately in receive_action().
-        """
-        game = self.games[game_id]
-
-        actions_payload = {
-            'type': 'pyodide_actions_ready',
-            'game_id': game_id,
-            'actions': game.pending_actions.copy(),
-            'frame_number': game.frame_number,
-            'timestamp': time.time()
-        }
-
-        # Broadcast to all players in game
-        self.sio.emit('pyodide_actions_ready',
-                     actions_payload,
-                     room=game_id)
-
-        logger.debug(
-            f"Game {game_id} frame {game.frame_number}: "
-            f"Broadcasted actions {game.pending_actions}"
-        )
-
-        # Clear pending actions and increment frame
-        game.pending_actions.clear()
-        game.frame_number += 1
-
-        # Check if we need to verify state this frame
-        if game.frame_number >= game.verification_frame:
-            self._request_state_verification(game_id)
-
-    def _request_state_verification(self, game_id: str):
-        """
-        Request state hash from all players for verification.
-
-        Verification detects desyncs early before they cascade.
-        Only used in host-based mode; server-authoritative mode broadcasts state directly.
-        """
-        game = self.games[game_id]
-
-        # Skip state verification in server-authoritative mode
-        # Server broadcasts authoritative state instead of requesting hashes
-        if game.server_authoritative:
-            logger.debug(
-                f"Game {game_id}: Skipping state verification (server-authoritative mode)"
-            )
-            return
-
-        self.sio.emit('pyodide_verify_state',
-                     {'frame_number': game.frame_number},
-                     room=game_id)
-
-        game.verification_frame = game.frame_number + game.state_broadcast_interval
-        # Note: We don't clear state_hashes here anymore since we track by frame number.
-        # Old frames are cleaned up in _cleanup_old_frame_hashes() after verification.
-
-        logger.debug(f"Game {game_id}: Requested state verification at frame {game.frame_number}")
-
-    def receive_state_hash(
-        self,
-        game_id: str,
-        player_id: str | int,
-        state_hash: str,
-        frame_number: int
-    ):
-        """
-        Collect and verify state hashes from players.
-
-        Hashes are grouped by frame number to ensure we only compare
-        hashes from the same frame across all players.
-
-        Only used in host-based mode; server-authoritative mode ignores hashes.
-
-        Args:
-            game_id: Game identifier
-            player_id: Player who sent the hash
-            state_hash: SHA256 hash of game state
-            frame_number: Frame number for this hash
-        """
-        with self.lock:
-            if game_id not in self.games:
-                return
-
-            game = self.games[game_id]
-
-            # Skip hash processing in server-authoritative mode
-            # Server broadcasts authoritative state instead of verifying client hashes
-            if game.server_authoritative:
-                logger.debug(
-                    f"Game {game_id}: Ignoring state hash from player {player_id} "
-                    f"(server-authoritative mode)"
+                game.server_runner.receive_action_realtime(
+                    player_id, action, frame_number, sync_epoch
                 )
-                return
-
-            # Initialize hash dict for this frame if needed
-            if frame_number not in game.state_hashes:
-                game.state_hashes[frame_number] = {}
-
-            # Store hash for this player at this frame
-            game.state_hashes[frame_number][player_id] = state_hash
-
-            frame_hashes = game.state_hashes[frame_number]
-
-            logger.debug(
-                f"Game {game_id} frame {frame_number}: "
-                f"Received hash from player {player_id} "
-                f"({len(frame_hashes)}/{len(game.players)} received for this frame)"
-            )
-
-            # Once all hashes received for this frame, verify
-            if len(frame_hashes) == len(game.players):
-                self._verify_synchronization(game_id, frame_number)
-                # Clean up old frame hashes to prevent memory growth
-                self._cleanup_old_frame_hashes(game, frame_number)
-
-    def _verify_synchronization(self, game_id: str, frame_number: int):
-        """
-        Check if all players have matching state hashes for a specific frame.
-
-        If hashes don't match, desync has occurred and we need to resync.
-        """
-        game = self.games[game_id]
-
-        # Get hashes for this specific frame
-        frame_hashes = game.state_hashes.get(frame_number, {})
-        if not frame_hashes:
-            logger.warning(f"Game {game_id}: No hashes found for frame {frame_number}")
-            return
-
-        hashes = list(frame_hashes.values())
-        unique_hashes = set(hashes)
-
-        if len(unique_hashes) == 1:
-            # All hashes match - synchronized! ✓
-            logger.info(
-                f"Game {game_id} frame {frame_number}: "
-                f"States synchronized ✓ (hash: {hashes[0][:8]}...)"
-            )
-        else:
-            # Desync detected! ✗
-            self.total_desyncs_detected += 1
-
-            logger.error(
-                f"Game {game_id} frame {frame_number}: "
-                f"DESYNC DETECTED! "
-                f"Unique hashes: {len(unique_hashes)}"
-            )
-
-            # Log which players have which hashes
-            for player_id, hash_val in frame_hashes.items():
-                logger.error(f"  Player {player_id}: {hash_val[:16]}...")
-
-            self._handle_desync(game_id, frame_number)
-
-    def _cleanup_old_frame_hashes(self, game: PyodideGameState, current_frame: int):
-        """
-        Remove hash data for old frames to prevent memory growth.
-
-        Keeps only recent frames in case of delayed hash arrivals.
-        """
-        # Keep hashes for frames within last 100 frames
-        frames_to_keep = 100
-        min_frame_to_keep = current_frame - frames_to_keep
-
-        frames_to_remove = [
-            frame for frame in game.state_hashes.keys()
-            if frame < min_frame_to_keep
-        ]
-
-        for frame in frames_to_remove:
-            del game.state_hashes[frame]
-
-        if frames_to_remove:
-            logger.debug(
-                f"Game {game.game_id}: Cleaned up hashes for {len(frames_to_remove)} old frames"
-            )
-
-    def _handle_desync(self, game_id: str, frame_number: int):
-        """
-        Handle desynchronization by requesting resync.
-
-        If server_authoritative mode is enabled, broadcast server state directly.
-        Otherwise, request full state from host.
-
-        Process (host-based):
-        1. Request full state from host
-        2. Host sends serialized state
-        3. Broadcast state to non-host clients
-        4. Clients apply state (snapping to correct state without pausing)
-
-        Process (server-authoritative):
-        1. Broadcast server state directly to all clients
-        """
-        game = self.games[game_id]
-
-        # If server-authoritative, broadcast server state directly
-        if game.server_authoritative and game.server_runner:
-            game.server_runner.broadcast_state()
-            logger.info(f"Game {game_id}: Broadcast server state for resync")
-            return
-
-        # Fall back to host-based resync
-        host_socket = game.players[game.host_player_id]
-        self.sio.emit('pyodide_request_full_state',
-                     {'frame_number': frame_number},
-                     room=host_socket)
-
-        logger.info(f"Game {game_id}: Initiated resync from host {game.host_player_id}")
-
-    def receive_full_state(self, game_id: str, full_state: dict):
-        """
-        Receive full state from host and broadcast to clients for resync.
-
-        Args:
-            game_id: Game identifier
-            full_state: Serialized game state from host
-        """
-        game = self.games[game_id]
-
-        # Broadcast to non-host players
-        for player_id, socket_id in game.players.items():
-            if player_id != game.host_player_id:
-                self.sio.emit('pyodide_apply_full_state',
-                             {'state': full_state},
-                             room=socket_id)
-
-        logger.info(f"Game {game_id}: Resynced all clients from host")
 
     def remove_player(self, game_id: str, player_id: str | int, notify_others: bool = True):
         """
@@ -714,50 +448,6 @@ class PyodideGameCoordinator:
                     game.server_runner.stop()
                 del self.games[game_id]
                 logger.info(f"Removed game {game_id} after player disconnection")
-
-    def _elect_new_host(self, game_id: str):
-        """
-        Elect a new host when the current host disconnects.
-
-        New host must:
-        1. Start logging data
-        2. Provide full state for resync (since states may have diverged)
-
-        Args:
-            game_id: Game identifier
-        """
-        game = self.games[game_id]
-
-        # Choose first remaining player as new host
-        new_host_id = list(game.players.keys())[0]
-        game.host_player_id = new_host_id
-        new_host_socket = game.players[new_host_id]
-
-        self.total_host_migrations += 1
-
-        # Notify new host
-        self.sio.emit('pyodide_host_elected',
-                     {
-                         'is_host': True,
-                         'promoted': True,
-                         'game_seed': game.rng_seed
-                     },
-                     room=new_host_socket)
-
-        # Notify other players
-        for player_id, socket_id in game.players.items():
-            if player_id != new_host_id:
-                self.sio.emit('pyodide_host_changed',
-                             {'new_host_id': new_host_id},
-                             room=socket_id)
-
-        logger.info(
-            f"Elected new host {new_host_id} for game {game_id} "
-            f"(migration #{self.total_host_migrations})"
-        )
-
-        # Trigger resync from new host
-        self._handle_desync(game_id, game.frame_number)
 
     def _log_game_diagnostics(self, game: PyodideGameState):
         """

@@ -19,14 +19,11 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         super(config);
 
         // Multiplayer state
-        this.isHost = false;
-        this.hostPlayerId = null;
         this.myPlayerId = config.player_id;
-        this.otherPlayerIds = config.other_player_ids || [];
         this.gameId = config.game_id;
         this.gameSeed = null;
 
-        // Action queue synchronization (Option B)
+        // Action queue synchronization
         this.otherPlayerActionQueues = {};  // { player_id: [{action, frame_number}, ...] }
         this.lastExecutedActions = {};      // { player_id: last_action } for fallback
 
@@ -37,12 +34,8 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         // Policy mapping (needed to know which agents are human)
         this.policyMapping = config.policy_mapping || {};
 
-        // State broadcast interval (frames between syncs) - used for both server-authoritative and host-based modes
-        this.stateBroadcastInterval = config.state_broadcast_interval || 30;
+        // Frame tracking
         this.frameNumber = 0;
-
-        // Data logging (only host logs)
-        this.shouldLogData = false;
 
         // Player-to-subject mapping (player_id -> subject_id)
         // Populated when game starts via pyodide_game_ready event
@@ -51,11 +44,10 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         // Episode completion tracking
         this.episodeComplete = false;
 
-        // Server-authoritative mode (set when game starts)
-        // When true, server broadcasts authoritative state periodically
+        // Server-authoritative mode (always true in current implementation)
         this.serverAuthoritative = false;
 
-        // Episode start synchronization (server-authoritative mode)
+        // Episode start synchronization
         // Client waits for server_episode_start before beginning each episode
         this.waitingForEpisodeStart = false;
         this.episodeStartResolve = null;
@@ -65,7 +57,6 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         this.diagnostics = {
             lastStepTime: 0,
             stepTimes: [],          // Rolling window of step execution times
-            queueSizeHistory: [],   // Track queue sizes over time
             lastDiagnosticsLog: 0,
             lastDiagnosticsFrame: 0,  // Frame number at last diagnostics log
             diagnosticsInterval: 5000,  // Log diagnostics every 5 seconds
@@ -79,15 +70,6 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
             frameDriftHistory: [],  // Track frame drift at each sync
         };
 
-        // Adaptive throttling to match slower client
-        this.throttle = {
-            enabled: true,           // Enable adaptive throttling
-            queueThreshold: 5,       // Start throttling when queue exceeds this
-            maxDelayMs: 50,          // Maximum delay to add per step
-            delayPerQueuedAction: 3, // ms delay per queued action above threshold
-            skippedFrames: 0,        // Count of frames skipped for throttling
-        };
-
         // State hash history for frame-aligned comparison
         // Maps frame_number -> state_hash (computed after stepping to that frame)
         this.stateHashHistory = new Map();
@@ -97,36 +79,18 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         this.actionSequence = [];  // [{frame: N, actions: {player: action}}]
         this.actionCounts = {};    // {playerId: {action: count}}
 
-        // Sync epoch - received from server, included in actions to prevent stale action matching.
-        // Actions with old epoch are rejected by server after a state broadcast.
+        // Sync epoch - received from server, included in actions to prevent stale action matching
         this.syncEpoch = 0;
 
-        // Server step tracking - prevents client from getting too far ahead of server.
-        // The server only steps when it receives actions from ALL players, so a fast client
-        // can accumulate extra local steps. We track the last known server step count and
-        // pause if we get too far ahead.
+        // Server step tracking - prevents client from getting too far ahead of server
         this.lastKnownServerStepNum = 0;
-        this.maxStepsAheadOfServer = 5;  // Don't get more than 5 steps ahead of server
-
-        // =========================================================================
-        // Client Prediction + Rollback (real-time server mode)
-        // =========================================================================
-
-        // Input buffer for rollback/replay
-        // Stores inputs for each frame so we can replay with corrected partner actions
-        // Each entry: {frame, myAction, partnerActions, timestamp}
-        this.inputBuffer = [];
-        this.inputBufferMaxSize = config.input_buffer_size || 300;  // ~10 sec at 30fps
+        this.maxStepsAheadOfServer = 5;
 
         // Confirmed state (last server-verified state)
         this.confirmedFrame = 0;
 
         // Partner action tracking for prediction
-        // In real-time mode, we predict partner actions when not available
         this.partnerLastActions = {};  // {player_id: last_action}
-
-        // Real-time mode flag (set from server when game starts)
-        this.realtimeMode = false;
 
         this.setupMultiplayerHandlers();
     }
@@ -136,59 +100,29 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
          * Set up SocketIO event handlers for multiplayer coordination
          */
 
-        // Host election
+        // Player initialization (receive player ID and game seed)
         socket.on('pyodide_host_elected', (data) => {
-            this.myPlayerId = data.player_id;  // Set from server-assigned player ID
-            this.gameId = data.game_id;  // Set game ID
-            this.isHost = data.is_host;
-            this.shouldLogData = data.is_host;
-            this.hostPlayerId = data.is_host ? this.myPlayerId : data.host_id;
+            this.myPlayerId = data.player_id;
+            this.gameId = data.game_id;
             this.gameSeed = data.game_seed;
 
             // Initialize seeded RNG for AI policies
             if (this.gameSeed) {
                 seeded_random.initMultiplayerRNG(this.gameSeed);
                 console.log(`[MultiplayerPyodide] Player ${this.myPlayerId} in game ${this.gameId} initialized with seed ${this.gameSeed}`);
-                console.log(`[MultiplayerPyodide] Host status: ${this.isHost}`);
-            }
-        });
-
-        // Host changed (after disconnection)
-        socket.on('pyodide_host_changed', (data) => {
-            const wasHost = this.isHost;
-            this.hostPlayerId = data.new_host_id;
-
-            if (this.myPlayerId === data.new_host_id) {
-                this.isHost = true;
-                this.shouldLogData = true;
-            }
-
-            if (!wasHost && this.isHost) {
-                console.log(`[MultiplayerPyodide] Promoted to host, now responsible for data logging`);
             }
         });
 
         // Game ready to start
         socket.on('pyodide_game_ready', (data) => {
             console.log(`[MultiplayerPyodide] Game ${data.game_id} ready with players:`, data.players);
-            console.log(`[MultiplayerPyodide] pyodide_game_ready data:`, JSON.stringify(data));
 
             // Store player-to-subject mapping for data logging
             this.playerSubjects = data.player_subjects || {};
-            console.log(`[MultiplayerPyodide] Player-subject mapping:`, this.playerSubjects);
 
-            // Check if server is authoritative
+            // Server-authoritative mode is always enabled
             this.serverAuthoritative = data.server_authoritative || false;
-            this.realtimeMode = data.realtime_mode !== false;  // Default true for server-authoritative
-            console.log(`[MultiplayerPyodide] Server-authoritative mode: ${this.serverAuthoritative}, realtime: ${this.realtimeMode}`);
-            if (this.serverAuthoritative) {
-                console.log(`[MultiplayerPyodide] Server-authoritative mode enabled - will receive server_authoritative_state events`);
-                if (this.realtimeMode) {
-                    console.log(`[MultiplayerPyodide] Real-time mode: client prediction + rollback enabled`);
-                }
-            } else {
-                console.log(`[MultiplayerPyodide] Host-based mode - will send state hashes for verification`);
-            }
+            console.log(`[MultiplayerPyodide] Server-authoritative mode: ${this.serverAuthoritative}`);
 
             // Initialize action queues for other players
             for (const playerId of data.players) {
@@ -199,9 +133,9 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
             }
         });
 
-        // Receive other player's action (Action Queue - Option B)
+        // Receive other player's action
         socket.on('pyodide_other_player_action', (data) => {
-            // Don't queue actions if game is done (prevents queue buildup at game end)
+            // Don't queue actions if game is done
             if (this.state === "done") {
                 return;
             }
@@ -213,86 +147,30 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
                 this.otherPlayerActionQueues[player_id] = [];
             }
 
-            // Add to queue (FIFO) - never drop actions to maintain sync
+            // Add to queue (FIFO)
             const queue = this.otherPlayerActionQueues[player_id];
             queue.push({ action, frame_number });
 
-            // Log warning if queue is growing large (client may be running slower)
-            // Only warn once every 30 frames to avoid spam
+            // Log warning if queue is growing large
             if (queue.length > 30 && queue.length % 30 === 0) {
-                console.warn(`[MultiplayerPyodide] Queue for player ${player_id} is large (${queue.length}), this client may be running slower`);
+                console.warn(`[MultiplayerPyodide] Queue for player ${player_id} is large (${queue.length})`);
             }
         });
 
-        // State verification request (host-based mode only)
-        // In server-authoritative mode, skip hash computation - server broadcasts state directly
-        socket.on('pyodide_verify_state', (data) => {
-            if (this.serverAuthoritative) {
-                return;  // Server handles state broadcast directly
-            }
-            this.verifyState(data.frame_number);
-        });
-
-        // Apply full state (non-host only)
-        socket.on('pyodide_apply_full_state', async (data) => {
-            if (!this.isHost) {
-                console.log(`[MultiplayerPyodide] Applying full state from host...`);
-                await this.applyFullState(data.state);
-
-                // Clear action queues for fresh start
-                for (const playerId in this.otherPlayerActionQueues) {
-                    this.otherPlayerActionQueues[playerId] = [];
-                }
-                this.lastExecutedActions = {};
-                console.log(`[MultiplayerPyodide] State resynced from host, now at frame ${this.frameNumber}`);
-            }
-        });
-
-        // Request full state (host only)
-        socket.on('pyodide_request_full_state', async (data) => {
-            if (this.isHost) {
-                console.log(`[MultiplayerPyodide] Providing full state for resync at frame ${data.frame_number}`);
-                const fullState = await this.getFullState();
-                socket.emit('pyodide_send_full_state', {
-                    game_id: this.gameId,
-                    state: fullState
-                });
-
-                // Broadcast HUD to ensure it's synced after state resync
-                this.broadcastHUD();
-
-                // Clear action queues for fresh start
-                for (const playerId in this.otherPlayerActionQueues) {
-                    this.otherPlayerActionQueues[playerId] = [];
-                }
-                this.lastExecutedActions = {};
-                console.log(`[MultiplayerPyodide] Host sent state at frame ${this.frameNumber}`);
-            }
-        });
-
-        // Receive synchronized HUD text from host (via server broadcast)
-        socket.on('pyodide_hud_sync', (data) => {
-            ui_utils.updateHUDText(data.hud_text);
-        });
-
-        // Server-authoritative state broadcast (Option B: Frame-Aligned Stepper)
+        // Server-authoritative state broadcast
         // Server periodically broadcasts authoritative state for verification/correction
         socket.on('server_authoritative_state', async (data) => {
-            console.log(`[MultiplayerPyodide] Received server_authoritative_state event (serverAuthoritative=${this.serverAuthoritative}, gameId=${this.gameId})`);
-
             if (!this.serverAuthoritative) {
-                console.log(`[MultiplayerPyodide] Ignoring server_authoritative_state - not in server-authoritative mode`);
-                return;  // Ignore if not in server-authoritative mode
+                return;
             }
 
             const { game_id, state } = data;
             if (game_id !== this.gameId) {
-                console.log(`[MultiplayerPyodide] Ignoring server_authoritative_state - game_id mismatch (received: ${game_id}, expected: ${this.gameId})`);
-                return;  // Not for this game
+                return;
             }
 
             // Calculate sync metrics
-            const frameDiff = this.frameNumber - state.frame_number;  // Positive = client ahead
+            const frameDiff = this.frameNumber - state.frame_number;
             this.diagnostics.syncCount++;
             this.diagnostics.frameDriftHistory.push(frameDiff);
             if (this.diagnostics.frameDriftHistory.length > 20) {
@@ -316,21 +194,15 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
                 ? Math.max(...stepTimes).toFixed(1)
                 : 'N/A';
 
-            // Calculate fallback rate per player and total
-            const fallbackRates = {};
+            // Calculate fallback rate
             let totalFallbacks = 0;
             let totalQueueHits = 0;
-            for (const [playerId, count] of Object.entries(this.diagnostics.fallbackCount)) {
-                const hits = this.diagnostics.queueHitCount[playerId] || 0;
-                const total = count + hits;
-                fallbackRates[playerId] = total > 0 ? ((count / total) * 100).toFixed(0) + '%' : '0%';
-                totalFallbacks += count;
-            }
+            for (const count of Object.values(this.diagnostics.fallbackCount)) totalFallbacks += count;
             for (const count of Object.values(this.diagnostics.queueHitCount)) totalQueueHits += count;
             const totalActions = totalFallbacks + totalQueueHits;
             const fallbackRate = totalActions > 0 ? ((totalFallbacks / totalActions) * 100).toFixed(1) : '0.0';
 
-            // Calculate FPS since last sync using actual timestamps
+            // Calculate FPS since last sync
             const now = Date.now();
             const targetFPS = this.config.fps || 10;
             const framesSinceLastSync = this.frameNumber - this.diagnostics.lastSyncFrame;
@@ -339,271 +211,36 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
                 ? ((framesSinceLastSync / timeSinceLastSync) * 1000).toFixed(1)
                 : 'N/A';
 
-            // Check if env_state is present (needed for actual state sync)
             const hasEnvState = state.env_state !== undefined && state.env_state !== null;
-
-            // Calculate staleness - how old is this state compared to when we received it?
-            const receiveTime = Date.now();
             const serverTimestamp = state.server_timestamp || 0;
-            const networkLatency = serverTimestamp > 0 ? receiveTime - serverTimestamp : 'N/A';
+            const networkLatency = serverTimestamp > 0 ? now - serverTimestamp : 'N/A';
 
-            // Log comprehensive sync info (matches [Perf] format)
+            // Log sync info
             console.log(
                 `[Sync #${this.diagnostics.syncCount}] ` +
                 `Server: ${state.frame_number} | Client: ${this.frameNumber} | Drift: ${frameDiff > 0 ? '+' : ''}${frameDiff} | ` +
                 `FPS: ${effectiveFPS}/${targetFPS} | ` +
                 `Step: ${avgStepTime}ms avg, ${maxStepTime}ms max | ` +
-                `Queues: ${totalQueueSize} ${JSON.stringify(queueSizes)} | ` +
-                `Fallback: ${fallbackRate}% ${JSON.stringify(fallbackRates)} | ` +
-                `EnvState: ${hasEnvState ? 'yes' : 'NO'} | ` +
+                `Queues: ${totalQueueSize} | ` +
+                `Fallback: ${fallbackRate}% | ` +
                 `Latency: ${typeof networkLatency === 'number' ? networkLatency.toFixed(0) + 'ms' : networkLatency}`
             );
 
-            // Real-time mode: use tolerance-based reconciliation
-            // Small drift is expected and tolerated; only correct on significant drift
-            if (this.realtimeMode && hasEnvState) {
-                const wasApplied = await this.reconcileWithServer(state);
-                // Update tracking
-                this.diagnostics.lastSyncFrame = state.frame_number;
-                this.diagnostics.lastSyncTime = Date.now();
-                if (!wasApplied) {
-                    // Correction was skipped - drift within tolerance
-                    // Keep local state, just synced metadata
-                }
-                return;
-            }
-
-            // Legacy frame-aligned mode: existing hash comparison + apply logic
+            // Reconcile with server state
             if (hasEnvState) {
-                // DETERMINISTIC STATE (custom get_state): Use hash comparison
-                const serverHash = state.state_hash || null;
-                const serverFrame = state.frame_number;
-                let clientHash = null;
-                let needsCorrection = true;  // Default to correcting if we can't compare
-                let comparisonResult = 'no_comparison';
-
-                // Look up client's hash at the SAME frame as server
-                if (serverHash && serverFrame !== undefined) {
-                    clientHash = this.getStateHashForFrame(serverFrame);
-
-                    if (clientHash !== null) {
-                        // We have a hash for this frame - compare them
-                        needsCorrection = (clientHash !== serverHash);
-                        comparisonResult = needsCorrection ? 'mismatch' : 'match';
-
-                        if (!needsCorrection) {
-                            console.log(
-                                `[Sync] States match at frame ${serverFrame} (hash=${serverHash.substring(0, 8)}), skipping correction. ` +
-                                `Current frame: ${this.frameNumber}, drift: ${frameDiff}`
-                            );
-                            // States are in sync - just update rewards display (don't reset frame number)
-                            if (state.cumulative_rewards) {
-                                this.cumulative_rewards = state.cumulative_rewards;
-                                ui_utils.updateHUDText(this.getHUDText());
-                            }
-                            // Update server step tracking (critical for throttling)
-                            if (state.step_num !== undefined) {
-                                this.lastKnownServerStepNum = state.step_num;
-                            }
-                        }
-                    } else {
-                        // Frame too old (not in history) or hash not yet recorded
-                        comparisonResult = 'no_history';
-
-                        // Check if history is empty (e.g., at start of episode)
-                        if (this.stateHashHistory.size === 0) {
-                            console.log(
-                                `[Sync] Hash history empty (likely start of episode). ` +
-                                `Skipping correction, will compare on next sync.`
-                            );
-                            // Don't correct - just let the game continue and compare next time
-                            needsCorrection = false;
-                            // Update rewards display
-                            if (state.cumulative_rewards) {
-                                this.cumulative_rewards = state.cumulative_rewards;
-                                ui_utils.updateHUDText(this.getHUDText());
-                            }
-                            // Update server step tracking (critical for throttling)
-                            if (state.step_num !== undefined) {
-                                this.lastKnownServerStepNum = state.step_num;
-                            }
-                        } else {
-                            const historyKeys = Array.from(this.stateHashHistory.keys());
-                            const oldestFrame = Math.min(...historyKeys);
-                            const newestFrame = Math.max(...historyKeys);
-
-                            if (serverFrame > newestFrame) {
-                                // Server is ahead of our history - hash not recorded yet (unlikely but possible)
-                                console.log(
-                                    `[Sync] Server frame ${serverFrame} ahead of history (newest: ${newestFrame}). ` +
-                                    `Hash not recorded yet, skipping correction.`
-                                );
-                                needsCorrection = false;
-                                if (state.cumulative_rewards) {
-                                    this.cumulative_rewards = state.cumulative_rewards;
-                                    ui_utils.updateHUDText(this.getHUDText());
-                                }
-                                // Update server step tracking (critical for throttling)
-                                if (state.step_num !== undefined) {
-                                    this.lastKnownServerStepNum = state.step_num;
-                                }
-                            } else if (serverFrame < oldestFrame) {
-                                // Server frame is older than our history - we're too far ahead
-                                console.warn(
-                                    `[Sync] Server frame ${serverFrame} older than history (oldest: ${oldestFrame}). ` +
-                                    `Client too far ahead, applying correction.`
-                                );
-                                needsCorrection = true;
-                            } else {
-                                // Frame is in range but missing - shouldn't happen
-                                console.warn(
-                                    `[Sync] Hash missing for frame ${serverFrame} (range: ${oldestFrame}-${newestFrame}). ` +
-                                    `Forcing correction.`
-                                );
-                                needsCorrection = true;
-                            }
-                        }
-                    }
-                }
-
-                if (needsCorrection) {
-                    // ===== ACTION VERIFICATION =====
-                    // Compare action tracking to diagnose root cause of divergence
-                    const serverActionCounts = state.action_counts || {};
-                    const serverSeqHash = state.action_sequence_hash || '';
-                    const clientSeqHash = this.computeActionSequenceHash();
-                    const serverTotalActions = state.total_actions || 0;
-                    const clientTotalActions = this.actionSequence.length;
-
-                    // Check sequence hash (order matters)
-                    const sequenceMatches = (serverSeqHash === clientSeqHash);
-
-                    // Check action counts (order doesn't matter)
-                    let countsMatch = true;
-                    let countDiffs = [];
-                    for (const [playerId, serverCounts] of Object.entries(serverActionCounts)) {
-                        const clientCounts = this.actionCounts[playerId] || {};
-                        for (const [action, serverCount] of Object.entries(serverCounts)) {
-                            const clientCount = clientCounts[action] || 0;
-                            if (serverCount !== clientCount) {
-                                countsMatch = false;
-                                countDiffs.push(`P${playerId} action ${action}: server=${serverCount} client=${clientCount}`);
-                            }
-                        }
-                        // Also check for actions client has that server doesn't
-                        for (const [action, clientCount] of Object.entries(clientCounts)) {
-                            if (!(action in serverCounts)) {
-                                countsMatch = false;
-                                countDiffs.push(`P${playerId} action ${action}: server=0 client=${clientCount}`);
-                            }
-                        }
-                    }
-                    // Check for players client has that server doesn't
-                    for (const playerId of Object.keys(this.actionCounts)) {
-                        if (!(playerId in serverActionCounts)) {
-                            countsMatch = false;
-                            countDiffs.push(`P${playerId}: server=missing client=present`);
-                        }
-                    }
-
-                    console.log(`[Sync Verify] Frame ${serverFrame}:`);
-                    console.log(`  Total actions: server=${serverTotalActions} client=${clientTotalActions}`);
-                    console.log(`  Sequence hash: ${sequenceMatches ? 'MATCH' : 'DIFFER'} (server=${serverSeqHash.substring(0, 8)} client=${clientSeqHash.substring(0, 8)})`);
-                    console.log(`  Action counts: ${countsMatch ? 'MATCH' : 'DIFFER'}`);
-                    if (!countsMatch) {
-                        console.log(`  Count differences: ${countDiffs.join(', ')}`);
-                    }
-
-                    // Diagnostic conclusion and action decision
-                    if (countsMatch && sequenceMatches) {
-                        console.log(`  → Same actions, same order (non-determinism in env step)`);
-                        // True non-determinism - need to correct
-                    } else if (countsMatch && !sequenceMatches) {
-                        console.log(`  → Same actions executed, different order (timing issue - SKIPPING correction)`);
-                        // Same actions in different order due to timing. For deterministic envs,
-                        // the final state should be the same. Skip the correction to avoid
-                        // constant state resets that cause jittery gameplay.
-                        // Just sync the frame number and rewards, but keep local state.
-                        if (state.cumulative_rewards) {
-                            this.cumulative_rewards = state.cumulative_rewards;
-                            ui_utils.updateHUDText(this.getHUDText());
-                        }
-                        // Sync action counts to prevent accumulating small differences
-                        this.actionCounts = JSON.parse(JSON.stringify(serverActionCounts));
-                        // Update server step tracking (critical for throttling)
-                        if (state.step_num !== undefined) {
-                            this.lastKnownServerStepNum = state.step_num;
-                        }
-                        // Don't apply state correction - continue with local state
-                        this.diagnostics.lastSyncFrame = state.frame_number;
-                        this.diagnostics.lastSyncTime = Date.now();
-                        return;
-                    } else {
-                        console.log(`  → Different actions executed (action sync issue)`);
-                        // Action mismatch - need to correct
-                    }
-                    // ===== END ACTION VERIFICATION =====
-
-                    // Track pre-sync state for debugging
-                    const preSyncFrame = this.frameNumber;
-
-                    // Apply server state to correct divergence
-                    const applyStartTime = performance.now();
-                    await this.applyServerState(state);
-                    const applyTime = performance.now() - applyStartTime;
-
-                    // Clear hash history since we've reset state
-                    this.stateHashHistory.clear();
-
-                    // Sync action tracking with server to prevent divergence accumulation
-                    // We need to rebuild our action sequence to match server's count
-                    // Since we don't have the full sequence, we just sync the counts and total
-                    if (state.action_counts) {
-                        this.actionCounts = JSON.parse(JSON.stringify(state.action_counts));
-                    }
-                    // Rebuild action sequence with correct length (details don't matter for count comparison)
-                    const serverTotal = state.total_actions || 0;
-                    if (this.actionSequence.length !== serverTotal) {
-                        // Trim or pad to match server's total
-                        if (this.actionSequence.length > serverTotal) {
-                            this.actionSequence = this.actionSequence.slice(0, serverTotal);
-                        }
-                        // Note: If client has fewer, we can't recover the missing entries,
-                        // but counts are synced so next comparison will work
-                    }
-
-                    // Log detailed sync application info
-                    console.log(
-                        `[Sync] Applied correction (${comparisonResult}): ` +
-                        `frame ${preSyncFrame} → ${this.frameNumber} | ` +
-                        `apply=${applyTime.toFixed(1)}ms | ` +
-                        `latency=${typeof networkLatency === 'number' ? networkLatency.toFixed(0) + 'ms' : networkLatency} | ` +
-                        `serverHash=${serverHash ? serverHash.substring(0, 8) : 'N/A'}, ` +
-                        `clientHash@${serverFrame}=${clientHash ? clientHash.substring(0, 8) : 'N/A'}`
-                    );
-
-                    if (Math.abs(frameDiff) > 5) {
-                        console.warn(
-                            `[Sync] ⚠️ Large drift detected (${frameDiff} frames). ` +
-                            `Queue pre-sync: ${totalQueueSize}`
-                        );
-                    }
-                }
+                await this.reconcileWithServer(state);
             } else {
-                // No env_state available - just sync rewards/frame number
-                console.warn(`[Sync] No env_state in server broadcast - state correction not possible`);
+                // No env_state - just sync rewards
                 if (state.cumulative_rewards) {
                     this.cumulative_rewards = state.cumulative_rewards;
                     ui_utils.updateHUDText(this.getHUDText());
                 }
             }
 
-            // Always update server step tracking when we receive a sync (critical for throttling)
-            // This ensures throttling works even when we skip corrections
+            // Update tracking
             if (state.step_num !== undefined) {
                 this.lastKnownServerStepNum = state.step_num;
             }
-
             this.diagnostics.lastSyncFrame = state.frame_number;
             this.diagnostics.lastSyncTime = now;
         });
@@ -659,22 +296,6 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
             if (data.cumulative_rewards) {
                 this.cumulative_rewards = data.cumulative_rewards;
             }
-        });
-    }
-
-    /**
-     * Broadcast HUD text to all players (host only).
-     * Called after reset and each step to keep HUD synchronized.
-     */
-    broadcastHUD() {
-        if (!this.isHost) {
-            return;
-        }
-
-        const hudText = this.getHUDText();
-        socket.emit('pyodide_hud_update', {
-            game_id: this.gameId,
-            hud_text: hudText
         });
     }
 
@@ -1136,26 +757,6 @@ obs, infos, render_state
         }
 
         // Store in input buffer for potential rollback/replay (real-time mode)
-        if (this.realtimeMode && this.serverAuthoritative) {
-            const myAction = finalActions[this.myPlayerId];
-            const partnerActions = {};
-            for (const [agentId, action] of Object.entries(finalActions)) {
-                if (String(agentId) !== String(this.myPlayerId)) {
-                    partnerActions[agentId] = action;
-                }
-            }
-            this.inputBuffer.push({
-                frame: this.frameNumber,
-                myAction: myAction,
-                partnerActions: partnerActions,
-                timestamp: Date.now()
-            });
-            // Trim buffer
-            while (this.inputBuffer.length > this.inputBufferMaxSize) {
-                this.inputBuffer.shift();
-            }
-        }
-
         // Track action sequence and counts for sync verification
         this.actionSequence.push({
             frame: this.frameNumber,
@@ -1213,27 +814,7 @@ obs, infos, render_state
         // Log diagnostics periodically
         this.logDiagnostics();
 
-        // 5. Trigger periodic state verification (host-based mode only)
-        // In server-authoritative mode, the server handles broadcasting
-        if (!this.serverAuthoritative && this.stateBroadcastInterval > 0 && this.frameNumber % this.stateBroadcastInterval === 0) {
-            this.triggerStateVerification();
-        }
-
-        // 6. If host, log data
-        if (this.shouldLogData) {
-            this.logFrameData({
-                frame: this.frameNumber,
-                observations: obs,
-                actions: finalActions,
-                rewards: rewards,
-                terminateds: terminateds,
-                truncateds: truncateds,
-                infos: infos,
-                player_subjects: this.playerSubjects  // Include player->subject mapping in every frame
-            });
-        }
-
-        // 7. Check if episode is complete (only trigger once)
+        // 5. Check if episode is complete (only trigger once)
         // Episode ends when: environment terminates/truncates OR max_steps reached
         const all_terminated = Array.from(terminateds.values()).every(value => value === true);
         const all_truncated = Array.from(truncateds.values()).every(value => value === true);
@@ -1399,51 +980,6 @@ obs, infos, render_state
         }
     }
 
-    /**
-     * Trigger state verification for hybrid sync.
-     * Sends state hash to server for comparison with other clients.
-     */
-    async triggerStateVerification() {
-        const stateHash = await this.computeStateHash();
-        socket.emit('pyodide_state_hash', {
-            game_id: this.gameId,
-            player_id: this.myPlayerId,
-            hash: stateHash,
-            frame_number: this.frameNumber
-        });
-    }
-
-    // Keep waitForAllActions for backwards compatibility but it's no longer used
-    waitForAllActions() {
-        /**
-         * Wait for server to broadcast all player actions
-         * with a timeout to prevent deadlock
-         */
-        return new Promise((resolve, reject) => {
-            if (this.allActionsReady) {
-                const actions = this.allActions;
-                this.allActionsReady = false;
-                this.allActions = null;
-                resolve(actions);
-            } else {
-                this.actionPromiseResolve = resolve;
-
-                // Add timeout to prevent hanging forever (10 seconds)
-                setTimeout(() => {
-                    if (this.actionPromiseResolve === resolve) {
-                        console.error(
-                            `[MultiplayerPyodide] Timeout waiting for actions at frame ${this.frameNumber}. ` +
-                            `This may indicate a desync or network issue.`
-                        );
-                        this.actionPromiseResolve = null;
-                        // Resolve with null to allow game to continue
-                        resolve(null);
-                    }
-                }, 10000);
-            }
-        });
-    }
-
     async stepWithActions(actions) {
         /**
          * Step environment with collected actions from all players
@@ -1509,20 +1045,6 @@ obs, rewards, terminateds, truncateds, infos, render_state
         };
 
         return [obs, rewards, terminateds, truncateds, infos, render_state];
-    }
-
-    async verifyState(frameNumber) {
-        /**
-         * Compute and send state hash for verification
-         */
-        const stateHash = await this.computeStateHash();
-
-        socket.emit('pyodide_state_hash', {
-            game_id: this.gameId,
-            player_id: this.myPlayerId,
-            hash: stateHash,
-            frame_number: frameNumber
-        });
     }
 
     /**
@@ -1591,193 +1113,6 @@ _hash = hashlib.md5(_json_str.encode()).hexdigest()[:16]
 _hash
         `);
         return hashResult;
-    }
-
-    async computeStateHash() {
-        /**
-         * Compute hash of current game state using JavaScript crypto.
-         * Uses env.get_state() for the environment state (same data used for full sync).
-         *
-         * Falls back to a simple hash function if crypto.subtle is unavailable
-         * (which happens on non-HTTPS connections).
-         *
-         * Requires the environment to implement get_state() returning a
-         * JSON-serializable dict.
-         */
-        const envState = await this.pyodide.runPythonAsync(`
-import json
-
-if not hasattr(env, 'get_state') or not callable(getattr(env, 'get_state')):
-    raise RuntimeError(
-        "Environment does not implement get_state(). "
-        "State synchronization requires get_state() and set_state() methods "
-        "that return/accept JSON-serializable dicts with primitive types only."
-    )
-
-env.get_state()
-        `);
-
-        // Build state dict in JavaScript
-        const stateDict = {
-            env_state: envState.toJs({ dict_converter: Object.fromEntries }),
-            frame: this.frameNumber,
-            step: this.step_num,
-            cumulative_rewards: this.cumulative_rewards,
-        };
-
-        // Create deterministic JSON string (sort keys for consistency)
-        const stateStr = JSON.stringify(stateDict, Object.keys(stateDict).sort());
-
-        // Use SubtleCrypto if available (requires HTTPS or localhost)
-        // Otherwise fall back to simple hash function
-        if (crypto && crypto.subtle) {
-            const hashBuffer = await crypto.subtle.digest(
-                'SHA-256',
-                new TextEncoder().encode(stateStr)
-            );
-            // Convert to hex string
-            return Array.from(new Uint8Array(hashBuffer))
-                .map(b => b.toString(16).padStart(2, '0'))
-                .join('');
-        } else {
-            // Fallback: Simple hash function for non-secure contexts (HTTP)
-            // This is less secure but functional for sync verification
-            return this._simpleHash(stateStr);
-        }
-    }
-
-    _simpleHash(str) {
-        /**
-         * Simple string hash function for use when crypto.subtle is unavailable.
-         * Based on cyrb53 - a fast, high-quality 53-bit hash.
-         * Not cryptographically secure, but sufficient for sync verification.
-         */
-        let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
-        for (let i = 0, ch; i < str.length; i++) {
-            ch = str.charCodeAt(i);
-            h1 = Math.imul(h1 ^ ch, 2654435761);
-            h2 = Math.imul(h2 ^ ch, 1597334677);
-        }
-        h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507);
-        h1 ^= Math.imul(h2 ^ (h2 >>> 13), 3266489909);
-        h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507);
-        h2 ^= Math.imul(h1 ^ (h1 >>> 13), 3266489909);
-        // Return as hex string (similar format to SHA256 output)
-        return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(16).padStart(16, '0');
-    }
-
-    /**
-     * Compute hash of action sequence for comparison with server.
-     */
-    computeActionSequenceHash() {
-        const str = JSON.stringify(this.actionSequence);
-        return this._simpleHash(str);
-    }
-
-    async getFullState() {
-        /**
-         * Serialize complete environment state (host only)
-         *
-         * Requires the environment to implement get_state() returning a
-         * JSON-serializable dict.
-         */
-        const fullState = await this.pyodide.runPythonAsync(`
-import numpy as np
-import json
-
-if not hasattr(env, 'get_state') or not callable(getattr(env, 'get_state')):
-    raise RuntimeError(
-        "Environment does not implement get_state(). "
-        "State synchronization requires get_state() and set_state() methods "
-        "that return/accept JSON-serializable dicts with primitive types only."
-    )
-
-env_state = env.get_state()
-
-# Validate that state is JSON-serializable
-try:
-    json.dumps(env_state)
-except (TypeError, ValueError) as e:
-    raise ValueError(
-        f"Environment state is not JSON-serializable: {e}\\n"
-        "State must contain only primitive types (int, float, str, bool, list, dict)"
-    )
-
-state_dict = {
-    'episode_num': ${this.num_episodes},
-    'step_num': ${this.step_num},
-    'frame_number': ${this.frameNumber},
-    'cumulative_rewards': ${this.pyodide.toPy(this.cumulative_rewards)},
-    'numpy_rng_state': np.random.get_state()[1].tolist(),
-    'env_state': env_state,
-}
-
-state_dict
-        `);
-
-        const state = await this.pyodide.toPy(fullState).toJs();
-
-        // Convert to plain object
-        const plainState = {};
-        for (let [key, value] of state.entries()) {
-            plainState[key] = value;
-        }
-
-        return plainState;
-    }
-
-    async applyFullState(state) {
-        /**
-         * Restore state from host's serialized data (non-host only)
-         *
-         * Requires the environment to implement set_state() that accepts a
-         * JSON-serializable dict.
-         */
-        await this.pyodide.runPythonAsync(`
-import numpy as np
-
-state_obj = ${this.pyodide.toPy(state)}
-
-# Restore environment state (most important!)
-if 'env_state' in state_obj:
-    env_state = state_obj['env_state']
-
-    if not hasattr(env, 'set_state') or not callable(getattr(env, 'set_state')):
-        raise RuntimeError(
-            "Environment does not implement set_state(). "
-            "State synchronization requires get_state() and set_state() methods "
-            "that return/accept JSON-serializable dicts with primitive types only."
-        )
-
-    env.set_state(env_state)
-    print("[Python] ✓ Restored environment state via set_state()")
-else:
-    print("[Python] Warning: No env_state in sync data")
-
-# Restore RNG state
-if 'numpy_rng_state' in state_obj:
-    rng_state_list = state_obj['numpy_rng_state']
-    rng_state_array = np.array(rng_state_list, dtype=np.uint32)
-
-    # Create full RNG state tuple (for numpy's set_state)
-    full_state = ('MT19937', rng_state_array, 0, 0, 0.0)
-    np.random.set_state(full_state)
-
-    print("[Python] ✓ Restored RNG state")
-        `);
-
-        // Restore JavaScript-side state
-        this.num_episodes = state.episode_num;
-        this.step_num = state.step_num;
-        this.frameNumber = state.frame_number;
-        this.cumulative_rewards = state.cumulative_rewards;
-
-        // Reset JavaScript RNG
-        if (this.gameSeed) {
-            seeded_random.resetMultiplayerRNG();
-        }
-
-        console.log('[MultiplayerPyodide] Applied full state from host');
     }
 
     async applyServerState(state) {
@@ -1917,18 +1252,11 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
          */
         const serverFrame = serverState.frame_number;
         const serverHash = serverState.state_hash;
-        const preSyncFrame = this.frameNumber;
-        const drift = preSyncFrame - serverFrame;
-        const absDrift = Math.abs(drift);
-
-        // Look up client's hash at server's frame
         const clientHash = this.getStateHashForFrame(serverFrame);
+        const drift = this.frameNumber - serverFrame;
 
-        // CASE 1: Hashes match - we're in sync!
-        if (clientHash && serverHash && clientHash === serverHash) {
-            this.confirmedFrame = serverFrame;
-            this.pruneInputBuffer(serverFrame);
-
+        // Helper to sync metadata from server
+        const syncMetadata = () => {
             if (serverState.step_num !== undefined) {
                 this.lastKnownServerStepNum = serverState.step_num;
             }
@@ -1936,7 +1264,12 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
                 this.cumulative_rewards = serverState.cumulative_rewards;
                 ui_utils.updateHUDText(this.getHUDText());
             }
+        };
 
+        // CASE 1: Both hashes available and they MATCH - we're in sync
+        if (clientHash && serverHash && clientHash === serverHash) {
+            this.confirmedFrame = serverFrame;
+            syncMetadata();
             console.log(
                 `[Reconcile] States match at frame ${serverFrame} ` +
                 `(hash=${serverHash.substring(0, 8)}), drift: ${drift}`
@@ -1944,163 +1277,29 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
             return false;
         }
 
-        // CASE 2: Hashes MISMATCH - real divergence, always apply server state
+        // CASE 2: Both hashes available but MISMATCH - proven divergence
         if (clientHash && serverHash && clientHash !== serverHash) {
             console.log(
                 `[Reconcile] HASH MISMATCH at frame ${serverFrame}. ` +
-                `Server: ${serverHash.substring(0, 8)}, Client: ${clientHash.substring(0, 8)}, ` +
-                `drift: ${drift}. Applying server state to correct divergence.`
+                `Server: ${serverHash.substring(0, 8)}, Client: ${clientHash.substring(0, 8)}. ` +
+                `Applying server state.`
             );
-
             await this.applyServerState(serverState);
             this.confirmedFrame = serverFrame;
-            this.stateHashHistory.clear();
-            this.inputBuffer = [];
+            this.stateHashHistory.clear();  // Clear on proven divergence
             return true;
         }
 
-        // CASE 3: No client hash available (history cleared or frame not reached yet)
-        // Only skip correction if drift is very small; otherwise apply server state
-        if (!clientHash && absDrift <= 1) {
-            console.log(
-                `[Reconcile] No client hash for frame ${serverFrame} (drift=${drift}), ` +
-                `syncing metadata only`
-            );
-
-            // Sync frame/step numbers to keep timing aligned
-            this.frameNumber = serverFrame;
-            if (serverState.step_num !== undefined) {
-                this.lastKnownServerStepNum = serverState.step_num;
-                this.step_num = serverState.step_num;
-            }
-            if (serverState.cumulative_rewards) {
-                this.cumulative_rewards = serverState.cumulative_rewards;
-                ui_utils.updateHUDText(this.getHUDText());
-            }
-
-            this.pruneInputBuffer(serverFrame);
-            return false;
-        }
-
-        // CASE 4: No client hash AND significant drift - apply server state
+        // CASE 3: No client hash (frame not in history) - apply server state to be safe
+        // This handles both "client ahead" and "client behind" scenarios
         console.log(
-            `[Reconcile] No client hash and drift=${drift}, applying server state. ` +
-            `Server: ${serverFrame}, Client: ${preSyncFrame}`
+            `[Reconcile] No client hash for frame ${serverFrame} (drift=${drift}), ` +
+            `applying server state`
         );
-
         await this.applyServerState(serverState);
         this.confirmedFrame = serverFrame;
-        this.stateHashHistory.clear();
-        this.inputBuffer = [];
+        // Don't clear hash history - we couldn't verify, let future syncs verify
         return true;
-    }
-
-    correctInputBuffer(serverInputs) {
-        /**
-         * Update input buffer with actual partner actions from server.
-         *
-         * The server's input_history contains the actions that were actually
-         * used for each frame. We update our predictions with the real values
-         * so replay uses correct actions.
-         */
-        const serverInputMap = new Map();
-        for (const inp of serverInputs) {
-            serverInputMap.set(inp.frame, inp.actions);
-        }
-
-        for (const localInput of this.inputBuffer) {
-            const serverActions = serverInputMap.get(localInput.frame);
-            if (serverActions) {
-                // Update partner actions with server's actual values
-                const correctedPartnerActions = {};
-                for (const [playerId, action] of Object.entries(localInput.partnerActions)) {
-                    const serverAction = serverActions[String(playerId)];
-                    correctedPartnerActions[playerId] = serverAction !== undefined
-                        ? serverAction
-                        : action;  // Keep prediction if server doesn't have it
-                }
-                localInput.correctedPartnerActions = correctedPartnerActions;
-            }
-        }
-    }
-
-    async replayFrames(startFrame, numFrames) {
-        /**
-         * Fast-forward through frames using buffered inputs.
-         *
-         * Replays without rendering to catch up quickly.
-         * Uses corrected partner actions if available from server history.
-         */
-        console.log(`[Replay] Starting replay of ${numFrames} frames from ${startFrame}`);
-        const replayStart = performance.now();
-
-        for (let i = 0; i < numFrames; i++) {
-            const frame = startFrame + i;
-            const input = this.inputBuffer.find(inp => inp.frame === frame);
-
-            if (!input) {
-                console.warn(`[Replay] Missing input for frame ${frame}, stopping replay`);
-                break;
-            }
-
-            // Build action dict
-            const actions = {};
-            actions[this.myPlayerId] = input.myAction;
-
-            // Use corrected partner actions if available
-            const partnerActions = input.correctedPartnerActions || input.partnerActions;
-            for (const [playerId, action] of Object.entries(partnerActions)) {
-                actions[playerId] = action;
-            }
-
-            // Step without rendering
-            await this.stepNoRender(actions);
-            this.frameNumber++;
-        }
-
-        // Render final state
-        try {
-            await this.pyodide.runPythonAsync(`env.render()`);
-        } catch (e) {
-            console.warn(`[Replay] Render failed: ${e}`);
-        }
-
-        const replayTime = performance.now() - replayStart;
-        console.log(
-            `[Replay] Completed ${numFrames} frames in ${replayTime.toFixed(1)}ms ` +
-            `(${(replayTime / numFrames).toFixed(1)}ms/frame)`
-        );
-    }
-
-    async stepNoRender(actions) {
-        /**
-         * Step environment without rendering.
-         *
-         * Used during rollback replay to quickly catch up.
-         */
-        const pyActions = JSON.stringify(actions);
-
-        await this.pyodide.runPythonAsync(`
-import json
-_actions_json = '''${pyActions}'''
-_actions = json.loads(_actions_json)
-_actions = {int(k) if k.lstrip('-').isdigit() else k: v for k, v in _actions.items()}
-obs, rewards, terminateds, truncateds, infos = env.step(_actions)
-        `);
-
-        this.step_num++;
-    }
-
-    pruneInputBuffer(confirmedFrame) {
-        /**
-         * Remove inputs older than confirmed frame (no longer needed for replay).
-         */
-        const oldLength = this.inputBuffer.length;
-        this.inputBuffer = this.inputBuffer.filter(inp => inp.frame >= confirmedFrame);
-        const pruned = oldLength - this.inputBuffer.length;
-        if (pruned > 0) {
-            console.log(`[InputBuffer] Pruned ${pruned} old inputs, ${this.inputBuffer.length} remaining`);
-        }
     }
 
     logFrameData(_data) {
