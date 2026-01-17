@@ -439,6 +439,9 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
             connectionDetails: null
         };
 
+        // TURN server configuration (populated by pyodide_game_ready)
+        this.turnConfig = null;
+
         this.setupMultiplayerHandlers();
     }
 
@@ -464,6 +467,12 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         // Game ready to start
         socket.on('pyodide_game_ready', (data) => {
             console.log(`[MultiplayerPyodide] Game ${data.game_id} ready with players:`, data.players);
+
+            // Store TURN configuration for P2P
+            this.turnConfig = data.turn_config || null;
+            if (this.turnConfig) {
+                console.log('[MultiplayerPyodide] TURN config received');
+            }
 
             // Store player-to-subject mapping for data logging
             this.playerSubjects = data.player_subjects || {};
@@ -2493,7 +2502,16 @@ env.step(_replay_actions)
          */
         console.log(`[MultiplayerPyodide] Initiating P2P connection to player ${this.p2pPeerId}`);
 
-        this.webrtcManager = new WebRTCManager(socket, this.gameId, this.myPlayerId);
+        // Build WebRTC options with TURN config if available
+        const webrtcOptions = {};
+        if (this.turnConfig) {
+            webrtcOptions.turnUsername = this.turnConfig.username;
+            webrtcOptions.turnCredential = this.turnConfig.credential;
+            webrtcOptions.forceRelay = this.turnConfig.force_relay || false;
+            console.log('[MultiplayerPyodide] Initializing WebRTC with TURN support');
+        }
+
+        this.webrtcManager = new WebRTCManager(socket, this.gameId, this.myPlayerId, webrtcOptions);
 
         // Set up callbacks
         this.webrtcManager.onDataChannelOpen = () => {
