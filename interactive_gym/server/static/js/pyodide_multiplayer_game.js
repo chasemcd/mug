@@ -434,7 +434,9 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
             inputsSentViaP2P: 0,
             inputsSentViaSocketIO: 0,
             p2pFallbackTriggered: false,
-            p2pFallbackFrame: null
+            p2pFallbackFrame: null,
+            connectionType: null,
+            connectionDetails: null
         };
 
         this.setupMultiplayerHandlers();
@@ -1274,6 +1276,7 @@ obs, infos, render_state
             const p2pReceiveRatio = totalReceived > 0
                 ? (this.p2pMetrics.inputsReceivedViaP2P / totalReceived * 100).toFixed(1)
                 : 'N/A';
+            const p2pType = this.p2pMetrics.connectionType || 'unknown';
 
             // Log episode summary with P2P metrics
             console.log(
@@ -1282,7 +1285,8 @@ obs, infos, render_state
                 `InputBuf: ${this.inputBuffer.size} | ` +
                 `Rollbacks: ${this.rollbackCount} | ` +
                 `Syncs: ${this.diagnostics.syncCount} | ` +
-                `P2P: ${this.p2pMetrics.inputsReceivedViaP2P}/${totalReceived} (${p2pReceiveRatio}%)` +
+                `P2P: ${this.p2pMetrics.inputsReceivedViaP2P}/${totalReceived} (${p2pReceiveRatio}%) | ` +
+                `Type: ${p2pType}` +
                 (this.p2pMetrics.p2pFallbackTriggered
                     ? ` | Fallback at frame ${this.p2pMetrics.p2pFallbackFrame}`
                     : '')
@@ -2543,8 +2547,46 @@ env.step(_replay_actions)
             }
         };
 
+        // Connection type detection callback
+        this.webrtcManager.onConnectionTypeDetected = (connInfo) => {
+            this._logConnectionType(connInfo);
+        };
+
+        // Quality degradation callback
+        this.webrtcManager.onQualityDegraded = (info) => {
+            console.warn('[P2P Quality] Degraded:', info);
+            // Quality degradation is logged but P2P continues - SocketIO provides fallback
+        };
+
         // Start the connection (role determined by player ID comparison)
         this.webrtcManager.connectToPeer(this.p2pPeerId);
+    }
+
+    /**
+     * Log connection type for research analytics.
+     * @param {Object} connInfo - Connection type info from WebRTCManager
+     */
+    _logConnectionType(connInfo) {
+        console.log('[P2P] Connection type:', connInfo.connectionType, connInfo);
+
+        // Store in p2pMetrics for episode summary
+        this.p2pMetrics.connectionType = connInfo.connectionType;
+        this.p2pMetrics.connectionDetails = {
+            localCandidateType: connInfo.localCandidateType,
+            remoteCandidateType: connInfo.remoteCandidateType,
+            protocol: connInfo.localProtocol || connInfo.protocol,
+            relayProtocol: connInfo.relayProtocol,
+            detectedAtFrame: this.frameNumber,
+            timestamp: Date.now()
+        };
+
+        // Emit to server for research data persistence
+        this.socket.emit('p2p_connection_type', {
+            game_id: this.gameId,
+            player_id: this.myPlayerId,
+            connection_type: connInfo.connectionType,
+            details: this.p2pMetrics.connectionDetails
+        });
     }
 
     _sendP2PTestMessage() {
