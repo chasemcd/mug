@@ -55,6 +55,7 @@ Plans:
 **Goal:** The existing GGPO rollback system uses P2P transport instead of server relay for input exchange.
 **Depends on:** Phase 2
 **Requirements:** GGPO-01, NPLAY-01
+**Plans:** 1 plan
 
 **Success Criteria:**
 1. Two players can complete a full game session with inputs exchanged exclusively via P2P DataChannel
@@ -63,7 +64,8 @@ Plans:
 4. State hash verification detects desyncs (if any occur)
 5. SocketIO fallback activates if P2P connection fails during gameplay
 
-**Plans:** (created by /gsd:plan-phase)
+Plans:
+- [ ] 03-01-PLAN.md -- Symmetric state sync, P2P metrics, fallback monitoring
 
 ---
 
@@ -105,9 +107,9 @@ Plans:
 
 | Phase | Status | Completed |
 |-------|--------|-----------|
-| 1 - WebRTC Foundation | Complete ✓ | 2026-01-16 |
-| 2 - P2P Transport Layer | Complete ✓ | 2026-01-17 |
-| 3 - GGPO P2P Integration | Not started | - |
+| 1 - WebRTC Foundation | Complete | 2026-01-16 |
+| 2 - P2P Transport Layer | Complete | 2026-01-17 |
+| 3 - GGPO P2P Integration | Planned | - |
 | 4 - TURN and Resilience | Not started | - |
 | 5 - Validation and Cleanup | Not started | - |
 
