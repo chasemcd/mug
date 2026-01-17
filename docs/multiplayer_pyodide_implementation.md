@@ -4,7 +4,9 @@
 
 This document describes the implementation of multiplayer support for Pyodide-based experiments in Interactive Gym. The system enables multiple human participants to play together in real-time, with each client running their own Pyodide environment in the browser while maintaining perfect synchronization.
 
-**Key Achievement**: True peer-to-peer multiplayer gameplay where Python/Gymnasium environments run entirely in each participant's browser, with server acting only as an action coordinator.
+**Key Achievement**: True peer-to-peer multiplayer gameplay where Python/Gymnasium environments run entirely in each participant's browser, with symmetric peer architecture and GGPO-style rollback netcode for local-feeling responsiveness.
+
+**Architecture Update (2026-01-17)**: The system now uses symmetric P2P architecture with WebRTC DataChannel for direct input exchange. The legacy "host" concept has been removed - all peers are equal participants. Inputs are sent P2P-first with SocketIO fallback only when DataChannel is unavailable.
 
 ---
 
@@ -53,9 +55,9 @@ Interactive Gym uses Pyodide to run Gymnasium environments in participants' brow
 2. **Perfect Synchronization**: All clients see identical game state at all times
 3. **Deterministic AI**: All clients produce identical AI actions
 4. **Early Desync Detection**: Catch divergence within 1 second (30 frames)
-5. **Automatic Recovery**: Resync from host without user intervention
-6. **Single Data Stream**: Only one client logs data (no duplicates)
-7. **Host Migration**: Handle disconnections gracefully
+5. **Automatic Recovery**: Resync via GGPO rollback without user intervention
+6. **Local Responsiveness**: Players experience immediate input response regardless of network latency
+7. **Graceful Degradation**: Handle disconnections and network issues transparently
 
 ---
 
@@ -63,36 +65,34 @@ Interactive Gym uses Pyodide to run Gymnasium environments in participants' brow
 
 ### High-Level Design
 
-The implementation uses a **lockstep protocol with action exchange**:
+The implementation uses a **symmetric P2P architecture with GGPO-style rollback**:
 
 ```
-┌─────────────────┐         ┌──────────────┐         ┌─────────────────┐
-│   Client 1      │         │    Server    │         │   Client 2      │
-│   (Browser)     │         │ Coordinator  │         │   (Browser)     │
-│                 │         │              │         │                 │
-│ ┌─────────────┐ │         │              │         │ ┌─────────────┐ │
-│ │  Pyodide    │ │         │              │         │ │  Pyodide    │ │
-│ │ Environment │ │         │              │         │ │ Environment │ │
-│ └─────────────┘ │         │              │         │ └─────────────┘ │
-│ ┌─────────────┐ │         │              │         │ ┌─────────────┐ │
-│ │ Seeded RNG  │ │         │              │         │ │ Seeded RNG  │ │
-│ └─────────────┘ │         │              │         │ └─────────────┘ │
-└─────────────────┘         └──────────────┘         └─────────────────┘
-         │                         │                         │
-         │    1. Send action       │                         │
-         ├────────────────────────>│                         │
-         │                         │    1. Send action       │
-         │                         │<────────────────────────┤
-         │                         │                         │
-         │                    2. Collect actions            │
-         │                    3. Broadcast when ready        │
-         │                         │                         │
-         │    4. Receive all       │    4. Receive all       │
-         │<────────────────────────┼────────────────────────>│
-         │                         │                         │
-         │    5. env.step()        │         5. env.step()   │
-         │    (identical)          │         (identical)     │
-         │                         │                         │
+┌─────────────────┐                                   ┌─────────────────┐
+│   Client 1      │         WebRTC DataChannel        │   Client 2      │
+│   (Browser)     │<=================================>│   (Browser)     │
+│                 │         P2P Input Exchange        │                 │
+│ ┌─────────────┐ │                                   │ ┌─────────────┐ │
+│ │  Pyodide    │ │                                   │ │  Pyodide    │ │
+│ │ Environment │ │                                   │ │ Environment │ │
+│ └─────────────┘ │                                   │ └─────────────┘ │
+│ ┌─────────────┐ │         ┌──────────────┐         │ ┌─────────────┐ │
+│ │ Seeded RNG  │ │         │    Server    │         │ │ Seeded RNG  │ │
+│ └─────────────┘ │         │  (Signaling  │         │ └─────────────┘ │
+│ ┌─────────────┐ │         │   + Seed)    │         │ ┌─────────────┐ │
+│ │ GGPO Sync   │ │         └──────────────┘         │ │ GGPO Sync   │ │
+│ └─────────────┘ │                ▲                  │ └─────────────┘ │
+└─────────────────┘                │                  └─────────────────┘
+         │                  SocketIO (fallback)               │
+         └─────────────────────────┴──────────────────────────┘
+
+FLOW:
+1. Server provides shared seed + player assignments to both clients
+2. Clients establish WebRTC DataChannel via server signaling
+3. Each client runs locally, applies inputs immediately (local responsiveness)
+4. Inputs exchanged P2P via DataChannel (or SocketIO fallback)
+5. Remote inputs trigger GGPO rollback/replay if prediction was wrong
+6. Both clients converge to identical state
 ```
 
 ### Core Components
@@ -100,8 +100,9 @@ The implementation uses a **lockstep protocol with action exchange**:
 | Component | Location | Purpose |
 |-----------|----------|---------|
 | **SeededRandom** | `seeded_random.js` | Deterministic RNG for AI policies |
-| **MultiplayerPyodideGame** | `pyodide_multiplayer_game.js` | Client-side multiplayer coordinator |
-| **PyodideGameCoordinator** | `pyodide_game_coordinator.py` | Server-side action synchronizer |
+| **MultiplayerPyodideGame** | `pyodide_multiplayer_game.js` | Client-side multiplayer coordinator with GGPO sync |
+| **WebRTCManager** | `webrtc_manager.js` | P2P DataChannel connections with TURN fallback |
+| **PyodideGameCoordinator** | `pyodide_game_coordinator.py` | Server-side signaling and seed distribution |
 | **SocketIO Handlers** | `app.py` | Event routing and data management |
 | **GameManager Integration** | `game_manager.py` | Matchmaking and game lifecycle |
 
@@ -197,14 +198,14 @@ obs, infos = env.reset(seed=seed)
 @dataclasses.dataclass
 class PyodideGameState:
     game_id: str
-    host_player_id: str | int | None        # First player (logs data)
     players: Dict[str | int, str]           # player_id -> socket_id
     pending_actions: Dict[str | int, Any]   # Current frame actions
     frame_number: int                        # Synchronized frame counter
     state_hashes: Dict[str | int, str]      # For verification
     verification_frame: int                  # Next frame to verify
-    rng_seed: int                           # Shared seed
-    accumulated_frame_data: list            # Host's logged data
+    rng_seed: int                           # Shared seed for determinism
+    turn_config: dict | None                # TURN server configuration
+    accumulated_frame_data: list            # Logged data (all peers log)
     # ... other fields
 ```
 
@@ -214,17 +215,17 @@ class PyodideGameState:
 
 ```python
 def create_game(self, game_id: str, num_players: int) -> PyodideGameState:
-    # Generate shared RNG seed
+    # Generate shared RNG seed for determinism
     rng_seed = random.randint(0, 2**32 - 1)
 
     game_state = PyodideGameState(
         game_id=game_id,
-        host_player_id=None,  # Set when first player joins
         players={},
         pending_actions={},
         frame_number=0,
         rng_seed=rng_seed,
         num_expected_players=num_players,
+        turn_config=self._build_turn_config(),  # TURN fallback if configured
         # ...
     )
 
@@ -232,32 +233,21 @@ def create_game(self, game_id: str, num_players: int) -> PyodideGameState:
     return game_state
 ```
 
-**2. Player Addition & Host Election**
+**2. Player Addition & Seed Distribution**
 
 ```python
 def add_player(self, game_id: str, player_id: str | int, socket_id: str):
     game = self.games[game_id]
     game.players[player_id] = socket_id
 
-    # First player becomes host
-    if game.host_player_id is None:
-        game.host_player_id = player_id
-
-        # Notify as host (with seed)
-        self.sio.emit('pyodide_host_elected', {
-            'is_host': True,
-            'player_id': player_id,
-            'game_seed': game.rng_seed,
-            'num_players': game.num_expected_players
-        }, room=socket_id)
-    else:
-        # Notify as non-host
-        self.sio.emit('pyodide_host_elected', {
-            'is_host': False,
-            'host_id': game.host_player_id,
-            'game_seed': game.rng_seed,
-            'num_players': game.num_expected_players
-        }, room=socket_id)
+    # Notify player of their assignment (symmetric - all players get same structure)
+    self.sio.emit('pyodide_player_assigned', {
+        'player_id': player_id,
+        'game_id': game_id,
+        'game_seed': game.rng_seed,
+        'num_players': game.num_expected_players,
+        'turn_config': game.turn_config  # TURN server config if available
+    }, room=socket_id)
 
     # Start game when all players joined
     if len(game.players) == game.num_expected_players:
@@ -344,68 +334,53 @@ def _verify_synchronization(self, game_id: str, frame_number: int):
         self._handle_desync(game_id, frame_number)
 ```
 
-**5. Desync Recovery**
+**5. Desync Detection (for debugging)**
 
 ```python
-def _handle_desync(self, game_id: str, frame_number: int):
+def _verify_synchronization(self, game_id: str, frame_number: int):
     game = self.games[game_id]
+    hashes = list(game.state_hashes.values())
+    unique_hashes = set(hashes)
 
-    # Pause all clients
-    self.sio.emit('pyodide_pause_for_resync', {
-        'frame_number': frame_number
-    }, room=game_id)
-
-    # Request full state from host
-    host_socket = game.players[game.host_player_id]
-    self.sio.emit('pyodide_request_full_state', {
-        'frame_number': frame_number
-    }, room=host_socket)
-
-def receive_full_state(self, game_id: str, full_state: dict):
-    game = self.games[game_id]
-
-    # Broadcast to non-host players
-    for player_id, socket_id in game.players.items():
-        if player_id != game.host_player_id:
-            self.sio.emit('pyodide_apply_full_state', {
-                'state': full_state
-            }, room=socket_id)
+    if len(unique_hashes) == 1:
+        # All match - synchronized
+        logger.info(f"Game {game_id} frame {frame_number}: States synchronized")
+    else:
+        # Desync detected - log for research (GGPO should handle via rollback)
+        logger.error(f"Game {game_id} frame {frame_number}: DESYNC DETECTED!")
+        for player_id, hash_val in game.state_hashes.items():
+            logger.error(f"  Player {player_id}: {hash_val[:16]}...")
 ```
 
-**6. Host Migration**
+**Note:** With symmetric P2P and GGPO rollback, explicit desync recovery is handled client-side through rollback/replay. The server verification is primarily for debugging and research analytics.
+
+**6. Player Disconnection**
 
 ```python
-def _elect_new_host(self, game_id: str):
-    game = self.games[game_id]
+def remove_player(self, game_id: str, player_id: str | int):
+    game = self.games.get(game_id)
+    if not game:
+        return
 
-    # Choose first remaining player
-    new_host_id = list(game.players.keys())[0]
-    game.host_player_id = new_host_id
-    new_host_socket = game.players[new_host_id]
+    # Remove player from game
+    if player_id in game.players:
+        del game.players[player_id]
 
-    # Notify new host
-    self.sio.emit('pyodide_host_elected', {
-        'is_host': True,
-        'promoted': True,
-        'game_seed': game.rng_seed
-    }, room=new_host_socket)
+    # Notify remaining players
+    self.sio.emit('pyodide_player_disconnected', {
+        'player_id': player_id
+    }, room=game_id)
 
-    # Notify other players
-    for player_id, socket_id in game.players.items():
-        if player_id != new_host_id:
-            self.sio.emit('pyodide_host_changed', {
-                'new_host_id': new_host_id
-            }, room=socket_id)
-
-    # Trigger resync (states may have diverged)
-    self._handle_desync(game_id, game.frame_number)
+    # Clean up game if empty
+    if len(game.players) == 0:
+        del self.games[game_id]
 ```
 
 ### Phase 3: Client-Side Multiplayer
 
-**Problem**: Client needs to wait for all actions before stepping, handle verification requests, and manage host responsibilities.
+**Problem**: Client needs to handle P2P input exchange, GGPO rollback, and maintain local responsiveness.
 
-**Solution**: `MultiplayerPyodideGame` class extending base `RemoteGame`.
+**Solution**: `MultiplayerPyodideGame` class extending base `RemoteGame` with GGPO sync.
 
 #### Key Methods
 
@@ -416,29 +391,29 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
     constructor(config) {
         super(config);
 
-        // Multiplayer state
-        this.isHost = false;
-        this.hostPlayerId = null;
+        // Multiplayer state (symmetric - no host concept)
         this.myPlayerId = config.player_id;
         this.otherPlayerIds = config.other_player_ids || [];
         this.gameId = config.game_id;
         this.gameSeed = null;
 
-        // Action synchronization
-        this.pendingMyAction = null;
-        this.allActionsReady = false;
-        this.allActions = null;
-        this.actionPromiseResolve = null;
+        // GGPO sync state
+        this.ggpoState = null;        // Rollback buffer
+        this.confirmedFrame = -1;     // Last frame with all confirmed inputs
+        this.predictedFrame = 0;      // Current simulation frame
 
-        // State verification
-        this.verificationFrequency = 30;
-        this.frameNumber = 0;
+        // P2P communication
+        this.webrtcManager = null;    // WebRTC DataChannel manager
+        this.p2pInputSender = null;   // Binary protocol input sender
 
-        // Data logging (only host logs)
-        this.shouldLogData = false;
-
-        // Game state tracking
-        this.isPaused = false;
+        // Research metrics
+        this.sessionMetrics = {
+            inputs: { p2pSent: 0, p2pReceived: 0, socketFallback: 0 },
+            rollbacks: { events: [], maxDepth: 0 },
+            sync: { hashMatches: 0, hashMismatches: 0 },
+            quality: [],
+            frames: { total: 0, predicted: 0, confirmed: 0 }
+        };
 
         this.setupMultiplayerHandlers();
     }
@@ -468,147 +443,105 @@ random.seed(${seed})
 
 ```javascript
 setupMultiplayerHandlers() {
-    // Host election
-    socket.on('pyodide_host_elected', (data) => {
-        this.isHost = data.is_host;
-        this.shouldLogData = data.is_host;
-        this.hostPlayerId = data.is_host ? this.myPlayerId : data.host_id;
+    // Player assignment (symmetric - all players receive identical structure)
+    socket.on('pyodide_player_assigned', (data) => {
+        this.myPlayerId = data.player_id;
+        this.gameId = data.game_id;
         this.gameSeed = data.game_seed;
+        this.turnConfig = data.turn_config;
 
-        // Initialize seeded RNG
+        // Initialize seeded RNG for determinism
         if (this.gameSeed) {
             seeded_random.initMultiplayerRNG(this.gameSeed);
-            console.log(`Initialized with seed ${this.gameSeed}`);
-            console.log(`Host status: ${this.isHost}`);
+            console.log(`[MultiplayerPyodide] Player ${this.myPlayerId} assigned ` +
+                        `to game ${this.gameId} with seed ${this.gameSeed}`);
         }
+
+        // Initialize WebRTC with TURN config if available
+        this._initializeWebRTC(this.turnConfig);
     });
 
-    // Actions ready from server
-    socket.on('pyodide_actions_ready', (data) => {
-        this.allActions = data.actions;
-        this.allActionsReady = true;
-
-        if (this.actionPromiseResolve) {
-            this.actionPromiseResolve(data.actions);
-            this.actionPromiseResolve = null;
-        }
+    // P2P input received (via DataChannel or SocketIO fallback)
+    // Triggers GGPO rollback if prediction was wrong
+    this.webrtcManager?.onMessage((data) => {
+        this.handleP2PInput(data);
     });
 
-    // State verification request
+    // State verification request (for debugging/analytics)
     socket.on('pyodide_verify_state', (data) => {
         this.verifyState(data.frame_number);
     });
 
-    // Desync handling
-    socket.on('pyodide_pause_for_resync', (data) => {
-        console.warn(`Desync detected at frame ${data.frame_number}`);
-        this.isPaused = true;
-        this.state = "paused";
-    });
-
-    // Resync from host (non-host only)
-    socket.on('pyodide_apply_full_state', async (data) => {
-        if (!this.isHost) {
-            console.log('Applying full state from host...');
-            await this.applyFullState(data.state);
-            this.isPaused = false;
-            this.state = "ready";
-        }
-    });
-
-    // Provide state (host only)
-    socket.on('pyodide_request_full_state', async (data) => {
-        if (this.isHost) {
-            const fullState = await this.getFullState();
-            socket.emit('pyodide_send_full_state', {
-                game_id: this.gameId,
-                state: fullState
-            });
-        }
-    });
-
-    // Host migration
-    socket.on('pyodide_host_changed', (data) => {
-        const wasHost = this.isHost;
-        this.hostPlayerId = data.new_host_id;
-
-        if (this.myPlayerId === data.new_host_id) {
-            this.isHost = true;
-            this.shouldLogData = true;
-            console.log('Promoted to host!');
-        }
+    // Player disconnection
+    socket.on('pyodide_player_disconnected', (data) => {
+        console.warn(`[MultiplayerPyodide] Player ${data.player_id} disconnected`);
+        this._handlePlayerDisconnect(data.player_id);
     });
 }
 ```
 
-**3. Synchronized Step**
+**Note:** The event handler no longer assigns `isHost` or `shouldLogData` since all peers are symmetric. Both peers run identical simulation and can log data independently.
+
+**3. GGPO-Style Step with Rollback**
 
 ```javascript
 async step(myAction) {
-    if (this.isPaused) {
-        console.warn('Game paused, waiting for resync...');
-        return null;
-    }
+    // 1. Apply local input immediately (local responsiveness)
+    this.storeLocalInput(this.predictedFrame, myAction);
 
-    // 1. Send my action to server
-    socket.emit('pyodide_player_action', {
-        game_id: this.gameId,
-        player_id: this.myPlayerId,
-        action: myAction,
-        frame_number: this.frameNumber,
-        timestamp: Date.now()
-    });
+    // 2. Send input to peer via P2P (or SocketIO fallback)
+    this._sendInputP2PFirst(myAction);
 
-    // 2. Wait for all player actions from server
-    const allActions = await this.waitForAllActions();
+    // 3. Predict remote input (copy last known or use default)
+    const predictedRemoteAction = this.predictRemoteInput(this.predictedFrame);
 
-    // 3. Step environment with all actions (deterministic)
+    // 4. Step environment with local + predicted remote
+    const allActions = {
+        [this.myPlayerId]: myAction,
+        [this.remotePlayerId]: predictedRemoteAction
+    };
     const stepResult = await this.stepWithActions(allActions);
 
-    if (!stepResult) return null;
+    // 5. Save state for potential rollback
+    this.ggpoState.saveFrame(this.predictedFrame, this.getGameState());
 
-    const [obs, rewards, terminateds, truncateds, infos, render_state] = stepResult;
+    // 6. Increment predicted frame
+    this.predictedFrame++;
+    this.sessionMetrics.frames.total++;
+    this.sessionMetrics.frames.predicted++;
 
-    // 4. Increment frame
-    this.frameNumber++;
-
-    // 5. If host, log data
-    if (this.shouldLogData) {
-        this.logFrameData({
-            frame: this.frameNumber,
-            observations: obs,
-            actions: allActions,
-            rewards: rewards,
-            terminateds: terminateds,
-            truncateds: truncateds,
-            infos: infos
-        });
-    }
-
-    // 6. Check if episode complete and save data
-    const all_terminated = Array.from(terminateds.values())
-        .every(value => value === true);
-    const all_truncated = Array.from(truncateds.values())
-        .every(value => value === true);
-
-    if ((all_terminated || all_truncated) && this.shouldLogData) {
-        this.saveEpisodeData();
-    }
-
-    return [obs, rewards, terminateds, truncateds, infos, render_state];
+    return stepResult;
 }
 
-waitForAllActions() {
-    return new Promise((resolve) => {
-        if (this.allActionsReady) {
-            const actions = this.allActions;
-            this.allActionsReady = false;
-            this.allActions = null;
-            resolve(actions);
-        } else {
-            this.actionPromiseResolve = resolve;
-        }
-    });
+// Called when remote input arrives (may be for past frame)
+storeRemoteInput(frame, playerId, action) {
+    const storedInput = this.remoteInputs[frame];
+
+    // Check if we predicted wrong
+    if (storedInput !== undefined && storedInput !== action) {
+        // Log rollback event for research
+        const rollbackDepth = this.predictedFrame - frame;
+        this.sessionMetrics.rollbacks.events.push({
+            frame: frame,
+            currentFrame: this.predictedFrame,
+            rollbackFrames: rollbackDepth,
+            playerId: playerId,
+            predictedAction: storedInput,
+            actualAction: action,
+            timestamp: performance.now()
+        });
+        this.sessionMetrics.rollbacks.maxDepth = Math.max(
+            this.sessionMetrics.rollbacks.maxDepth, rollbackDepth
+        );
+
+        // Trigger rollback
+        this._performRollback(frame, playerId, action);
+    }
+
+    // Store confirmed input
+    this.remoteInputs[frame] = action;
+    this.confirmedFrame = Math.max(this.confirmedFrame, frame);
+    this.sessionMetrics.frames.confirmed++;
 }
 ```
 
@@ -705,51 +638,70 @@ np.random.set_state(full_state)
 }
 ```
 
-**6. Data Logging (Host Only)**
+**6. Research Metrics Export**
 
 ```javascript
-logFrameData(data) {
-    if (!this.shouldLogData) return;
-
-    socket.emit('pyodide_log_data', {
-        game_id: this.gameId,
-        player_id: this.myPlayerId,
-        data: data,
-        frame_number: this.frameNumber
-    });
+exportSessionMetrics() {
+    return {
+        gameId: this.gameId,
+        playerId: this.myPlayerId,
+        inputs: { ...this.sessionMetrics.inputs },
+        rollbacks: {
+            events: [...this.sessionMetrics.rollbacks.events],
+            maxDepth: this.sessionMetrics.rollbacks.maxDepth,
+            totalCount: this.sessionMetrics.rollbacks.events.length
+        },
+        sync: { ...this.sessionMetrics.sync },
+        quality: [...this.sessionMetrics.quality],
+        frames: { ...this.sessionMetrics.frames },
+        connection: {
+            type: this.webrtcManager?.getConnectionType() || 'unknown',
+            p2pConnected: this.webrtcManager?.isConnected() || false
+        }
+    };
 }
 
-saveEpisodeData() {
-    if (!this.shouldLogData) return;
-
-    const scene_id = this.config.scene_id || 'unknown_scene';
-    const subject_id = window.subjectId || 'unknown_subject';
-
-    socket.emit('pyodide_save_episode_data', {
-        game_id: this.gameId,
-        player_id: this.myPlayerId,
-        scene_id: scene_id,
-        subject_id: subject_id,
-        interactiveGymGlobals: this.interactive_gym_globals || {}
+// Called at episode end
+_logEpisodeSummary() {
+    const metrics = this.exportSessionMetrics();
+    console.log('[GGPO Episode Summary]', {
+        p2pReceiveRatio: metrics.inputs.p2pReceived /
+            (metrics.inputs.p2pReceived + metrics.inputs.socketFallback),
+        rollbackCount: metrics.rollbacks.totalCount,
+        maxRollbackDepth: metrics.rollbacks.maxDepth,
+        connectionType: metrics.connection.type,
+        sessionMetrics: metrics
     });
 }
 ```
 
+**Note:** With symmetric P2P architecture, both peers independently log their own metrics. There is no designated "host" for data logging - each participant has their own research data.
+
 ### Phase 4: SocketIO Event Handlers
 
-**Problem**: Need to route events between clients and coordinator.
+**Problem**: Need to route signaling and fallback events between clients.
 
-**Solution**: Event handlers in `app.py` that delegate to coordinator.
+**Solution**: Event handlers in `app.py` for WebRTC signaling and input fallback.
 
 ```python
 # In app.py
 
 PYODIDE_COORDINATOR: pyodide_game_coordinator.PyodideGameCoordinator | None = None
 
+@socketio.on("webrtc_signal")
+def on_webrtc_signal(data):
+    """Relay WebRTC signaling (SDP offers/answers, ICE candidates)"""
+    PYODIDE_COORDINATOR.handle_webrtc_signal(
+        game_id=data['game_id'],
+        from_player=data['from_player'],
+        to_player=data['to_player'],
+        signal=data['signal']
+    )
+
 @socketio.on("pyodide_player_action")
 def on_pyodide_player_action(data):
-    """Receive action from player and forward to coordinator"""
-    PYODIDE_COORDINATOR.receive_action(
+    """Receive action from player (fallback when P2P unavailable)"""
+    PYODIDE_COORDINATOR.relay_action(
         game_id=data['game_id'],
         player_id=data['player_id'],
         action=data['action'],
@@ -758,7 +710,7 @@ def on_pyodide_player_action(data):
 
 @socketio.on("pyodide_state_hash")
 def on_pyodide_state_hash(data):
-    """Receive state hash for verification"""
+    """Receive state hash for verification (debugging/analytics)"""
     PYODIDE_COORDINATOR.receive_state_hash(
         game_id=data['game_id'],
         player_id=data['player_id'],
@@ -766,61 +718,9 @@ def on_pyodide_state_hash(data):
         frame_number=data['frame_number']
     )
 
-@socketio.on("pyodide_send_full_state")
-def on_pyodide_send_full_state(data):
-    """Receive full state from host for resync"""
-    PYODIDE_COORDINATOR.receive_full_state(
-        game_id=data['game_id'],
-        full_state=data['state']
-    )
-
-@socketio.on("pyodide_log_data")
-def on_pyodide_log_data(data):
-    """Route data logging - only accept from host"""
-    filtered_data = PYODIDE_COORDINATOR.log_data(
-        game_id=data['game_id'],
-        player_id=data['player_id'],
-        data=data['data']
-    )
-
-    if filtered_data is None:
-        return  # Non-host tried to log (expected, ignore)
-
-    # Accumulate data
-    game_state = PYODIDE_COORDINATOR.games.get(data['game_id'])
-    if game_state:
-        game_state.accumulated_frame_data.append(filtered_data)
-
-@socketio.on("pyodide_save_episode_data")
-def on_pyodide_save_episode_data(data):
-    """Save accumulated episode data to CSV"""
-    game_state = PYODIDE_COORDINATOR.games.get(data['game_id'])
-
-    # Verify this is the host
-    if not game_state or data['player_id'] != game_state.host_player_id:
-        return
-
-    # Convert accumulated data to DataFrame
-    flattened_data = flatten_dict.flatten(
-        {i: frame for i, frame in enumerate(game_state.accumulated_frame_data)},
-        reducer="dot"
-    )
-
-    # Pad and save
-    df = pd.DataFrame(padded_data)
-    df.to_csv(f"data/{data['scene_id']}/{data['subject_id']}.csv", index=False)
-
-    # Save globals
-    with open(f"data/{data['scene_id']}/{data['subject_id']}_globals.json", "w") as f:
-        json.dump(data['interactiveGymGlobals'], f)
-
-    # Clear accumulated data
-    game_state.accumulated_frame_data.clear()
-
 @socketio.on("disconnect")
 def on_pyodide_disconnect():
     """Handle player disconnection"""
-    # Find player across all games
     for game_id, game_state in list(PYODIDE_COORDINATOR.games.items()):
         for player_id, socket_id in game_state.players.items():
             if socket_id == flask.request.sid:
@@ -835,6 +735,8 @@ def run(config):
 
     socketio.run(app, port=config.port, host=config.host)
 ```
+
+**Note:** With P2P-first architecture, the server primarily handles WebRTC signaling and acts as a fallback relay when DataChannel is unavailable. Data logging is handled client-side.
 
 ### Phase 5: GameManager Integration
 
@@ -936,126 +838,99 @@ class GymScene(scene.Scene):
 
 ## Communication Protocol
 
-### Frame-by-Frame Sequence Diagram
+### Connection Establishment Sequence
 
 ```
 Client 1              Server                 Client 2
    │                     │                       │
-   │  1. Initialize      │                       │  1. Initialize
+   │  1. Join game       │                       │  1. Join game
    │────────────────────>│<──────────────────────│
    │                     │                       │
-   │  2. Host election   │   2. Host election    │
-   │<────────────────────┤──────────────────────>│
-   │  (seed: 12345)      │   (seed: 12345)       │
-   │  (is_host: true)    │   (is_host: false)    │
+   │  2. Player assigned │   2. Player assigned  │
+   │<────────────────────┼──────────────────────>│
+   │  (player_id: 0,     │   (player_id: 1,      │
+   │   seed: 12345,      │    seed: 12345,       │
+   │   turn_config: ...) │    turn_config: ...)  │
    │                     │                       │
-   │  3. Start game      │                       │
+   │  3. WebRTC offer    │                       │
+   │─ ─ ─ ─ ─ ─ ─ ─ ─ ─>│──────────────────────>│  (via signaling)
+   │                     │                       │
+   │                     │   4. WebRTC answer    │
+   │<──────────────────────────────── ─ ─ ─ ─ ─ ┤  (via signaling)
+   │                     │                       │
+   │  5. ICE candidates  │   5. ICE candidates   │
+   │<─ ─ ─ ─ ─ ─ ─ ─ ─ ─┼─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─>│  (via signaling)
+   │                     │                       │
+   │  6. DataChannel OPEN                        │
+   │<═══════════════════════════════════════════>│  (P2P direct)
+   │                     │                       │
+   │  7. Start game      │                       │
    │<────────────────────┴──────────────────────>│
+```
+
+### GGPO Game Loop Sequence (Per Frame)
+
+```
+Client 1                                      Client 2
    │                                              │
-   ├─ GAME LOOP ────────────────────────────────┤
+   ├─ GAME LOOP (Local Responsiveness) ──────────┤
    │                                              │
-   │  4. Get human action                        │  4. Get human action
-   │     action = 2                              │     action = 3
-   │                     │                       │
-   │  5. Send action     │                       │  5. Send action
-   │────────────────────>│<──────────────────────│
-   │  (player: 0,        │  (player: 1,          │
-   │   action: 2,        │   action: 3,          │
-   │   frame: 0)         │   frame: 0)           │
-   │                     │                       │
-   │              6. Collect actions             │
-   │              7. Wait for both               │
-   │                     │                       │
-   │  8. Broadcast       │   8. Broadcast        │
-   │<────────────────────┼──────────────────────>│
-   │  {0: 2, 1: 3}       │   {0: 2, 1: 3}        │
-   │                     │                       │
-   │  9. env.step()      │                       │  9. env.step()
-   │     {0: 2, 1: 3}    │                       │     {0: 2, 1: 3}
-   │                     │                       │
-   │  10. Render state   │                       │  10. Render state
-   │     frame_num++     │                       │     frame_num++
-   │                     │                       │
-   │  11. Log data       │                       │  (no log - not host)
-   │────────────────────>│                       │
-   │                     │                       │
-   ├─ REPEAT ───────────────────────────────────┤
+   │  1. Human input                              │  1. Human input
+   │     action = 2                               │     action = 3
+   │                                              │
+   │  2. Apply locally (immediate)                │  2. Apply locally (immediate)
+   │     env.step({0: 2, 1: predicted})           │     env.step({0: predicted, 1: 3})
+   │                                              │
+   │  3. Send via P2P DataChannel                 │  3. Send via P2P DataChannel
+   │═════════════════════════════════════════════>│
+   │<═════════════════════════════════════════════│
+   │     (frame: 10, action: 2)                   │     (frame: 10, action: 3)
+   │                                              │
+   │  4. Receive remote input                     │  4. Receive remote input
+   │     Prediction correct? → Continue           │     Prediction correct? → Continue
+   │     Prediction wrong? → Rollback & Replay    │     Prediction wrong? → Rollback & Replay
+   │                                              │
+   │  5. Render state                             │  5. Render state
+   │     (both see identical game)                │     (both see identical game)
+   │                                              │
+   ├─ REPEAT ─────────────────────────────────────┤
 ```
 
-### State Verification Sequence (Every 30 Frames)
+### Rollback Recovery Sequence (GGPO)
 
 ```
-Client 1              Server                 Client 2
-   │                     │                       │
-   │  Frame 30 reached   │                       │
-   │                     │                       │
-   │  1. Request hash    │   1. Request hash     │
-   │<────────────────────┼──────────────────────>│
-   │                     │                       │
-   │  2. Compute hash    │                       │  2. Compute hash
-   │     hash = "a3f2..."│                       │     hash = "a3f2..."
-   │                     │                       │
-   │  3. Send hash       │                       │  3. Send hash
-   │────────────────────>│<──────────────────────│
-   │  (hash: a3f2...)    │  (hash: a3f2...)      │
-   │                     │                       │
-   │              4. Compare hashes              │
-   │              5. Verify match                │
-   │                     │                       │
-   │  6. Continue        │   6. Continue         │
-   │<────────────────────┴──────────────────────>│
-```
-
-### Desync Recovery Sequence
-
-```
-Client 1 (Host)       Server              Client 2 (Desynced)
-   │                     │                       │
-   │  Hash: "a3f2..."    │   Hash: "b4e1..."     │
-   │────────────────────>│<──────────────────────│
-   │                     │                       │
-   │              1. Detect mismatch             │
-   │              2. Log error                   │
-   │                     │                       │
-   │  3. Pause           │   3. Pause            │
-   │<────────────────────┼──────────────────────>│
-   │  (desync!)          │   (desync!)           │
-   │                     │                       │
-   │  4. Request state   │                       │
-   │<────────────────────│                       │
-   │                     │                       │
-   │  5. Serialize state │                       │
-   │     - frame_number  │                       │
-   │     - rewards       │                       │
-   │     - RNG state     │                       │
-   │                     │                       │
-   │  6. Send state      │                       │
-   │────────────────────>│                       │
-   │                     │                       │
-   │                     │   7. Apply state      │
-   │                     │──────────────────────>│
-   │                     │                       │
-   │                     │   8. Restore RNG      │
-   │                     │   9. Update vars      │
-   │                     │                       │
-   │  10. Resume         │   10. Resume          │
-   │<────────────────────┴──────────────────────>│
-   │                     │                       │
-   │  (now synchronized) │   (now synchronized)  │
+Client 1                                      Client 2
+   │                                              │
+   │  Frame 10: Local action = 2                  │  Frame 10: Local action = 3
+   │  Predicted remote = 0 (wrong!)               │  Predicted remote = 0 (wrong!)
+   │                                              │
+   │  env.step({0: 2, 1: 0})  ← wrong state       │
+   │                                              │
+   │  Frame 11: Continue with prediction...       │
+   │                                              │
+   │  ← Receives frame 10 remote input (3)        │
+   │                                              │
+   │  ROLLBACK TRIGGERED:                         │
+   │  1. Restore state at frame 9                 │
+   │  2. Replay frame 10 with correct inputs:     │
+   │     env.step({0: 2, 1: 3})  ← correct!       │
+   │  3. Replay frame 11 with predictions...      │
+   │                                              │
+   │  Both clients converge to identical state    │
 ```
 
 ---
 
 ## Data Flow
 
-### Complete Frame Processing Pipeline
+### Complete Frame Processing Pipeline (P2P-First)
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                         FRAME N                                  │
 └─────────────────────────────────────────────────────────────────┘
 
-CLIENT 1 (Host)                                       CLIENT 2
+CLIENT 1                                              CLIENT 2
 ─────────────────                                    ──────────────
 
 1. Human Input                                       1. Human Input
@@ -1064,76 +939,42 @@ CLIENT 1 (Host)                                       CLIENT 2
    ↓                                                    ↓
    action = 0                                           action = 4
 
-2. Send to Server                                    2. Send to Server
+2. Apply Locally (IMMEDIATE)                         2. Apply Locally (IMMEDIATE)
    ↓                                                    ↓
-   socket.emit('pyodide_player_action', {               socket.emit('pyodide_player_action', {
-     game_id: "abc123",                                   game_id: "abc123",
-     player_id: 0,                ─────────────────────> player_id: 1,
-     action: 0,                          │                action: 4,
-     frame_number: 10                    │                frame_number: 10
-   })                                    │              })
-                                         │
-                                         ↓
-                                    ┌────────────┐
-                                    │   SERVER   │
-                                    └────────────┘
-                                         │
-                         3. Coordinator.receive_action(0, action=0)
-                            Coordinator.receive_action(1, action=4)
-                                         │
-                         4. pending_actions = {0: 0, 1: 4}
-                            All actions received? YES
-                                         │
-                         5. Broadcast to all clients
-                                         │
-   ┌─────────────────────────────────────┴─────────────────────────┐
-   ↓                                                                 ↓
+   storeLocalInput(frame: 10, action: 0)               storeLocalInput(frame: 10, action: 4)
+   predictRemote = lastKnown[1] or default             predictRemote = lastKnown[0] or default
+   env.step({0: 0, 1: predictRemote})                  env.step({0: predictRemote, 1: 4})
+   saveState(frame: 10)                                saveState(frame: 10)
 
-3. Receive Actions                                   3. Receive Actions
-   socket.on('pyodide_actions_ready')                   socket.on('pyodide_actions_ready')
+3. Send via P2P DataChannel                          3. Send via P2P DataChannel
    ↓                                                    ↓
-   allActions = {0: 0, 1: 4}                            allActions = {0: 0, 1: 4}
+   Binary packet:                                       Binary packet:
+   [frame: 10, action: 0, checksum]                    [frame: 10, action: 4, checksum]
+        ↓                                                    ↓
+        ════════════════ P2P DataChannel ════════════════════
+        ↓                                                    ↓
 
-4. Environment Step                                  4. Environment Step
+4. Receive Remote Input                              4. Receive Remote Input
    ↓                                                    ↓
-   obs, rewards, dones, infos =                         obs, rewards, dones, infos =
-     env.step({0: 0, 1: 4})                              env.step({0: 0, 1: 4})
+   storeRemoteInput(frame: 10, player: 1, action: 4)   storeRemoteInput(frame: 10, player: 0, action: 0)
 
-   (DETERMINISTIC - same RNG seed)                      (DETERMINISTIC - same RNG seed)
+5. Check Prediction                                  5. Check Prediction
    ↓                                                    ↓
-   obs = {0: [...], 1: [...]}                           obs = {0: [...], 1: [...]}
-   rewards = {0: 1.0, 1: 1.0}                           rewards = {0: 1.0, 1: 1.0}
+   if (predicted != actual):                           if (predicted != actual):
+     rollback(frame: 10)                                 rollback(frame: 10)
+     replay with confirmed inputs                        replay with confirmed inputs
 
-5. Increment Frame                                   5. Increment Frame
+6. Update Metrics                                    6. Update Metrics
    ↓                                                    ↓
-   frameNumber = 11                                     frameNumber = 11
-
-6. Log Data (Host Only)                              6. Skip Logging (Not Host)
-   ↓                                                    ↓
-   socket.emit('pyodide_log_data', {                    // shouldLogData = false
-     game_id: "abc123",                                 // No emission
-     player_id: 0,
-     data: {
-       frame: 11,
-       observations: obs,
-       actions: {0: 0, 1: 4},
-       rewards: {0: 1.0, 1: 1.0}
-     }
-   })
-   ↓
-   ┌────────────┐
-   │   SERVER   │
-   └────────────┘
-   ↓
-   Coordinator.log_data(player_id=0) → Accept (is host)
-   ↓
-   game_state.accumulated_frame_data.append(data)
+   sessionMetrics.frames.total++                       sessionMetrics.frames.total++
+   sessionMetrics.inputs.p2pReceived++                 sessionMetrics.inputs.p2pReceived++
 
 7. Render State                                      7. Render State
    ↓                                                    ↓
    render_state = env.render()                          render_state = env.render()
    ↓                                                    ↓
    Display on canvas                                    Display on canvas
+   (both see identical game state)                      (both see identical game state)
 
 8. Next Frame                                        8. Next Frame
    ↓                                                    ↓
@@ -1147,7 +988,7 @@ CLIENT 1 (Host)                                       CLIENT 2
 │                   EPISODE COMPLETE                               │
 └─────────────────────────────────────────────────────────────────┘
 
-CLIENT 1 (Host)                                       CLIENT 2
+CLIENT 1                                              CLIENT 2
 ─────────────────                                    ──────────────
 
 1. Detect Episode End                                1. Detect Episode End
@@ -1155,46 +996,35 @@ CLIENT 1 (Host)                                       CLIENT 2
    all_terminated = true                                all_terminated = true
    OR all_truncated = true                              OR all_truncated = true
 
-2. Save Data (Host Only)                             2. Skip Save (Not Host)
+2. Export Session Metrics                            2. Export Session Metrics
    ↓                                                    ↓
-   if (shouldLogData) {                                 // shouldLogData = false
-     socket.emit('pyodide_save_episode_data', {         // No emission
-       game_id: "abc123",
-       player_id: 0,
-       scene_id: "overcooked_cramped",
-       subject_id: "participant_001",
-       interactiveGymGlobals: {...}
-     })
-   }
-   ↓
-   ┌────────────┐
-   │   SERVER   │
-   └────────────┘
-   ↓
-   Verify player_id == host_player_id? YES
-   ↓
-   Get accumulated_frame_data (300 frames)
-   ↓
-   Flatten nested dicts:
-     frame.0.observations.0 = [...]
-     frame.0.actions.0 = 2
-     frame.0.rewards.0 = 1.0
-     frame.1.observations.0 = [...]
-     ...
-   ↓
-   Convert to DataFrame (300 rows × N columns)
-   ↓
-   Save to CSV:
-     data/overcooked_cramped/participant_001.csv
-   ↓
-   Save globals:
-     data/overcooked_cramped/participant_001_globals.json
-   ↓
-   Clear accumulated_frame_data
+   metrics = exportSessionMetrics()                     metrics = exportSessionMetrics()
+   ↓                                                    ↓
+   {                                                    {
+     inputs: { p2pSent: 300, p2pReceived: 298, ... }     inputs: { p2pSent: 300, p2pReceived: 299, ... }
+     rollbacks: { events: [...], maxDepth: 3 }           rollbacks: { events: [...], maxDepth: 2 }
+     connection: { type: 'direct', p2pConnected: true }  connection: { type: 'direct', p2pConnected: true }
+   }                                                    }
 
-3. Continue to Next Episode                          3. Continue to Next Episode
+3. Log Episode Summary                               3. Log Episode Summary
+   ↓                                                    ↓
+   console.log('[GGPO Episode Summary]', {              console.log('[GGPO Episode Summary]', {
+     p2pReceiveRatio: 0.99,                               p2pReceiveRatio: 0.99,
+     rollbackCount: 5,                                    rollbackCount: 3,
+     maxRollbackDepth: 3,                                 maxRollbackDepth: 2,
+     connectionType: 'direct'                             connectionType: 'direct'
+   })                                                    })
+
+4. Reset for Next Episode                            4. Reset for Next Episode
+   ↓                                                    ↓
+   clearGGPOState()                                      clearGGPOState()
+   resetSessionMetrics()                                 resetSessionMetrics()
+
+5. Continue to Next Episode                          5. Continue to Next Episode
    OR End Scene                                         OR End Scene
 ```
+
+**Note:** With symmetric P2P architecture, both clients independently track and export their own session metrics. There is no centralized data collection - each peer has visibility into their own rollback/sync statistics.
 
 ---
 
@@ -1208,17 +1038,20 @@ interactive-gym/
 │   ├── server/
 │   │   ├── app.py                           # SocketIO event handlers
 │   │   ├── game_manager.py                  # Matchmaking integration
-│   │   ├── pyodide_game_coordinator.py      # Server coordinator (NEW)
+│   │   ├── pyodide_game_coordinator.py      # Server coordinator
 │   │   └── static/
 │   │       └── js/
-│   │           ├── seeded_random.js         # Deterministic RNG (NEW)
+│   │           ├── seeded_random.js         # Deterministic RNG
+│   │           ├── webrtc_manager.js        # P2P DataChannel + TURN fallback
 │   │           ├── onnx_inference.js        # Updated for seeded RNG
 │   │           ├── pyodide_remote_game.js   # Base single-player class
-│   │           └── pyodide_multiplayer_game.js  # Multiplayer class (NEW)
+│   │           └── pyodide_multiplayer_game.js  # Multiplayer with GGPO sync
+│   ├── configurations/
+│   │   └── remote_config.py                 # TURN server configuration
 │   └── scenes/
 │       └── gym_scene.py                     # Scene configuration
 └── docs/
-    └── multiplayer_pyodide_implementation.md  # This document (NEW)
+    └── multiplayer_pyodide_implementation.md  # This document
 ```
 
 ### Class Hierarchy
@@ -1233,11 +1066,11 @@ RemoteGame (pyodide_remote_game.js)
     │
     └─ MultiplayerPyodideGame (pyodide_multiplayer_game.js)
        - Extends RemoteGame
-       - Adds action synchronization
-       - Uses seeded RNG
-       - Host/non-host roles
-       - State verification
-       - Desync recovery
+       - Symmetric P2P architecture (no host concept)
+       - GGPO-style rollback/replay
+       - P2P input exchange via WebRTC DataChannel
+       - SocketIO fallback when P2P unavailable
+       - Research metrics tracking (rollbacks, sync, quality)
 ```
 
 ### Key Classes
@@ -1265,49 +1098,59 @@ RemoteGame (pyodide_remote_game.js)
 **Extends**: `RemoteGame`
 
 **Key Properties**:
-- `isHost` - Whether this client is the host
 - `myPlayerId` - This client's player ID
 - `gameId` - Game identifier
-- `gameSeed` - Shared RNG seed
-- `frameNumber` - Synchronized frame counter
-- `shouldLogData` - Whether to log data (host only)
-- `isPaused` - Whether paused for resync
+- `gameSeed` - Shared RNG seed for determinism
+- `predictedFrame` - Current simulation frame
+- `confirmedFrame` - Last frame with confirmed inputs from all players
+- `ggpoState` - Rollback buffer for state snapshots
+- `webrtcManager` - WebRTC DataChannel manager
+- `p2pInputSender` - Binary protocol input sender
+- `sessionMetrics` - Research metrics (inputs, rollbacks, sync, quality)
 
 **Key Methods**:
-- `setupMultiplayerHandlers()` - Register SocketIO handlers
+- `setupMultiplayerHandlers()` - Register SocketIO and P2P handlers
 - `async seedPythonEnvironment(seed)` - Seed numpy/random
-- `async step(myAction)` - Synchronized step
-- `waitForAllActions()` - Wait for server broadcast
-- `async stepWithActions(actions)` - Step with collected actions
-- `async verifyState(frameNumber)` - Compute and send hash
-- `async computeStateHash()` - SHA256 of game state
-- `async getFullState()` - Serialize complete state
-- `async applyFullState(state)` - Restore from serialized state
-- `logFrameData(data)` - Send data to server (host only)
-- `saveEpisodeData()` - Trigger episode save (host only)
+- `async step(myAction)` - GGPO-style step with local application
+- `storeRemoteInput(frame, playerId, action)` - Handle remote input, trigger rollback if needed
+- `_performRollback(frame, playerId, action)` - Restore state and replay
+- `_sendInputP2PFirst(action)` - Send via DataChannel, fallback to SocketIO
+- `exportSessionMetrics()` - Export research metrics for analysis
+- `_logEpisodeSummary()` - Log P2P stats at episode end
+
+#### WebRTCManager (`webrtc_manager.js`)
+
+**Purpose**: P2P DataChannel connections with TURN fallback
+
+**Key Properties**:
+- `peerConnection` - RTCPeerConnection instance
+- `dataChannel` - RTCDataChannel for input exchange
+- `connectionQualityMonitor` - RTT/quality tracking
+- `turnConfig` - TURN server configuration
+
+**Key Methods**:
+- `connect(remotePlayerId, turnConfig)` - Establish P2P connection
+- `send(data)` - Send binary data over DataChannel
+- `onMessage(callback)` - Register message handler
+- `getConnectionType()` - Return 'direct', 'relay', or 'unknown'
+- `isConnected()` - Check DataChannel state
+- `attemptICERestart()` - Try to recover connection
 
 #### PyodideGameCoordinator (`pyodide_game_coordinator.py`)
 
-**Purpose**: Server-side multiplayer coordination
+**Purpose**: Server-side signaling and seed distribution
 
 **Key Properties**:
 - `games: Dict[str, PyodideGameState]` - Active games
 - `verification_frequency: int` - Frames between verifications (30)
-- `action_timeout: float` - Seconds to wait for actions (5.0)
 
 **Key Methods**:
 - `create_game(game_id, num_players)` - Initialize game state
-- `add_player(game_id, player_id, socket_id)` - Add player, elect host
-- `receive_action(game_id, player_id, action, frame_number)` - Collect action
-- `_broadcast_actions(game_id)` - Send actions to all clients
-- `_request_state_verification(game_id)` - Request hashes
-- `receive_state_hash(game_id, player_id, state_hash, frame_number)` - Collect hash
-- `_verify_synchronization(game_id, frame_number)` - Compare hashes
-- `_handle_desync(game_id, frame_number)` - Trigger resync
-- `receive_full_state(game_id, full_state)` - Broadcast host's state
-- `log_data(game_id, player_id, data)` - Filter host-only logging
+- `add_player(game_id, player_id, socket_id)` - Add player, send assignment
+- `handle_webrtc_signal(game_id, from_player, to_player, signal)` - Relay WebRTC signaling
+- `relay_action(game_id, player_id, action, frame_number)` - Fallback action relay
+- `receive_state_hash(game_id, player_id, state_hash, frame_number)` - Collect hash for debugging
 - `remove_player(game_id, player_id)` - Handle disconnection
-- `_elect_new_host(game_id)` - Choose new host on disconnect
 
 #### PyodideGameState (`pyodide_game_coordinator.py`)
 
@@ -1315,15 +1158,14 @@ RemoteGame (pyodide_remote_game.js)
 
 **Properties**:
 - `game_id: str` - Unique identifier
-- `host_player_id: str | int | None` - Current host
-- `players: Dict[str | int, str]` - player_id → socket_id
-- `pending_actions: Dict[str | int, Any]` - Current frame actions
+- `players: Dict[str | int, str]` - player_id to socket_id mapping
+- `pending_actions: Dict[str | int, Any]` - Current frame actions (fallback)
 - `frame_number: int` - Synchronized frame counter
-- `state_hashes: Dict[str | int, str]` - For verification
+- `state_hashes: Dict[str | int, str]` - For verification/debugging
 - `verification_frame: int` - Next frame to verify
-- `rng_seed: int` - Shared seed
-- `num_expected_players: int` - Total players
-- `accumulated_frame_data: list` - Host's logged data
+- `rng_seed: int` - Shared seed for determinism
+- `turn_config: dict | None` - TURN server configuration
+- `num_expected_players: int` - Total players expected
 
 ---
 
@@ -1515,7 +1357,7 @@ actions = df[action_cols]
 
 ## Technical Decisions
 
-### Why Lockstep Protocol?
+### Why GGPO-Style Rollback?
 
 **Alternatives Considered**:
 
@@ -1524,26 +1366,28 @@ actions = df[action_cols]
    - Standard for competitive games
    - **Rejected**: Defeats purpose of Pyodide (server-side computation)
 
-2. **State Broadcasting**
-   - One client runs env, broadcasts state
-   - Lower bandwidth than action exchange
-   - **Rejected**: Security concerns, single point of failure
+2. **Lockstep (wait for all inputs)**
+   - Simple: collect all inputs, then step
+   - Input latency = network RTT (feels sluggish)
+   - **Rejected**: Poor user experience with latency
 
-3. **Lockstep with Action Exchange** ✓ **CHOSEN**
-   - Each client runs environment
-   - Server coordinates action synchronization
-   - Deterministic execution ensures sync
+3. **GGPO-Style Rollback** - **CHOSEN**
+   - Apply local inputs immediately (responsive)
+   - Predict remote inputs
+   - Rollback and replay when prediction wrong
+   - P2P input exchange minimizes latency
 
 **Advantages**:
+- Local-feeling responsiveness (no input delay)
 - Zero server computation (Pyodide benefit preserved)
-- Scalable (server only routes messages)
-- No single point of failure for computation
-- Perfect for research (not competitive gaming)
+- P2P minimizes latency (no server hop)
+- Automatic correction via rollback
+- Perfect for research (captures natural behavior without latency artifacts)
 
 **Tradeoffs**:
+- More complex client code (state snapshots, rollback logic)
+- Visual "pops" on misprediction (usually subtle)
 - Requires determinism (handled by seeded RNG)
-- Higher bandwidth (but negligible for 2-4 players)
-- More complex client code
 
 ### Why Mulberry32 RNG?
 
@@ -1590,45 +1434,39 @@ At 30 FPS with verification every 30 frames:
 
 **Verdict**: Negligible performance impact, strong guarantees.
 
-### Why Host-Based Data Logging?
+### Why Symmetric Peer Architecture?
 
-**Problem**: With N clients running identical environments, all would log identical data.
+**Problem**: Traditional multiplayer uses "host" concept - one client has authority.
 
-**Alternatives Considered**:
+**Why we removed the host concept:**
 
-1. **All Clients Log**
-   - Simple, no coordination
-   - Creates N duplicates
-   - Wastes storage, complicates analysis
-   - **Rejected**
+1. **Research validity**: No asymmetric experience between participants
+2. **Simpler code**: Same logic on all clients, no special cases
+3. **GGPO compatibility**: GGPO assumes symmetric peers by design
+4. **Fault tolerance**: No single point of failure
 
-2. **Server-Side Aggregation**
-   - Clients send data to server
-   - Server deduplicates before saving
-   - **Rejected**: Complex, requires data comparison
-
-3. **Host-Only Logging** ✓ **CHOSEN**
-   - First player designated as host
-   - Only host sends data to server
-   - Other clients skip logging
+**Data logging approach:**
+- Each client independently logs their own session metrics
+- Both peers have visibility into rollback/sync statistics
+- No central aggregation needed - each participant's data is valid
 
 **Implementation**:
-```python
-# In PyodideGameCoordinator
-def log_data(self, game_id, player_id, data):
-    game = self.games[game_id]
-
-    if player_id != game.host_player_id:
-        return None  # Reject non-host data
-
-    return data  # Accept host data
+```javascript
+// Both clients independently track metrics
+exportSessionMetrics() {
+    return {
+        inputs: { p2pSent, p2pReceived, socketFallback },
+        rollbacks: { events, maxDepth, totalCount },
+        connection: { type, p2pConnected }
+    };
+}
 ```
 
 **Benefits**:
-- Zero duplicates
-- Simple client logic
-- No server-side deduplication
-- Host migration handles disconnections
+- Equal experience for all participants
+- Simpler, more maintainable code
+- Better research data (no host bias)
+- GGPO rollback works naturally
 
 ### Why Periodic Verification (Every 30 Frames)?
 
@@ -1706,7 +1544,8 @@ random.seed(${seed})
 **Debug Steps**:
 ```javascript
 // 1. Verify seed received
-socket.on('pyodide_host_elected', (data) => {
+socket.on('pyodide_player_assigned', (data) => {
+    console.log('Player assigned:', data.player_id);
     console.log('Received seed:', data.game_seed);
     console.log('RNG initialized:', seeded_random.isMultiplayer());
 });
@@ -1723,130 +1562,81 @@ print('NumPy seed:', np.random.get_state()[1][0])
 `);
 ```
 
-#### Issue: Actions Not Synchronized
+#### Issue: P2P Connection Fails
 
 **Symptoms**:
-- Clients step with different actions
-- Players see different game states
-- Frame numbers diverge
+- DataChannel never opens
+- All inputs via SocketIO fallback
+- High latency gameplay
 
 **Likely Causes**:
-1. Action not sent to server
-2. Server not broadcasting correctly
-3. Client not waiting for broadcast
+1. WebRTC not supported
+2. Symmetric NAT blocking direct connection
+3. TURN server not configured
 
 **Debug Steps**:
 ```javascript
-// 1. Verify action sent
-socket.emit('pyodide_player_action', {
-    game_id: this.gameId,
-    player_id: this.myPlayerId,
-    action: myAction,
-    frame_number: this.frameNumber
-});
-console.log(`Sent action ${myAction} for frame ${this.frameNumber}`);
+// 1. Check WebRTC support
+console.log('RTCPeerConnection available:', !!window.RTCPeerConnection);
 
-// 2. Verify action received
-socket.on('pyodide_actions_ready', (data) => {
-    console.log(`Received actions for frame ${data.frame_number}:`, data.actions);
-});
+// 2. Check connection type
+console.log('Connection type:', this.webrtcManager.getConnectionType());
+// 'direct' = P2P, 'relay' = TURN, 'unknown' = failed
 
-// 3. Check step execution
-console.log('Stepping with actions:', allActions);
-const result = await this.stepWithActions(allActions);
-console.log('Step result:', result);
+// 3. Check DataChannel state
+console.log('DataChannel state:', this.webrtcManager.dataChannel?.readyState);
+// Should be 'open'
+
+// 4. Check TURN config received
+console.log('TURN config:', this.turnConfig);
 ```
 
-#### Issue: Data Not Saved
+#### Issue: Excessive Rollbacks
 
 **Symptoms**:
-- No CSV files generated
-- Empty data directory
-- Log says "no accumulated data"
+- Frequent visual "pops"
+- High maxRollbackDepth in metrics
+- Many rollback events logged
 
 **Likely Causes**:
-1. Non-host trying to log
-2. Episode not completing
-3. Save event not triggered
+1. High network latency (P2P or TURN)
+2. Packet loss causing delayed inputs
+3. Non-deterministic environment
 
 **Debug Steps**:
 ```javascript
-// 1. Verify host status
-console.log('Am I host?', this.isHost);
-console.log('Should I log data?', this.shouldLogData);
+// 1. Check rollback metrics
+const metrics = this.exportSessionMetrics();
+console.log('Rollback count:', metrics.rollbacks.totalCount);
+console.log('Max depth:', metrics.rollbacks.maxDepth);
+console.log('Rollback events:', metrics.rollbacks.events);
 
-// 2. Verify logging attempts
-logFrameData(data) {
-    if (!this.shouldLogData) {
-        console.log('Skipping log (not host)');
-        return;
-    }
-    console.log('Logging frame', this.frameNumber);
-    socket.emit('pyodide_log_data', {...});
-}
+// 2. Check RTT
+console.log('RTT:', this.webrtcManager.connectionQualityMonitor?.getStats());
 
-// 3. Check episode completion
-if (all_terminated || all_truncated) {
-    console.log('Episode complete, saving data');
-    this.saveEpisodeData();
-}
-```
-
-```python
-# Server-side debugging
-@socketio.on("pyodide_log_data")
-def on_pyodide_log_data(data):
-    print(f"Received log from player {data['player_id']}")
-
-    filtered_data = PYODIDE_COORDINATOR.log_data(...)
-
-    if filtered_data is None:
-        print(f"  → Rejected (non-host)")
-    else:
-        print(f"  → Accepted (host)")
+// 3. Verify determinism - run same inputs, compare hashes
 ```
 
 ### Performance Monitoring
 
 ```javascript
-// Add performance metrics
-class MultiplayerPyodideGame extends RemoteGame {
-    constructor(config) {
-        super(config);
-        this.metrics = {
-            actionWaitTimes: [],
-            stepTimes: [],
-            verificationTimes: []
-        };
-    }
+// Session metrics are built-in - access via exportSessionMetrics()
+const metrics = this.exportSessionMetrics();
 
-    async step(myAction) {
-        const startWait = performance.now();
-        const allActions = await this.waitForAllActions();
-        const waitTime = performance.now() - startWait;
-        this.metrics.actionWaitTimes.push(waitTime);
+// Key metrics to monitor:
+console.log('P2P Stats:', {
+    // Input delivery
+    p2pReceiveRatio: metrics.inputs.p2pReceived /
+        (metrics.inputs.p2pReceived + metrics.inputs.socketFallback),
 
-        const startStep = performance.now();
-        const result = await this.stepWithActions(allActions);
-        const stepTime = performance.now() - startStep;
-        this.metrics.stepTimes.push(stepTime);
+    // Rollback frequency
+    rollbacksPerMinute: metrics.rollbacks.totalCount / (metrics.frames.total / 30 / 60),
+    maxRollbackDepth: metrics.rollbacks.maxDepth,
 
-        // Log every 100 frames
-        if (this.frameNumber % 100 === 0) {
-            console.log('Performance metrics:', {
-                avgWaitTime: this.average(this.metrics.actionWaitTimes),
-                avgStepTime: this.average(this.metrics.stepTimes),
-                frameNumber: this.frameNumber
-            });
-        }
-
-        return result;
-    }
-
-    average(arr) {
-        return arr.reduce((a, b) => a + b, 0) / arr.length;
-    }
-}
+    // Connection quality
+    connectionType: metrics.connection.type,
+    p2pConnected: metrics.connection.p2pConnected
+});
 ```
 
 ---
@@ -1855,40 +1645,30 @@ class MultiplayerPyodideGame extends RemoteGame {
 
 ### Potential Improvements
 
-1. **Adaptive Verification Frequency**
-   - Increase frequency after desync
-   - Decrease after long stability
-   - Balance performance and reliability
+1. **Adaptive Input Delay**
+   - Dynamically adjust input delay based on RTT
+   - Balance responsiveness vs rollback frequency
+   - Implemented in GGPO reference implementation
 
-2. **Partial State Sync**
-   - Only send changed state (delta)
-   - Reduce bandwidth for large states
-   - Faster resync
+2. **N-Player Mesh Topology**
+   - Extend beyond 2-player to N-player
+   - Mesh of DataChannels
+   - More complex input synchronization
 
-3. **Network Prediction**
-   - Client-side prediction of other players
-   - Smoother experience with latency
-   - Rollback on mismatch
-
-4. **Compression**
-   - Compress state for resync
-   - Reduce network bandwidth
-   - Faster recovery
-
-5. **Spectator Mode**
+3. **Spectator Mode**
    - Allow observers without affecting game
    - Receive state updates without stepping
    - Useful for demos/experiments
 
-6. **Replay System**
-   - Save action sequences
-   - Deterministic replay from seed
-   - Debugging and analysis
+4. **Replay System**
+   - Save input sequences with seed
+   - Deterministic replay for analysis
+   - Debugging and research
 
-7. **Cross-Episode Persistence**
-   - Maintain coordinator state across episodes
-   - Faster game creation
-   - Reduced overhead
+5. **Server-Side Metrics Persistence**
+   - Export sessionMetrics to server
+   - Aggregate across sessions
+   - Research data pipeline
 
 ---
 
@@ -1896,13 +1676,13 @@ class MultiplayerPyodideGame extends RemoteGame {
 
 This implementation provides a robust foundation for multiplayer Pyodide experiments in Interactive Gym. Key achievements:
 
-✓ **Zero server computation** - Environments run entirely in browsers
-✓ **Perfect synchronization** - Lockstep protocol with action exchange
-✓ **Deterministic AI** - Seeded RNG ensures identical behavior
-✓ **Early desync detection** - Verification every second (30 frames)
-✓ **Automatic recovery** - Resync from host without user intervention
-✓ **Single data stream** - Host-only logging eliminates duplicates
-✓ **Host migration** - Graceful handling of disconnections
+- **Zero server computation** - Environments run entirely in browsers
+- **Local responsiveness** - GGPO rollback eliminates input delay
+- **Symmetric P2P architecture** - No host concept, equal experience for all
+- **Deterministic execution** - Seeded RNG ensures identical state
+- **P2P-first communication** - WebRTC DataChannel with TURN fallback
+- **Research metrics** - Rollback events, sync stats, connection quality
+- **Graceful degradation** - SocketIO fallback when P2P unavailable
 
 The system is production-ready for human-human and human-AI experiments requiring real-time multiplayer coordination with full Gymnasium environment support.
 
@@ -1912,22 +1692,28 @@ The system is production-ready for human-human and human-AI experiments requirin
 
 ### Implementation Files
 
-- `interactive_gym/server/static/js/seeded_random.js`
-- `interactive_gym/server/static/js/pyodide_multiplayer_game.js`
-- `interactive_gym/server/pyodide_game_coordinator.py`
-- `interactive_gym/server/app.py`
-- `interactive_gym/server/game_manager.py`
-- `interactive_gym/scenes/gym_scene.py`
+- `interactive_gym/server/static/js/seeded_random.js` - Deterministic RNG
+- `interactive_gym/server/static/js/webrtc_manager.js` - P2P DataChannel + TURN
+- `interactive_gym/server/static/js/pyodide_multiplayer_game.js` - GGPO sync
+- `interactive_gym/server/pyodide_game_coordinator.py` - Server signaling
+- `interactive_gym/server/app.py` - SocketIO handlers
+- `interactive_gym/configurations/remote_config.py` - TURN configuration
 
 ### External Resources
 
+- [GGPO](https://www.ggpo.net/) - Rollback netcode reference
 - [Mulberry32 PRNG](https://github.com/bryc/code/blob/master/jshash/PRNGs.md)
+- [WebRTC API](https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API)
+- [Open Relay Project](https://www.metered.ca/tools/openrelay/) - Free TURN servers
 - [Pyodide Documentation](https://pyodide.org/)
-- [SocketIO Documentation](https://socket.io/docs/v4/)
 - [Gymnasium API](https://gymnasium.farama.org/)
 
 ---
 
-**Document Version**: 1.0
-**Last Updated**: 2025-01-11
+**Document Version**: 2.0
+**Last Updated**: 2026-01-17
 **Author**: Claude (Anthropic)
+
+**Changelog:**
+- v2.0 (2026-01-17): Updated for symmetric P2P architecture with GGPO rollback. Removed host concept.
+- v1.0 (2025-01-11): Initial documentation with host-based sync.
