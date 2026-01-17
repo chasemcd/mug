@@ -9,7 +9,150 @@
  * - ICE candidate buffering to handle out-of-order signaling
  * - SocketIO-based signaling relay
  * - Deterministic initiator/answerer role assignment
+ * - TURN server fallback for NAT traversal
+ * - Connection type detection (direct vs relay)
+ * - Connection quality monitoring
+ * - ICE restart for connection recovery
  */
+
+/**
+ * Monitors P2P connection quality by polling RTCPeerConnection.getStats().
+ * Detects latency degradation and invokes callbacks for warnings.
+ */
+class ConnectionQualityMonitor {
+    /**
+     * Create a connection quality monitor.
+     * @param {RTCPeerConnection} peerConnection - The peer connection to monitor
+     * @param {Object} options - Monitor options
+     * @param {number} options.pollInterval - Polling interval in ms (default: 2000)
+     * @param {number} options.warningLatency - RTT threshold for warning in ms (default: 150)
+     * @param {number} options.criticalLatency - RTT threshold for critical in ms (default: 300)
+     */
+    constructor(peerConnection, options = {}) {
+        this.pc = peerConnection;
+        this.pollInterval = options.pollInterval || 2000;
+        this.warningLatencyMs = options.warningLatency || 150;
+        this.criticalLatencyMs = options.criticalLatency || 300;
+
+        this.lastStats = null;
+        this.intervalId = null;
+
+        // Callbacks
+        this.onQualityChange = null;
+        this.onDegradation = null;
+    }
+
+    /**
+     * Start polling for connection quality metrics.
+     */
+    start() {
+        this.intervalId = setInterval(() => this._poll(), this.pollInterval);
+    }
+
+    /**
+     * Stop polling.
+     */
+    stop() {
+        if (this.intervalId) {
+            clearInterval(this.intervalId);
+            this.intervalId = null;
+        }
+    }
+
+    /**
+     * Poll getStats() and check thresholds.
+     * @private
+     */
+    async _poll() {
+        if (!this.pc || this.pc.connectionState !== 'connected') return;
+
+        try {
+            const stats = await this.pc.getStats();
+            const quality = this._extractQualityMetrics(stats);
+
+            if (quality) {
+                this._checkThresholds(quality);
+                this.lastStats = quality;
+            }
+        } catch (e) {
+            console.warn('[QualityMonitor] Poll failed:', e);
+        }
+    }
+
+    /**
+     * Extract quality metrics from getStats() results.
+     * @private
+     * @param {RTCStatsReport} stats - Stats from getStats()
+     * @returns {Object|null} Quality metrics or null if unavailable
+     */
+    _extractQualityMetrics(stats) {
+        let selectedPairId = null;
+        let pairStats = null;
+
+        // Find transport and selected pair
+        stats.forEach(report => {
+            if (report.type === 'transport' && report.selectedCandidatePairId) {
+                selectedPairId = report.selectedCandidatePairId;
+            }
+        });
+
+        if (!selectedPairId) return null;
+
+        stats.forEach(report => {
+            if (report.type === 'candidate-pair' && report.id === selectedPairId) {
+                pairStats = report;
+            }
+        });
+
+        if (!pairStats) return null;
+
+        return {
+            currentRtt: pairStats.currentRoundTripTime ?
+                        pairStats.currentRoundTripTime * 1000 : null,  // Convert to ms
+            avgRtt: pairStats.totalRoundTripTime && pairStats.responsesReceived ?
+                    (pairStats.totalRoundTripTime / pairStats.responsesReceived) * 1000 : null,
+            bytesSent: pairStats.bytesSent,
+            bytesReceived: pairStats.bytesReceived,
+            packetsSent: pairStats.packetsSent,
+            packetsReceived: pairStats.packetsReceived,
+            state: pairStats.state,
+            availableOutgoingBitrate: pairStats.availableOutgoingBitrate,
+            timestamp: pairStats.timestamp
+        };
+    }
+
+    /**
+     * Check metrics against thresholds and invoke callbacks.
+     * @private
+     * @param {Object} quality - Quality metrics
+     */
+    _checkThresholds(quality) {
+        const rtt = quality.currentRtt || quality.avgRtt;
+
+        if (rtt === null) return;
+
+        let status = 'good';
+        if (rtt > this.criticalLatencyMs) {
+            status = 'critical';
+        } else if (rtt > this.warningLatencyMs) {
+            status = 'warning';
+        }
+
+        this.onQualityChange?.({
+            status,
+            rtt,
+            ...quality
+        });
+
+        if (status !== 'good') {
+            this.onDegradation?.({
+                status,
+                rtt,
+                message: `Connection latency ${status}: ${rtt.toFixed(0)}ms RTT`
+            });
+        }
+    }
+}
 
 class WebRTCManager {
     /**
@@ -17,8 +160,12 @@ class WebRTCManager {
      * @param {Object} socket - SocketIO socket instance
      * @param {string} gameId - Game identifier
      * @param {string|number} myPlayerId - This player's ID
+     * @param {Object} options - Optional configuration
+     * @param {string} options.turnUsername - TURN server username
+     * @param {string} options.turnCredential - TURN server credential/password
+     * @param {boolean} options.forceRelay - Force relay-only connections (for testing)
      */
-    constructor(socket, gameId, myPlayerId) {
+    constructor(socket, gameId, myPlayerId, options = {}) {
         this.socket = socket;
         this.gameId = gameId;
         this.myPlayerId = myPlayerId;
@@ -28,11 +175,25 @@ class WebRTCManager {
         this.remoteDescriptionSet = false;
         this.targetPeerId = null;
 
+        // TURN configuration
+        this.turnUsername = options.turnUsername || null;
+        this.turnCredential = options.turnCredential || null;
+        this.forceRelay = options.forceRelay || false;
+
+        // Connection monitoring
+        this.connectionType = null;
+        this.iceRestartAttempts = 0;
+        this.maxIceRestarts = 3;
+        this.disconnectTimeoutId = null;
+        this.qualityMonitor = null;
+
         // Callbacks (set by consumer)
         this.onDataChannelOpen = null;
         this.onDataChannelMessage = null;
         this.onDataChannelClose = null;
         this.onConnectionFailed = null;
+        this.onConnectionTypeDetected = null;
+        this.onQualityDegraded = null;
 
         // Bound handler reference for cleanup
         this._boundSignalHandler = null;
@@ -111,10 +272,14 @@ class WebRTCManager {
      */
     _createPeerConnection() {
         const config = {
-            iceServers: [
-                { urls: 'stun:stun.l.google.com:19302' }
-            ]
+            iceServers: this._getIceServers()
         };
+
+        // Force relay for testing TURN
+        if (this.forceRelay) {
+            config.iceTransportPolicy = 'relay';
+            console.log('[WebRTC] Forcing relay mode (testing)');
+        }
 
         this.peerConnection = new RTCPeerConnection(config);
 
@@ -122,12 +287,15 @@ class WebRTCManager {
         this.peerConnection.onicecandidate = (event) => {
             if (event.candidate) {
                 this._sendSignal('ice-candidate', event.candidate);
-                console.log('[WebRTC] Sent ICE candidate');
+                console.log('[WebRTC] Sent ICE candidate:', {
+                    type: event.candidate.type,
+                    protocol: event.candidate.protocol
+                });
             }
         };
 
         // Handle connection state changes
-        this.peerConnection.onconnectionstatechange = () => {
+        this.peerConnection.onconnectionstatechange = async () => {
             const state = this.peerConnection.connectionState;
             console.log(`[WebRTC] Connection state: ${state}`);
 
@@ -136,6 +304,10 @@ class WebRTCManager {
                 this.onConnectionFailed?.();
             } else if (state === 'connected') {
                 console.log('[WebRTC] Peer connection established');
+                // Detect connection type after connection is established
+                await this._detectConnectionType();
+                // Start quality monitoring
+                this._startQualityMonitoring();
             }
         };
 
@@ -143,6 +315,22 @@ class WebRTCManager {
         this.peerConnection.oniceconnectionstatechange = () => {
             const state = this.peerConnection.iceConnectionState;
             console.log(`[WebRTC] ICE connection state: ${state}`);
+
+            switch (state) {
+                case 'failed':
+                    console.warn('[WebRTC] ICE failed, attempting restart');
+                    this._handleIceFailure();
+                    break;
+                case 'disconnected':
+                    // May recover on its own - start timeout
+                    this._startDisconnectTimeout();
+                    break;
+                case 'connected':
+                case 'completed':
+                    this._cancelDisconnectTimeout();
+                    this.iceRestartAttempts = 0;  // Reset restart counter on successful connection
+                    break;
+            }
         };
 
         // Handle incoming DataChannel (for answerer)
@@ -151,6 +339,181 @@ class WebRTCManager {
             this.dataChannel = event.channel;
             this._setupDataChannel(this.dataChannel);
         };
+    }
+
+    /**
+     * Build ICE server configuration with STUN and optional TURN servers.
+     * @private
+     * @returns {Array} ICE server configuration array
+     */
+    _getIceServers() {
+        const servers = [
+            // Public STUN servers (free, always available)
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' }
+        ];
+
+        // Add TURN servers if credentials provided
+        if (this.turnUsername && this.turnCredential) {
+            const turnServers = [
+                // TURN UDP on port 80 (most permissive)
+                'turn:a.relay.metered.ca:80',
+                // TURN TCP on port 80 (for UDP-blocked networks)
+                'turn:a.relay.metered.ca:80?transport=tcp',
+                // TURN UDP on port 443 (alternative)
+                'turn:a.relay.metered.ca:443',
+                // TURNS over TLS on port 443 (most restrictive networks)
+                'turns:a.relay.metered.ca:443?transport=tcp'
+            ];
+
+            for (const url of turnServers) {
+                servers.push({
+                    urls: url,
+                    username: this.turnUsername,
+                    credential: this.turnCredential
+                });
+            }
+
+            console.log('[WebRTC] TURN servers configured');
+        }
+
+        return servers;
+    }
+
+    /**
+     * Detect connection type (direct vs relay) via getStats() API.
+     * @private
+     */
+    async _detectConnectionType() {
+        const connType = await this.getConnectionType();
+        if (connType) {
+            this.connectionType = connType;
+            console.log('[WebRTC] Connection type:', connType);
+            this.onConnectionTypeDetected?.(connType);
+        }
+    }
+
+    /**
+     * Get connection type by analyzing the active candidate pair.
+     * @returns {Promise<Object|null>} Connection type info or null if unavailable
+     */
+    async getConnectionType() {
+        if (!this.peerConnection) return null;
+
+        try {
+            const stats = await this.peerConnection.getStats();
+
+            // Step 1: Find selected candidate pair via transport stats
+            let selectedPairId = null;
+            stats.forEach(report => {
+                if (report.type === 'transport' && report.selectedCandidatePairId) {
+                    selectedPairId = report.selectedCandidatePairId;
+                }
+            });
+
+            if (!selectedPairId) return null;
+
+            // Step 2: Get the candidate pair
+            let localCandidateId = null;
+            let remoteCandidateId = null;
+            stats.forEach(report => {
+                if (report.type === 'candidate-pair' && report.id === selectedPairId) {
+                    localCandidateId = report.localCandidateId;
+                    remoteCandidateId = report.remoteCandidateId;
+                }
+            });
+
+            // Step 3: Get candidate details
+            let localCandidate = null;
+            let remoteCandidate = null;
+            stats.forEach(report => {
+                if (report.type === 'local-candidate' && report.id === localCandidateId) {
+                    localCandidate = report;
+                }
+                if (report.type === 'remote-candidate' && report.id === remoteCandidateId) {
+                    remoteCandidate = report;
+                }
+            });
+
+            // Step 4: Determine connection type
+            const isRelay = localCandidate?.candidateType === 'relay' ||
+                            remoteCandidate?.candidateType === 'relay';
+
+            return {
+                connectionType: isRelay ? 'relay' : 'direct',
+                localCandidateType: localCandidate?.candidateType,
+                remoteCandidateType: remoteCandidate?.candidateType,
+                localProtocol: localCandidate?.protocol,
+                relayProtocol: localCandidate?.relayProtocol || null
+            };
+        } catch (e) {
+            console.error('[WebRTC] Failed to get connection type:', e);
+            return null;
+        }
+    }
+
+    /**
+     * Handle ICE failure by attempting restart.
+     * @private
+     */
+    _handleIceFailure() {
+        if (this.iceRestartAttempts >= this.maxIceRestarts) {
+            console.error('[WebRTC] Max ICE restart attempts reached');
+            this.onConnectionFailed?.();
+            return;
+        }
+
+        this.iceRestartAttempts++;
+        console.log(`[WebRTC] ICE restart attempt ${this.iceRestartAttempts}/${this.maxIceRestarts}`);
+        this.peerConnection.restartIce();
+    }
+
+    /**
+     * Start timeout for disconnect recovery.
+     * If still disconnected after timeout, trigger ICE restart.
+     * @private
+     */
+    _startDisconnectTimeout() {
+        this._cancelDisconnectTimeout();
+        this.disconnectTimeoutId = setTimeout(() => {
+            if (this.peerConnection?.iceConnectionState === 'disconnected') {
+                console.warn('[WebRTC] Disconnect timeout, triggering ICE restart');
+                this._handleIceFailure();
+            }
+        }, 5000);  // 5 second grace period
+    }
+
+    /**
+     * Cancel disconnect timeout.
+     * @private
+     */
+    _cancelDisconnectTimeout() {
+        if (this.disconnectTimeoutId) {
+            clearTimeout(this.disconnectTimeoutId);
+            this.disconnectTimeoutId = null;
+        }
+    }
+
+    /**
+     * Start connection quality monitoring.
+     * @private
+     */
+    _startQualityMonitoring() {
+        if (this.qualityMonitor) {
+            this.qualityMonitor.stop();
+        }
+
+        this.qualityMonitor = new ConnectionQualityMonitor(this.peerConnection, {
+            warningLatency: 150,
+            criticalLatency: 300
+        });
+
+        this.qualityMonitor.onDegradation = (info) => {
+            console.warn('[WebRTC] Quality degraded:', info);
+            this.onQualityDegraded?.(info);
+        };
+
+        this.qualityMonitor.start();
     }
 
     /**
@@ -357,6 +720,15 @@ class WebRTCManager {
     close() {
         console.log('[WebRTC] Closing connection');
 
+        // Stop quality monitoring
+        if (this.qualityMonitor) {
+            this.qualityMonitor.stop();
+            this.qualityMonitor = null;
+        }
+
+        // Cancel disconnect timeout
+        this._cancelDisconnectTimeout();
+
         // Remove signaling event listener
         if (this._boundSignalHandler) {
             this.socket.off('webrtc_signal', this._boundSignalHandler);
@@ -383,5 +755,5 @@ class WebRTCManager {
 }
 
 // Export for ES modules and global access
-export { WebRTCManager };
+export { WebRTCManager, ConnectionQualityMonitor };
 export default WebRTCManager;
