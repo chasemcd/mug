@@ -422,6 +422,11 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         this.p2pConnected = false;
         this.p2pPeerId = null;  // The other player's ID
 
+        // P2P input sending
+        this.p2pInputSender = null;
+        this.connectionHealth = null;
+        this.pingIntervalId = null;
+
         this.setupMultiplayerHandlers();
     }
 
@@ -1107,6 +1112,11 @@ obs, infos, render_state
                 timestamp: Date.now(),
                 sync_epoch: this.syncEpoch
             });
+
+            // Also send via P2P DataChannel (parallel to SocketIO)
+            if (this.p2pConnected && this.p2pInputSender) {
+                this.p2pInputSender.recordAndSend(myCurrentAction, targetFrame);
+            }
         }
 
         // 3. Build final action dict - ALL human players use delayed inputs from buffer
@@ -2451,7 +2461,20 @@ env.step(_replay_actions)
             console.log('[MultiplayerPyodide] P2P DataChannel OPEN');
             this.p2pConnected = true;
 
-            // Send a test message to verify connection
+            // Initialize P2P input sending
+            this.p2pInputSender = new P2PInputSender(
+                this.webrtcManager,
+                this.myPlayerId,
+                3  // redundancy count
+            );
+
+            // Initialize connection health monitoring
+            this.connectionHealth = new ConnectionHealthMonitor();
+
+            // Start periodic ping for RTT measurement
+            this._startPingInterval();
+
+            // Send a test message to verify connection (legacy)
             this._sendP2PTestMessage();
         };
 
