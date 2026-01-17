@@ -13,6 +13,7 @@ import * as pyodide_remote_game from './pyodide_remote_game.js';
 import { convertUndefinedToNull } from './pyodide_remote_game.js';
 import * as seeded_random from './seeded_random.js';
 import * as ui_utils from './ui_utils.js';
+import { WebRTCManager } from './webrtc_manager.js';
 
 export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
     constructor(config) {
@@ -125,6 +126,11 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         this.lastP2PSyncFrame = 0;  // Last frame we sent/received P2P sync
         this.p2pHashMismatches = 0;  // Count of hash mismatches detected
 
+        // P2P WebRTC connection
+        this.webrtcManager = null;
+        this.p2pConnected = false;
+        this.p2pPeerId = null;  // The other player's ID
+
         this.setupMultiplayerHandlers();
     }
 
@@ -164,6 +170,16 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
                     this.otherPlayerActionQueues[playerId] = [];
                     console.log(`[MultiplayerPyodide] Initialized action queue for player ${playerId}`);
                 }
+            }
+
+            // Initiate P2P WebRTC connection
+            // Find the other player's ID (for 2-player games)
+            const otherPlayers = data.players.filter(pid => pid != this.myPlayerId);
+            if (otherPlayers.length === 1) {
+                this.p2pPeerId = otherPlayers[0];
+                this._initP2PConnection();
+            } else if (otherPlayers.length > 1) {
+                console.warn('[MultiplayerPyodide] P2P only supports 2-player games, skipping WebRTC');
             }
         });
 
@@ -2089,6 +2105,14 @@ env.step(_replay_actions)
         this.pendingRollbackFrame = null;
         this.rollbackCount = 0;
         this.maxRollbackFrames = 0;
+
+        // Clean up WebRTC connection
+        if (this.webrtcManager) {
+            this.webrtcManager.close();
+            this.webrtcManager = null;
+            this.p2pConnected = false;
+        }
+
         console.log('[GGPO] State cleared for new episode');
     }
 
@@ -2122,5 +2146,91 @@ env.step(_replay_actions)
 
         context.putImageData(imageData, 0, 0);
         return canvas.toDataURL('image/png');
+    }
+
+    // ========== P2P WebRTC Methods ==========
+
+    _initP2PConnection() {
+        /**
+         * Initialize WebRTC P2P connection to peer.
+         * Called after pyodide_game_ready when we know the other player's ID.
+         */
+        console.log(`[MultiplayerPyodide] Initiating P2P connection to player ${this.p2pPeerId}`);
+
+        this.webrtcManager = new WebRTCManager(socket, this.gameId, this.myPlayerId);
+
+        // Set up callbacks
+        this.webrtcManager.onDataChannelOpen = () => {
+            console.log('[MultiplayerPyodide] P2P DataChannel OPEN');
+            this.p2pConnected = true;
+
+            // Send a test message to verify connection
+            this._sendP2PTestMessage();
+        };
+
+        this.webrtcManager.onDataChannelMessage = (data) => {
+            this._handleP2PMessage(data);
+        };
+
+        this.webrtcManager.onDataChannelClose = () => {
+            console.log('[MultiplayerPyodide] P2P DataChannel CLOSED');
+            this.p2pConnected = false;
+        };
+
+        this.webrtcManager.onConnectionFailed = () => {
+            console.error('[MultiplayerPyodide] P2P connection FAILED');
+            this.p2pConnected = false;
+            // For Phase 1, just log - fallback to SocketIO is existing behavior
+        };
+
+        // Start the connection (role determined by player ID comparison)
+        this.webrtcManager.connectToPeer(this.p2pPeerId);
+    }
+
+    _sendP2PTestMessage() {
+        /**
+         * Send a test message over the P2P DataChannel to verify connectivity.
+         */
+        const testMessage = {
+            type: 'test',
+            from: this.myPlayerId,
+            timestamp: Date.now()
+        };
+
+        const success = this.webrtcManager.send(JSON.stringify(testMessage));
+        if (success) {
+            console.log('[MultiplayerPyodide] Sent P2P test message');
+        } else {
+            console.warn('[MultiplayerPyodide] Failed to send P2P test message');
+        }
+    }
+
+    _handleP2PMessage(data) {
+        /**
+         * Handle incoming P2P DataChannel messages.
+         * For Phase 1, only handles test messages. Phase 2 will add input handling.
+         */
+        try {
+            // Handle both string and ArrayBuffer data
+            let message;
+            if (typeof data === 'string') {
+                message = JSON.parse(data);
+            } else if (data instanceof ArrayBuffer) {
+                const decoder = new TextDecoder();
+                message = JSON.parse(decoder.decode(data));
+            } else {
+                console.warn('[MultiplayerPyodide] Unknown P2P message type:', typeof data);
+                return;
+            }
+
+            if (message.type === 'test') {
+                const latency = Date.now() - message.timestamp;
+                console.log(`[MultiplayerPyodide] Received P2P test from player ${message.from}, latency: ${latency}ms`);
+            } else {
+                console.log('[MultiplayerPyodide] Received P2P message:', message.type);
+            }
+        } catch (e) {
+            console.error('[MultiplayerPyodide] Failed to parse P2P message:', e);
+        }
     }
 }
