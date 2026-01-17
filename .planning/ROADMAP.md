@@ -74,7 +74,7 @@ Plans:
 **Goal:** Connections succeed even when direct P2P fails due to NAT configurations, with proper detection and logging.
 **Depends on:** Phase 3
 **Requirements:** WEBRTC-03, WEBRTC-04
-**Plans:** 1 plan
+**Plans:** 2 plans
 
 **Success Criteria:**
 1. TURN server credentials are configured and used when ICE direct connection fails
@@ -84,7 +84,8 @@ Plans:
 5. Connection quality degradation triggers appropriate warnings/fallbacks
 
 Plans:
-- [ ] 04-01-PLAN.md -- TURN configuration, connection type detection, quality monitoring, ICE recovery
+- [x] 04-01-PLAN.md -- TURN configuration, connection type detection, quality monitoring, ICE recovery
+- [ ] 04-02-PLAN.md -- Wire TURN credentials from server config to WebRTCManager (gap closure)
 
 ---
 
@@ -112,7 +113,7 @@ Plans:
 | 1 - WebRTC Foundation | Complete | 2026-01-16 |
 | 2 - P2P Transport Layer | Complete | 2026-01-17 |
 | 3 - GGPO P2P Integration | Complete | 2026-01-17 |
-| 4 - TURN and Resilience | Not started | - |
+| 4 - TURN and Resilience | In progress | - |
 | 5 - Validation and Cleanup | Not started | - |
 
 ---
