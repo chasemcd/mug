@@ -355,7 +355,8 @@ obs, rewards, terminateds, truncateds, infos, render_state
         let formatted_time_left = time_left.toFixed(1).toString().padStart(5, '0');
 
         // Round number is 1-indexed for display
-        let current_round = this.num_episodes + 1;
+        // Cap at max to avoid showing "Round 3/2" after final episode increments num_episodes
+        let current_round = Math.min(this.num_episodes + 1, this.max_episodes);
         let total_rounds = this.max_episodes;
 
         let hud_text = `Round: ${current_round}/${total_rounds} | Score: ${formatted_score} | Time left: ${formatted_time_left}s`;
