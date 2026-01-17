@@ -94,6 +94,7 @@ Plans:
 **Goal:** Legacy host-based sync code is removed and the system is validated for research use.
 **Depends on:** Phase 4
 **Requirements:** CLEAN-01
+**Plans:** 3 plans
 
 **Success Criteria:**
 1. Legacy "host client" election code is removed from P2P mode
@@ -102,7 +103,10 @@ Plans:
 4. Multiple game sessions can complete without silent desyncs
 5. Documentation updated to reflect P2P architecture
 
-**Plans:** (created by /gsd:plan-phase)
+Plans:
+- [ ] 05-01-PLAN.md -- Remove legacy host code (server + client)
+- [ ] 05-02-PLAN.md -- P2P-first input sending + research metrics
+- [ ] 05-03-PLAN.md -- Documentation update + validation checkpoint
 
 ---
 
@@ -114,7 +118,7 @@ Plans:
 | 2 - P2P Transport Layer | Complete | 2026-01-17 |
 | 3 - GGPO P2P Integration | Complete | 2026-01-17 |
 | 4 - TURN and Resilience | Complete | 2026-01-17 |
-| 5 - Validation and Cleanup | Not started | - |
+| 5 - Validation and Cleanup | Planned | - |
 
 ---
 
