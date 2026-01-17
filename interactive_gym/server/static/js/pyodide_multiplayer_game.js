@@ -513,7 +513,7 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         });
 
         // P2P state hash sync (non-server-authoritative mode)
-        // Host broadcasts state hash, non-host compares to detect desync
+        // Both peers broadcast state hash for symmetric desync detection
         socket.on('p2p_state_sync', async (data) => {
             // Only process in non-server-authoritative mode
             if (this.serverAuthoritative) {
@@ -1208,10 +1208,10 @@ obs, infos, render_state
         // In P2P mode: used for peer state verification
         await this.recordStateHashForFrame(this.frameNumber);
 
-        // P2P sync: Host broadcasts state hash periodically for non-host to verify
-        if (!this.serverAuthoritative && this.isHost) {
+        // P2P sync: Both peers broadcast state hash periodically for mutual verification
+        if (!this.serverAuthoritative) {
             if (this.frameNumber - this.lastP2PSyncFrame >= this.p2pSyncInterval) {
-                await this.broadcastP2PStateSync();
+                await this.broadcastSymmetricStateSync();
             }
         }
 
@@ -1435,10 +1435,10 @@ obs, rewards, terminateds, truncateds, infos, render_state
     }
 
     /**
-     * Broadcast P2P state sync message (host only, non-server-authoritative mode).
-     * Sends current state hash to other players for desync detection.
+     * Broadcast P2P state sync message (symmetric, non-server-authoritative mode).
+     * Both peers broadcast their state hash for mutual desync detection.
      */
-    async broadcastP2PStateSync() {
+    async broadcastSymmetricStateSync() {
         try {
             const stateHash = await this.computeQuickStateHash();
 
@@ -1453,7 +1453,7 @@ obs, rewards, terminateds, truncateds, infos, render_state
             this.lastP2PSyncFrame = this.frameNumber;
 
             console.log(
-                `[P2P Sync] Host broadcast at frame ${this.frameNumber} ` +
+                `[P2P Sync] Player ${this.myPlayerId} broadcast at frame ${this.frameNumber} ` +
                 `(hash=${stateHash.substring(0, 8)})`
             );
         } catch (e) {
