@@ -438,6 +438,15 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
             connectionDetails: null
         };
 
+        // Session metrics for research data export
+        this.sessionMetrics = {
+            rollbacks: {
+                events: [],
+                count: 0,
+                maxFrames: 0
+            }
+        };
+
         // TURN server configuration (populated by pyodide_game_ready)
         this.turnConfig = null;
 
@@ -1292,7 +1301,7 @@ obs, infos, render_state
                 `[Episode] Complete at frame ${this.frameNumber} | ` +
                 `Rewards: ${JSON.stringify(this.cumulative_rewards)} | ` +
                 `InputBuf: ${this.inputBuffer.size} | ` +
-                `Rollbacks: ${this.rollbackCount} | ` +
+                `Rollbacks: ${this.rollbackCount} (max depth: ${this.sessionMetrics.rollbacks.maxFrames}) | ` +
                 `Syncs: ${this.diagnostics.syncCount} | ` +
                 `P2P: ${this.p2pMetrics.inputsReceivedViaP2P}/${totalReceived} (${p2pReceiveRatio}%) | ` +
                 `Type: ${p2pType}` +
@@ -1300,6 +1309,10 @@ obs, infos, render_state
                     ? ` | Fallback at frame ${this.p2pMetrics.p2pFallbackFrame}`
                     : '')
             );
+
+            // Export and log full session metrics for research analysis
+            const sessionMetrics = this.exportSessionMetrics();
+            console.log('[Episode] Session metrics:', JSON.stringify(sessionMetrics, null, 2));
 
             // Signal scene termination to server
             // Data is saved via remoteGameLogger and sent at scene termination via emit_remote_game_data
@@ -1984,11 +1997,34 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
             if (actionRecord) {
                 const usedAction = actionRecord.actions[playerIdStr] ?? actionRecord.actions[parseInt(playerIdStr)];
                 if (usedAction !== undefined && usedAction !== action) {
-                    console.log(
-                        `[GGPO] Late input from player ${playerIdStr} at frame ${frameNumber} ` +
-                        `(current: ${this.frameNumber}). Used: ${usedAction}, Actual: ${action}. ` +
-                        `Triggering rollback.`
+                    const rollbackFrames = this.frameNumber - frameNumber;
+
+                    // Record rollback event for research analytics
+                    const rollbackEvent = {
+                        frame: frameNumber,
+                        currentFrame: this.frameNumber,
+                        rollbackFrames: rollbackFrames,
+                        playerId: playerIdStr,
+                        predictedAction: usedAction,
+                        actualAction: action,
+                        timestamp: Date.now()
+                    };
+
+                    // Track in session metrics for export
+                    this.sessionMetrics.rollbacks.events.push(rollbackEvent);
+                    this.sessionMetrics.rollbacks.count++;
+                    this.sessionMetrics.rollbacks.maxFrames = Math.max(
+                        this.sessionMetrics.rollbacks.maxFrames,
+                        rollbackFrames
                     );
+
+                    console.log(
+                        `[GGPO] Late input triggering rollback: ` +
+                        `player=${playerIdStr}, frame=${frameNumber}, ` +
+                        `predicted=${usedAction}, actual=${action}, ` +
+                        `rollback depth=${rollbackFrames} frames`
+                    );
+
                     // Mark for rollback - will be processed in next step()
                     this.pendingRollbackFrame = Math.min(
                         this.pendingRollbackFrame ?? frameNumber,
@@ -2796,6 +2832,45 @@ env.step(_replay_actions)
             this.pingIntervalId = null;
             console.log('[P2P] Stopped ping interval');
         }
+    }
+
+    /**
+     * Export session metrics for research data analysis.
+     * Call at episode end to get structured metrics for persistence.
+     * @returns {Object} Session metrics including connection info, inputs, rollbacks, etc.
+     */
+    exportSessionMetrics() {
+        return {
+            gameId: this.gameId,
+            playerId: this.myPlayerId,
+
+            connection: {
+                type: this.p2pMetrics.connectionType || 'unknown',
+                connectionDetails: this.p2pMetrics.connectionDetails || {}
+            },
+
+            inputs: {
+                sentViaP2P: this.p2pMetrics.inputsSentViaP2P,
+                sentViaSocketIO: this.p2pMetrics.inputsSentViaSocketIO,
+                receivedViaP2P: this.p2pMetrics.inputsReceivedViaP2P,
+                receivedViaSocketIO: this.p2pMetrics.inputsReceivedViaSocketIO
+            },
+
+            rollbacks: this.sessionMetrics.rollbacks,
+
+            sync: {
+                p2pHashMismatches: this.p2pHashMismatches || 0
+            },
+
+            quality: {
+                p2pFallbackTriggered: this.p2pMetrics.p2pFallbackTriggered,
+                p2pFallbackFrame: this.p2pMetrics.p2pFallbackFrame
+            },
+
+            frames: {
+                total: this.frameNumber
+            }
+        };
     }
 
     /**
