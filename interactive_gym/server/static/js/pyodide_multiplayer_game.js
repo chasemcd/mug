@@ -1125,23 +1125,25 @@ obs, infos, render_state
             // Store in our own input buffer for the delayed frame
             this.storeLocalInput(myCurrentAction, this.frameNumber);
 
-            // 2. Send to server immediately for relay to other clients
-            socket.emit('pyodide_player_action', {
-                game_id: this.gameId,
-                player_id: this.myPlayerId,
-                action: myCurrentAction,
-                frame_number: targetFrame,  // Target frame with delay applied
-                timestamp: Date.now(),
-                sync_epoch: this.syncEpoch
-            });
-            this.p2pMetrics.inputsSentViaSocketIO++;
+            // 2. Send input to other players - P2P first with SocketIO fallback
+            const p2pHealthy = this.p2pConnected &&
+                               this.p2pInputSender &&
+                               !this.p2pMetrics.p2pFallbackTriggered;
 
-            // Also send via P2P DataChannel (parallel to SocketIO)
-            if (this.p2pConnected && this.p2pInputSender) {
+            if (p2pHealthy) {
+                // Primary: P2P DataChannel
                 const sent = this.p2pInputSender.recordAndSend(myCurrentAction, targetFrame);
                 if (sent) {
                     this.p2pMetrics.inputsSentViaP2P++;
+                    // P2P success - don't use SocketIO
+                } else {
+                    // P2P send failed (buffer congested) - fall back to SocketIO
+                    console.warn('[P2P] Send failed (buffer full), falling back to SocketIO');
+                    this._sendViaSocketIO(myCurrentAction, targetFrame);
                 }
+            } else {
+                // No healthy P2P connection - use SocketIO
+                this._sendViaSocketIO(myCurrentAction, targetFrame);
             }
         }
 
@@ -2603,6 +2605,23 @@ env.step(_replay_actions)
             connection_type: connInfo.connectionType,
             details: this.p2pMetrics.connectionDetails
         });
+    }
+
+    /**
+     * Send input to other players via SocketIO (fallback path).
+     * @param {number} action - The action taken
+     * @param {number} targetFrame - The frame this input is scheduled for
+     */
+    _sendViaSocketIO(action, targetFrame) {
+        socket.emit('pyodide_player_action', {
+            game_id: this.gameId,
+            player_id: this.myPlayerId,
+            action: action,
+            frame_number: targetFrame,
+            timestamp: Date.now(),
+            sync_epoch: this.syncEpoch
+        });
+        this.p2pMetrics.inputsSentViaSocketIO++;
     }
 
     _sendP2PTestMessage() {
