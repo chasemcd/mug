@@ -2481,4 +2481,64 @@ env.step(_replay_actions)
             console.log('[P2P] Received JSON message:', message.type);
         }
     }
+
+    _handleInputPacket(buffer) {
+        /**
+         * Process received input packet and store inputs in GGPO buffer.
+         */
+        const packet = decodeInputPacket(buffer);
+        if (!packet) {
+            console.warn('[P2P] Failed to decode input packet');
+            return;
+        }
+
+        // Store all inputs from the packet (handles redundancy - duplicates are ignored by storeRemoteInput)
+        for (const input of packet.inputs) {
+            this.storeRemoteInput(packet.playerId, input.action, input.frame);
+        }
+
+        // Update connection health monitor
+        if (this.connectionHealth) {
+            this.connectionHealth.recordReceivedInput(packet.currentFrame);
+        }
+
+        // Log occasionally for debugging
+        if (this.frameNumber % 60 === 0) {
+            console.log(`[P2P] Received input packet: player=${packet.playerId}, frame=${packet.currentFrame}, inputs=${packet.inputs.length}`);
+        }
+    }
+
+    _handlePing(buffer) {
+        /**
+         * Respond to ping with pong (echo timestamp back).
+         */
+        const view = new DataView(buffer);
+        const timestamp = view.getFloat64(1, false);
+
+        // Echo back as pong
+        const pong = encodePong(timestamp);
+        if (this.webrtcManager?.isReady()) {
+            this.webrtcManager.send(pong);
+        }
+    }
+
+    _handlePong(buffer) {
+        /**
+         * Process pong response and update RTT tracking.
+         */
+        const view = new DataView(buffer);
+        const sentTime = view.getFloat64(1, false);
+
+        // Record RTT sample
+        if (this.connectionHealth) {
+            this.connectionHealth.rttTracker.recordRTT(sentTime);
+        }
+
+        // Calculate and log RTT
+        const rtt = performance.now() - sentTime;
+        if (this.frameNumber % 60 === 0) {
+            const avgRtt = this.connectionHealth?.rttTracker.getAverageRTT();
+            console.log(`[P2P] RTT: ${rtt.toFixed(1)}ms (avg: ${avgRtt?.toFixed(1) ?? 'N/A'}ms)`);
+        }
+    }
 }
