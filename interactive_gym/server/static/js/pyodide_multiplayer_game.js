@@ -901,10 +901,8 @@ obs, infos, render_state
         // 4. Increment frame (AFTER recording hash)
         this.frameNumber++;
 
-        // Prune old input buffer entries to prevent unbounded growth
-        this.pruneInputBuffer();
-
         // GGPO: Check for pending rollback (late input arrived)
+        // IMPORTANT: Do this BEFORE pruning to ensure we have inputs for the rollback
         if (this.pendingRollbackFrame !== null && this.pendingRollbackFrame !== undefined) {
             const rollbackFrame = this.pendingRollbackFrame;
             this.pendingRollbackFrame = null;
@@ -917,6 +915,10 @@ obs, infos, render_state
             // Perform rollback and replay
             await this.performRollback(rollbackFrame, playerIds);
         }
+
+        // Prune old input buffer entries to prevent unbounded growth
+        // IMPORTANT: Do this AFTER rollback to ensure we don't remove inputs we need
+        this.pruneInputBuffer();
 
         // Log diagnostics periodically
         this.logDiagnostics();
@@ -1602,8 +1604,19 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
         // Update last confirmed action for this player (used for prediction)
         this.lastConfirmedActions[playerIdStr] = action;
 
+        // Log buffer state periodically for debugging
+        if (frameNumber % 30 === 0) {
+            const bufferFrames = Array.from(this.inputBuffer.keys()).sort((a, b) => a - b);
+            console.log(
+                `[GGPO] Input buffer state: frames=[${bufferFrames.slice(-10).join(',')}], ` +
+                `current=${this.frameNumber}, stored=${frameNumber}`
+            );
+        }
+
         // Check if this input arrived late (we already simulated past this frame)
         // and we used a prediction that might be wrong
+        // NOTE: Use >= for late detection because frameNumber == this.frameNumber means we're
+        // about to step that frame but haven't yet, so it's not late
         if (frameNumber < this.frameNumber && this.predictedFrames.has(frameNumber)) {
             // Late input! Check what action we ACTUALLY used at that frame
             // by looking at actionSequence, not by calling getPredictedAction()
@@ -1635,8 +1648,8 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
             }
         }
 
-        // Prune old input buffer entries
-        this.pruneInputBuffer();
+        // NOTE: Don't prune here - let step() handle pruning to avoid removing inputs
+        // needed for pending rollbacks
     }
 
     /**
@@ -1692,8 +1705,11 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
      *
      * This ensures both clients use the same logic: either the confirmed input
      * for that exact frame, or the same prediction algorithm.
+     *
+     * @param trackPredictions - If true, track predicted frames for rollback detection.
+     *                           Set to false during replay to avoid re-marking frames.
      */
-    getInputsForFrame(frameNumber, playerIds) {
+    getInputsForFrame(frameNumber, playerIds, trackPredictions = true) {
         const inputs = {};
         let usedPrediction = false;
 
@@ -1716,7 +1732,8 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
         }
 
         // Track that we used prediction for this frame (for rollback detection)
-        if (usedPrediction) {
+        // Only track during normal stepping, not during replay
+        if (usedPrediction && trackPredictions) {
             this.predictedFrames.add(frameNumber);
         }
 
@@ -1941,7 +1958,37 @@ if 'py_rng_state' in _snapshot:
         // Replay each frame
         for (let frame = snapshotFrame; frame < currentFrame; frame++) {
             // Get human inputs from buffer (now has confirmed inputs including the late one)
-            const humanInputs = this.getInputsForFrame(frame, playerIds);
+            // Note: getInputsForFrame may still use prediction if inputs haven't arrived yet
+            // Pass trackPredictions=false during replay to avoid re-marking frames
+            const humanInputs = this.getInputsForFrame(frame, playerIds, false);
+
+            // Log what inputs we're using during replay
+            const confirmedForFrame = [];
+            const predictedForFrame = [];
+            const frameInputs = this.inputBuffer.get(frame);
+            for (const pid of playerIds) {
+                if (frameInputs && frameInputs.has(String(pid))) {
+                    confirmedForFrame.push(pid);
+                } else {
+                    predictedForFrame.push(pid);
+                }
+            }
+
+            // Warn if we're still using prediction during replay - this means inputs are missing!
+            if (predictedForFrame.length > 0) {
+                console.warn(
+                    `[GGPO] WARNING: Still using prediction during replay at frame ${frame}! ` +
+                    `Missing inputs for players: [${predictedForFrame.join(',')}]. ` +
+                    `This will likely cause continued desync.`
+                );
+            }
+
+            console.log(
+                `[GGPO] Replay frame ${frame}: ` +
+                `Confirmed: [${confirmedForFrame.join(',')}], ` +
+                `Predicted: [${predictedForFrame.join(',')}], ` +
+                `Inputs: ${JSON.stringify(humanInputs)}`
+            );
 
             // Build complete action dict
             const envActions = {};
@@ -1982,11 +2029,6 @@ if 'py_rng_state' in _snapshot:
                 this.actionCounts[playerId][actionKey] = (this.actionCounts[playerId][actionKey] || 0) + 1;
             }
 
-            // Log the replayed action for debugging
-            console.log(
-                `[GGPO] Replay frame ${frame}: ${JSON.stringify(envActions)}`
-            );
-
             // Step environment
             await this.pyodide.runPythonAsync(`
 _replay_actions = ${JSON.stringify(envActions)}
@@ -2007,8 +2049,9 @@ env.step(_replay_actions)
      */
     pruneInputBuffer() {
         // Remove entries for frames we've already simulated
-        // Keep a small buffer behind for potential rollback
-        const pruneThreshold = this.frameNumber - 10;
+        // Keep a larger buffer behind for potential rollback (must be >= maxSnapshots * snapshotInterval)
+        // With snapshotInterval=5 and maxSnapshots=30, we need at least 150 frames of buffer
+        const pruneThreshold = this.frameNumber - 60;  // Keep ~2 seconds at 30 FPS
         const keysToDelete = [];
 
         for (const key of this.inputBuffer.keys()) {
