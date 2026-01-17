@@ -2635,7 +2635,7 @@ env.step(_replay_actions)
         };
 
         // Emit to server for research data persistence
-        this.socket.emit('p2p_connection_type', {
+        socket.emit('p2p_connection_type', {
             game_id: this.gameId,
             player_id: this.myPlayerId,
             connection_type: connInfo.connectionType,
