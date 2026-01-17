@@ -85,7 +85,7 @@ Plans:
 
 Plans:
 - [x] 04-01-PLAN.md -- TURN configuration, connection type detection, quality monitoring, ICE recovery
-- [ ] 04-02-PLAN.md -- Wire TURN credentials from server config to WebRTCManager (gap closure)
+- [x] 04-02-PLAN.md -- Wire TURN credentials from server config to WebRTCManager (gap closure)
 
 ---
 
@@ -113,7 +113,7 @@ Plans:
 | 1 - WebRTC Foundation | Complete | 2026-01-16 |
 | 2 - P2P Transport Layer | Complete | 2026-01-17 |
 | 3 - GGPO P2P Integration | Complete | 2026-01-17 |
-| 4 - TURN and Resilience | In progress | - |
+| 4 - TURN and Resilience | Complete | 2026-01-17 |
 | 5 - Validation and Cleanup | Not started | - |
 
 ---
