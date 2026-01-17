@@ -129,6 +129,111 @@ function getMessageType(buffer) {
     return view.getUint8(0);
 }
 
+/**
+ * Tracks round-trip time measurements from ping/pong exchanges.
+ */
+class RTTTracker {
+    constructor() {
+        this.rttSamples = [];
+        this.maxSamples = 10;
+        this.lastPingTime = 0;
+        this.pingInterval = 500;  // ms between pings
+    }
+
+    /**
+     * Check if enough time has passed to send another ping.
+     * @returns {boolean}
+     */
+    shouldPing() {
+        return performance.now() - this.lastPingTime >= this.pingInterval;
+    }
+
+    /**
+     * Record an RTT sample from a pong response.
+     * @param {number} sentTime - The timestamp echoed back in the pong
+     */
+    recordRTT(sentTime) {
+        const rtt = performance.now() - sentTime;
+        this.rttSamples.push(rtt);
+        if (this.rttSamples.length > this.maxSamples) {
+            this.rttSamples.shift();
+        }
+    }
+
+    /**
+     * Get the average RTT across recent samples.
+     * @returns {number|null} Average RTT in ms, or null if no samples
+     */
+    getAverageRTT() {
+        if (this.rttSamples.length === 0) return null;
+        return this.rttSamples.reduce((a, b) => a + b, 0) / this.rttSamples.length;
+    }
+
+    /**
+     * Get estimated one-way latency (half of RTT).
+     * @returns {number|null} Latency in ms, or null if no samples
+     */
+    getLatency() {
+        const rtt = this.getAverageRTT();
+        return rtt !== null ? rtt / 2 : null;
+    }
+}
+
+/**
+ * Monitors P2P connection health based on packet reception patterns and latency.
+ */
+class ConnectionHealthMonitor {
+    constructor() {
+        this.rttTracker = new RTTTracker();
+        this.lastReceivedFrame = -1;
+        this.packetsReceived = 0;
+        this.gapCount = 0;  // Count of detected frame gaps
+
+        // Health thresholds
+        this.warningLatencyMs = 100;
+        this.criticalLatencyMs = 200;
+    }
+
+    /**
+     * Record that we received an input for a frame.
+     * @param {number} frame - The frame number received
+     */
+    recordReceivedInput(frame) {
+        this.packetsReceived++;
+
+        // Detect gaps (indicates packet loss, though redundancy may cover it)
+        if (this.lastReceivedFrame >= 0 && frame > this.lastReceivedFrame + 1) {
+            this.gapCount++;
+        }
+        this.lastReceivedFrame = Math.max(this.lastReceivedFrame, frame);
+    }
+
+    /**
+     * Get current connection health status.
+     * @returns {{rtt: number|null, latency: number|null, packetsReceived: number, gapCount: number, status: string}}
+     */
+    getHealthStatus() {
+        const latency = this.rttTracker.getLatency();
+
+        let status = 'good';
+        if (latency !== null) {
+            if (latency > this.criticalLatencyMs) {
+                status = 'critical';
+            } else if (latency > this.warningLatencyMs) {
+                status = 'warning';
+            }
+        }
+
+        return {
+            rtt: this.rttTracker.getAverageRTT(),
+            latency: latency,
+            packetsReceived: this.packetsReceived,
+            gapCount: this.gapCount,
+            status: status
+        };
+    }
+}
+
 export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
     constructor(config) {
         super(config);
