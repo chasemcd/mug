@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md
 
 **Core value:** Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
-**Current focus:** Phase 3 - GGPO P2P Integration
+**Current focus:** Phase 4 - TURN and Resilience
 
 ## Current Position
 
-Phase: 3 of 5 (GGPO P2P Integration)
+Phase: 4 of 5 (TURN and Resilience)
 Plan: 1 of 1 complete
 Status: Phase complete
-Last activity: 2026-01-17 - Completed 03-01-PLAN.md
+Last activity: 2026-01-17 - Completed 04-01-PLAN.md
 
-Progress: [######----] 60%
+Progress: [########--] 80%
 
 ## Phase Overview
 
@@ -23,13 +23,13 @@ Progress: [######----] 60%
 | 1 | WebRTC Foundation | WEBRTC-01, WEBRTC-02 | Complete |
 | 2 | P2P Transport Layer | GGPO-02, GGPO-03 | Complete |
 | 3 | GGPO P2P Integration | GGPO-01, NPLAY-01 | Complete |
-| 4 | TURN and Resilience | WEBRTC-03, WEBRTC-04 | Not started |
+| 4 | TURN and Resilience | WEBRTC-03, WEBRTC-04 | Complete |
 | 5 | Validation and Cleanup | CLEAN-01 | Not started |
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 6
+- Total plans completed: 7
 - Average duration: ~5 min
 
 **By Phase:**
@@ -39,6 +39,7 @@ Progress: [######----] 60%
 | 1 | 2 | ~20 min | ~10 min |
 | 2 | 3 | ~6 min | ~2 min |
 | 3 | 1 | ~5 min | ~5 min |
+| 4 | 1 | ~5 min | ~5 min |
 
 ## Accumulated Context
 
@@ -57,6 +58,10 @@ Progress: [######----] 60%
 
 **Modified in Phase 3:**
 - `interactive_gym/server/static/js/pyodide_multiplayer_game.js` - broadcastSymmetricStateSync(), p2pMetrics, _checkP2PHealth()
+
+**Modified in Phase 4:**
+- `interactive_gym/server/static/js/webrtc_manager.js` - TURN config, ConnectionQualityMonitor, getConnectionType(), ICE restart (759 lines now)
+- `interactive_gym/server/static/js/pyodide_multiplayer_game.js` - _logConnectionType(), p2pMetrics.connectionType, episode summary update
 
 ### Decisions
 
@@ -77,6 +82,10 @@ Progress: [######----] 60%
 | 02-03 | Parallel SocketIO/P2P sending | Phase 3 will add P2P-first routing |
 | 03-01 | Symmetric state sync (both peers broadcast) | Removed host-only restriction for mutual verification |
 | 03-01 | Fallback at 300ms latency or critical status | Explicit threshold for degraded P2P detection |
+| 04-01 | Open Relay Project TURN provider | Free 20GB/month tier sufficient for research |
+| 04-01 | Quality thresholds: 150ms/300ms | Higher than Phase 2 to account for TURN overhead |
+| 04-01 | Max 3 ICE restart attempts | Balance recovery vs giving up on broken connections |
+| 04-01 | 5 second disconnect timeout | Grace period for transient issues |
 
 ### Pending Todos
 
@@ -86,13 +95,13 @@ Progress: [######----] 60%
 
 **Research pitfalls addressed:**
 - Pitfall #4: DataChannel reliability mode - using unreliable/unordered (ordered: false, maxRetransmits: 0)
+- Pitfall #11: TURN latency detection - Connection type detection via getStats() implemented in Phase 4
 
 **Research pitfalls remaining:**
-- Pitfall #11: TURN latency detection - Deferred to Phase 4
 - Pitfall #1: Determinism validation - Deferred to Phase 5
 
 ## Session Continuity
 
 Last session: 2026-01-17
-Stopped at: Completed 03-01-PLAN.md (Phase 3 complete)
-Resume with: Begin Phase 4 planning/execution
+Stopped at: Completed 04-01-PLAN.md (Phase 4 complete)
+Resume with: Begin Phase 5 planning/execution
