@@ -1905,13 +1905,13 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
         /**
          * Reconcile client state with server's authoritative state.
          *
-         * In real-time mode, the server and client step independently, so
-         * hash mismatches are EXPECTED due to timing differences in action
-         * application. We use a tolerance-based approach:
+         * Server is always authoritative. We apply server state when:
+         * 1. Hashes mismatch (real divergence detected)
+         * 2. Large frame drift (client got too far ahead/behind)
          *
-         * - Small drift (±2 frames): Skip correction, just sync metadata
-         * - Moderate drift (3-30 frames): Apply server state (no replay - actions differ)
-         * - Large drift (>30 frames): Force full resync
+         * We skip correction only when:
+         * - Hashes match (confirmed in sync)
+         * - No client hash available AND small drift (can't verify, trust timing)
          *
          * Returns true if state correction was applied, false if skipped.
          */
@@ -1919,13 +1919,13 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
         const serverHash = serverState.state_hash;
         const preSyncFrame = this.frameNumber;
         const drift = preSyncFrame - serverFrame;
+        const absDrift = Math.abs(drift);
 
         // Look up client's hash at server's frame
         const clientHash = this.getStateHashForFrame(serverFrame);
 
-        // Check if we're in sync (hashes match)
+        // CASE 1: Hashes match - we're in sync!
         if (clientHash && serverHash && clientHash === serverHash) {
-            // States match - just update tracking
             this.confirmedFrame = serverFrame;
             this.pruneInputBuffer(serverFrame);
 
@@ -1944,46 +1944,54 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
             return false;
         }
 
-        // Hashes don't match - decide strategy based on drift magnitude
-        const absDrift = Math.abs(drift);
-
-        // Small drift (±2 frames): SKIP correction
-        // In real-time mode, small timing differences are expected.
-        // Correcting every mismatch causes constant jitter.
-        // Just sync metadata and trust local state.
-        if (absDrift <= 2) {
+        // CASE 2: Hashes MISMATCH - real divergence, always apply server state
+        if (clientHash && serverHash && clientHash !== serverHash) {
             console.log(
-                `[Reconcile] Hash mismatch but small drift (${drift}), skipping correction. ` +
-                `Server hash: ${serverHash?.substring(0, 8)}, Client hash: ${clientHash?.substring(0, 8) || 'N/A'}`
+                `[Reconcile] HASH MISMATCH at frame ${serverFrame}. ` +
+                `Server: ${serverHash.substring(0, 8)}, Client: ${clientHash.substring(0, 8)}, ` +
+                `drift: ${drift}. Applying server state to correct divergence.`
             );
 
-            // Still sync cumulative rewards (authoritative)
+            await this.applyServerState(serverState);
+            this.confirmedFrame = serverFrame;
+            this.stateHashHistory.clear();
+            this.inputBuffer = [];
+            return true;
+        }
+
+        // CASE 3: No client hash available (history cleared or frame not reached yet)
+        // Only skip correction if drift is very small; otherwise apply server state
+        if (!clientHash && absDrift <= 1) {
+            console.log(
+                `[Reconcile] No client hash for frame ${serverFrame} (drift=${drift}), ` +
+                `syncing metadata only`
+            );
+
+            // Sync frame/step numbers to keep timing aligned
+            this.frameNumber = serverFrame;
+            if (serverState.step_num !== undefined) {
+                this.lastKnownServerStepNum = serverState.step_num;
+                this.step_num = serverState.step_num;
+            }
             if (serverState.cumulative_rewards) {
                 this.cumulative_rewards = serverState.cumulative_rewards;
                 ui_utils.updateHUDText(this.getHUDText());
             }
-            if (serverState.step_num !== undefined) {
-                this.lastKnownServerStepNum = serverState.step_num;
-            }
 
-            // Prune old inputs
             this.pruneInputBuffer(serverFrame);
             return false;
         }
 
-        // Moderate or large drift: Apply server state
+        // CASE 4: No client hash AND significant drift - apply server state
         console.log(
-            `[Reconcile] Drift ${drift} exceeds tolerance, applying server state. ` +
+            `[Reconcile] No client hash and drift=${drift}, applying server state. ` +
             `Server: ${serverFrame}, Client: ${preSyncFrame}`
         );
 
         await this.applyServerState(serverState);
         this.confirmedFrame = serverFrame;
         this.stateHashHistory.clear();
-
-        // Clear input buffer - can't replay since server used different actions
         this.inputBuffer = [];
-
         return true;
     }
 
