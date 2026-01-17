@@ -234,6 +234,78 @@ class ConnectionHealthMonitor {
     }
 }
 
+/**
+ * Manages sending local inputs over P2P DataChannel with redundancy.
+ * Each packet includes the last N inputs to handle packet loss.
+ */
+class P2PInputSender {
+    /**
+     * @param {WebRTCManager} webrtcManager - The WebRTC connection manager
+     * @param {number} myPlayerId - This player's ID
+     * @param {number} redundancyCount - Number of inputs to include per packet (default: 3)
+     */
+    constructor(webrtcManager, myPlayerId, redundancyCount = 3) {
+        this.webrtcManager = webrtcManager;
+        this.myPlayerId = myPlayerId;
+        this.redundancyCount = redundancyCount;
+
+        // Track recent inputs for redundant sending
+        // [{frame, action}, ...] - most recent at end
+        this.recentInputs = [];
+        this.maxRecentInputs = 10;  // Keep larger buffer than redundancy needs
+
+        // Buffer congestion threshold (bytes)
+        this.bufferThreshold = 16384;
+    }
+
+    /**
+     * Record a local input and send it (with redundancy) to peer.
+     * @param {number} action - The action taken
+     * @param {number} targetFrame - The frame this input is scheduled for
+     * @returns {boolean} True if sent, false if skipped (buffer congested or not ready)
+     */
+    recordAndSend(action, targetFrame) {
+        // Record this input
+        this.recentInputs.push({ frame: targetFrame, action: action });
+
+        // Trim to max size
+        if (this.recentInputs.length > this.maxRecentInputs) {
+            this.recentInputs.shift();
+        }
+
+        // Check if channel is ready
+        if (!this.webrtcManager?.isReady()) {
+            return false;
+        }
+
+        // Check buffer congestion
+        const dc = this.webrtcManager.dataChannel;
+        if (dc && dc.bufferedAmount > this.bufferThreshold) {
+            console.warn('[P2P] Buffer congested, skipping input packet');
+            return false;
+        }
+
+        // Build redundant input set (current + last N-1)
+        const inputsToSend = this.recentInputs.slice(-this.redundancyCount);
+
+        // Encode and send
+        const packet = encodeInputPacket(
+            this.myPlayerId,
+            targetFrame,
+            inputsToSend
+        );
+
+        return this.webrtcManager.send(packet);
+    }
+
+    /**
+     * Clear recorded inputs (call on episode reset).
+     */
+    reset() {
+        this.recentInputs = [];
+    }
+}
+
 export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
     constructor(config) {
         super(config);
