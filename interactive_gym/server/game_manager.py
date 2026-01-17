@@ -137,6 +137,8 @@ class GameManager:
                 action_population_method = getattr(self.scene, 'action_population_method', 'previous_submitted_action')
                 realtime_mode = getattr(self.scene, 'realtime_mode', True)
                 input_buffer_size = getattr(self.scene, 'input_buffer_size', 300)
+                num_episodes = getattr(self.scene, 'num_episodes', 1)
+                max_steps = getattr(self.scene, 'max_steps', 10000)
 
                 self.pyodide_coordinator.create_game(
                     game_id=game_id,
@@ -149,6 +151,8 @@ class GameManager:
                     action_population_method=action_population_method,
                     realtime_mode=realtime_mode,
                     input_buffer_size=input_buffer_size,
+                    max_episodes=num_episodes,
+                    max_steps=max_steps,
                 )
                 logger.info(
                     f"Created multiplayer Pyodide game state for {game_id} "

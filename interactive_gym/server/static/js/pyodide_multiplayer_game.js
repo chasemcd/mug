@@ -359,12 +359,17 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
                 `Latency: ${typeof networkLatency === 'number' ? networkLatency.toFixed(0) + 'ms' : networkLatency}`
             );
 
-            // Real-time mode: use rollback + replay for smooth reconciliation
+            // Real-time mode: use tolerance-based reconciliation
+            // Small drift is expected and tolerated; only correct on significant drift
             if (this.realtimeMode && hasEnvState) {
-                await this.reconcileWithServer(state);
+                const wasApplied = await this.reconcileWithServer(state);
                 // Update tracking
                 this.diagnostics.lastSyncFrame = state.frame_number;
                 this.diagnostics.lastSyncTime = Date.now();
+                if (!wasApplied) {
+                    // Correction was skipped - drift within tolerance
+                    // Keep local state, just synced metadata
+                }
                 return;
             }
 
@@ -625,6 +630,34 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
                 this.episodeStartResolve(state);
                 this.episodeStartResolve = null;
                 this.waitingForEpisodeStart = false;
+            }
+        });
+
+        // Server game complete (server-authoritative mode)
+        // Server broadcasts this when all configured episodes have been completed
+        socket.on('server_game_complete', (data) => {
+            if (!this.serverAuthoritative) {
+                return;
+            }
+
+            const { game_id, episode_num, max_episodes } = data;
+            if (game_id !== this.gameId) {
+                return;
+            }
+
+            console.log(
+                `[MultiplayerPyodide] Server game complete: ` +
+                `${episode_num}/${max_episodes} episodes`
+            );
+
+            // Mark game as complete - this stops the game loop
+            this.state = "done";
+            this.episodeComplete = true;
+            this.num_episodes = episode_num;
+
+            // Sync final rewards if provided
+            if (data.cumulative_rewards) {
+                this.cumulative_rewards = data.cumulative_rewards;
             }
         });
     }
@@ -1201,10 +1234,12 @@ obs, infos, render_state
         }
 
         // 7. Check if episode is complete (only trigger once)
+        // Episode ends when: environment terminates/truncates OR max_steps reached
         const all_terminated = Array.from(terminateds.values()).every(value => value === true);
         const all_truncated = Array.from(truncateds.values()).every(value => value === true);
+        const max_steps_reached = this.step_num >= this.max_steps;
 
-        if ((all_terminated || all_truncated) && !this.episodeComplete) {
+        if ((all_terminated || all_truncated || max_steps_reached) && !this.episodeComplete) {
             this.episodeComplete = true;
 
             // Log episode summary
@@ -1870,31 +1905,33 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
         /**
          * Reconcile client state with server's authoritative state.
          *
-         * In real-time mode, uses rollback + replay:
-         * 1. Compare hash at server's frame
-         * 2. If match: just update confirmedFrame, continue
-         * 3. If mismatch: apply server state, correct input buffer, replay
+         * In real-time mode, the server and client step independently, so
+         * hash mismatches are EXPECTED due to timing differences in action
+         * application. We use a tolerance-based approach:
          *
-         * Returns true if reconciliation was performed, false if already in sync.
+         * - Small drift (±2 frames): Skip correction, just sync metadata
+         * - Moderate drift (3-30 frames): Apply server state (no replay - actions differ)
+         * - Large drift (>30 frames): Force full resync
+         *
+         * Returns true if state correction was applied, false if skipped.
          */
         const serverFrame = serverState.frame_number;
         const serverHash = serverState.state_hash;
         const preSyncFrame = this.frameNumber;
+        const drift = preSyncFrame - serverFrame;
 
         // Look up client's hash at server's frame
         const clientHash = this.getStateHashForFrame(serverFrame);
 
-        // Check if we're in sync
+        // Check if we're in sync (hashes match)
         if (clientHash && serverHash && clientHash === serverHash) {
             // States match - just update tracking
             this.confirmedFrame = serverFrame;
             this.pruneInputBuffer(serverFrame);
 
-            // Update server step tracking
             if (serverState.step_num !== undefined) {
                 this.lastKnownServerStepNum = serverState.step_num;
             }
-            // Sync cumulative rewards
             if (serverState.cumulative_rewards) {
                 this.cumulative_rewards = serverState.cumulative_rewards;
                 ui_utils.updateHUDText(this.getHUDText());
@@ -1902,56 +1939,50 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
 
             console.log(
                 `[Reconcile] States match at frame ${serverFrame} ` +
-                `(hash=${serverHash.substring(0, 8)}), client ahead by ${preSyncFrame - serverFrame}`
+                `(hash=${serverHash.substring(0, 8)}), drift: ${drift}`
             );
-            return false;  // No reconciliation needed
+            return false;
         }
 
-        // States don't match - need to rollback and replay
-        const framesToReplay = preSyncFrame - serverFrame;
+        // Hashes don't match - decide strategy based on drift magnitude
+        const absDrift = Math.abs(drift);
 
+        // Small drift (±2 frames): SKIP correction
+        // In real-time mode, small timing differences are expected.
+        // Correcting every mismatch causes constant jitter.
+        // Just sync metadata and trust local state.
+        if (absDrift <= 2) {
+            console.log(
+                `[Reconcile] Hash mismatch but small drift (${drift}), skipping correction. ` +
+                `Server hash: ${serverHash?.substring(0, 8)}, Client hash: ${clientHash?.substring(0, 8) || 'N/A'}`
+            );
+
+            // Still sync cumulative rewards (authoritative)
+            if (serverState.cumulative_rewards) {
+                this.cumulative_rewards = serverState.cumulative_rewards;
+                ui_utils.updateHUDText(this.getHUDText());
+            }
+            if (serverState.step_num !== undefined) {
+                this.lastKnownServerStepNum = serverState.step_num;
+            }
+
+            // Prune old inputs
+            this.pruneInputBuffer(serverFrame);
+            return false;
+        }
+
+        // Moderate or large drift: Apply server state
         console.log(
-            `[Reconcile] Mismatch at frame ${serverFrame}, ` +
-            `client at ${preSyncFrame}, need to replay ${framesToReplay} frames`
+            `[Reconcile] Drift ${drift} exceeds tolerance, applying server state. ` +
+            `Server: ${serverFrame}, Client: ${preSyncFrame}`
         );
 
-        // Decide on reconciliation strategy based on drift
-        if (framesToReplay <= 0) {
-            // Client is behind or at server - just apply state, no replay
-            await this.applyServerState(serverState);
-            this.confirmedFrame = serverFrame;
-            this.inputBuffer = [];  // Clear buffer - stale
-            return true;
-        }
-
-        if (framesToReplay > 30) {
-            // Large drift - just snap to server state (replay would take too long)
-            console.warn(`[Reconcile] Large drift (${framesToReplay} frames), snapping to server`);
-            await this.applyServerState(serverState);
-            this.confirmedFrame = serverFrame;
-            this.inputBuffer = [];
-            this.stateHashHistory.clear();
-            return true;
-        }
-
-        // Moderate drift - apply server state, correct inputs, and replay
         await this.applyServerState(serverState);
         this.confirmedFrame = serverFrame;
-
-        // Correct input buffer with server's input history
-        const serverInputs = serverState.input_history || [];
-        this.correctInputBuffer(serverInputs);
-
-        // Replay frames
-        if (framesToReplay > 0) {
-            await this.replayFrames(serverFrame, framesToReplay);
-        }
-
-        // Clear hash history (replayed states have new hashes)
         this.stateHashHistory.clear();
 
-        // Prune old inputs
-        this.pruneInputBuffer(serverFrame);
+        // Clear input buffer - can't replay since server used different actions
+        this.inputBuffer = [];
 
         return true;
     }

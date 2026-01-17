@@ -324,10 +324,12 @@ obs, rewards, terminateds, truncateds, infos, render_state
         ui_utils.updateHUDText(this.getHUDText());
 
         // Check if the episode is complete
+        // Episode ends when: environment terminates/truncates OR max_steps reached
         const all_terminated = Array.from(terminateds.values()).every(value => value === true);
         const all_truncated = Array.from(truncateds.values()).every(value => value === true);
+        const max_steps_reached = this.step_num >= this.max_steps;
 
-        if (all_terminated || all_truncated) {
+        if (all_terminated || all_truncated || max_steps_reached) {
             this.num_episodes += 1;
 
             if (this.num_episodes >= this.max_episodes) {

@@ -74,6 +74,8 @@ class ServerGameRunner:
         action_population_method: str = "previous_submitted_action",
         realtime_mode: bool = True,
         input_buffer_size: int = 300,
+        max_episodes: int = 1,
+        max_steps: int = 10000,
     ):
         self.game_id = game_id
         self.environment_code = environment_code
@@ -88,6 +90,8 @@ class ServerGameRunner:
         self.action_population_method = action_population_method
         self.realtime_mode = realtime_mode
         self.input_buffer_size = input_buffer_size
+        self.max_episodes = max_episodes
+        self.max_steps = max_steps
 
         # Environment state
         self.env = None
@@ -275,10 +279,19 @@ random.seed({rng_seed})
         now = time.time()
         self.last_tick_time = now
 
-        # Build action dict using configured fallback strategy
+        # Build action dict: use received action if available, otherwise fallback
+        # Clear each action after use to match client's "pop from queue" behavior
         actions = {}
         for player_id in self.player_ids:
-            actions[player_id] = self._get_action_for_player(player_id)
+            player_id_str = str(player_id)
+            if player_id_str in self.current_actions:
+                # Use the received action and consume it (non-sticky)
+                actions[player_id] = self.current_actions.pop(player_id_str)
+                # Track as last submitted for fallback
+                self.last_submitted_actions[player_id_str] = actions[player_id]
+            else:
+                # No action received this tick - use fallback
+                actions[player_id] = self._get_action_for_player(player_id)
 
         # Record input for this frame (for client replay verification)
         self.input_history.append(InputFrame(
@@ -316,8 +329,12 @@ random.seed({rng_seed})
             self.frame_number += 1
             self.step_num += 1
 
-            # Check for episode end
-            episode_done = terminateds.get("__all__", False) or truncateds.get("__all__", False)
+            # Check for episode end (environment termination OR max_steps reached)
+            episode_done = (
+                terminateds.get("__all__", False) or
+                truncateds.get("__all__", False) or
+                self.step_num >= self.max_steps
+            )
             if episode_done:
                 self._handle_episode_end_realtime()
             elif self.frame_number % self.state_broadcast_interval == 0:
@@ -348,6 +365,39 @@ random.seed({rng_seed})
     def _handle_episode_end_realtime(self):
         """Handle episode completion in real-time mode."""
         self.episode_num += 1
+        logger.info(
+            f"[ServerGameRunner] Episode {self.episode_num}/{self.max_episodes} "
+            f"completed for {self.game_id}"
+        )
+
+        # Check if we've reached max episodes
+        if self.episode_num >= self.max_episodes:
+            logger.info(
+                f"[ServerGameRunner] All {self.max_episodes} episodes complete "
+                f"for {self.game_id}, stopping"
+            )
+            self.stop_realtime()
+
+            # Broadcast game completion to clients
+            if self.sio:
+                self.sio.emit(
+                    "server_game_complete",
+                    {
+                        "game_id": self.game_id,
+                        "episode_num": self.episode_num,
+                        "max_episodes": self.max_episodes,
+                        "cumulative_rewards": self.cumulative_rewards,
+                    },
+                    room=self.game_id
+                )
+            return
+
+        # Pause the real-time loop during episode transition
+        # This prevents ticking while clients show their countdown
+        self.running = False
+        logger.info(f"[ServerGameRunner] Pausing for episode transition")
+
+        # Reset for next episode
         self.frame_number = 0
         self.step_num = 0
 
@@ -367,9 +417,31 @@ random.seed({rng_seed})
         self.action_counts = {}
         self.sync_epoch += 1
 
-        # Broadcast episode start
+        # Broadcast episode start state to clients
+        # Clients will show countdown then signal ready
         self.broadcast_state(event_type="server_episode_start")
-        logger.info(f"[ServerGameRunner] Episode {self.episode_num} started (real-time)")
+        logger.info(f"[ServerGameRunner] Episode {self.episode_num + 1} state broadcast, waiting for clients")
+
+        # Resume after a delay to allow client countdown (3 seconds + buffer)
+        import eventlet
+        eventlet.spawn_after(4.0, self._resume_after_episode_transition)
+
+    def _resume_after_episode_transition(self):
+        """Resume the real-time loop after episode transition delay."""
+        if not self.is_initialized:
+            return
+
+        # Don't resume if we've been stopped (e.g., game ended)
+        if self.episode_num >= self.max_episodes:
+            return
+
+        logger.info(
+            f"[ServerGameRunner] Resuming real-time loop for episode "
+            f"{self.episode_num + 1} of {self.game_id}"
+        )
+        self.running = True
+        self.last_tick_time = time.time()
+        self._schedule_next_tick()
 
     def receive_action_realtime(
         self,

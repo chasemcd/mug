@@ -99,6 +99,8 @@ class PyodideGameCoordinator:
         action_population_method: str = "previous_submitted_action",
         realtime_mode: bool = True,
         input_buffer_size: int = 300,
+        max_episodes: int = 1,
+        max_steps: int = 10000,
     ) -> PyodideGameState:
         """
         Initialize a new Pyodide multiplayer game.
@@ -159,6 +161,8 @@ class PyodideGameCoordinator:
                     action_population_method=action_population_method,
                     realtime_mode=realtime_mode,
                     input_buffer_size=input_buffer_size,
+                    max_episodes=max_episodes,
+                    max_steps=max_steps,
                 )
                 mode_str = "real-time" if realtime_mode else "frame-aligned"
                 logger.info(
