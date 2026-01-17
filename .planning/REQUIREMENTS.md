@@ -55,12 +55,12 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 
 ## Success Criteria
 
-- [ ] Two players can connect via WebRTC DataChannel (direct or TURN)
-- [ ] Both players experience identical, local-feeling input responsiveness
-- [ ] Rollback/replay occurs correctly on input misprediction
-- [ ] Game state remains synchronized (verified by hash comparison)
-- [ ] Legacy host-based sync code removed from P2P mode
-- [ ] Research experiments can run with valid data collection
+- [x] Two players can connect via WebRTC DataChannel (direct or TURN)
+- [x] Both players experience identical, local-feeling input responsiveness
+- [x] Rollback/replay occurs correctly on input misprediction
+- [x] Game state remains synchronized (verified by hash comparison)
+- [x] Legacy host-based sync code removed from P2P mode
+- [x] Research experiments can run with valid data collection
 
 ---
 
@@ -85,7 +85,7 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 | GGPO-02 | Phase 2 | Complete |
 | GGPO-03 | Phase 2 | Complete |
 | NPLAY-01 | Phase 3 | Complete |
-| CLEAN-01 | Phase 5 | Pending |
+| CLEAN-01 | Phase 5 | Complete |
 
 ---
 
