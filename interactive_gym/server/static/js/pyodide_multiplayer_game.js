@@ -698,18 +698,20 @@ obs, infos, render_state
         }
 
         // GGPO Input Synchronization:
+        // We only need to wait for OTHER players' inputs, not our own.
         // With input delay, actions for frame N should arrive before we need to step frame N.
-        // We briefly wait for inputs, then proceed with predictions if needed.
-        // The key is: INPUT_DELAY gives actions time to propagate before we need them.
 
         // Get all human player IDs
         const humanPlayerIds = Object.entries(this.policyMapping)
             .filter(([_, policy]) => policy === 'human')
             .map(([id, _]) => String(id));
 
-        if (this.serverAuthoritative) {
-            // Check if we have confirmed inputs for this frame from all players
-            const haveAllInputs = this.hasConfirmedInputsForFrame(this.frameNumber, humanPlayerIds);
+        // Other human players (excluding self) - these are the ones we need inputs from
+        const otherHumanPlayerIds = humanPlayerIds.filter(pid => pid !== String(this.myPlayerId));
+
+        if (this.serverAuthoritative && otherHumanPlayerIds.length > 0) {
+            // Check if we have confirmed inputs for this frame from OTHER players
+            const haveAllInputs = this.hasConfirmedInputsForFrame(this.frameNumber, otherHumanPlayerIds);
 
             // If we don't have all inputs, wait briefly (input delay should have provided buffer)
             if (!haveAllInputs) {
@@ -721,17 +723,17 @@ obs, infos, render_state
                     await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
                     waited += pollIntervalMs;
 
-                    if (this.hasConfirmedInputsForFrame(this.frameNumber, humanPlayerIds)) {
+                    if (this.hasConfirmedInputsForFrame(this.frameNumber, otherHumanPlayerIds)) {
                         break;
                     }
                 }
             }
 
-            // Log if we're about to use prediction
-            if (!this.hasConfirmedInputsForFrame(this.frameNumber, humanPlayerIds)) {
+            // Log if we're about to use prediction for other players
+            if (!this.hasConfirmedInputsForFrame(this.frameNumber, otherHumanPlayerIds)) {
                 // Only log occasionally to avoid spam
                 if (this.frameNumber % 30 === 0) {
-                    const missingPlayers = humanPlayerIds.filter(pid => {
+                    const missingPlayers = otherHumanPlayerIds.filter(pid => {
                         const frameInputs = this.inputBuffer.get(this.frameNumber);
                         return !frameInputs || !frameInputs.has(pid);
                     });
@@ -740,29 +742,23 @@ obs, infos, render_state
                     );
                 }
             }
-
-            // Legacy throttle: if queue is building up, slow down
-            const totalQueueSize = Object.values(this.otherPlayerActionQueues)
-                .reduce((sum, queue) => sum + queue.length, 0);
-            if (totalQueueSize > 10) {
-                const throttleDelayMs = Math.min((totalQueueSize - 10) * 3, 30);
-                await new Promise(resolve => setTimeout(resolve, throttleDelayMs));
-            }
         }
 
-        // 1. Build final action dict using GGPO input buffer
-        // Use frame-indexed inputs for human players (confirmed or predicted)
+        // 1. Build final action dict
+        // Local player's action executes immediately (no delay on own client)
+        // Other player's action comes from GGPO buffer (confirmed or predicted)
         const finalActions = {};
 
-        // Get inputs for all human players from GGPO buffer
-        const ggpoInputs = this.getInputsForFrame(this.frameNumber, humanPlayerIds);
+        // Get inputs for other human players from GGPO buffer
+        // (otherHumanPlayerIds already defined above)
+        const ggpoInputs = this.getInputsForFrame(this.frameNumber, otherHumanPlayerIds);
 
         for (const [agentId, policy] of Object.entries(this.policyMapping)) {
             const agentIdStr = String(agentId);
             const myPlayerIdStr = String(this.myPlayerId);
 
             if (agentIdStr === myPlayerIdStr) {
-                // My action - from current input (not from buffer, we execute immediately)
+                // My action - execute immediately (no delay on own client)
                 finalActions[agentId] = allActionsDict[agentId];
                 if (finalActions[agentId] === undefined || finalActions[agentId] === null) {
                     finalActions[agentId] = this.defaultAction;
