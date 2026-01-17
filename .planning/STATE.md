@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md
 
 **Core value:** Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
-**Current focus:** Phase 4 - TURN and Resilience
+**Current focus:** Phase 4 - TURN and Resilience (complete)
 
 ## Current Position
 
 Phase: 4 of 5 (TURN and Resilience)
-Plan: 1 of 1 complete
+Plan: 2 of 2 complete
 Status: Phase complete
-Last activity: 2026-01-17 - Completed 04-01-PLAN.md
+Last activity: 2026-01-17 - Completed 04-02-PLAN.md (gap closure)
 
 Progress: [########--] 80%
 
@@ -29,7 +29,7 @@ Progress: [########--] 80%
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 7
+- Total plans completed: 8
 - Average duration: ~5 min
 
 **By Phase:**
@@ -39,7 +39,7 @@ Progress: [########--] 80%
 | 1 | 2 | ~20 min | ~10 min |
 | 2 | 3 | ~6 min | ~2 min |
 | 3 | 1 | ~5 min | ~5 min |
-| 4 | 1 | ~5 min | ~5 min |
+| 4 | 2 | ~10 min | ~5 min |
 
 ## Accumulated Context
 
@@ -61,7 +61,9 @@ Progress: [########--] 80%
 
 **Modified in Phase 4:**
 - `interactive_gym/server/static/js/webrtc_manager.js` - TURN config, ConnectionQualityMonitor, getConnectionType(), ICE restart (759 lines now)
-- `interactive_gym/server/static/js/pyodide_multiplayer_game.js` - _logConnectionType(), p2pMetrics.connectionType, episode summary update
+- `interactive_gym/server/static/js/pyodide_multiplayer_game.js` - _logConnectionType(), p2pMetrics.connectionType, episode summary update, turnConfig storage
+- `interactive_gym/configurations/remote_config.py` - Added turn_username, turn_credential, force_turn_relay, webrtc() method
+- `interactive_gym/server/pyodide_game_coordinator.py` - TURN config in PyodideGameState and pyodide_game_ready event
 
 ### Decisions
 
@@ -86,6 +88,8 @@ Progress: [########--] 80%
 | 04-01 | Quality thresholds: 150ms/300ms | Higher than Phase 2 to account for TURN overhead |
 | 04-01 | Max 3 ICE restart attempts | Balance recovery vs giving up on broken connections |
 | 04-01 | 5 second disconnect timeout | Grace period for transient issues |
+| 04-02 | TURN config conditional in socket event | Only include when credentials provided |
+| 04-02 | webrtc() follows fluent chaining pattern | Consistency with existing config methods |
 
 ### Pending Todos
 
@@ -103,5 +107,5 @@ Progress: [########--] 80%
 ## Session Continuity
 
 Last session: 2026-01-17
-Stopped at: Completed 04-01-PLAN.md (Phase 4 complete)
+Stopped at: Completed 04-02-PLAN.md (Phase 4 gap closure complete)
 Resume with: Begin Phase 5 planning/execution
