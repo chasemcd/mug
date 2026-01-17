@@ -23,7 +23,37 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         this.gameId = config.game_id;
         this.gameSeed = null;
 
-        // Action queue synchronization
+        // ========== GGPO Rollback Netcode ==========
+        // Input delay: local inputs are scheduled for frame N + INPUT_DELAY
+        // This gives time for inputs to reach the other player before they're needed
+        this.INPUT_DELAY = config.input_delay ?? 2;  // frames of input delay
+
+        // Frame tracking
+        this.frameNumber = 0;           // Current simulation frame
+        this.confirmedFrame = -1;       // Last frame with confirmed inputs from ALL players
+
+        // Input buffers: store inputs by frame number
+        // inputBuffer[frame][playerId] = action
+        this.inputBuffer = new Map();   // Map<frameNumber, Map<playerId, action>>
+        this.inputBufferMaxSize = 120;  // Keep ~4 seconds at 30 FPS
+
+        // Local input queue: inputs scheduled for future frames due to input delay
+        this.localInputQueue = [];      // [{frame, action}] - sorted by frame
+
+        // State snapshots for rollback (stored periodically)
+        this.stateSnapshots = new Map();  // Map<frameNumber, envState>
+        this.snapshotInterval = 5;        // Save snapshot every N frames
+        this.maxSnapshots = 30;           // Keep ~5 seconds of snapshots
+
+        // Prediction tracking
+        this.lastConfirmedActions = {};   // {playerId: lastAction} - for prediction
+        this.predictedFrames = new Set(); // Frames where we used prediction
+
+        // Rollback stats
+        this.rollbackCount = 0;
+        this.maxRollbackFrames = 0;
+
+        // Legacy compatibility (kept for now, will phase out)
         this.otherPlayerActionQueues = {};  // { player_id: [{action, frame_number}, ...] }
         this.lastExecutedActions = {};      // { player_id: last_action } for fallback
 
@@ -33,9 +63,6 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
 
         // Policy mapping (needed to know which agents are human)
         this.policyMapping = config.policy_mapping || {};
-
-        // Frame tracking
-        this.frameNumber = 0;
 
         // Player-to-subject mapping (player_id -> subject_id)
         // Populated when game starts via pyodide_game_ready event
@@ -133,7 +160,7 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
             }
         });
 
-        // Receive other player's action
+        // Receive other player's action (GGPO: store by frame for rollback)
         socket.on('pyodide_other_player_action', (data) => {
             // Don't queue actions if game is done
             if (this.state === "done") {
@@ -142,12 +169,13 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
 
             const { player_id, action, frame_number } = data;
 
-            // Initialize queue if needed
+            // Store in frame-indexed input buffer for GGPO
+            this.storeRemoteInput(player_id, action, frame_number);
+
+            // Legacy: also add to queue for compatibility during transition
             if (!this.otherPlayerActionQueues[player_id]) {
                 this.otherPlayerActionQueues[player_id] = [];
             }
-
-            // Add to queue (FIFO)
             const queue = this.otherPlayerActionQueues[player_id];
             queue.push({ action, frame_number });
 
@@ -396,6 +424,9 @@ print(f"[Python] Seeded RNG with {${seed}}")
             this.otherPlayerActionQueues[playerId] = [];
         }
         this.lastExecutedActions = {};
+
+        // Clear GGPO state for new episode
+        this.clearGGPOState();
 
         // Clear action tracking for sync verification
         this.actionSequence = [];
@@ -666,38 +697,23 @@ obs, infos, render_state
             return null;
         }
 
-        // Action synchronization for server-authoritative mode:
-        // We check if we have actions from other players. If not, we wait briefly.
-        // But we DON'T block indefinitely - that kills FPS.
-        //
-        // The key insight: The server waits for ALL players before stepping.
-        // So if we step with a fallback action, the server will get our real action
-        // and step correctly. The only issue is if we use fallback TOO OFTEN,
-        // causing action count divergence. But occasional fallback is fine.
-        //
-        // Strategy: Quick check (no wait) if we have actions. If not, brief wait.
-        // If still no actions after brief wait, proceed with fallback.
+        // GGPO Input Synchronization:
+        // With input delay, actions for frame N should arrive before we need to step frame N.
+        // We briefly wait for inputs, then proceed with predictions if needed.
+        // The key is: INPUT_DELAY gives actions time to propagate before we need them.
+
+        // Get all human player IDs
+        const humanPlayerIds = Object.entries(this.policyMapping)
+            .filter(([_, policy]) => policy === 'human')
+            .map(([id, _]) => String(id));
+
         if (this.serverAuthoritative) {
-            // First, check if we already have all actions (common case - no wait needed)
-            let haveAllActions = true;
-            for (const [agentId, policy] of Object.entries(this.policyMapping)) {
-                const agentIdStr = String(agentId);
-                const myPlayerIdStr = String(this.myPlayerId);
+            // Check if we have confirmed inputs for this frame from all players
+            const haveAllInputs = this.hasConfirmedInputsForFrame(this.frameNumber, humanPlayerIds);
 
-                if (agentIdStr === myPlayerIdStr || policy !== 'human') {
-                    continue;
-                }
-
-                const queue = this.otherPlayerActionQueues[agentIdStr] || [];
-                if (queue.length === 0) {
-                    haveAllActions = false;
-                    break;
-                }
-            }
-
-            // Only wait if we don't have actions yet
-            if (!haveAllActions) {
-                const maxWaitMs = 50;  // Brief wait - don't block too long
+            // If we don't have all inputs, wait briefly (input delay should have provided buffer)
+            if (!haveAllInputs) {
+                const maxWaitMs = 30;  // Brief wait - input delay should handle most cases
                 const pollIntervalMs = 5;
                 let waited = 0;
 
@@ -705,62 +721,55 @@ obs, infos, render_state
                     await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
                     waited += pollIntervalMs;
 
-                    // Re-check if actions arrived
-                    haveAllActions = true;
-                    for (const [agentId, policy] of Object.entries(this.policyMapping)) {
-                        const agentIdStr = String(agentId);
-                        const myPlayerIdStr = String(this.myPlayerId);
-
-                        if (agentIdStr === myPlayerIdStr || policy !== 'human') {
-                            continue;
-                        }
-
-                        const queue = this.otherPlayerActionQueues[agentIdStr] || [];
-                        if (queue.length === 0) {
-                            haveAllActions = false;
-                            break;
-                        }
-                    }
-
-                    if (haveAllActions) {
+                    if (this.hasConfirmedInputsForFrame(this.frameNumber, humanPlayerIds)) {
                         break;
                     }
                 }
             }
 
-            // Throttle if queue is building up (we're faster than partner)
+            // Log if we're about to use prediction
+            if (!this.hasConfirmedInputsForFrame(this.frameNumber, humanPlayerIds)) {
+                // Only log occasionally to avoid spam
+                if (this.frameNumber % 30 === 0) {
+                    const missingPlayers = humanPlayerIds.filter(pid => {
+                        const frameInputs = this.inputBuffer.get(this.frameNumber);
+                        return !frameInputs || !frameInputs.has(pid);
+                    });
+                    console.log(
+                        `[GGPO] Frame ${this.frameNumber}: Missing inputs from ${missingPlayers.join(', ')}, using prediction`
+                    );
+                }
+            }
+
+            // Legacy throttle: if queue is building up, slow down
             const totalQueueSize = Object.values(this.otherPlayerActionQueues)
                 .reduce((sum, queue) => sum + queue.length, 0);
             if (totalQueueSize > 10) {
                 const throttleDelayMs = Math.min((totalQueueSize - 10) * 3, 30);
                 await new Promise(resolve => setTimeout(resolve, throttleDelayMs));
             }
-        } else if (this.throttle.enabled) {
-            // Non-server-authoritative mode: use simpler throttling
-            const totalQueueSize = Object.values(this.otherPlayerActionQueues)
-                .reduce((sum, queue) => sum + queue.length, 0);
-
-            if (totalQueueSize === 0) {
-                await new Promise(resolve => setTimeout(resolve, this.throttle.maxDelayMs));
-            }
         }
 
-        // 1. Build final action dict with queue lookups for other players
+        // 1. Build final action dict using GGPO input buffer
+        // Use frame-indexed inputs for human players (confirmed or predicted)
         const finalActions = {};
+
+        // Get inputs for all human players from GGPO buffer
+        const ggpoInputs = this.getInputsForFrame(this.frameNumber, humanPlayerIds);
 
         for (const [agentId, policy] of Object.entries(this.policyMapping)) {
             const agentIdStr = String(agentId);
             const myPlayerIdStr = String(this.myPlayerId);
 
             if (agentIdStr === myPlayerIdStr) {
-                // My action - from input
+                // My action - from current input (not from buffer, we execute immediately)
                 finalActions[agentId] = allActionsDict[agentId];
                 if (finalActions[agentId] === undefined || finalActions[agentId] === null) {
                     finalActions[agentId] = this.defaultAction;
                 }
             } else if (policy === 'human') {
-                // Other human player - pop from queue
-                finalActions[agentId] = this.getOtherPlayerAction(agentId);
+                // Other human player - use GGPO buffer (confirmed or predicted)
+                finalActions[agentId] = ggpoInputs[agentIdStr] ?? this.defaultAction;
             } else {
                 // Bot - from allActionsDict (already computed by phaser_gym_graphics)
                 finalActions[agentId] = allActionsDict[agentId];
@@ -792,17 +801,23 @@ obs, infos, render_state
         }
 
         // 2. Send MY action to server (for other clients to queue)
-        // Don't send actions during episode transitions to prevent queue buildup
+        // With GGPO: include the target frame (current + INPUT_DELAY) so other clients
+        // know exactly when this action should execute
         const inEpisodeTransition = this.episodeComplete || this.waitingForEpisodeStart || this.shouldReset;
         if (!inEpisodeTransition) {
             const myAction = finalActions[this.myPlayerId];
+            const targetFrame = this.frameNumber + this.INPUT_DELAY;
+
+            // Store in our own input buffer for the delayed frame
+            this.storeLocalInput(myAction, this.frameNumber);
+
             socket.emit('pyodide_player_action', {
                 game_id: this.gameId,
                 player_id: this.myPlayerId,
                 action: myAction,
-                frame_number: this.frameNumber,
+                frame_number: targetFrame,  // GGPO: target frame with delay applied
                 timestamp: Date.now(),
-                sync_epoch: this.syncEpoch  // Include epoch to prevent stale action matching
+                sync_epoch: this.syncEpoch
             });
         }
 
@@ -825,10 +840,29 @@ obs, infos, render_state
         // Client should also associate the post-step state with frame N (not N+1).
         if (this.serverAuthoritative) {
             await this.recordStateHashForFrame(this.frameNumber);
+
+            // GGPO: Save state snapshot periodically for rollback
+            if (this.frameNumber % this.snapshotInterval === 0) {
+                await this.saveStateSnapshot(this.frameNumber);
+            }
         }
 
         // 4. Increment frame (AFTER recording hash)
         this.frameNumber++;
+
+        // GGPO: Check for pending rollback (late input arrived)
+        if (this.pendingRollbackFrame !== null && this.pendingRollbackFrame !== undefined) {
+            const rollbackFrame = this.pendingRollbackFrame;
+            this.pendingRollbackFrame = null;
+
+            // Get all player IDs
+            const playerIds = Object.keys(this.policyMapping).filter(
+                pid => this.policyMapping[pid] === 'human'
+            );
+
+            // Perform rollback and replay
+            await this.performRollback(rollbackFrame, playerIds);
+        }
 
         // Log diagnostics periodically
         this.logDiagnostics();
@@ -1298,14 +1332,29 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
 
         // CASE 2: Both hashes available but MISMATCH - proven divergence, must correct
         if (clientHash && serverHash && clientHash !== serverHash) {
+            const framesToRollback = this.frameNumber - serverFrame;
             console.log(
                 `[Reconcile] HASH MISMATCH at frame ${serverFrame}. ` +
                 `Server: ${serverHash.substring(0, 8)}, Client: ${clientHash.substring(0, 8)}. ` +
-                `Applying server state.`
+                `Rolling back ${framesToRollback} frames. (Rollbacks so far: ${this.rollbackCount})`
             );
+
+            // Apply server state and clear GGPO predictions from that point forward
             await this.applyServerState(serverState);
             this.confirmedFrame = serverFrame;
-            this.stateHashHistory.clear();  // Clear on proven divergence
+            this.stateHashHistory.clear();
+
+            // Clear predictions for frames we've now corrected
+            for (const frame of this.predictedFrames) {
+                if (frame >= serverFrame) {
+                    this.predictedFrames.delete(frame);
+                }
+            }
+
+            // Save a fresh snapshot at this corrected frame
+            await this.saveStateSnapshot(serverFrame);
+
+            this.rollbackCount++;
             return true;
         }
 
@@ -1367,6 +1416,300 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
             this.shouldReset = true;
             console.log(`[MultiplayerPyodide] Episode ${this.num_episodes}/${this.max_episodes} complete, will reset`);
         }
+    }
+
+    // ========== GGPO Rollback Netcode Methods ==========
+
+    /**
+     * Store a remote player's input for a specific frame.
+     * If we've already simulated past this frame with a prediction, trigger rollback.
+     */
+    storeRemoteInput(playerId, action, frameNumber) {
+        const playerIdStr = String(playerId);
+
+        // Ensure input buffer exists for this frame
+        if (!this.inputBuffer.has(frameNumber)) {
+            this.inputBuffer.set(frameNumber, new Map());
+        }
+
+        const frameInputs = this.inputBuffer.get(frameNumber);
+
+        // Check if we already have an input for this player at this frame
+        if (frameInputs.has(playerIdStr)) {
+            // Already have confirmed input, ignore duplicate
+            return;
+        }
+
+        // Store the confirmed input
+        frameInputs.set(playerIdStr, action);
+
+        // Update last confirmed action for this player (used for prediction)
+        this.lastConfirmedActions[playerIdStr] = action;
+
+        // Check if this input arrived late (we already simulated past this frame)
+        // and we used a prediction that might be wrong
+        if (frameNumber <= this.frameNumber && this.predictedFrames.has(frameNumber)) {
+            // Late input! We need to check if our prediction was wrong
+            const predictedAction = this.getPredictedAction(playerIdStr, frameNumber);
+            if (predictedAction !== action) {
+                console.log(
+                    `[GGPO] Late input from player ${playerIdStr} at frame ${frameNumber} ` +
+                    `(current: ${this.frameNumber}). Predicted: ${predictedAction}, Actual: ${action}. ` +
+                    `Triggering rollback.`
+                );
+                // Mark for rollback - will be processed in next step()
+                this.pendingRollbackFrame = Math.min(
+                    this.pendingRollbackFrame ?? frameNumber,
+                    frameNumber
+                );
+            }
+        }
+
+        // Prune old input buffer entries
+        this.pruneInputBuffer();
+    }
+
+    /**
+     * Store local player's input with input delay applied.
+     * Input pressed at frame N is scheduled for frame N + INPUT_DELAY.
+     */
+    storeLocalInput(action, currentFrame) {
+        const targetFrame = currentFrame + this.INPUT_DELAY;
+        const myPlayerIdStr = String(this.myPlayerId);
+
+        // Ensure input buffer exists for target frame
+        if (!this.inputBuffer.has(targetFrame)) {
+            this.inputBuffer.set(targetFrame, new Map());
+        }
+
+        const frameInputs = this.inputBuffer.get(targetFrame);
+        frameInputs.set(myPlayerIdStr, action);
+
+        // Also update last confirmed action for self
+        this.lastConfirmedActions[myPlayerIdStr] = action;
+
+        // Return the target frame so caller knows when this input will execute
+        return targetFrame;
+    }
+
+    /**
+     * Get predicted action for a player.
+     * Uses their last confirmed action, or default if none.
+     */
+    getPredictedAction(playerId, frameNumber) {
+        const playerIdStr = String(playerId);
+        return this.lastConfirmedActions[playerIdStr] ?? this.defaultAction;
+    }
+
+    /**
+     * Get inputs for a specific frame.
+     * Returns {playerId: action} dict with confirmed inputs where available,
+     * predictions where not.
+     */
+    getInputsForFrame(frameNumber, playerIds) {
+        const inputs = {};
+        const frameInputs = this.inputBuffer.get(frameNumber);
+        let usedPrediction = false;
+
+        for (const playerId of playerIds) {
+            const playerIdStr = String(playerId);
+
+            if (frameInputs && frameInputs.has(playerIdStr)) {
+                // Have confirmed input
+                inputs[playerIdStr] = frameInputs.get(playerIdStr);
+            } else {
+                // Need to predict
+                inputs[playerIdStr] = this.getPredictedAction(playerIdStr, frameNumber);
+                usedPrediction = true;
+            }
+        }
+
+        // Track that we used prediction for this frame
+        if (usedPrediction) {
+            this.predictedFrames.add(frameNumber);
+        }
+
+        return inputs;
+    }
+
+    /**
+     * Check if we have confirmed inputs from all players for a frame.
+     */
+    hasConfirmedInputsForFrame(frameNumber, playerIds) {
+        const frameInputs = this.inputBuffer.get(frameNumber);
+        if (!frameInputs) return false;
+
+        for (const playerId of playerIds) {
+            if (!frameInputs.has(String(playerId))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Save a state snapshot for potential rollback.
+     */
+    async saveStateSnapshot(frameNumber) {
+        try {
+            const stateJson = await this.pyodide.runPythonAsync(`
+import json
+_state = env.get_state()
+json.dumps(_state)
+            `);
+            this.stateSnapshots.set(frameNumber, stateJson);
+
+            // Prune old snapshots
+            if (this.stateSnapshots.size > this.maxSnapshots) {
+                const keysToDelete = [];
+                for (const key of this.stateSnapshots.keys()) {
+                    if (this.stateSnapshots.size - keysToDelete.length <= this.maxSnapshots) {
+                        break;
+                    }
+                    keysToDelete.push(key);
+                }
+                for (const key of keysToDelete) {
+                    this.stateSnapshots.delete(key);
+                }
+            }
+        } catch (e) {
+            console.warn(`[GGPO] Failed to save snapshot at frame ${frameNumber}: ${e}`);
+        }
+    }
+
+    /**
+     * Find the best snapshot to rollback to (closest to but not after targetFrame).
+     */
+    findBestSnapshot(targetFrame) {
+        let bestFrame = -1;
+        for (const frame of this.stateSnapshots.keys()) {
+            if (frame <= targetFrame && frame > bestFrame) {
+                bestFrame = frame;
+            }
+        }
+        return bestFrame;
+    }
+
+    /**
+     * Load a state snapshot and reset to that frame.
+     */
+    async loadStateSnapshot(frameNumber) {
+        const stateJson = this.stateSnapshots.get(frameNumber);
+        if (!stateJson) {
+            console.error(`[GGPO] No snapshot found for frame ${frameNumber}`);
+            return false;
+        }
+
+        try {
+            await this.pyodide.runPythonAsync(`
+import json
+_state = json.loads('''${stateJson.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}''')
+env.set_state(_state)
+            `);
+            return true;
+        } catch (e) {
+            console.error(`[GGPO] Failed to load snapshot for frame ${frameNumber}: ${e}`);
+            return false;
+        }
+    }
+
+    /**
+     * Perform rollback to a target frame and replay forward.
+     * This is the core GGPO operation.
+     */
+    async performRollback(targetFrame, playerIds) {
+        const currentFrame = this.frameNumber;
+        const rollbackFrames = currentFrame - targetFrame;
+
+        console.log(
+            `[GGPO] Rolling back ${rollbackFrames} frames ` +
+            `(${currentFrame} → ${targetFrame})`
+        );
+
+        this.rollbackCount++;
+        this.maxRollbackFrames = Math.max(this.maxRollbackFrames, rollbackFrames);
+
+        // Find best snapshot to restore
+        const snapshotFrame = this.findBestSnapshot(targetFrame);
+        if (snapshotFrame < 0) {
+            console.error(`[GGPO] No valid snapshot found for rollback to frame ${targetFrame}`);
+            return false;
+        }
+
+        // Load snapshot
+        const loaded = await this.loadStateSnapshot(snapshotFrame);
+        if (!loaded) {
+            return false;
+        }
+
+        console.log(`[GGPO] Loaded snapshot from frame ${snapshotFrame}, replaying to ${currentFrame}`);
+
+        // Replay from snapshot frame to current frame
+        this.frameNumber = snapshotFrame;
+
+        // Clear predicted frames from snapshot onwards (we'll re-simulate)
+        for (const frame of this.predictedFrames) {
+            if (frame >= snapshotFrame) {
+                this.predictedFrames.delete(frame);
+            }
+        }
+
+        // Replay each frame
+        for (let frame = snapshotFrame; frame < currentFrame; frame++) {
+            const inputs = this.getInputsForFrame(frame, playerIds);
+
+            // Step environment with these inputs
+            const envActions = {};
+            for (const [pid, action] of Object.entries(inputs)) {
+                envActions[parseInt(pid) || pid] = action;
+            }
+
+            await this.pyodide.runPythonAsync(`
+_replay_actions = ${JSON.stringify(envActions)}
+_replay_actions = {int(k) if str(k).isdigit() else k: v for k, v in _replay_actions.items()}
+env.step(_replay_actions)
+            `);
+
+            this.frameNumber = frame + 1;
+        }
+
+        console.log(`[GGPO] Replay complete, now at frame ${this.frameNumber}`);
+        return true;
+    }
+
+    /**
+     * Prune old entries from input buffer.
+     */
+    pruneInputBuffer() {
+        if (this.inputBuffer.size > this.inputBufferMaxSize) {
+            const keysToDelete = [];
+            for (const key of this.inputBuffer.keys()) {
+                if (this.inputBuffer.size - keysToDelete.length <= this.inputBufferMaxSize) {
+                    break;
+                }
+                keysToDelete.push(key);
+            }
+            for (const key of keysToDelete) {
+                this.inputBuffer.delete(key);
+                this.predictedFrames.delete(key);
+            }
+        }
+    }
+
+    /**
+     * Clear GGPO state for episode reset.
+     */
+    clearGGPOState() {
+        this.inputBuffer.clear();
+        this.localInputQueue = [];
+        this.stateSnapshots.clear();
+        this.lastConfirmedActions = {};
+        this.predictedFrames.clear();
+        this.confirmedFrame = -1;
+        this.pendingRollbackFrame = null;
+        this.rollbackCount = 0;
+        this.maxRollbackFrames = 0;
+        console.log('[GGPO] State cleared for new episode');
     }
 
     convertRGBArrayToImage(rgbArray) {

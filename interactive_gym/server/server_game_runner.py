@@ -86,8 +86,12 @@ class ServerGameRunner:
         # Action tracking (used in both modes)
         self.action_lock = threading.Lock()
 
-        # Real-time mode: "sticky" actions - last received action per player
-        # Persists until replaced by new action from that player
+        # GGPO-style frame-indexed input buffer
+        # input_buffer[frame_number][player_id] = action
+        self.input_buffer: Dict[int, Dict[str, int]] = {}
+        self.input_buffer_max_size = 120  # Keep ~4 seconds at 30 FPS
+
+        # Legacy sticky actions (kept for backwards compatibility during transition)
         self.current_actions: Dict[str, int] = {}
 
         # For action_population_method="previous_submitted_action"
@@ -253,19 +257,29 @@ random.seed({rng_seed})
         now = time.time()
         self.last_tick_time = now
 
-        # Build action dict: use received action if available, otherwise fallback
-        # Clear each action after use to match client's "pop from queue" behavior
+        # GGPO: Build action dict using frame-indexed inputs
+        # Use input for current frame if available, otherwise use fallback
         actions = {}
+        frame_inputs = self.input_buffer.get(self.frame_number, {})
+
         for player_id in self.player_ids:
             player_id_str = str(player_id)
-            if player_id_str in self.current_actions:
-                # Use the received action and consume it (non-sticky)
-                actions[player_id] = self.current_actions.pop(player_id_str)
+            if player_id_str in frame_inputs:
+                # Have confirmed input for this frame
+                actions[player_id] = frame_inputs[player_id_str]
                 # Track as last submitted for fallback
                 self.last_submitted_actions[player_id_str] = actions[player_id]
+            elif player_id_str in self.current_actions:
+                # Fallback: use latest received action (legacy sticky)
+                actions[player_id] = self.current_actions[player_id_str]
+                self.last_submitted_actions[player_id_str] = actions[player_id]
             else:
-                # No action received this tick - use fallback
+                # No action at all - use configured fallback
                 actions[player_id] = self._get_action_for_player(player_id)
+
+        # Clean up used frame inputs
+        if self.frame_number in self.input_buffer:
+            del self.input_buffer[self.frame_number]
 
         # Step environment
         try:
@@ -329,6 +343,17 @@ random.seed({rng_seed})
         else:
             return self.default_action
 
+    def _prune_input_buffer(self):
+        """Remove old entries from input buffer to prevent memory growth."""
+        if len(self.input_buffer) > self.input_buffer_max_size:
+            # Remove entries for frames we've already processed
+            frames_to_delete = [
+                f for f in self.input_buffer.keys()
+                if f < self.frame_number - 10  # Keep some recent history
+            ]
+            for frame in frames_to_delete:
+                del self.input_buffer[frame]
+
     def _handle_episode_end_realtime(self):
         """Handle episode completion in real-time mode."""
         self.episode_num += 1
@@ -380,6 +405,7 @@ random.seed({rng_seed})
         # Clear action tracking
         self.current_actions.clear()
         self.last_submitted_actions.clear()  # Clear fallback actions from previous episode
+        self.input_buffer.clear()  # Clear GGPO input buffer
         self.action_sequence = []
         self.action_counts = {}
         self.sync_epoch += 1
@@ -418,7 +444,11 @@ random.seed({rng_seed})
         sync_epoch: int | None = None
     ):
         """
-        Receive action in real-time mode. Updates sticky action, doesn't trigger step.
+        Receive action in real-time mode with GGPO frame tagging.
+
+        Actions are stored by their target frame number, not as sticky actions.
+        This allows the server to match inputs to specific frames, enabling
+        proper synchronization with clients using input delay.
 
         The timer-based _tick() method handles stepping independently.
         """
@@ -436,14 +466,23 @@ random.seed({rng_seed})
             return
 
         with self.action_lock:
-            # Update sticky action
+            # GGPO: Store action by target frame number
+            # client_frame is the frame this action should execute at
+            if client_frame not in self.input_buffer:
+                self.input_buffer[client_frame] = {}
+            self.input_buffer[client_frame][player_id_str] = action
+
+            # Also keep legacy sticky action for fallback
             self.current_actions[player_id_str] = action
             # Track for previous_submitted_action fallback
             self.last_submitted_actions[player_id_str] = action
 
+            # Prune old input buffer entries
+            self._prune_input_buffer()
+
         logger.debug(
             f"[ServerGameRunner] Received action from {player_id_str}: "
-            f"action={action}, client_frame={client_frame}"
+            f"action={action}, target_frame={client_frame}"
         )
 
     def get_authoritative_state(self) -> Dict[str, Any]:
