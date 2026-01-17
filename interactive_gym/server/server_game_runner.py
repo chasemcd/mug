@@ -379,6 +379,7 @@ random.seed({rng_seed})
 
         # Clear action tracking
         self.current_actions.clear()
+        self.last_submitted_actions.clear()  # Clear fallback actions from previous episode
         self.action_sequence = []
         self.action_counts = {}
         self.sync_epoch += 1

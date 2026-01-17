@@ -352,10 +352,7 @@ class PyodideGameCoordinator:
                 self._log_game_diagnostics(game)
                 game.last_diagnostics_log = now
 
-            # Track last known action from this player (for debugging)
-            game.pending_actions[player_id] = action
-
-            # Log frame info for debugging (no longer used for sync)
+            # Log frame info for debugging
             logger.debug(
                 f"Game {game_id}: Received action {action} from player {player_id} "
                 f"at frame {frame_number}"

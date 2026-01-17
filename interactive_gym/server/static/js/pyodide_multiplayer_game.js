@@ -519,6 +519,10 @@ obs, infos, render_state
                 // Use inherited method (which checks isSubsequentEpisode internally)
                 await this.showEpisodeTransition();
 
+                // Clear action queues AFTER countdown to discard any actions received during transition
+                // This prevents stale actions from the previous episode or countdown from executing
+                this.clearActionQueues();
+
                 console.log(`[MultiplayerPyodide] Reset complete from server state (episode ${serverState.episode_num})`);
                 return [obs, infos, render_state];
             } else {
@@ -530,6 +534,9 @@ obs, infos, render_state
         // Non-server-authoritative mode or fallback: do normal reset
         // Show episode transition for subsequent episodes
         await this.showEpisodeTransition();
+
+        // Clear action queues AFTER countdown to discard any actions received during transition
+        this.clearActionQueues();
 
         // Re-seed for deterministic resets
         if (this.gameSeed !== null) {
@@ -622,6 +629,18 @@ obs, infos, render_state
                 originalResolve(state);
             };
         });
+    }
+
+    /**
+     * Clear all action queues and last executed actions.
+     * Called after episode transitions to prevent stale actions from executing.
+     */
+    clearActionQueues() {
+        for (const playerId in this.otherPlayerActionQueues) {
+            this.otherPlayerActionQueues[playerId] = [];
+        }
+        this.lastExecutedActions = {};
+        console.log('[MultiplayerPyodide] Cleared action queues after episode transition');
     }
 
     async step(allActionsDict) {
@@ -1253,9 +1272,9 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
         const serverFrame = serverState.frame_number;
         const serverHash = serverState.state_hash;
         const clientHash = this.getStateHashForFrame(serverFrame);
-        const drift = this.frameNumber - serverFrame;
+        const drift = this.frameNumber - serverFrame;  // Positive = client ahead, negative = client behind
 
-        // Helper to sync metadata from server
+        // Helper to sync metadata from server without applying full state
         const syncMetadata = () => {
             if (serverState.step_num !== undefined) {
                 this.lastKnownServerStepNum = serverState.step_num;
@@ -1266,7 +1285,7 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
             }
         };
 
-        // CASE 1: Both hashes available and they MATCH - we're in sync
+        // CASE 1: Both hashes available and they MATCH - confirmed in sync
         if (clientHash && serverHash && clientHash === serverHash) {
             this.confirmedFrame = serverFrame;
             syncMetadata();
@@ -1277,7 +1296,7 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
             return false;
         }
 
-        // CASE 2: Both hashes available but MISMATCH - proven divergence
+        // CASE 2: Both hashes available but MISMATCH - proven divergence, must correct
         if (clientHash && serverHash && clientHash !== serverHash) {
             console.log(
                 `[Reconcile] HASH MISMATCH at frame ${serverFrame}. ` +
@@ -1290,15 +1309,34 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
             return true;
         }
 
-        // CASE 3: No client hash (frame not in history) - apply server state to be safe
-        // This handles both "client ahead" and "client behind" scenarios
+        // CASE 3: No client hash available - can't verify sync
+        // This happens when:
+        // - Client is behind server (drift < 0): hasn't reached that frame yet
+        // - Client is ahead but hash was pruned: frame too old
+        // - Hash history was recently cleared
+        //
+        // For small drift, trust that we're in sync and just update metadata.
+        // For large drift, apply server state to catch up / correct.
+        const DRIFT_TOLERANCE = 5;  // Allow up to 5 frames of drift without correction
+
+        if (Math.abs(drift) <= DRIFT_TOLERANCE) {
+            // Small drift - likely just timing difference, trust local state
+            syncMetadata();
+            console.log(
+                `[Reconcile] No hash for frame ${serverFrame}, drift=${drift} within tolerance. ` +
+                `Syncing metadata only.`
+            );
+            return false;
+        }
+
+        // Large drift - apply server state to get back in sync
         console.log(
-            `[Reconcile] No client hash for frame ${serverFrame} (drift=${drift}), ` +
-            `applying server state`
+            `[Reconcile] No hash for frame ${serverFrame}, drift=${drift} exceeds tolerance. ` +
+            `Applying server state.`
         );
         await this.applyServerState(serverState);
         this.confirmedFrame = serverFrame;
-        // Don't clear hash history - we couldn't verify, let future syncs verify
+        // Don't clear hash history - we couldn't verify divergence
         return true;
     }
 
