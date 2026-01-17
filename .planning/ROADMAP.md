@@ -15,6 +15,7 @@ This roadmap transforms the existing pseudo-P2P multiplayer system into true pee
 **Goal:** Two browser clients can establish a direct WebRTC DataChannel connection via server-mediated signaling.
 **Depends on:** Nothing (first phase)
 **Requirements:** WEBRTC-01, WEBRTC-02
+**Plans:** 2 plans
 
 **Success Criteria:**
 1. User A and User B can establish a WebRTC peer connection after server-mediated SDP exchange
@@ -22,7 +23,9 @@ This roadmap transforms the existing pseudo-P2P multiplayer system into true pee
 3. Both peers can send and receive test messages over the DataChannel
 4. ICE candidate exchange completes via SocketIO signaling
 
-**Plans:** (created by /gsd:plan-phase)
+Plans:
+- [ ] 01-01-PLAN.md -- Server-side signaling handler + WebRTCManager class
+- [ ] 01-02-PLAN.md -- Integration into multiplayer game flow + verification
 
 ---
 
@@ -98,7 +101,7 @@ This roadmap transforms the existing pseudo-P2P multiplayer system into true pee
 
 | Phase | Status | Completed |
 |-------|--------|-----------|
-| 1 - WebRTC Foundation | Not started | - |
+| 1 - WebRTC Foundation | Planned | - |
 | 2 - P2P Transport Layer | Not started | - |
 | 3 - GGPO P2P Integration | Not started | - |
 | 4 - TURN and Resilience | Not started | - |
