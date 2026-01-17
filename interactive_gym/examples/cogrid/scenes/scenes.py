@@ -440,7 +440,7 @@ cramped_room_human_human = (
         default_action=Noop,
         action_mapping=action_mapping,
         num_episodes=20,
-        max_steps=500,
+        max_steps=1350,
         input_mode=configuration_constants.InputModes.SingleKeystroke,
     )
     .user_experience(
