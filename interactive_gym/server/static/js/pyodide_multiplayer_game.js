@@ -2106,14 +2106,10 @@ env.step(_replay_actions)
         this.rollbackCount = 0;
         this.maxRollbackFrames = 0;
 
-        // Clean up WebRTC connection
-        if (this.webrtcManager) {
-            this.webrtcManager.close();
-            this.webrtcManager = null;
-            this.p2pConnected = false;
-        }
+        // NOTE: Do NOT close WebRTC connection here - it persists across episodes
+        // WebRTC is only closed when the game session ends (in destroy/cleanup)
 
-        console.log('[GGPO] State cleared for new episode');
+        console.log('[GGPO] State cleared for new episode (P2P connection preserved)');
     }
 
     convertRGBArrayToImage(rgbArray) {
