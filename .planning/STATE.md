@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md
 
 **Core value:** Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
-**Current focus:** Phase 4 - TURN and Resilience (complete)
+**Current focus:** Phase 5 - Validation and Cleanup (in progress)
 
 ## Current Position
 
-Phase: 4 of 5 (TURN and Resilience)
-Plan: 2 of 2 complete
-Status: Phase complete
-Last activity: 2026-01-17 - Completed 04-02-PLAN.md (gap closure)
+Phase: 5 of 5 (Validation and Cleanup)
+Plan: 1 of 3 complete
+Status: In progress
+Last activity: 2026-01-17 - Completed 05-01-PLAN.md (host concept removal)
 
-Progress: [########--] 80%
+Progress: [########+-] 82%
 
 ## Phase Overview
 
@@ -24,12 +24,12 @@ Progress: [########--] 80%
 | 2 | P2P Transport Layer | GGPO-02, GGPO-03 | Complete |
 | 3 | GGPO P2P Integration | GGPO-01, NPLAY-01 | Complete |
 | 4 | TURN and Resilience | WEBRTC-03, WEBRTC-04 | Complete |
-| 5 | Validation and Cleanup | CLEAN-01 | Not started |
+| 5 | Validation and Cleanup | CLEAN-01 | In progress |
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 8
+- Total plans completed: 9
 - Average duration: ~5 min
 
 **By Phase:**
@@ -40,6 +40,7 @@ Progress: [########--] 80%
 | 2 | 3 | ~6 min | ~2 min |
 | 3 | 1 | ~5 min | ~5 min |
 | 4 | 2 | ~10 min | ~5 min |
+| 5 | 1 | ~2.5 min | ~2.5 min |
 
 ## Accumulated Context
 
@@ -64,6 +65,10 @@ Progress: [########--] 80%
 - `interactive_gym/server/static/js/pyodide_multiplayer_game.js` - _logConnectionType(), p2pMetrics.connectionType, episode summary update, turnConfig storage
 - `interactive_gym/configurations/remote_config.py` - Added turn_username, turn_credential, force_turn_relay, webrtc() method
 - `interactive_gym/server/pyodide_game_coordinator.py` - TURN config in PyodideGameState and pyodide_game_ready event
+
+**Modified in Phase 5:**
+- `interactive_gym/server/pyodide_game_coordinator.py` - Removed host_player_id, renamed event to pyodide_player_assigned
+- `interactive_gym/server/static/js/pyodide_multiplayer_game.js` - Removed isHost, renamed handler to pyodide_player_assigned
 
 ### Decisions
 
@@ -90,6 +95,7 @@ Progress: [########--] 80%
 | 04-01 | 5 second disconnect timeout | Grace period for transient issues |
 | 04-02 | TURN config conditional in socket event | Only include when credentials provided |
 | 04-02 | webrtc() follows fluent chaining pattern | Consistency with existing config methods |
+| 05-01 | pyodide_player_assigned as single event name | Descriptive name reflecting symmetric peer assignment |
 
 ### Pending Todos
 
@@ -102,10 +108,10 @@ Progress: [########--] 80%
 - Pitfall #11: TURN latency detection - Connection type detection via getStats() implemented in Phase 4
 
 **Research pitfalls remaining:**
-- Pitfall #1: Determinism validation - Deferred to Phase 5
+- Pitfall #1: Determinism validation - Deferred to Phase 5 (05-03-PLAN.md)
 
 ## Session Continuity
 
 Last session: 2026-01-17
-Stopped at: Completed 04-02-PLAN.md (Phase 4 gap closure complete)
-Resume with: Begin Phase 5 planning/execution
+Stopped at: Completed 05-01-PLAN.md (host concept removal)
+Resume with: Continue with 05-02-PLAN.md
