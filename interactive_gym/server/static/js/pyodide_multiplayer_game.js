@@ -88,6 +88,47 @@ function decodeInputPacket(buffer) {
     return { playerId, currentFrame, inputs };
 }
 
+/**
+ * Encode a ping message for RTT measurement.
+ * Format: 9 bytes
+ *   Byte 0: Message type (0x02)
+ *   Bytes 1-8: Timestamp (float64, performance.now())
+ *
+ * @returns {ArrayBuffer} Encoded ping
+ */
+function encodePing() {
+    const buffer = new ArrayBuffer(9);
+    const view = new DataView(buffer);
+    view.setUint8(0, P2P_MSG_PING);
+    view.setFloat64(1, performance.now(), false);
+    return buffer;
+}
+
+/**
+ * Encode a pong response (echo back the original timestamp).
+ *
+ * @param {number} originalTimestamp - Timestamp from received ping
+ * @returns {ArrayBuffer} Encoded pong
+ */
+function encodePong(originalTimestamp) {
+    const buffer = new ArrayBuffer(9);
+    const view = new DataView(buffer);
+    view.setUint8(0, P2P_MSG_PONG);
+    view.setFloat64(1, originalTimestamp, false);
+    return buffer;
+}
+
+/**
+ * Get the message type from a binary message.
+ *
+ * @param {ArrayBuffer} buffer - Received message
+ * @returns {number} Message type byte
+ */
+function getMessageType(buffer) {
+    const view = new DataView(buffer);
+    return view.getUint8(0);
+}
+
 export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
     constructor(config) {
         super(config);
