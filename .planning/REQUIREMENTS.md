@@ -77,8 +77,8 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| WEBRTC-01 | Phase 1 | Pending |
-| WEBRTC-02 | Phase 1 | Pending |
+| WEBRTC-01 | Phase 1 | Complete |
+| WEBRTC-02 | Phase 1 | Complete |
 | WEBRTC-03 | Phase 4 | Pending |
 | WEBRTC-04 | Phase 4 | Pending |
 | GGPO-01 | Phase 3 | Pending |

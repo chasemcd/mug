@@ -24,8 +24,8 @@ This roadmap transforms the existing pseudo-P2P multiplayer system into true pee
 4. ICE candidate exchange completes via SocketIO signaling
 
 Plans:
-- [ ] 01-01-PLAN.md -- Server-side signaling handler + WebRTCManager class
-- [ ] 01-02-PLAN.md -- Integration into multiplayer game flow + verification
+- [x] 01-01-PLAN.md -- Server-side signaling handler + WebRTCManager class
+- [x] 01-02-PLAN.md -- Integration into multiplayer game flow + verification
 
 ---
 
@@ -101,7 +101,7 @@ Plans:
 
 | Phase | Status | Completed |
 |-------|--------|-----------|
-| 1 - WebRTC Foundation | Planned | - |
+| 1 - WebRTC Foundation | Complete ✓ | 2026-01-16 |
 | 2 - P2P Transport Layer | Not started | - |
 | 3 - GGPO P2P Integration | Not started | - |
 | 4 - TURN and Resilience | Not started | - |
