@@ -91,6 +91,11 @@ class RemoteConfig:
         self.environment_initialization_code: str = ""
         self.packages_to_install: list[str] = []
 
+        # webrtc / turn server configuration
+        self.turn_username: str | None = None
+        self.turn_credential: str | None = None
+        self.force_turn_relay: bool = False  # For testing TURN without direct P2P
+
     def logging(self, logfile: str | None = None):
         if logfile is not None:
             self.logfile = logfile
@@ -355,6 +360,27 @@ class RemoteConfig:
         if packages_to_install is not None:
             self.packages_to_install = packages_to_install
 
+        return self
+
+    def webrtc(
+        self,
+        turn_username: str | None = None,
+        turn_credential: str | None = None,
+        force_relay: bool = False,
+    ):
+        """
+        Configure WebRTC settings for P2P multiplayer.
+
+        Args:
+            turn_username: TURN server username (from metered.ca or similar)
+            turn_credential: TURN server credential/password
+            force_relay: Force relay mode (for testing TURN without direct P2P)
+        """
+        if turn_username is not None:
+            self.turn_username = turn_username
+        if turn_credential is not None:
+            self.turn_credential = turn_credential
+        self.force_turn_relay = force_relay
         return self
 
     @property
