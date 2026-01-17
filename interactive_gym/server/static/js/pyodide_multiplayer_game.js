@@ -427,6 +427,16 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         this.connectionHealth = null;
         this.pingIntervalId = null;
 
+        // P2P metrics for observability
+        this.p2pMetrics = {
+            inputsReceivedViaP2P: 0,
+            inputsReceivedViaSocketIO: 0,
+            inputsSentViaP2P: 0,
+            inputsSentViaSocketIO: 0,
+            p2pFallbackTriggered: false,
+            p2pFallbackFrame: null
+        };
+
         this.setupMultiplayerHandlers();
     }
 
@@ -506,6 +516,9 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
             // Store in frame-indexed input buffer for GGPO
             // frame_number is the TARGET frame (sender's frame + INPUT_DELAY)
             this.storeRemoteInput(player_id, action, frame_number);
+
+            // Track SocketIO input reception for metrics
+            this.p2pMetrics.inputsReceivedViaSocketIO++;
 
             // Also update lastConfirmedActions immediately so we always have
             // the latest action for prediction/fallback
@@ -1112,10 +1125,14 @@ obs, infos, render_state
                 timestamp: Date.now(),
                 sync_epoch: this.syncEpoch
             });
+            this.p2pMetrics.inputsSentViaSocketIO++;
 
             // Also send via P2P DataChannel (parallel to SocketIO)
             if (this.p2pConnected && this.p2pInputSender) {
-                this.p2pInputSender.recordAndSend(myCurrentAction, targetFrame);
+                const sent = this.p2pInputSender.recordAndSend(myCurrentAction, targetFrame);
+                if (sent) {
+                    this.p2pMetrics.inputsSentViaP2P++;
+                }
             }
         }
 
@@ -1249,13 +1266,23 @@ obs, infos, render_state
         if ((all_terminated || all_truncated || max_steps_reached) && !this.episodeComplete) {
             this.episodeComplete = true;
 
-            // Log episode summary
+            // Calculate P2P receive ratio
+            const totalReceived = this.p2pMetrics.inputsReceivedViaP2P + this.p2pMetrics.inputsReceivedViaSocketIO;
+            const p2pReceiveRatio = totalReceived > 0
+                ? (this.p2pMetrics.inputsReceivedViaP2P / totalReceived * 100).toFixed(1)
+                : 'N/A';
+
+            // Log episode summary with P2P metrics
             console.log(
                 `[Episode] Complete at frame ${this.frameNumber} | ` +
                 `Rewards: ${JSON.stringify(this.cumulative_rewards)} | ` +
                 `InputBuf: ${this.inputBuffer.size} | ` +
                 `Rollbacks: ${this.rollbackCount} | ` +
-                `Syncs: ${this.diagnostics.syncCount}`
+                `Syncs: ${this.diagnostics.syncCount} | ` +
+                `P2P: ${this.p2pMetrics.inputsReceivedViaP2P}/${totalReceived} (${p2pReceiveRatio}%)` +
+                (this.p2pMetrics.p2pFallbackTriggered
+                    ? ` | Fallback at frame ${this.p2pMetrics.p2pFallbackFrame}`
+                    : '')
             );
 
             // Signal scene termination to server
@@ -2597,6 +2624,9 @@ env.step(_replay_actions)
         for (const input of packet.inputs) {
             this.storeRemoteInput(packet.playerId, input.action, input.frame);
         }
+
+        // Track P2P input reception for metrics
+        this.p2pMetrics.inputsReceivedViaP2P++;
 
         // Update connection health monitor
         if (this.connectionHealth) {
