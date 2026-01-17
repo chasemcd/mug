@@ -34,6 +34,7 @@ Plans:
 **Goal:** Game inputs flow directly between peers over the DataChannel with proper serialization and loss handling.
 **Depends on:** Phase 1
 **Requirements:** GGPO-02, GGPO-03
+**Plans:** 3 plans
 
 **Success Criteria:**
 1. Input messages are serialized and sent over DataChannel with frame number and player ID
@@ -42,7 +43,10 @@ Plans:
 4. Keepalive/ping messages maintain connection awareness and measure RTT
 5. Connection health is monitored (packet loss rate, latency)
 
-**Plans:** (created by /gsd:plan-phase)
+Plans:
+- [ ] 02-01-PLAN.md -- Binary message encoding/decoding (input packets, ping/pong)
+- [ ] 02-02-PLAN.md -- P2P message receiving (RTTTracker, ConnectionHealthMonitor, handlers)
+- [ ] 02-03-PLAN.md -- P2P input sending with redundancy and ping interval
 
 ---
 
@@ -101,8 +105,8 @@ Plans:
 
 | Phase | Status | Completed |
 |-------|--------|-----------|
-| 1 - WebRTC Foundation | Complete ✓ | 2026-01-16 |
-| 2 - P2P Transport Layer | Not started | - |
+| 1 - WebRTC Foundation | Complete | 2026-01-16 |
+| 2 - P2P Transport Layer | Planned | - |
 | 3 - GGPO P2P Integration | Not started | - |
 | 4 - TURN and Resilience | Not started | - |
 | 5 - Validation and Cleanup | Not started | - |
