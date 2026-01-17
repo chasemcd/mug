@@ -119,6 +119,12 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         // Partner action tracking for prediction
         this.partnerLastActions = {};  // {player_id: last_action}
 
+        // P2P sync state (for non-server-authoritative mode)
+        this.isHost = false;  // Set when pyodide_host_elected is received
+        this.p2pSyncInterval = 30;  // Frames between P2P state hash broadcasts
+        this.lastP2PSyncFrame = 0;  // Last frame we sent/received P2P sync
+        this.p2pHashMismatches = 0;  // Count of hash mismatches detected
+
         this.setupMultiplayerHandlers();
     }
 
@@ -132,11 +138,12 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
             this.myPlayerId = data.player_id;
             this.gameId = data.game_id;
             this.gameSeed = data.game_seed;
+            this.isHost = data.is_host;  // Host is responsible for P2P sync broadcasts
 
             // Initialize seeded RNG for AI policies
             if (this.gameSeed) {
                 seeded_random.initMultiplayerRNG(this.gameSeed);
-                console.log(`[MultiplayerPyodide] Player ${this.myPlayerId} in game ${this.gameId} initialized with seed ${this.gameSeed}`);
+                console.log(`[MultiplayerPyodide] Player ${this.myPlayerId} in game ${this.gameId} initialized with seed ${this.gameSeed} (host: ${this.isHost})`);
             }
         });
 
@@ -169,6 +176,21 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
 
             const { player_id, action, frame_number } = data;
 
+            // Log received action for debugging
+            const frameDiff = this.frameNumber - frame_number;
+            if (frameDiff > 0) {
+                console.log(
+                    `[GGPO] Received LATE action from player ${player_id}: ` +
+                    `action=${action}, targetFrame=${frame_number}, currentFrame=${this.frameNumber}, ` +
+                    `late by ${frameDiff} frames`
+                );
+            } else if (this.frameNumber % 30 === 0) {
+                console.log(
+                    `[GGPO] Received action from player ${player_id}: ` +
+                    `action=${action}, targetFrame=${frame_number}, currentFrame=${this.frameNumber}`
+                );
+            }
+
             // Store in frame-indexed input buffer for GGPO
             // frame_number is the TARGET frame (sender's frame + INPUT_DELAY)
             this.storeRemoteInput(player_id, action, frame_number);
@@ -176,6 +198,83 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
             // Also update lastConfirmedActions immediately so we always have
             // the latest action for prediction/fallback
             this.lastConfirmedActions[String(player_id)] = action;
+        });
+
+        // P2P state hash sync (non-server-authoritative mode)
+        // Host broadcasts state hash, non-host compares to detect desync
+        socket.on('p2p_state_sync', async (data) => {
+            // Only process in non-server-authoritative mode
+            if (this.serverAuthoritative) {
+                return;
+            }
+
+            const { game_id, sender_id, frame_number, state_hash, action_counts } = data;
+            if (game_id !== this.gameId || sender_id === this.myPlayerId) {
+                return;  // Ignore own messages or wrong game
+            }
+
+            // Compute our hash for comparison
+            // Use the hash at the same frame if we have it, or compute current
+            let ourHash = this.stateHashHistory.get(frame_number);
+            if (!ourHash && Math.abs(this.frameNumber - frame_number) <= 5) {
+                // We're close enough, compute current hash for comparison
+                ourHash = await this.computeQuickStateHash();
+            }
+
+            if (ourHash && state_hash) {
+                if (ourHash === state_hash) {
+                    console.log(
+                        `[P2P Sync] States match at frame ${frame_number} ` +
+                        `(hash=${state_hash.substring(0, 8)}), frame diff: ${this.frameNumber - frame_number}`
+                    );
+                    this.confirmedFrame = Math.max(this.confirmedFrame, frame_number);
+                } else {
+                    this.p2pHashMismatches++;
+                    console.warn(
+                        `[P2P DESYNC] Hash mismatch at frame ${frame_number}! ` +
+                        `Host: ${state_hash.substring(0, 8)}, Ours: ${ourHash.substring(0, 8)}. ` +
+                        `Total mismatches: ${this.p2pHashMismatches}`
+                    );
+
+                    // Log action count comparison for debugging
+                    if (action_counts) {
+                        for (const [playerId, hostCounts] of Object.entries(action_counts)) {
+                            const ourCounts = this.actionCounts[playerId] || {};
+                            for (const [action, hostCount] of Object.entries(hostCounts)) {
+                                const ourCount = ourCounts[action] || 0;
+                                if (hostCount !== ourCount) {
+                                    console.warn(
+                                        `  Player ${playerId} action ${action}: host=${hostCount}, ours=${ourCount}`
+                                    );
+                                }
+                            }
+                        }
+
+                        // Also check if we have actions the host doesn't
+                        for (const [playerId, ourCounts] of Object.entries(this.actionCounts)) {
+                            const hostPlayerCounts = action_counts[playerId] || {};
+                            for (const [action, ourCount] of Object.entries(ourCounts)) {
+                                if (!(action in hostPlayerCounts)) {
+                                    console.warn(
+                                        `  Player ${playerId} action ${action}: host=0 (missing), ours=${ourCount}`
+                                    );
+                                }
+                            }
+                        }
+
+                        // Log our action sequence around the mismatched frame
+                        const nearbyActions = this.actionSequence.filter(
+                            r => r.frame >= frame_number - 5 && r.frame <= frame_number + 5
+                        );
+                        console.warn(
+                            `[P2P DESYNC] Our action sequence around frame ${frame_number}:`,
+                            JSON.stringify(nearbyActions.map(r => ({f: r.frame, a: r.actions})))
+                        );
+                    }
+                }
+            }
+
+            this.lastP2PSyncFrame = frame_number;
         });
 
         // Server-authoritative state broadcast
@@ -710,6 +809,27 @@ obs, infos, render_state
         // Get inputs for ALL human players from GGPO buffer (including self)
         const ggpoInputs = this.getInputsForFrame(this.frameNumber, humanPlayerIds);
 
+        // Log which inputs are confirmed vs predicted for debugging
+        const confirmedPlayers = [];
+        const predictedPlayers = [];
+        for (const playerId of humanPlayerIds) {
+            const frameInputs = this.inputBuffer.get(this.frameNumber);
+            if (frameInputs && frameInputs.has(playerId)) {
+                confirmedPlayers.push(playerId);
+            } else {
+                predictedPlayers.push(playerId);
+            }
+        }
+
+        if (this.frameNumber % 30 === 0 || predictedPlayers.length > 0) {
+            console.log(
+                `[GGPO] Frame ${this.frameNumber}: ` +
+                `Confirmed: [${confirmedPlayers.join(',')}], ` +
+                `Predicted: [${predictedPlayers.join(',')}], ` +
+                `Actions: ${JSON.stringify(ggpoInputs)}`
+            );
+        }
+
         for (const [agentId, policy] of Object.entries(this.policyMapping)) {
             const agentIdStr = String(agentId);
 
@@ -745,6 +865,13 @@ obs, infos, render_state
             this.actionCounts[playerId][actionKey] = (this.actionCounts[playerId][actionKey] || 0) + 1;
         }
 
+        // GGPO: Save state snapshot BEFORE stepping (state that will be input to this frame's step)
+        // This is critical: snapshot[N] = state BEFORE stepping frame N
+        // So when we rollback to frame N, we load the state and can re-execute frame N
+        if (this.frameNumber % this.snapshotInterval === 0) {
+            await this.saveStateSnapshot(this.frameNumber);
+        }
+
         // 3. Step environment immediately with complete actions (no waiting!)
         const stepStartTime = performance.now();
         const stepResult = await this.stepWithActions(finalActions);
@@ -758,14 +885,17 @@ obs, infos, render_state
         // Track step timing for diagnostics
         this.trackStepTime(stepStartTime);
 
-        // GGPO: Save state snapshot periodically for rollback (always, for P2P rollback support)
-        if (this.frameNumber % this.snapshotInterval === 0) {
-            await this.saveStateSnapshot(this.frameNumber);
-        }
+        // Record state hash for frame-aligned comparison (both modes)
+        // This is computed AFTER stepping, so hash[N] = hash of state after frame N stepped
+        // In server-authoritative mode: used for server reconciliation
+        // In P2P mode: used for peer state verification
+        await this.recordStateHashForFrame(this.frameNumber);
 
-        // Record state hash for server-authoritative mode (frame-aligned comparison)
-        if (this.serverAuthoritative) {
-            await this.recordStateHashForFrame(this.frameNumber);
+        // P2P sync: Host broadcasts state hash periodically for non-host to verify
+        if (!this.serverAuthoritative && this.isHost) {
+            if (this.frameNumber - this.lastP2PSyncFrame >= this.p2pSyncInterval) {
+                await this.broadcastP2PStateSync();
+            }
         }
 
         // 4. Increment frame (AFTER recording hash)
@@ -983,6 +1113,33 @@ obs, rewards, terminateds, truncateds, infos, render_state
         };
 
         return [obs, rewards, terminateds, truncateds, infos, render_state];
+    }
+
+    /**
+     * Broadcast P2P state sync message (host only, non-server-authoritative mode).
+     * Sends current state hash to other players for desync detection.
+     */
+    async broadcastP2PStateSync() {
+        try {
+            const stateHash = await this.computeQuickStateHash();
+
+            socket.emit('p2p_state_sync', {
+                game_id: this.gameId,
+                sender_id: this.myPlayerId,
+                frame_number: this.frameNumber,
+                state_hash: stateHash,
+                action_counts: this.actionCounts
+            });
+
+            this.lastP2PSyncFrame = this.frameNumber;
+
+            console.log(
+                `[P2P Sync] Host broadcast at frame ${this.frameNumber} ` +
+                `(hash=${stateHash.substring(0, 8)})`
+            );
+        } catch (e) {
+            console.warn(`[P2P Sync] Failed to broadcast state hash: ${e}`);
+        }
     }
 
     /**
@@ -1447,16 +1604,30 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
 
         // Check if this input arrived late (we already simulated past this frame)
         // and we used a prediction that might be wrong
-        if (frameNumber <= this.frameNumber && this.predictedFrames.has(frameNumber)) {
-            // Late input! We need to check if our prediction was wrong
-            const predictedAction = this.getPredictedAction(playerIdStr, frameNumber);
-            if (predictedAction !== action) {
-                console.log(
+        if (frameNumber < this.frameNumber && this.predictedFrames.has(frameNumber)) {
+            // Late input! Check what action we ACTUALLY used at that frame
+            // by looking at actionSequence, not by calling getPredictedAction()
+            const actionRecord = this.actionSequence.find(r => r.frame === frameNumber);
+            if (actionRecord) {
+                const usedAction = actionRecord.actions[playerIdStr] ?? actionRecord.actions[parseInt(playerIdStr)];
+                if (usedAction !== undefined && usedAction !== action) {
+                    console.log(
+                        `[GGPO] Late input from player ${playerIdStr} at frame ${frameNumber} ` +
+                        `(current: ${this.frameNumber}). Used: ${usedAction}, Actual: ${action}. ` +
+                        `Triggering rollback.`
+                    );
+                    // Mark for rollback - will be processed in next step()
+                    this.pendingRollbackFrame = Math.min(
+                        this.pendingRollbackFrame ?? frameNumber,
+                        frameNumber
+                    );
+                }
+            } else {
+                // No record found - shouldn't happen but trigger rollback to be safe
+                console.warn(
                     `[GGPO] Late input from player ${playerIdStr} at frame ${frameNumber} ` +
-                    `(current: ${this.frameNumber}). Predicted: ${predictedAction}, Actual: ${action}. ` +
-                    `Triggering rollback.`
+                    `but no action record found. Triggering rollback.`
                 );
-                // Mark for rollback - will be processed in next step()
                 this.pendingRollbackFrame = Math.min(
                     this.pendingRollbackFrame ?? frameNumber,
                     frameNumber
@@ -1510,13 +1681,17 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
     }
 
     /**
-     * Get inputs for a specific frame.
+     * Get inputs for a specific frame (pure GGPO).
      * Returns {playerId: action} dict with confirmed inputs where available,
      * predictions where not.
      *
-     * IMPORTANT: With input delay, the other player's inputs are tagged for
-     * future frames. If we don't have an input for the exact frame, we look
-     * for the closest earlier input, or fall back to lastConfirmedActions.
+     * GGPO requires EXACT frame matching:
+     * - If we have input for exact frame N, use it
+     * - Otherwise, use PREDICTION (based on actionPopulationMethod)
+     * - Mark the frame as "predicted" so we know to check it when real input arrives
+     *
+     * This ensures both clients use the same logic: either the confirmed input
+     * for that exact frame, or the same prediction algorithm.
      */
     getInputsForFrame(frameNumber, playerIds) {
         const inputs = {};
@@ -1524,43 +1699,23 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
 
         for (const playerId of playerIds) {
             const playerIdStr = String(playerId);
-            let foundInput = false;
 
-            // First, check for exact frame match
+            // Check for EXACT frame match only (pure GGPO)
             const frameInputs = this.inputBuffer.get(frameNumber);
             if (frameInputs && frameInputs.has(playerIdStr)) {
+                // Have confirmed input for this exact frame
                 inputs[playerIdStr] = frameInputs.get(playerIdStr);
-                foundInput = true;
-            }
-
-            // If no exact match, look for the closest earlier input we haven't used yet
-            // This handles the case where the other player is ahead
-            if (!foundInput) {
-                // Find the closest input at or before this frame
-                let bestFrame = -1;
-                for (const frame of this.inputBuffer.keys()) {
-                    const fi = this.inputBuffer.get(frame);
-                    if (fi && fi.has(playerIdStr) && frame <= frameNumber && frame > bestFrame) {
-                        bestFrame = frame;
-                    }
-                }
-
-                if (bestFrame >= 0) {
-                    inputs[playerIdStr] = this.inputBuffer.get(bestFrame).get(playerIdStr);
-                    foundInput = true;
-                    // Update lastConfirmedActions with this
-                    this.lastConfirmedActions[playerIdStr] = inputs[playerIdStr];
-                }
-            }
-
-            // If still no input, use prediction (lastConfirmedActions or default)
-            if (!foundInput) {
+                // Update lastConfirmedActions for future predictions
+                this.lastConfirmedActions[playerIdStr] = inputs[playerIdStr];
+            } else {
+                // No input for this exact frame - use prediction
+                // This is the key GGPO behavior: predict, then rollback if wrong
                 inputs[playerIdStr] = this.getPredictedAction(playerIdStr, frameNumber);
                 usedPrediction = true;
             }
         }
 
-        // Track that we used prediction for this frame
+        // Track that we used prediction for this frame (for rollback detection)
         if (usedPrediction) {
             this.predictedFrames.add(frameNumber);
         }
@@ -1585,13 +1740,40 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
 
     /**
      * Save a state snapshot for potential rollback.
+     * Includes environment state AND RNG state for deterministic replay.
      */
     async saveStateSnapshot(frameNumber) {
         try {
+            // Capture both environment state and RNG state
             const stateJson = await this.pyodide.runPythonAsync(`
 import json
-_state = env.get_state()
-json.dumps(_state)
+import numpy as np
+import random
+
+# Get environment state
+_env_state = env.get_state()
+
+# Capture numpy RNG state (convert to list for JSON serialization)
+_np_rng_state = np.random.get_state()
+_np_rng_serializable = (
+    _np_rng_state[0],  # 'MT19937'
+    _np_rng_state[1].tolist(),  # state array as list
+    _np_rng_state[2],  # pos
+    _np_rng_state[3],  # has_gauss
+    _np_rng_state[4]   # cached_gaussian
+)
+
+# Capture Python random state
+_py_rng_state = random.getstate()
+
+# Combine into snapshot
+_snapshot = {
+    'env_state': _env_state,
+    'np_rng_state': _np_rng_serializable,
+    'py_rng_state': _py_rng_state
+}
+
+json.dumps(_snapshot)
             `);
             this.stateSnapshots.set(frameNumber, stateJson);
 
@@ -1628,6 +1810,7 @@ json.dumps(_state)
 
     /**
      * Load a state snapshot and reset to that frame.
+     * Restores both environment state and RNG state for deterministic replay.
      */
     async loadStateSnapshot(frameNumber) {
         const stateJson = this.stateSnapshots.get(frameNumber);
@@ -1637,10 +1820,43 @@ json.dumps(_state)
         }
 
         try {
+            // Escape the JSON string for embedding in Python code
+            const escapedJson = stateJson.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+
             await this.pyodide.runPythonAsync(`
 import json
-_state = json.loads('''${stateJson.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}''')
-env.set_state(_state)
+import numpy as np
+import random
+
+_snapshot = json.loads('''${escapedJson}''')
+
+# Restore environment state
+env.set_state(_snapshot['env_state'])
+
+# Restore numpy RNG state
+if 'np_rng_state' in _snapshot:
+    _np_state = _snapshot['np_rng_state']
+    # Convert list back to numpy array for the state
+    _np_rng_tuple = (
+        _np_state[0],  # 'MT19937'
+        np.array(_np_state[1], dtype=np.uint32),  # state array
+        _np_state[2],  # pos
+        _np_state[3],  # has_gauss
+        _np_state[4]   # cached_gaussian
+    )
+    np.random.set_state(_np_rng_tuple)
+
+# Restore Python random state
+if 'py_rng_state' in _snapshot:
+    # Convert lists back to tuples as needed by setstate
+    _py_state = _snapshot['py_rng_state']
+    if isinstance(_py_state, list):
+        _py_state = (
+            _py_state[0],
+            tuple(_py_state[1]),
+            _py_state[2] if len(_py_state) > 2 else None
+        )
+    random.setstate(_py_state)
             `);
             return true;
         } catch (e) {
@@ -1652,6 +1868,13 @@ env.set_state(_state)
     /**
      * Perform rollback to a target frame and replay forward.
      * This is the core GGPO operation.
+     *
+     * Key insight: The late input that triggered the rollback is now in inputBuffer.
+     * So when we replay, getInputsForFrame will use the confirmed (correct) inputs.
+     *
+     * For bot actions: We use the recorded actions from actionSequence since bots
+     * need to produce the same actions they did originally.
+     * TODO: For full determinism, bot actions should be re-computed with correct RNG state.
      */
     async performRollback(targetFrame, playerIds) {
         const currentFrame = this.frameNumber;
@@ -1665,14 +1888,14 @@ env.set_state(_state)
         this.rollbackCount++;
         this.maxRollbackFrames = Math.max(this.maxRollbackFrames, rollbackFrames);
 
-        // Find best snapshot to restore
+        // Find best snapshot to restore (snapshot[N] = state BEFORE stepping frame N)
         const snapshotFrame = this.findBestSnapshot(targetFrame);
         if (snapshotFrame < 0) {
             console.error(`[GGPO] No valid snapshot found for rollback to frame ${targetFrame}`);
             return false;
         }
 
-        // Load snapshot
+        // Load snapshot - this restores state BEFORE snapshotFrame was stepped
         const loaded = await this.loadStateSnapshot(snapshotFrame);
         if (!loaded) {
             return false;
@@ -1680,26 +1903,91 @@ env.set_state(_state)
 
         console.log(`[GGPO] Loaded snapshot from frame ${snapshotFrame}, replaying to ${currentFrame}`);
 
+        // Build a map of recorded actions for quick lookup (these are actions that were USED, possibly predicted)
+        const recordedActionsMap = new Map();
+        for (const record of this.actionSequence) {
+            recordedActionsMap.set(record.frame, record.actions);
+        }
+
         // Replay from snapshot frame to current frame
         this.frameNumber = snapshotFrame;
 
-        // Clear predicted frames from snapshot onwards (we'll re-simulate)
+        // Clear predicted frames from snapshot onwards (we'll re-simulate with correct inputs)
         for (const frame of this.predictedFrames) {
             if (frame >= snapshotFrame) {
                 this.predictedFrames.delete(frame);
             }
         }
 
+        // Recompute action counts from snapshotFrame onwards
+        // First, subtract the old counts for frames we're re-doing
+        for (const record of this.actionSequence) {
+            if (record.frame >= snapshotFrame) {
+                for (const [playerId, action] of Object.entries(record.actions)) {
+                    const actionKey = String(action);
+                    if (this.actionCounts[playerId] && this.actionCounts[playerId][actionKey]) {
+                        this.actionCounts[playerId][actionKey]--;
+                        if (this.actionCounts[playerId][actionKey] <= 0) {
+                            delete this.actionCounts[playerId][actionKey];
+                        }
+                    }
+                }
+            }
+        }
+
+        // Also remove old action records from snapshotFrame onwards (we'll record new ones)
+        this.actionSequence = this.actionSequence.filter(r => r.frame < snapshotFrame);
+
         // Replay each frame
         for (let frame = snapshotFrame; frame < currentFrame; frame++) {
-            const inputs = this.getInputsForFrame(frame, playerIds);
+            // Get human inputs from buffer (now has confirmed inputs including the late one)
+            const humanInputs = this.getInputsForFrame(frame, playerIds);
 
-            // Step environment with these inputs
+            // Build complete action dict
             const envActions = {};
-            for (const [pid, action] of Object.entries(inputs)) {
+
+            // Add human actions from confirmed inputs
+            for (const [pid, action] of Object.entries(humanInputs)) {
                 envActions[parseInt(pid) || pid] = action;
             }
 
+            // For non-human agents, use recorded actions from original execution
+            // TODO: Ideally re-compute with correct RNG state for full determinism
+            const originalActions = recordedActionsMap.get(frame);
+            if (originalActions) {
+                for (const [agentId, policy] of Object.entries(this.policyMapping)) {
+                    if (policy !== 'human') {
+                        const agentIdKey = parseInt(agentId) || agentId;
+                        if (originalActions[agentId] !== undefined) {
+                            envActions[agentIdKey] = originalActions[agentId];
+                        } else if (originalActions[String(agentId)] !== undefined) {
+                            envActions[agentIdKey] = originalActions[String(agentId)];
+                        }
+                    }
+                }
+            }
+
+            // Record the corrected actions
+            this.actionSequence.push({
+                frame: frame,
+                actions: {...envActions}
+            });
+
+            // Update action counts with corrected actions
+            for (const [playerId, action] of Object.entries(envActions)) {
+                if (!this.actionCounts[playerId]) {
+                    this.actionCounts[playerId] = {};
+                }
+                const actionKey = String(action);
+                this.actionCounts[playerId][actionKey] = (this.actionCounts[playerId][actionKey] || 0) + 1;
+            }
+
+            // Log the replayed action for debugging
+            console.log(
+                `[GGPO] Replay frame ${frame}: ${JSON.stringify(envActions)}`
+            );
+
+            // Step environment
             await this.pyodide.runPythonAsync(`
 _replay_actions = ${JSON.stringify(envActions)}
 _replay_actions = {int(k) if str(k).isdigit() else k: v for k, v in _replay_actions.items()}

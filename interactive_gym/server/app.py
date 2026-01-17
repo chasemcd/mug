@@ -903,6 +903,53 @@ def on_pyodide_hud_update(data):
     )
 
 
+@socketio.on("p2p_state_sync")
+def on_p2p_state_sync(data):
+    """
+    Relay P2P state sync message from host to other players (non-server-authoritative mode).
+
+    Host broadcasts state hash periodically for non-host clients to compare
+    and detect desyncs.
+
+    Args:
+        data: {
+            'game_id': str,
+            'sender_id': str | int,
+            'frame_number': int,
+            'state_hash': str,
+            'action_counts': dict (optional, for debugging)
+        }
+    """
+    global PYODIDE_COORDINATOR
+
+    if PYODIDE_COORDINATOR is None:
+        logger.error("Pyodide coordinator not initialized")
+        return
+
+    game_id = data.get("game_id")
+    sender_id = data.get("sender_id")
+
+    # Get the game to relay to all other players
+    game = PYODIDE_COORDINATOR.games.get(game_id)
+    if game is None:
+        logger.warning(f"P2P state sync for non-existent game {game_id}")
+        return
+
+    # Don't relay in server-authoritative mode (server handles sync)
+    if game.server_authoritative:
+        return
+
+    # Relay to all other players in the game
+    for player_id, socket_id in game.players.items():
+        if player_id != sender_id:
+            socketio.emit('p2p_state_sync', data, room=socket_id)
+
+    logger.debug(
+        f"Relayed P2P state sync from player {sender_id} in game {game_id} "
+        f"at frame {data.get('frame_number')} to {len(game.players) - 1} other player(s)"
+    )
+
+
 @socketio.on("pyodide_state_hash")
 def on_pyodide_state_hash(data):
     """
