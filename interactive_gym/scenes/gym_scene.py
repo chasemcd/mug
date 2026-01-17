@@ -145,6 +145,12 @@ class GymScene(scene.Scene):
         # Number of frames of input history to keep for potential replay
         self.input_buffer_size: int = 300  # ~10 sec at 30fps
 
+        # GGPO input delay (frames)
+        # Both local and remote actions are delayed by this many frames
+        # This gives time for actions to propagate before they're needed
+        # Set to 0 for no input delay (not recommended for multiplayer)
+        self.input_delay: int = 0  # frames of input delay
+
         # Player group settings (for multiplayer games)
         # Groups are always tracked automatically after each game completes.
         # wait_for_known_group controls whether to require the same group members in this scene.
@@ -468,6 +474,7 @@ class GymScene(scene.Scene):
         state_broadcast_interval: int = NotProvided,
         realtime_mode: bool = NotProvided,
         input_buffer_size: int = NotProvided,
+        input_delay: int = NotProvided,
     ):
         """Configure Pyodide-related settings for the GymScene.
 
@@ -502,6 +509,10 @@ class GymScene(scene.Scene):
         :param input_buffer_size: Number of frames of input history to keep for potential rollback/replay.
             Default is 300 (~10 sec at 30fps). Only used in real-time mode. defaults to NotProvided
         :type input_buffer_size: int, optional
+        :param input_delay: GGPO input delay in frames. Both local and remote actions are delayed by this
+            many frames, ensuring both clients execute the same actions on the same frame. Default is 2.
+            Set to 0 for no delay (not recommended for multiplayer). defaults to NotProvided
+        :type input_delay: int, optional
         :return: The GymScene instance (self)
         :rtype: GymScene
         """
@@ -553,6 +564,10 @@ class GymScene(scene.Scene):
         if input_buffer_size is not NotProvided:
             assert isinstance(input_buffer_size, int) and input_buffer_size > 0
             self.input_buffer_size = input_buffer_size
+
+        if input_delay is not NotProvided:
+            assert isinstance(input_delay, int) and input_delay >= 0
+            self.input_delay = input_delay
 
         return self
 

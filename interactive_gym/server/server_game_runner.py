@@ -293,10 +293,17 @@ random.seed({rng_seed})
                     self.cumulative_rewards[pid_str] += reward
 
             # Track action sequence
-            self.action_sequence.append({
+            action_record = {
                 "frame": self.frame_number,
                 "actions": {str(k): int(v) for k, v in env_actions.items()}
-            })
+            }
+            self.action_sequence.append(action_record)
+
+            # Log every 30 frames for debugging divergence
+            if self.frame_number % 30 == 0:
+                logger.info(
+                    f"[SERVER] Frame {self.frame_number}: actions={action_record['actions']}"
+                )
 
             # Update action counts per player
             for player_id, action in env_actions.items():
@@ -512,6 +519,8 @@ random.seed({rng_seed})
             "action_counts": {k: dict(v) for k, v in self.action_counts.items()},
             "action_sequence_hash": self._compute_action_sequence_hash(),
             "total_actions": len(self.action_sequence),
+            # Include recent action sequence for detailed comparison (last 30 frames)
+            "recent_actions": self._get_recent_action_sequence(30),
         }
 
         # Include environment state - requires get_state() method
@@ -568,6 +577,12 @@ random.seed({rng_seed})
         import json
         seq_str = json.dumps(self.action_sequence, sort_keys=True)
         return hashlib.md5(seq_str.encode()).hexdigest()[:16]
+
+    def _get_recent_action_sequence(self, num_frames: int) -> list:
+        """Get the most recent N frames of action sequence for comparison."""
+        if len(self.action_sequence) <= num_frames:
+            return self.action_sequence
+        return self.action_sequence[-num_frames:]
 
     def broadcast_state(self, event_type: str = "server_authoritative_state"):
         """

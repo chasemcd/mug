@@ -26,7 +26,7 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         // ========== GGPO Rollback Netcode ==========
         // Input delay: local inputs are scheduled for frame N + INPUT_DELAY
         // This gives time for inputs to reach the other player before they're needed
-        this.INPUT_DELAY = config.input_delay ?? 2;  // frames of input delay
+        this.INPUT_DELAY = config.input_delay ?? 0;  // frames of input delay
 
         // Frame tracking
         this.frameNumber = 0;           // Current simulation frame
@@ -653,14 +653,17 @@ obs, infos, render_state
 
     async step(allActionsDict) {
         /**
-         * Step environment in multiplayer mode (Action Queue approach)
+         * Step environment in multiplayer mode (True GGPO)
+         *
+         * True GGPO: Both local AND remote actions are delayed by INPUT_DELAY frames.
+         * This ensures both clients execute the same actions on the same frame.
          *
          * Process:
-         * 1. Build final action dict (my action + queue actions for others)
-         * 2. Send MY action to server (for other clients' queues)
-         * 3. Step environment immediately (no waiting!)
-         * 4. Optionally verify state (hybrid fallback)
-         * 5. Log data if host
+         * 1. Store current local input for future frame (current + INPUT_DELAY)
+         * 2. Send action to server immediately (for relay to other clients)
+         * 3. Build final action dict from input buffer (ALL players delayed)
+         * 4. Step environment with delayed actions
+         * 5. Save snapshots for potential rollback
          */
 
         // Don't step until multiplayer setup is complete
@@ -674,74 +677,44 @@ obs, infos, render_state
             return null;
         }
 
-        // GGPO Input Synchronization:
-        // We only need to wait for OTHER players' inputs, not our own.
-        // With input delay, actions for frame N should arrive before we need to step frame N.
-
         // Get all human player IDs
         const humanPlayerIds = Object.entries(this.policyMapping)
             .filter(([_, policy]) => policy === 'human')
             .map(([id, _]) => String(id));
 
-        // Other human players (excluding self) - these are the ones we need inputs from
-        const otherHumanPlayerIds = humanPlayerIds.filter(pid => pid !== String(this.myPlayerId));
+        // 1. Store current local input for future execution (INPUT_DELAY frames ahead)
+        // This must happen BEFORE we build finalActions so the input is available
+        const inEpisodeTransition = this.episodeComplete || this.waitingForEpisodeStart || this.shouldReset;
+        if (!inEpisodeTransition) {
+            const myCurrentAction = allActionsDict[this.myPlayerId] ?? this.defaultAction;
+            const targetFrame = this.frameNumber + this.INPUT_DELAY;
 
-        if (this.serverAuthoritative && otherHumanPlayerIds.length > 0) {
-            // Check if we have confirmed inputs for this frame from OTHER players
-            const haveAllInputs = this.hasConfirmedInputsForFrame(this.frameNumber, otherHumanPlayerIds);
+            // Store in our own input buffer for the delayed frame
+            this.storeLocalInput(myCurrentAction, this.frameNumber);
 
-            // If we don't have all inputs, wait briefly (input delay should have provided buffer)
-            if (!haveAllInputs) {
-                const maxWaitMs = 30;  // Brief wait - input delay should handle most cases
-                const pollIntervalMs = 5;
-                let waited = 0;
-
-                while (waited < maxWaitMs) {
-                    await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
-                    waited += pollIntervalMs;
-
-                    if (this.hasConfirmedInputsForFrame(this.frameNumber, otherHumanPlayerIds)) {
-                        break;
-                    }
-                }
-            }
-
-            // Log if we're about to use prediction for other players
-            if (!this.hasConfirmedInputsForFrame(this.frameNumber, otherHumanPlayerIds)) {
-                // Only log occasionally to avoid spam
-                if (this.frameNumber % 30 === 0) {
-                    const missingPlayers = otherHumanPlayerIds.filter(pid => {
-                        const frameInputs = this.inputBuffer.get(this.frameNumber);
-                        return !frameInputs || !frameInputs.has(pid);
-                    });
-                    console.log(
-                        `[GGPO] Frame ${this.frameNumber}: Missing inputs from ${missingPlayers.join(', ')}, using prediction`
-                    );
-                }
-            }
+            // 2. Send to server immediately for relay to other clients
+            socket.emit('pyodide_player_action', {
+                game_id: this.gameId,
+                player_id: this.myPlayerId,
+                action: myCurrentAction,
+                frame_number: targetFrame,  // Target frame with delay applied
+                timestamp: Date.now(),
+                sync_epoch: this.syncEpoch
+            });
         }
 
-        // 1. Build final action dict
-        // Local player's action executes immediately (no delay on own client)
-        // Other player's action comes from GGPO buffer (confirmed or predicted)
+        // 3. Build final action dict - ALL human players use delayed inputs from buffer
+        // This is true GGPO: local player also experiences input delay
         const finalActions = {};
 
-        // Get inputs for other human players from GGPO buffer
-        // (otherHumanPlayerIds already defined above)
-        const ggpoInputs = this.getInputsForFrame(this.frameNumber, otherHumanPlayerIds);
+        // Get inputs for ALL human players from GGPO buffer (including self)
+        const ggpoInputs = this.getInputsForFrame(this.frameNumber, humanPlayerIds);
 
         for (const [agentId, policy] of Object.entries(this.policyMapping)) {
             const agentIdStr = String(agentId);
-            const myPlayerIdStr = String(this.myPlayerId);
 
-            if (agentIdStr === myPlayerIdStr) {
-                // My action - execute immediately (no delay on own client)
-                finalActions[agentId] = allActionsDict[agentId];
-                if (finalActions[agentId] === undefined || finalActions[agentId] === null) {
-                    finalActions[agentId] = this.defaultAction;
-                }
-            } else if (policy === 'human') {
-                // Other human player - use GGPO buffer (confirmed or predicted)
+            if (policy === 'human') {
+                // ALL human players use delayed input from buffer (true GGPO)
                 finalActions[agentId] = ggpoInputs[agentIdStr] ?? this.defaultAction;
             } else {
                 // Bot - from allActionsDict (already computed by phaser_gym_graphics)
@@ -757,7 +730,6 @@ obs, infos, render_state
             this.lastExecutedActions[agentId] = action;
         }
 
-        // Store in input buffer for potential rollback/replay (real-time mode)
         // Track action sequence and counts for sync verification
         this.actionSequence.push({
             frame: this.frameNumber,
@@ -773,27 +745,6 @@ obs, infos, render_state
             this.actionCounts[playerId][actionKey] = (this.actionCounts[playerId][actionKey] || 0) + 1;
         }
 
-        // 2. Send MY action to server (for other clients to queue)
-        // With GGPO: include the target frame (current + INPUT_DELAY) so other clients
-        // know exactly when this action should execute
-        const inEpisodeTransition = this.episodeComplete || this.waitingForEpisodeStart || this.shouldReset;
-        if (!inEpisodeTransition) {
-            const myAction = finalActions[this.myPlayerId];
-            const targetFrame = this.frameNumber + this.INPUT_DELAY;
-
-            // Store in our own input buffer for the delayed frame
-            this.storeLocalInput(myAction, this.frameNumber);
-
-            socket.emit('pyodide_player_action', {
-                game_id: this.gameId,
-                player_id: this.myPlayerId,
-                action: myAction,
-                frame_number: targetFrame,  // GGPO: target frame with delay applied
-                timestamp: Date.now(),
-                sync_epoch: this.syncEpoch
-            });
-        }
-
         // 3. Step environment immediately with complete actions (no waiting!)
         const stepStartTime = performance.now();
         const stepResult = await this.stepWithActions(finalActions);
@@ -807,17 +758,14 @@ obs, infos, render_state
         // Track step timing for diagnostics
         this.trackStepTime(stepStartTime);
 
-        // Record state hash for this frame SYNCHRONOUSLY (must complete before next step)
-        // IMPORTANT: Record BEFORE incrementing frameNumber to match server's frame numbering.
-        // Server sets frame_number = N after stepping with frame N actions.
-        // Client should also associate the post-step state with frame N (not N+1).
+        // GGPO: Save state snapshot periodically for rollback (always, for P2P rollback support)
+        if (this.frameNumber % this.snapshotInterval === 0) {
+            await this.saveStateSnapshot(this.frameNumber);
+        }
+
+        // Record state hash for server-authoritative mode (frame-aligned comparison)
         if (this.serverAuthoritative) {
             await this.recordStateHashForFrame(this.frameNumber);
-
-            // GGPO: Save state snapshot periodically for rollback
-            if (this.frameNumber % this.snapshotInterval === 0) {
-                await this.saveStateSnapshot(this.frameNumber);
-            }
         }
 
         // 4. Increment frame (AFTER recording hash)
@@ -1256,6 +1204,9 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
             }
         };
 
+        // Compare action sequences to find divergence
+        this.compareActionSequences(serverState);
+
         // CASE 1: Both hashes available and they MATCH - confirmed in sync
         if (clientHash && serverHash && clientHash === serverHash) {
             this.confirmedFrame = serverFrame;
@@ -1295,35 +1246,146 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
             return true;
         }
 
-        // CASE 3: No client hash available - can't verify sync
+        // CASE 3: No client hash available for server's exact frame
         // This happens when:
         // - Client is behind server (drift < 0): hasn't reached that frame yet
         // - Client is ahead but hash was pruned: frame too old
         // - Hash history was recently cleared
         //
-        // For small drift, trust that we're in sync and just update metadata.
-        // For large drift, apply server state to catch up / correct.
-        const DRIFT_TOLERANCE = 5;  // Allow up to 5 frames of drift without correction
+        // Since we can't verify sync, we should ALWAYS apply server state.
+        // Silent divergence (where states differ but we don't correct) is worse
+        // than occasional unnecessary corrections.
+        //
+        // The only exception: if we recently applied server state (confirmedFrame is close),
+        // trust that we're still in sync.
 
-        if (Math.abs(drift) <= DRIFT_TOLERANCE) {
-            // Small drift - likely just timing difference, trust local state
-            syncMetadata();
+        // CASE 3: No client hash available for server's exact frame
+        // We can't verify sync directly. Since we can't compare hashes, apply server
+        // state periodically to ensure we don't silently diverge.
+
+        const framesSinceConfirmed = serverFrame - this.confirmedFrame;
+        const FORCE_SYNC_INTERVAL = 90;  // Force sync every ~3 seconds at 30fps broadcast
+
+        if (framesSinceConfirmed > FORCE_SYNC_INTERVAL) {
             console.log(
-                `[Reconcile] No hash for frame ${serverFrame}, drift=${drift} within tolerance. ` +
-                `Syncing metadata only.`
+                `[Reconcile] No hash for frame ${serverFrame}, forcing sync ` +
+                `(${framesSinceConfirmed} frames since last confirmed). Applying server state.`
             );
-            return false;
+            await this.applyServerState(serverState);
+            this.confirmedFrame = serverFrame;
+            this.stateHashHistory.clear();
+            return true;
         }
 
-        // Large drift - apply server state to get back in sync
+        // Within tolerance - sync metadata only but log that we couldn't verify
+        syncMetadata();
         console.log(
-            `[Reconcile] No hash for frame ${serverFrame}, drift=${drift} exceeds tolerance. ` +
-            `Applying server state.`
+            `[Reconcile] No hash for frame ${serverFrame}, drift=${drift}, ` +
+            `${framesSinceConfirmed} frames since confirmed. Syncing metadata only.`
         );
-        await this.applyServerState(serverState);
-        this.confirmedFrame = serverFrame;
-        // Don't clear hash history - we couldn't verify divergence
-        return true;
+        return false;
+    }
+
+    /**
+     * Compare client and server action sequences to identify where divergence occurs.
+     * Logs detailed info about first mismatch found.
+     */
+    compareActionSequences(serverState) {
+        if (!serverState.recent_actions || !serverState.recent_actions.length) {
+            return;  // No action sequence from server
+        }
+
+        const serverActions = serverState.recent_actions;
+        const serverFrame = serverState.frame_number;
+
+        // Find overlapping frame range between server and client
+        const serverMinFrame = serverActions[0]?.frame ?? 0;
+        const serverMaxFrame = serverActions[serverActions.length - 1]?.frame ?? 0;
+
+        // Build client action map for quick lookup
+        const clientActionMap = new Map();
+        for (const record of this.actionSequence) {
+            clientActionMap.set(record.frame, record.actions);
+        }
+
+        // Check for mismatches in overlapping frames
+        let mismatchFound = false;
+        let mismatchDetails = [];
+
+        for (const serverRecord of serverActions) {
+            const frame = serverRecord.frame;
+            const clientActions = clientActionMap.get(frame);
+
+            if (!clientActions) {
+                // Client doesn't have this frame yet (normal if client is behind)
+                continue;
+            }
+
+            // Compare actions for each player
+            for (const [playerId, serverAction] of Object.entries(serverRecord.actions)) {
+                const clientAction = clientActions[playerId];
+                if (clientAction !== undefined && clientAction !== serverAction) {
+                    mismatchFound = true;
+                    mismatchDetails.push({
+                        frame,
+                        playerId,
+                        server: serverAction,
+                        client: clientAction
+                    });
+                }
+            }
+        }
+
+        if (mismatchFound) {
+            console.warn(
+                `[ACTION MISMATCH] Found ${mismatchDetails.length} action mismatches between server and client!`
+            );
+            // Log first few mismatches
+            for (const detail of mismatchDetails.slice(0, 5)) {
+                console.warn(
+                    `  Frame ${detail.frame}, Player ${detail.playerId}: ` +
+                    `Server=${detail.server}, Client=${detail.client}`
+                );
+            }
+            if (mismatchDetails.length > 5) {
+                console.warn(`  ... and ${mismatchDetails.length - 5} more mismatches`);
+            }
+        }
+
+        // Also log action count comparison
+        if (serverState.action_counts) {
+            for (const [playerId, serverCounts] of Object.entries(serverState.action_counts)) {
+                const clientCounts = this.actionCounts[playerId] || {};
+                const countMismatches = [];
+
+                for (const [action, serverCount] of Object.entries(serverCounts)) {
+                    const clientCount = clientCounts[action] || 0;
+                    if (serverCount !== clientCount) {
+                        countMismatches.push(`action ${action}: server=${serverCount}, client=${clientCount}`);
+                    }
+                }
+
+                if (countMismatches.length > 0) {
+                    console.warn(
+                        `[ACTION COUNT MISMATCH] Player ${playerId} at frame ${serverFrame}: ` +
+                        countMismatches.join(', ')
+                    );
+                }
+            }
+        }
+
+        // Log client's current action sequence for comparison (every 90 frames)
+        if (serverFrame % 90 === 0) {
+            const recentClientActions = this.actionSequence.slice(-10);
+            console.log(
+                `[CLIENT] Recent actions (last 10): ` +
+                JSON.stringify(recentClientActions.map(r => ({ f: r.frame, a: r.actions })))
+            );
+            console.log(
+                `[SERVER] Recent actions (last 10): ` +
+                JSON.stringify(serverActions.slice(-10).map(r => ({ f: r.frame, a: r.actions })))
+            );
+        }
     }
 
     logFrameData(_data) {
@@ -1430,12 +1492,21 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
     }
 
     /**
-     * Get predicted action for a player.
-     * Uses their last confirmed action, or default if none.
+     * Get predicted action for a player when no confirmed input is available.
+     * Uses configurable action_population_method:
+     * - 'previous_submitted_action': Use player's last confirmed action
+     * - 'default': Use the configured default action
      */
     getPredictedAction(playerId, frameNumber) {
         const playerIdStr = String(playerId);
-        return this.lastConfirmedActions[playerIdStr] ?? this.defaultAction;
+
+        if (this.actionPopulationMethod === 'previous_submitted_action') {
+            // Use last confirmed action from this player
+            return this.lastConfirmedActions[playerIdStr] ?? this.defaultAction;
+        } else {
+            // Use configured default action
+            return this.defaultAction;
+        }
     }
 
     /**
