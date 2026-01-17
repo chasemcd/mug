@@ -474,7 +474,7 @@ cramped_room_human_human = (
         # Multiplayer sync settings (Action Queue with queue-based resync)
         state_broadcast_interval=15,  # Sync state every 300 frames (~10s at 30fps), None to disable
         server_authoritative=False,  # Server-authoritative mode
-        input_delay=0,
+        input_delay=3,
     )
 )
 
