@@ -494,6 +494,79 @@ class PyodideGameCoordinator:
                         f"This may cause queue buildup and lag."
                     )
 
+    def handle_webrtc_signal(
+        self,
+        game_id: str,
+        target_player_id: str | int,
+        signal_type: str,
+        payload: Any,
+        sender_socket_id: str,
+    ):
+        """
+        Relay WebRTC signaling messages between peers.
+
+        Routes SDP offers/answers and ICE candidates from one player to another
+        without inspecting or modifying the payload.
+
+        Args:
+            game_id: Game identifier
+            target_player_id: Player ID to receive the signal
+            signal_type: Type of signal (offer, answer, ice-candidate)
+            payload: The signaling payload (SDP or ICE candidate)
+            sender_socket_id: Socket ID of the sender (for reverse lookup)
+        """
+        with self.lock:
+            if game_id not in self.games:
+                logger.warning(
+                    f"WebRTC signal for unknown game {game_id}"
+                )
+                return
+
+            game = self.games[game_id]
+
+            # Find target player's socket
+            target_socket = game.players.get(target_player_id)
+            if target_socket is None:
+                # Try with string/int conversion
+                target_socket = game.players.get(str(target_player_id))
+                if target_socket is None:
+                    target_socket = game.players.get(int(target_player_id) if isinstance(target_player_id, str) and target_player_id.isdigit() else target_player_id)
+                if target_socket is None:
+                    logger.warning(
+                        f"WebRTC signal for unknown player {target_player_id} in game {game_id}"
+                    )
+                    return
+
+            # Find sender's player ID by reverse lookup
+            sender_player_id = None
+            for player_id, socket_id in game.players.items():
+                if socket_id == sender_socket_id:
+                    sender_player_id = player_id
+                    break
+
+            if sender_player_id is None:
+                logger.warning(
+                    f"WebRTC signal from unknown socket {sender_socket_id} in game {game_id}"
+                )
+                return
+
+            # Relay the signal to target peer
+            self.sio.emit(
+                'webrtc_signal',
+                {
+                    'type': signal_type,
+                    'from_player_id': sender_player_id,
+                    'game_id': game_id,
+                    'payload': payload,
+                },
+                room=target_socket,
+            )
+
+            logger.debug(
+                f"Relayed WebRTC {signal_type} from player {sender_player_id} "
+                f"to player {target_player_id} in game {game_id}"
+            )
+
     def get_stats(self) -> dict:
         """Get coordinator statistics for monitoring/debugging."""
         return {
