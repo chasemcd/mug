@@ -15,6 +15,79 @@ import * as seeded_random from './seeded_random.js';
 import * as ui_utils from './ui_utils.js';
 import { WebRTCManager } from './webrtc_manager.js';
 
+// ========== P2P Binary Message Protocol ==========
+// Message Types
+const P2P_MSG_INPUT = 0x01;
+const P2P_MSG_PING = 0x02;
+const P2P_MSG_PONG = 0x03;
+const P2P_MSG_KEEPALIVE = 0x04;
+
+/**
+ * Encode an input packet for P2P transmission.
+ * Format: 9 bytes header + 5 bytes per input
+ *   Header:
+ *     Byte 0: Message type (0x01)
+ *     Bytes 1-2: Player ID (uint16)
+ *     Bytes 3-6: Current frame (uint32)
+ *     Byte 7: Input count (1-5)
+ *     Byte 8: Reserved/flags
+ *   Each input:
+ *     Bytes 0-3: Frame number (uint32)
+ *     Byte 4: Action value (uint8)
+ *
+ * @param {number} playerId - Player ID (0-65535)
+ * @param {number} currentFrame - Current simulation frame
+ * @param {Array<{frame: number, action: number}>} inputs - Inputs to send (oldest first)
+ * @returns {ArrayBuffer} Encoded packet
+ */
+function encodeInputPacket(playerId, currentFrame, inputs) {
+    const inputCount = Math.min(inputs.length, 5);
+    const buffer = new ArrayBuffer(9 + inputCount * 5);
+    const view = new DataView(buffer);
+
+    view.setUint8(0, P2P_MSG_INPUT);
+    view.setUint16(1, playerId, false);  // big-endian
+    view.setUint32(3, currentFrame, false);
+    view.setUint8(7, inputCount);
+    view.setUint8(8, 0);  // reserved
+
+    for (let i = 0; i < inputCount; i++) {
+        const offset = 9 + i * 5;
+        view.setUint32(offset, inputs[i].frame, false);
+        view.setUint8(offset + 4, inputs[i].action);
+    }
+
+    return buffer;
+}
+
+/**
+ * Decode a binary input packet.
+ *
+ * @param {ArrayBuffer} buffer - Received packet
+ * @returns {{playerId: number, currentFrame: number, inputs: Array<{frame: number, action: number}>}|null}
+ */
+function decodeInputPacket(buffer) {
+    const view = new DataView(buffer);
+
+    const type = view.getUint8(0);
+    if (type !== P2P_MSG_INPUT) return null;
+
+    const playerId = view.getUint16(1, false);
+    const currentFrame = view.getUint32(3, false);
+    const inputCount = view.getUint8(7);
+
+    const inputs = [];
+    for (let i = 0; i < inputCount; i++) {
+        const offset = 9 + i * 5;
+        inputs.push({
+            frame: view.getUint32(offset, false),
+            action: view.getUint8(offset + 4)
+        });
+    }
+
+    return { playerId, currentFrame, inputs };
+}
+
 export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
     constructor(config) {
         super(config);
