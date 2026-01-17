@@ -5,8 +5,7 @@ Coordinates client-side Pyodide games by:
 - Generating shared RNG seeds for determinism
 - Collecting and broadcasting player actions
 - Verifying state synchronization across clients
-- Managing host election and migration
-- Routing data logging to prevent duplicates
+- Assigning player IDs to symmetric peers
 """
 
 from __future__ import annotations
@@ -29,7 +28,6 @@ class PyodideGameState:
     """State for a single Pyodide multiplayer game."""
 
     game_id: str
-    host_player_id: str | int | None  # First player to join (used for logging)
     players: Dict[str | int, str]  # player_id -> socket_id
     player_subjects: Dict[str | int, str]  # player_id -> subject_id (participant name)
     frame_number: int
@@ -66,8 +64,7 @@ class PyodideGameCoordinator:
     2. Collect actions from all players each frame
     3. Broadcast actions when all received (or timeout)
     4. Verify state synchronization periodically
-    5. Handle host election and migration
-    6. Route data logging to host only
+    5. Assign player IDs to symmetric peers
     """
 
     def __init__(self, sio: flask_socketio.SocketIO):
@@ -82,7 +79,6 @@ class PyodideGameCoordinator:
         # Statistics
         self.total_games_created = 0
         self.total_desyncs_detected = 0
-        self.total_host_migrations = 0
 
         logger.info("PyodideGameCoordinator initialized")
 
@@ -131,7 +127,6 @@ class PyodideGameCoordinator:
 
             game_state = PyodideGameState(
                 game_id=game_id,
-                host_player_id=None,  # Will be set when first player joins
                 players={},
                 player_subjects={},  # player_id -> subject_id mapping
                 frame_number=0,
@@ -191,11 +186,9 @@ class PyodideGameCoordinator:
         subject_id: str | None = None
     ):
         """
-        Add a player to the game and elect host if needed.
+        Add a player to the game.
 
-        The first player to join becomes the host. Host is responsible for:
-        - Sending data logs (others send nothing to avoid duplicates)
-        - Providing full state for resync if desync detected
+        All players are symmetric peers - no host/client distinction.
 
         Args:
             game_id: Game identifier
@@ -213,41 +206,20 @@ class PyodideGameCoordinator:
             if subject_id is not None:
                 game.player_subjects[player_id] = subject_id
 
-            # First player becomes host
-            if game.host_player_id is None:
-                game.host_player_id = player_id
+            # Send player assignment to all players (symmetric - no host distinction)
+            self.sio.emit('pyodide_player_assigned',
+                         {
+                             'player_id': player_id,
+                             'game_id': game_id,
+                             'game_seed': game.rng_seed,
+                             'num_players': game.num_expected_players
+                         },
+                         room=socket_id)
 
-                self.sio.emit('pyodide_host_elected',
-                             {
-                                 'is_host': True,
-                                 'player_id': player_id,
-                                 'game_id': game_id,
-                                 'game_seed': game.rng_seed,
-                                 'num_players': game.num_expected_players
-                             },
-                             room=socket_id)
-
-                logger.info(
-                    f"Player {player_id} elected as host for game {game_id} "
-                    f"(seed: {game.rng_seed})"
-                )
-            else:
-                # Non-host player
-                self.sio.emit('pyodide_host_elected',
-                             {
-                                 'is_host': False,
-                                 'player_id': player_id,
-                                 'game_id': game_id,
-                                 'host_id': game.host_player_id,
-                                 'game_seed': game.rng_seed,
-                                 'num_players': game.num_expected_players
-                             },
-                             room=socket_id)
-
-                logger.info(
-                    f"Player {player_id} joined game {game_id} as client "
-                    f"(host: {game.host_player_id})"
-                )
+            logger.info(
+                f"Player {player_id} assigned to game {game_id} "
+                f"(seed: {game.rng_seed})"
+            )
 
             # Check if game is ready to start
             if len(game.players) == game.num_expected_players:
@@ -401,7 +373,6 @@ class PyodideGameCoordinator:
         """
         Handle player disconnection.
 
-        If host disconnects, elect new host and trigger resync.
         If all players disconnect, remove game.
         Notifies remaining players that the game has ended.
 
@@ -419,8 +390,6 @@ class PyodideGameCoordinator:
             if player_id not in game.players:
                 return
 
-            was_host = (player_id == game.host_player_id)
-
             # Get remaining player sockets before removing the disconnected player
             remaining_player_sockets = [
                 socket_id for pid, socket_id in game.players.items()
@@ -429,10 +398,7 @@ class PyodideGameCoordinator:
 
             del game.players[player_id]
 
-            logger.info(
-                f"Player {player_id} disconnected from game {game_id} "
-                f"({'host' if was_host else 'client'})"
-            )
+            logger.info(f"Player {player_id} disconnected from game {game_id}")
 
             # Notify remaining players that the game has ended due to disconnection
             if notify_others and len(remaining_player_sockets) > 0:
@@ -591,5 +557,4 @@ class PyodideGameCoordinator:
             'active_games': len(self.games),
             'total_games_created': self.total_games_created,
             'total_desyncs_detected': self.total_desyncs_detected,
-            'total_host_migrations': self.total_host_migrations,
         }
