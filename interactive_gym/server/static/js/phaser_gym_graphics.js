@@ -280,7 +280,13 @@ class GymScene extends Phaser.Scene {
             return;
         };
 
-        if (this.pyodide_remote_game && !this.isProcessingPyodide && this.pyodide_remote_game.pyodideReady) {
+        // Check if game is ready to process:
+        // 1. pyodide_remote_game exists
+        // 2. Not already processing
+        // 3. Pyodide is ready
+        // 4. P2P is ready (for multiplayer - waits for WebRTC connection or timeout)
+        const p2pReady = !this.pyodide_remote_game?.isP2PReady || this.pyodide_remote_game.isP2PReady();
+        if (this.pyodide_remote_game && !this.isProcessingPyodide && this.pyodide_remote_game.pyodideReady && p2pReady) {
             this.processPyodideGame();
         }
         

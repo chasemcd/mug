@@ -5,7 +5,7 @@
  * - Each client runs their own Pyodide environment
  * - Server coordinates action synchronization
  * - Deterministic execution via seeded RNG
- * - Only host logs data (avoids duplicates)
+ * - Symmetric P2P architecture (no host)
  * - State verification detects desyncs
  */
 
@@ -14,6 +14,26 @@ import { convertUndefinedToNull } from './pyodide_remote_game.js';
 import * as seeded_random from './seeded_random.js';
 import * as ui_utils from './ui_utils.js';
 import { WebRTCManager } from './webrtc_manager.js';
+
+// ========== Logging Configuration ==========
+// Control verbosity via browser console: window.p2pLogLevel = 'debug'
+// Levels: 'error' (critical only), 'warn' (+ warnings), 'info' (+ key events), 'debug' (+ verbose)
+const LOG_LEVELS = { error: 0, warn: 1, info: 2, debug: 3 };
+
+function getLogLevel() {
+    if (typeof window !== 'undefined' && window.p2pLogLevel) {
+        return LOG_LEVELS[window.p2pLogLevel] ?? LOG_LEVELS.info;
+    }
+    return LOG_LEVELS.info;  // Default: show key events but not verbose debug
+}
+
+// Logging helpers - use these instead of console.log directly
+const p2pLog = {
+    error: (...args) => console.error('[P2P]', ...args),
+    warn: (...args) => { if (getLogLevel() >= LOG_LEVELS.warn) console.warn('[P2P]', ...args); },
+    info: (...args) => { if (getLogLevel() >= LOG_LEVELS.info) console.log('[P2P]', ...args); },
+    debug: (...args) => { if (getLogLevel() >= LOG_LEVELS.debug) console.log('[P2P]', ...args); },
+};
 
 // ========== P2P Binary Message Protocol ==========
 // Message Types
@@ -318,7 +338,7 @@ class P2PInputSender {
         // Check buffer congestion
         const dc = this.webrtcManager.dataChannel;
         if (dc && dc.bufferedAmount > this.bufferThreshold) {
-            console.warn('[P2P] Buffer congested, skipping input packet');
+            p2pLog.debug('Buffer congested, skipping input packet');
             return false;
         }
 
@@ -512,6 +532,15 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         // TURN server configuration (populated by pyodide_game_ready)
         this.turnConfig = null;
 
+        // P2P ready gate - prevents game loop from starting until P2P is established
+        // This ensures the first frame can use P2P, not just SocketIO fallback
+        this.p2pReadyGate = {
+            enabled: true,           // Set to false to skip waiting for P2P
+            resolved: false,         // True when P2P is ready or timeout
+            timeoutMs: 5000,         // Max time to wait for P2P connection
+            timeoutId: null          // Timeout handle
+        };
+
         this.setupMultiplayerHandlers();
     }
 
@@ -529,13 +558,13 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
             // Initialize seeded RNG for AI policies
             if (this.gameSeed) {
                 seeded_random.initMultiplayerRNG(this.gameSeed);
-                console.log(`[MultiplayerPyodide] Player ${this.myPlayerId} assigned to game ${this.gameId} with seed ${this.gameSeed}`);
+                p2pLog.info(`Player ${this.myPlayerId} assigned to game ${this.gameId} (seed=${this.gameSeed})`);
             }
         });
 
         // Game ready to start
         socket.on('pyodide_game_ready', (data) => {
-            console.log(`[MultiplayerPyodide] Game ${data.game_id} ready with players:`, data.players);
+            p2pLog.info(`Game ready: ${data.players.length} players, server_auth=${data.server_authoritative || false}`);
 
             // Build player ID <-> index mapping for binary protocol
             // Sort players to ensure deterministic index assignment across clients
@@ -544,26 +573,24 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
                 this.playerIdToIndex[playerId] = index;
                 this.indexToPlayerId[index] = playerId;
             });
-            console.log('[MultiplayerPyodide] Player ID mapping:', this.playerIdToIndex);
+            p2pLog.debug('Player ID mapping:', this.playerIdToIndex);
 
             // Store TURN configuration for P2P
             this.turnConfig = data.turn_config || null;
             if (this.turnConfig) {
-                console.log('[MultiplayerPyodide] TURN config received');
+                p2pLog.debug('TURN config received');
             }
 
             // Store player-to-subject mapping for data logging
             this.playerSubjects = data.player_subjects || {};
 
-            // Server-authoritative mode is always enabled
+            // Server-authoritative mode
             this.serverAuthoritative = data.server_authoritative || false;
-            console.log(`[MultiplayerPyodide] Server-authoritative mode: ${this.serverAuthoritative}`);
 
             // Initialize action queues for other players
             for (const playerId of data.players) {
                 if (playerId != this.myPlayerId) {
                     this.otherPlayerActionQueues[playerId] = [];
-                    console.log(`[MultiplayerPyodide] Initialized action queue for player ${playerId}`);
                 }
             }
 
@@ -573,8 +600,23 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
             if (otherPlayers.length === 1) {
                 this.p2pPeerId = otherPlayers[0];
                 this._initP2PConnection();
+
+                // Start P2P ready gate timeout - game will start after P2P connects or timeout
+                if (this.p2pReadyGate.enabled) {
+                    p2pLog.info(`Waiting for P2P connection (max ${this.p2pReadyGate.timeoutMs}ms)...`);
+                    this.p2pReadyGate.timeoutId = setTimeout(() => {
+                        if (!this.p2pReadyGate.resolved) {
+                            p2pLog.warn(`P2P connection timeout - starting game with SocketIO fallback`);
+                            this._resolveP2PReadyGate();
+                        }
+                    }, this.p2pReadyGate.timeoutMs);
+                }
             } else if (otherPlayers.length > 1) {
-                console.warn('[MultiplayerPyodide] P2P only supports 2-player games, skipping WebRTC');
+                p2pLog.warn('P2P only supports 2-player games, using SocketIO only');
+                this._resolveP2PReadyGate();  // No P2P for >2 players
+            } else {
+                // Single player or no other players - no P2P needed
+                this._resolveP2PReadyGate();
             }
         });
 
@@ -587,19 +629,10 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
 
             const { player_id, action, frame_number } = data;
 
-            // Log received action for debugging
+            // Only log late inputs (potential rollback trigger)
             const frameDiff = this.frameNumber - frame_number;
             if (frameDiff > 0) {
-                console.log(
-                    `[GGPO] Received LATE action from player ${player_id}: ` +
-                    `action=${action}, targetFrame=${frame_number}, currentFrame=${this.frameNumber}, ` +
-                    `late by ${frameDiff} frames`
-                );
-            } else if (this.frameNumber % 30 === 0) {
-                console.log(
-                    `[GGPO] Received action from player ${player_id}: ` +
-                    `action=${action}, targetFrame=${frame_number}, currentFrame=${this.frameNumber}`
-                );
+                p2pLog.debug(`Late input via SocketIO: player=${player_id}, frame=${frame_number}, late by ${frameDiff}`);
             }
 
             // Store in frame-indexed input buffer for GGPO (via delay queue if debug enabled)
@@ -642,60 +675,35 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
 
             if (ourHash && state_hash) {
                 if (ourHash === state_hash) {
-                    console.log(
-                        `[P2P Sync] States match at frame ${frame_number} ` +
-                        `(hash=${state_hash.substring(0, 8)}), frame diff: ${this.frameNumber - frame_number}`
-                    );
+                    // States match - only log in debug mode
+                    p2pLog.debug(`Sync OK at frame ${frame_number} (hash=${state_hash.substring(0, 8)})`);
                     this.confirmedFrame = Math.max(this.confirmedFrame, frame_number);
                 } else {
+                    // DESYNC - always log this critical event
                     this.p2pHashMismatches++;
-                    console.warn(
-                        `[P2P DESYNC] Hash mismatch at frame ${frame_number}! ` +
-                        `Host: ${state_hash.substring(0, 8)}, Ours: ${ourHash.substring(0, 8)}. ` +
-                        `Total mismatches: ${this.p2pHashMismatches}`
+                    p2pLog.warn(
+                        `DESYNC at frame ${frame_number}! ` +
+                        `Peer: ${state_hash.substring(0, 8)}, Ours: ${ourHash.substring(0, 8)} ` +
+                        `(total: ${this.p2pHashMismatches})`
                     );
 
-                    // Log action count comparison for debugging
-                    if (action_counts) {
-                        for (const [playerId, hostCounts] of Object.entries(action_counts)) {
+                    // Log action count mismatches only in debug mode
+                    if (action_counts && getLogLevel() >= LOG_LEVELS.debug) {
+                        for (const [playerId, peerCounts] of Object.entries(action_counts)) {
                             const ourCounts = this.actionCounts[playerId] || {};
-                            for (const [action, hostCount] of Object.entries(hostCounts)) {
+                            for (const [action, peerCount] of Object.entries(peerCounts)) {
                                 const ourCount = ourCounts[action] || 0;
-                                if (hostCount !== ourCount) {
-                                    console.warn(
-                                        `  Player ${playerId} action ${action}: host=${hostCount}, ours=${ourCount}`
-                                    );
+                                if (peerCount !== ourCount) {
+                                    p2pLog.debug(`  Action diff: player=${playerId} action=${action} peer=${peerCount} ours=${ourCount}`);
                                 }
                             }
                         }
-
-                        // Also check if we have actions the host doesn't
-                        for (const [playerId, ourCounts] of Object.entries(this.actionCounts)) {
-                            const hostPlayerCounts = action_counts[playerId] || {};
-                            for (const [action, ourCount] of Object.entries(ourCounts)) {
-                                if (!(action in hostPlayerCounts)) {
-                                    console.warn(
-                                        `  Player ${playerId} action ${action}: host=0 (missing), ours=${ourCount}`
-                                    );
-                                }
-                            }
-                        }
-
-                        // Log our action sequence around the mismatched frame
-                        const nearbyActions = this.actionSequence.filter(
-                            r => r.frame >= frame_number - 5 && r.frame <= frame_number + 5
-                        );
-                        console.warn(
-                            `[P2P DESYNC] Our action sequence around frame ${frame_number}:`,
-                            JSON.stringify(nearbyActions.map(r => ({f: r.frame, a: r.actions})))
-                        );
                     }
 
                     // P2P State Resync: Request state from peer if desync detected
                     // Use deterministic tie-breaker: lower player ID defers to higher
-                    // This prevents both peers from trying to send state simultaneously
                     if (this._shouldRequestStateResync(sender_id)) {
-                        console.log(`[P2P RESYNC] Requesting state from peer ${sender_id} (we defer as ${this.myPlayerId})`);
+                        p2pLog.info(`Requesting state resync from peer ${sender_id}`);
                         socket.emit('p2p_state_request', {
                             game_id: this.gameId,
                             requester_id: this.myPlayerId,
@@ -718,11 +726,11 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
 
             // Can't respond if state sync not supported
             if (!this.stateSyncSupported) {
-                console.warn('[P2P RESYNC] Cannot respond to state request - get_state not available');
+                p2pLog.warn('Cannot respond to state request - get_state not available');
                 return;
             }
 
-            console.log(`[P2P RESYNC] Peer ${requester_id} requested our state at frame ${frame_number}`);
+            p2pLog.debug(`Peer ${requester_id} requested our state`);
 
             // Get current state and send it
             try {
@@ -741,9 +749,9 @@ env.get_state()
                     env_state: stateDict,
                     cumulative_rewards: this.cumulative_rewards
                 });
-                console.log(`[P2P RESYNC] Sent state to peer ${requester_id} (frame=${this.frameNumber})`);
+                p2pLog.debug(`Sent state to peer ${requester_id} (frame=${this.frameNumber})`);
             } catch (err) {
-                console.error('[P2P RESYNC] Failed to get/send state:', err);
+                p2pLog.error('Failed to get/send state:', err);
             }
         });
 
@@ -756,18 +764,18 @@ env.get_state()
 
             // Can't apply if state sync not supported
             if (!this.stateSyncSupported) {
-                console.warn('[P2P RESYNC] Cannot apply peer state - set_state not available');
+                p2pLog.warn('Cannot apply peer state - set_state not available');
                 return;
             }
 
-            console.log(`[P2P RESYNC] Received state from peer ${sender_id} (frame=${frame_number})`);
+            p2pLog.info(`Applying peer state from ${sender_id} (frame=${frame_number})`);
 
             try {
                 // Apply the peer's state
                 await this._applyP2PState(env_state, frame_number, step_num, cumulative_rewards);
-                console.log(`[P2P RESYNC] Applied peer state successfully, now at frame ${this.frameNumber}`);
+                p2pLog.info(`State resync complete, now at frame ${this.frameNumber}`);
             } catch (err) {
-                console.error('[P2P RESYNC] Failed to apply peer state:', err);
+                p2pLog.error('Failed to apply peer state:', err);
             }
         });
 
@@ -809,30 +817,19 @@ env.get_state()
                 ? ((framesSinceLastSync / timeSinceLastSync) * 1000).toFixed(1)
                 : 'N/A';
 
-            const hasEnvState = state.env_state !== undefined && state.env_state !== null;
-            const serverTimestamp = state.server_timestamp || 0;
-            const networkLatency = serverTimestamp > 0 ? now - serverTimestamp : 'N/A';
-
-            // Log sync info
-            console.log(
-                `[Sync #${this.diagnostics.syncCount}] ` +
-                `Server: ${state.frame_number} | Client: ${this.frameNumber} | Drift: ${frameDiff > 0 ? '+' : ''}${frameDiff} | ` +
-                `FPS: ${effectiveFPS}/${targetFPS} | ` +
-                `Step: ${avgStepTime}ms avg, ${maxStepTime}ms max | ` +
-                `InputBuf: ${this.inputBuffer.size} | ` +
-                `Predictions: ${this.predictedFrames.size} | ` +
-                `Latency: ${typeof networkLatency === 'number' ? networkLatency.toFixed(0) + 'ms' : networkLatency}`
+            // Log sync info (verbose - debug only)
+            p2pLog.debug(
+                `Sync #${this.diagnostics.syncCount}: ` +
+                `Server=${state.frame_number} Client=${this.frameNumber} Drift=${frameDiff > 0 ? '+' : ''}${frameDiff} ` +
+                `FPS=${effectiveFPS}/${targetFPS} Step=${avgStepTime}/${maxStepTime}ms ` +
+                `Buf=${this.inputBuffer.size} Pred=${this.predictedFrames.size}`
             );
 
-            // Reconcile with server state
-            if (hasEnvState) {
-                await this.reconcileWithServer(state);
-            } else {
-                // No env_state - just sync rewards
-                if (state.cumulative_rewards) {
-                    this.cumulative_rewards = state.cumulative_rewards;
-                    ui_utils.updateHUDText(this.getHUDText());
-                }
+            // NOTE: Server reconciliation disabled - GGPO rollback handles sync.
+            // Just sync rewards/metadata without state correction.
+            if (state.cumulative_rewards) {
+                this.cumulative_rewards = state.cumulative_rewards;
+                ui_utils.updateHUDText(this.getHUDText());
             }
 
             // Update tracking
@@ -855,7 +852,7 @@ env.get_state()
                 return;  // Not for this game
             }
 
-            console.log(`[MultiplayerPyodide] Received server_episode_start for episode ${state.episode_num}`);
+            p2pLog.debug(`Received server_episode_start for episode ${state.episode_num}`);
 
             // Store the state for when reset() is called
             this.pendingEpisodeState = state;
@@ -880,10 +877,7 @@ env.get_state()
                 return;
             }
 
-            console.log(
-                `[MultiplayerPyodide] Server game complete: ` +
-                `${episode_num}/${max_episodes} episodes`
-            );
+            p2pLog.info(`Server game complete: ${episode_num}/${max_episodes} episodes`);
 
             // Mark game as complete - this stops the game loop
             this.state = "done";
@@ -957,9 +951,9 @@ else:
         this.stateSyncSupported = capabilities.has_get_state && capabilities.has_set_state;
 
         if (this.stateSyncSupported) {
-            console.log(`[MultiplayerPyodide] State sync enabled for ${capabilities.env_type}`);
+            p2pLog.info(`State sync enabled for ${capabilities.env_type}`);
         } else {
-            console.warn(`[MultiplayerPyodide] State sync DISABLED - environment missing get_state/set_state`);
+            p2pLog.warn(`State sync DISABLED - environment missing get_state/set_state`);
         }
     }
 
@@ -994,7 +988,7 @@ print(f"[Python] Seeded RNG with {${seed}}")
          * This ensures all clients start each episode from the exact same state.
          */
         this.shouldReset = false;
-        console.log(`[Episode] Starting reset for episode ${this.num_episodes + 1}. Player: ${this.myPlayerId}, Game: ${this.gameId}`);
+        p2pLog.debug(`Episode reset starting: episode=${this.num_episodes + 1} player=${this.myPlayerId}`);
 
         // Clear action queues at the start of reset to discard stale actions from previous episode
         for (const playerId in this.otherPlayerActionQueues) {
@@ -1032,7 +1026,7 @@ print(f"[Python] Seeded RNG with {${seed}}")
                 ui_utils.showEpisodeWaiting("Next round will begin shortly...");
             }
 
-            console.log("[MultiplayerPyodide] Waiting for server episode start state...");
+            p2pLog.debug("Waiting for server episode start state...");
 
             // Check if we already have pending state (server sent it before we called reset)
             let serverState = this.pendingEpisodeState;
@@ -1046,7 +1040,7 @@ print(f"[Python] Seeded RNG with {${seed}}")
             this.pendingEpisodeState = null;
 
             if (serverState && serverState.env_state) {
-                console.log(`[MultiplayerPyodide] Applying server episode state (episode ${serverState.episode_num})`);
+                p2pLog.debug(`Applying server episode state (episode ${serverState.episode_num})`);
 
                 // Do a local reset FIRST to initialize internal structures (like env_agents),
                 // THEN apply set_state() to sync with server's state.
@@ -1134,7 +1128,7 @@ obs, infos, render_state
                 // This prevents stale actions from the previous episode or countdown from executing
                 this.clearActionQueues();
 
-                console.log(`[MultiplayerPyodide] Reset complete from server state (episode ${serverState.episode_num})`);
+                p2pLog.debug(`Reset complete from server state (episode ${serverState.episode_num})`);
                 return [obs, infos, render_state];
             } else {
                 // No server state received (timeout or error) - hide overlay and fall through to normal reset
@@ -1177,7 +1171,7 @@ obs, infos, render_state
         `);
 
         const endTime = performance.now();
-        console.log(`[MultiplayerPyodide] Reset took ${endTime - startTime}ms`);
+        p2pLog.debug(`Reset took ${(endTime - startTime).toFixed(1)}ms`);
 
         let [obs, infos, render_state] = await this.pyodide.toPy(result).toJs();
 
@@ -1226,7 +1220,7 @@ obs, infos, render_state
             // Timeout to prevent hanging forever
             const timeout = setTimeout(() => {
                 if (this.waitingForEpisodeStart) {
-                    console.warn(`[MultiplayerPyodide] Timeout waiting for server episode start`);
+                    p2pLog.warn(`Timeout waiting for server episode start`);
                     this.waitingForEpisodeStart = false;
                     this.episodeStartResolve = null;
                     resolve(null);  // Resolve with null to allow fallback
@@ -1251,7 +1245,7 @@ obs, infos, render_state
             this.otherPlayerActionQueues[playerId] = [];
         }
         this.lastExecutedActions = {};
-        console.log('[MultiplayerPyodide] Cleared action queues after episode transition');
+        p2pLog.debug('Cleared action queues after episode transition');
     }
 
     async step(allActionsDict) {
@@ -1271,12 +1265,12 @@ obs, infos, render_state
 
         // Don't step until multiplayer setup is complete
         if (this.myPlayerId === null || this.myPlayerId === undefined) {
-            console.warn('[MultiplayerPyodide] Waiting for player ID assignment...');
+            p2pLog.debug('Waiting for player ID assignment...');
             return null;
         }
 
         if (this.gameId === null || this.gameId === undefined) {
-            console.warn('[MultiplayerPyodide] Waiting for game ID assignment...');
+            p2pLog.debug('Waiting for game ID assignment...');
             return null;
         }
 
@@ -1308,7 +1302,7 @@ obs, infos, render_state
                     // P2P success - don't use SocketIO
                 } else {
                     // P2P send failed (buffer congested) - fall back to SocketIO
-                    console.warn('[P2P] Send failed (buffer full), falling back to SocketIO');
+                    p2pLog.debug('Send failed (buffer full), using SocketIO');
                     this._sendViaSocketIO(myCurrentAction, targetFrame);
                 }
             } else {
@@ -1340,12 +1334,11 @@ obs, infos, render_state
             }
         }
 
-        if (this.frameNumber % 30 === 0 || predictedPlayers.length > 0) {
-            console.log(
-                `[GGPO] Frame ${this.frameNumber}: ` +
-                `Confirmed: [${confirmedPlayers.join(',')}], ` +
-                `Predicted: [${predictedPlayers.join(',')}], ` +
-                `Actions: ${JSON.stringify(ggpoInputs)}`
+        // Only log predictions (key event) - confirmed inputs are normal operation
+        if (predictedPlayers.length > 0) {
+            p2pLog.debug(
+                `Frame ${this.frameNumber}: predicted=[${predictedPlayers.join(',')}] ` +
+                `confirmed=[${confirmedPlayers.join(',')}]`
             );
         }
 
@@ -1404,18 +1397,10 @@ obs, infos, render_state
         // Track step timing for diagnostics
         this.trackStepTime(stepStartTime);
 
-        // Record state hash for frame-aligned comparison (both modes)
-        // This is computed AFTER stepping, so hash[N] = hash of state after frame N stepped
-        // In server-authoritative mode: used for server reconciliation
-        // In P2P mode: used for peer state verification
-        await this.recordStateHashForFrame(this.frameNumber);
-
-        // P2P sync: Both peers broadcast state hash periodically for mutual verification
-        if (!this.serverAuthoritative) {
-            if (this.frameNumber - this.lastP2PSyncFrame >= this.p2pSyncInterval) {
-                await this.broadcastSymmetricStateSync();
-            }
-        }
+        // NOTE: State hash recording and P2P sync broadcasts disabled.
+        // GGPO rollback handles synchronization via input prediction and replay.
+        // State sync (hash comparison) is a separate verification layer that's not needed
+        // when rollback is working correctly.
 
         // Check P2P health for fallback awareness
         this._checkP2PHealth();
@@ -1465,12 +1450,12 @@ obs, infos, render_state
                 this.signalEpisodeComplete();
             } else if (this.webrtcManager?.isReady()) {
                 // P2P mode with active connection: broadcast and wait for peer
-                console.log(`[P2P] Episode end detected at frame ${this.frameNumber}, broadcasting to peer...`);
+                p2pLog.debug(`Episode end detected at frame ${this.frameNumber}, broadcasting to peer...`);
                 this._broadcastEpisodeEnd();
                 // Don't set episodeComplete yet - _checkEpisodeSyncAndReset will do it when both agree
             } else {
                 // P2P mode but no WebRTC connection: fallback to immediate completion
-                console.log(`[P2P] Episode end at frame ${this.frameNumber}, no P2P connection - completing immediately`);
+                p2pLog.debug(`Episode end at frame ${this.frameNumber}, no P2P - completing immediately`);
                 this.episodeComplete = true;
                 this.signalEpisodeComplete();
             }
@@ -1550,14 +1535,11 @@ obs, infos, render_state
         const framesDelta = this.frameNumber - this.diagnostics.lastDiagnosticsFrame;
         const effectiveFPS = intervalMs > 0 ? ((framesDelta / intervalMs) * 1000).toFixed(1) : 'N/A';
 
-        // Log comprehensive summary
-        console.log(
-            `[Perf] Frame: ${this.frameNumber} | ` +
-            `FPS: ${effectiveFPS}/${targetFPS} | ` +
-            `Step: ${avgStepTime}ms avg, ${maxStepTime}ms max | ` +
-            `InputBuffer: ${inputBufferSize} | ` +
-            `Predictions: ${predictionCount} | ` +
-            `Rollbacks: ${this.rollbackCount}`
+        // Performance summary - only in debug mode (periodic, every 5s)
+        p2pLog.debug(
+            `[PERF] frame=${this.frameNumber} fps=${effectiveFPS}/${targetFPS} ` +
+            `step=${avgStepTime}/${maxStepTime}ms buf=${inputBufferSize} ` +
+            `pred=${predictionCount} rb=${this.rollbackCount}`
         );
 
         // Clear rolling windows for next interval
@@ -1670,12 +1652,9 @@ obs, rewards, terminateds, truncateds, infos, render_state
 
             this.lastP2PSyncFrame = this.frameNumber;
 
-            console.log(
-                `[P2P Sync] Player ${this.myPlayerId} broadcast at frame ${this.frameNumber} ` +
-                `(hash=${stateHash.substring(0, 8)})`
-            );
+            p2pLog.debug(`State sync broadcast: frame=${this.frameNumber} hash=${stateHash?.substring(0, 8)}`);
         } catch (e) {
-            console.warn(`[P2P Sync] Failed to broadcast state hash: ${e}`);
+            p2pLog.warn(`Failed to broadcast state hash: ${e}`);
         }
     }
 
@@ -1710,7 +1689,7 @@ obs, rewards, terminateds, truncateds, infos, render_state
             }
         } catch (e) {
             // Don't let hash computation errors break the game
-            console.warn(`[StateHash] Failed to record hash for frame ${frameNumber}: ${e}`);
+            p2pLog.warn(`Failed to record hash for frame ${frameNumber}: ${e}`);
         }
     }
 
@@ -1827,18 +1806,12 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
             applyTiming.renderEnd = performance.now();
         } catch (e) {
             applyTiming.renderEnd = performance.now();
-            console.warn(`[applyServerState] Render failed: ${e}`);
+            p2pLog.warn(`applyServerState render failed: ${e}`);
         }
 
         const totalTime = performance.now() - applyTiming.start;
-        const pythonTime = applyTiming.pythonEnd - applyTiming.pythonStart;
-        const renderTime = applyTiming.renderEnd - applyTiming.renderStart;
 
-        console.log(
-            `[applyServerState] Timing: total=${totalTime.toFixed(1)}ms, ` +
-            `python=${pythonTime.toFixed(1)}ms, render=${renderTime.toFixed(1)}ms, ` +
-            `frame: ${oldFrame} → ${this.frameNumber}`
-        );
+        p2pLog.debug(`applyServerState: ${totalTime.toFixed(1)}ms, frame ${oldFrame}→${this.frameNumber}`);
 
         // Handle action queues after state correction.
         // If we went BACKWARDS in frame number, the actions in our queue are for
@@ -1852,23 +1825,14 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
         // When going forwards or staying same, keep the queue - those actions
         // are still valid and needed.
         if (this.frameNumber < oldFrame) {
-            console.log(
-                `[applyServerState] Frame went backwards (${oldFrame} → ${this.frameNumber}), ` +
-                `clearing action queues to prevent duplicates`
-            );
+            p2pLog.debug(`Frame went backwards (${oldFrame}→${this.frameNumber}), clearing action queues`);
             for (const playerId in this.otherPlayerActionQueues) {
-                const oldQueueSize = this.otherPlayerActionQueues[playerId].length;
                 this.otherPlayerActionQueues[playerId] = [];
-                if (oldQueueSize > 0) {
-                    console.log(`  Cleared ${oldQueueSize} actions from player ${playerId}'s queue`);
-                }
             }
         }
 
         // Update HUD
         ui_utils.updateHUDText(this.getHUDText());
-
-        console.log(`[MultiplayerPyodide] Server state applied, now at frame ${this.frameNumber}`);
     }
 
     async reconcileWithServer(serverState) {
@@ -1908,20 +1872,17 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
         if (clientHash && serverHash && clientHash === serverHash) {
             this.confirmedFrame = serverFrame;
             syncMetadata();
-            console.log(
-                `[Reconcile] States match at frame ${serverFrame} ` +
-                `(hash=${serverHash.substring(0, 8)}), drift: ${drift}`
-            );
+            p2pLog.debug(`Reconcile OK: frame=${serverFrame} hash=${serverHash.substring(0, 8)} drift=${drift}`);
             return false;
         }
 
         // CASE 2: Both hashes available but MISMATCH - proven divergence, must correct
         if (clientHash && serverHash && clientHash !== serverHash) {
             const framesToRollback = this.frameNumber - serverFrame;
-            console.log(
-                `[Reconcile] HASH MISMATCH at frame ${serverFrame}. ` +
-                `Server: ${serverHash.substring(0, 8)}, Client: ${clientHash.substring(0, 8)}. ` +
-                `Rolling back ${framesToRollback} frames. (Rollbacks so far: ${this.rollbackCount})`
+            // DESYNC - always log this key event
+            p2pLog.warn(
+                `HASH MISMATCH: frame=${serverFrame} server=${serverHash.substring(0, 8)} ` +
+                `client=${clientHash.substring(0, 8)} rollback=${framesToRollback}frames`
             );
 
             // Apply server state and clear GGPO predictions from that point forward
@@ -1964,22 +1925,15 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
         const FORCE_SYNC_INTERVAL = 90;  // Force sync every ~3 seconds at 30fps broadcast
 
         if (framesSinceConfirmed > FORCE_SYNC_INTERVAL) {
-            console.log(
-                `[Reconcile] No hash for frame ${serverFrame}, forcing sync ` +
-                `(${framesSinceConfirmed} frames since last confirmed). Applying server state.`
-            );
+            p2pLog.debug(`No hash for frame ${serverFrame}, forcing sync (${framesSinceConfirmed} frames since confirmed)`);
             await this.applyServerState(serverState);
             this.confirmedFrame = serverFrame;
             this.stateHashHistory.clear();
             return true;
         }
 
-        // Within tolerance - sync metadata only but log that we couldn't verify
+        // Within tolerance - sync metadata only
         syncMetadata();
-        console.log(
-            `[Reconcile] No hash for frame ${serverFrame}, drift=${drift}, ` +
-            `${framesSinceConfirmed} frames since confirmed. Syncing metadata only.`
-        );
         return false;
     }
 
@@ -1993,11 +1947,6 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
         }
 
         const serverActions = serverState.recent_actions;
-        const serverFrame = serverState.frame_number;
-
-        // Find overlapping frame range between server and client
-        const serverMinFrame = serverActions[0]?.frame ?? 0;
-        const serverMaxFrame = serverActions[serverActions.length - 1]?.frame ?? 0;
 
         // Build client action map for quick lookup
         const clientActionMap = new Map();
@@ -2033,55 +1982,25 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
             }
         }
 
+        // ACTION MISMATCH - always log this key event (indicates desync)
         if (mismatchFound) {
-            console.warn(
-                `[ACTION MISMATCH] Found ${mismatchDetails.length} action mismatches between server and client!`
-            );
-            // Log first few mismatches
-            for (const detail of mismatchDetails.slice(0, 5)) {
-                console.warn(
-                    `  Frame ${detail.frame}, Player ${detail.playerId}: ` +
-                    `Server=${detail.server}, Client=${detail.client}`
-                );
-            }
-            if (mismatchDetails.length > 5) {
-                console.warn(`  ... and ${mismatchDetails.length - 5} more mismatches`);
-            }
+            p2pLog.warn(`ACTION MISMATCH: ${mismatchDetails.length} mismatches detected`);
+            // Log first mismatch detail for debugging
+            const first = mismatchDetails[0];
+            p2pLog.warn(`  First: frame=${first.frame} player=${first.playerId} server=${first.server} client=${first.client}`);
         }
 
-        // Also log action count comparison
+        // Action count comparison - only warn if significant divergence
         if (serverState.action_counts) {
             for (const [playerId, serverCounts] of Object.entries(serverState.action_counts)) {
                 const clientCounts = this.actionCounts[playerId] || {};
-                const countMismatches = [];
-
                 for (const [action, serverCount] of Object.entries(serverCounts)) {
                     const clientCount = clientCounts[action] || 0;
-                    if (serverCount !== clientCount) {
-                        countMismatches.push(`action ${action}: server=${serverCount}, client=${clientCount}`);
+                    if (Math.abs(serverCount - clientCount) > 5) {  // Only warn on significant divergence
+                        p2pLog.warn(`ACTION COUNT DRIFT: player=${playerId} action=${action} server=${serverCount} client=${clientCount}`);
                     }
                 }
-
-                if (countMismatches.length > 0) {
-                    console.warn(
-                        `[ACTION COUNT MISMATCH] Player ${playerId} at frame ${serverFrame}: ` +
-                        countMismatches.join(', ')
-                    );
-                }
             }
-        }
-
-        // Log client's current action sequence for comparison (every 90 frames)
-        if (serverFrame % 90 === 0) {
-            const recentClientActions = this.actionSequence.slice(-10);
-            console.log(
-                `[CLIENT] Recent actions (last 10): ` +
-                JSON.stringify(recentClientActions.map(r => ({ f: r.frame, a: r.actions })))
-            );
-            console.log(
-                `[SERVER] Recent actions (last 10): ` +
-                JSON.stringify(serverActions.slice(-10).map(r => ({ f: r.frame, a: r.actions })))
-            );
         }
     }
 
@@ -2107,10 +2026,10 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
 
         if (this.num_episodes >= this.max_episodes) {
             this.state = "done";
-            console.log(`[MultiplayerPyodide] Game complete (${this.num_episodes}/${this.max_episodes} episodes)`);
+            p2pLog.info(`Game complete (${this.num_episodes}/${this.max_episodes} episodes)`);
         } else {
             this.shouldReset = true;
-            console.log(`[MultiplayerPyodide] Episode ${this.num_episodes}/${this.max_episodes} complete, will reset`);
+            p2pLog.debug(`Episode ${this.num_episodes}/${this.max_episodes} complete, will reset`);
         }
     }
 
@@ -2126,23 +2045,20 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
             : 'N/A';
         const p2pType = this.p2pMetrics.connectionType || 'unknown';
 
-        // Log episode summary with P2P metrics
-        console.log(
-            `[Episode] Complete at frame ${this.frameNumber} | ` +
-            `Rewards: ${JSON.stringify(this.cumulative_rewards)} | ` +
-            `InputBuf: ${this.inputBuffer.size} | ` +
-            `Rollbacks: ${this.rollbackCount} (max depth: ${this.sessionMetrics.rollbacks.maxFrames}) | ` +
-            `Syncs: ${this.diagnostics.syncCount} | ` +
-            `P2P: ${this.p2pMetrics.inputsReceivedViaP2P}/${totalReceived} (${p2pReceiveRatio}%) | ` +
-            `Type: ${p2pType}` +
-            (this.p2pMetrics.p2pFallbackTriggered
-                ? ` | Fallback at frame ${this.p2pMetrics.p2pFallbackFrame}`
-                : '')
+        // Log episode summary - always show this key event
+        p2pLog.info(
+            `EPISODE END: frame=${this.frameNumber} ` +
+            `rollbacks=${this.rollbackCount}/${this.sessionMetrics.rollbacks.maxFrames}max ` +
+            `p2p=${p2pReceiveRatio}% ` +
+            `type=${p2pType}` +
+            (this.p2pMetrics.p2pFallbackTriggered ? ` fallback@${this.p2pMetrics.p2pFallbackFrame}` : '')
         );
 
-        // Export and log full session metrics for research analysis
-        const sessionMetrics = this.exportSessionMetrics();
-        console.log('[Episode] Session metrics:', JSON.stringify(sessionMetrics, null, 2));
+        // Full session metrics only in debug mode
+        if (getLogLevel() >= LOG_LEVELS.debug) {
+            const sessionMetrics = this.exportSessionMetrics();
+            p2pLog.debug('Session metrics:', JSON.stringify(sessionMetrics, null, 2));
+        }
     }
 
     // ========== P2P State Resync Methods ==========
@@ -2165,7 +2081,8 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
      * Similar to applyServerState but for peer-to-peer sync.
      */
     async _applyP2PState(envState, frameNumber, stepNum, cumulativeRewards) {
-        console.log(`[P2P RESYNC] Applying peer state: frame=${frameNumber}, step=${stepNum}`);
+        // P2P RESYNC - key event, always log at info level
+        p2pLog.info(`P2P RESYNC: applying peer state frame=${frameNumber} step=${stepNum}`);
 
         // Apply environment state via set_state
         const envStateJson = JSON.stringify(envState);
@@ -2189,7 +2106,7 @@ env.set_state(env_state)
         // Update HUD
         ui_utils.updateHUDText(this.getHUDText());
 
-        console.log(`[P2P RESYNC] State applied, synced to frame ${this.frameNumber}`);
+        p2pLog.debug(`P2P resync complete, now at frame ${this.frameNumber}`);
     }
 
     // ========== GGPO Rollback Netcode Methods ==========
@@ -2219,15 +2136,6 @@ env.set_state(env_state)
 
         // Update last confirmed action for this player (used for prediction)
         this.lastConfirmedActions[playerIdStr] = action;
-
-        // Log buffer state periodically for debugging
-        if (frameNumber % 30 === 0) {
-            const bufferFrames = Array.from(this.inputBuffer.keys()).sort((a, b) => a - b);
-            console.log(
-                `[GGPO] Input buffer state: frames=[${bufferFrames.slice(-10).join(',')}], ` +
-                `current=${this.frameNumber}, stored=${frameNumber}`
-            );
-        }
 
         // Check if this input arrived late (we already simulated past this frame)
         // and we used a prediction that might be wrong
@@ -2261,11 +2169,10 @@ env.set_state(env_state)
                         rollbackFrames
                     );
 
-                    console.log(
-                        `[GGPO] Late input triggering rollback: ` +
-                        `player=${playerIdStr}, frame=${frameNumber}, ` +
-                        `predicted=${usedAction}, actual=${action}, ` +
-                        `rollback depth=${rollbackFrames} frames`
+                    // ROLLBACK - always log this key event
+                    p2pLog.info(
+                        `ROLLBACK: player=${playerIdStr} frame=${frameNumber} depth=${rollbackFrames} ` +
+                        `(predicted=${usedAction} actual=${action})`
                     );
 
                     // Mark for rollback - will be processed in next step()
@@ -2276,10 +2183,7 @@ env.set_state(env_state)
                 }
             } else {
                 // No record found - shouldn't happen but trigger rollback to be safe
-                console.warn(
-                    `[GGPO] Late input from player ${playerIdStr} at frame ${frameNumber} ` +
-                    `but no action record found. Triggering rollback.`
-                );
+                p2pLog.warn(`Late input at frame ${frameNumber} but no action record - triggering rollback`);
                 this.pendingRollbackFrame = Math.min(
                     this.pendingRollbackFrame ?? frameNumber,
                     frameNumber
@@ -2399,6 +2303,11 @@ env.set_state(env_state)
      * Includes environment state AND RNG state for deterministic replay.
      */
     async saveStateSnapshot(frameNumber) {
+        // Skip if state sync not supported (env doesn't have get_state/set_state)
+        if (!this.stateSyncSupported) {
+            return;
+        }
+
         try {
             // Capture both environment state and RNG state
             const stateJson = await this.pyodide.runPythonAsync(`
@@ -2433,6 +2342,11 @@ json.dumps(_snapshot)
             `);
             this.stateSnapshots.set(frameNumber, stateJson);
 
+            // Debug: log snapshot saves periodically
+            if (this.stateSnapshots.size % 10 === 0) {
+                p2pLog.debug(`Snapshot saved: frame=${frameNumber}, total=${this.stateSnapshots.size}`);
+            }
+
             // Prune old snapshots
             if (this.stateSnapshots.size > this.maxSnapshots) {
                 const keysToDelete = [];
@@ -2447,7 +2361,7 @@ json.dumps(_snapshot)
                 }
             }
         } catch (e) {
-            console.warn(`[GGPO] Failed to save snapshot at frame ${frameNumber}: ${e}`);
+            p2pLog.warn(`Failed to save snapshot at frame ${frameNumber}: ${e}`);
         }
     }
 
@@ -2471,7 +2385,7 @@ json.dumps(_snapshot)
     async loadStateSnapshot(frameNumber) {
         const stateJson = this.stateSnapshots.get(frameNumber);
         if (!stateJson) {
-            console.error(`[GGPO] No snapshot found for frame ${frameNumber}`);
+            p2pLog.error(`No snapshot found for frame ${frameNumber}`);
             return false;
         }
 
@@ -2516,7 +2430,7 @@ if 'py_rng_state' in _snapshot:
             `);
             return true;
         } catch (e) {
-            console.error(`[GGPO] Failed to load snapshot for frame ${frameNumber}: ${e}`);
+            p2pLog.error(`Failed to load snapshot for frame ${frameNumber}: ${e}`);
             return false;
         }
     }
@@ -2536,10 +2450,13 @@ if 'py_rng_state' in _snapshot:
         const currentFrame = this.frameNumber;
         const rollbackFrames = currentFrame - targetFrame;
 
-        console.log(
-            `[GGPO] Rolling back ${rollbackFrames} frames ` +
-            `(${currentFrame} → ${targetFrame})`
-        );
+        p2pLog.debug(`Performing rollback: ${currentFrame} → ${targetFrame} (${rollbackFrames} frames)`);
+
+        // Skip rollback if state sync not supported - can't restore state
+        if (!this.stateSyncSupported) {
+            p2pLog.warn(`Cannot rollback - state sync not supported (env missing get_state/set_state)`);
+            return false;
+        }
 
         this.rollbackCount++;
         this.maxRollbackFrames = Math.max(this.maxRollbackFrames, rollbackFrames);
@@ -2547,7 +2464,11 @@ if 'py_rng_state' in _snapshot:
         // Find best snapshot to restore (snapshot[N] = state BEFORE stepping frame N)
         const snapshotFrame = this.findBestSnapshot(targetFrame);
         if (snapshotFrame < 0) {
-            console.error(`[GGPO] No valid snapshot found for rollback to frame ${targetFrame}`);
+            p2pLog.error(
+                `No valid snapshot found for rollback to frame ${targetFrame}. ` +
+                `Snapshots available: ${this.stateSnapshots.size}, ` +
+                `keys: [${Array.from(this.stateSnapshots.keys()).slice(-5).join(', ')}...]`
+            );
             return false;
         }
 
@@ -2557,7 +2478,7 @@ if 'py_rng_state' in _snapshot:
             return false;
         }
 
-        console.log(`[GGPO] Loaded snapshot from frame ${snapshotFrame}, replaying to ${currentFrame}`);
+        p2pLog.debug(`Loaded snapshot ${snapshotFrame}, replaying ${currentFrame - snapshotFrame} frames`);
 
         // Build a map of recorded actions for quick lookup (these are actions that were USED, possibly predicted)
         const recordedActionsMap = new Map();
@@ -2615,19 +2536,8 @@ if 'py_rng_state' in _snapshot:
 
             // Warn if we're still using prediction during replay - this means inputs are missing!
             if (predictedForFrame.length > 0) {
-                console.warn(
-                    `[GGPO] WARNING: Still using prediction during replay at frame ${frame}! ` +
-                    `Missing inputs for players: [${predictedForFrame.join(',')}]. ` +
-                    `This will likely cause continued desync.`
-                );
+                p2pLog.warn(`Replay frame ${frame}: still missing inputs for [${predictedForFrame.join(',')}]`);
             }
-
-            console.log(
-                `[GGPO] Replay frame ${frame}: ` +
-                `Confirmed: [${confirmedForFrame.join(',')}], ` +
-                `Predicted: [${predictedForFrame.join(',')}], ` +
-                `Inputs: ${JSON.stringify(humanInputs)}`
-            );
 
             // Build complete action dict
             const envActions = {};
@@ -2678,7 +2588,7 @@ env.step(_replay_actions)
             this.frameNumber = frame + 1;
         }
 
-        console.log(`[GGPO] Replay complete, now at frame ${this.frameNumber}`);
+        p2pLog.debug(`Replay complete, now at frame ${this.frameNumber}`);
         return true;
     }
 
@@ -2708,10 +2618,7 @@ env.step(_replay_actions)
 
         // Actually store the delayed inputs now
         for (const item of ready) {
-            console.log(
-                `[DEBUG] Processing delayed input: player=${item.playerId}, ` +
-                `frame=${item.frameNumber}, delayed by ${this.frameNumber - item.frameNumber} frames`
-            );
+            p2pLog.debug(`[DEBUG-DELAY] Processing: player=${item.playerId} frame=${item.frameNumber} late_by=${this.frameNumber - item.frameNumber}`);
             this.storeRemoteInput(item.playerId, item.action, item.frameNumber);
         }
     }
@@ -2734,10 +2641,8 @@ env.step(_replay_actions)
                 frameNumber,
                 processAtFrame
             });
-            console.log(
-                `[DEBUG] Delaying input: player=${playerId}, frame=${frameNumber}, ` +
-                `will process at frame ${processAtFrame} (delay=${this.debugRemoteInputDelay})`
-            );
+            // Debug delay logging - only in debug mode
+            p2pLog.debug(`[DEBUG-DELAY] Queued: player=${playerId} frame=${frameNumber} process_at=${processAtFrame}`);
         } else {
             // No delay - process immediately
             this.storeRemoteInput(playerId, action, frameNumber);
@@ -2802,7 +2707,7 @@ env.step(_replay_actions)
             this.p2pInputSender.reset();
         }
 
-        console.log('[GGPO] State cleared for new episode (P2P connection preserved)');
+        p2pLog.debug('GGPO state cleared for new episode');
     }
 
     convertRGBArrayToImage(rgbArray) {
@@ -2844,7 +2749,7 @@ env.step(_replay_actions)
          * Initialize WebRTC P2P connection to peer.
          * Called after pyodide_game_ready when we know the other player's ID.
          */
-        console.log(`[MultiplayerPyodide] Initiating P2P connection to player ${this.p2pPeerId}`);
+        p2pLog.debug(`Initiating connection to peer ${this.p2pPeerId}`);
 
         // Build WebRTC options with TURN config if available
         const webrtcOptions = {};
@@ -2852,14 +2757,14 @@ env.step(_replay_actions)
             webrtcOptions.turnUsername = this.turnConfig.username;
             webrtcOptions.turnCredential = this.turnConfig.credential;
             webrtcOptions.forceRelay = this.turnConfig.force_relay || false;
-            console.log('[MultiplayerPyodide] Initializing WebRTC with TURN support');
+            p2pLog.debug('Using TURN configuration');
         }
 
         this.webrtcManager = new WebRTCManager(socket, this.gameId, this.myPlayerId, webrtcOptions);
 
         // Set up callbacks
         this.webrtcManager.onDataChannelOpen = () => {
-            console.log('[MultiplayerPyodide] P2P DataChannel OPEN');
+            p2pLog.info('DataChannel OPEN - P2P connection established');
             this.p2pConnected = true;
 
             // Initialize P2P input sending (use numeric index for binary protocol)
@@ -2876,8 +2781,11 @@ env.step(_replay_actions)
             // Start periodic ping for RTT measurement
             this._startPingInterval();
 
-            // Send a test message to verify connection (legacy)
+            // Send a test message to verify connection
             this._sendP2PTestMessage();
+
+            // Resolve P2P ready gate - game can now start with P2P
+            this._resolveP2PReadyGate();
         };
 
         this.webrtcManager.onDataChannelMessage = (data) => {
@@ -2885,7 +2793,7 @@ env.step(_replay_actions)
         };
 
         this.webrtcManager.onDataChannelClose = () => {
-            console.log('[MultiplayerPyodide] P2P DataChannel CLOSED');
+            p2pLog.warn('DataChannel CLOSED');
             this.p2pConnected = false;
             this._stopPingInterval();
 
@@ -2893,12 +2801,12 @@ env.step(_replay_actions)
             if (!this.p2pMetrics.p2pFallbackTriggered) {
                 this.p2pMetrics.p2pFallbackTriggered = true;
                 this.p2pMetrics.p2pFallbackFrame = this.frameNumber;
-                console.warn(`[P2P Fallback] DataChannel closed at frame ${this.frameNumber}. SocketIO continues as fallback.`);
+                p2pLog.warn(`Fallback to SocketIO at frame ${this.frameNumber}`);
             }
         };
 
         this.webrtcManager.onConnectionFailed = () => {
-            console.error('[MultiplayerPyodide] P2P connection FAILED');
+            p2pLog.error('Connection FAILED');
             this.p2pConnected = false;
             this._stopPingInterval();
 
@@ -2906,7 +2814,7 @@ env.step(_replay_actions)
             if (!this.p2pMetrics.p2pFallbackTriggered) {
                 this.p2pMetrics.p2pFallbackTriggered = true;
                 this.p2pMetrics.p2pFallbackFrame = this.frameNumber;
-                console.warn(`[P2P Fallback] Connection failed at frame ${this.frameNumber}. SocketIO continues as fallback.`);
+                p2pLog.warn(`Fallback to SocketIO at frame ${this.frameNumber}`);
             }
         };
 
@@ -2917,8 +2825,7 @@ env.step(_replay_actions)
 
         // Quality degradation callback
         this.webrtcManager.onQualityDegraded = (info) => {
-            console.warn('[P2P Quality] Degraded:', info);
-            // Quality degradation is logged but P2P continues - SocketIO provides fallback
+            p2pLog.warn('Quality degraded:', info.reason);
         };
 
         // Start the connection (role determined by player ID comparison)
@@ -2930,7 +2837,7 @@ env.step(_replay_actions)
      * @param {Object} connInfo - Connection type info from WebRTCManager
      */
     _logConnectionType(connInfo) {
-        console.log('[P2P] Connection type:', connInfo.connectionType, connInfo);
+        p2pLog.info(`Connection type: ${connInfo.connectionType} (${connInfo.localCandidateType}/${connInfo.remoteCandidateType})`);
 
         // Store in p2pMetrics for episode summary
         this.p2pMetrics.connectionType = connInfo.connectionType;
@@ -2950,6 +2857,39 @@ env.step(_replay_actions)
             connection_type: connInfo.connectionType,
             details: this.p2pMetrics.connectionDetails
         });
+    }
+
+    /**
+     * Resolve the P2P ready gate, allowing the game to start.
+     * Called when P2P connection is established or timeout occurs.
+     */
+    _resolveP2PReadyGate() {
+        if (this.p2pReadyGate.resolved) {
+            return;  // Already resolved
+        }
+
+        this.p2pReadyGate.resolved = true;
+
+        // Clear timeout if still pending
+        if (this.p2pReadyGate.timeoutId) {
+            clearTimeout(this.p2pReadyGate.timeoutId);
+            this.p2pReadyGate.timeoutId = null;
+        }
+
+        const status = this.p2pConnected ? 'P2P ready' : 'SocketIO fallback';
+        p2pLog.info(`P2P ready gate resolved: ${status}`);
+    }
+
+    /**
+     * Check if the game is ready to start (P2P established or gate disabled/timeout).
+     * Used by the game loop to wait for P2P before processing frames.
+     */
+    isP2PReady() {
+        // If gate is disabled, always ready
+        if (!this.p2pReadyGate.enabled) {
+            return true;
+        }
+        return this.p2pReadyGate.resolved;
     }
 
     /**
@@ -2979,12 +2919,7 @@ env.step(_replay_actions)
             timestamp: Date.now()
         };
 
-        const success = this.webrtcManager.send(JSON.stringify(testMessage));
-        if (success) {
-            console.log('[MultiplayerPyodide] Sent P2P test message');
-        } else {
-            console.warn('[MultiplayerPyodide] Failed to send P2P test message');
-        }
+        this.webrtcManager.send(JSON.stringify(testMessage));
     }
 
     _handleP2PMessage(data) {
@@ -3005,12 +2940,12 @@ env.step(_replay_actions)
                 const message = JSON.parse(data);
                 this._handleJsonMessage(message);
             } catch (e) {
-                console.error('[P2P] Failed to parse JSON message:', e);
+                p2pLog.error('Failed to parse JSON message:', e);
             }
             return;
         }
 
-        console.warn('[P2P] Unknown message data type:', typeof data);
+        p2pLog.warn('Unknown message data type:', typeof data);
     }
 
     _handleBinaryMessage(buffer) {
@@ -3036,7 +2971,7 @@ env.step(_replay_actions)
                 this._handleEpisodeEnd(buffer);
                 break;
             default:
-                console.warn('[P2P] Unknown binary message type:', messageType);
+                p2pLog.warn(`Unknown binary message type: ${messageType}`);
         }
     }
 
@@ -3046,9 +2981,9 @@ env.step(_replay_actions)
          */
         if (message.type === 'test') {
             const latency = Date.now() - message.timestamp;
-            console.log(`[P2P] Received test from player ${message.from}, latency: ${latency}ms`);
+            p2pLog.debug(`Test message from player ${message.from}, latency: ${latency}ms`);
         } else {
-            console.log('[P2P] Received JSON message:', message.type);
+            p2pLog.debug(`JSON message type: ${message.type}`);
         }
     }
 
@@ -3058,14 +2993,14 @@ env.step(_replay_actions)
          */
         const packet = decodeInputPacket(buffer);
         if (!packet) {
-            console.warn('[P2P] Failed to decode input packet');
+            p2pLog.warn('Failed to decode input packet');
             return;
         }
 
         // Convert numeric player index back to player ID
         const playerId = this.indexToPlayerId[packet.playerId];
         if (playerId === undefined) {
-            console.warn(`[P2P] Unknown player index: ${packet.playerId}`);
+            p2pLog.warn(`Unknown player index: ${packet.playerId}`);
             return;
         }
 
@@ -3083,10 +3018,6 @@ env.step(_replay_actions)
             this.connectionHealth.recordReceivedInput(packet.currentFrame);
         }
 
-        // Log occasionally for debugging
-        if (this.frameNumber % 60 === 0) {
-            console.log(`[P2P] Received input packet: player=${packet.playerId}, frame=${packet.currentFrame}, inputs=${packet.inputs.length}`);
-        }
     }
 
     _handlePing(buffer) {
@@ -3114,13 +3045,6 @@ env.step(_replay_actions)
         if (this.connectionHealth) {
             this.connectionHealth.rttTracker.recordRTT(sentTime);
         }
-
-        // Calculate and log RTT
-        const rtt = performance.now() - sentTime;
-        if (this.frameNumber % 60 === 0) {
-            const avgRtt = this.connectionHealth?.rttTracker.getAverageRTT();
-            console.log(`[P2P] RTT: ${rtt.toFixed(1)}ms (avg: ${avgRtt?.toFixed(1) ?? 'N/A'}ms)`);
-        }
     }
 
     _handleEpisodeEnd(buffer) {
@@ -3131,11 +3055,11 @@ env.step(_replay_actions)
          */
         const packet = decodeEpisodeEnd(buffer);
         if (!packet) {
-            console.warn('[P2P] Failed to decode episode end packet');
+            p2pLog.warn('Failed to decode episode end packet');
             return;
         }
 
-        console.log(`[P2P] Received episode end from peer: frame=${packet.frameNumber}, episode=${packet.episodeNumber}`);
+        p2pLog.debug(`Received episode end from peer: frame=${packet.frameNumber}`);
 
         // Record that we received peer's episode end notification
         this.p2pEpisodeSync.remoteEpisodeEndReceived = true;
@@ -3151,13 +3075,13 @@ env.step(_replay_actions)
          * Called when we detect episode end locally (environment terminated/truncated).
          */
         if (!this.webrtcManager?.isReady()) {
-            console.warn('[P2P] Cannot broadcast episode end - WebRTC not ready');
+            p2pLog.debug('Cannot broadcast episode end - WebRTC not ready');
             return;
         }
 
         const packet = encodeEpisodeEnd(this.frameNumber, this.num_episodes);
         this.webrtcManager.send(packet);
-        console.log(`[P2P] Broadcast episode end: frame=${this.frameNumber}, episode=${this.num_episodes}`);
+        p2pLog.debug(`Broadcast episode end: frame=${this.frameNumber}`);
 
         // Record that we detected episode end locally
         this.p2pEpisodeSync.localEpisodeEndDetected = true;
@@ -3168,7 +3092,7 @@ env.step(_replay_actions)
         // If we don't hear from peer, proceed with reset anyway
         this.p2pEpisodeSync.syncTimeoutId = setTimeout(() => {
             if (this.p2pEpisodeSync.pendingReset && !this.p2pEpisodeSync.remoteEpisodeEndReceived) {
-                console.warn('[P2P] Episode sync timeout - proceeding with reset without peer confirmation');
+                p2pLog.warn('Episode sync timeout - proceeding with reset');
                 this._clearEpisodeSyncState();
                 this.episodeComplete = true;
                 this.signalEpisodeComplete();
@@ -3190,16 +3114,13 @@ env.step(_replay_actions)
 
         // Both peers must agree before we can reset
         if (!sync.localEpisodeEndDetected || !sync.remoteEpisodeEndReceived) {
-            console.log(`[P2P] Waiting for episode sync: local=${sync.localEpisodeEndDetected}, remote=${sync.remoteEpisodeEndReceived}`);
-            return;
+            return;  // Still waiting for sync
         }
 
         // Both peers agree - frames may differ slightly due to network timing, that's OK
         const frameDiff = Math.abs((sync.localEpisodeEndFrame || 0) - (sync.remoteEpisodeEndFrame || 0));
         if (frameDiff > 5) {
-            console.warn(`[P2P] Large frame difference at episode end: local=${sync.localEpisodeEndFrame}, remote=${sync.remoteEpisodeEndFrame}`);
-        } else {
-            console.log(`[P2P] Episode end synchronized: local=${sync.localEpisodeEndFrame}, remote=${sync.remoteEpisodeEndFrame}`);
+            p2pLog.warn(`Large frame difference at episode end: ${frameDiff} frames`);
         }
 
         // Clear sync state for next episode
@@ -3243,7 +3164,7 @@ env.step(_replay_actions)
             }
         }, 500);  // Every 500ms
 
-        console.log('[P2P] Started ping interval (500ms)');
+        p2pLog.debug('Started ping interval');
     }
 
     _stopPingInterval() {
@@ -3253,7 +3174,7 @@ env.step(_replay_actions)
         if (this.pingIntervalId) {
             clearInterval(this.pingIntervalId);
             this.pingIntervalId = null;
-            console.log('[P2P] Stopped ping interval');
+            p2pLog.debug('Stopped ping interval');
         }
     }
 
@@ -3315,10 +3236,10 @@ env.step(_replay_actions)
         if (isDegraded && !this.p2pMetrics.p2pFallbackTriggered) {
             this.p2pMetrics.p2pFallbackTriggered = true;
             this.p2pMetrics.p2pFallbackFrame = this.frameNumber;
-            console.warn(
-                `[P2P Fallback] Connection degraded at frame ${this.frameNumber}. ` +
-                `Latency: ${health.latency?.toFixed(1) ?? 'N/A'}ms, Status: ${health.status}. ` +
-                `SocketIO continues as fallback.`
+            // P2P FALLBACK - key event, always log
+            p2pLog.warn(
+                `FALLBACK: P2P degraded at frame=${this.frameNumber} ` +
+                `latency=${health.latency?.toFixed(1) ?? 'N/A'}ms status=${health.status}`
             );
         }
     }
