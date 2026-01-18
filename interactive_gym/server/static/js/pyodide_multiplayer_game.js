@@ -357,6 +357,12 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         // This gives time for inputs to reach the other player before they're needed
         this.INPUT_DELAY = config.input_delay ?? 0;  // frames of input delay
 
+        // DEBUG: Artificial delay for remote inputs (in frames) to force rollbacks
+        // Set via browser console: window.debugRemoteInputDelay = 5
+        // This delays processing of remote inputs to simulate network latency
+        this.debugRemoteInputDelay = 0;
+        this.debugDelayedInputQueue = [];  // [{playerId, action, frameNumber, processAtFrame}]
+
         // Frame tracking
         this.frameNumber = 0;           // Current simulation frame
         this.confirmedFrame = -1;       // Last frame with confirmed inputs from ALL players
@@ -596,9 +602,9 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
                 );
             }
 
-            // Store in frame-indexed input buffer for GGPO
+            // Store in frame-indexed input buffer for GGPO (via delay queue if debug enabled)
             // frame_number is the TARGET frame (sender's frame + INPUT_DELAY)
-            this.storeRemoteInput(player_id, action, frame_number);
+            this.queueRemoteInputWithDelay(player_id, action, frame_number);
 
             // Track SocketIO input reception for metrics
             this.p2pMetrics.inputsReceivedViaSocketIO++;
@@ -1310,6 +1316,10 @@ obs, infos, render_state
                 this._sendViaSocketIO(myCurrentAction, targetFrame);
             }
         }
+
+        // Process any debug-delayed remote inputs that are now ready
+        // This enables testing rollback behavior by artificially delaying inputs
+        this.processDelayedInputs();
 
         // 3. Build final action dict - ALL human players use delayed inputs from buffer
         // This is true GGPO: local player also experiences input delay
@@ -2673,6 +2683,68 @@ env.step(_replay_actions)
     }
 
     /**
+     * Process any delayed inputs that are ready.
+     * Used for debug testing of rollback behavior.
+     */
+    processDelayedInputs() {
+        // Check for debug delay setting from window (allows runtime adjustment)
+        if (typeof window !== 'undefined' && window.debugRemoteInputDelay !== undefined) {
+            this.debugRemoteInputDelay = window.debugRemoteInputDelay;
+        }
+
+        // Process any delayed inputs that are now ready
+        const ready = [];
+        const stillWaiting = [];
+
+        for (const item of this.debugDelayedInputQueue) {
+            if (this.frameNumber >= item.processAtFrame) {
+                ready.push(item);
+            } else {
+                stillWaiting.push(item);
+            }
+        }
+
+        this.debugDelayedInputQueue = stillWaiting;
+
+        // Actually store the delayed inputs now
+        for (const item of ready) {
+            console.log(
+                `[DEBUG] Processing delayed input: player=${item.playerId}, ` +
+                `frame=${item.frameNumber}, delayed by ${this.frameNumber - item.frameNumber} frames`
+            );
+            this.storeRemoteInput(item.playerId, item.action, item.frameNumber);
+        }
+    }
+
+    /**
+     * Queue a remote input for delayed processing (debug feature).
+     * If debugRemoteInputDelay > 0, input is held before being stored.
+     */
+    queueRemoteInputWithDelay(playerId, action, frameNumber) {
+        // Check for debug delay setting from window
+        if (typeof window !== 'undefined' && window.debugRemoteInputDelay !== undefined) {
+            this.debugRemoteInputDelay = window.debugRemoteInputDelay;
+        }
+
+        if (this.debugRemoteInputDelay > 0) {
+            const processAtFrame = this.frameNumber + this.debugRemoteInputDelay;
+            this.debugDelayedInputQueue.push({
+                playerId,
+                action,
+                frameNumber,
+                processAtFrame
+            });
+            console.log(
+                `[DEBUG] Delaying input: player=${playerId}, frame=${frameNumber}, ` +
+                `will process at frame ${processAtFrame} (delay=${this.debugRemoteInputDelay})`
+            );
+        } else {
+            // No delay - process immediately
+            this.storeRemoteInput(playerId, action, frameNumber);
+        }
+    }
+
+    /**
      * Prune old entries from input buffer.
      * Removes frames we've already passed to prevent unbounded growth.
      */
@@ -2718,6 +2790,9 @@ env.step(_replay_actions)
         this.pendingRollbackFrame = null;
         this.rollbackCount = 0;
         this.maxRollbackFrames = 0;
+
+        // Clear debug delayed input queue
+        this.debugDelayedInputQueue = [];
 
         // NOTE: Do NOT close WebRTC connection here - it persists across episodes
         // WebRTC is only closed when the game session ends (in destroy/cleanup)
@@ -2994,9 +3069,10 @@ env.step(_replay_actions)
             return;
         }
 
-        // Store all inputs from the packet (handles redundancy - duplicates are ignored by storeRemoteInput)
+        // Store all inputs from the packet (via delay queue if debug enabled)
+        // Handles redundancy - duplicates are ignored by storeRemoteInput
         for (const input of packet.inputs) {
-            this.storeRemoteInput(playerId, input.action, input.frame);
+            this.queueRemoteInputWithDelay(playerId, input.action, input.frame);
         }
 
         // Track P2P input reception for metrics
