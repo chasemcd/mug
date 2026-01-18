@@ -81,6 +81,7 @@ slime_scene = (
         num_episodes=5,
         max_steps=3000,
         input_mode=configuration_constants.InputModes.PressedKeys,
+        action_population_method=configuration_constants.ActionSettings.PreviousSubmittedAction,
     )
     .user_experience(
         scene_header="Slime Volleyball",
