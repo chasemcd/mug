@@ -669,181 +669,181 @@ class InteractiveGymOvercooked(OvercookedRewardEnv):
     def render(self):
         return self.env_to_render_fn()
 
-    # def get_state(self) -> dict:
-    #     """
-    #     Return deterministic JSON-serializable state for multiplayer sync.
+    def get_state(self) -> dict:
+        """
+        Return deterministic JSON-serializable state for multiplayer sync.
 
-    #     This method extracts all gameplay-affecting state into primitive types,
-    #     enabling hash comparison across CPython (server) and Pyodide (client).
-    #     """
-    #     state = {
-    #         "t": int(self.t),
-    #         "current_layout_id": str(self.current_layout_id) if hasattr(self, 'current_layout_id') else "",
-    #     }
+        This method extracts all gameplay-affecting state into primitive types,
+        enabling hash comparison across CPython (server) and Pyodide (client).
+        """
+        state = {
+            "t": int(self.t),
+            "current_layout_id": str(self.current_layout_id) if hasattr(self, 'current_layout_id') else "",
+        }
 
-    #     # Serialize agent state
-    #     agents_state = {}
-    #     for agent_id, agent in self.grid.grid_agents.items():
-    #         agent_state = {
-    #             "pos": [int(agent.pos[0]), int(agent.pos[1])],
-    #             "dir": int(agent.dir),
-    #             "inventory": [],
-    #         }
-    #         # Serialize inventory items
-    #         for item in agent.inventory:
-    #             item_type = type(item).__name__
-    #             agent_state["inventory"].append({"type": item_type})
-    #         agents_state[str(agent_id)] = agent_state
-    #     state["agents"] = agents_state
+        # Serialize agent state
+        agents_state = {}
+        for agent_id, agent in self.grid.grid_agents.items():
+            agent_state = {
+                "pos": [int(agent.pos[0]), int(agent.pos[1])],
+                "dir": int(agent.dir),
+                "inventory": [],
+            }
+            # Serialize inventory items
+            for item in agent.inventory:
+                item_type = type(item).__name__
+                agent_state["inventory"].append({"type": item_type})
+            agents_state[str(agent_id)] = agent_state
+        state["agents"] = agents_state
 
-    #     # Serialize dynamic grid objects (pots, items on counters, etc.)
-    #     grid_objects_state = []
-    #     for obj in self.grid.grid:
-    #         if obj is None:
-    #             continue
+        # Serialize dynamic grid objects (pots, items on counters, etc.)
+        grid_objects_state = []
+        for obj in self.grid.grid:
+            if obj is None:
+                continue
 
-    #         obj_state = self._serialize_grid_object(obj)
-    #         if obj_state:
-    #             grid_objects_state.append(obj_state)
+            obj_state = self._serialize_grid_object(obj)
+            if obj_state:
+                grid_objects_state.append(obj_state)
 
-    #         # Also serialize objects placed on top of other objects (e.g., onion on counter)
-    #         if hasattr(obj, 'can_place_on') and obj.can_place_on and hasattr(obj, 'obj_placed_on') and obj.obj_placed_on is not None:
-    #             placed_obj_state = self._serialize_grid_object(obj.obj_placed_on)
-    #             if placed_obj_state:
-    #                 placed_obj_state["placed_on_pos"] = [int(obj.pos[0]), int(obj.pos[1])]
-    #                 grid_objects_state.append(placed_obj_state)
+            # Also serialize objects placed on top of other objects (e.g., onion on counter)
+            if hasattr(obj, 'can_place_on') and obj.can_place_on and hasattr(obj, 'obj_placed_on') and obj.obj_placed_on is not None:
+                placed_obj_state = self._serialize_grid_object(obj.obj_placed_on)
+                if placed_obj_state:
+                    placed_obj_state["placed_on_pos"] = [int(obj.pos[0]), int(obj.pos[1])]
+                    grid_objects_state.append(placed_obj_state)
 
-    #     state["grid_objects"] = grid_objects_state
+        state["grid_objects"] = grid_objects_state
 
-    #     # Serialize reward weights (if they affect gameplay)
-    #     if hasattr(self, 'reward_weights'):
-    #         state["reward_weights"] = {
-    #             str(k): {str(rk): float(rv) for rk, rv in v.items()}
-    #             for k, v in self.reward_weights.items()
-    #         }
+        # Serialize reward weights (if they affect gameplay)
+        if hasattr(self, 'reward_weights'):
+            state["reward_weights"] = {
+                str(k): {str(rk): float(rv) for rk, rv in v.items()}
+                for k, v in self.reward_weights.items()
+            }
 
-    #     return state
+        return state
 
-    # def _serialize_grid_object(self, obj) -> dict | None:
-    #     """Serialize a single grid object to a dict."""
-    #     obj_type = type(obj).__name__
+    def _serialize_grid_object(self, obj) -> dict | None:
+        """Serialize a single grid object to a dict."""
+        obj_type = type(obj).__name__
 
-    #     # Only serialize dynamic objects that affect gameplay
-    #     if isinstance(obj, overcooked_grid_objects.Pot):
-    #         return {
-    #             "type": obj_type,
-    #             "pos": [int(obj.pos[0]), int(obj.pos[1])],
-    #             "cooking_timer": int(obj.cooking_timer) if hasattr(obj, 'cooking_timer') else 0,
-    #             "objects_in_pot": len(obj.objects_in_pot) if hasattr(obj, 'objects_in_pot') else 0,
-    #         }
-    #     elif isinstance(obj, overcooked_grid_objects.Onion):
-    #         return {
-    #             "type": obj_type,
-    #             "pos": [int(obj.pos[0]), int(obj.pos[1])],
-    #         }
-    #     elif isinstance(obj, overcooked_grid_objects.Plate):
-    #         return {
-    #             "type": obj_type,
-    #             "pos": [int(obj.pos[0]), int(obj.pos[1])],
-    #         }
-    #     elif isinstance(obj, overcooked_grid_objects.OnionSoup):
-    #         return {
-    #             "type": obj_type,
-    #             "pos": [int(obj.pos[0]), int(obj.pos[1])],
-    #         }
-    #     # Static objects (counters, walls, stacks, delivery zones) don't need serialization
-    #     # as they don't change during gameplay
-    #     return None
+        # Only serialize dynamic objects that affect gameplay
+        if isinstance(obj, overcooked_grid_objects.Pot):
+            return {
+                "type": obj_type,
+                "pos": [int(obj.pos[0]), int(obj.pos[1])],
+                "cooking_timer": int(obj.cooking_timer) if hasattr(obj, 'cooking_timer') else 0,
+                "objects_in_pot": len(obj.objects_in_pot) if hasattr(obj, 'objects_in_pot') else 0,
+            }
+        elif isinstance(obj, overcooked_grid_objects.Onion):
+            return {
+                "type": obj_type,
+                "pos": [int(obj.pos[0]), int(obj.pos[1])],
+            }
+        elif isinstance(obj, overcooked_grid_objects.Plate):
+            return {
+                "type": obj_type,
+                "pos": [int(obj.pos[0]), int(obj.pos[1])],
+            }
+        elif isinstance(obj, overcooked_grid_objects.OnionSoup):
+            return {
+                "type": obj_type,
+                "pos": [int(obj.pos[0]), int(obj.pos[1])],
+            }
+        # Static objects (counters, walls, stacks, delivery zones) don't need serialization
+        # as they don't change during gameplay
+        return None
 
-    # def set_state(self, state: dict) -> None:
-    #     """
-    #     Restore environment state from a state dict.
+    def set_state(self, state: dict) -> None:
+        """
+        Restore environment state from a state dict.
 
-    #     This method applies state received from the server to synchronize
-    #     the client's environment with the authoritative server state.
-    #     """
-    #     # Restore time step
-    #     if "t" in state:
-    #         self.t = state["t"]
+        This method applies state received from the server to synchronize
+        the client's environment with the authoritative server state.
+        """
+        # Restore time step
+        if "t" in state:
+            self.t = state["t"]
 
-    #     # Restore agent state
-    #     if "agents" in state:
-    #         for agent_id_str, agent_state in state["agents"].items():
-    #             agent_id = int(agent_id_str)
-    #             if agent_id in self.grid.grid_agents:
-    #                 agent = self.grid.grid_agents[agent_id]
+        # Restore agent state
+        if "agents" in state:
+            for agent_id_str, agent_state in state["agents"].items():
+                agent_id = int(agent_id_str)
+                if agent_id in self.grid.grid_agents:
+                    agent = self.grid.grid_agents[agent_id]
 
-    #                 # Update position
-    #                 new_pos = tuple(agent_state["pos"])
-    #                 if hasattr(agent, 'pos'):
-    #                     agent.pos = new_pos
+                    # Update position
+                    new_pos = tuple(agent_state["pos"])
+                    if hasattr(agent, 'pos'):
+                        agent.pos = new_pos
 
-    #                 # Update direction
-    #                 if "dir" in agent_state:
-    #                     agent.dir = agent_state["dir"]
+                    # Update direction
+                    if "dir" in agent_state:
+                        agent.dir = agent_state["dir"]
 
-    #                 # Restore inventory
-    #                 agent.inventory = []
-    #                 for item_data in agent_state.get("inventory", []):
-    #                     item_type = item_data["type"]
-    #                     if item_type == "Onion":
-    #                         agent.inventory.append(overcooked_grid_objects.Onion())
-    #                     elif item_type == "Plate":
-    #                         agent.inventory.append(overcooked_grid_objects.Plate())
-    #                     elif item_type == "OnionSoup":
-    #                         agent.inventory.append(overcooked_grid_objects.OnionSoup())
+                    # Restore inventory
+                    agent.inventory = []
+                    for item_data in agent_state.get("inventory", []):
+                        item_type = item_data["type"]
+                        if item_type == "Onion":
+                            agent.inventory.append(overcooked_grid_objects.Onion())
+                        elif item_type == "Plate":
+                            agent.inventory.append(overcooked_grid_objects.Plate())
+                        elif item_type == "OnionSoup":
+                            agent.inventory.append(overcooked_grid_objects.OnionSoup())
 
-    #     # Restore grid objects (pots, placed items)
-    #     if "grid_objects" in state:
-    #         # First, clear dynamic objects from counters
-    #         for obj in self.grid.grid:
-    #             if obj is not None and hasattr(obj, 'obj_placed_on'):
-    #                 obj.obj_placed_on = None
+        # Restore grid objects (pots, placed items)
+        if "grid_objects" in state:
+            # First, clear dynamic objects from counters
+            for obj in self.grid.grid:
+                if obj is not None and hasattr(obj, 'obj_placed_on'):
+                    obj.obj_placed_on = None
 
-    #         # Clear pots
-    #         for obj in self.grid.grid:
-    #             if isinstance(obj, overcooked_grid_objects.Pot):
-    #                 if hasattr(obj, 'objects_in_pot'):
-    #                     obj.objects_in_pot = []
-    #                 if hasattr(obj, 'cooking_timer'):
-    #                     obj.cooking_timer = 20  # Default cooking time
+            # Clear pots
+            for obj in self.grid.grid:
+                if isinstance(obj, overcooked_grid_objects.Pot):
+                    if hasattr(obj, 'objects_in_pot'):
+                        obj.objects_in_pot = []
+                    if hasattr(obj, 'cooking_timer'):
+                        obj.cooking_timer = 20  # Default cooking time
 
-    #         # Restore serialized objects
-    #         for obj_state in state["grid_objects"]:
-    #             obj_type = obj_state["type"]
-    #             pos = tuple(obj_state["pos"]) if "pos" in obj_state else None
+            # Restore serialized objects
+            for obj_state in state["grid_objects"]:
+                obj_type = obj_state["type"]
+                pos = tuple(obj_state["pos"]) if "pos" in obj_state else None
 
-    #             if obj_type == "Pot" and pos:
-    #                 # Find the pot at this position and restore its state
-    #                 pot = self.grid.get(*pos)
-    #                 if isinstance(pot, overcooked_grid_objects.Pot):
-    #                     if "cooking_timer" in obj_state:
-    #                         pot.cooking_timer = obj_state["cooking_timer"]
-    #                     if "objects_in_pot" in obj_state:
-    #                         num_onions = obj_state["objects_in_pot"]
-    #                         pot.objects_in_pot = [overcooked_grid_objects.Onion() for _ in range(num_onions)]
+                if obj_type == "Pot" and pos:
+                    # Find the pot at this position and restore its state
+                    pot = self.grid.get(*pos)
+                    if isinstance(pot, overcooked_grid_objects.Pot):
+                        if "cooking_timer" in obj_state:
+                            pot.cooking_timer = obj_state["cooking_timer"]
+                        if "objects_in_pot" in obj_state:
+                            num_onions = obj_state["objects_in_pot"]
+                            pot.objects_in_pot = [overcooked_grid_objects.Onion() for _ in range(num_onions)]
 
-    #             elif "placed_on_pos" in obj_state:
-    #                 # This object was placed on a counter
-    #                 placed_pos = tuple(obj_state["placed_on_pos"])
-    #                 counter = self.grid.get(*placed_pos)
-    #                 if counter is not None and hasattr(counter, 'obj_placed_on'):
-    #                     if obj_type == "Onion":
-    #                         counter.obj_placed_on = overcooked_grid_objects.Onion()
-    #                         counter.obj_placed_on.pos = placed_pos
-    #                     elif obj_type == "Plate":
-    #                         counter.obj_placed_on = overcooked_grid_objects.Plate()
-    #                         counter.obj_placed_on.pos = placed_pos
-    #                     elif obj_type == "OnionSoup":
-    #                         counter.obj_placed_on = overcooked_grid_objects.OnionSoup()
-    #                         counter.obj_placed_on.pos = placed_pos
+                elif "placed_on_pos" in obj_state:
+                    # This object was placed on a counter
+                    placed_pos = tuple(obj_state["placed_on_pos"])
+                    counter = self.grid.get(*placed_pos)
+                    if counter is not None and hasattr(counter, 'obj_placed_on'):
+                        if obj_type == "Onion":
+                            counter.obj_placed_on = overcooked_grid_objects.Onion()
+                            counter.obj_placed_on.pos = placed_pos
+                        elif obj_type == "Plate":
+                            counter.obj_placed_on = overcooked_grid_objects.Plate()
+                            counter.obj_placed_on.pos = placed_pos
+                        elif obj_type == "OnionSoup":
+                            counter.obj_placed_on = overcooked_grid_objects.OnionSoup()
+                            counter.obj_placed_on.pos = placed_pos
 
-    #     # Restore reward weights
-    #     if "reward_weights" in state and hasattr(self, 'reward_weights'):
-    #         self.reward_weights = {
-    #             int(k): {rk: rv for rk, rv in v.items()}
-    #             for k, v in state["reward_weights"].items()
-    #         }
+        # Restore reward weights
+        if "reward_weights" in state and hasattr(self, 'reward_weights'):
+            self.reward_weights = {
+                int(k): {rk: rv for rk, rv in v.items()}
+                for k, v in state["reward_weights"].items()
+            }
 
     def get_infos(self, **kwargs):
         """Add the agent positions and directions to the infos dictionary"""
