@@ -675,10 +675,73 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
                             JSON.stringify(nearbyActions.map(r => ({f: r.frame, a: r.actions})))
                         );
                     }
+
+                    // P2P State Resync: Request state from peer if desync detected
+                    // Use deterministic tie-breaker: lower player ID defers to higher
+                    // This prevents both peers from trying to send state simultaneously
+                    if (this._shouldRequestStateResync(sender_id)) {
+                        console.log(`[P2P RESYNC] Requesting state from peer ${sender_id} (we defer as ${this.myPlayerId})`);
+                        socket.emit('p2p_state_request', {
+                            game_id: this.gameId,
+                            requester_id: this.myPlayerId,
+                            target_id: sender_id,
+                            frame_number: frame_number
+                        });
+                    }
                 }
             }
 
             this.lastP2PSyncFrame = frame_number;
+        });
+
+        // P2P state request - peer is asking us to send our state
+        socket.on('p2p_state_request', async (data) => {
+            const { game_id, requester_id, target_id, frame_number } = data;
+            if (game_id !== this.gameId || target_id !== this.myPlayerId) {
+                return;
+            }
+
+            console.log(`[P2P RESYNC] Peer ${requester_id} requested our state at frame ${frame_number}`);
+
+            // Get current state and send it
+            try {
+                const envState = await this.pyodide.runPythonAsync(`
+import json
+env.get_state()
+                `);
+                const stateDict = envState.toJs({ dict_converter: Object.fromEntries });
+
+                socket.emit('p2p_state_response', {
+                    game_id: this.gameId,
+                    sender_id: this.myPlayerId,
+                    target_id: requester_id,
+                    frame_number: this.frameNumber,
+                    step_num: this.step_num,
+                    env_state: stateDict,
+                    cumulative_rewards: this.cumulative_rewards
+                });
+                console.log(`[P2P RESYNC] Sent state to peer ${requester_id} (frame=${this.frameNumber})`);
+            } catch (err) {
+                console.error('[P2P RESYNC] Failed to get/send state:', err);
+            }
+        });
+
+        // P2P state response - peer is sending us their state
+        socket.on('p2p_state_response', async (data) => {
+            const { game_id, sender_id, target_id, frame_number, step_num, env_state, cumulative_rewards } = data;
+            if (game_id !== this.gameId || target_id !== this.myPlayerId) {
+                return;
+            }
+
+            console.log(`[P2P RESYNC] Received state from peer ${sender_id} (frame=${frame_number})`);
+
+            try {
+                // Apply the peer's state
+                await this._applyP2PState(env_state, frame_number, step_num, cumulative_rewards);
+                console.log(`[P2P RESYNC] Applied peer state successfully, now at frame ${this.frameNumber}`);
+            } catch (err) {
+                console.error('[P2P RESYNC] Failed to apply peer state:', err);
+            }
         });
 
         // Server-authoritative state broadcast
@@ -2034,6 +2097,53 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
         // Export and log full session metrics for research analysis
         const sessionMetrics = this.exportSessionMetrics();
         console.log('[Episode] Session metrics:', JSON.stringify(sessionMetrics, null, 2));
+    }
+
+    // ========== P2P State Resync Methods ==========
+
+    /**
+     * Determine if we should request state from peer on desync.
+     * Uses deterministic tie-breaker: lower player ID defers to higher.
+     * This ensures only one peer requests state, not both.
+     */
+    _shouldRequestStateResync(peerId) {
+        // Compare as strings to handle both numeric and string IDs
+        const myId = String(this.myPlayerId);
+        const theirId = String(peerId);
+        // Lower ID defers to higher ID (requests state from them)
+        return myId < theirId;
+    }
+
+    /**
+     * Apply state received from peer during P2P resync.
+     * Similar to applyServerState but for peer-to-peer sync.
+     */
+    async _applyP2PState(envState, frameNumber, stepNum, cumulativeRewards) {
+        console.log(`[P2P RESYNC] Applying peer state: frame=${frameNumber}, step=${stepNum}`);
+
+        // Apply environment state via set_state
+        const envStateJson = JSON.stringify(envState);
+        await this.pyodide.runPythonAsync(`
+import json
+
+env_state = json.loads('''${envStateJson.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}''')
+env.set_state(env_state)
+        `);
+
+        // Sync JavaScript-side state
+        this.frameNumber = frameNumber;
+        this.step_num = stepNum;
+        if (cumulativeRewards) {
+            this.cumulative_rewards = cumulativeRewards;
+        }
+
+        // Clear GGPO state since we're now in sync
+        this.clearGGPOState();
+
+        // Update HUD
+        ui_utils.updateHUDText(this.getHUDText());
+
+        console.log(`[P2P RESYNC] State applied, synced to frame ${this.frameNumber}`);
     }
 
     // ========== GGPO Rollback Netcode Methods ==========

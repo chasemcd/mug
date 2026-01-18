@@ -977,6 +977,88 @@ def on_p2p_state_sync(data):
     )
 
 
+@socketio.on("p2p_state_request")
+def on_p2p_state_request(data):
+    """
+    Relay P2P state request from one player to another (for desync recovery).
+
+    When a player detects desync via hash mismatch, the lower player ID
+    requests state from the higher player ID (deterministic tie-breaker).
+
+    Args:
+        data: {
+            'game_id': str,
+            'requester_id': str | int,
+            'target_id': str | int,
+            'frame_number': int
+        }
+    """
+    global PYODIDE_COORDINATOR
+
+    if PYODIDE_COORDINATOR is None:
+        logger.error("Pyodide coordinator not initialized")
+        return
+
+    game_id = data.get("game_id")
+    target_id = data.get("target_id")
+
+    game = PYODIDE_COORDINATOR.games.get(game_id)
+    if game is None:
+        logger.warning(f"P2P state request for non-existent game {game_id}")
+        return
+
+    # Only relay in non-server-authoritative mode
+    if game.server_authoritative:
+        return
+
+    # Relay to the target player
+    target_socket_id = game.players.get(target_id)
+    if target_socket_id:
+        socketio.emit('p2p_state_request', data, room=target_socket_id)
+        logger.debug(f"Relayed P2P state request to {target_id} in game {game_id}")
+
+
+@socketio.on("p2p_state_response")
+def on_p2p_state_response(data):
+    """
+    Relay P2P state response from one player to another (for desync recovery).
+
+    Args:
+        data: {
+            'game_id': str,
+            'sender_id': str | int,
+            'target_id': str | int,
+            'frame_number': int,
+            'step_num': int,
+            'env_state': dict,
+            'cumulative_rewards': dict
+        }
+    """
+    global PYODIDE_COORDINATOR
+
+    if PYODIDE_COORDINATOR is None:
+        logger.error("Pyodide coordinator not initialized")
+        return
+
+    game_id = data.get("game_id")
+    target_id = data.get("target_id")
+
+    game = PYODIDE_COORDINATOR.games.get(game_id)
+    if game is None:
+        logger.warning(f"P2P state response for non-existent game {game_id}")
+        return
+
+    # Only relay in non-server-authoritative mode
+    if game.server_authoritative:
+        return
+
+    # Relay to the target player
+    target_socket_id = game.players.get(target_id)
+    if target_socket_id:
+        socketio.emit('p2p_state_response', data, room=target_socket_id)
+        logger.debug(f"Relayed P2P state response to {target_id} in game {game_id}")
+
+
 @socketio.on("pyodide_state_hash")
 def on_pyodide_state_hash(data):
     """
