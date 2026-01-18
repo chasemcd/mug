@@ -105,7 +105,7 @@ slime_scene = (
             "opencv-python",
         ],
         state_broadcast_interval=30,  # Sync state every 300 frames (~10s at 30fps), None to disable
-        server_authoritative=True,  # Server-authoritative mode
+        server_authoritative=False,  # Server-authoritative mode
     )
 )
 
