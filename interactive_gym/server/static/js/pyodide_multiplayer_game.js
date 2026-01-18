@@ -2764,9 +2764,9 @@ env.step(_replay_actions)
             return;
         }
 
-        // Convert numeric player index back to string player ID
+        // Convert numeric player index back to player ID
         const playerId = this.indexToPlayerId[packet.playerId];
-        if (!playerId) {
+        if (playerId === undefined) {
             console.warn(`[P2P] Unknown player index: ${packet.playerId}`);
             return;
         }
