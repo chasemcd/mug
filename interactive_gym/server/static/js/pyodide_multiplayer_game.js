@@ -21,6 +21,7 @@ const P2P_MSG_INPUT = 0x01;
 const P2P_MSG_PING = 0x02;
 const P2P_MSG_PONG = 0x03;
 const P2P_MSG_KEEPALIVE = 0x04;
+const P2P_MSG_EPISODE_END = 0x05;  // Episode reset synchronization
 
 /**
  * Encode an input packet for P2P transmission.
@@ -116,6 +117,42 @@ function encodePong(originalTimestamp) {
     view.setUint8(0, P2P_MSG_PONG);
     view.setFloat64(1, originalTimestamp, false);
     return buffer;
+}
+
+/**
+ * Encode an episode end notification for P2P transmission.
+ * Format: 9 bytes
+ *   Byte 0: Message type (0x05)
+ *   Bytes 1-4: Frame number where episode ended (uint32)
+ *   Bytes 5-8: Episode number (uint32)
+ *
+ * @param {number} frameNumber - Frame where episode ended
+ * @param {number} episodeNumber - Current episode number
+ * @returns {ArrayBuffer} Encoded packet
+ */
+function encodeEpisodeEnd(frameNumber, episodeNumber) {
+    const buffer = new ArrayBuffer(9);
+    const view = new DataView(buffer);
+    view.setUint8(0, P2P_MSG_EPISODE_END);
+    view.setUint32(1, frameNumber, false);
+    view.setUint32(5, episodeNumber, false);
+    return buffer;
+}
+
+/**
+ * Decode an episode end notification.
+ *
+ * @param {ArrayBuffer} buffer - Received packet
+ * @returns {{frameNumber: number, episodeNumber: number}|null}
+ */
+function decodeEpisodeEnd(buffer) {
+    const view = new DataView(buffer);
+    const type = view.getUint8(0);
+    if (type !== P2P_MSG_EPISODE_END) return null;
+    return {
+        frameNumber: view.getUint32(1, false),
+        episodeNumber: view.getUint32(5, false)
+    };
 }
 
 /**
@@ -440,6 +477,17 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
             p2pFallbackFrame: null,
             connectionType: null,
             connectionDetails: null
+        };
+
+        // P2P episode synchronization
+        // Both peers must agree on episode end before resetting
+        this.p2pEpisodeSync = {
+            localEpisodeEndDetected: false,   // We detected episode end
+            localEpisodeEndFrame: null,       // Frame where we detected it
+            remoteEpisodeEndReceived: false,  // Peer sent episode end message
+            remoteEpisodeEndFrame: null,      // Frame where peer detected it
+            pendingReset: false,              // Waiting for sync before reset
+            syncTimeoutId: null               // Timeout to prevent infinite waiting
         };
 
         // Session metrics for research data export
@@ -874,6 +922,9 @@ print(f"[Python] Seeded RNG with {${seed}}")
         // Clear state hash history for fresh episode
         this.stateHashHistory.clear();
 
+        // Clear P2P episode sync state for fresh episode
+        this._clearEpisodeSyncState();
+
         // In server-authoritative mode, wait for server to broadcast episode start state
         if (this.serverAuthoritative) {
             // Check if this is a subsequent episode (not the first one)
@@ -1299,37 +1350,29 @@ obs, infos, render_state
         const all_truncated = Array.from(truncateds.values()).every(value => value === true);
         const max_steps_reached = this.step_num >= this.max_steps;
 
-        if ((all_terminated || all_truncated || max_steps_reached) && !this.episodeComplete) {
-            this.episodeComplete = true;
+        const episodeEndDetected = all_terminated || all_truncated || max_steps_reached;
 
-            // Calculate P2P receive ratio
-            const totalReceived = this.p2pMetrics.inputsReceivedViaP2P + this.p2pMetrics.inputsReceivedViaSocketIO;
-            const p2pReceiveRatio = totalReceived > 0
-                ? (this.p2pMetrics.inputsReceivedViaP2P / totalReceived * 100).toFixed(1)
-                : 'N/A';
-            const p2pType = this.p2pMetrics.connectionType || 'unknown';
+        // In P2P mode (non-server-authoritative), use synchronized episode end
+        // Both peers must agree before resetting to prevent desync
+        if (episodeEndDetected && !this.episodeComplete && !this.p2pEpisodeSync.localEpisodeEndDetected) {
+            // Log episode end detection (metrics logged here, actual completion when both peers agree)
+            this._logEpisodeEndMetrics();
 
-            // Log episode summary with P2P metrics
-            console.log(
-                `[Episode] Complete at frame ${this.frameNumber} | ` +
-                `Rewards: ${JSON.stringify(this.cumulative_rewards)} | ` +
-                `InputBuf: ${this.inputBuffer.size} | ` +
-                `Rollbacks: ${this.rollbackCount} (max depth: ${this.sessionMetrics.rollbacks.maxFrames}) | ` +
-                `Syncs: ${this.diagnostics.syncCount} | ` +
-                `P2P: ${this.p2pMetrics.inputsReceivedViaP2P}/${totalReceived} (${p2pReceiveRatio}%) | ` +
-                `Type: ${p2pType}` +
-                (this.p2pMetrics.p2pFallbackTriggered
-                    ? ` | Fallback at frame ${this.p2pMetrics.p2pFallbackFrame}`
-                    : '')
-            );
-
-            // Export and log full session metrics for research analysis
-            const sessionMetrics = this.exportSessionMetrics();
-            console.log('[Episode] Session metrics:', JSON.stringify(sessionMetrics, null, 2));
-
-            // Signal scene termination to server
-            // Data is saved via remoteGameLogger and sent at scene termination via emit_remote_game_data
-            this.signalEpisodeComplete();
+            if (this.serverAuthoritative) {
+                // Server-authoritative mode: immediately complete (server coordinates)
+                this.episodeComplete = true;
+                this.signalEpisodeComplete();
+            } else if (this.webrtcManager?.isReady()) {
+                // P2P mode with active connection: broadcast and wait for peer
+                console.log(`[P2P] Episode end detected at frame ${this.frameNumber}, broadcasting to peer...`);
+                this._broadcastEpisodeEnd();
+                // Don't set episodeComplete yet - _checkEpisodeSyncAndReset will do it when both agree
+            } else {
+                // P2P mode but no WebRTC connection: fallback to immediate completion
+                console.log(`[P2P] Episode end at frame ${this.frameNumber}, no P2P connection - completing immediately`);
+                this.episodeComplete = true;
+                this.signalEpisodeComplete();
+            }
         }
 
         // Return finalActions alongside step results so caller can log synchronized actions
@@ -1960,6 +2003,37 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
             this.shouldReset = true;
             console.log(`[MultiplayerPyodide] Episode ${this.num_episodes}/${this.max_episodes} complete, will reset`);
         }
+    }
+
+    _logEpisodeEndMetrics() {
+        /**
+         * Log episode end metrics. Called when episode end is first detected,
+         * before P2P synchronization completes.
+         */
+        // Calculate P2P receive ratio
+        const totalReceived = this.p2pMetrics.inputsReceivedViaP2P + this.p2pMetrics.inputsReceivedViaSocketIO;
+        const p2pReceiveRatio = totalReceived > 0
+            ? (this.p2pMetrics.inputsReceivedViaP2P / totalReceived * 100).toFixed(1)
+            : 'N/A';
+        const p2pType = this.p2pMetrics.connectionType || 'unknown';
+
+        // Log episode summary with P2P metrics
+        console.log(
+            `[Episode] Complete at frame ${this.frameNumber} | ` +
+            `Rewards: ${JSON.stringify(this.cumulative_rewards)} | ` +
+            `InputBuf: ${this.inputBuffer.size} | ` +
+            `Rollbacks: ${this.rollbackCount} (max depth: ${this.sessionMetrics.rollbacks.maxFrames}) | ` +
+            `Syncs: ${this.diagnostics.syncCount} | ` +
+            `P2P: ${this.p2pMetrics.inputsReceivedViaP2P}/${totalReceived} (${p2pReceiveRatio}%) | ` +
+            `Type: ${p2pType}` +
+            (this.p2pMetrics.p2pFallbackTriggered
+                ? ` | Fallback at frame ${this.p2pMetrics.p2pFallbackFrame}`
+                : '')
+        );
+
+        // Export and log full session metrics for research analysis
+        const sessionMetrics = this.exportSessionMetrics();
+        console.log('[Episode] Session metrics:', JSON.stringify(sessionMetrics, null, 2));
     }
 
     // ========== GGPO Rollback Netcode Methods ==========
@@ -2737,6 +2811,9 @@ env.step(_replay_actions)
             case P2P_MSG_KEEPALIVE:
                 // Just receiving it confirms connection is alive
                 break;
+            case P2P_MSG_EPISODE_END:
+                this._handleEpisodeEnd(buffer);
+                break;
             default:
                 console.warn('[P2P] Unknown binary message type:', messageType);
         }
@@ -2822,6 +2899,109 @@ env.step(_replay_actions)
             const avgRtt = this.connectionHealth?.rttTracker.getAverageRTT();
             console.log(`[P2P] RTT: ${rtt.toFixed(1)}ms (avg: ${avgRtt?.toFixed(1) ?? 'N/A'}ms)`);
         }
+    }
+
+    _handleEpisodeEnd(buffer) {
+        /**
+         * Handle episode end notification from peer.
+         * In P2P mode, both peers must agree on episode end before resetting.
+         * This prevents desync when one client detects episode end slightly before the other.
+         */
+        const packet = decodeEpisodeEnd(buffer);
+        if (!packet) {
+            console.warn('[P2P] Failed to decode episode end packet');
+            return;
+        }
+
+        console.log(`[P2P] Received episode end from peer: frame=${packet.frameNumber}, episode=${packet.episodeNumber}`);
+
+        // Record that we received peer's episode end notification
+        this.p2pEpisodeSync.remoteEpisodeEndReceived = true;
+        this.p2pEpisodeSync.remoteEpisodeEndFrame = packet.frameNumber;
+
+        // Check if we can now trigger the synchronized reset
+        this._checkEpisodeSyncAndReset();
+    }
+
+    _broadcastEpisodeEnd() {
+        /**
+         * Send episode end notification to peer.
+         * Called when we detect episode end locally (environment terminated/truncated).
+         */
+        if (!this.webrtcManager?.isReady()) {
+            console.warn('[P2P] Cannot broadcast episode end - WebRTC not ready');
+            return;
+        }
+
+        const packet = encodeEpisodeEnd(this.frameNumber, this.num_episodes);
+        this.webrtcManager.send(packet);
+        console.log(`[P2P] Broadcast episode end: frame=${this.frameNumber}, episode=${this.num_episodes}`);
+
+        // Record that we detected episode end locally
+        this.p2pEpisodeSync.localEpisodeEndDetected = true;
+        this.p2pEpisodeSync.localEpisodeEndFrame = this.frameNumber;
+        this.p2pEpisodeSync.pendingReset = true;
+
+        // Start timeout in case peer message is lost (2 seconds)
+        // If we don't hear from peer, proceed with reset anyway
+        this.p2pEpisodeSync.syncTimeoutId = setTimeout(() => {
+            if (this.p2pEpisodeSync.pendingReset && !this.p2pEpisodeSync.remoteEpisodeEndReceived) {
+                console.warn('[P2P] Episode sync timeout - proceeding with reset without peer confirmation');
+                this._clearEpisodeSyncState();
+                this.episodeComplete = true;
+                this.signalEpisodeComplete();
+            }
+        }, 2000);
+
+        // Check if peer already sent their notification
+        this._checkEpisodeSyncAndReset();
+    }
+
+    _checkEpisodeSyncAndReset() {
+        /**
+         * Check if both peers have detected episode end and trigger synchronized reset.
+         * This is called:
+         * 1. When we detect episode end locally (after broadcasting)
+         * 2. When we receive episode end from peer
+         */
+        const sync = this.p2pEpisodeSync;
+
+        // Both peers must agree before we can reset
+        if (!sync.localEpisodeEndDetected || !sync.remoteEpisodeEndReceived) {
+            console.log(`[P2P] Waiting for episode sync: local=${sync.localEpisodeEndDetected}, remote=${sync.remoteEpisodeEndReceived}`);
+            return;
+        }
+
+        // Both peers agree - frames may differ slightly due to network timing, that's OK
+        const frameDiff = Math.abs((sync.localEpisodeEndFrame || 0) - (sync.remoteEpisodeEndFrame || 0));
+        if (frameDiff > 5) {
+            console.warn(`[P2P] Large frame difference at episode end: local=${sync.localEpisodeEndFrame}, remote=${sync.remoteEpisodeEndFrame}`);
+        } else {
+            console.log(`[P2P] Episode end synchronized: local=${sync.localEpisodeEndFrame}, remote=${sync.remoteEpisodeEndFrame}`);
+        }
+
+        // Clear sync state for next episode
+        this._clearEpisodeSyncState();
+
+        // Now safe to signal episode complete (which triggers shouldReset)
+        this.episodeComplete = true;
+        this.signalEpisodeComplete();
+    }
+
+    _clearEpisodeSyncState() {
+        /**
+         * Reset episode sync state for the next episode.
+         */
+        // Clear timeout if it exists
+        if (this.p2pEpisodeSync.syncTimeoutId) {
+            clearTimeout(this.p2pEpisodeSync.syncTimeoutId);
+        }
+        this.p2pEpisodeSync.localEpisodeEndDetected = false;
+        this.p2pEpisodeSync.localEpisodeEndFrame = null;
+        this.p2pEpisodeSync.remoteEpisodeEndReceived = false;
+        this.p2pEpisodeSync.remoteEpisodeEndFrame = null;
+        this.p2pEpisodeSync.pendingReset = false;
+        this.p2pEpisodeSync.syncTimeoutId = null;
     }
 
     _startPingInterval() {
