@@ -104,9 +104,9 @@ Plans:
 5. Documentation updated to reflect P2P architecture
 
 Plans:
-- [ ] 05-01-PLAN.md -- Remove legacy host code (server + client)
-- [ ] 05-02-PLAN.md -- P2P-first input sending + research metrics
-- [ ] 05-03-PLAN.md -- Documentation update + validation checkpoint
+- [x] 05-01-PLAN.md -- Remove legacy host code (server + client)
+- [x] 05-02-PLAN.md -- P2P-first input sending + research metrics
+- [x] 05-03-PLAN.md -- Documentation update + validation checkpoint
 
 ---
 
@@ -118,7 +118,7 @@ Plans:
 | 2 - P2P Transport Layer | Complete | 2026-01-17 |
 | 3 - GGPO P2P Integration | Complete | 2026-01-17 |
 | 4 - TURN and Resilience | Complete | 2026-01-17 |
-| 5 - Validation and Cleanup | Planned | - |
+| 5 - Validation and Cleanup | Complete | 2026-01-17 |
 
 ---
 
