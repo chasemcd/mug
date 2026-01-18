@@ -453,6 +453,10 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         this.lastP2PSyncFrame = 0;  // Last frame we sent/received P2P sync
         this.p2pHashMismatches = 0;  // Count of hash mismatches detected
 
+        // State sync capability (requires env.get_state() and env.set_state())
+        // Set during validateStateSync() - if false, hash comparison and resync are disabled
+        this.stateSyncSupported = false;
+
         // P2P WebRTC connection
         this.webrtcManager = null;
         this.p2pConnected = false;
@@ -612,6 +616,11 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
                 return;
             }
 
+            // Skip hash comparison if state sync not supported (no get_state/set_state)
+            if (!this.stateSyncSupported) {
+                return;
+            }
+
             const { game_id, sender_id, frame_number, state_hash, action_counts } = data;
             if (game_id !== this.gameId || sender_id === this.myPlayerId) {
                 return;  // Ignore own messages or wrong game
@@ -701,6 +710,12 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
                 return;
             }
 
+            // Can't respond if state sync not supported
+            if (!this.stateSyncSupported) {
+                console.warn('[P2P RESYNC] Cannot respond to state request - get_state not available');
+                return;
+            }
+
             console.log(`[P2P RESYNC] Peer ${requester_id} requested our state at frame ${frame_number}`);
 
             // Get current state and send it
@@ -730,6 +745,12 @@ env.get_state()
         socket.on('p2p_state_response', async (data) => {
             const { game_id, sender_id, target_id, frame_number, step_num, env_state, cumulative_rewards } = data;
             if (game_id !== this.gameId || target_id !== this.myPlayerId) {
+                return;
+            }
+
+            // Can't apply if state sync not supported
+            if (!this.stateSyncSupported) {
+                console.warn('[P2P RESYNC] Cannot apply peer state - set_state not available');
                 return;
             }
 
@@ -912,8 +933,8 @@ if not has_get_state or not has_set_state:
     if not has_set_state:
         missing.append("set_state()")
     print(f"[Python] ⚠️ Environment {env_type} is missing required methods: {', '.join(missing)}")
-    print(f"[Python] ⚠️ State synchronization will NOT work without these methods.")
-    print(f"[Python] ⚠️ Please implement get_state() and set_state() that return/accept JSON-serializable dicts.")
+    print(f"[Python] ⚠️ State synchronization (hash comparison, P2P resync) will be DISABLED.")
+    print(f"[Python] ⚠️ To enable, implement get_state() and set_state() that return/accept JSON-serializable dicts.")
 else:
     print(f"[Python] ✓ Environment {env_type} has get_state() and set_state() methods")
 
@@ -925,8 +946,15 @@ else:
 }
         `);
 
-        // State sync validation complete - just need to call toJs() to release the proxy
-        void result.toJs();
+        // Store the capability for later use
+        const capabilities = result.toJs({ dict_converter: Object.fromEntries });
+        this.stateSyncSupported = capabilities.has_get_state && capabilities.has_set_state;
+
+        if (this.stateSyncSupported) {
+            console.log(`[MultiplayerPyodide] State sync enabled for ${capabilities.env_type}`);
+        } else {
+            console.warn(`[MultiplayerPyodide] State sync DISABLED - environment missing get_state/set_state`);
+        }
     }
 
     async seedPythonEnvironment(seed) {
@@ -1614,6 +1642,11 @@ obs, rewards, terminateds, truncateds, infos, render_state
      * Both peers broadcast their state hash for mutual desync detection.
      */
     async broadcastSymmetricStateSync() {
+        // Skip if state sync not supported (no get_state)
+        if (!this.stateSyncSupported) {
+            return;
+        }
+
         try {
             const stateHash = await this.computeQuickStateHash();
 
@@ -1642,6 +1675,11 @@ obs, rewards, terminateds, truncateds, infos, render_state
      * Runs asynchronously to avoid blocking the game loop.
      */
     async recordStateHashForFrame(frameNumber) {
+        // Skip if state sync not supported (no get_state)
+        if (!this.stateSyncSupported) {
+            return;
+        }
+
         try {
             const hash = await this.computeQuickStateHash();
             this.stateHashHistory.set(frameNumber, hash);
@@ -1681,18 +1719,16 @@ obs, rewards, terminateds, truncateds, infos, render_state
          * Returns first 16 chars of MD5 hash to match server format.
          *
          * Requires the environment to implement get_state() returning a
-         * JSON-serializable dict.
+         * JSON-serializable dict. Returns null if not supported.
          */
+        // Return null if state sync not supported
+        if (!this.stateSyncSupported) {
+            return null;
+        }
+
         const hashResult = await this.pyodide.runPythonAsync(`
 import json
 import hashlib
-
-if not hasattr(env, 'get_state') or not callable(getattr(env, 'get_state')):
-    raise RuntimeError(
-        "Environment does not implement get_state(). "
-        "State synchronization requires get_state() and set_state() methods "
-        "that return/accept JSON-serializable dicts with primitive types only."
-    )
 
 _env_state_for_hash = env.get_state()
 
