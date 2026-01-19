@@ -2,7 +2,7 @@
 
 **Project:** Interactive Gym P2P Multiplayer
 **Created:** 2026-01-16
-**Phases:** 5
+**Phases:** 6
 
 ## Overview
 
@@ -110,6 +110,31 @@ Plans:
 
 ---
 
+### Phase 6: GGPO Input Queue Fix
+
+**Goal:** Fix rollback divergence by implementing GGPO-style synchronous input processing - queue inputs during network reception, process all queued inputs at frame start before rollback.
+**Depends on:** Phase 5
+**Requirements:** GGPO-04 (new: correct rollback synchronization)
+**Plans:** 1 plan
+
+**Success Criteria:**
+1. Incoming P2P inputs are queued rather than processed immediately
+2. All queued inputs are processed synchronously at the start of each frame
+3. Rollback executes as a tight synchronous loop without yielding to event loop
+4. Games remain visually synchronized after rollbacks with artificial delay testing
+5. No inputs are lost or missed during rollback replay
+
+Plans:
+- [x] 06-01-PLAN.md -- GGPO-style input queuing and synchronous rollback
+
+**Details:**
+Based on [GGPO Developer Guide](https://github.com/pond3r/ggpo/blob/master/doc/DeveloperGuide.md) best practices:
+- `ggpo_idle()` processes network packets BEFORE frame step
+- `ggpo_synchronize_inputs()` handles rollback synchronously
+- Rollback must complete without yielding to event loop to prevent input race conditions
+
+---
+
 ## Progress
 
 | Phase | Status | Completed |
@@ -119,6 +144,7 @@ Plans:
 | 3 - GGPO P2P Integration | Complete | 2026-01-17 |
 | 4 - TURN and Resilience | Complete | 2026-01-17 |
 | 5 - Validation and Cleanup | Complete | 2026-01-17 |
+| 6 - GGPO Input Queue Fix | Complete | 2026-01-19 |
 
 ---
 
@@ -135,8 +161,9 @@ Plans:
 | GGPO-03 | Phase 2 | Redundant input sending |
 | NPLAY-01 | Phase 3 | 2-player P2P support |
 | CLEAN-01 | Phase 5 | Remove legacy host-based sync |
+| GGPO-04 | Phase 6 | Synchronous input processing and rollback |
 
-**Coverage:** 9/9 requirements mapped
+**Coverage:** 10/10 requirements mapped
 
 ---
 

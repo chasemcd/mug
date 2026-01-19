@@ -42,11 +42,19 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 
 ---
 
+### Rollback Fix
+
+| ID | Requirement | Acceptance Criteria |
+|----|-------------|---------------------|
+| GGPO-04 | Synchronous input processing | Inputs queued during network reception, processed synchronously at frame start before rollback |
+
+---
+
 ## Deferred to Future Milestones
 
 | ID | Feature | Reason |
 |----|---------|--------|
-| GGPO-04 | Adaptive input delay | Complexity; fixed input delay sufficient for research |
+| GGPO-05 | Adaptive input delay | Complexity; fixed input delay sufficient for research |
 | NPLAY-02 | N-player mesh topology | 2-player covers primary research use case |
 | NPLAY-03 | Hybrid relay for large N | Requires NPLAY-02 first |
 | MATCH-01 | Ping-based matchmaking | Nice-to-have, not critical for controlled experiments |
@@ -86,6 +94,7 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 | GGPO-03 | Phase 2 | Complete |
 | NPLAY-01 | Phase 3 | Complete |
 | CLEAN-01 | Phase 5 | Complete |
+| GGPO-04 | Phase 6 | Complete |
 
 ---
 
