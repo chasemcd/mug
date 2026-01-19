@@ -2206,6 +2206,11 @@ env.set_state(env_state)
         // and we used a prediction that might be wrong
         // NOTE: Use >= for late detection because frameNumber == this.frameNumber means we're
         // about to step that frame but haven't yet, so it's not late
+        // GGPO: Skip rollback detection if we're already in a rollback (prevents nested rollbacks)
+        if (this.rollbackInProgress) {
+            // Input is stored above, but don't trigger new rollback during replay
+            return;
+        }
         if (frameNumber < this.frameNumber && this.predictedFrames.has(frameNumber)) {
             // Late input! Check what action we ACTUALLY used at that frame
             // by looking at actionSequence, not by calling getPredictedAction()
@@ -2784,6 +2789,11 @@ for _rf in _replay_frames:
 
         // Clear debug delayed input queue
         this.debugDelayedInputQueue = [];
+
+        // Clear GGPO-style input queues and rollback guard
+        this.pendingInputPackets = [];
+        this.pendingSocketIOInputs = [];
+        this.rollbackInProgress = false;
 
         // NOTE: Do NOT close WebRTC connection here - it persists across episodes
         // WebRTC is only closed when the game session ends (in destroy/cleanup)
