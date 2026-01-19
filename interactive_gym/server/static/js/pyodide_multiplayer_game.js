@@ -541,6 +541,12 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
             timeoutId: null          // Timeout handle
         };
 
+        // GGPO-style input queuing: inputs are queued during network reception
+        // and processed synchronously at frame start to prevent race conditions
+        this.pendingInputPackets = [];     // Queued P2P input packets
+        this.pendingSocketIOInputs = [];   // Queued SocketIO inputs
+        this.rollbackInProgress = false;   // Guard against nested rollbacks
+
         this.setupMultiplayerHandlers();
     }
 
@@ -620,7 +626,7 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
             }
         });
 
-        // Receive other player's action (GGPO: store by frame for rollback)
+        // Receive other player's action (GGPO: queue for synchronous processing at frame start)
         socket.on('pyodide_other_player_action', (data) => {
             // Don't queue actions if game is done
             if (this.state === "done") {
@@ -635,9 +641,13 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
                 p2pLog.debug(`Late input via SocketIO: player=${player_id}, frame=${frame_number}, late by ${frameDiff}`);
             }
 
-            // Store in frame-indexed input buffer for GGPO (via delay queue if debug enabled)
-            // frame_number is the TARGET frame (sender's frame + INPUT_DELAY)
-            this.queueRemoteInputWithDelay(player_id, action, frame_number);
+            // GGPO-style: Queue input for synchronous processing at frame start
+            // This prevents race conditions during rollback replay
+            this.pendingSocketIOInputs.push({
+                playerId: player_id,
+                action: action,
+                frameNumber: frame_number
+            });
 
             // Track SocketIO input reception for metrics
             this.p2pMetrics.inputsReceivedViaSocketIO++;
@@ -1410,6 +1420,7 @@ obs, infos, render_state
 
         // GGPO: Check for pending rollback (late input arrived)
         // IMPORTANT: Do this BEFORE pruning to ensure we have inputs for the rollback
+        let rollbackOccurred = false;
         if (this.pendingRollbackFrame !== null && this.pendingRollbackFrame !== undefined) {
             const rollbackFrame = this.pendingRollbackFrame;
             this.pendingRollbackFrame = null;
@@ -1420,7 +1431,7 @@ obs, infos, render_state
             );
 
             // Perform rollback and replay
-            await this.performRollback(rollbackFrame, playerIds);
+            rollbackOccurred = await this.performRollback(rollbackFrame, playerIds);
         }
 
         // Prune old input buffer entries to prevent unbounded growth
@@ -1461,8 +1472,33 @@ obs, infos, render_state
             }
         }
 
+        // If rollback occurred, get fresh render_state from the corrected environment state
+        // This ensures the display shows the correct state after rollback+replay
+        let finalRenderState = render_state;
+        if (rollbackOccurred) {
+            try {
+                const freshRender = await this.pyodide.runPythonAsync(`env.render()`);
+                let freshRenderState = await this.pyodide.toPy(freshRender).toJs();
+
+                // Handle RGB array rendering if needed
+                let game_image_base64 = null;
+                if (Array.isArray(freshRenderState) && Array.isArray(freshRenderState[0])) {
+                    game_image_base64 = this.convertRGBArrayToImage(freshRenderState);
+                }
+
+                finalRenderState = {
+                    "game_state_objects": game_image_base64 ? null : freshRenderState.map(item => convertUndefinedToNull(item)),
+                    "game_image_base64": game_image_base64,
+                    "step": this.step_num,
+                };
+                p2pLog.debug(`Rollback render update: frame=${this.frameNumber}`);
+            } catch (e) {
+                p2pLog.warn(`Failed to get post-rollback render state: ${e}`);
+            }
+        }
+
         // Return finalActions alongside step results so caller can log synchronized actions
-        return [obs, rewards, terminateds, truncateds, infos, render_state, finalActions];
+        return [obs, rewards, terminateds, truncateds, infos, finalRenderState, finalActions];
     }
 
     /**
@@ -1535,11 +1571,29 @@ obs, infos, render_state
         const framesDelta = this.frameNumber - this.diagnostics.lastDiagnosticsFrame;
         const effectiveFPS = intervalMs > 0 ? ((framesDelta / intervalMs) * 1000).toFixed(1) : 'N/A';
 
+        // P2P input metrics
+        const p2pReceived = this.p2pMetrics.inputsReceivedViaP2P;
+        const socketReceived = this.p2pMetrics.inputsReceivedViaSocketIO;
+        const p2pSent = this.p2pMetrics.inputsSentViaP2P;
+        const socketSent = this.p2pMetrics.inputsSentViaSocketIO;
+
+        // Connection health
+        const health = this.connectionHealth?.getHealthStatus() || {};
+        const rtt = health.rtt?.toFixed(0) || 'N/A';
+        const gaps = health.gapCount || 0;
+
         // Performance summary - only in debug mode (periodic, every 5s)
         p2pLog.debug(
             `[PERF] frame=${this.frameNumber} fps=${effectiveFPS}/${targetFPS} ` +
             `step=${avgStepTime}/${maxStepTime}ms buf=${inputBufferSize} ` +
             `pred=${predictionCount} rb=${this.rollbackCount}`
+        );
+
+        // Input metrics summary
+        p2pLog.debug(
+            `[INPUT] recv: p2p=${p2pReceived} sock=${socketReceived} | ` +
+            `sent: p2p=${p2pSent} sock=${socketSent} | ` +
+            `rtt=${rtt}ms gaps=${gaps}`
         );
 
         // Clear rolling windows for next interval
@@ -2535,8 +2589,9 @@ if 'py_rng_state' in _snapshot:
             }
 
             // Warn if we're still using prediction during replay - this means inputs are missing!
+            // This is expected with artificial delay - we'll rollback again when those inputs arrive
             if (predictedForFrame.length > 0) {
-                p2pLog.warn(`Replay frame ${frame}: still missing inputs for [${predictedForFrame.join(',')}]`);
+                p2pLog.debug(`Replay frame ${frame}: still missing inputs for [${predictedForFrame.join(',')}]`);
             }
 
             // Build complete action dict
@@ -2989,7 +3044,8 @@ env.step(_replay_actions)
 
     _handleInputPacket(buffer) {
         /**
-         * Process received input packet and store inputs in GGPO buffer.
+         * GGPO-style: Queue received input packet for synchronous processing at frame start.
+         * This prevents race conditions where inputs arrive during rollback replay.
          */
         const packet = decodeInputPacket(buffer);
         if (!packet) {
@@ -3004,11 +3060,13 @@ env.step(_replay_actions)
             return;
         }
 
-        // Store all inputs from the packet (via delay queue if debug enabled)
-        // Handles redundancy - duplicates are ignored by storeRemoteInput
-        for (const input of packet.inputs) {
-            this.queueRemoteInputWithDelay(playerId, input.action, input.frame);
-        }
+        // Queue the decoded packet for synchronous processing at frame start
+        // Processing happens in _processQueuedInputs() called from step()
+        this.pendingInputPackets.push({
+            playerId: playerId,
+            inputs: packet.inputs,
+            currentFrame: packet.currentFrame
+        });
 
         // Track P2P input reception for metrics
         this.p2pMetrics.inputsReceivedViaP2P++;
@@ -3017,7 +3075,42 @@ env.step(_replay_actions)
         if (this.connectionHealth) {
             this.connectionHealth.recordReceivedInput(packet.currentFrame);
         }
+    }
 
+    /**
+     * GGPO-style: Process all queued inputs synchronously at frame start.
+     * This is called from step() BEFORE checking for rollbacks, ensuring
+     * inputs don't arrive during rollback replay.
+     *
+     * Key insight: By draining all queues at once at a known point in the
+     * game loop, we eliminate race conditions where async network events
+     * could fire during await calls in rollback replay.
+     */
+    _processQueuedInputs() {
+        // Don't process inputs during rollback - they stay queued
+        if (this.rollbackInProgress) {
+            return;
+        }
+
+        // Drain P2P input packets
+        const p2pPackets = this.pendingInputPackets;
+        this.pendingInputPackets = [];
+
+        for (const packet of p2pPackets) {
+            // Each packet contains multiple inputs (redundancy)
+            // Handles redundancy - duplicates are ignored by storeRemoteInput
+            for (const input of packet.inputs) {
+                this.queueRemoteInputWithDelay(packet.playerId, input.action, input.frame);
+            }
+        }
+
+        // Drain SocketIO inputs
+        const socketInputs = this.pendingSocketIOInputs;
+        this.pendingSocketIOInputs = [];
+
+        for (const input of socketInputs) {
+            this.queueRemoteInputWithDelay(input.playerId, input.action, input.frameNumber);
+        }
     }
 
     _handlePing(buffer) {
