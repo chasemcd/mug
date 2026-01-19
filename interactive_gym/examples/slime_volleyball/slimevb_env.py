@@ -198,12 +198,16 @@ class SlimeVBEnvIG(slimevolley_env.SlimeVolleyEnv):
         return slime_volleyball_env_to_rendering(self)
 
     def get_state(self) -> dict[str, int | float | str]:
-        """Return the state that fully describes the game for state syncing. 
+        """Return the state that fully describes the game for state syncing.
 
         :return: State that fully describes the game for state syncing.
         :rtype: dict
         """
         return {
+            # Timestep
+            "t": self.t,
+            # Delay screen state (countdown before ball starts moving)
+            "delay_screen_life": self.game.delay_screen.life,
             # Ball State
             "ball_x": self.game.ball.x,
             "ball_y": self.game.ball.y,
@@ -226,6 +230,8 @@ class SlimeVBEnvIG(slimevolley_env.SlimeVolleyEnv):
             "agent_left_powerups_available": self.game.agent_left.powerups_available,
             "agent_left_powered_up_timer": self.game.agent_left.powered_up_timer,
             "agent_left_emotion": self.game.agent_left.emotion,
+            "agent_left_life": self.game.agent_left.life,
+            "agent_left_should_powerup": self.game.agent_left.should_powerup,
             # Agent Right State
             "agent_right_dir": self.game.agent_right.dir,
             "agent_right_x": self.game.agent_right.x,
@@ -239,14 +245,20 @@ class SlimeVBEnvIG(slimevolley_env.SlimeVolleyEnv):
             "agent_right_powerups_available": self.game.agent_right.powerups_available,
             "agent_right_powered_up_timer": self.game.agent_right.powered_up_timer,
             "agent_right_emotion": self.game.agent_right.emotion,
+            "agent_right_life": self.game.agent_right.life,
+            "agent_right_should_powerup": self.game.agent_right.should_powerup,
         }
 
     def set_state(self, state: dict[str, int | float | str]) -> None:
-        """ Set the state of the environment from a state dictionary. 
-        
+        """Set the state of the environment from a state dictionary.
+
         :param state: State dictionary containing the state of the environment.
         :type state: dict[str, int | float | str]
         """
+        # Timestep
+        self.t = state["t"]
+        # Delay screen state (countdown before ball starts moving)
+        self.game.delay_screen.life = state["delay_screen_life"]
         # Ball State
         self.game.ball.x = state["ball_x"]
         self.game.ball.y = state["ball_y"]
@@ -269,6 +281,8 @@ class SlimeVBEnvIG(slimevolley_env.SlimeVolleyEnv):
         self.game.agent_left.powerups_available = state["agent_left_powerups_available"]
         self.game.agent_left.powered_up_timer = state["agent_left_powered_up_timer"]
         self.game.agent_left.emotion = state["agent_left_emotion"]
+        self.game.agent_left.life = state["agent_left_life"]
+        self.game.agent_left.should_powerup = state["agent_left_should_powerup"]
         # Agent Right State
         self.game.agent_right.dir = state["agent_right_dir"]
         self.game.agent_right.x = state["agent_right_x"]
@@ -282,6 +296,8 @@ class SlimeVBEnvIG(slimevolley_env.SlimeVolleyEnv):
         self.game.agent_right.powerups_available = state["agent_right_powerups_available"]
         self.game.agent_right.powered_up_timer = state["agent_right_powered_up_timer"]
         self.game.agent_right.emotion = state["agent_right_emotion"]
+        self.game.agent_right.life = state["agent_right_life"]
+        self.game.agent_right.should_powerup = state["agent_right_should_powerup"]
 
 # Initialize the environment for use in the browser. SlimeVB uses a seed only in initialization
 # rather than on reset() so that each episode isn't identical; we want the sequence of episodes to 

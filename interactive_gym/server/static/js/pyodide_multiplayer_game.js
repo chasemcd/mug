@@ -42,6 +42,7 @@ const P2P_MSG_PING = 0x02;
 const P2P_MSG_PONG = 0x03;
 const P2P_MSG_KEEPALIVE = 0x04;
 const P2P_MSG_EPISODE_END = 0x05;  // Episode reset synchronization
+const P2P_MSG_EPISODE_READY = 0x06;  // Episode start synchronization
 
 /**
  * Encode an input packet for P2P transmission.
@@ -172,6 +173,51 @@ function decodeEpisodeEnd(buffer) {
     return {
         frameNumber: view.getUint32(1, false),
         episodeNumber: view.getUint32(5, false)
+    };
+}
+
+/**
+ * Encode an episode ready notification for P2P transmission.
+ * Sent after local reset completes to synchronize episode start.
+ * Format: 13 bytes
+ *   Byte 0: Message type (0x06)
+ *   Bytes 1-4: Episode number (uint32)
+ *   Bytes 5-12: State hash for verification (8 chars as bytes)
+ *
+ * @param {number} episodeNumber - Episode number we're ready for
+ * @param {string} stateHash - 8-char hex hash of initial state
+ * @returns {ArrayBuffer} Encoded packet
+ */
+function encodeEpisodeReady(episodeNumber, stateHash) {
+    const buffer = new ArrayBuffer(13);
+    const view = new DataView(buffer);
+    view.setUint8(0, P2P_MSG_EPISODE_READY);
+    view.setUint32(1, episodeNumber, false);
+    // Write 8-char hash as bytes
+    for (let i = 0; i < 8; i++) {
+        view.setUint8(5 + i, stateHash.charCodeAt(i) || 0);
+    }
+    return buffer;
+}
+
+/**
+ * Decode an episode ready notification.
+ *
+ * @param {ArrayBuffer} buffer - Received packet
+ * @returns {{episodeNumber: number, stateHash: string}|null}
+ */
+function decodeEpisodeReady(buffer) {
+    const view = new DataView(buffer);
+    const type = view.getUint8(0);
+    if (type !== P2P_MSG_EPISODE_READY) return null;
+    // Read 8-char hash from bytes
+    let stateHash = '';
+    for (let i = 0; i < 8; i++) {
+        stateHash += String.fromCharCode(view.getUint8(5 + i));
+    }
+    return {
+        episodeNumber: view.getUint32(1, false),
+        stateHash: stateHash
     };
 }
 
@@ -511,13 +557,22 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
 
         // P2P episode synchronization
         // Both peers must agree on episode end before resetting
+        // AND both peers must agree on episode start before beginning
         this.p2pEpisodeSync = {
+            // Episode END sync
             localEpisodeEndDetected: false,   // We detected episode end
             localEpisodeEndFrame: null,       // Frame where we detected it
             remoteEpisodeEndReceived: false,  // Peer sent episode end message
             remoteEpisodeEndFrame: null,      // Frame where peer detected it
             pendingReset: false,              // Waiting for sync before reset
-            syncTimeoutId: null               // Timeout to prevent infinite waiting
+            syncTimeoutId: null,              // Timeout to prevent infinite waiting
+            // Episode START sync
+            localResetComplete: false,        // We completed our reset
+            remoteResetComplete: false,       // Peer completed their reset
+            localStateHash: null,             // Our initial state hash
+            remoteStateHash: null,            // Peer's initial state hash
+            startResolve: null,               // Promise resolve for start sync
+            startTimeoutId: null              // Timeout for start sync
         };
 
         // Session metrics for research data export
@@ -1215,6 +1270,30 @@ obs, infos, render_state
         ui_utils.showHUD();
         ui_utils.updateHUDText(this.getHUDText());
 
+        // P2P episode start synchronization
+        // Compute state hash and wait for peer to be ready before starting
+        if (!this.serverAuthoritative && this.webrtcManager?.isReady()) {
+            try {
+                // Compute state hash for verification
+                const stateHash = await this.pyodide.runPythonAsync(`
+import json
+import hashlib
+_state = env.get_state()
+hashlib.md5(json.dumps(_state, sort_keys=True).encode()).hexdigest()[:8]
+                `);
+
+                // Broadcast that we're ready and wait for peer
+                this._broadcastEpisodeReady(stateHash);
+
+                p2pLog.info(`Waiting for peer to be ready for episode ${this.num_episodes + 1}...`);
+                await this.waitForP2PEpisodeStart(5000);  // 5 second timeout
+                p2pLog.info(`Episode start synchronized - both peers ready`);
+            } catch (e) {
+                p2pLog.warn(`Episode start sync error: ${e.message}`);
+                // Continue anyway - deterministic reset should keep clients in sync
+            }
+        }
+
         return [obs, infos, render_state];
     }
 
@@ -1401,6 +1480,11 @@ obs, infos, render_state
         }
 
         // Track action sequence and counts for sync verification
+        // DEBUG: Log executed actions when prediction is used (use info level)
+        if (predictedPlayers.length > 0) {
+            const actionsStr = Object.entries(finalActions).map(([p, a]) => `${p}:${a}`).join(' ');
+            p2pLog.info(`EXECUTE: frame=${this.frameNumber} actions={${actionsStr}} predicted=[${predictedPlayers.join(',')}]`);
+        }
         this.actionSequence.push({
             frame: this.frameNumber,
             actions: {...finalActions}  // Clone to avoid mutation
@@ -1424,6 +1508,24 @@ obs, infos, render_state
 
         // 3. Step environment immediately with complete actions (no waiting!)
         const stepStartTime = performance.now();
+
+        // DEBUG: Log state and actions for sync verification
+        // This helps trace divergence by comparing exact states/actions between clients
+        if (this.frameNumber < 100) {
+            try {
+                const preHashResult = await this.pyodide.runPythonAsync(`
+import json
+import hashlib
+_st = env.get_state()
+hashlib.md5(json.dumps(_st, sort_keys=True).encode()).hexdigest()[:8]
+                `);
+                const actionsStr = Object.entries(finalActions).map(([p, a]) => `${p}:${a}`).join(',');
+                p2pLog.info(`FRAME: ${this.frameNumber} pre_hash=${preHashResult} actions={${actionsStr}} rollback=${rollbackOccurred}`);
+            } catch (e) {
+                p2pLog.debug(`Could not compute pre-step hash: ${e}`);
+            }
+        }
+
         const stepResult = await this.stepWithActions(finalActions);
 
         if (!stepResult) {
@@ -1431,6 +1533,21 @@ obs, infos, render_state
         }
 
         const [obs, rewards, terminateds, truncateds, infos, render_state] = stepResult;
+
+        // DEBUG: Log state hash after step for sync verification
+        if (this.frameNumber < 100) {
+            try {
+                const hashResult = await this.pyodide.runPythonAsync(`
+import json
+import hashlib
+_st = env.get_state()
+hashlib.md5(json.dumps(_st, sort_keys=True).encode()).hexdigest()[:8]
+                `);
+                p2pLog.info(`FRAME: ${this.frameNumber} post_hash=${hashResult}`);
+            } catch (e) {
+                p2pLog.debug(`Could not compute post-step hash: ${e}`);
+            }
+        }
 
         // Track step timing for diagnostics
         this.trackStepTime(stepStartTime);
@@ -2183,6 +2300,9 @@ env.set_state(env_state)
     storeRemoteInput(playerId, action, frameNumber) {
         const playerIdStr = String(playerId);
 
+        // DEBUG: Log all remote inputs received (use info level to ensure visibility)
+        p2pLog.info(`STORE_INPUT: player=${playerIdStr} frame=${frameNumber} action=${action} myFrame=${this.frameNumber}`);
+
         // Ensure input buffer exists for this frame
         if (!this.inputBuffer.has(frameNumber)) {
             this.inputBuffer.set(frameNumber, new Map());
@@ -2193,6 +2313,7 @@ env.set_state(env_state)
         // Check if we already have an input for this player at this frame
         if (frameInputs.has(playerIdStr)) {
             // Already have confirmed input, ignore duplicate
+            p2pLog.debug(`STORE_INPUT: DUPLICATE player=${playerIdStr} frame=${frameNumber} (existing=${frameInputs.get(playerIdStr)})`);
             return;
         }
 
@@ -2272,6 +2393,11 @@ env.set_state(env_state)
     storeLocalInput(action, currentFrame) {
         const targetFrame = currentFrame + this.INPUT_DELAY;
         const myPlayerIdStr = String(this.myPlayerId);
+
+        // DEBUG: Log local input storage
+        if (targetFrame < 50) {
+            p2pLog.debug(`LOCAL_INPUT: player=${myPlayerIdStr} currentFrame=${currentFrame} targetFrame=${targetFrame} action=${action}`);
+        }
 
         // Ensure input buffer exists for target frame
         if (!this.inputBuffer.has(targetFrame)) {
@@ -2412,10 +2538,13 @@ json.dumps(_snapshot)
             `);
             this.stateSnapshots.set(frameNumber, stateJson);
 
-            // Debug: log snapshot saves periodically
-            if (this.stateSnapshots.size % 10 === 0) {
-                p2pLog.debug(`Snapshot saved: frame=${frameNumber}, total=${this.stateSnapshots.size}`);
-            }
+            // Log snapshot save with agent state summary for debugging
+            const snapshotData = JSON.parse(stateJson);
+            const agentStates = snapshotData.env_state?.agents || {};
+            const agentSummary = Object.entries(agentStates).map(([id, a]) =>
+                `${id}:pos=${a.pos},inv=${a.inventory?.length || 0}`
+            ).join(' ');
+            p2pLog.info(`SAVE_SNAPSHOT: frame=${frameNumber} agents=[${agentSummary}]`);
 
             // Prune old snapshots
             if (this.stateSnapshots.size > this.maxSnapshots) {
@@ -2463,15 +2592,30 @@ json.dumps(_snapshot)
             // Escape the JSON string for embedding in Python code
             const escapedJson = stateJson.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 
-            await this.pyodide.runPythonAsync(`
+            // Log what we're restoring for debugging
+            const snapshotData = JSON.parse(stateJson);
+            const agentStates = snapshotData.env_state?.agents || {};
+            const agentSummary = Object.entries(agentStates).map(([id, a]) =>
+                `${id}:pos=${a.pos},inv=${a.inventory?.length || 0}`
+            ).join(' ');
+            p2pLog.info(`LOAD_SNAPSHOT: frame=${frameNumber} agents=[${agentSummary}]`);
+
+            // Verify state restoration with Python-side logging
+            const verifyResult = await this.pyodide.runPythonAsync(`
 import json
 import numpy as np
 import random
 
 _snapshot = json.loads('''${escapedJson}''')
 
+# Get state BEFORE restore for comparison
+_before_state = env.get_state()
+
 # Restore environment state
 env.set_state(_snapshot['env_state'])
+
+# Get state AFTER restore to verify
+_after_state = env.get_state()
 
 # Restore numpy RNG state
 if 'np_rng_state' in _snapshot:
@@ -2497,7 +2641,17 @@ if 'py_rng_state' in _snapshot:
             _py_state[2] if len(_py_state) > 2 else None
         )
     random.setstate(_py_state)
+
+# Return verification info
+json.dumps({
+    'snapshot_t': _snapshot['env_state'].get('t', 'N/A'),
+    'before_t': _before_state.get('t', 'N/A'),
+    'after_t': _after_state.get('t', 'N/A'),
+    'match': _snapshot['env_state'] == _after_state
+})
             `);
+            const verify = JSON.parse(verifyResult);
+            p2pLog.info(`VERIFY_RESTORE: snapshot_t=${verify.snapshot_t} before_t=${verify.before_t} after_t=${verify.after_t} match=${verify.match}`);
             return true;
         } catch (e) {
             p2pLog.error(`Failed to load snapshot for frame ${frameNumber}: ${e}`);
@@ -2601,6 +2755,15 @@ if 'py_rng_state' in _snapshot:
                 const confirmedForFrame = [];
                 const predictedForFrame = [];
                 const frameInputs = this.inputBuffer.get(frame);
+
+                // DEBUG: Log input buffer contents for this frame
+                if (frameInputs) {
+                    const bufferContents = Array.from(frameInputs.entries()).map(([k, v]) => `${k}:${v}`).join(',');
+                    p2pLog.info(`REPLAY_BUFFER: frame=${frame} buffer={${bufferContents}} playerIds=[${playerIds.join(',')}]`);
+                } else {
+                    p2pLog.info(`REPLAY_BUFFER: frame=${frame} buffer=EMPTY playerIds=[${playerIds.join(',')}]`);
+                }
+
                 for (const pid of playerIds) {
                     if (frameInputs && frameInputs.has(String(pid))) {
                         confirmedForFrame.push(pid);
@@ -2609,10 +2772,12 @@ if 'py_rng_state' in _snapshot:
                     }
                 }
 
-                // Warn if we're still using prediction during replay - this means inputs are missing!
-                // This is expected with artificial delay - we'll rollback again when those inputs arrive
+                // If we're still using prediction during replay, RE-ADD to predictedFrames
+                // This is critical: when the real input arrives later, we need to know
+                // this frame still needs rollback correction
                 if (predictedForFrame.length > 0) {
-                    p2pLog.debug(`Replay frame ${frame}: still missing inputs for [${predictedForFrame.join(',')}]`);
+                    this.predictedFrames.add(frame);
+                    p2pLog.debug(`Replay frame ${frame}: still missing inputs for [${predictedForFrame.join(',')}] - re-marked as predicted`);
                 }
 
                 // Build complete action dict
@@ -2664,18 +2829,76 @@ if 'py_rng_state' in _snapshot:
             // Execute ALL replay steps in a single Python call (no event loop yields)
             // This is the key GGPO optimization - synchronous replay prevents race conditions
             if (replayFrames.length > 0) {
-                await this.pyodide.runPythonAsync(`
+                // Log replay actions for debugging
+                const replayActionsStr = replayFrames.map(rf => `${rf.frame}:{${Object.entries(rf.actions).map(([k,v]) => `${k}:${v}`).join(',')}}`).join(' ');
+                p2pLog.info(`REPLAY: snapshotFrame=${snapshotFrame} frames=[${replayActionsStr}]`);
+
+                const replayVerify = await this.pyodide.runPythonAsync(`
+import json
+import hashlib
+import numpy as np
+import random
 _replay_frames = ${JSON.stringify(replayFrames)}
+_snapshot_interval = ${this.snapshotInterval}
+_t_before_replay = env.t if hasattr(env, 't') else 'N/A'
+_replay_log = []
+_snapshots_to_save = {}
 for _rf in _replay_frames:
+    _frame = _rf['frame']
+    _pre_state = env.get_state()
+    _pre_hash = hashlib.md5(json.dumps(_pre_state, sort_keys=True).encode()).hexdigest()[:8]
+
+    # Save snapshot BEFORE stepping if this frame is on snapshot interval
+    # This updates old incorrect snapshots with correct state after rollback
+    if _frame % _snapshot_interval == 0:
+        _np_rng_state = np.random.get_state()
+        _np_rng_serializable = (
+            _np_rng_state[0],
+            _np_rng_state[1].tolist(),
+            _np_rng_state[2],
+            _np_rng_state[3],
+            _np_rng_state[4]
+        )
+        _py_rng_state = random.getstate()
+        _snapshots_to_save[_frame] = {
+            'env_state': _pre_state,
+            'np_rng_state': _np_rng_serializable,
+            'py_rng_state': _py_rng_state
+        }
+
     _actions = {int(k) if str(k).isdigit() else k: v for k, v in _rf['actions'].items()}
     env.step(_actions)
+    _post_state = env.get_state()
+    _post_hash = hashlib.md5(json.dumps(_post_state, sort_keys=True).encode()).hexdigest()[:8]
+    _replay_log.append({'frame': _frame, 'actions': _rf['actions'], 'pre_hash': _pre_hash, 'post_hash': _post_hash})
+_t_after_replay = env.t if hasattr(env, 't') else 'N/A'
+_state_after = env.get_state()
+_state_hash = hashlib.md5(json.dumps(_state_after, sort_keys=True).encode()).hexdigest()[:8]
+json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps': len(_replay_frames), 'state_hash': _state_hash, 'replay_log': _replay_log, 'snapshots': {str(k): v for k, v in _snapshots_to_save.items()}})
                 `);
+                const replayInfo = JSON.parse(replayVerify);
+                // Log each replay frame for comparison with client A
+                for (const entry of replayInfo.replay_log) {
+                    const actionsStr = Object.entries(entry.actions).map(([k,v]) => `${k}:${v}`).join(',');
+                    p2pLog.info(`REPLAY_FRAME: ${entry.frame} pre_hash=${entry.pre_hash} actions={${actionsStr}} post_hash=${entry.post_hash}`);
+                }
+                p2pLog.info(`REPLAY_DONE: t_before=${replayInfo.t_before} t_after=${replayInfo.t_after} final_hash=${replayInfo.state_hash}`);
+
+                // Update snapshots with corrected state from replay
+                // This is critical: old snapshots had pre-rollback (incorrect) state
+                if (replayInfo.snapshots) {
+                    for (const [frameStr, snapshotData] of Object.entries(replayInfo.snapshots)) {
+                        const frame = parseInt(frameStr);
+                        this.stateSnapshots.set(frame, JSON.stringify(snapshotData));
+                        p2pLog.info(`SNAPSHOT_UPDATED: frame=${frame} (corrected after rollback)`);
+                    }
+                }
             }
 
             // Update JS frame counter to match Python state
             this.frameNumber = currentFrame;
 
-            p2pLog.debug(`Replay complete, now at frame ${this.frameNumber}`);
+            p2pLog.info(`REPLAY_DONE: jsFrame=${this.frameNumber}`);
             return true;
         } finally {
             // Always clear rollback guard
@@ -2711,6 +2934,35 @@ for _rf in _replay_frames:
         for (const item of ready) {
             p2pLog.debug(`[DEBUG-DELAY] Processing: player=${item.playerId} frame=${item.frameNumber} late_by=${this.frameNumber - item.frameNumber}`);
             this.storeRemoteInput(item.playerId, item.action, item.frameNumber);
+        }
+
+        // CRITICAL: If a rollback was triggered, release delayed inputs for frames
+        // that will be replayed. Future inputs stay delayed to simulate persistent latency.
+        if (this.pendingRollbackFrame !== null && this.debugDelayedInputQueue.length > 0) {
+            const rollbackTarget = this.pendingRollbackFrame;
+            const forReplay = [];
+            const keepDelayed = [];
+
+            for (const item of this.debugDelayedInputQueue) {
+                // Release inputs for frames that will be replayed (rollback target to current frame)
+                // These are needed NOW for correct replay
+                if (item.frameNumber >= rollbackTarget && item.frameNumber < this.frameNumber) {
+                    forReplay.push(item);
+                } else {
+                    // Keep future inputs delayed to simulate persistent poor connection
+                    keepDelayed.push(item);
+                }
+            }
+
+            this.debugDelayedInputQueue = keepDelayed;
+
+            if (forReplay.length > 0) {
+                p2pLog.info(`[DEBUG-DELAY] Releasing ${forReplay.length} inputs for rollback replay (frames ${rollbackTarget}-${this.frameNumber - 1})`);
+                for (const item of forReplay) {
+                    p2pLog.info(`[DEBUG-DELAY] Released for replay: player=${item.playerId} frame=${item.frameNumber}`);
+                    this.storeRemoteInput(item.playerId, item.action, item.frameNumber);
+                }
+            }
         }
     }
 
@@ -3066,6 +3318,9 @@ for _rf in _replay_frames:
             case P2P_MSG_EPISODE_END:
                 this._handleEpisodeEnd(buffer);
                 break;
+            case P2P_MSG_EPISODE_READY:
+                this._handleEpisodeReady(buffer);
+                break;
             default:
                 p2pLog.warn(`Unknown binary message type: ${messageType}`);
         }
@@ -3269,16 +3524,138 @@ for _rf in _replay_frames:
         /**
          * Reset episode sync state for the next episode.
          */
-        // Clear timeout if it exists
+        // Clear end sync timeout if it exists
         if (this.p2pEpisodeSync.syncTimeoutId) {
             clearTimeout(this.p2pEpisodeSync.syncTimeoutId);
         }
+        // Clear start sync timeout if it exists
+        if (this.p2pEpisodeSync.startTimeoutId) {
+            clearTimeout(this.p2pEpisodeSync.startTimeoutId);
+        }
+        // Episode END sync state
         this.p2pEpisodeSync.localEpisodeEndDetected = false;
         this.p2pEpisodeSync.localEpisodeEndFrame = null;
         this.p2pEpisodeSync.remoteEpisodeEndReceived = false;
         this.p2pEpisodeSync.remoteEpisodeEndFrame = null;
         this.p2pEpisodeSync.pendingReset = false;
         this.p2pEpisodeSync.syncTimeoutId = null;
+        // Episode START sync state
+        this.p2pEpisodeSync.localResetComplete = false;
+        this.p2pEpisodeSync.remoteResetComplete = false;
+        this.p2pEpisodeSync.localStateHash = null;
+        this.p2pEpisodeSync.remoteStateHash = null;
+        this.p2pEpisodeSync.startResolve = null;
+        this.p2pEpisodeSync.startTimeoutId = null;
+    }
+
+    _handleEpisodeReady(buffer) {
+        /**
+         * Handle episode ready notification from peer.
+         * Called when peer has completed their reset and is ready to start the episode.
+         */
+        const packet = decodeEpisodeReady(buffer);
+        if (!packet) {
+            p2pLog.warn('Failed to decode episode ready packet');
+            return;
+        }
+
+        p2pLog.info(`Received episode ready from peer: episode=${packet.episodeNumber} hash=${packet.stateHash}`);
+
+        // Store peer's state hash for verification
+        this.p2pEpisodeSync.remoteResetComplete = true;
+        this.p2pEpisodeSync.remoteStateHash = packet.stateHash;
+
+        // Check if we can now start the episode
+        this._checkEpisodeStartSync();
+    }
+
+    _broadcastEpisodeReady(stateHash) {
+        /**
+         * Send episode ready notification to peer.
+         * Called after local reset completes successfully.
+         *
+         * @param {string} stateHash - 8-char hex hash of initial environment state
+         */
+        if (!this.webrtcManager?.isReady()) {
+            p2pLog.debug('Cannot broadcast episode ready - WebRTC not ready');
+            return;
+        }
+
+        const episodeNumber = this.num_episodes + 1;  // Next episode number
+        const packet = encodeEpisodeReady(episodeNumber, stateHash);
+        this.webrtcManager.send(packet);
+        p2pLog.info(`Broadcast episode ready: episode=${episodeNumber} hash=${stateHash}`);
+
+        // Record that our reset is complete
+        this.p2pEpisodeSync.localResetComplete = true;
+        this.p2pEpisodeSync.localStateHash = stateHash;
+
+        // Check if peer is already ready
+        this._checkEpisodeStartSync();
+    }
+
+    _checkEpisodeStartSync() {
+        /**
+         * Check if both peers have completed reset and are ready to start.
+         * If both are ready, resolve the start promise to begin the episode.
+         */
+        const sync = this.p2pEpisodeSync;
+
+        if (!sync.localResetComplete || !sync.remoteResetComplete) {
+            return;  // Still waiting for both peers
+        }
+
+        // Verify state hashes match
+        if (sync.localStateHash && sync.remoteStateHash && sync.localStateHash !== sync.remoteStateHash) {
+            p2pLog.error(`Episode start state mismatch! local=${sync.localStateHash} remote=${sync.remoteStateHash}`);
+            // Continue anyway - the first frame hash logging will show divergence
+        } else {
+            p2pLog.info(`Episode start synchronized: both peers have matching state hash=${sync.localStateHash}`);
+        }
+
+        // Clear the timeout since we synced successfully
+        if (sync.startTimeoutId) {
+            clearTimeout(sync.startTimeoutId);
+            sync.startTimeoutId = null;
+        }
+
+        // Resolve the start promise to unblock the game loop
+        if (sync.startResolve) {
+            sync.startResolve();
+            sync.startResolve = null;
+        }
+    }
+
+    waitForP2PEpisodeStart(timeoutMs = 5000) {
+        /**
+         * Wait for peer to be ready before starting the episode.
+         * Returns a promise that resolves when both peers are ready.
+         *
+         * @param {number} timeoutMs - Maximum wait time before proceeding anyway
+         * @returns {Promise<void>}
+         */
+        return new Promise((resolve) => {
+            const sync = this.p2pEpisodeSync;
+
+            // If peer is already ready, resolve immediately
+            if (sync.localResetComplete && sync.remoteResetComplete) {
+                p2pLog.debug('Peer already ready - starting immediately');
+                resolve();
+                return;
+            }
+
+            // Store resolve function for when peer becomes ready
+            sync.startResolve = resolve;
+
+            // Timeout to prevent infinite waiting if peer message is lost
+            sync.startTimeoutId = setTimeout(() => {
+                if (sync.startResolve) {
+                    p2pLog.warn(`Episode start sync timeout - peer not ready after ${timeoutMs}ms, proceeding anyway`);
+                    sync.startResolve = null;
+                    resolve();
+                }
+            }, timeoutMs);
+        });
     }
 
     _startPingInterval() {
@@ -3348,6 +3725,91 @@ for _rf in _replay_frames:
             frames: {
                 total: this.frameNumber
             }
+        };
+    }
+
+    /**
+     * Export action history for debugging divergence.
+     * Call from browser console: window.game.exportActionHistory()
+     * Compare output between two clients to find where they diverged.
+     * @param {number} startFrame - Optional start frame (default: 0)
+     * @param {number} endFrame - Optional end frame (default: all)
+     * @returns {Object} Action history with per-frame actions for all players
+     */
+    exportActionHistory(startFrame = 0, endFrame = Infinity) {
+        const history = {
+            playerId: this.myPlayerId,
+            gameId: this.gameId,
+            currentFrame: this.frameNumber,
+            actionCount: this.actionSequence.length,
+            frames: {}
+        };
+
+        for (const record of this.actionSequence) {
+            if (record.frame >= startFrame && record.frame <= endFrame) {
+                // Convert actions to simple format: {0: action, 1: action}
+                const frameActions = {};
+                for (const [pid, action] of Object.entries(record.actions)) {
+                    frameActions[pid] = action;
+                }
+                history.frames[record.frame] = frameActions;
+            }
+        }
+
+        return history;
+    }
+
+    /**
+     * Compare action histories from two clients and find divergences.
+     * Usage:
+     *   1. On client A: let histA = window.game.exportActionHistory()
+     *   2. On client B: let histB = window.game.exportActionHistory()
+     *   3. On either: window.game.compareActionHistories(histA, histB)
+     * @param {Object} histA - Action history from client A
+     * @param {Object} histB - Action history from client B
+     * @returns {Object} Divergence report
+     */
+    compareActionHistories(histA, histB) {
+        const divergences = [];
+        const allFrames = new Set([
+            ...Object.keys(histA.frames || {}),
+            ...Object.keys(histB.frames || {})
+        ]);
+
+        for (const frameStr of [...allFrames].sort((a, b) => parseInt(a) - parseInt(b))) {
+            const frame = parseInt(frameStr);
+            const actionsA = histA.frames?.[frame];
+            const actionsB = histB.frames?.[frame];
+
+            if (!actionsA && actionsB) {
+                divergences.push({ frame, issue: 'missing_in_A', actionsB });
+            } else if (actionsA && !actionsB) {
+                divergences.push({ frame, issue: 'missing_in_B', actionsA });
+            } else if (actionsA && actionsB) {
+                // Compare each player's action
+                const allPlayers = new Set([...Object.keys(actionsA), ...Object.keys(actionsB)]);
+                for (const pid of allPlayers) {
+                    if (actionsA[pid] !== actionsB[pid]) {
+                        divergences.push({
+                            frame,
+                            player: pid,
+                            issue: 'action_mismatch',
+                            actionA: actionsA[pid],
+                            actionB: actionsB[pid]
+                        });
+                    }
+                }
+            }
+        }
+
+        return {
+            playerA: histA.playerId,
+            playerB: histB.playerId,
+            framesA: Object.keys(histA.frames || {}).length,
+            framesB: Object.keys(histB.frames || {}).length,
+            divergenceCount: divergences.length,
+            firstDivergence: divergences[0] || null,
+            divergences: divergences.slice(0, 20)  // First 20 divergences
         };
     }
 

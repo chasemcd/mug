@@ -688,6 +688,7 @@ class InteractiveGymOvercooked(OvercookedRewardEnv):
                 "pos": [int(agent.pos[0]), int(agent.pos[1])],
                 "dir": int(agent.dir),
                 "inventory": [],
+                "orientation": int(agent.orientation),
             }
             # Serialize inventory items
             for item in agent.inventory:

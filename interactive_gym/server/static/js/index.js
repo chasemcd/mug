@@ -17,6 +17,11 @@ var maxLatency;
 
 var pyodideRemoteGame = null;
 
+// Expose game instance for debugging (access via window.game)
+Object.defineProperty(window, 'game', {
+    get: function() { return pyodideRemoteGame; }
+});
+
 var documentInFocus = false;
 document.addEventListener("visibilitychange", function() {
   if (document.hidden) {

@@ -78,7 +78,7 @@ slime_scene = (
     .gameplay(
         default_action=NOOP,
         action_mapping=ACTION_MAPPING,
-        num_episodes=5,
+        num_episodes=10,
         max_steps=3000,
         input_mode=configuration_constants.InputModes.PressedKeys,
         action_population_method=configuration_constants.ActionSettings.PreviousSubmittedAction,
