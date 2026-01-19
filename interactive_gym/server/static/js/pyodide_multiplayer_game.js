@@ -1284,6 +1284,22 @@ obs, infos, render_state
             return null;
         }
 
+        // GGPO Order of Operations:
+        // 1. Clear stale rollback flag (prevents stale rollbacks from previous frames)
+        // 2. Process queued inputs synchronously (drains network buffers)
+        // 3. Process debug-delayed inputs
+        // 4. Check for and execute pending rollback BEFORE stepping current frame
+        // 5. Store local input and send to peer
+        // 6. Build final action dict from confirmed/predicted inputs
+        // 7. Step environment
+
+        // Clear stale rollback flag at frame start - rollback detection happens fresh
+        this.pendingRollbackFrame = null;
+
+        // GGPO-style: Process all queued network inputs synchronously
+        // This ensures inputs don't arrive during rollback replay (race condition prevention)
+        this._processQueuedInputs();
+
         // Get all human player IDs
         const humanPlayerIds = Object.entries(this.policyMapping)
             .filter(([_, policy]) => policy === 'human')
@@ -1324,6 +1340,18 @@ obs, infos, render_state
         // Process any debug-delayed remote inputs that are now ready
         // This enables testing rollback behavior by artificially delaying inputs
         this.processDelayedInputs();
+
+        // GGPO: Check for and execute pending rollback BEFORE stepping current frame
+        // Rollback may have been triggered by storeRemoteInput when processing queued inputs
+        // IMPORTANT: Execute rollback BEFORE building finalActions so we use corrected state
+        let rollbackOccurred = false;
+        if (this.pendingRollbackFrame !== null && this.pendingRollbackFrame !== undefined) {
+            const rollbackFrame = this.pendingRollbackFrame;
+            this.pendingRollbackFrame = null;
+
+            // Perform rollback and replay synchronously
+            rollbackOccurred = await this.performRollback(rollbackFrame, humanPlayerIds);
+        }
 
         // 3. Build final action dict - ALL human players use delayed inputs from buffer
         // This is true GGPO: local player also experiences input delay
@@ -1418,24 +1446,7 @@ obs, infos, render_state
         // 4. Increment frame (AFTER recording hash)
         this.frameNumber++;
 
-        // GGPO: Check for pending rollback (late input arrived)
-        // IMPORTANT: Do this BEFORE pruning to ensure we have inputs for the rollback
-        let rollbackOccurred = false;
-        if (this.pendingRollbackFrame !== null && this.pendingRollbackFrame !== undefined) {
-            const rollbackFrame = this.pendingRollbackFrame;
-            this.pendingRollbackFrame = null;
-
-            // Get all player IDs
-            const playerIds = Object.keys(this.policyMapping).filter(
-                pid => this.policyMapping[pid] === 'human'
-            );
-
-            // Perform rollback and replay
-            rollbackOccurred = await this.performRollback(rollbackFrame, playerIds);
-        }
-
         // Prune old input buffer entries to prevent unbounded growth
-        // IMPORTANT: Do this AFTER rollback to ensure we don't remove inputs we need
         this.pruneInputBuffer();
 
         // Log diagnostics periodically
@@ -2512,139 +2523,159 @@ if 'py_rng_state' in _snapshot:
             return false;
         }
 
-        this.rollbackCount++;
-        this.maxRollbackFrames = Math.max(this.maxRollbackFrames, rollbackFrames);
+        // Set rollback guard to prevent nested rollbacks
+        this.rollbackInProgress = true;
 
-        // Find best snapshot to restore (snapshot[N] = state BEFORE stepping frame N)
-        const snapshotFrame = this.findBestSnapshot(targetFrame);
-        if (snapshotFrame < 0) {
-            p2pLog.error(
-                `No valid snapshot found for rollback to frame ${targetFrame}. ` +
-                `Snapshots available: ${this.stateSnapshots.size}, ` +
-                `keys: [${Array.from(this.stateSnapshots.keys()).slice(-5).join(', ')}...]`
-            );
-            return false;
-        }
+        try {
+            this.rollbackCount++;
+            this.maxRollbackFrames = Math.max(this.maxRollbackFrames, rollbackFrames);
 
-        // Load snapshot - this restores state BEFORE snapshotFrame was stepped
-        const loaded = await this.loadStateSnapshot(snapshotFrame);
-        if (!loaded) {
-            return false;
-        }
-
-        p2pLog.debug(`Loaded snapshot ${snapshotFrame}, replaying ${currentFrame - snapshotFrame} frames`);
-
-        // Build a map of recorded actions for quick lookup (these are actions that were USED, possibly predicted)
-        const recordedActionsMap = new Map();
-        for (const record of this.actionSequence) {
-            recordedActionsMap.set(record.frame, record.actions);
-        }
-
-        // Replay from snapshot frame to current frame
-        this.frameNumber = snapshotFrame;
-
-        // Clear predicted frames from snapshot onwards (we'll re-simulate with correct inputs)
-        for (const frame of this.predictedFrames) {
-            if (frame >= snapshotFrame) {
-                this.predictedFrames.delete(frame);
+            // Find best snapshot to restore (snapshot[N] = state BEFORE stepping frame N)
+            const snapshotFrame = this.findBestSnapshot(targetFrame);
+            if (snapshotFrame < 0) {
+                p2pLog.error(
+                    `No valid snapshot found for rollback to frame ${targetFrame}. ` +
+                    `Snapshots available: ${this.stateSnapshots.size}, ` +
+                    `keys: [${Array.from(this.stateSnapshots.keys()).slice(-5).join(', ')}...]`
+                );
+                return false;
             }
-        }
 
-        // Recompute action counts from snapshotFrame onwards
-        // First, subtract the old counts for frames we're re-doing
-        for (const record of this.actionSequence) {
-            if (record.frame >= snapshotFrame) {
-                for (const [playerId, action] of Object.entries(record.actions)) {
+            // Load snapshot - this restores state BEFORE snapshotFrame was stepped
+            const loaded = await this.loadStateSnapshot(snapshotFrame);
+            if (!loaded) {
+                return false;
+            }
+
+            p2pLog.debug(`Loaded snapshot ${snapshotFrame}, replaying ${currentFrame - snapshotFrame} frames`);
+
+            // Build a map of recorded actions for quick lookup (these are actions that were USED, possibly predicted)
+            const recordedActionsMap = new Map();
+            for (const record of this.actionSequence) {
+                recordedActionsMap.set(record.frame, record.actions);
+            }
+
+            // Clear predicted frames from snapshot onwards (we'll re-simulate with correct inputs)
+            for (const frame of this.predictedFrames) {
+                if (frame >= snapshotFrame) {
+                    this.predictedFrames.delete(frame);
+                }
+            }
+
+            // Recompute action counts from snapshotFrame onwards
+            // First, subtract the old counts for frames we're re-doing
+            for (const record of this.actionSequence) {
+                if (record.frame >= snapshotFrame) {
+                    for (const [playerId, action] of Object.entries(record.actions)) {
+                        const actionKey = String(action);
+                        if (this.actionCounts[playerId] && this.actionCounts[playerId][actionKey]) {
+                            this.actionCounts[playerId][actionKey]--;
+                            if (this.actionCounts[playerId][actionKey] <= 0) {
+                                delete this.actionCounts[playerId][actionKey];
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Also remove old action records from snapshotFrame onwards (we'll record new ones)
+            this.actionSequence = this.actionSequence.filter(r => r.frame < snapshotFrame);
+
+            // GGPO-style: Build all replay frame actions FIRST (in JavaScript)
+            // Then execute ALL env.step() calls in a single Python batch
+            // This prevents event loop yields during replay that could allow new inputs
+            const replayFrames = [];
+
+            for (let frame = snapshotFrame; frame < currentFrame; frame++) {
+                // Get human inputs from buffer (now has confirmed inputs including the late one)
+                // Note: getInputsForFrame may still use prediction if inputs haven't arrived yet
+                // Pass trackPredictions=false during replay to avoid re-marking frames
+                const humanInputs = this.getInputsForFrame(frame, playerIds, false);
+
+                // Log what inputs we're using during replay
+                const confirmedForFrame = [];
+                const predictedForFrame = [];
+                const frameInputs = this.inputBuffer.get(frame);
+                for (const pid of playerIds) {
+                    if (frameInputs && frameInputs.has(String(pid))) {
+                        confirmedForFrame.push(pid);
+                    } else {
+                        predictedForFrame.push(pid);
+                    }
+                }
+
+                // Warn if we're still using prediction during replay - this means inputs are missing!
+                // This is expected with artificial delay - we'll rollback again when those inputs arrive
+                if (predictedForFrame.length > 0) {
+                    p2pLog.debug(`Replay frame ${frame}: still missing inputs for [${predictedForFrame.join(',')}]`);
+                }
+
+                // Build complete action dict
+                const envActions = {};
+
+                // Add human actions from confirmed inputs
+                for (const [pid, action] of Object.entries(humanInputs)) {
+                    envActions[parseInt(pid) || pid] = action;
+                }
+
+                // For non-human agents, use recorded actions from original execution
+                // TODO: Ideally re-compute with correct RNG state for full determinism
+                const originalActions = recordedActionsMap.get(frame);
+                if (originalActions) {
+                    for (const [agentId, policy] of Object.entries(this.policyMapping)) {
+                        if (policy !== 'human') {
+                            const agentIdKey = parseInt(agentId) || agentId;
+                            if (originalActions[agentId] !== undefined) {
+                                envActions[agentIdKey] = originalActions[agentId];
+                            } else if (originalActions[String(agentId)] !== undefined) {
+                                envActions[agentIdKey] = originalActions[String(agentId)];
+                            }
+                        }
+                    }
+                }
+
+                // Record the corrected actions in JavaScript
+                this.actionSequence.push({
+                    frame: frame,
+                    actions: {...envActions}
+                });
+
+                // Update action counts with corrected actions
+                for (const [playerId, action] of Object.entries(envActions)) {
+                    if (!this.actionCounts[playerId]) {
+                        this.actionCounts[playerId] = {};
+                    }
                     const actionKey = String(action);
-                    if (this.actionCounts[playerId] && this.actionCounts[playerId][actionKey]) {
-                        this.actionCounts[playerId][actionKey]--;
-                        if (this.actionCounts[playerId][actionKey] <= 0) {
-                            delete this.actionCounts[playerId][actionKey];
-                        }
-                    }
+                    this.actionCounts[playerId][actionKey] = (this.actionCounts[playerId][actionKey] || 0) + 1;
                 }
+
+                // Add to replay batch
+                replayFrames.push({
+                    frame: frame,
+                    actions: envActions
+                });
             }
+
+            // Execute ALL replay steps in a single Python call (no event loop yields)
+            // This is the key GGPO optimization - synchronous replay prevents race conditions
+            if (replayFrames.length > 0) {
+                await this.pyodide.runPythonAsync(`
+_replay_frames = ${JSON.stringify(replayFrames)}
+for _rf in _replay_frames:
+    _actions = {int(k) if str(k).isdigit() else k: v for k, v in _rf['actions'].items()}
+    env.step(_actions)
+                `);
+            }
+
+            // Update JS frame counter to match Python state
+            this.frameNumber = currentFrame;
+
+            p2pLog.debug(`Replay complete, now at frame ${this.frameNumber}`);
+            return true;
+        } finally {
+            // Always clear rollback guard
+            this.rollbackInProgress = false;
         }
-
-        // Also remove old action records from snapshotFrame onwards (we'll record new ones)
-        this.actionSequence = this.actionSequence.filter(r => r.frame < snapshotFrame);
-
-        // Replay each frame
-        for (let frame = snapshotFrame; frame < currentFrame; frame++) {
-            // Get human inputs from buffer (now has confirmed inputs including the late one)
-            // Note: getInputsForFrame may still use prediction if inputs haven't arrived yet
-            // Pass trackPredictions=false during replay to avoid re-marking frames
-            const humanInputs = this.getInputsForFrame(frame, playerIds, false);
-
-            // Log what inputs we're using during replay
-            const confirmedForFrame = [];
-            const predictedForFrame = [];
-            const frameInputs = this.inputBuffer.get(frame);
-            for (const pid of playerIds) {
-                if (frameInputs && frameInputs.has(String(pid))) {
-                    confirmedForFrame.push(pid);
-                } else {
-                    predictedForFrame.push(pid);
-                }
-            }
-
-            // Warn if we're still using prediction during replay - this means inputs are missing!
-            // This is expected with artificial delay - we'll rollback again when those inputs arrive
-            if (predictedForFrame.length > 0) {
-                p2pLog.debug(`Replay frame ${frame}: still missing inputs for [${predictedForFrame.join(',')}]`);
-            }
-
-            // Build complete action dict
-            const envActions = {};
-
-            // Add human actions from confirmed inputs
-            for (const [pid, action] of Object.entries(humanInputs)) {
-                envActions[parseInt(pid) || pid] = action;
-            }
-
-            // For non-human agents, use recorded actions from original execution
-            // TODO: Ideally re-compute with correct RNG state for full determinism
-            const originalActions = recordedActionsMap.get(frame);
-            if (originalActions) {
-                for (const [agentId, policy] of Object.entries(this.policyMapping)) {
-                    if (policy !== 'human') {
-                        const agentIdKey = parseInt(agentId) || agentId;
-                        if (originalActions[agentId] !== undefined) {
-                            envActions[agentIdKey] = originalActions[agentId];
-                        } else if (originalActions[String(agentId)] !== undefined) {
-                            envActions[agentIdKey] = originalActions[String(agentId)];
-                        }
-                    }
-                }
-            }
-
-            // Record the corrected actions
-            this.actionSequence.push({
-                frame: frame,
-                actions: {...envActions}
-            });
-
-            // Update action counts with corrected actions
-            for (const [playerId, action] of Object.entries(envActions)) {
-                if (!this.actionCounts[playerId]) {
-                    this.actionCounts[playerId] = {};
-                }
-                const actionKey = String(action);
-                this.actionCounts[playerId][actionKey] = (this.actionCounts[playerId][actionKey] || 0) + 1;
-            }
-
-            // Step environment
-            await this.pyodide.runPythonAsync(`
-_replay_actions = ${JSON.stringify(envActions)}
-_replay_actions = {int(k) if str(k).isdigit() else k: v for k, v in _replay_actions.items()}
-env.step(_replay_actions)
-            `);
-
-            this.frameNumber = frame + 1;
-        }
-
-        p2pLog.debug(`Replay complete, now at frame ${this.frameNumber}`);
-        return true;
     }
 
     /**
