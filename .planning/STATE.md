@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md
 
 **Core value:** Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
-**Current focus:** Phase 5 - Validation and Cleanup (in progress)
+**Current focus:** Phase 6 - GGPO Input Queue Fix (COMPLETE)
 
 ## Current Position
 
-Phase: 5 of 5 (Validation and Cleanup)
-Plan: 2 of 3 complete
-Status: In progress
-Last activity: 2026-01-17 - Completed 05-02-PLAN.md (P2P-first input sending and research metrics)
+Phase: 6 of 6 (GGPO Input Queue Fix)
+Plan: 1 of 1 complete
+Status: Phase complete
+Last activity: 2026-01-19 - Completed 06-01-PLAN.md (GGPO-style input queuing)
 
-Progress: [#########-] 91%
+Progress: [###########] 100% (All phases complete)
 
 ## Phase Overview
 
@@ -24,12 +24,13 @@ Progress: [#########-] 91%
 | 2 | P2P Transport Layer | GGPO-02, GGPO-03 | Complete |
 | 3 | GGPO P2P Integration | GGPO-01, NPLAY-01 | Complete |
 | 4 | TURN and Resilience | WEBRTC-03, WEBRTC-04 | Complete |
-| 5 | Validation and Cleanup | CLEAN-01 | In progress |
+| 5 | Validation and Cleanup | CLEAN-01 | Complete |
+| 6 | GGPO Input Queue Fix | GGPO-04 | Complete |
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 10
+- Total plans completed: 11
 - Average duration: ~5 min
 
 **By Phase:**
@@ -41,6 +42,7 @@ Progress: [#########-] 91%
 | 3 | 1 | ~5 min | ~5 min |
 | 4 | 2 | ~10 min | ~5 min |
 | 5 | 2 | ~5.5 min | ~2.75 min |
+| 6 | 1 | ~4 min | ~4 min |
 
 ## Accumulated Context
 
@@ -69,6 +71,9 @@ Progress: [#########-] 91%
 **Modified in Phase 5:**
 - `interactive_gym/server/pyodide_game_coordinator.py` - Removed host_player_id, renamed event to pyodide_player_assigned
 - `interactive_gym/server/static/js/pyodide_multiplayer_game.js` - Removed isHost, renamed handler to pyodide_player_assigned, P2P-first input routing, sessionMetrics, exportSessionMetrics()
+
+**Modified in Phase 6:**
+- `interactive_gym/server/static/js/pyodide_multiplayer_game.js` - GGPO-style input queuing (pendingInputPackets, pendingSocketIOInputs), _processQueuedInputs(), batched rollback replay, rollbackInProgress guard
 
 ### Decisions
 
@@ -100,6 +105,10 @@ Progress: [#########-] 91%
 | 05-02 | p2pHealthy includes fallback flag | Prevents oscillation back to P2P once fallback triggered |
 | 05-02 | Rollback events stored as array | Full history enables post-hoc analysis of rollback patterns |
 | 05-02 | exportSessionMetrics() at episode end | Immediate visibility for debugging; future: emit to server |
+| 06-01 | Queue inputs instead of immediate processing | Prevents race conditions where inputs arrive during rollback replay |
+| 06-01 | Batch replay into single Python call | No event loop yields during replay ensures atomic execution |
+| 06-01 | rollbackInProgress guard | Prevents nested rollbacks from inputs arriving during replay |
+| 06-01 | Rollback detection before stepping | Proper GGPO order: process inputs, detect rollback, execute rollback, then step |
 
 ### Pending Todos
 
@@ -110,12 +119,17 @@ Progress: [#########-] 91%
 **Research pitfalls addressed:**
 - Pitfall #4: DataChannel reliability mode - using unreliable/unordered (ordered: false, maxRetransmits: 0)
 - Pitfall #11: TURN latency detection - Connection type detection via getStats() implemented in Phase 4
+- Pitfall #7: Input race conditions - GGPO-style input queuing prevents inputs from arriving during rollback replay
 
 **Research pitfalls remaining:**
 - Pitfall #1: Determinism validation - Deferred to Phase 5 (05-03-PLAN.md)
 
 ## Session Continuity
 
-Last session: 2026-01-17
-Stopped at: Completed 05-02-PLAN.md (P2P-first input sending and research metrics)
-Resume with: Continue with 05-03-PLAN.md (determinism validation)
+Last session: 2026-01-19 14:18:53Z
+Stopped at: Completed 06-01-PLAN.md (GGPO input queue fix)
+Resume file: None (project complete)
+
+### Roadmap Evolution
+
+- Phase 6 added and completed: GGPO Input Queue Fix - fixed rollback divergence by implementing synchronous input processing per GGPO best practices
