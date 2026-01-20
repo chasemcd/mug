@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-01-19)
 
 **Core value:** Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
-**Current focus:** v1.1 Admin Console — Phase 8 planned, ready to execute
+**Current focus:** v1.1 Admin Console — Phase 8 in progress (08-01 complete)
 
 ## Current Position
 
 Phase: 8 of 10 (Read-Only Dashboard)
-Plan: 2 plans ready (08-01, 08-02)
-Status: Ready to execute
-Last activity: 2026-01-20 — Phase 8 planned (2 plans, 6 tasks, 7 files)
+Plan: 1 of 2 complete (08-01 done, 08-02 ready)
+Status: In progress
+Last activity: 2026-01-20 — Completed 08-01-PLAN.md (backend state aggregation)
 
-Progress: v1.0 complete | v1.1 ██░░░░░░░░ 25%
+Progress: v1.0 complete | v1.1 ███░░░░░░░ 35%
 
 ## Milestone History
 
@@ -37,6 +37,7 @@ Progress: v1.0 complete | v1.1 ██░░░░░░░░ 25%
 - `interactive_gym/server/admin/__init__.py` - Blueprint and AdminUser
 - `interactive_gym/server/admin/routes.py` - Login/logout/dashboard routes
 - `interactive_gym/server/admin/namespace.py` - AdminNamespace for SocketIO
+- `interactive_gym/server/admin/aggregator.py` - AdminEventAggregator (390 LOC)
 - `interactive_gym/server/admin/templates/` - DaisyUI dashboard templates
 
 ### Decisions
@@ -46,6 +47,7 @@ See: .planning/PROJECT.md Key Decisions table
 | ID | Decision | Rationale |
 |----|----------|-----------|
 | D-0701-01 | Password-only auth (no multi-user) | Single researcher use case per v1.1 research |
+| D-0801-01 | Observer pattern for state collection | Read-only references to avoid race conditions |
 
 ### Pending Todos
 
@@ -60,11 +62,11 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-01-20
-Stopped at: Phase 8 planned
+Stopped at: Completed 08-01-PLAN.md
 Resume file: None
 
 ### Next Steps
 
-1. `/gsd:execute-phase 8` — execute the Read-Only Dashboard plans
+1. Execute 08-02-PLAN.md (Dashboard Frontend)
 2. `/gsd:plan-phase 9` — plan Intervention & Data phase
 3. Continue with phases 9-10
