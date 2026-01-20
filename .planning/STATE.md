@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-01-19)
 
 **Core value:** Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
-**Current focus:** v1.1 Admin Console — Phase 7 complete, Phase 8 ready to plan
+**Current focus:** v1.1 Admin Console — Phase 8 planned, ready to execute
 
 ## Current Position
 
-Phase: 7 of 10 (Admin Foundation)
-Plan: 1 of 1 complete
-Status: Phase complete
-Last activity: 2026-01-20 — Completed 07-01-PLAN.md (admin foundation)
+Phase: 8 of 10 (Read-Only Dashboard)
+Plan: 2 plans ready (08-01, 08-02)
+Status: Ready to execute
+Last activity: 2026-01-20 — Phase 8 planned (2 plans, 6 tasks, 7 files)
 
 Progress: v1.0 complete | v1.1 ██░░░░░░░░ 25%
 
@@ -60,11 +60,11 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-01-20
-Stopped at: Completed 07-01-PLAN.md
+Stopped at: Phase 8 planned
 Resume file: None
 
 ### Next Steps
 
-1. `/gsd:plan-phase 8` — plan Read-Only Dashboard phase
-2. `/gsd:execute-phase 8` — implement participant monitoring
+1. `/gsd:execute-phase 8` — execute the Read-Only Dashboard plans
+2. `/gsd:plan-phase 9` — plan Intervention & Data phase
 3. Continue with phases 9-10
