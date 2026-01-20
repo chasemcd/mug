@@ -2,8 +2,8 @@
 
 ## Milestones
 
-- ✅ **v1.0 P2P Multiplayer** - Phases 1-6 (shipped 2026-01-19)
-- 🚧 **v1.1 Admin Console** - Phases 7-10 (in progress)
+- **v1.0 P2P Multiplayer** - Phases 1-6 (shipped 2026-01-19)
+- **v1.1 Admin Console** - Phases 7-10 (in progress)
 
 ## Phases
 
@@ -12,7 +12,7 @@
 - Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
 
 <details>
-<summary>✅ v1.0 P2P Multiplayer (Phases 1-6) - SHIPPED 2026-01-19</summary>
+<summary>v1.0 P2P Multiplayer (Phases 1-6) - SHIPPED 2026-01-19</summary>
 
 See .planning/MILESTONES.md for v1.0 details.
 
@@ -21,11 +21,11 @@ See .planning/MILESTONES.md for v1.0 details.
 
 </details>
 
-### 🚧 v1.1 Admin Console (In Progress)
+### v1.1 Admin Console (In Progress)
 
 **Milestone Goal:** Real-time experiment monitoring and light intervention capabilities for researchers running experiments.
 
-- [x] **Phase 7: Admin Foundation** - Secure admin infrastructure with authentication ✓
+- [x] **Phase 7: Admin Foundation** - Secure admin infrastructure with authentication
 - [ ] **Phase 8: Read-Only Dashboard** - Participant monitoring and experiment state visibility
 - [ ] **Phase 9: Intervention & Data** - Kick participants and download data
 - [ ] **Phase 10: Debug & Multiplayer** - Debug log viewer and multiplayer group view
@@ -44,7 +44,7 @@ See .planning/MILESTONES.md for v1.0 details.
 **Plans**: 1
 
 Plans:
-- [x] 07-01: Secure admin infrastructure with authentication and namespace isolation ✓
+- [x] 07-01: Secure admin infrastructure with authentication and namespace isolation
 
 ### Phase 8: Read-Only Dashboard
 **Goal**: See all participants and experiment state in real-time
@@ -56,10 +56,11 @@ Plans:
   3. Admin can see how many participants are in each waiting room and how long they've waited
   4. Admin can see a chronological timeline of experiment events
 **Research**: Unlikely needed (existing data structures, just projecting)
-**Plans**: TBD
+**Plans**: 2
 
 Plans:
-- [ ] 08-01: TBD
+- [ ] 08-01-PLAN.md - Backend state aggregation (AdminEventAggregator + SocketIO emissions)
+- [ ] 08-02-PLAN.md - Frontend dashboard UI (participant table, status badges, waiting room view, timeline)
 
 ### Phase 9: Intervention & Data
 **Goal**: Act on participant issues and access data
@@ -92,15 +93,15 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 7 → 8 → 9 → 10
+Phases execute in numeric order: 7 -> 8 -> 9 -> 10
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 7. Admin Foundation | v1.1 | 1/1 | ✓ Complete | 2026-01-19 |
-| 8. Read-Only Dashboard | v1.1 | 0/TBD | Not started | - |
+| 7. Admin Foundation | v1.1 | 1/1 | Complete | 2026-01-19 |
+| 8. Read-Only Dashboard | v1.1 | 0/2 | Planned | - |
 | 9. Intervention & Data | v1.1 | 0/TBD | Not started | - |
 | 10. Debug & Multiplayer | v1.1 | 0/TBD | Not started | - |
 
 ---
 *Created: 2026-01-19*
-*Last updated: 2026-01-19 after Phase 7 completion*
+*Last updated: 2026-01-20 after Phase 8 planning*
