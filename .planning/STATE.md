@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-01-19)
 
 **Core value:** Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
-**Current focus:** v1.1 Admin Console — Phase 7 ready to plan
+**Current focus:** v1.1 Admin Console — Phase 7 complete, Phase 8 ready to plan
 
 ## Current Position
 
 Phase: 7 of 10 (Admin Foundation)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-01-19 — v1.1 roadmap created (4 phases, 11 requirements)
+Plan: 1 of 1 complete
+Status: Phase complete
+Last activity: 2026-01-20 — Completed 07-01-PLAN.md (admin foundation)
 
-Progress: v1.0 complete | v1.1 ░░░░░░░░░░ 0%
+Progress: v1.0 complete | v1.1 ██░░░░░░░░ 25%
 
 ## Milestone History
 
@@ -33,9 +33,19 @@ Progress: v1.0 complete | v1.1 ░░░░░░░░░░ 0%
 - `interactive_gym/server/pyodide_game_coordinator.py`
 - `interactive_gym/configurations/remote_config.py`
 
+**Admin Console (created in v1.1):**
+- `interactive_gym/server/admin/__init__.py` - Blueprint and AdminUser
+- `interactive_gym/server/admin/routes.py` - Login/logout/dashboard routes
+- `interactive_gym/server/admin/namespace.py` - AdminNamespace for SocketIO
+- `interactive_gym/server/admin/templates/` - DaisyUI dashboard templates
+
 ### Decisions
 
 See: .planning/PROJECT.md Key Decisions table
+
+| ID | Decision | Rationale |
+|----|----------|-----------|
+| D-0701-01 | Password-only auth (no multi-user) | Single researcher use case per v1.1 research |
 
 ### Pending Todos
 
@@ -49,12 +59,12 @@ See: .planning/PROJECT.md Key Decisions table
 
 ## Session Continuity
 
-Last session: 2026-01-19
-Stopped at: Roadmap created for v1.1
+Last session: 2026-01-20
+Stopped at: Completed 07-01-PLAN.md
 Resume file: None
 
 ### Next Steps
 
-1. `/gsd:plan-phase 7` — plan Admin Foundation phase
-2. `/gsd:execute-phase 7` — execute the plan
-3. Continue with phases 8-10
+1. `/gsd:plan-phase 8` — plan Read-Only Dashboard phase
+2. `/gsd:execute-phase 8` — implement participant monitoring
+3. Continue with phases 9-10
