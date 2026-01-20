@@ -3562,6 +3562,11 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
         this.p2pEpisodeSync.remoteStateHash = null;
         this.p2pEpisodeSync.startResolve = null;
         this.p2pEpisodeSync.startTimeoutId = null;
+        // Clear retry timeout
+        if (this.p2pEpisodeSync.retryTimeoutId) {
+            clearTimeout(this.p2pEpisodeSync.retryTimeoutId);
+            this.p2pEpisodeSync.retryTimeoutId = null;
+        }
     }
 
     _handleEpisodeReady(buffer) {
@@ -3587,8 +3592,9 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
 
     _broadcastEpisodeReady(stateHash) {
         /**
-         * Send episode ready notification to peer.
+         * Send episode ready notification to peer with retry mechanism.
          * Called after local reset completes successfully.
+         * Retries a few times to handle case where peer's DataChannel isn't fully ready.
          *
          * @param {string} stateHash - 8-char hex hash of initial environment state
          */
@@ -3599,12 +3605,38 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
 
         const episodeNumber = this.num_episodes + 1;  // Next episode number
         const packet = encodeEpisodeReady(episodeNumber, stateHash);
+
+        // Send immediately
         this.webrtcManager.send(packet);
         p2pLog.debug(`Broadcast episode ready: episode=${episodeNumber} hash=${stateHash}`);
 
         // Record that our reset is complete
         this.p2pEpisodeSync.localResetComplete = true;
         this.p2pEpisodeSync.localStateHash = stateHash;
+
+        // Retry sending a couple times in case peer's DataChannel wasn't ready
+        // Clear any existing retry timeout
+        if (this.p2pEpisodeSync.retryTimeoutId) {
+            clearTimeout(this.p2pEpisodeSync.retryTimeoutId);
+        }
+
+        let retryCount = 0;
+        const maxRetries = 3;
+        const retryInterval = 500;  // 500ms between retries
+
+        const retryBroadcast = () => {
+            retryCount++;
+            if (retryCount <= maxRetries && !this.p2pEpisodeSync.remoteResetComplete) {
+                // Peer hasn't responded yet - resend
+                if (this.webrtcManager?.isReady()) {
+                    this.webrtcManager.send(packet);
+                    p2pLog.debug(`Episode ready retry ${retryCount}/${maxRetries}`);
+                }
+                this.p2pEpisodeSync.retryTimeoutId = setTimeout(retryBroadcast, retryInterval);
+            }
+        };
+
+        this.p2pEpisodeSync.retryTimeoutId = setTimeout(retryBroadcast, retryInterval);
 
         // Check if peer is already ready
         this._checkEpisodeStartSync();
@@ -3629,10 +3661,14 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
             p2pLog.debug(`Episode start synchronized: both peers have matching state hash=${sync.localStateHash}`);
         }
 
-        // Clear the timeout since we synced successfully
+        // Clear the timeout and retry since we synced successfully
         if (sync.startTimeoutId) {
             clearTimeout(sync.startTimeoutId);
             sync.startTimeoutId = null;
+        }
+        if (sync.retryTimeoutId) {
+            clearTimeout(sync.retryTimeoutId);
+            sync.retryTimeoutId = null;
         }
 
         // Resolve the start promise to unblock the game loop
