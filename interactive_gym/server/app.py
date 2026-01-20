@@ -31,6 +31,10 @@ from interactive_gym.scenes import unity_scene
 from interactive_gym.server import pyodide_game_coordinator
 from interactive_gym.server import player_pairing_manager
 
+from flask_login import LoginManager
+from interactive_gym.server.admin import admin_bp, AdminUser
+from interactive_gym.server.admin.namespace import AdminNamespace
+
 
 @dataclasses.dataclass
 class ParticipantSession:
@@ -140,6 +144,23 @@ socketio = flask_socketio.SocketIO(
     logger=app.config["DEBUG"],
     # engineio_logger=False,
 )
+
+# Flask-Login setup for admin authentication
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'admin.login'
+login_manager.login_message = 'Please log in to access the admin dashboard.'
+
+
+@login_manager.user_loader
+def load_user(user_id):
+    if user_id == 'admin':
+        return AdminUser(user_id)
+    return None
+
+
+# Register admin blueprint
+app.register_blueprint(admin_bp)
 
 #######################
 # Flask Configuration #
@@ -1314,6 +1335,10 @@ def run(config):
     print(f"  Public (if accessible):  http://{public_ip}:{config.port}")
     print("="*70 + "\n")
 
+    # Register admin namespace
+    admin_namespace = AdminNamespace('/admin')
+    socketio.on_namespace(admin_namespace)
+    logger.info("Admin namespace registered on /admin")
 
     socketio.run(
         app,
