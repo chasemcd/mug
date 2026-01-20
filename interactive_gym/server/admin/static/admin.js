@@ -42,18 +42,19 @@ function updateConnectionBadge(status) {
     if (!badge) return;
 
     badge.classList.remove('badge-success', 'badge-warning', 'badge-error');
+    const statusText = badge.querySelector('.status-text');
 
     switch(status) {
         case 'connected':
-            badge.textContent = 'Connected';
+            if (statusText) statusText.textContent = 'Connected';
             badge.classList.add('badge-success');
             break;
         case 'disconnected':
-            badge.textContent = 'Disconnected';
+            if (statusText) statusText.textContent = 'Disconnected';
             badge.classList.add('badge-error');
             break;
         case 'error':
-            badge.textContent = 'Error';
+            if (statusText) statusText.textContent = 'Error';
             badge.classList.add('badge-error');
             break;
     }
@@ -76,83 +77,118 @@ adminSocket.on('activity_event', (event) => {
 
 function updateDashboard(state) {
     updateSummaryStats(state.summary);
-    updateParticipantsTable(state.participants);
+    updateParticipants(state.participants);
     updateWaitingRooms(state.waiting_rooms);
     updateActivityTimeline(state.activity_log);
 }
 
 // ============================================
-// Summary stats
+// Summary stats (new element IDs)
 // ============================================
 
 function updateSummaryStats(summary) {
-    const elParticipants = document.getElementById('stat-participants');
-    const elGames = document.getElementById('stat-games');
+    const elConnected = document.getElementById('stat-connected');
     const elWaiting = document.getElementById('stat-waiting');
+    const elGames = document.getElementById('stat-games');
+    const elCompleted = document.getElementById('stat-completed');
+    const elParticipantCount = document.getElementById('participant-count');
+    const elActivityCount = document.getElementById('activity-count');
 
-    if (elParticipants) {
-        elParticipants.textContent = summary.total_participants || 0;
-    }
-    if (elGames) {
-        elGames.textContent = summary.active_games || 0;
+    if (elConnected) {
+        elConnected.textContent = summary.connected_count || 0;
     }
     if (elWaiting) {
         elWaiting.textContent = summary.waiting_count || 0;
     }
+    if (elGames) {
+        elGames.textContent = summary.active_games || 0;
+    }
+    if (elCompleted) {
+        elCompleted.textContent = summary.completed_count || 0;
+    }
+    if (elParticipantCount) {
+        elParticipantCount.textContent = `${summary.total_participants || 0} total`;
+    }
+    if (elActivityCount && currentState.activity_log) {
+        elActivityCount.textContent = `${currentState.activity_log.length} events`;
+    }
 }
 
 // ============================================
-// Participants table
+// Participants (card-based display)
 // ============================================
 
-function updateParticipantsTable(participants) {
-    const tbody = document.getElementById('participants-tbody');
-    if (!tbody) return;
+function updateParticipants(participants) {
+    const container = document.getElementById('participants-container');
+    if (!container) return;
 
     if (!participants || participants.length === 0) {
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="5" class="text-center text-base-content/50">
-                    No participants connected
-                </td>
-            </tr>
+        container.innerHTML = `
+            <div class="empty-state">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-12 h-12 mx-auto mb-2 opacity-30">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
+                </svg>
+                <p class="text-base-content/50">No participants connected</p>
+            </div>
         `;
         return;
     }
 
-    // Sort by created_at (newest first)
-    const sorted = [...participants].sort((a, b) =>
-        (b.created_at || 0) - (a.created_at || 0)
-    );
+    // Sort: connected first, then by created_at (newest first)
+    const sorted = [...participants].sort((a, b) => {
+        // Priority: connected > reconnecting > disconnected > completed
+        const statusPriority = { 'connected': 0, 'reconnecting': 1, 'disconnected': 2, 'completed': 3 };
+        const priorityA = statusPriority[a.connection_status] ?? 4;
+        const priorityB = statusPriority[b.connection_status] ?? 4;
+        if (priorityA !== priorityB) return priorityA - priorityB;
+        return (b.created_at || 0) - (a.created_at || 0);
+    });
 
-    tbody.innerHTML = sorted.map(p => `
-        <tr class="hover">
-            <td class="font-mono text-sm">${escapeHtml(truncateId(p.subject_id))}</td>
-            <td>${getStatusBadge(p.connection_status)}</td>
-            <td>${escapeHtml(p.current_scene_id || '-')}</td>
-            <td>${getProgressBadge(p.scene_progress)}</td>
-            <td class="text-xs text-base-content/60">
-                ${formatTimestamp(p.last_updated_at)}
-            </td>
-        </tr>
-    `).join('');
+    container.innerHTML = `
+        <div class="participant-grid">
+            ${sorted.map(p => renderParticipantCard(p)).join('')}
+        </div>
+    `;
+}
+
+function renderParticipantCard(p) {
+    return `
+        <div class="participant-card">
+            <div class="participant-card-header">
+                <span class="participant-card-id" title="${escapeHtml(p.subject_id)}">${escapeHtml(p.subject_id)}</span>
+                ${getStatusBadge(p.connection_status)}
+            </div>
+            <div class="participant-card-body">
+                <div class="participant-card-row">
+                    <span class="participant-card-label">Scene</span>
+                    <span class="participant-card-value">${escapeHtml(p.current_scene_id || '—')}</span>
+                </div>
+                <div class="participant-card-row">
+                    <span class="participant-card-label">Progress</span>
+                    <span class="participant-card-value">${getProgressDisplay(p.scene_progress)}</span>
+                </div>
+                <div class="participant-card-row">
+                    <span class="participant-card-label">Updated</span>
+                    <span class="participant-card-value">${formatTimestamp(p.last_updated_at)}</span>
+                </div>
+            </div>
+        </div>
+    `;
 }
 
 function getStatusBadge(status) {
     const badges = {
-        'connected': '<span class="badge badge-success badge-sm">Connected</span>',
-        'reconnecting': '<span class="badge badge-warning badge-sm">Reconnecting</span>',
-        'disconnected': '<span class="badge badge-error badge-sm">Disconnected</span>',
-        'completed': '<span class="badge badge-ghost badge-sm">Completed</span>'
+        'connected': '<span class="badge badge-success badge-xs">Connected</span>',
+        'reconnecting': '<span class="badge badge-warning badge-xs">Reconnecting</span>',
+        'disconnected': '<span class="badge badge-error badge-xs">Disconnected</span>',
+        'completed': '<span class="badge badge-ghost badge-xs">Completed</span>'
     };
-    return badges[status] || '<span class="badge badge-ghost badge-sm">Unknown</span>';
+    return badges[status] || '<span class="badge badge-ghost badge-xs">Unknown</span>';
 }
 
-function getProgressBadge(progress) {
-    if (!progress) return '-';
-    const pct = Math.round((progress.current_index / progress.total_scenes) * 100);
-    return `<progress class="progress progress-primary w-16" value="${progress.current_index}" max="${progress.total_scenes}"></progress>
-            <span class="text-xs ml-2">${progress.current_index}/${progress.total_scenes}</span>`;
+function getProgressDisplay(progress) {
+    if (!progress || !progress.total_scenes) return '—';
+    return `${progress.current_index}/${progress.total_scenes}`;
 }
 
 // ============================================
@@ -165,38 +201,34 @@ function updateWaitingRooms(waitingRooms) {
 
     if (!waitingRooms || waitingRooms.length === 0) {
         container.innerHTML = `
-            <div class="text-center text-base-content/50 py-4">
-                No active waiting rooms
+            <div class="empty-state-sm">
+                <p class="text-base-content/50 text-sm">No active waiting rooms</p>
             </div>
         `;
         return;
     }
 
     container.innerHTML = waitingRooms.map(room => `
-        <div class="card bg-base-100 shadow-sm border border-base-300 mb-2">
-            <div class="card-body p-3">
-                <div class="flex justify-between items-center">
-                    <span class="font-medium text-sm">${escapeHtml(room.scene_id)}</span>
-                    <span class="badge badge-outline badge-sm">
-                        ${room.waiting_count}/${room.target_size} waiting
-                    </span>
-                </div>
-                ${room.groups && room.groups.length > 0 ? `
-                    <div class="mt-2 text-xs text-base-content/60">
-                        ${room.groups.map(g => `
-                            <div class="flex justify-between">
-                                <span>Group ${truncateId(g.group_id)}</span>
-                                <span>${g.waiting_count} waiting, ${formatDuration(g.wait_duration_ms)}</span>
-                            </div>
-                        `).join('')}
-                    </div>
-                ` : ''}
-                ${room.avg_wait_duration_ms > 0 ? `
-                    <div class="text-xs text-base-content/60 mt-1">
-                        Avg wait: ${formatDuration(room.avg_wait_duration_ms)}
-                    </div>
-                ` : ''}
+        <div class="waiting-room-card">
+            <div class="waiting-room-header">
+                <span class="waiting-room-scene">${escapeHtml(room.scene_id)}</span>
+                <span class="waiting-room-count">${room.waiting_count}/${room.target_size}</span>
             </div>
+            ${room.groups && room.groups.length > 0 ? `
+                <div class="waiting-room-groups">
+                    ${room.groups.map(g => `
+                        <div class="waiting-room-group">
+                            <span>Group ${truncateId(g.group_id)}</span>
+                            <span>${g.waiting_count} waiting, ${formatDuration(g.wait_duration_ms)}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            ` : ''}
+            ${room.avg_wait_duration_ms > 0 ? `
+                <div class="text-xs text-base-content/50 mt-1">
+                    Avg wait: ${formatDuration(room.avg_wait_duration_ms)}
+                </div>
+            ` : ''}
         </div>
     `).join('');
 }
@@ -207,12 +239,17 @@ function updateWaitingRooms(waitingRooms) {
 
 function updateActivityTimeline(events) {
     const container = document.getElementById('activity-timeline');
+    const countBadge = document.getElementById('activity-count');
     if (!container) return;
+
+    if (countBadge) {
+        countBadge.textContent = `${events?.length || 0} events`;
+    }
 
     if (!events || events.length === 0) {
         container.innerHTML = `
-            <div class="text-center text-base-content/50 py-4">
-                No activity yet
+            <div class="empty-state-sm">
+                <p class="text-base-content/50 text-sm">No activity yet</p>
             </div>
         `;
         return;
@@ -222,13 +259,11 @@ function updateActivityTimeline(events) {
     const sorted = [...events].sort((a, b) => b.timestamp - a.timestamp);
 
     container.innerHTML = sorted.slice(0, 50).map(event => `
-        <div class="flex items-start gap-2 py-1 border-b border-base-200 last:border-0">
-            <span class="text-xs text-base-content/50 min-w-[60px]">
-                ${formatTime(event.timestamp)}
-            </span>
-            ${getEventIcon(event.event_type)}
-            <span class="text-sm flex-1">
-                <span class="font-mono text-xs">${escapeHtml(truncateId(event.subject_id))}</span>
+        <div class="activity-item">
+            <span class="activity-time">${formatTime(event.timestamp)}</span>
+            <span class="activity-icon">${getEventIcon(event.event_type)}</span>
+            <span class="activity-content">
+                <span class="subject-id">${escapeHtml(truncateId(event.subject_id))}</span>
                 ${getEventDescription(event)}
             </span>
         </div>
@@ -253,20 +288,20 @@ function addActivityEvent(event) {
 
 function getEventIcon(eventType) {
     const icons = {
-        'join': '<span class="text-success">+</span>',
-        'disconnect': '<span class="text-error">-</span>',
-        'scene_advance': '<span class="text-info">></span>',
-        'game_start': '<span class="text-primary">*</span>',
-        'game_end': '<span class="text-warning">*</span>'
+        'join': '<span class="event-join">+</span>',
+        'disconnect': '<span class="event-disconnect">−</span>',
+        'scene_advance': '<span class="event-advance">→</span>',
+        'game_start': '<span class="event-game">▶</span>',
+        'game_end': '<span class="event-game">■</span>'
     };
-    return `<span class="w-4 text-center">${icons[eventType] || '.'}</span>`;
+    return icons[eventType] || '•';
 }
 
 function getEventDescription(event) {
     const descriptions = {
         'join': 'joined',
         'disconnect': 'disconnected',
-        'scene_advance': `advanced to <span class="font-mono text-xs">${escapeHtml(event.details?.scene_id || '?')}</span>`,
+        'scene_advance': `→ ${escapeHtml(event.details?.scene_id || '?')}`,
         'game_start': 'started game',
         'game_end': 'ended game'
     };
@@ -285,19 +320,19 @@ function escapeHtml(text) {
 }
 
 function truncateId(id) {
-    if (!id) return '-';
+    if (!id) return '—';
     if (id.length <= 12) return id;
-    return id.substring(0, 8) + '...';
+    return id.substring(0, 8) + '…';
 }
 
 function formatTimestamp(ts) {
-    if (!ts) return '-';
+    if (!ts) return '—';
     const date = new Date(ts * 1000);
     return date.toLocaleTimeString();
 }
 
 function formatTime(ts) {
-    if (!ts) return '-';
+    if (!ts) return '—';
     const date = new Date(ts * 1000);
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
