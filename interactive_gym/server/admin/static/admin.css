@@ -1,0 +1,130 @@
+/**
+ * Admin Dashboard Custom Styles
+ * Extends DaisyUI with dashboard-specific styles
+ */
+
+/* Activity timeline scrolling */
+#activity-timeline {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+/* Participants table responsive */
+#participants-table {
+    font-size: 0.875rem;
+}
+
+#participants-table th,
+#participants-table td {
+    padding: 0.5rem 0.75rem;
+}
+
+/* Subject ID column - monospace and truncated */
+.subject-id {
+    font-family: ui-monospace, monospace;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Status badge semantic classes */
+.status-connected {
+    --tw-bg-opacity: 1;
+    background-color: oklch(var(--su) / var(--tw-bg-opacity));
+}
+
+.status-reconnecting {
+    --tw-bg-opacity: 1;
+    background-color: oklch(var(--wa) / var(--tw-bg-opacity));
+}
+
+.status-disconnected {
+    --tw-bg-opacity: 1;
+    background-color: oklch(var(--er) / var(--tw-bg-opacity));
+}
+
+.status-completed {
+    --tw-bg-opacity: 0.5;
+    background-color: oklch(var(--bc) / var(--tw-bg-opacity));
+}
+
+/* Waiting room cards */
+.waiting-room-card {
+    transition: box-shadow 0.2s ease;
+}
+
+.waiting-room-card:hover {
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+}
+
+/* Timeline event icons */
+.event-join {
+    color: oklch(var(--su));
+}
+
+.event-disconnect {
+    color: oklch(var(--er));
+}
+
+.event-advance {
+    color: oklch(var(--in));
+}
+
+.event-game {
+    color: oklch(var(--p));
+}
+
+/* Auto-refresh indicator */
+@keyframes pulse-dot {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+.live-indicator::before {
+    content: '';
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: oklch(var(--su));
+    margin-right: 0.5rem;
+    animation: pulse-dot 2s infinite;
+}
+
+/* Progress bar in table */
+.progress {
+    height: 0.5rem;
+}
+
+/* Compact cards for waiting rooms */
+.card-body.compact {
+    padding: 0.75rem;
+}
+
+/* Empty state styling */
+.empty-state {
+    color: oklch(var(--bc) / 0.5);
+    text-align: center;
+    padding: 2rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    #participants-table {
+        font-size: 0.75rem;
+    }
+
+    #participants-table th,
+    #participants-table td {
+        padding: 0.25rem 0.5rem;
+    }
+
+    .subject-id {
+        max-width: 80px;
+    }
+}
