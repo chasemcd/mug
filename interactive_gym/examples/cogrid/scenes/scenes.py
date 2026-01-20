@@ -470,7 +470,7 @@ cramped_room_human_human = (
         run_through_pyodide=True,
         multiplayer=True,  # Enable multiplayer Pyodide coordination
         environment_initialization_code_filepath="interactive_gym/examples/cogrid/environments/cramped_room_environment_initialization_hh.py",
-        packages_to_install=["numpy", "cogrid==0.0.15", "opencv-python"],
+        packages_to_install=["numpy", "cogrid==0.1.1", "opencv-python"],
         # Multiplayer sync settings (Action Queue with queue-based resync)
         state_broadcast_interval=15,  # Sync state every 300 frames (~10s at 30fps), None to disable
         server_authoritative=False,  # Server-authoritative mode
