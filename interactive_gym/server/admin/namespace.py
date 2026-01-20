@@ -76,11 +76,13 @@ class AdminNamespace(Namespace):
             state = self.aggregator.get_experiment_snapshot()
             emit('state_update', state)
         else:
-            # Phase 7: Return placeholder
+            # Fallback if aggregator not initialized
             emit('state_update', {
                 'participants': [],
-                'games': [],
-                'message': 'State aggregation not yet implemented'
+                'waiting_rooms': [],
+                'activity_log': [],
+                'summary': {'total_participants': 0, 'active_games': 0, 'waiting_count': 0},
+                'message': 'Aggregator not initialized'
             })
 
     def on_subscribe_participant(self, data):

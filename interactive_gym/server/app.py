@@ -34,6 +34,7 @@ from interactive_gym.server import player_pairing_manager
 from flask_login import LoginManager
 from interactive_gym.server.admin import admin_bp, AdminUser
 from interactive_gym.server.admin.namespace import AdminNamespace
+from interactive_gym.server.admin.aggregator import AdminEventAggregator
 
 
 @dataclasses.dataclass
@@ -101,6 +102,9 @@ PYODIDE_COORDINATOR: pyodide_game_coordinator.PyodideGameCoordinator | None = No
 # Player group manager for tracking player relationships across scenes
 # Supports groups of any size (2 or more players)
 GROUP_MANAGER: player_pairing_manager.PlayerGroupManager | None = None
+
+# Admin event aggregator for dashboard state collection
+ADMIN_AGGREGATOR: AdminEventAggregator | None = None
 
 # Mapping of users to locks associated with the ID. Enforces user-level serialization
 USER_LOCKS = utils.ThreadSafeDict()
@@ -255,6 +259,10 @@ def register_subject(data):
     SESSION_ID_TO_SUBJECT_ID[sid] = subject_id
     logger.info(f"Registered session ID {sid} with subject {subject_id}")
 
+    # Log activity for admin dashboard
+    if ADMIN_AGGREGATOR:
+        ADMIN_AGGREGATOR.log_activity("join", subject_id, {"socket_id": sid})
+
     # Get client-sent interactiveGymGlobals (if any)
     client_globals = data.get("interactiveGymGlobals", {})
 
@@ -383,6 +391,10 @@ def advance_scene(data):
     logger.info(
         f"Advanced to scene: {current_scene.scene_id}. Metadata export: {current_scene.should_export_metadata}"
     )
+
+    # Log activity for admin dashboard
+    if ADMIN_AGGREGATOR:
+        ADMIN_AGGREGATOR.log_activity("scene_advance", subject_id, {"scene_id": current_scene.scene_id})
 
     # Update session state with new scene position for session restoration
     session = PARTICIPANT_SESSIONS.get(subject_id)
@@ -1189,6 +1201,15 @@ def on_disconnect():
         logger.info("No subject_id found for disconnecting socket")
         return
 
+    # Log activity for admin dashboard (before cleanup)
+    session = PARTICIPANT_SESSIONS.get(subject_id)
+    if ADMIN_AGGREGATOR:
+        ADMIN_AGGREGATOR.log_activity(
+            "disconnect",
+            subject_id,
+            {"scene_id": session.current_scene_id if session else None}
+        )
+
     participant_stager = STAGERS.get(subject_id, None)
     if participant_stager is None:
         logger.info(f"No stager found for subject {subject_id}")
@@ -1297,7 +1318,7 @@ def on_disconnect():
 
 
 def run(config):
-    global app, CONFIG, logger, GENERIC_STAGER, PYODIDE_COORDINATOR, GROUP_MANAGER
+    global app, CONFIG, logger, GENERIC_STAGER, PYODIDE_COORDINATOR, GROUP_MANAGER, ADMIN_AGGREGATOR
     CONFIG = config
     GENERIC_STAGER = config.stager
 
@@ -1308,6 +1329,18 @@ def run(config):
     # Initialize player group manager
     GROUP_MANAGER = player_pairing_manager.PlayerGroupManager()
     logger.info("Initialized player group manager")
+
+    # Initialize admin event aggregator
+    ADMIN_AGGREGATOR = AdminEventAggregator(
+        sio=socketio,
+        participant_sessions=PARTICIPANT_SESSIONS,
+        stagers=STAGERS,
+        game_managers=GAME_MANAGERS,
+        pyodide_coordinator=PYODIDE_COORDINATOR,
+        processed_subjects=PROCESSED_SUBJECT_NAMES
+    )
+    ADMIN_AGGREGATOR.start_broadcast_loop(interval_seconds=1.0)
+    logger.info("Admin event aggregator initialized and broadcast loop started")
 
     atexit.register(on_exit)
 
@@ -1335,8 +1368,8 @@ def run(config):
     print(f"  Public (if accessible):  http://{public_ip}:{config.port}")
     print("="*70 + "\n")
 
-    # Register admin namespace
-    admin_namespace = AdminNamespace('/admin')
+    # Register admin namespace with aggregator
+    admin_namespace = AdminNamespace('/admin', aggregator=ADMIN_AGGREGATOR)
     socketio.on_namespace(admin_namespace)
     logger.info("Admin namespace registered on /admin")
 

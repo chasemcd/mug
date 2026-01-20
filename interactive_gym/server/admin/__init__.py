@@ -37,3 +37,4 @@ class AdminUser:
 
 
 from . import routes  # Import routes after blueprint creation
+from .aggregator import AdminEventAggregator
