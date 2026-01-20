@@ -16,15 +16,15 @@ import * as ui_utils from './ui_utils.js';
 import { WebRTCManager } from './webrtc_manager.js';
 
 // ========== Logging Configuration ==========
-// Control verbosity via browser console: window.p2pLogLevel = 'debug'
-// Levels: 'error' (critical only), 'warn' (+ warnings), 'info' (+ key events), 'debug' (+ verbose)
+// Control verbosity via browser console: window.p2pLogLevel = 'info' or 'debug'
+// Levels: 'error' (critical only), 'warn' (+ important events), 'info' (+ status), 'debug' (+ verbose)
 const LOG_LEVELS = { error: 0, warn: 1, info: 2, debug: 3 };
 
 function getLogLevel() {
     if (typeof window !== 'undefined' && window.p2pLogLevel) {
-        return LOG_LEVELS[window.p2pLogLevel] ?? LOG_LEVELS.info;
+        return LOG_LEVELS[window.p2pLogLevel] ?? LOG_LEVELS.warn;
     }
-    return LOG_LEVELS.info;  // Default: show key events but not verbose debug
+    return LOG_LEVELS.warn;  // Default: only important events (rollbacks, episodes, errors)
 }
 
 // Logging helpers - use these instead of console.log directly
@@ -623,13 +623,13 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
             // Initialize seeded RNG for AI policies
             if (this.gameSeed) {
                 seeded_random.initMultiplayerRNG(this.gameSeed);
-                p2pLog.info(`Player ${this.myPlayerId} assigned to game ${this.gameId} (seed=${this.gameSeed})`);
+                p2pLog.debug(`Player ${this.myPlayerId} assigned to game ${this.gameId} (seed=${this.gameSeed})`);
             }
         });
 
         // Game ready to start
         socket.on('pyodide_game_ready', (data) => {
-            p2pLog.info(`Game ready: ${data.players.length} players, server_auth=${data.server_authoritative || false}`);
+            p2pLog.debug(`Game ready: ${data.players.length} players, server_auth=${data.server_authoritative || false}`);
 
             // Build player ID <-> index mapping for binary protocol
             // Sort players to ensure deterministic index assignment across clients
@@ -668,7 +668,7 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
 
                 // Start P2P ready gate timeout - game will start after P2P connects or timeout
                 if (this.p2pReadyGate.enabled) {
-                    p2pLog.info(`Waiting for P2P connection (max ${this.p2pReadyGate.timeoutMs}ms)...`);
+                    p2pLog.debug(`Waiting for P2P connection (max ${this.p2pReadyGate.timeoutMs}ms)...`);
                     this.p2pReadyGate.timeoutId = setTimeout(() => {
                         if (!this.p2pReadyGate.resolved) {
                             p2pLog.warn(`P2P connection timeout - starting game with SocketIO fallback`);
@@ -772,7 +772,7 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
                     // P2P State Resync: Request state from peer if desync detected
                     // Use deterministic tie-breaker: lower player ID defers to higher
                     if (this._shouldRequestStateResync(sender_id)) {
-                        p2pLog.info(`Requesting state resync from peer ${sender_id}`);
+                        p2pLog.debug(`Requesting state resync from peer ${sender_id}`);
                         socket.emit('p2p_state_request', {
                             game_id: this.gameId,
                             requester_id: this.myPlayerId,
@@ -837,12 +837,12 @@ env.get_state()
                 return;
             }
 
-            p2pLog.info(`Applying peer state from ${sender_id} (frame=${frame_number})`);
+            p2pLog.debug(`Applying peer state from ${sender_id} (frame=${frame_number})`);
 
             try {
                 // Apply the peer's state
                 await this._applyP2PState(env_state, frame_number, step_num, cumulative_rewards);
-                p2pLog.info(`State resync complete, now at frame ${this.frameNumber}`);
+                p2pLog.debug(`State resync complete, now at frame ${this.frameNumber}`);
             } catch (err) {
                 p2pLog.error('Failed to apply peer state:', err);
             }
@@ -946,7 +946,7 @@ env.get_state()
                 return;
             }
 
-            p2pLog.info(`Server game complete: ${episode_num}/${max_episodes} episodes`);
+            p2pLog.debug(`Server game complete: ${episode_num}/${max_episodes} episodes`);
 
             // Mark game as complete - this stops the game loop
             this.state = "done";
@@ -1020,7 +1020,7 @@ else:
         this.stateSyncSupported = capabilities.has_get_state && capabilities.has_set_state;
 
         if (this.stateSyncSupported) {
-            p2pLog.info(`State sync enabled for ${capabilities.env_type}`);
+            p2pLog.debug(`State sync enabled for ${capabilities.env_type}`);
         } else {
             p2pLog.warn(`State sync DISABLED - environment missing get_state/set_state`);
         }
@@ -1289,9 +1289,9 @@ hashlib.md5(json.dumps(_state, sort_keys=True).encode()).hexdigest()[:8]
                 // Broadcast that we're ready and wait for peer
                 this._broadcastEpisodeReady(stateHash);
 
-                p2pLog.info(`Waiting for peer to be ready for episode ${this.num_episodes + 1}...`);
+                p2pLog.debug(`Waiting for peer to be ready for episode ${this.num_episodes + 1}...`);
                 await this.waitForP2PEpisodeStart(5000);  // 5 second timeout
-                p2pLog.info(`Episode start synchronized - both peers ready`);
+                p2pLog.debug(`Episode start synchronized - both peers ready`);
             } catch (e) {
                 p2pLog.warn(`Episode start sync error: ${e.message}`);
                 // Continue anyway - deterministic reset should keep clients in sync
@@ -1487,7 +1487,7 @@ hashlib.md5(json.dumps(_state, sort_keys=True).encode()).hexdigest()[:8]
         // DEBUG: Log executed actions when prediction is used (use info level)
         if (predictedPlayers.length > 0) {
             const actionsStr = Object.entries(finalActions).map(([p, a]) => `${p}:${a}`).join(' ');
-            p2pLog.info(`EXECUTE: frame=${this.frameNumber} actions={${actionsStr}} predicted=[${predictedPlayers.join(',')}]`);
+            p2pLog.debug(`EXECUTE: frame=${this.frameNumber} actions={${actionsStr}} predicted=[${predictedPlayers.join(',')}]`);
         }
         this.actionSequence.push({
             frame: this.frameNumber,
@@ -1524,7 +1524,7 @@ _st = env.get_state()
 hashlib.md5(json.dumps(_st, sort_keys=True).encode()).hexdigest()[:8]
                 `);
                 const actionsStr = Object.entries(finalActions).map(([p, a]) => `${p}:${a}`).join(',');
-                p2pLog.info(`FRAME: ${this.frameNumber} pre_hash=${preHashResult} actions={${actionsStr}} rollback=${rollbackOccurred}`);
+                p2pLog.debug(`FRAME: ${this.frameNumber} pre_hash=${preHashResult} actions={${actionsStr}} rollback=${rollbackOccurred}`);
             } catch (e) {
                 p2pLog.debug(`Could not compute pre-step hash: ${e}`);
             }
@@ -1547,7 +1547,7 @@ import hashlib
 _st = env.get_state()
 hashlib.md5(json.dumps(_st, sort_keys=True).encode()).hexdigest()[:8]
                 `);
-                p2pLog.info(`FRAME: ${this.frameNumber} post_hash=${hashResult}`);
+                p2pLog.debug(`FRAME: ${this.frameNumber} post_hash=${hashResult}`);
             } catch (e) {
                 p2pLog.debug(`Could not compute post-step hash: ${e}`);
             }
@@ -2224,7 +2224,7 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
 
         if (this.num_episodes >= this.max_episodes) {
             this.state = "done";
-            p2pLog.info(`Game complete (${this.num_episodes}/${this.max_episodes} episodes)`);
+            p2pLog.warn(`Game complete (${this.num_episodes}/${this.max_episodes} episodes)`);
         } else {
             this.shouldReset = true;
             p2pLog.debug(`Episode ${this.num_episodes}/${this.max_episodes} complete, will reset`);
@@ -2244,7 +2244,7 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
         const p2pType = this.p2pMetrics.connectionType || 'unknown';
 
         // Log episode summary - always show this key event
-        p2pLog.info(
+        p2pLog.warn(
             `EPISODE END: frame=${this.frameNumber} ` +
             `rollbacks=${this.rollbackCount}/${this.sessionMetrics.rollbacks.maxFrames}max ` +
             `p2p=${p2pReceiveRatio}% ` +
@@ -2280,7 +2280,7 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
      */
     async _applyP2PState(envState, frameNumber, stepNum, cumulativeRewards) {
         // P2P RESYNC - key event, always log at info level
-        p2pLog.info(`P2P RESYNC: applying peer state frame=${frameNumber} step=${stepNum}`);
+        p2pLog.debug(`P2P RESYNC: applying peer state frame=${frameNumber} step=${stepNum}`);
 
         // Apply environment state via set_state
         const envStateJson = JSON.stringify(envState);
@@ -2317,7 +2317,7 @@ env.set_state(env_state)
         const playerIdStr = String(playerId);
 
         // DEBUG: Log all remote inputs received (use info level to ensure visibility)
-        p2pLog.info(`STORE_INPUT: player=${playerIdStr} frame=${frameNumber} action=${action} myFrame=${this.frameNumber}`);
+        p2pLog.debug(`STORE_INPUT: player=${playerIdStr} frame=${frameNumber} action=${action} myFrame=${this.frameNumber}`);
 
         // Ensure input buffer exists for this frame
         if (!this.inputBuffer.has(frameNumber)) {
@@ -2377,7 +2377,7 @@ env.set_state(env_state)
                     );
 
                     // ROLLBACK - always log this key event
-                    p2pLog.info(
+                    p2pLog.warn(
                         `ROLLBACK: player=${playerIdStr} frame=${frameNumber} depth=${rollbackFrames} ` +
                         `(predicted=${usedAction} actual=${action})`
                     );
@@ -2560,7 +2560,7 @@ json.dumps(_snapshot)
             const agentSummary = Object.entries(agentStates).map(([id, a]) =>
                 `${id}:pos=${a.pos},inv=${a.inventory?.length || 0}`
             ).join(' ');
-            p2pLog.info(`SAVE_SNAPSHOT: frame=${frameNumber} agents=[${agentSummary}]`);
+            p2pLog.debug(`SAVE_SNAPSHOT: frame=${frameNumber} agents=[${agentSummary}]`);
 
             // Prune old snapshots
             if (this.stateSnapshots.size > this.maxSnapshots) {
@@ -2614,7 +2614,7 @@ json.dumps(_snapshot)
             const agentSummary = Object.entries(agentStates).map(([id, a]) =>
                 `${id}:pos=${a.pos},inv=${a.inventory?.length || 0}`
             ).join(' ');
-            p2pLog.info(`LOAD_SNAPSHOT: frame=${frameNumber} agents=[${agentSummary}]`);
+            p2pLog.debug(`LOAD_SNAPSHOT: frame=${frameNumber} agents=[${agentSummary}]`);
 
             // Verify state restoration with Python-side logging
             const verifyResult = await this.pyodide.runPythonAsync(`
@@ -2667,7 +2667,7 @@ json.dumps({
 })
             `);
             const verify = JSON.parse(verifyResult);
-            p2pLog.info(`VERIFY_RESTORE: snapshot_t=${verify.snapshot_t} before_t=${verify.before_t} after_t=${verify.after_t} match=${verify.match}`);
+            p2pLog.debug(`VERIFY_RESTORE: snapshot_t=${verify.snapshot_t} before_t=${verify.before_t} after_t=${verify.after_t} match=${verify.match}`);
             return true;
         } catch (e) {
             p2pLog.error(`Failed to load snapshot for frame ${frameNumber}: ${e}`);
@@ -2775,9 +2775,9 @@ json.dumps({
                 // DEBUG: Log input buffer contents for this frame
                 if (frameInputs) {
                     const bufferContents = Array.from(frameInputs.entries()).map(([k, v]) => `${k}:${v}`).join(',');
-                    p2pLog.info(`REPLAY_BUFFER: frame=${frame} buffer={${bufferContents}} playerIds=[${playerIds.join(',')}]`);
+                    p2pLog.debug(`REPLAY_BUFFER: frame=${frame} buffer={${bufferContents}} playerIds=[${playerIds.join(',')}]`);
                 } else {
-                    p2pLog.info(`REPLAY_BUFFER: frame=${frame} buffer=EMPTY playerIds=[${playerIds.join(',')}]`);
+                    p2pLog.debug(`REPLAY_BUFFER: frame=${frame} buffer=EMPTY playerIds=[${playerIds.join(',')}]`);
                 }
 
                 for (const pid of playerIds) {
@@ -2847,7 +2847,7 @@ json.dumps({
             if (replayFrames.length > 0) {
                 // Log replay actions for debugging
                 const replayActionsStr = replayFrames.map(rf => `${rf.frame}:{${Object.entries(rf.actions).map(([k,v]) => `${k}:${v}`).join(',')}}`).join(' ');
-                p2pLog.info(`REPLAY: snapshotFrame=${snapshotFrame} frames=[${replayActionsStr}]`);
+                p2pLog.debug(`REPLAY: snapshotFrame=${snapshotFrame} frames=[${replayActionsStr}]`);
 
                 const replayVerify = await this.pyodide.runPythonAsync(`
 import json
@@ -2896,9 +2896,9 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
                 // Log each replay frame for comparison with client A
                 for (const entry of replayInfo.replay_log) {
                     const actionsStr = Object.entries(entry.actions).map(([k,v]) => `${k}:${v}`).join(',');
-                    p2pLog.info(`REPLAY_FRAME: ${entry.frame} pre_hash=${entry.pre_hash} actions={${actionsStr}} post_hash=${entry.post_hash}`);
+                    p2pLog.debug(`REPLAY_FRAME: ${entry.frame} pre_hash=${entry.pre_hash} actions={${actionsStr}} post_hash=${entry.post_hash}`);
                 }
-                p2pLog.info(`REPLAY_DONE: t_before=${replayInfo.t_before} t_after=${replayInfo.t_after} final_hash=${replayInfo.state_hash}`);
+                p2pLog.debug(`REPLAY_DONE: t_before=${replayInfo.t_before} t_after=${replayInfo.t_after} final_hash=${replayInfo.state_hash}`);
 
                 // Update snapshots with corrected state from replay
                 // This is critical: old snapshots had pre-rollback (incorrect) state
@@ -2906,7 +2906,7 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
                     for (const [frameStr, snapshotData] of Object.entries(replayInfo.snapshots)) {
                         const frame = parseInt(frameStr);
                         this.stateSnapshots.set(frame, JSON.stringify(snapshotData));
-                        p2pLog.info(`SNAPSHOT_UPDATED: frame=${frame} (corrected after rollback)`);
+                        p2pLog.debug(`SNAPSHOT_UPDATED: frame=${frame} (corrected after rollback)`);
                     }
                 }
             }
@@ -2914,7 +2914,7 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
             // Update JS frame counter to match Python state
             this.frameNumber = currentFrame;
 
-            p2pLog.info(`REPLAY_DONE: jsFrame=${this.frameNumber}`);
+            p2pLog.debug(`REPLAY_DONE: jsFrame=${this.frameNumber}`);
             return true;
         } finally {
             // Always clear rollback guard
@@ -2973,9 +2973,9 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
             this.debugDelayedInputQueue = keepDelayed;
 
             if (forReplay.length > 0) {
-                p2pLog.info(`[DEBUG-DELAY] Releasing ${forReplay.length} inputs for rollback replay (frames ${rollbackTarget}-${this.frameNumber - 1})`);
+                p2pLog.debug(`[DEBUG-DELAY] Releasing ${forReplay.length} inputs for rollback replay (frames ${rollbackTarget}-${this.frameNumber - 1})`);
                 for (const item of forReplay) {
-                    p2pLog.info(`[DEBUG-DELAY] Released for replay: player=${item.playerId} frame=${item.frameNumber}`);
+                    p2pLog.debug(`[DEBUG-DELAY] Released for replay: player=${item.playerId} frame=${item.frameNumber}`);
                     this.storeRemoteInput(item.playerId, item.action, item.frameNumber);
                 }
             }
@@ -3128,7 +3128,7 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
 
         // Set up callbacks
         this.webrtcManager.onDataChannelOpen = () => {
-            p2pLog.info('DataChannel OPEN - P2P connection established');
+            p2pLog.warn('DataChannel OPEN - P2P connection established');
             this.p2pConnected = true;
 
             // Initialize P2P input sending (use numeric index for binary protocol)
@@ -3201,7 +3201,7 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
      * @param {Object} connInfo - Connection type info from WebRTCManager
      */
     _logConnectionType(connInfo) {
-        p2pLog.info(`Connection type: ${connInfo.connectionType} (${connInfo.localCandidateType}/${connInfo.remoteCandidateType})`);
+        p2pLog.warn(`Connection type: ${connInfo.connectionType} (${connInfo.localCandidateType}/${connInfo.remoteCandidateType})`);
 
         // Store in p2pMetrics for episode summary
         this.p2pMetrics.connectionType = connInfo.connectionType;
@@ -3241,7 +3241,7 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
         }
 
         const status = this.p2pConnected ? 'P2P ready' : 'SocketIO fallback';
-        p2pLog.info(`P2P ready gate resolved: ${status}`);
+        p2pLog.debug(`P2P ready gate resolved: ${status}`);
     }
 
     /**
@@ -3575,7 +3575,7 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
             return;
         }
 
-        p2pLog.info(`Received episode ready from peer: episode=${packet.episodeNumber} hash=${packet.stateHash}`);
+        p2pLog.debug(`Received episode ready from peer: episode=${packet.episodeNumber} hash=${packet.stateHash}`);
 
         // Store peer's state hash for verification
         this.p2pEpisodeSync.remoteResetComplete = true;
@@ -3600,7 +3600,7 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
         const episodeNumber = this.num_episodes + 1;  // Next episode number
         const packet = encodeEpisodeReady(episodeNumber, stateHash);
         this.webrtcManager.send(packet);
-        p2pLog.info(`Broadcast episode ready: episode=${episodeNumber} hash=${stateHash}`);
+        p2pLog.debug(`Broadcast episode ready: episode=${episodeNumber} hash=${stateHash}`);
 
         // Record that our reset is complete
         this.p2pEpisodeSync.localResetComplete = true;
@@ -3626,7 +3626,7 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
             p2pLog.error(`Episode start state mismatch! local=${sync.localStateHash} remote=${sync.remoteStateHash}`);
             // Continue anyway - the first frame hash logging will show divergence
         } else {
-            p2pLog.info(`Episode start synchronized: both peers have matching state hash=${sync.localStateHash}`);
+            p2pLog.debug(`Episode start synchronized: both peers have matching state hash=${sync.localStateHash}`);
         }
 
         // Clear the timeout since we synced successfully
