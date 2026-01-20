@@ -14,10 +14,10 @@ Requirements for the admin console milestone. Each maps to roadmap phases.
 
 ### Monitoring
 
-- [ ] **MON-01**: Admin can view table of all participants with subject ID, current scene, and experiment progress
-- [ ] **MON-02**: Admin can see connection status indicators (connected/reconnecting/disconnected/completed) for each participant
-- [ ] **MON-03**: Admin can view waiting room population (participants waiting, target group size, wait duration)
-- [ ] **MON-04**: Admin can view chronological activity timeline of experiment events (joins, scene advances, disconnects)
+- [x] **MON-01**: Admin can view table of all participants with subject ID, current scene, and experiment progress ✓
+- [x] **MON-02**: Admin can see connection status indicators (connected/reconnecting/disconnected/completed) for each participant ✓
+- [x] **MON-03**: Admin can view waiting room population (participants waiting, target group size, wait duration) ✓
+- [x] **MON-04**: Admin can view chronological activity timeline of experiment events (joins, scene advances, disconnects) ✓
 
 ### Intervention
 
@@ -77,10 +77,10 @@ Which phases cover which requirements. Updated by create-roadmap.
 |-------------|-------|--------|
 | INFRA-01 | Phase 7 | Complete |
 | INFRA-02 | Phase 7 | Complete |
-| MON-01 | Phase 8 | Pending |
-| MON-02 | Phase 8 | Pending |
-| MON-03 | Phase 8 | Pending |
-| MON-04 | Phase 8 | Pending |
+| MON-01 | Phase 8 | Complete |
+| MON-02 | Phase 8 | Complete |
+| MON-03 | Phase 8 | Complete |
+| MON-04 | Phase 8 | Complete |
 | INT-01 | Phase 9 | Pending |
 | DATA-01 | Phase 9 | Pending |
 | MULTI-01 | Phase 10 | Pending |
@@ -94,4 +94,4 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 ---
 *Requirements defined: 2026-01-19*
-*Last updated: 2026-01-19 after Phase 7 completion (INFRA-01, INFRA-02 complete)*
+*Last updated: 2026-01-20 after Phase 8 completion (MON-01, MON-02, MON-03, MON-04 complete)*

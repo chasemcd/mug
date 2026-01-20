@@ -26,7 +26,7 @@ See .planning/MILESTONES.md for v1.0 details.
 **Milestone Goal:** Real-time experiment monitoring and light intervention capabilities for researchers running experiments.
 
 - [x] **Phase 7: Admin Foundation** - Secure admin infrastructure with authentication
-- [ ] **Phase 8: Read-Only Dashboard** - Participant monitoring and experiment state visibility
+- [x] **Phase 8: Read-Only Dashboard** - Participant monitoring and experiment state visibility ✓
 - [ ] **Phase 9: Intervention & Data** - Kick participants and download data
 - [ ] **Phase 10: Debug & Multiplayer** - Debug log viewer and multiplayer group view
 
@@ -59,8 +59,8 @@ Plans:
 **Plans**: 2
 
 Plans:
-- [ ] 08-01-PLAN.md - Backend state aggregation (AdminEventAggregator + SocketIO emissions)
-- [ ] 08-02-PLAN.md - Frontend dashboard UI (participant table, status badges, waiting room view, timeline)
+- [x] 08-01: Backend state aggregation (AdminEventAggregator + SocketIO emissions) ✓
+- [x] 08-02: Frontend dashboard UI (participant table, status badges, waiting room view, timeline) ✓
 
 ### Phase 9: Intervention & Data
 **Goal**: Act on participant issues and access data
@@ -98,10 +98,10 @@ Phases execute in numeric order: 7 -> 8 -> 9 -> 10
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 7. Admin Foundation | v1.1 | 1/1 | Complete | 2026-01-19 |
-| 8. Read-Only Dashboard | v1.1 | 0/2 | Planned | - |
+| 8. Read-Only Dashboard | v1.1 | 2/2 | ✓ Complete | 2026-01-20 |
 | 9. Intervention & Data | v1.1 | 0/TBD | Not started | - |
 | 10. Debug & Multiplayer | v1.1 | 0/TBD | Not started | - |
 
 ---
 *Created: 2026-01-19*
-*Last updated: 2026-01-20 after Phase 8 planning*
+*Last updated: 2026-01-20 after Phase 8 completion*
