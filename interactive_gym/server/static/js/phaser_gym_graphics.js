@@ -214,6 +214,7 @@ class GymScene extends Phaser.Scene {
         this.pyodide_remote_game = config.pyodide_remote_game;
         this.isProcessingPyodide = false;
         this.stateImageSprite = null;
+
         if (this.pyodide_remote_game) {
             this.pyodide_remote_game.reinitialize_environment(this.pyodide_remote_game.config);
         }
@@ -861,26 +862,71 @@ class GymScene extends Phaser.Scene {
     }
 
     _addCircle(circle_config, object_map) {
+        let x = circle_config.x * this.width;
+        let y = circle_config.y * this.height;
 
-        var graphics = this.add.graphics();
-        graphics.setDepth(circle_config.depth);
+        // Create a container at the target position
+        let container = this.add.container(x, y);
+        container.setDepth(circle_config.depth);
 
-        // Set the fill style (color and alpha)
-        graphics.fillStyle(this._strToHex(circle_config.color), circle_config.alpha); // Red color, fully opaque
+        // Create graphics and draw circle at origin (0,0) relative to container
+        let graphics = this.add.graphics();
+        graphics.fillStyle(this._strToHex(circle_config.color), circle_config.alpha);
+        graphics.fillCircle(0, 0, circle_config.radius);
 
-        // Draw a filled circle (x, y, radius)
-        object_map[circle_config.uuid] = graphics.fillCircle(
-            circle_config.x * this.width,
-            circle_config.y * this.height,
-            circle_config.radius,
-        );
+        container.add(graphics);
+
+        // Store container in object_map with tween tracking
+        container.tween = null;
+        container.graphics = graphics;  // Keep reference for redraws
+        container.lastConfig = circle_config;  // Store config for redraws
+        object_map[circle_config.uuid] = container;
     }
 
     _updateCircle(circle_config, object_map) {
         let uuid = circle_config.uuid;
-        let graphics = object_map[uuid];
-        graphics.clear();
-        this._addCircle(circle_config, object_map);
+        let container = object_map[uuid];
+
+        let new_x = circle_config.x * this.width;
+        let new_y = circle_config.y * this.height;
+
+        // Check if color or radius changed - need to redraw
+        let lastConfig = container.lastConfig;
+        if (lastConfig.color !== circle_config.color ||
+            lastConfig.radius !== circle_config.radius ||
+            lastConfig.alpha !== circle_config.alpha) {
+            container.graphics.clear();
+            container.graphics.fillStyle(this._strToHex(circle_config.color), circle_config.alpha);
+            container.graphics.fillCircle(0, 0, circle_config.radius);
+            container.lastConfig = circle_config;
+        }
+
+        // Update depth if changed
+        container.setDepth(circle_config.depth);
+
+        // Handle position update with optional tweening
+        if (
+            circle_config.tween === true &&
+            container.tween === null &&
+            (new_x !== container.x || new_y !== container.y)
+        ) {
+            container.tween = this.tweens.add({
+                targets: [container],
+                x: new_x,
+                y: new_y,
+                duration: circle_config.tween_duration || 100,
+                ease: 'Linear',
+                onComplete: () => {
+                    container.tween = null;
+                }
+            });
+        } else if (
+            container.tween === null &&
+            (new_x !== container.x || new_y !== container.y)
+        ) {
+            container.x = new_x;
+            container.y = new_y;
+        }
     }
 
     _addRectangle(rectangle_config, object_map) {
@@ -892,27 +938,107 @@ class GymScene extends Phaser.Scene {
     }
 
     _addPolygon(polygon_config, object_map) {
+        // Calculate centroid of polygon for container position
+        let points = polygon_config.points;
+        let centroidX = points.reduce((sum, p) => sum + p[0], 0) / points.length * this.width;
+        let centroidY = points.reduce((sum, p) => sum + p[1], 0) / points.length * this.height;
 
+        // Create a container at the centroid
+        let container = this.add.container(centroidX, centroidY);
+        container.setDepth(polygon_config.depth);
+
+        // Create graphics and draw polygon relative to container origin
         let graphics = this.add.graphics();
-        var points = polygon_config.points.map((point) => new Phaser.Math.Vector2(point[0] * this.width, point[1] * this.height))
+        let relativePoints = points.map((point) =>
+            new Phaser.Math.Vector2(
+                point[0] * this.width - centroidX,
+                point[1] * this.height - centroidY
+            )
+        );
 
-        graphics.setDepth(polygon_config.depth);
-
-
-        // Set the fill style (color and alpha)
         graphics.fillStyle(this._strToHex(polygon_config.color), polygon_config.alpha);
+        graphics.fillPoints(relativePoints, true);
 
-        // Draw the filled polygon
-        graphics.fillPoints(points, true); // 'true' to close the polygon
+        container.add(graphics);
 
-        object_map[polygon_config.uuid] = graphics;
+        // Store container in object_map with tween tracking
+        container.tween = null;
+        container.graphics = graphics;
+        container.lastConfig = polygon_config;
+        container.lastCentroid = { x: centroidX, y: centroidY };
+        object_map[polygon_config.uuid] = container;
     }
 
     _updatePolygon(polygon_config, object_map) {
         let uuid = polygon_config.uuid;
-        let graphics = object_map[uuid];
-        graphics.clear();
-        this._addPolygon(polygon_config, object_map);
+        let container = object_map[uuid];
+
+        // Calculate new centroid
+        let points = polygon_config.points;
+        let newCentroidX = points.reduce((sum, p) => sum + p[0], 0) / points.length * this.width;
+        let newCentroidY = points.reduce((sum, p) => sum + p[1], 0) / points.length * this.height;
+
+        // Check if polygon shape changed (color, alpha, or relative point positions)
+        let lastConfig = container.lastConfig;
+        let shapeChanged = lastConfig.color !== polygon_config.color ||
+            lastConfig.alpha !== polygon_config.alpha ||
+            lastConfig.points.length !== polygon_config.points.length;
+
+        if (!shapeChanged) {
+            // Check if relative positions changed (shape deformation)
+            for (let i = 0; i < points.length; i++) {
+                let lastRelX = lastConfig.points[i][0] * this.width - container.lastCentroid.x;
+                let lastRelY = lastConfig.points[i][1] * this.height - container.lastCentroid.y;
+                let newRelX = points[i][0] * this.width - newCentroidX;
+                let newRelY = points[i][1] * this.height - newCentroidY;
+                if (Math.abs(lastRelX - newRelX) > 0.1 || Math.abs(lastRelY - newRelY) > 0.1) {
+                    shapeChanged = true;
+                    break;
+                }
+            }
+        }
+
+        if (shapeChanged) {
+            // Redraw the polygon
+            container.graphics.clear();
+            let relativePoints = points.map((point) =>
+                new Phaser.Math.Vector2(
+                    point[0] * this.width - newCentroidX,
+                    point[1] * this.height - newCentroidY
+                )
+            );
+            container.graphics.fillStyle(this._strToHex(polygon_config.color), polygon_config.alpha);
+            container.graphics.fillPoints(relativePoints, true);
+            container.lastConfig = polygon_config;
+            container.lastCentroid = { x: newCentroidX, y: newCentroidY };
+        }
+
+        // Update depth if changed
+        container.setDepth(polygon_config.depth);
+
+        // Handle position update with optional tweening
+        if (
+            polygon_config.tween === true &&
+            container.tween === null &&
+            (newCentroidX !== container.x || newCentroidY !== container.y)
+        ) {
+            container.tween = this.tweens.add({
+                targets: [container],
+                x: newCentroidX,
+                y: newCentroidY,
+                duration: polygon_config.tween_duration || 100,
+                ease: 'Linear',
+                onComplete: () => {
+                    container.tween = null;
+                }
+            });
+        } else if (
+            container.tween === null &&
+            (newCentroidX !== container.x || newCentroidY !== container.y)
+        ) {
+            container.x = newCentroidX;
+            container.y = newCentroidY;
+        }
     }
 
     _addText(text_config, object_map) {

@@ -157,6 +157,12 @@ class GymScene(scene.Scene):
         self.wait_for_known_group: bool = False  # If True, wait for existing group; if False, use FIFO matching
         self.group_wait_timeout: int = 60000  # ms to wait for known group members before timeout
 
+        # Rollback smoothing settings (for multiplayer games with GGPO)
+        # When enabled, objects smoothly tween to their new positions after rollback corrections
+        # instead of snapping/teleporting. This hides visual "jank" from state corrections.
+        # Set to None to disable, or a positive integer (ms) to enable with that duration.
+        self.rollback_smoothing_duration: int | None = 100  # Tween duration in ms, None to disable
+
     def environment(
         self,
         env_creator: Callable = NotProvided,
@@ -200,6 +206,7 @@ class GymScene(scene.Scene):
         assets_dir: str = NotProvided,
         assets_to_preload: list[str] = NotProvided,
         animation_configs: list = NotProvided,
+        rollback_smoothing_duration: int | None = NotProvided,
     ):
         """_summary_
 
@@ -229,6 +236,11 @@ class GymScene(scene.Scene):
         :type assets_to_preload: list[str], optional
         :param animation_configs: Configurations for game animations, defaults to NotProvided
         :type animation_configs: list, optional
+        :param rollback_smoothing_duration: Duration of position smoothing tween in milliseconds after
+            rollback corrections. Set to None to disable smoothing, or a positive integer to enable.
+            Defaults to NotProvided (uses class default of 100ms).
+        :type rollback_smoothing_duration: int | None, optional
+        :raises ValueError: If rollback_smoothing_duration is less than 0
         :return: This scene object
         :rtype: GymScene
         """
@@ -274,6 +286,11 @@ class GymScene(scene.Scene):
 
         if animation_configs is not NotProvided:
             self.animation_configs = animation_configs
+
+        if rollback_smoothing_duration is not NotProvided:
+            if rollback_smoothing_duration is not None and rollback_smoothing_duration < 0:
+                raise ValueError("rollback_smoothing_duration must be None or >= 0")
+            self.rollback_smoothing_duration = rollback_smoothing_duration
 
         return self
 

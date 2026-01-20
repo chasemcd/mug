@@ -475,6 +475,10 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         // Server-authoritative mode (always true in current implementation)
         this.serverAuthoritative = false;
 
+        // Rollback smoothing settings (for visual stability after corrections)
+        // null/undefined disables smoothing, positive integer enables with that duration (ms)
+        this.rollbackSmoothingDuration = config.rollback_smoothing_duration ?? 100;
+
         // Episode start synchronization
         // Client waits for server_episode_start before beginning each episode
         this.waitingForEpisodeStart = false;
@@ -1614,12 +1618,24 @@ hashlib.md5(json.dumps(_st, sort_keys=True).encode()).hexdigest()[:8]
                     game_image_base64 = this.convertRGBArrayToImage(freshRenderState);
                 }
 
+                // Apply tween flags for rollback smoothing (smooth position transitions)
+                // Enabled when rollbackSmoothingDuration is a positive number
+                let gameStateObjects = game_image_base64 ? null : freshRenderState.map(item => convertUndefinedToNull(item));
+                const smoothingEnabled = this.rollbackSmoothingDuration != null && this.rollbackSmoothingDuration > 0;
+                if (smoothingEnabled && gameStateObjects) {
+                    gameStateObjects = gameStateObjects.map(obj => ({
+                        ...obj,
+                        tween: true,
+                        tween_duration: this.rollbackSmoothingDuration
+                    }));
+                }
+
                 finalRenderState = {
-                    "game_state_objects": game_image_base64 ? null : freshRenderState.map(item => convertUndefinedToNull(item)),
+                    "game_state_objects": gameStateObjects,
                     "game_image_base64": game_image_base64,
                     "step": this.step_num,
                 };
-                p2pLog.debug(`Rollback render update: frame=${this.frameNumber}`);
+                p2pLog.debug(`Rollback render update: frame=${this.frameNumber}, smoothing=${smoothingEnabled}`);
             } catch (e) {
                 p2pLog.warn(`Failed to get post-rollback render state: ${e}`);
             }

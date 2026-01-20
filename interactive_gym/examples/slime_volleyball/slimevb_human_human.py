@@ -74,6 +74,7 @@ slime_scene = (
         game_width=600,
         game_height=250,
         hud_score_carry_over=True,
+        rollback_smoothing_duration=300,
     )
     .gameplay(
         default_action=NOOP,
