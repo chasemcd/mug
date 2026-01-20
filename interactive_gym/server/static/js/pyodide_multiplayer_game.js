@@ -3573,6 +3573,10 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
         /**
          * Handle episode ready notification from peer.
          * Called when peer has completed their reset and is ready to start the episode.
+         *
+         * When we receive a peer's "episode ready" message and we've already completed our
+         * own reset, we send our ready message back. This ensures two-way acknowledgment
+         * even if one side's initial message was lost or arrived before the other was listening.
          */
         const packet = decodeEpisodeReady(buffer);
         if (!packet) {
@@ -3585,6 +3589,21 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
         // Store peer's state hash for verification
         this.p2pEpisodeSync.remoteResetComplete = true;
         this.p2pEpisodeSync.remoteStateHash = packet.stateHash;
+
+        // If we've already completed our reset but peer might not have received our message,
+        // send it again as an acknowledgment. This handles the case where:
+        // 1. We finished reset and sent our ready message
+        // 2. Peer wasn't ready to receive it (DataChannel timing, message loss, etc.)
+        // 3. Peer then finishes and sends their ready message to us
+        // 4. We need to echo back our ready status so peer knows we're ready too
+        if (this.p2pEpisodeSync.localResetComplete && this.p2pEpisodeSync.localStateHash) {
+            const episodeNumber = this.num_episodes + 1;
+            const ackPacket = encodeEpisodeReady(episodeNumber, this.p2pEpisodeSync.localStateHash);
+            if (this.webrtcManager?.isReady()) {
+                this.webrtcManager.send(ackPacket);
+                p2pLog.debug(`Sent episode ready acknowledgment: episode=${episodeNumber}`);
+            }
+        }
 
         // Check if we can now start the episode
         this._checkEpisodeStartSync();
