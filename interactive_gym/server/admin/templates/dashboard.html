@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block body %}
+<div class="navbar bg-base-100 shadow-lg">
+    <div class="flex-1">
+        <span class="text-xl font-bold px-4">Interactive Gym Admin</span>
+    </div>
+    <div class="flex-none">
+        <div class="badge badge-success badge-outline mr-4" id="connection-status">
+            Connecting...
+        </div>
+        <a href="{{ url_for('admin.logout') }}" class="btn btn-ghost btn-sm">
+            Logout
+        </a>
+    </div>
+</div>
+
+<div class="container mx-auto p-6">
+    <!-- Stats overview (placeholder for Phase 8) -->
+    <div class="stats shadow w-full mb-6 bg-base-100">
+        <div class="stat">
+            <div class="stat-title">Active Participants</div>
+            <div class="stat-value" id="stat-participants">-</div>
+            <div class="stat-desc">Currently connected</div>
+        </div>
+        <div class="stat">
+            <div class="stat-title">Active Games</div>
+            <div class="stat-value" id="stat-games">-</div>
+            <div class="stat-desc">In progress</div>
+        </div>
+        <div class="stat">
+            <div class="stat-title">Waiting Room</div>
+            <div class="stat-value" id="stat-waiting">-</div>
+            <div class="stat-desc">Participants waiting</div>
+        </div>
+    </div>
+
+    <!-- Main content area (placeholder for Phase 8) -->
+    <div class="card bg-base-100 shadow-xl">
+        <div class="card-body">
+            <h2 class="card-title">Experiment Monitor</h2>
+            <p class="text-base-content/70">
+                Dashboard foundation ready. Participant monitoring will be added in Phase 8.
+            </p>
+
+            <div class="divider"></div>
+
+            <div class="overflow-x-auto">
+                <table class="table" id="participants-table">
+                    <thead>
+                        <tr>
+                            <th>Subject ID</th>
+                            <th>Status</th>
+                            <th>Current Scene</th>
+                            <th>Connected</th>
+                        </tr>
+                    </thead>
+                    <tbody id="participants-tbody">
+                        <!-- Populated via SocketIO in Phase 8 -->
+                        <tr>
+                            <td colspan="4" class="text-center text-base-content/50">
+                                No participants connected
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Connect to admin SocketIO namespace
+    const adminSocket = io('/admin', {
+        transports: ['websocket', 'polling']
+    });
+
+    adminSocket.on('connect', () => {
+        console.log('Admin connected to /admin namespace');
+        document.getElementById('connection-status').textContent = 'Connected';
+        document.getElementById('connection-status').classList.remove('badge-warning');
+        document.getElementById('connection-status').classList.add('badge-success');
+    });
+
+    adminSocket.on('disconnect', () => {
+        console.log('Admin disconnected from /admin namespace');
+        document.getElementById('connection-status').textContent = 'Disconnected';
+        document.getElementById('connection-status').classList.remove('badge-success');
+        document.getElementById('connection-status').classList.add('badge-error');
+    });
+
+    adminSocket.on('connect_error', (error) => {
+        console.error('Admin connection error:', error);
+        document.getElementById('connection-status').textContent = 'Error';
+        document.getElementById('connection-status').classList.add('badge-error');
+    });
+
+    // Placeholder for state updates (Phase 8)
+    adminSocket.on('state_update', (data) => {
+        console.log('State update received:', data);
+    });
+</script>
+{% endblock %}
