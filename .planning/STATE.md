@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-01-19)
 
 **Core value:** Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
-**Current focus:** v1.1 Admin Console — Phase 8 in progress (08-01 complete)
+**Current focus:** v1.1 Admin Console — Phase 8 complete, ready for Phase 9
 
 ## Current Position
 
-Phase: 8 of 10 (Read-Only Dashboard)
-Plan: 1 of 2 complete (08-01 done, 08-02 ready)
-Status: In progress
-Last activity: 2026-01-20 — Completed 08-01-PLAN.md (backend state aggregation)
+Phase: 8 of 10 (Read-Only Dashboard) - COMPLETE
+Plan: 2 of 2 complete (08-01, 08-02 both done)
+Status: Phase complete
+Last activity: 2026-01-20 — Completed 08-02-PLAN.md (dashboard frontend)
 
-Progress: v1.0 complete | v1.1 ███░░░░░░░ 35%
+Progress: v1.0 complete | v1.1 ████░░░░░░ 40%
 
 ## Milestone History
 
@@ -39,6 +39,8 @@ Progress: v1.0 complete | v1.1 ███░░░░░░░ 35%
 - `interactive_gym/server/admin/namespace.py` - AdminNamespace for SocketIO
 - `interactive_gym/server/admin/aggregator.py` - AdminEventAggregator (390 LOC)
 - `interactive_gym/server/admin/templates/` - DaisyUI dashboard templates
+- `interactive_gym/server/admin/static/admin.js` - Dashboard JS (319 LOC)
+- `interactive_gym/server/admin/static/admin.css` - Dashboard styles (130 LOC)
 
 ### Decisions
 
@@ -48,6 +50,7 @@ See: .planning/PROJECT.md Key Decisions table
 |----|----------|-----------|
 | D-0701-01 | Password-only auth (no multi-user) | Single researcher use case per v1.1 research |
 | D-0801-01 | Observer pattern for state collection | Read-only references to avoid race conditions |
+| D-0802-01 | External JS/CSS over inline | Better maintainability, caching, separation of concerns |
 
 ### Pending Todos
 
@@ -62,11 +65,11 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-01-20
-Stopped at: Completed 08-01-PLAN.md
+Stopped at: Completed 08-02-PLAN.md (Phase 8 complete)
 Resume file: None
 
 ### Next Steps
 
-1. Execute 08-02-PLAN.md (Dashboard Frontend)
-2. `/gsd:plan-phase 9` — plan Intervention & Data phase
-3. Continue with phases 9-10
+1. `/gsd:plan-phase 9` — plan Intervention & Data phase
+2. Execute Phase 9 plans
+3. Continue with Phase 10
