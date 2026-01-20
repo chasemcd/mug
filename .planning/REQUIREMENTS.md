@@ -9,8 +9,8 @@ Requirements for the admin console milestone. Each maps to roadmap phases.
 
 ### Infrastructure
 
-- [ ] **INFRA-01**: Admin can access dashboard at `/admin` route
-- [ ] **INFRA-02**: Admin dashboard requires authentication before access
+- [x] **INFRA-01**: Admin can access dashboard at `/admin` route ✓
+- [x] **INFRA-02**: Admin dashboard requires authentication before access ✓
 
 ### Monitoring
 
@@ -75,8 +75,8 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| INFRA-01 | Phase 7 | Pending |
-| INFRA-02 | Phase 7 | Pending |
+| INFRA-01 | Phase 7 | Complete |
+| INFRA-02 | Phase 7 | Complete |
 | MON-01 | Phase 8 | Pending |
 | MON-02 | Phase 8 | Pending |
 | MON-03 | Phase 8 | Pending |
@@ -94,4 +94,4 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 ---
 *Requirements defined: 2026-01-19*
-*Last updated: 2026-01-19 after roadmap creation (traceability added)*
+*Last updated: 2026-01-19 after Phase 7 completion (INFRA-01, INFRA-02 complete)*

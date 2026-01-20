@@ -25,7 +25,7 @@ See .planning/MILESTONES.md for v1.0 details.
 
 **Milestone Goal:** Real-time experiment monitoring and light intervention capabilities for researchers running experiments.
 
-- [ ] **Phase 7: Admin Foundation** - Secure admin infrastructure with authentication
+- [x] **Phase 7: Admin Foundation** - Secure admin infrastructure with authentication ✓
 - [ ] **Phase 8: Read-Only Dashboard** - Participant monitoring and experiment state visibility
 - [ ] **Phase 9: Intervention & Data** - Kick participants and download data
 - [ ] **Phase 10: Debug & Multiplayer** - Debug log viewer and multiplayer group view
@@ -41,10 +41,10 @@ See .planning/MILESTONES.md for v1.0 details.
   2. Unauthenticated users are redirected to login when accessing `/admin`
   3. Admin can authenticate and access the dashboard
 **Research**: Unlikely needed (standard Flask patterns)
-**Plans**: TBD
+**Plans**: 1
 
 Plans:
-- [ ] 07-01: TBD
+- [x] 07-01: Secure admin infrastructure with authentication and namespace isolation ✓
 
 ### Phase 8: Read-Only Dashboard
 **Goal**: See all participants and experiment state in real-time
@@ -96,11 +96,11 @@ Phases execute in numeric order: 7 → 8 → 9 → 10
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 7. Admin Foundation | v1.1 | 0/TBD | Not started | - |
+| 7. Admin Foundation | v1.1 | 1/1 | ✓ Complete | 2026-01-19 |
 | 8. Read-Only Dashboard | v1.1 | 0/TBD | Not started | - |
 | 9. Intervention & Data | v1.1 | 0/TBD | Not started | - |
 | 10. Debug & Multiplayer | v1.1 | 0/TBD | Not started | - |
 
 ---
 *Created: 2026-01-19*
-*Last updated: 2026-01-19 after v1.1 roadmap creation*
+*Last updated: 2026-01-19 after Phase 7 completion*
