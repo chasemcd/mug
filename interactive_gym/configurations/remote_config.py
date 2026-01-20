@@ -371,15 +371,27 @@ class RemoteConfig:
         """
         Configure WebRTC settings for P2P multiplayer.
 
+        Credentials can be provided directly or via environment variables:
+            - TURN_USERNAME: TURN server username
+            - TURN_CREDENTIAL: TURN server credential/password
+
         Args:
-            turn_username: TURN server username (from metered.ca or similar)
-            turn_credential: TURN server credential/password
+            turn_username: TURN server username (from metered.ca or similar).
+                          Falls back to TURN_USERNAME env var if not provided.
+            turn_credential: TURN server credential/password.
+                            Falls back to TURN_CREDENTIAL env var if not provided.
             force_relay: Force relay mode (for testing TURN without direct P2P)
         """
-        if turn_username is not None:
-            self.turn_username = turn_username
-        if turn_credential is not None:
-            self.turn_credential = turn_credential
+        import os
+
+        # Use provided values, fall back to environment variables
+        resolved_username = turn_username or os.environ.get("TURN_USERNAME")
+        resolved_credential = turn_credential or os.environ.get("TURN_CREDENTIAL")
+
+        if resolved_username is not None:
+            self.turn_username = resolved_username
+        if resolved_credential is not None:
+            self.turn_credential = resolved_credential
         self.force_turn_relay = force_relay
         return self
 
