@@ -2,13 +2,17 @@
 
 {% block title %}Dashboard{% endblock %}
 
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('admin.static', filename='admin.css') }}">
+{% endblock %}
+
 {% block body %}
 <div class="navbar bg-base-100 shadow-lg">
     <div class="flex-1">
         <span class="text-xl font-bold px-4">Interactive Gym Admin</span>
     </div>
     <div class="flex-none">
-        <div class="badge badge-success badge-outline mr-4" id="connection-status">
+        <div class="badge badge-success badge-outline mr-4 live-indicator" id="connection-status">
             Connecting...
         </div>
         <a href="{{ url_for('admin.logout') }}" class="btn btn-ghost btn-sm">
@@ -18,7 +22,7 @@
 </div>
 
 <div class="container mx-auto p-6">
-    <!-- Stats overview (placeholder for Phase 8) -->
+    <!-- Stats overview -->
     <div class="stats shadow w-full mb-6 bg-base-100">
         <div class="stat">
             <div class="stat-title">Active Participants</div>
@@ -37,35 +41,61 @@
         </div>
     </div>
 
-    <!-- Main content area (placeholder for Phase 8) -->
-    <div class="card bg-base-100 shadow-xl">
-        <div class="card-body">
-            <h2 class="card-title">Experiment Monitor</h2>
-            <p class="text-base-content/70">
-                Dashboard foundation ready. Participant monitoring will be added in Phase 8.
-            </p>
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Participants Table (2/3 width on large screens) -->
+        <div class="lg:col-span-2">
+            <div class="card bg-base-100 shadow-xl">
+                <div class="card-body">
+                    <h2 class="card-title">Participants</h2>
 
-            <div class="divider"></div>
+                    <div class="overflow-x-auto">
+                        <table class="table table-zebra" id="participants-table">
+                            <thead>
+                                <tr>
+                                    <th>Subject ID</th>
+                                    <th>Status</th>
+                                    <th>Current Scene</th>
+                                    <th>Progress</th>
+                                    <th>Last Update</th>
+                                </tr>
+                            </thead>
+                            <tbody id="participants-tbody">
+                                <tr>
+                                    <td colspan="5" class="text-center text-base-content/50">
+                                        Loading...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-            <div class="overflow-x-auto">
-                <table class="table" id="participants-table">
-                    <thead>
-                        <tr>
-                            <th>Subject ID</th>
-                            <th>Status</th>
-                            <th>Current Scene</th>
-                            <th>Connected</th>
-                        </tr>
-                    </thead>
-                    <tbody id="participants-tbody">
-                        <!-- Populated via SocketIO in Phase 8 -->
-                        <tr>
-                            <td colspan="4" class="text-center text-base-content/50">
-                                No participants connected
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+        <!-- Sidebar (1/3 width on large screens) -->
+        <div class="space-y-6">
+            <!-- Waiting Rooms -->
+            <div class="card bg-base-100 shadow-xl">
+                <div class="card-body">
+                    <h2 class="card-title text-base">Waiting Rooms</h2>
+                    <div id="waiting-rooms-container">
+                        <div class="text-center text-base-content/50 py-4">
+                            Loading...
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Activity Timeline -->
+            <div class="card bg-base-100 shadow-xl">
+                <div class="card-body">
+                    <h2 class="card-title text-base">Activity Timeline</h2>
+                    <div id="activity-timeline">
+                        <div class="text-center text-base-content/50 py-4">
+                            Loading...
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -73,35 +103,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
-    // Connect to admin SocketIO namespace
-    const adminSocket = io('/admin', {
-        transports: ['websocket', 'polling']
-    });
-
-    adminSocket.on('connect', () => {
-        console.log('Admin connected to /admin namespace');
-        document.getElementById('connection-status').textContent = 'Connected';
-        document.getElementById('connection-status').classList.remove('badge-warning');
-        document.getElementById('connection-status').classList.add('badge-success');
-    });
-
-    adminSocket.on('disconnect', () => {
-        console.log('Admin disconnected from /admin namespace');
-        document.getElementById('connection-status').textContent = 'Disconnected';
-        document.getElementById('connection-status').classList.remove('badge-success');
-        document.getElementById('connection-status').classList.add('badge-error');
-    });
-
-    adminSocket.on('connect_error', (error) => {
-        console.error('Admin connection error:', error);
-        document.getElementById('connection-status').textContent = 'Error';
-        document.getElementById('connection-status').classList.add('badge-error');
-    });
-
-    // Placeholder for state updates (Phase 8)
-    adminSocket.on('state_update', (data) => {
-        console.log('State update received:', data);
-    });
-</script>
+<script src="{{ url_for('admin.static', filename='admin.js') }}"></script>
 {% endblock %}
