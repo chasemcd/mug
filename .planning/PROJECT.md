@@ -8,6 +8,17 @@ A framework for running browser-based reinforcement learning experiments with hu
 
 Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
 
+## Current Milestone: v1.1 Admin Console
+
+**Goal:** Real-time experiment monitoring and light intervention capabilities for researchers running experiments.
+
+**Target features:**
+- Participant overview dashboard (all participants, current scene, experiment progress)
+- Scene-specific metrics (configurable per-scene: player count, episode, waiting room population)
+- Multiplayer group view (group composition and status)
+- Debug log viewer (console interception + explicit logging API)
+- Light intervention controls (kick, pause, message participants)
+
 ## Current State (v1.0)
 
 **Shipped:** 2026-01-19
@@ -53,6 +64,15 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 
 ### Active
 
+*v1.1 Admin Console:*
+- [ ] Web-based admin dashboard at /admin route
+- [ ] Participant overview (all participants, current scene, progress)
+- [ ] Scene-specific configurable metrics (player count, episode, waiting room)
+- [ ] Multiplayer group view (who's paired with whom, group status)
+- [ ] Debug log viewer (console.* interception + explicit logging API)
+- [ ] Light intervention controls (kick, pause, message participants)
+
+*Deferred from v1.0:*
 - [ ] Rollback visual smoothing (tween objects after corrections)
 - [ ] N-player support with hybrid topology (mesh for small N, relay for large N)
 - [ ] Adaptive input delay based on RTT
@@ -96,4 +116,4 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 | Open Relay Project for TURN | Free 20GB/month tier sufficient for research | ✓ Good |
 
 ---
-*Last updated: 2026-01-19 after v1.0 milestone*
+*Last updated: 2026-01-19 after starting v1.1 Admin Console milestone*
