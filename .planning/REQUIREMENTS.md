@@ -75,23 +75,23 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| INFRA-01 | — | Pending |
-| INFRA-02 | — | Pending |
-| MON-01 | — | Pending |
-| MON-02 | — | Pending |
-| MON-03 | — | Pending |
-| MON-04 | — | Pending |
-| INT-01 | — | Pending |
-| DATA-01 | — | Pending |
-| MULTI-01 | — | Pending |
-| DEBUG-01 | — | Pending |
-| DEBUG-02 | — | Pending |
+| INFRA-01 | Phase 7 | Pending |
+| INFRA-02 | Phase 7 | Pending |
+| MON-01 | Phase 8 | Pending |
+| MON-02 | Phase 8 | Pending |
+| MON-03 | Phase 8 | Pending |
+| MON-04 | Phase 8 | Pending |
+| INT-01 | Phase 9 | Pending |
+| DATA-01 | Phase 9 | Pending |
+| MULTI-01 | Phase 10 | Pending |
+| DEBUG-01 | Phase 10 | Pending |
+| DEBUG-02 | Phase 10 | Pending |
 
 **Coverage:**
 - v1.1 requirements: 11 total
-- Mapped to phases: 0
-- Unmapped: 11 ⚠️
+- Mapped to phases: 11 ✓
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-01-19*
-*Last updated: 2026-01-19 after initial definition*
+*Last updated: 2026-01-19 after roadmap creation (traceability added)*
