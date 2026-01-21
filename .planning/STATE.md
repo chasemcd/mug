@@ -2,24 +2,25 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-01-20)
+See: .planning/PROJECT.md (updated 2026-01-21)
 
 **Core value:** Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
-**Current focus:** v1.1 Sync Validation (complete, pending audit)
+**Current focus:** v1.2 Participant Exclusion
 
 ## Current Position
 
-Phase: 14 of 14 (Validation Export)
-Plan: 14-01 complete
-Status: v1.1 milestone complete, ready for audit
-Last activity: 2026-01-21 - Completed 14-01-PLAN.md
+Phase: Not started (run /gsd:create-roadmap)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-01-21 — Milestone v1.2 started
 
-Progress: [==========] 100% (v1.1 - all phases complete)
+Progress: [          ] 0% (v1.2 - not started)
 
 ## Milestone History
 
 | Milestone | Phases | Status | Shipped |
 |-----------|--------|--------|---------|
+| v1.2 Participant Exclusion | TBD | Not started | - |
 | v1.1 Sync Validation | 11-14 | Complete (pending audit) | - |
 | v1.0 P2P Multiplayer | 1-10 | Complete | 2026-01-19 |
 
@@ -84,9 +85,10 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-01-21
-Stopped at: Completed 14-01-PLAN.md
+Stopped at: Started v1.2 Participant Exclusion milestone
 Resume file: None
 
 ### Next Steps
 
-1. `/gsd:audit-milestone` - v1.1 Sync Validation milestone audit
+1. `/gsd:define-requirements` or `/gsd:research-project` — scope v1.2 requirements
+2. `/gsd:create-roadmap` — create phase breakdown

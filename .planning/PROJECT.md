@@ -8,15 +8,21 @@ A framework for running browser-based reinforcement learning experiments with hu
 
 Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
 
-## Current Milestone: v1.1 Sync Validation
+## Current Milestone: v1.2 Participant Exclusion
 
-**Goal:** Build a validation system that confirms verified action sequences and state hashes are identical across all peers, enabling debugging of non-deterministic environments and networking issues.
+**Goal:** A configurable, extensible system to exclude participants who don't meet experiment requirements — checked both at entry and continuously during play.
 
 **Target features:**
-- Live state hash comparison after confirmed inputs are applied
-- Action sequence verification between peers
-- Mismatch logging (continue gameplay, don't interrupt)
-- Post-game JSON export with frame-by-frame validation data
+- Pre-experiment screening — check criteria before experiment starts, block with configurable message
+- Continuous monitoring — re-check criteria during experiment, exclude if violated
+- Configurable exclusion rules — hybrid approach: built-in rules via config + custom callback functions
+- Per-rule messaging — each exclusion criterion defines its own participant-facing message
+- Multiplayer handling — when one player excluded mid-experiment, end game for both
+
+**Example criteria categories:**
+- Connection quality (ping threshold, packet loss, connection type)
+- Device/browser (browser type, screen size, mobile detection)
+- Behavior-based (inactivity timeout, disconnect patterns)
 
 ## Previous State (v1.0)
 
@@ -63,11 +69,13 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 
 ### Active
 
-- [ ] Deterministic state hashing via env.get_state()
-- [ ] Live state hash exchange between peers after confirmed inputs
-- [ ] Action sequence verification (compare verified input histories)
-- [ ] Mismatch detection and logging (non-blocking)
-- [ ] Post-game validation JSON export (frame-by-frame hashes and actions)
+- [ ] Exclusion rule framework with pluggable criteria
+- [ ] Pre-experiment screening system
+- [ ] Continuous monitoring during experiment
+- [ ] Built-in rules: ping threshold, browser exclusion, inactivity detection
+- [ ] Custom callback support for arbitrary exclusion logic
+- [ ] Per-rule configurable messaging
+- [ ] Multiplayer exclusion handling (end game for both players)
 
 ### Deferred
 
@@ -114,4 +122,4 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 | Open Relay Project for TURN | Free 20GB/month tier sufficient for research | ✓ Good |
 
 ---
-*Last updated: 2026-01-20 after v1.1 milestone start*
+*Last updated: 2026-01-21 after v1.2 milestone start*
