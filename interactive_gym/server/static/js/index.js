@@ -77,6 +77,85 @@ function calculateMedian(arr) {
     return median;
 }
 
+// ============================================
+// Entry Screening (Phase 15)
+// ============================================
+
+/**
+ * Run entry screening checks based on scene metadata.
+ * Returns an object with { passed: boolean, failedRule: string | null, message: string | null }
+ */
+function runEntryScreening(sceneMetadata) {
+    // If no screening rules configured, pass immediately
+    if (!sceneMetadata.device_exclusion &&
+        !sceneMetadata.browser_requirements &&
+        !sceneMetadata.browser_blocklist) {
+        return { passed: true, failedRule: null, message: null };
+    }
+
+    const parser = new UAParser();
+    const result = parser.getResult();
+    const deviceType = result.device.type; // "mobile", "tablet", or undefined (desktop)
+    const browserName = result.browser.name; // "Chrome", "Safari", "Firefox", etc.
+
+    console.debug("[EntryScreening] Device type:", deviceType || "desktop");
+    console.debug("[EntryScreening] Browser:", browserName);
+
+    // Check device exclusion
+    if (sceneMetadata.device_exclusion === "mobile") {
+        // Exclude mobile and tablet devices
+        if (deviceType === "mobile" || deviceType === "tablet") {
+            const message = sceneMetadata.exclusion_messages?.mobile ||
+                "This study requires a desktop or laptop computer.";
+            return { passed: false, failedRule: "mobile", message: message };
+        }
+    } else if (sceneMetadata.device_exclusion === "desktop") {
+        // Exclude desktop devices (undefined device type = desktop)
+        if (!deviceType) {
+            const message = sceneMetadata.exclusion_messages?.desktop ||
+                "This study requires a mobile device.";
+            return { passed: false, failedRule: "desktop", message: message };
+        }
+    }
+
+    // Check browser blocklist first (takes precedence)
+    if (sceneMetadata.browser_blocklist && sceneMetadata.browser_blocklist.length > 0) {
+        const blockedLower = sceneMetadata.browser_blocklist.map(b => b.toLowerCase());
+        if (browserName && blockedLower.includes(browserName.toLowerCase())) {
+            const message = sceneMetadata.exclusion_messages?.browser ||
+                "Your browser is not supported for this study.";
+            return { passed: false, failedRule: "browser", message: message };
+        }
+    }
+
+    // Check browser requirements (allowlist)
+    if (sceneMetadata.browser_requirements && sceneMetadata.browser_requirements.length > 0) {
+        const allowedLower = sceneMetadata.browser_requirements.map(b => b.toLowerCase());
+        if (!browserName || !allowedLower.includes(browserName.toLowerCase())) {
+            const message = sceneMetadata.exclusion_messages?.browser ||
+                "Your browser is not supported for this study.";
+            return { passed: false, failedRule: "browser", message: message };
+        }
+    }
+
+    // All checks passed
+    return { passed: true, failedRule: null, message: null };
+}
+
+/**
+ * Display exclusion message and hide start button.
+ */
+function showExclusionMessage(message) {
+    $("#instructions").hide();
+    $("#startButton").hide();
+    $("#startButton").attr("disabled", true);
+    $('#errorText').text(message);
+    $('#errorText').show();
+}
+
+// Track entry screening result for the current scene
+var entryScreeningPassed = true;
+var entryScreeningMessage = null;
 
 function sendPing() {
     window.lastPingTime = Date.now();
@@ -656,6 +735,19 @@ function startEndScene(data) {
 function startGymScene(data) {
     enableStartRefreshInterval();
 
+    // Run entry screening checks (Phase 15)
+    const screeningResult = runEntryScreening(data);
+    entryScreeningPassed = screeningResult.passed;
+    entryScreeningMessage = screeningResult.message;
+
+    if (!screeningResult.passed) {
+        console.log("[EntryScreening] Failed:", screeningResult.failedRule, screeningResult.message);
+        showExclusionMessage(screeningResult.message);
+        // Clear the refresh interval since we're not enabling the start button
+        clearInterval(refreshStartButton);
+        return; // Don't proceed with scene setup
+    }
+
     // Initialize or increment the gym scene counter
     if (typeof window.interactiveGymGlobals === 'undefined') {
         window.interactiveGymGlobals = {};
@@ -843,20 +935,22 @@ function enableCheckPyodideDone() {
 var refreshStartButton;
 function enableStartRefreshInterval() {
     refreshStartButton = setInterval(() => {
+        // Use configured min_ping_measurements or default to 5
+        const minPingMeasurements = currentSceneMetadata.min_ping_measurements || 5;
+
         if (currentSceneMetadata.scene_type !== "GymScene") {
             $("#startButton").hide();
             $("#startButton").attr("disabled", true);
-        } else if (maxLatency != null && latencyMeasurements.length > 5 && curLatency > maxLatency) {
-            $("#instructions").hide();
-            $("#startButton").hide();
-            $("#startButton").attr("disabled", true);
-            $('#errorText').show()
-            $('#errorText').text("Sorry, your connection is too slow for this application. Please make sure you have a strong internet connection to ensure a good experience for all players in the game.");
+        } else if (maxLatency != null && latencyMeasurements.length > minPingMeasurements && curLatency > maxLatency) {
+            // Use configured ping exclusion message if available, otherwise use default
+            const pingMessage = currentSceneMetadata.exclusion_messages?.ping ||
+                "Sorry, your connection is too slow for this application. Please make sure you have a strong internet connection to ensure a good experience for all players in the game.";
+            showExclusionMessage(pingMessage);
             clearInterval(refreshStartButton);
-        } else if (maxLatency != null && latencyMeasurements.length <= 5) {
+        } else if (maxLatency != null && latencyMeasurements.length <= minPingMeasurements) {
             $("#startButton").show();
             $("#startButton").attr("disabled", true);
-        } 
+        }
         else if (pyodideReadyIfUsing()){
             $('#errorText').hide()
             $("#startButton").show();
