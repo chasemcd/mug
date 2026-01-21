@@ -1,0 +1,99 @@
+# Requirements: Interactive Gym v1.1 Sync Validation
+
+**Defined:** 2026-01-20
+**Core Value:** Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
+
+## v1.1 Requirements
+
+Requirements for sync validation milestone. Each maps to roadmap phases.
+
+### State Hashing
+
+- [ ] **HASH-01**: System computes state hash only on confirmed frames (not predicted)
+- [ ] **HASH-02**: System normalizes floats to 10 decimal places before hashing
+- [ ] **HASH-03**: System uses SHA-256 (truncated to 16 chars) for deterministic cross-platform hashing
+- [ ] **HASH-04**: System maintains confirmedHashHistory with frame-to-hash mapping
+
+### Hash Exchange
+
+- [ ] **EXCH-01**: System sends state hashes via P2P DataChannel (message type 0x07)
+- [ ] **EXCH-02**: System exchanges hashes asynchronously without blocking frame advancement
+- [ ] **EXCH-03**: System invalidates hash history entries when rollback occurs (frames >= target)
+- [ ] **EXCH-04**: System encodes hash messages in binary format (13 bytes: type + frame + hash)
+
+### Mismatch Detection
+
+- [ ] **DETECT-01**: System identifies exact frame number where mismatch occurred
+- [ ] **DETECT-02**: System buffers peer hashes until local confirmation catches up
+- [ ] **DETECT-03**: System logs desync events with frame, both hashes, and timestamp
+- [ ] **DETECT-04**: System tracks verifiedFrame as highest mutually-verified frame
+- [ ] **DETECT-05**: System captures full state dump when mismatch detected
+
+### Validation Export
+
+- [ ] **EXPORT-01**: System exports post-game JSON with frame-by-frame hashes and actions
+- [ ] **EXPORT-02**: System exports only confirmed-frame data (excludes predictions)
+- [ ] **EXPORT-03**: System includes desync events in validation export
+- [ ] **EXPORT-04**: System exports verified action sequences per player
+
+## v2 Requirements
+
+Deferred to future milestone. Tracked but not in current roadmap.
+
+### Development Tools
+
+- **TOOL-01**: Sync test mode for single-player determinism validation
+- **TOOL-02**: Live sync debug overlay showing validation metrics
+- **TOOL-03**: Hierarchical checksums for subsystem-level debugging
+- **TOOL-04**: Frame diff logging with side-by-side state comparison
+
+### Advanced Validation
+
+- **ADV-01**: Deterministic replay validation for CI regression tests
+- **ADV-02**: Cross-platform determinism validation (Chrome/Firefox/Safari)
+- **ADV-03**: Binary search desync localization
+
+## Out of Scope
+
+Explicitly excluded. Documented to prevent scope creep.
+
+| Feature | Reason |
+|---------|--------|
+| Full state sync every frame | Massive bandwidth; defeats purpose of input-based sync |
+| Blocking validation | Kills responsiveness; validation can trail simulation |
+| Automated resync on mismatch | Research needs to KNOW about desyncs, not hide them |
+| Cryptographic hash for security | Overkill — integrity checking, not security |
+| Complex serialization (protobuf) | JSON with deterministic ordering is sufficient |
+
+## Traceability
+
+Which phases cover which requirements. Updated by create-roadmap.
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| HASH-01 | — | Pending |
+| HASH-02 | — | Pending |
+| HASH-03 | — | Pending |
+| HASH-04 | — | Pending |
+| EXCH-01 | — | Pending |
+| EXCH-02 | — | Pending |
+| EXCH-03 | — | Pending |
+| EXCH-04 | — | Pending |
+| DETECT-01 | — | Pending |
+| DETECT-02 | — | Pending |
+| DETECT-03 | — | Pending |
+| DETECT-04 | — | Pending |
+| DETECT-05 | — | Pending |
+| EXPORT-01 | — | Pending |
+| EXPORT-02 | — | Pending |
+| EXPORT-03 | — | Pending |
+| EXPORT-04 | — | Pending |
+
+**Coverage:**
+- v1.1 requirements: 17 total
+- Mapped to phases: 0 (run /gsd:create-roadmap)
+- Unmapped: 17
+
+---
+*Requirements defined: 2026-01-20*
+*Last updated: 2026-01-20 after initial definition*
