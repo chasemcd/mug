@@ -74,9 +74,10 @@ Plans:
   3. Desync events logged with frame, both hashes, timestamp
   4. verifiedFrame tracks highest mutually-verified frame
   5. Full state dump captured on mismatch
-**Research flag:** Likely (integration with rollback requires careful testing)
-**Research topics:** Rollback integration, hash invalidation timing, state dump format
-**Plans:** TBD
+**Research flag:** Unlikely (architecture documented, patterns from prior phases)
+**Plans:** 1 plan
+Plans:
+- [ ] 13-01-PLAN.md — verifiedFrame tracking, desyncEvents logging, comparison logic, rollback integration
 
 ### Phase 14: Validation Export
 **Goal:** Post-game JSON export with frame-by-frame validation data
@@ -99,9 +100,9 @@ Phases execute in numeric order: 11 -> 12 -> 13 -> 14
 |-------|-----------|----------------|--------|-----------|
 | 11. Hash Infrastructure | v1.1 | 1/1 | Complete | 2026-01-21 |
 | 12. P2P Hash Exchange | v1.1 | 1/1 | Complete | 2026-01-21 |
-| 13. Mismatch Detection | v1.1 | 0/TBD | Not started | - |
+| 13. Mismatch Detection | v1.1 | 0/1 | Planned | - |
 | 14. Validation Export | v1.1 | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-01-21 after Phase 12 execution complete*
+*Last updated: 2026-01-21 after Phase 13 planning complete*
