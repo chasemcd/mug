@@ -730,6 +730,12 @@ function terminateGymScene(data) {
     // Sync globals to server before emitting game data
     socket.emit("sync_globals", {interactiveGymGlobals: window.interactiveGymGlobals});
 
+    // Emit multiplayer metrics separately if this is a multiplayer game
+    // Metrics are sent via dedicated socket event for proper JSON storage (not bundled with game CSV)
+    if (pyodideRemoteGame && typeof pyodideRemoteGame.emitMultiplayerMetrics === 'function') {
+        pyodideRemoteGame.emitMultiplayerMetrics(data.scene_id);
+    }
+
     let remoteGameData = getRemoteGameData();
     const binaryData = msgpack.encode(remoteGameData);
     socket.emit("emit_remote_game_data", {data: binaryData, scene_id: data.scene_id, session_id: window.sessionId, interactiveGymGlobals: window.interactiveGymGlobals});

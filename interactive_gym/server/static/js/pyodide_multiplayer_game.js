@@ -576,6 +576,16 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         this.actionSequence = [];  // [{frame: N, actions: {player: action}}]
         this.actionCounts = {};    // {playerId: {action: count}}
 
+        // Cumulative validation data - persists across episodes for full session export
+        // This data is NOT cleared on episode reset, only when scene ends
+        this.cumulativeValidation = {
+            episodes: [],           // Per-episode summaries
+            allHashes: [],          // All confirmed hashes across all episodes
+            allDesyncEvents: [],    // All desync events across all episodes
+            allRollbacks: [],       // All rollback events across all episodes
+            sessionStartTime: Date.now()
+        };
+
         // Sync epoch - received from server, included in actions to prevent stale action matching
         this.syncEpoch = 0;
 
@@ -2048,6 +2058,8 @@ obs, rewards, terminateds, truncateds, infos, render_state
     /**
      * Compute and store hash for a confirmed frame.
      * Only called when frame is fully confirmed (all inputs received, no rollback pending).
+     * IMPORTANT: Uses the snapshot for that frame, not current state, to ensure
+     * both peers hash the same state even if they confirm at different times.
      * @param {number} frameNumber - The confirmed frame to hash
      */
     async _computeAndStoreConfirmedHash(frameNumber) {
@@ -2061,8 +2073,27 @@ obs, rewards, terminateds, truncateds, infos, render_state
             return;
         }
 
+        // Get the snapshot for this frame - we MUST hash the state from that frame,
+        // not the current state, to ensure deterministic comparison between peers
+        const snapshotJson = this.stateSnapshots.get(frameNumber);
+        if (!snapshotJson) {
+            // No snapshot available for this frame - can happen if:
+            // - Frame is older than maxSnapshots
+            // - Snapshot was never saved (shouldn't happen in normal flow)
+            p2pLog.debug(`No snapshot for confirmed frame ${frameNumber}, skipping hash`);
+            return;
+        }
+
         try {
-            const hash = await this.computeQuickStateHash();
+            // Parse snapshot and hash only the env_state portion
+            const snapshot = JSON.parse(snapshotJson);
+            const hash = await this._computeHashFromState(snapshot.env_state);
+
+            if (!hash) {
+                p2pLog.warn(`Failed to compute hash from snapshot for frame ${frameNumber}`);
+                return;
+            }
+
             this.confirmedHashHistory.set(frameNumber, hash);
 
             // Queue hash for P2P exchange (EXCH-02: async, non-blocking)
@@ -2078,6 +2109,44 @@ obs, rewards, terminateds, truncateds, infos, render_state
         } catch (e) {
             p2pLog.warn(`Failed to compute confirmed hash for frame ${frameNumber}: ${e}`);
         }
+    }
+
+    /**
+     * Compute SHA-256 hash from a given state object (not current env state).
+     * Used for hashing snapshots of past frames.
+     * @param {Object} envState - The environment state to hash
+     * @returns {string|null} 16-char truncated SHA-256 hash, or null on failure
+     * @private
+     */
+    async _computeHashFromState(envState) {
+        if (!envState) {
+            return null;
+        }
+
+        const stateJson = JSON.stringify(envState);
+        const hashResult = await this.pyodide.runPythonAsync(`
+import json
+import hashlib
+
+def _normalize_floats(obj, precision=10):
+    """Recursively normalize floats to fixed precision for deterministic hashing."""
+    if isinstance(obj, float):
+        return round(obj, precision)
+    elif isinstance(obj, dict):
+        return {k: _normalize_floats(v, precision) for k, v in obj.items()}
+    elif isinstance(obj, (list, tuple)):
+        return [_normalize_floats(item, precision) for item in obj]
+    return obj
+
+_state_to_hash = json.loads('''${stateJson.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}''')
+_normalized_state = _normalize_floats(_state_to_hash)
+
+# SHA-256 hash with deterministic JSON serialization (HASH-03)
+_json_str = json.dumps(_normalized_state, sort_keys=True, separators=(',', ':'))
+_hash = hashlib.sha256(_json_str.encode()).hexdigest()[:16]
+_hash
+        `);
+        return hashResult;
     }
 
     /**
@@ -3447,8 +3516,12 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
 
     /**
      * Clear GGPO state for episode reset.
+     * Preserves cumulative validation data for full session export.
      */
     clearGGPOState() {
+        // Archive current episode data to cumulative validation before clearing
+        this._archiveEpisodeValidationData();
+
         this.inputBuffer.clear();
         this.localInputQueue = [];
         this.stateSnapshots.clear();
@@ -3487,6 +3560,65 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
         }
 
         p2pLog.debug('GGPO state cleared for new episode');
+    }
+
+    /**
+     * Archive current episode's validation data to cumulative storage.
+     * Called before clearGGPOState() clears per-episode data.
+     * @private
+     */
+    _archiveEpisodeValidationData() {
+        // Only archive if we have meaningful data (episode actually ran)
+        if (this.frameNumber <= 0 && this.confirmedHashHistory.size === 0) {
+            return;
+        }
+
+        const episodeNum = this.num_episodes;
+
+        // Archive episode summary
+        const episodeSummary = {
+            episodeNum: episodeNum,
+            totalFrames: this.frameNumber,
+            confirmedFrame: this.confirmedFrame,
+            verifiedFrame: this.verifiedFrame,
+            hashCount: this.confirmedHashHistory.size,
+            desyncCount: this.desyncEvents.length,
+            rollbackCount: this.rollbackCount,
+            maxRollbackFrames: this.maxRollbackFrames,
+            timestamp: Date.now()
+        };
+        this.cumulativeValidation.episodes.push(episodeSummary);
+
+        // Archive all confirmed hashes with episode tag
+        for (const [frame, hash] of this.confirmedHashHistory.entries()) {
+            this.cumulativeValidation.allHashes.push({
+                episode: episodeNum,
+                frame: frame,
+                hash: hash
+            });
+        }
+
+        // Archive all desync events with episode tag
+        for (const evt of this.desyncEvents) {
+            this.cumulativeValidation.allDesyncEvents.push({
+                episode: episodeNum,
+                ...evt
+            });
+        }
+
+        // Archive rollback summary for this episode
+        if (this.rollbackCount > 0) {
+            this.cumulativeValidation.allRollbacks.push({
+                episode: episodeNum,
+                count: this.rollbackCount,
+                maxFrames: this.maxRollbackFrames
+            });
+        }
+
+        p2pLog.debug(
+            `Archived episode ${episodeNum} validation: ` +
+            `${this.confirmedHashHistory.size} hashes, ${this.desyncEvents.length} desyncs`
+        );
     }
 
     convertRGBArrayToImage(rgbArray) {
@@ -4305,6 +4437,118 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
         }
 
         return result;
+    }
+
+    /**
+     * Export all multiplayer metrics for persistence.
+     * Uses cumulative data across all episodes for complete session export.
+     * Call at scene termination.
+     * @returns {Object} Complete multiplayer metrics for research data export
+     */
+    exportMultiplayerMetrics() {
+        // Archive current episode data first (in case not yet archived)
+        this._archiveEpisodeValidationData();
+
+        // Get connection health if available
+        const connectionHealth = this.connectionHealth?.getHealthStatus() || null;
+
+        return {
+            // Session identification
+            gameId: this.gameId,
+            playerId: this.myPlayerId,
+            peerPlayerId: this._getHumanPlayerIds().find(id => id !== this.myPlayerId) || null,
+            exportTimestamp: Date.now(),
+            sessionStartTime: this.cumulativeValidation.sessionStartTime,
+            sessionDurationMs: Date.now() - this.cumulativeValidation.sessionStartTime,
+
+            // P2P connection metrics
+            connection: {
+                type: this.p2pMetrics.connectionType || 'unknown',
+                connectionDetails: this.p2pMetrics.connectionDetails || {},
+                p2pConnected: this.p2pConnected,
+                health: connectionHealth ? {
+                    rtt: connectionHealth.rtt,
+                    latency: connectionHealth.latency,
+                    packetsReceived: connectionHealth.packetsReceived,
+                    gapCount: connectionHealth.gapCount,
+                    status: connectionHealth.status
+                } : null,
+                fallback: {
+                    triggered: this.p2pMetrics.p2pFallbackTriggered,
+                    frame: this.p2pMetrics.p2pFallbackFrame
+                }
+            },
+
+            // Input delivery stats (cumulative across session)
+            inputDelivery: {
+                sentViaP2P: this.p2pMetrics.inputsSentViaP2P,
+                sentViaSocketIO: this.p2pMetrics.inputsSentViaSocketIO,
+                receivedViaP2P: this.p2pMetrics.inputsReceivedViaP2P,
+                receivedViaSocketIO: this.p2pMetrics.inputsReceivedViaSocketIO,
+                p2pReceiveRatio: this._calculateP2PReceiveRatio()
+            },
+
+            // Cumulative validation data across ALL episodes
+            validation: {
+                // Per-episode summaries
+                episodes: this.cumulativeValidation.episodes,
+
+                // Aggregate stats
+                totalEpisodes: this.cumulativeValidation.episodes.length,
+                totalHashes: this.cumulativeValidation.allHashes.length,
+                totalDesyncs: this.cumulativeValidation.allDesyncEvents.length,
+                totalRollbacks: this.cumulativeValidation.allRollbacks.reduce(
+                    (sum, r) => sum + r.count, 0
+                ),
+
+                // All frame hashes across all episodes
+                allHashes: this.cumulativeValidation.allHashes,
+
+                // All desync events across all episodes
+                allDesyncEvents: this.cumulativeValidation.allDesyncEvents.map(evt => ({
+                    episode: evt.episode,
+                    frame: evt.frame,
+                    ourHash: evt.ourHash,
+                    peerHash: evt.peerHash,
+                    timestamp: evt.timestamp,
+                    verifiedFrameAtDesync: evt.verifiedFrameAtDesync,
+                    hasStateDump: !!evt.stateDump
+                })),
+
+                // All rollback events across all episodes
+                allRollbacks: this.cumulativeValidation.allRollbacks
+            }
+        };
+    }
+
+    /**
+     * Emit multiplayer metrics to server via socket.
+     * Call at scene termination to send validation data for server-side storage.
+     * @param {string} sceneId - The scene ID for file organization
+     */
+    emitMultiplayerMetrics(sceneId) {
+        const metrics = this.exportMultiplayerMetrics();
+
+        socket.emit('emit_multiplayer_metrics', {
+            scene_id: sceneId,
+            metrics: metrics
+        });
+
+        p2pLog.info(
+            `Emitted multiplayer metrics: ${metrics.validation.totalEpisodes} episodes, ` +
+            `${metrics.validation.totalHashes} hashes, ${metrics.validation.totalDesyncs} desyncs`
+        );
+    }
+
+    /**
+     * Calculate the P2P receive ratio (percentage of inputs received via P2P).
+     * @returns {number} Ratio from 0-100, or null if no inputs received
+     * @private
+     */
+    _calculateP2PReceiveRatio() {
+        const totalReceived = this.p2pMetrics.inputsReceivedViaP2P + this.p2pMetrics.inputsReceivedViaSocketIO;
+        if (totalReceived === 0) return null;
+        return (this.p2pMetrics.inputsReceivedViaP2P / totalReceived * 100);
     }
 
     /**

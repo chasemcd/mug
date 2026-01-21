@@ -109,6 +109,11 @@ SESSION_ID_TO_SUBJECT_ID = utils.ThreadSafeDict()
 # Maps subject_id -> ParticipantSession
 PARTICIPANT_SESSIONS: dict[SubjectID, ParticipantSession] = utils.ThreadSafeDict()
 
+# Pending multiplayer metrics for aggregation
+# Maps (scene_id, game_id) -> {player_id: metrics, ...}
+# When both players submit, metrics are aggregated into a comparison file
+PENDING_MULTIPLAYER_METRICS: dict[tuple[str, str], dict] = utils.ThreadSafeDict()
+
 
 def get_subject_id_from_session_id(session_id: str) -> SubjectID:
     subject_id = SESSION_ID_TO_SUBJECT_ID.get(session_id, None)
@@ -828,6 +833,233 @@ def receive_remote_game_data(data):
     # # save the metadata to a json file
     # with open(f"data/{data['scene_id']}/{subject_id}_metadata.json", "w") as f:
     #     json.dump(current_scene_metadata, f)
+
+
+@socketio.on("emit_multiplayer_metrics")
+def receive_multiplayer_metrics(data):
+    """
+    Receive and save multiplayer validation metrics from client.
+
+    Data includes:
+    - Session/connection info (gameId, playerId, P2P connection type/health)
+    - Sync validation data (frame hashes, verified frames, desync events)
+    - Input delivery stats (P2P vs SocketIO counts)
+    - Rollback metrics
+
+    Saved as JSON file per subject per scene for research analysis.
+    When both players in a game submit, creates aggregated comparison file.
+    """
+    global PARTICIPANT_SESSIONS, PENDING_MULTIPLAYER_METRICS
+
+    subject_id = get_subject_id_from_session_id(flask.request.sid)
+
+    if not CONFIG.save_experiment_data:
+        return
+
+    scene_id = data.get("scene_id")
+    metrics = data.get("metrics")
+
+    if not scene_id or not metrics:
+        logger.warning(f"Invalid multiplayer metrics data from {subject_id}")
+        return
+
+    # Create directory if needed
+    os.makedirs(f"data/{scene_id}/", exist_ok=True)
+
+    # Save individual player's metrics
+    filename = f"data/{scene_id}/{subject_id}_multiplayer_metrics.json"
+    logger.info(f"Saving multiplayer metrics to {filename}")
+    with open(filename, "w") as f:
+        json.dump(metrics, f, indent=2)
+
+    # Aggregate metrics when both players submit
+    game_id = metrics.get("gameId")
+    player_id = metrics.get("playerId")
+
+    if game_id and player_id:
+        key = (scene_id, game_id)
+
+        # Store this player's metrics
+        if key not in PENDING_MULTIPLAYER_METRICS:
+            PENDING_MULTIPLAYER_METRICS[key] = {}
+
+        PENDING_MULTIPLAYER_METRICS[key][player_id] = {
+            "subjectId": subject_id,
+            "metrics": metrics
+        }
+
+        # Check if we have metrics from both players
+        pending = PENDING_MULTIPLAYER_METRICS[key]
+        if len(pending) >= 2:
+            # Both players submitted - create aggregated comparison file
+            _create_aggregated_metrics(scene_id, game_id, pending)
+            # Clean up pending storage
+            del PENDING_MULTIPLAYER_METRICS[key]
+
+
+def _create_aggregated_metrics(scene_id: str, game_id: str, player_metrics: dict):
+    """
+    Create aggregated comparison file from both players' metrics.
+
+    Combines:
+    - Both players' hashes for frame-by-frame comparison
+    - Both players' episode summaries
+    - Desync events from both perspectives
+    - Hash comparison showing matches/mismatches
+    """
+    players = list(player_metrics.keys())
+    if len(players) < 2:
+        logger.warning(f"Cannot aggregate metrics: only {len(players)} player(s)")
+        return
+
+    player_a_id = players[0]
+    player_b_id = players[1]
+    player_a = player_metrics[player_a_id]
+    player_b = player_metrics[player_b_id]
+
+    metrics_a = player_a["metrics"]
+    metrics_b = player_b["metrics"]
+
+    # Build hash comparison
+    hash_comparison = _compare_hashes(
+        metrics_a.get("validation", {}).get("allHashes", []),
+        metrics_b.get("validation", {}).get("allHashes", []),
+        player_a_id,
+        player_b_id
+    )
+
+    # Build aggregated structure
+    aggregated = {
+        "gameId": game_id,
+        "sceneId": scene_id,
+        "aggregatedAt": int(time.time() * 1000),
+
+        "players": {
+            player_a_id: {
+                "subjectId": player_a["subjectId"],
+                "playerId": player_a_id,
+                "connection": metrics_a.get("connection", {}),
+                "inputDelivery": metrics_a.get("inputDelivery", {}),
+                "sessionDurationMs": metrics_a.get("sessionDurationMs"),
+            },
+            player_b_id: {
+                "subjectId": player_b["subjectId"],
+                "playerId": player_b_id,
+                "connection": metrics_b.get("connection", {}),
+                "inputDelivery": metrics_b.get("inputDelivery", {}),
+                "sessionDurationMs": metrics_b.get("sessionDurationMs"),
+            }
+        },
+
+        "validation": {
+            "summary": {
+                "totalFramesCompared": hash_comparison["totalFrames"],
+                "matchingFrames": hash_comparison["matchingFrames"],
+                "mismatchingFrames": hash_comparison["mismatchingFrames"],
+                "playerAOnlyFrames": hash_comparison["playerAOnly"],
+                "playerBOnlyFrames": hash_comparison["playerBOnly"],
+                "matchRate": hash_comparison["matchRate"],
+            },
+
+            # Episode summaries from both players
+            "episodes": {
+                player_a_id: metrics_a.get("validation", {}).get("episodes", []),
+                player_b_id: metrics_b.get("validation", {}).get("episodes", []),
+            },
+
+            # Frame-by-frame hash comparison
+            "hashComparison": hash_comparison["frames"],
+
+            # Desync events from both perspectives
+            "desyncEvents": {
+                player_a_id: metrics_a.get("validation", {}).get("allDesyncEvents", []),
+                player_b_id: metrics_b.get("validation", {}).get("allDesyncEvents", []),
+            },
+
+            # Rollback events from both perspectives
+            "rollbacks": {
+                player_a_id: metrics_a.get("validation", {}).get("allRollbacks", []),
+                player_b_id: metrics_b.get("validation", {}).get("allRollbacks", []),
+            }
+        }
+    }
+
+    # Save aggregated file
+    filename = f"data/{scene_id}/{game_id}_aggregated_metrics.json"
+    logger.info(f"Saving aggregated multiplayer metrics to {filename}")
+    with open(filename, "w") as f:
+        json.dump(aggregated, f, indent=2)
+
+
+def _compare_hashes(hashes_a: list, hashes_b: list, player_a_id: str, player_b_id: str) -> dict:
+    """
+    Compare frame hashes from both players.
+
+    Returns comparison structure with:
+    - Per-frame comparison showing both hashes and match status
+    - Summary statistics
+    """
+    # Build lookup by (episode, frame)
+    lookup_a = {(h["episode"], h["frame"]): h["hash"] for h in hashes_a}
+    lookup_b = {(h["episode"], h["frame"]): h["hash"] for h in hashes_b}
+
+    all_keys = set(lookup_a.keys()) | set(lookup_b.keys())
+
+    frames = []
+    matching = 0
+    mismatching = 0
+    a_only = 0
+    b_only = 0
+
+    for key in sorted(all_keys):
+        episode, frame = key
+        hash_a = lookup_a.get(key)
+        hash_b = lookup_b.get(key)
+
+        if hash_a and hash_b:
+            match = hash_a == hash_b
+            if match:
+                matching += 1
+            else:
+                mismatching += 1
+            frames.append({
+                "episode": episode,
+                "frame": frame,
+                player_a_id: hash_a,
+                player_b_id: hash_b,
+                "match": match
+            })
+        elif hash_a:
+            a_only += 1
+            frames.append({
+                "episode": episode,
+                "frame": frame,
+                player_a_id: hash_a,
+                player_b_id: None,
+                "match": None
+            })
+        else:
+            b_only += 1
+            frames.append({
+                "episode": episode,
+                "frame": frame,
+                player_a_id: None,
+                player_b_id: hash_b,
+                "match": None
+            })
+
+    total = matching + mismatching
+    match_rate = (matching / total * 100) if total > 0 else None
+
+    return {
+        "totalFrames": len(frames),
+        "matchingFrames": matching,
+        "mismatchingFrames": mismatching,
+        "playerAOnly": a_only,
+        "playerBOnly": b_only,
+        "matchRate": match_rate,
+        "frames": frames
+    }
 
 
 #####################################
