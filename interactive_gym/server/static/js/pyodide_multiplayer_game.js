@@ -560,6 +560,14 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         this.confirmedHashHistory = new Map();  // frameNumber -> hash (SHA-256 truncated)
         this.confirmedHashHistoryMaxSize = 120;  // Keep ~4 seconds at 30fps
 
+        // Pending hash exchange: hashes computed but not yet sent to peer
+        // [{frame: number, hash: string}, ...]
+        this.pendingHashExchange = [];
+
+        // Pending peer hashes: hashes received from peer awaiting comparison (Phase 13)
+        // Map<frameNumber, hash>
+        this.pendingPeerHashes = new Map();
+
         // Action tracking for sync verification
         this.actionSequence = [];  // [{frame: N, actions: {player: action}}]
         this.actionCounts = {};    // {playerId: {action: count}}
@@ -2036,6 +2044,9 @@ obs, rewards, terminateds, truncateds, infos, render_state
         try {
             const hash = await this.computeQuickStateHash();
             this.confirmedHashHistory.set(frameNumber, hash);
+
+            // Queue hash for P2P exchange (EXCH-02: async, non-blocking)
+            this.pendingHashExchange.push({ frame: frameNumber, hash: hash });
 
             p2pLog.debug(`Confirmed hash for frame ${frameNumber}: ${hash}`);
 
