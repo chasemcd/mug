@@ -8,17 +8,18 @@ A framework for running browser-based reinforcement learning experiments with hu
 
 Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
 
-## Current Milestone: v1.1 Sync Validation
+## Current Milestone: v1.1 Admin Console
 
-**Goal:** Build a validation system that confirms verified action sequences and state hashes are identical across all peers, enabling debugging of non-deterministic environments and networking issues.
+**Goal:** Real-time experiment monitoring and light intervention capabilities for researchers running experiments.
 
 **Target features:**
-- Live state hash comparison after confirmed inputs are applied
-- Action sequence verification between peers
-- Mismatch logging (continue gameplay, don't interrupt)
-- Post-game JSON export with frame-by-frame validation data
+- Participant overview dashboard (all participants, current scene, experiment progress)
+- Scene-specific metrics (configurable per-scene: player count, episode, waiting room population)
+- Multiplayer group view (group composition and status)
+- Debug log viewer (console interception + explicit logging API)
+- Light intervention controls (kick, pause, message participants)
 
-## Previous State (v1.0)
+## Current State (v1.0)
 
 **Shipped:** 2026-01-19
 
@@ -63,14 +64,15 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 
 ### Active
 
-- [ ] Deterministic state hashing via env.get_state()
-- [ ] Live state hash exchange between peers after confirmed inputs
-- [ ] Action sequence verification (compare verified input histories)
-- [ ] Mismatch detection and logging (non-blocking)
-- [ ] Post-game validation JSON export (frame-by-frame hashes and actions)
+*v1.1 Admin Console:*
+- [ ] Web-based admin dashboard at /admin route
+- [ ] Participant overview (all participants, current scene, progress)
+- [ ] Scene-specific configurable metrics (player count, episode, waiting room)
+- [ ] Multiplayer group view (who's paired with whom, group status)
+- [ ] Debug log viewer (console.* interception + explicit logging API)
+- [ ] Light intervention controls (kick, pause, message participants)
 
-### Deferred
-
+*Deferred from v1.0:*
 - [ ] Rollback visual smoothing (tween objects after corrections)
 - [ ] N-player support with hybrid topology (mesh for small N, relay for large N)
 - [ ] Adaptive input delay based on RTT
@@ -114,4 +116,4 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 | Open Relay Project for TURN | Free 20GB/month tier sufficient for research | ✓ Good |
 
 ---
-*Last updated: 2026-01-20 after v1.1 milestone start*
+*Last updated: 2026-01-19 after starting v1.1 Admin Console milestone*

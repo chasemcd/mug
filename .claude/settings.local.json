@@ -4,7 +4,13 @@
       "Bash(find:*)",
       "Bash(python3:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(pip show:*)",
+      "Bash(node --check:*)",
+      "Bash(npx acorn:*)",
+      "Bash(node -e \"import\\(''file://'' + process.cwd\\(\\) + ''/interactive_gym/server/static/js/pyodide_multiplayer_game.js''\\)\")",
+      "Bash(npx -y esprima-next:*)",
+      "Bash(python -m py_compile:*)"
     ],
     "deny": [],
     "ask": []

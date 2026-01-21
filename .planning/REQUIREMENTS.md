@@ -1,57 +1,58 @@
-# Requirements: Interactive Gym v1.1 Sync Validation
+# Requirements: Interactive Gym v1.1 Admin Console
 
-**Defined:** 2026-01-20
-**Core Value:** Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
+**Defined:** 2026-01-19
+**Core Value:** Real-time experiment monitoring and light intervention capabilities for researchers running experiments.
 
 ## v1.1 Requirements
 
-Requirements for sync validation milestone. Each maps to roadmap phases.
+Requirements for the admin console milestone. Each maps to roadmap phases.
 
-### State Hashing
+### Infrastructure
 
-- [x] **HASH-01**: System computes state hash only on confirmed frames (not predicted)
-- [x] **HASH-02**: System normalizes floats to 10 decimal places before hashing
-- [x] **HASH-03**: System uses SHA-256 (truncated to 16 chars) for deterministic cross-platform hashing
-- [x] **HASH-04**: System maintains confirmedHashHistory with frame-to-hash mapping
+- [x] **INFRA-01**: Admin can access dashboard at `/admin` route ✓
+- [x] **INFRA-02**: Admin dashboard requires authentication before access ✓
 
-### Hash Exchange
+### Monitoring
 
-- [x] **EXCH-01**: System sends state hashes via P2P DataChannel (message type 0x07)
-- [x] **EXCH-02**: System exchanges hashes asynchronously without blocking frame advancement
-- [x] **EXCH-03**: System invalidates hash history entries when rollback occurs (frames >= target)
-- [x] **EXCH-04**: System encodes hash messages in binary format (13 bytes: type + frame + hash)
+- [x] **MON-01**: Admin can view table of all participants with subject ID, current scene, and experiment progress ✓
+- [x] **MON-02**: Admin can see connection status indicators (connected/reconnecting/disconnected/completed) for each participant ✓
+- [x] **MON-03**: Admin can view waiting room population (participants waiting, target group size, wait duration) ✓
+- [x] **MON-04**: Admin can view chronological activity timeline of experiment events (joins, scene advances, disconnects) ✓
 
-### Mismatch Detection
+### Intervention
 
-- [x] **DETECT-01**: System identifies exact frame number where mismatch occurred
-- [x] **DETECT-02**: System buffers peer hashes until local confirmation catches up
-- [x] **DETECT-03**: System logs desync events with frame, both hashes, and timestamp
-- [x] **DETECT-04**: System tracks verifiedFrame as highest mutually-verified frame
-- [x] **DETECT-05**: System captures full state dump when mismatch detected
+- [ ] **INT-01**: Admin can kick a participant from the experiment with confirmation dialog
 
-### Validation Export
+### Data Access
 
-- [x] **EXPORT-01**: System exports post-game JSON with frame-by-frame hashes and actions
-- [x] **EXPORT-02**: System exports only confirmed-frame data (excludes predictions)
-- [x] **EXPORT-03**: System includes desync events in validation export
-- [x] **EXPORT-04**: System exports verified action sequences per player
+- [ ] **DATA-01**: Admin can download collected data as CSV from the admin panel
+
+### Multiplayer
+
+- [ ] **MULTI-01**: Admin can view multiplayer groups (who's paired with whom, group status)
+
+### Debug
+
+- [ ] **DEBUG-01**: Admin can view debug logs captured from participant browsers (console.log/error/warn)
+- [ ] **DEBUG-02**: Admin can filter debug logs by participant and severity level
 
 ## v2 Requirements
 
-Deferred to future milestone. Tracked but not in current roadmap.
+Deferred to future release. Tracked but not in current roadmap.
 
-### Development Tools
+### Intervention
 
-- **TOOL-01**: Sync test mode for single-player determinism validation
-- **TOOL-02**: Live sync debug overlay showing validation metrics
-- **TOOL-03**: Hierarchical checksums for subsystem-level debugging
-- **TOOL-04**: Frame diff logging with side-by-side state comparison
+- **INT-02**: Admin can pause/resume experiment (halt new enrollments)
+- **INT-03**: Admin can send message to specific participant
 
-### Advanced Validation
+### Monitoring
 
-- **ADV-01**: Deterministic replay validation for CI regression tests
-- **ADV-02**: Cross-platform determinism validation (Chrome/Firefox/Safari)
-- **ADV-03**: Binary search desync localization
+- **MON-05**: Admin can add notes to individual participants
+- **MON-06**: Admin can view scene-specific metrics (completions, episodes, avg time)
+
+### Infrastructure
+
+- **INFRA-03**: All admin actions are logged to audit trail for research validity
 
 ## Out of Scope
 
@@ -59,41 +60,38 @@ Explicitly excluded. Documented to prevent scope creep.
 
 | Feature | Reason |
 |---------|--------|
-| Full state sync every frame | Massive bandwidth; defeats purpose of input-based sync |
-| Blocking validation | Kills responsiveness; validation can trail simulation |
-| Automated resync on mismatch | Research needs to KNOW about desyncs, not hide them |
-| Cryptographic hash for security | Overkill — integrity checking, not security |
-| Complex serialization (protobuf) | JSON with deterministic ordering is sufficient |
+| Video recording / screen capture | Privacy/consent implications; huge storage costs |
+| Automated fraud/bot detection | Complex, error-prone; recruitment platforms (Prolific, CloudResearch) handle this |
+| Bi-directional participant chat | Scope creep; changes experiment dynamics; researcher availability bottleneck |
+| Historical analytics dashboards | v1.1 is live monitoring; use R/Python for post-experiment analysis |
+| Multi-researcher permissions | Over-engineering for v1.1; single admin password sufficient for small teams |
+| Mobile-optimized interface | Desktop-first; researchers monitor from desktops during experiments |
+| Experiment design from admin panel | Experiments are code-defined; admin is for monitoring not authoring |
+| Push notifications to phones | External service complexity (Twilio); overkill for v1.1 |
 
 ## Traceability
 
-Which phases cover which requirements.
+Which phases cover which requirements. Updated by create-roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| HASH-01 | Phase 11 | Complete |
-| HASH-02 | Phase 11 | Complete |
-| HASH-03 | Phase 11 | Complete |
-| HASH-04 | Phase 11 | Complete |
-| EXCH-01 | Phase 12 | Complete |
-| EXCH-02 | Phase 12 | Complete |
-| EXCH-03 | Phase 12 | Complete |
-| EXCH-04 | Phase 12 | Complete |
-| DETECT-01 | Phase 13 | Complete |
-| DETECT-02 | Phase 13 | Complete |
-| DETECT-03 | Phase 13 | Complete |
-| DETECT-04 | Phase 13 | Complete |
-| DETECT-05 | Phase 13 | Complete |
-| EXPORT-01 | Phase 14 | Complete |
-| EXPORT-02 | Phase 14 | Complete |
-| EXPORT-03 | Phase 14 | Complete |
-| EXPORT-04 | Phase 14 | Complete |
+| INFRA-01 | Phase 7 | Complete |
+| INFRA-02 | Phase 7 | Complete |
+| MON-01 | Phase 8 | Complete |
+| MON-02 | Phase 8 | Complete |
+| MON-03 | Phase 8 | Complete |
+| MON-04 | Phase 8 | Complete |
+| INT-01 | Phase 9 | Pending |
+| DATA-01 | Phase 9 | Pending |
+| MULTI-01 | Phase 10 | Pending |
+| DEBUG-01 | Phase 10 | Pending |
+| DEBUG-02 | Phase 10 | Pending |
 
 **Coverage:**
-- v1.1 requirements: 17 total
-- Mapped to phases: 17 ✓
+- v1.1 requirements: 11 total
+- Mapped to phases: 11 ✓
 - Unmapped: 0
 
 ---
-*Requirements defined: 2026-01-20*
-*Last updated: 2026-01-21 after Phase 14 execution complete — all v1.1 requirements satisfied*
+*Requirements defined: 2026-01-19*
+*Last updated: 2026-01-20 after Phase 8 completion (MON-01, MON-02, MON-03, MON-04 complete)*

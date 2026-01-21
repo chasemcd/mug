@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-01-20)
 
 **Core value:** Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
-**Current focus:** v1.1 Sync Validation (complete, pending audit)
+**Current focus:** v1.1 Admin Console — Phase 8 complete, ready for Phase 9
 
 ## Current Position
 
-Phase: 14 of 14 (Validation Export)
-Plan: 14-01 complete
-Status: v1.1 milestone complete, ready for audit
-Last activity: 2026-01-21 - Completed 14-01-PLAN.md
+Phase: 8 of 10 (Read-Only Dashboard) - COMPLETE
+Plan: 2 of 2 complete (08-01, 08-02 both done)
+Status: Phase complete
+Last activity: 2026-01-20 — Completed 08-02-PLAN.md (dashboard frontend)
 
-Progress: [==========] 100% (v1.1 - all phases complete)
+Progress: v1.0 complete | v1.1 ████░░░░░░ 40%
 
 ## Milestone History
 
 | Milestone | Phases | Status | Shipped |
 |-----------|--------|--------|---------|
-| v1.1 Sync Validation | 11-14 | Complete (pending audit) | - |
-| v1.0 P2P Multiplayer | 1-10 | Complete | 2026-01-19 |
+| v1.0 P2P Multiplayer | 1-6 | Complete | 2026-01-19 |
+| v1.1 Admin Console | 7-10 | In Progress | — |
 
 ## Accumulated Context
 
@@ -33,43 +33,24 @@ Progress: [==========] 100% (v1.1 - all phases complete)
 - `interactive_gym/server/pyodide_game_coordinator.py`
 - `interactive_gym/configurations/remote_config.py`
 
-**v1.1 Execution:**
-- `.planning/phases/11-hash-infrastructure/11-01-SUMMARY.md`
-- `.planning/phases/12-p2p-hash-exchange/12-01-SUMMARY.md`
-- `.planning/phases/13-mismatch-detection/13-01-SUMMARY.md`
-- `.planning/phases/14-validation-export/14-01-SUMMARY.md`
-- `.planning/research/SUMMARY.md`
-- `.planning/research/ARCHITECTURE.md`
+**Admin Console (created in v1.1):**
+- `interactive_gym/server/admin/__init__.py` - Blueprint and AdminUser
+- `interactive_gym/server/admin/routes.py` - Login/logout/dashboard routes
+- `interactive_gym/server/admin/namespace.py` - AdminNamespace for SocketIO
+- `interactive_gym/server/admin/aggregator.py` - AdminEventAggregator (390 LOC)
+- `interactive_gym/server/admin/templates/` - DaisyUI dashboard templates
+- `interactive_gym/server/admin/static/admin.js` - Dashboard JS (319 LOC)
+- `interactive_gym/server/admin/static/admin.css` - Dashboard styles (130 LOC)
 
 ### Decisions
 
 See: .planning/PROJECT.md Key Decisions table
 
-**v1.1 decisions (Phase 11):**
-- SHA-256 (not MD5) for cross-platform hash reliability (HASH-03)
-- Float normalization to 10 decimal places before hashing (HASH-02)
-- Hash computation only on confirmed frames (not predicted) (HASH-01)
-- confirmedHashHistory separate from stateHashHistory (legacy) (HASH-04)
-- Hash invalidation >= targetFrame on rollback (not snapshotFrame)
-- 16-char truncated SHA-256 for efficient storage/transmission
-
-**v1.1 decisions (Phase 12):**
-- Binary hash encoding (8 bytes from 16 hex chars) for compact P2P transmission (EXCH-04)
-- Queue-based async exchange to avoid blocking game loop (EXCH-02)
-- Re-queue on buffer full instead of dropping hashes
-- Skip hash exchange during rollback to avoid invalid state hashes
-
-**v1.1 decisions (Phase 13):**
-- Dual-trigger comparison: call _attemptHashComparison from both hash storage paths (DETECT-01)
-- Skip comparison during rollback (state is in flux) (DETECT-02)
-- Async state dump capture in _handleDesync to avoid blocking game loop (DETECT-05)
-- Reset verifiedFrame on rollback to maintain verification invariant (DETECT-04)
-
-**v1.1 decisions (Phase 14):**
-- Export only confirmed data (confirmedHashHistory, not stateHashHistory) (EXPORT-02)
-- Sort hashes by frame number for consistent output (EXPORT-01)
-- Filter actions to verifiedFrame for mutually-confirmed sequences (EXPORT-04)
-- Include hasStateDump flag instead of full dump for manageable export size (EXPORT-03)
+| ID | Decision | Rationale |
+|----|----------|-----------|
+| D-0701-01 | Password-only auth (no multi-user) | Single researcher use case per v1.1 research |
+| D-0801-01 | Observer pattern for state collection | Read-only references to avoid race conditions |
+| D-0802-01 | External JS/CSS over inline | Better maintainability, caching, separation of concerns |
 
 ### Pending Todos
 
@@ -83,10 +64,12 @@ See: .planning/PROJECT.md Key Decisions table
 
 ## Session Continuity
 
-Last session: 2026-01-21
-Stopped at: Completed 14-01-PLAN.md
+Last session: 2026-01-20
+Stopped at: Completed 08-02-PLAN.md (Phase 8 complete)
 Resume file: None
 
 ### Next Steps
 
-1. `/gsd:audit-milestone` - v1.1 Sync Validation milestone audit
+1. `/gsd:plan-phase 9` — plan Intervention & Data phase
+2. Execute Phase 9 plans
+3. Continue with Phase 10

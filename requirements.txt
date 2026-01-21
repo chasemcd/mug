@@ -6,3 +6,4 @@ pandas
 flatten_dict
 flask
 flask_socketio
+flask-login>=0.6.3

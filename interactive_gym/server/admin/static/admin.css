@@ -1,0 +1,471 @@
+/**
+ * Admin Dashboard Custom Styles
+ * Extends DaisyUI with dashboard-specific styles
+ */
+
+/* ============================================
+   Stat Cards - Modular top-level metrics
+   ============================================ */
+
+.stat-card {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem;
+    background: oklch(var(--b1));
+    border-radius: 0.75rem;
+    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+}
+
+.stat-card-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 0.5rem;
+    flex-shrink: 0;
+}
+
+.stat-card-content {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.stat-card-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.stat-card-label {
+    font-size: 0.75rem;
+    color: oklch(var(--bc) / 0.6);
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+}
+
+/* ============================================
+   Participant Cards - Grid display
+   ============================================ */
+
+.participant-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 0.75rem;
+}
+
+.participant-card {
+    display: flex;
+    flex-direction: column;
+    padding: 0.875rem;
+    background: oklch(var(--b1));
+    border: 1px solid oklch(var(--bc) / 0.1);
+    border-radius: 0.5rem;
+    transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.participant-card:hover {
+    border-color: oklch(var(--bc) / 0.2);
+    box-shadow: 0 2px 8px 0 rgb(0 0 0 / 0.08);
+}
+
+.participant-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+}
+
+.participant-card-id {
+    font-family: ui-monospace, monospace;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: oklch(var(--bc));
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.participant-card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+}
+
+.participant-card-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.75rem;
+}
+
+.participant-card-label {
+    color: oklch(var(--bc) / 0.5);
+}
+
+.participant-card-value {
+    color: oklch(var(--bc) / 0.8);
+}
+
+/* Progress bar in participant card */
+.participant-progress {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.participant-progress .progress {
+    height: 0.375rem;
+    flex: 1;
+}
+
+.participant-progress-text {
+    font-size: 0.6875rem;
+    color: oklch(var(--bc) / 0.6);
+    min-width: 2.5rem;
+    text-align: right;
+}
+
+/* ============================================
+   Connection Status Badge (navbar)
+   ============================================ */
+
+#connection-status {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+#connection-status .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: oklch(var(--bc) / 0.3);
+}
+
+#connection-status.badge-success .status-dot {
+    background: oklch(var(--su));
+    animation: pulse-dot 2s infinite;
+}
+
+#connection-status.badge-error .status-dot {
+    background: oklch(var(--er));
+}
+
+#connection-status.badge-warning .status-dot {
+    background: oklch(var(--wa));
+    animation: pulse-dot 1s infinite;
+}
+
+/* ============================================
+   Activity Timeline
+   ============================================ */
+
+.activity-timeline {
+    max-height: 350px;
+    overflow-y: auto;
+    padding: 0.75rem;
+}
+
+.activity-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid oklch(var(--bc) / 0.08);
+}
+
+.activity-item:last-child {
+    border-bottom: none;
+}
+
+.activity-time {
+    font-size: 0.6875rem;
+    color: oklch(var(--bc) / 0.4);
+    min-width: 55px;
+    font-family: ui-monospace, monospace;
+}
+
+.activity-icon {
+    width: 1rem;
+    text-align: center;
+    font-weight: 600;
+}
+
+.activity-content {
+    flex: 1;
+    font-size: 0.8125rem;
+    color: oklch(var(--bc) / 0.8);
+}
+
+.activity-content .subject-id {
+    font-family: ui-monospace, monospace;
+    font-size: 0.75rem;
+    background: oklch(var(--bc) / 0.05);
+    padding: 0.125rem 0.25rem;
+    border-radius: 0.25rem;
+}
+
+/* ============================================
+   Waiting Rooms
+   ============================================ */
+
+.waiting-room-card {
+    padding: 0.75rem;
+    background: oklch(var(--b2));
+    border-radius: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.waiting-room-card:last-child {
+    margin-bottom: 0;
+}
+
+.waiting-room-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.375rem;
+}
+
+.waiting-room-scene {
+    font-weight: 500;
+    font-size: 0.875rem;
+}
+
+.waiting-room-count {
+    font-size: 0.75rem;
+    color: oklch(var(--bc) / 0.6);
+}
+
+.waiting-room-groups {
+    font-size: 0.6875rem;
+    color: oklch(var(--bc) / 0.5);
+}
+
+.waiting-room-group {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.25rem 0;
+}
+
+/* ============================================
+   Empty States
+   ============================================ */
+
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    color: oklch(var(--bc) / 0.4);
+    text-align: center;
+}
+
+.empty-state svg {
+    opacity: 0.3;
+}
+
+.empty-state-sm {
+    padding: 1rem;
+    color: oklch(var(--bc) / 0.4);
+    text-align: center;
+    font-size: 0.875rem;
+}
+
+/* ============================================
+   Animations
+   ============================================ */
+
+@keyframes pulse-dot {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.4;
+    }
+}
+
+/* ============================================
+   Status Colors
+   ============================================ */
+
+.status-connected {
+    --tw-bg-opacity: 1;
+    background-color: oklch(var(--su) / var(--tw-bg-opacity));
+}
+
+.status-reconnecting {
+    --tw-bg-opacity: 1;
+    background-color: oklch(var(--wa) / var(--tw-bg-opacity));
+}
+
+.status-disconnected {
+    --tw-bg-opacity: 1;
+    background-color: oklch(var(--er) / var(--tw-bg-opacity));
+}
+
+.status-completed {
+    --tw-bg-opacity: 0.5;
+    background-color: oklch(var(--bc) / var(--tw-bg-opacity));
+}
+
+/* Event type colors for timeline */
+.event-join { color: oklch(var(--su)); }
+.event-disconnect { color: oklch(var(--er)); }
+.event-advance { color: oklch(var(--in)); }
+.event-game { color: oklch(var(--p)); }
+
+/* ============================================
+   Multiplayer Games
+   ============================================ */
+
+.multiplayer-game-card {
+    padding: 0.75rem;
+    background: oklch(var(--b2));
+    border-radius: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.multiplayer-game-card:last-child {
+    margin-bottom: 0;
+}
+
+.multiplayer-game-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+}
+
+.multiplayer-game-id {
+    font-family: ui-monospace, monospace;
+    font-size: 0.8125rem;
+    font-weight: 500;
+}
+
+.multiplayer-game-players {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+}
+
+.multiplayer-player {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.6875rem;
+    font-family: ui-monospace, monospace;
+    padding: 0.25rem 0.5rem;
+    background: oklch(var(--bc) / 0.08);
+    border-radius: 0.25rem;
+    color: oklch(var(--bc) / 0.7);
+}
+
+.multiplayer-player.host {
+    background: oklch(var(--su) / 0.15);
+    color: oklch(var(--su));
+}
+
+.host-badge {
+    font-size: 0.5625rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    background: oklch(var(--su) / 0.2);
+    padding: 0.125rem 0.25rem;
+    border-radius: 0.125rem;
+    letter-spacing: 0.02em;
+}
+
+/* ============================================
+   Console Logs
+   ============================================ */
+
+.console-logs-container {
+    max-height: 350px;
+    overflow-y: auto;
+    font-family: ui-monospace, monospace;
+    font-size: 0.6875rem;
+}
+
+.log-entry {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding: 0.375rem 0.75rem;
+    border-bottom: 1px solid oklch(var(--bc) / 0.05);
+}
+
+.log-entry:last-child {
+    border-bottom: none;
+}
+
+.log-entry.log-error {
+    background: oklch(var(--er) / 0.08);
+}
+
+.log-entry.log-warn {
+    background: oklch(var(--wa) / 0.08);
+}
+
+.log-entry.log-info {
+    background: oklch(var(--in) / 0.05);
+}
+
+.log-time {
+    color: oklch(var(--bc) / 0.4);
+    min-width: 55px;
+    flex-shrink: 0;
+}
+
+.log-level {
+    font-weight: 600;
+    min-width: 40px;
+    flex-shrink: 0;
+}
+
+.log-level-error { color: oklch(var(--er)); }
+.log-level-warn { color: oklch(var(--wa)); }
+.log-level-info { color: oklch(var(--in)); }
+.log-level-log { color: oklch(var(--bc) / 0.5); }
+
+.log-subject {
+    color: oklch(var(--bc) / 0.5);
+    background: oklch(var(--bc) / 0.05);
+    padding: 0.0625rem 0.25rem;
+    border-radius: 0.125rem;
+    flex-shrink: 0;
+    max-width: 80px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.log-message {
+    color: oklch(var(--bc) / 0.8);
+    word-break: break-word;
+    flex: 1;
+    min-width: 0;
+}
+
+/* ============================================
+   Responsive
+   ============================================ */
+
+@media (max-width: 640px) {
+    .stat-card {
+        padding: 0.75rem;
+    }
+
+    .stat-card-value {
+        font-size: 1.25rem;
+    }
+
+    .participant-grid {
+        grid-template-columns: 1fr;
+    }
+}
