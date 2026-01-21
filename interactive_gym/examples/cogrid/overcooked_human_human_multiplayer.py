@@ -81,6 +81,11 @@ if __name__ == "__main__":
         experiment_config.ExperimentConfig()
         .experiment(stager=stager, experiment_id="overcooked_multiplayer_hh")
         .hosting(port=args.port, host="0.0.0.0")
+        # For TURN server fallback, use:
+        # $ export TURN_USERNAME=<open-relay-username>
+        # $ export TURN_CREDENTIAL=<open-relay-password>
+        # Or pass them in below.
+        .webrtc(force_relay=False)
     )
-
+		
     app.run(experiment_config)

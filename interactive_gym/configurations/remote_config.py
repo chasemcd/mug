@@ -383,16 +383,34 @@ class RemoteConfig:
             force_relay: Force relay mode (for testing TURN without direct P2P)
         """
         import os
+        import logging
+
+        logger = logging.getLogger(__name__)
 
         # Use provided values, fall back to environment variables
         resolved_username = turn_username or os.environ.get("TURN_USERNAME")
         resolved_credential = turn_credential or os.environ.get("TURN_CREDENTIAL")
 
-        if resolved_username is not None:
+        if resolved_username and resolved_credential:
             self.turn_username = resolved_username
-        if resolved_credential is not None:
             self.turn_credential = resolved_credential
+            logger.info(
+                f"TURN credentials loaded (username: {resolved_username[:4]}...)"
+            )
+        elif resolved_username or resolved_credential:
+            logger.warning(
+                "Partial TURN config: both TURN_USERNAME and TURN_CREDENTIAL required"
+            )
+        else:
+            logger.warning(
+                "No TURN credentials found. Set TURN_USERNAME and TURN_CREDENTIAL "
+                "env vars for NAT traversal fallback."
+            )
+
         self.force_turn_relay = force_relay
+        if force_relay:
+            logger.info("TURN force_relay enabled - all connections will use TURN")
+
         return self
 
     @property
