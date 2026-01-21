@@ -67,33 +67,33 @@ Explicitly excluded. Documented to prevent scope creep.
 
 ## Traceability
 
-Which phases cover which requirements. Updated by create-roadmap.
+Which phases cover which requirements.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| HASH-01 | — | Pending |
-| HASH-02 | — | Pending |
-| HASH-03 | — | Pending |
-| HASH-04 | — | Pending |
-| EXCH-01 | — | Pending |
-| EXCH-02 | — | Pending |
-| EXCH-03 | — | Pending |
-| EXCH-04 | — | Pending |
-| DETECT-01 | — | Pending |
-| DETECT-02 | — | Pending |
-| DETECT-03 | — | Pending |
-| DETECT-04 | — | Pending |
-| DETECT-05 | — | Pending |
-| EXPORT-01 | — | Pending |
-| EXPORT-02 | — | Pending |
-| EXPORT-03 | — | Pending |
-| EXPORT-04 | — | Pending |
+| HASH-01 | Phase 11 | Pending |
+| HASH-02 | Phase 11 | Pending |
+| HASH-03 | Phase 11 | Pending |
+| HASH-04 | Phase 11 | Pending |
+| EXCH-01 | Phase 12 | Pending |
+| EXCH-02 | Phase 12 | Pending |
+| EXCH-03 | Phase 12 | Pending |
+| EXCH-04 | Phase 12 | Pending |
+| DETECT-01 | Phase 13 | Pending |
+| DETECT-02 | Phase 13 | Pending |
+| DETECT-03 | Phase 13 | Pending |
+| DETECT-04 | Phase 13 | Pending |
+| DETECT-05 | Phase 13 | Pending |
+| EXPORT-01 | Phase 14 | Pending |
+| EXPORT-02 | Phase 14 | Pending |
+| EXPORT-03 | Phase 14 | Pending |
+| EXPORT-04 | Phase 14 | Pending |
 
 **Coverage:**
 - v1.1 requirements: 17 total
-- Mapped to phases: 0 (run /gsd:create-roadmap)
-- Unmapped: 17
+- Mapped to phases: 17 ✓
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-01-20*
-*Last updated: 2026-01-20 after initial definition*
+*Last updated: 2026-01-20 after roadmap creation*
