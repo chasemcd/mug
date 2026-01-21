@@ -89,7 +89,9 @@ Plans:
   3. Desync events included in export
   4. Verified action sequences exported per player
 **Research flag:** Unlikely (straightforward JSON export)
-**Plans:** TBD
+**Plans:** 1 plan
+Plans:
+- [ ] 14-01-PLAN.md — exportValidationData method, confirmed hash export, verified actions, desync events
 
 ## Progress
 
@@ -101,8 +103,8 @@ Phases execute in numeric order: 11 -> 12 -> 13 -> 14
 | 11. Hash Infrastructure | v1.1 | 1/1 | Complete | 2026-01-21 |
 | 12. P2P Hash Exchange | v1.1 | 1/1 | Complete | 2026-01-21 |
 | 13. Mismatch Detection | v1.1 | 1/1 | Complete | 2026-01-21 |
-| 14. Validation Export | v1.1 | 0/TBD | Not started | - |
+| 14. Validation Export | v1.1 | 0/1 | Planned | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-01-21 after Phase 13 execution complete*
+*Last updated: 2026-01-21 after Phase 14 planning complete*
