@@ -4233,6 +4233,56 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
     }
 
     /**
+     * Extract confirmed hashes from confirmedHashHistory for export.
+     * @returns {Array<{frame: number, hash: string}>} Sorted array of frame/hash pairs
+     * @private
+     */
+    _exportConfirmedHashes() {
+        // Convert Map to sorted array of {frame, hash} objects
+        const hashes = [];
+        for (const [frame, hash] of this.confirmedHashHistory.entries()) {
+            hashes.push({ frame, hash });
+        }
+        // Sort by frame number for consistent output
+        return hashes.sort((a, b) => a.frame - b.frame);
+    }
+
+    /**
+     * Extract verified actions per player up to verifiedFrame for export.
+     * @returns {Object} Per-player action sequences {playerId: [{frame, action}, ...]}
+     * @private
+     */
+    _exportVerifiedActions() {
+        // Build per-player action sequences from inputBuffer
+        // Only include frames up to verifiedFrame (mutually confirmed)
+        const result = {};
+        const humanPlayerIds = this._getHumanPlayerIds();
+
+        for (const playerId of humanPlayerIds) {
+            result[playerId] = [];
+        }
+
+        // Get frames in sorted order
+        const frames = Array.from(this.inputBuffer.keys())
+            .filter(f => f <= this.verifiedFrame)
+            .sort((a, b) => a - b);
+
+        for (const frame of frames) {
+            const frameInputs = this.inputBuffer.get(frame);
+            if (frameInputs) {
+                for (const playerId of humanPlayerIds) {
+                    const action = frameInputs.get(playerId);
+                    if (action !== undefined) {
+                        result[playerId].push({ frame, action });
+                    }
+                }
+            }
+        }
+
+        return result;
+    }
+
+    /**
      * Export action history for debugging divergence.
      * Call from browser console: window.game.exportActionHistory()
      * Compare output between two clients to find where they diverged.
