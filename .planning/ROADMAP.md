@@ -2,9 +2,9 @@
 
 ## Milestones
 
-- ✅ **v1.0 P2P Multiplayer** - Phases 1-10 (shipped 2026-01-19)
-- ✅ **v1.1 Sync Validation** - Phases 11-14 (complete)
-- 🚧 **v1.2 Participant Exclusion** - Phases 15-18 (in progress)
+- **v1.0 P2P Multiplayer** - Phases 1-10 (shipped 2026-01-19)
+- **v1.1 Sync Validation** - Phases 11-14 (complete)
+- **v1.2 Participant Exclusion** - Phases 15-18 (in progress)
 
 ## Phases
 
@@ -27,7 +27,7 @@ Key deliverables:
 </details>
 
 <details>
-<summary>✅ v1.1 Sync Validation (Phases 11-14) - COMPLETE</summary>
+<summary>v1.1 Sync Validation (Phases 11-14) - COMPLETE</summary>
 
 **Milestone Goal:** Build a validation system that confirms verified action sequences and state hashes are identical across all peers, enabling debugging of non-deterministic environments and networking issues.
 
@@ -38,9 +38,9 @@ Key deliverables:
 
 </details>
 
-### 🚧 v1.2 Participant Exclusion (In Progress)
+### v1.2 Participant Exclusion (In Progress)
 
-**Milestone Goal:** A configurable, extensible system to exclude participants who don't meet experiment requirements — checked both at entry and continuously during play.
+**Milestone Goal:** A configurable, extensible system to exclude participants who don't meet experiment requirements - checked both at entry and continuously during play.
 
 - [ ] **Phase 15: Entry Screening Rules** - Pre-game device/browser/ping checks with exclusion messaging
 - [ ] **Phase 16: Continuous Monitoring** - Real-time ping and tab visibility monitoring during gameplay
@@ -61,7 +61,7 @@ Key deliverables:
 **Research flag:** Unlikely (standard patterns)
 **Plans:** 1 plan
 Plans:
-- [x] 11-01-PLAN.md — SHA-256 hashing, float normalization, confirmedHashHistory, rollback invalidation
+- [x] 11-01-PLAN.md - SHA-256 hashing, float normalization, confirmedHashHistory, rollback invalidation
 
 ### Phase 12: P2P Hash Exchange
 **Goal:** Binary hash message protocol over DataChannel
@@ -75,7 +75,7 @@ Plans:
 **Research flag:** Unlikely (extension of existing protocol)
 **Plans:** 1 plan
 Plans:
-- [x] 12-01-PLAN.md — P2P_MSG_STATE_HASH protocol, encode/decode, exchange queue, rollback invalidation
+- [x] 12-01-PLAN.md - P2P_MSG_STATE_HASH protocol, encode/decode, exchange queue, rollback invalidation
 
 ### Phase 13: Mismatch Detection
 **Goal:** Comparison logic, peer buffering, desync event logging
@@ -90,7 +90,7 @@ Plans:
 **Research flag:** Unlikely (architecture documented, patterns from prior phases)
 **Plans:** 1 plan
 Plans:
-- [x] 13-01-PLAN.md — verifiedFrame tracking, desyncEvents logging, comparison logic, rollback integration
+- [x] 13-01-PLAN.md - verifiedFrame tracking, desyncEvents logging, comparison logic, rollback integration
 
 ### Phase 14: Validation Export
 **Goal:** Post-game JSON export with frame-by-frame validation data
@@ -104,7 +104,7 @@ Plans:
 **Research flag:** Unlikely (straightforward JSON export)
 **Plans:** 1 plan
 Plans:
-- [x] 14-01-PLAN.md — exportValidationData method, confirmed hash export, verified actions, desync events
+- [x] 14-01-PLAN.md - exportValidationData method, confirmed hash export, verified actions, desync events
 
 ### Phase 15: Entry Screening Rules
 **Goal:** Pre-game screening with device, browser, and ping checks
@@ -116,10 +116,9 @@ Plans:
   3. Participant blocked at entry if ping exceeds configured threshold
   4. Participant sees rule-specific message explaining why excluded
 **Research flag:** Unlikely (jsPsych browser-check as reference, ua-parser-js documented)
-**Plans:** TBD
-
+**Plans:** 1 plan
 Plans:
-- [ ] 15-01-PLAN.md — TBD
+- [ ] 15-01-PLAN.md - GymScene.entry_screening() config, ua-parser-js detection, exclusion UI
 
 ### Phase 16: Continuous Monitoring
 **Goal:** Real-time ping and tab visibility monitoring during gameplay
@@ -134,7 +133,7 @@ Plans:
 **Plans:** TBD
 
 Plans:
-- [ ] 16-01-PLAN.md — TBD
+- [ ] 16-01-PLAN.md - TBD
 
 ### Phase 17: Multiplayer Exclusion Handling
 **Goal:** Coordinated game termination when one player excluded
@@ -148,7 +147,7 @@ Plans:
 **Plans:** TBD
 
 Plans:
-- [ ] 17-01-PLAN.md — TBD
+- [ ] 17-01-PLAN.md - TBD
 
 ### Phase 18: Custom Exclusion Callbacks
 **Goal:** Researcher-defined arbitrary exclusion logic via Python callbacks
@@ -162,12 +161,12 @@ Plans:
 **Plans:** TBD
 
 Plans:
-- [ ] 18-01-PLAN.md — TBD
+- [ ] 18-01-PLAN.md - TBD
 
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 11 -> 12 -> 13 -> 14
+Phases execute in numeric order: 15 -> 16 -> 17 -> 18
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -175,11 +174,11 @@ Phases execute in numeric order: 11 -> 12 -> 13 -> 14
 | 12. P2P Hash Exchange | v1.1 | 1/1 | Complete | 2026-01-21 |
 | 13. Mismatch Detection | v1.1 | 1/1 | Complete | 2026-01-21 |
 | 14. Validation Export | v1.1 | 1/1 | Complete | 2026-01-21 |
-| 15. Entry Screening Rules | v1.2 | 0/1 | Not started | - |
+| 15. Entry Screening Rules | v1.2 | 0/1 | Planned | - |
 | 16. Continuous Monitoring | v1.2 | 0/1 | Not started | - |
 | 17. Multiplayer Exclusion | v1.2 | 0/1 | Not started | - |
 | 18. Custom Callbacks | v1.2 | 0/1 | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-01-21 after v1.2 roadmap created*
+*Last updated: 2026-01-21 after Phase 15 plan created*
