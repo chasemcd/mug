@@ -42,7 +42,7 @@ Key deliverables:
 
 **Milestone Goal:** A configurable, extensible system to exclude participants who don't meet experiment requirements - checked both at entry and continuously during play.
 
-- [ ] **Phase 15: Entry Screening Rules** - Pre-game device/browser/ping checks with exclusion messaging
+- [x] **Phase 15: Entry Screening Rules** - Pre-game device/browser/ping checks with exclusion messaging
 - [ ] **Phase 16: Continuous Monitoring** - Real-time ping and tab visibility monitoring during gameplay
 - [ ] **Phase 17: Multiplayer Exclusion Handling** - Coordinated game termination when one player excluded
 - [ ] **Phase 18: Custom Exclusion Callbacks** - Researcher-defined arbitrary exclusion logic
@@ -118,7 +118,7 @@ Plans:
 **Research flag:** Unlikely (jsPsych browser-check as reference, ua-parser-js documented)
 **Plans:** 1 plan
 Plans:
-- [ ] 15-01-PLAN.md - GymScene.entry_screening() config, ua-parser-js detection, exclusion UI
+- [x] 15-01-PLAN.md - GymScene.entry_screening() config, ua-parser-js detection, exclusion UI
 
 ### Phase 16: Continuous Monitoring
 **Goal:** Real-time ping and tab visibility monitoring during gameplay
@@ -174,11 +174,11 @@ Phases execute in numeric order: 15 -> 16 -> 17 -> 18
 | 12. P2P Hash Exchange | v1.1 | 1/1 | Complete | 2026-01-21 |
 | 13. Mismatch Detection | v1.1 | 1/1 | Complete | 2026-01-21 |
 | 14. Validation Export | v1.1 | 1/1 | Complete | 2026-01-21 |
-| 15. Entry Screening Rules | v1.2 | 0/1 | Planned | - |
+| 15. Entry Screening Rules | v1.2 | 1/1 | Complete | 2026-01-21 |
 | 16. Continuous Monitoring | v1.2 | 0/1 | Not started | - |
 | 17. Multiplayer Exclusion | v1.2 | 0/1 | Not started | - |
 | 18. Custom Callbacks | v1.2 | 0/1 | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-01-21 after Phase 15 plan created*
+*Last updated: 2026-01-21 after Phase 15 complete*

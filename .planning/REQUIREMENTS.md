@@ -9,10 +9,10 @@ Requirements for v1.2 Participant Exclusion milestone. Each maps to roadmap phas
 
 ### Entry Screening
 
-- [ ] **ENTRY-01**: Researcher can configure device type exclusion (mobile/desktop/both allowed)
-- [ ] **ENTRY-02**: Researcher can configure browser type requirements (e.g., require Chrome/Firefox, block Safari)
-- [ ] **ENTRY-03**: Researcher can configure ping threshold for entry (exclude if latency > N ms)
-- [ ] **ENTRY-04**: Participant sees configurable message explaining why they were excluded at entry
+- [x] **ENTRY-01**: Researcher can configure device type exclusion (mobile/desktop/both allowed)
+- [x] **ENTRY-02**: Researcher can configure browser type requirements (e.g., require Chrome/Firefox, block Safari)
+- [x] **ENTRY-03**: Researcher can configure ping threshold for entry (exclude if latency > N ms)
+- [x] **ENTRY-04**: Participant sees configurable message explaining why they were excluded at entry
 
 ### Continuous Monitoring
 
@@ -73,10 +73,10 @@ Which phases cover which requirements.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| ENTRY-01 | Phase 15 | Pending |
-| ENTRY-02 | Phase 15 | Pending |
-| ENTRY-03 | Phase 15 | Pending |
-| ENTRY-04 | Phase 15 | Pending |
+| ENTRY-01 | Phase 15 | Complete |
+| ENTRY-02 | Phase 15 | Complete |
+| ENTRY-03 | Phase 15 | Complete |
+| ENTRY-04 | Phase 15 | Complete |
 | MONITOR-01 | Phase 16 | Pending |
 | MONITOR-02 | Phase 16 | Pending |
 | MONITOR-03 | Phase 16 | Pending |
@@ -95,4 +95,4 @@ Which phases cover which requirements.
 
 ---
 *Requirements defined: 2026-01-21*
-*Last updated: 2026-01-21 after roadmap created*
+*Last updated: 2026-01-21 after Phase 15 complete*

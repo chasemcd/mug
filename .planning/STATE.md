@@ -9,10 +9,10 @@ See: .planning/PROJECT.md (updated 2026-01-21)
 
 ## Current Position
 
-Phase: 15 of 18 (Entry Screening Rules)
-Plan: 15-01 complete
-Status: Phase 15 complete
-Last activity: 2026-01-21 - Completed 15-01-PLAN.md
+Phase: 16 of 18 (Continuous Monitoring)
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-01-21 — Phase 15 verified complete
 
 Progress: [##........] 25% (v1.2 - 1/4 phases complete)
 
@@ -94,9 +94,9 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-01-21
-Stopped at: Completed 15-01-PLAN.md
+Stopped at: Phase 15 verified complete
 Resume file: None
 
 ### Next Steps
 
-1. `/gsd:execute-phase 16` - execute In-Game Exclusion Events phase
+1. `/gsd:plan-phase 16` — plan Continuous Monitoring phase
