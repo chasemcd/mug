@@ -507,6 +507,12 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         this.stateHashHistory = new Map();
         this.stateHashHistoryMaxSize = 60;  // Keep ~6 seconds at 10 FPS
 
+        // Confirmed hash history: hashes for frames where ALL players' inputs are confirmed
+        // This is separate from stateHashHistory which may include predicted frames
+        // Uses SHA-256 (truncated to 16 chars) with float normalization for cross-platform reliability
+        this.confirmedHashHistory = new Map();  // frameNumber -> hash (SHA-256 truncated)
+        this.confirmedHashHistoryMaxSize = 120;  // Keep ~4 seconds at 30fps
+
         // Action tracking for sync verification
         this.actionSequence = [];  // [{frame: N, actions: {player: action}}]
         this.actionCounts = {};    // {playerId: {action: count}}
@@ -1901,9 +1907,10 @@ obs, rewards, terminateds, truncateds, infos, render_state
 
     async computeQuickStateHash() {
         /**
-         * Compute MD5 hash of env_state only (matches server's state_hash).
-         * This is used for quick comparison to avoid unnecessary state corrections.
-         * Returns first 16 chars of MD5 hash to match server format.
+         * Compute SHA-256 hash of env_state with float normalization.
+         * Uses SHA-256 for cross-platform reliability (HASH-03).
+         * Normalizes floats to 10 decimal places before hashing for determinism (HASH-02).
+         * Returns first 16 chars of SHA-256 hash for efficient storage/transmission.
          *
          * Requires the environment to implement get_state() returning a
          * JSON-serializable dict. Returns null if not supported.
@@ -1917,11 +1924,23 @@ obs, rewards, terminateds, truncateds, infos, render_state
 import json
 import hashlib
 
-_env_state_for_hash = env.get_state()
+def _normalize_floats(obj, precision=10):
+    """Recursively normalize floats to fixed precision for deterministic hashing."""
+    if isinstance(obj, float):
+        return round(obj, precision)
+    elif isinstance(obj, dict):
+        return {k: _normalize_floats(v, precision) for k, v in obj.items()}
+    elif isinstance(obj, (list, tuple)):
+        return [_normalize_floats(item, precision) for item in obj]
+    return obj
 
-# Compute MD5 hash matching server's format (sort_keys=True for consistency)
-_json_str = json.dumps(_env_state_for_hash, sort_keys=True)
-_hash = hashlib.md5(_json_str.encode()).hexdigest()[:16]
+_env_state_for_hash = env.get_state()
+_normalized_state = _normalize_floats(_env_state_for_hash)
+
+# SHA-256 hash with deterministic JSON serialization (HASH-03)
+# Using separators=(',', ':') for compact, consistent JSON output
+_json_str = json.dumps(_normalized_state, sort_keys=True, separators=(',', ':'))
+_hash = hashlib.sha256(_json_str.encode()).hexdigest()[:16]
 _hash
         `);
         return hashResult;
