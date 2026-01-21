@@ -1905,6 +1905,118 @@ obs, rewards, terminateds, truncateds, infos, render_state
         return this.stateHashHistory.get(frameNumber) || null;
     }
 
+    // ========== Confirmed Hash Infrastructure (HASH-01 through HASH-04) ==========
+
+    /**
+     * Get list of human player IDs from policy mapping.
+     * @returns {Array<string>} Array of player IDs where policy is 'human'
+     */
+    _getHumanPlayerIds() {
+        const humanIds = [];
+        for (const [agentId, policy] of Object.entries(this.policyMapping)) {
+            if (policy === 'human') {
+                humanIds.push(String(agentId));
+            }
+        }
+        return humanIds;
+    }
+
+    /**
+     * Check if all specified players have confirmed inputs for a frame.
+     * @param {number} frameNumber - Frame to check
+     * @param {Array<string>} playerIds - Player IDs to check
+     * @returns {boolean} True if all players have inputs for this frame
+     */
+    _hasAllInputsForFrame(frameNumber, playerIds) {
+        const frameInputs = this.inputBuffer.get(frameNumber);
+        if (!frameInputs) return false;
+
+        for (const playerId of playerIds) {
+            if (!frameInputs.has(String(playerId))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Update confirmedFrame to the highest frame where ALL players have confirmed inputs.
+     * Called after processing inputs and after rollback completion.
+     * Triggers hash computation for newly confirmed frames (HASH-01).
+     */
+    async _updateConfirmedFrame() {
+        const humanPlayerIds = this._getHumanPlayerIds();
+        if (humanPlayerIds.length === 0) return;
+
+        // Find highest consecutive confirmed frame
+        for (let frame = this.confirmedFrame + 1; frame < this.frameNumber; frame++) {
+            if (this._hasAllInputsForFrame(frame, humanPlayerIds)) {
+                // This frame is now confirmed (all inputs received)
+                this.confirmedFrame = frame;
+
+                // Remove from predictedFrames if it was there
+                this.predictedFrames.delete(frame);
+
+                // Compute and store hash for this confirmed frame
+                await this._computeAndStoreConfirmedHash(frame);
+            } else {
+                // Gap in confirmation - stop here
+                break;
+            }
+        }
+    }
+
+    /**
+     * Compute and store hash for a confirmed frame.
+     * Only called when frame is fully confirmed (all inputs received, no rollback pending).
+     * @param {number} frameNumber - The confirmed frame to hash
+     */
+    async _computeAndStoreConfirmedHash(frameNumber) {
+        // Skip if hash already exists (e.g., from prior confirmation)
+        if (this.confirmedHashHistory.has(frameNumber)) {
+            return;
+        }
+
+        // Skip if state sync not supported
+        if (!this.stateSyncSupported) {
+            return;
+        }
+
+        try {
+            const hash = await this.computeQuickStateHash();
+            this.confirmedHashHistory.set(frameNumber, hash);
+
+            p2pLog.debug(`Confirmed hash for frame ${frameNumber}: ${hash}`);
+
+            // Prune old entries to prevent unbounded growth
+            this._pruneConfirmedHashHistory();
+        } catch (e) {
+            p2pLog.warn(`Failed to compute confirmed hash for frame ${frameNumber}: ${e}`);
+        }
+    }
+
+    /**
+     * Remove old entries from confirmedHashHistory to prevent memory growth.
+     * Keeps most recent confirmedHashHistoryMaxSize entries.
+     */
+    _pruneConfirmedHashHistory() {
+        if (this.confirmedHashHistory.size <= this.confirmedHashHistoryMaxSize) {
+            return;
+        }
+
+        // Map maintains insertion order - delete oldest entries
+        const keysToDelete = [];
+        for (const key of this.confirmedHashHistory.keys()) {
+            if (this.confirmedHashHistory.size - keysToDelete.length <= this.confirmedHashHistoryMaxSize) {
+                break;
+            }
+            keysToDelete.push(key);
+        }
+        for (const key of keysToDelete) {
+            this.confirmedHashHistory.delete(key);
+        }
+    }
+
     async computeQuickStateHash() {
         /**
          * Compute SHA-256 hash of env_state with float normalization.
