@@ -174,6 +174,20 @@ class GymScene(scene.Scene):
             "ping": "Your internet connection is too slow for this study. Please try again with a stronger connection."
         }
 
+        # Continuous monitoring (Phase 16)
+        self.continuous_max_ping: int | None = None  # Max ping during gameplay (ms)
+        self.continuous_ping_violation_window: int = 5  # Measurements to track
+        self.continuous_ping_required_violations: int = 3  # Consecutive violations for exclusion
+        self.continuous_tab_warning_ms: int = 3000  # Warn after 3s hidden
+        self.continuous_tab_exclude_ms: int = 10000  # Exclude after 10s hidden
+        self.continuous_monitoring_enabled: bool = False  # Master enable flag
+        self.continuous_exclusion_messages: dict[str, str] = {
+            "ping_warning": "Your connection is unstable. Please close other applications.",
+            "ping_exclude": "Your connection became too slow. The game has ended.",
+            "tab_warning": "Please return to the experiment window to continue.",
+            "tab_exclude": "You left the experiment window for too long. The game has ended."
+        }
+
     def environment(
         self,
         env_creator: Callable = NotProvided,
@@ -698,6 +712,86 @@ class GymScene(scene.Scene):
                 "exclusion_messages must be a dictionary"
             # Merge with defaults (user messages override defaults)
             self.exclusion_messages = {**self.exclusion_messages, **exclusion_messages}
+
+        return self
+
+    def continuous_monitoring(
+        self,
+        max_ping: int = NotProvided,
+        ping_violation_window: int = NotProvided,
+        ping_required_violations: int = NotProvided,
+        tab_warning_ms: int = NotProvided,
+        tab_exclude_ms: int = NotProvided,
+        exclusion_messages: dict[str, str] = NotProvided,
+    ):
+        """Configure continuous monitoring during gameplay.
+
+        This monitoring runs DURING the game, after entry screening passes.
+        It detects sustained connection issues or tab switching and can
+        warn or exclude participants mid-game.
+
+        :param max_ping: Maximum allowed latency in milliseconds during gameplay.
+            Participants are warned/excluded if ping exceeds this for sustained period.
+            None disables ping monitoring. defaults to NotProvided
+        :type max_ping: int, optional
+        :param ping_violation_window: Number of measurements to track for violation
+            detection. defaults to NotProvided (uses 5)
+        :type ping_violation_window: int, optional
+        :param ping_required_violations: Consecutive violations required before
+            exclusion. Must be <= ping_violation_window. defaults to NotProvided (uses 3)
+        :type ping_required_violations: int, optional
+        :param tab_warning_ms: Milliseconds hidden before showing warning.
+            None disables tab warning. defaults to NotProvided (uses 3000)
+        :type tab_warning_ms: int, optional
+        :param tab_exclude_ms: Milliseconds hidden before exclusion.
+            None disables tab exclusion. defaults to NotProvided (uses 10000)
+        :type tab_exclude_ms: int, optional
+        :param exclusion_messages: Custom messages for warnings and exclusions.
+            Keys: "ping_warning", "ping_exclude", "tab_warning", "tab_exclude".
+            defaults to NotProvided
+        :type exclusion_messages: dict[str, str], optional
+        :return: The GymScene instance (self)
+        :rtype: GymScene
+        """
+        # Enable continuous monitoring if any parameter is set
+        self.continuous_monitoring_enabled = True
+
+        if max_ping is not NotProvided:
+            assert max_ping is None or (isinstance(max_ping, int) and max_ping > 0), \
+                "max_ping must be None or a positive integer"
+            self.continuous_max_ping = max_ping
+
+        if ping_violation_window is not NotProvided:
+            assert isinstance(ping_violation_window, int) and ping_violation_window >= 1, \
+                "ping_violation_window must be a positive integer"
+            self.continuous_ping_violation_window = ping_violation_window
+
+        if ping_required_violations is not NotProvided:
+            assert isinstance(ping_required_violations, int) and ping_required_violations >= 1, \
+                "ping_required_violations must be a positive integer"
+            self.continuous_ping_required_violations = ping_required_violations
+
+        if tab_warning_ms is not NotProvided:
+            assert tab_warning_ms is None or (isinstance(tab_warning_ms, int) and tab_warning_ms >= 0), \
+                "tab_warning_ms must be None or a non-negative integer"
+            self.continuous_tab_warning_ms = tab_warning_ms
+
+        if tab_exclude_ms is not NotProvided:
+            assert tab_exclude_ms is None or (isinstance(tab_exclude_ms, int) and tab_exclude_ms >= 0), \
+                "tab_exclude_ms must be None or a non-negative integer"
+            self.continuous_tab_exclude_ms = tab_exclude_ms
+
+        if exclusion_messages is not NotProvided:
+            assert isinstance(exclusion_messages, dict), \
+                "exclusion_messages must be a dictionary"
+            self.continuous_exclusion_messages = {**self.continuous_exclusion_messages, **exclusion_messages}
+
+        # Validate that required_violations <= window
+        if self.continuous_ping_required_violations > self.continuous_ping_violation_window:
+            raise ValueError(
+                f"ping_required_violations ({self.continuous_ping_required_violations}) "
+                f"cannot exceed ping_violation_window ({self.continuous_ping_violation_window})"
+            )
 
         return self
 
