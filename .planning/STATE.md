@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-01-21)
 ## Current Position
 
 Phase: 15 of 18 (Entry Screening Rules)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-01-21 — v1.2 roadmap created
+Plan: 15-01-PLAN.md (1 plan, verified)
+Status: Ready to execute
+Last activity: 2026-01-21 — Phase 15 planned
 
 Progress: [          ] 0% (v1.2 - 0/4 phases complete)
 
@@ -90,4 +90,4 @@ Resume file: None
 
 ### Next Steps
 
-1. `/gsd:plan-phase 15` — plan Entry Screening Rules phase
+1. `/gsd:execute-phase 15` — execute Entry Screening Rules phase
