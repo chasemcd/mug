@@ -9,19 +9,19 @@ See: .planning/PROJECT.md (updated 2026-01-21)
 
 ## Current Position
 
-Phase: Not started (run /gsd:create-roadmap)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-01-21 — Milestone v1.2 started
+Phase: 15 of 18 (Entry Screening Rules)
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-01-21 — v1.2 roadmap created
 
-Progress: [          ] 0% (v1.2 - not started)
+Progress: [          ] 0% (v1.2 - 0/4 phases complete)
 
 ## Milestone History
 
 | Milestone | Phases | Status | Shipped |
 |-----------|--------|--------|---------|
-| v1.2 Participant Exclusion | TBD | Not started | - |
-| v1.1 Sync Validation | 11-14 | Complete (pending audit) | - |
+| v1.2 Participant Exclusion | 15-18 | In progress | - |
+| v1.1 Sync Validation | 11-14 | Complete | - |
 | v1.0 P2P Multiplayer | 1-10 | Complete | 2026-01-19 |
 
 ## Accumulated Context
@@ -85,10 +85,9 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-01-21
-Stopped at: Started v1.2 Participant Exclusion milestone
+Stopped at: v1.2 roadmap created
 Resume file: None
 
 ### Next Steps
 
-1. `/gsd:define-requirements` or `/gsd:research-project` — scope v1.2 requirements
-2. `/gsd:create-roadmap` — create phase breakdown
+1. `/gsd:plan-phase 15` — plan Entry Screening Rules phase

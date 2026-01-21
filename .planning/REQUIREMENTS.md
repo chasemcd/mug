@@ -69,30 +69,30 @@ Explicitly excluded. Documented to prevent scope creep.
 
 ## Traceability
 
-Which phases cover which requirements. Updated by create-roadmap.
+Which phases cover which requirements.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| ENTRY-01 | TBD | Pending |
-| ENTRY-02 | TBD | Pending |
-| ENTRY-03 | TBD | Pending |
-| ENTRY-04 | TBD | Pending |
-| MONITOR-01 | TBD | Pending |
-| MONITOR-02 | TBD | Pending |
-| MONITOR-03 | TBD | Pending |
-| MONITOR-04 | TBD | Pending |
-| MULTI-01 | TBD | Pending |
-| MULTI-02 | TBD | Pending |
-| MULTI-03 | TBD | Pending |
-| EXT-01 | TBD | Pending |
-| EXT-02 | TBD | Pending |
-| EXT-03 | TBD | Pending |
+| ENTRY-01 | Phase 15 | Pending |
+| ENTRY-02 | Phase 15 | Pending |
+| ENTRY-03 | Phase 15 | Pending |
+| ENTRY-04 | Phase 15 | Pending |
+| MONITOR-01 | Phase 16 | Pending |
+| MONITOR-02 | Phase 16 | Pending |
+| MONITOR-03 | Phase 16 | Pending |
+| MONITOR-04 | Phase 16 | Pending |
+| MULTI-01 | Phase 17 | Pending |
+| MULTI-02 | Phase 17 | Pending |
+| MULTI-03 | Phase 17 | Pending |
+| EXT-01 | Phase 18 | Pending |
+| EXT-02 | Phase 18 | Pending |
+| EXT-03 | Phase 18 | Pending |
 
 **Coverage:**
 - v1.2 requirements: 14 total
-- Mapped to phases: 0 (pending roadmap)
-- Unmapped: 14
+- Mapped to phases: 14 ✓
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-01-21*
-*Last updated: 2026-01-21 after initial definition*
+*Last updated: 2026-01-21 after roadmap created*

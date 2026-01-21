@@ -2,8 +2,9 @@
 
 ## Milestones
 
-- **v1.0 P2P Multiplayer** - Phases 1-10 (shipped 2026-01-19)
-- **v1.1 Sync Validation** - Phases 11-14 (complete, pending audit)
+- ✅ **v1.0 P2P Multiplayer** - Phases 1-10 (shipped 2026-01-19)
+- ✅ **v1.1 Sync Validation** - Phases 11-14 (complete)
+- 🚧 **v1.2 Participant Exclusion** - Phases 15-18 (in progress)
 
 ## Phases
 
@@ -25,7 +26,8 @@ Key deliverables:
 
 </details>
 
-### v1.1 Sync Validation (Complete)
+<details>
+<summary>✅ v1.1 Sync Validation (Phases 11-14) - COMPLETE</summary>
 
 **Milestone Goal:** Build a validation system that confirms verified action sequences and state hashes are identical across all peers, enabling debugging of non-deterministic environments and networking issues.
 
@@ -33,6 +35,17 @@ Key deliverables:
 - [x] **Phase 12: P2P Hash Exchange** - Binary hash message protocol over DataChannel
 - [x] **Phase 13: Mismatch Detection** - Comparison logic, peer buffering, desync logging
 - [x] **Phase 14: Validation Export** - Post-game JSON export with frame-by-frame data
+
+</details>
+
+### 🚧 v1.2 Participant Exclusion (In Progress)
+
+**Milestone Goal:** A configurable, extensible system to exclude participants who don't meet experiment requirements — checked both at entry and continuously during play.
+
+- [ ] **Phase 15: Entry Screening Rules** - Pre-game device/browser/ping checks with exclusion messaging
+- [ ] **Phase 16: Continuous Monitoring** - Real-time ping and tab visibility monitoring during gameplay
+- [ ] **Phase 17: Multiplayer Exclusion Handling** - Coordinated game termination when one player excluded
+- [ ] **Phase 18: Custom Exclusion Callbacks** - Researcher-defined arbitrary exclusion logic
 
 ## Phase Details
 
@@ -93,6 +106,64 @@ Plans:
 Plans:
 - [x] 14-01-PLAN.md — exportValidationData method, confirmed hash export, verified actions, desync events
 
+### Phase 15: Entry Screening Rules
+**Goal:** Pre-game screening with device, browser, and ping checks
+**Depends on:** v1.1 complete (existing P2P infrastructure)
+**Requirements:** ENTRY-01, ENTRY-02, ENTRY-03, ENTRY-04
+**Success Criteria** (what must be TRUE):
+  1. Researcher can configure device type exclusion (mobile/desktop/both) in Python config
+  2. Researcher can configure browser requirements (require/block specific browsers)
+  3. Participant blocked at entry if ping exceeds configured threshold
+  4. Participant sees rule-specific message explaining why excluded
+**Research flag:** Unlikely (jsPsych browser-check as reference, ua-parser-js documented)
+**Plans:** TBD
+
+Plans:
+- [ ] 15-01-PLAN.md — TBD
+
+### Phase 16: Continuous Monitoring
+**Goal:** Real-time ping and tab visibility monitoring during gameplay
+**Depends on:** Phase 15
+**Requirements:** MONITOR-01, MONITOR-02, MONITOR-03, MONITOR-04
+**Success Criteria** (what must be TRUE):
+  1. Participant ping monitored continuously during gameplay
+  2. Participant excluded mid-game if ping exceeds threshold for sustained period
+  3. Tab switch detected when participant leaves experiment window
+  4. Tab switch triggers configurable warning or exclusion
+**Research flag:** Likely (power-saving mode pitfall P10 needs careful handling)
+**Plans:** TBD
+
+Plans:
+- [ ] 16-01-PLAN.md — TBD
+
+### Phase 17: Multiplayer Exclusion Handling
+**Goal:** Coordinated game termination when one player excluded
+**Depends on:** Phase 16
+**Requirements:** MULTI-01, MULTI-02, MULTI-03
+**Success Criteria** (what must be TRUE):
+  1. Non-excluded player sees clear partner notification message
+  2. Game terminates cleanly for both players when one is excluded
+  3. Valid game data up to exclusion point is preserved and marked as partial session
+**Research flag:** Likely (no existing patterns for real-time multiplayer exclusion)
+**Plans:** TBD
+
+Plans:
+- [ ] 17-01-PLAN.md — TBD
+
+### Phase 18: Custom Exclusion Callbacks
+**Goal:** Researcher-defined arbitrary exclusion logic via Python callbacks
+**Depends on:** Phase 17
+**Requirements:** EXT-01, EXT-02, EXT-03
+**Success Criteria** (what must be TRUE):
+  1. Researcher can define custom exclusion rules via Python callback functions
+  2. Callbacks receive full participant context (ping, browser, focus state, etc.)
+  3. Callbacks return exclusion decision with optional message
+**Research flag:** Unlikely (standard callback patterns)
+**Plans:** TBD
+
+Plans:
+- [ ] 18-01-PLAN.md — TBD
+
 ## Progress
 
 **Execution Order:**
@@ -104,7 +175,11 @@ Phases execute in numeric order: 11 -> 12 -> 13 -> 14
 | 12. P2P Hash Exchange | v1.1 | 1/1 | Complete | 2026-01-21 |
 | 13. Mismatch Detection | v1.1 | 1/1 | Complete | 2026-01-21 |
 | 14. Validation Export | v1.1 | 1/1 | Complete | 2026-01-21 |
+| 15. Entry Screening Rules | v1.2 | 0/1 | Not started | - |
+| 16. Continuous Monitoring | v1.2 | 0/1 | Not started | - |
+| 17. Multiplayer Exclusion | v1.2 | 0/1 | Not started | - |
+| 18. Custom Callbacks | v1.2 | 0/1 | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-01-21 after Phase 14 execution complete*
+*Last updated: 2026-01-21 after v1.2 roadmap created*
