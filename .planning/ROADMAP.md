@@ -60,7 +60,9 @@ Plans:
   3. Hash history cleared when rollback invalidates frames
   4. Binary message format (13 bytes) works correctly
 **Research flag:** Unlikely (extension of existing protocol)
-**Plans:** TBD
+**Plans:** 1 plan
+Plans:
+- [ ] 12-01-PLAN.md — P2P_MSG_STATE_HASH protocol, encode/decode, exchange queue, rollback invalidation
 
 ### Phase 13: Mismatch Detection
 **Goal:** Comparison logic, peer buffering, desync event logging
@@ -96,10 +98,10 @@ Phases execute in numeric order: 11 -> 12 -> 13 -> 14
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 11. Hash Infrastructure | v1.1 | 1/1 | Complete | 2026-01-21 |
-| 12. P2P Hash Exchange | v1.1 | 0/TBD | Not started | - |
+| 12. P2P Hash Exchange | v1.1 | 0/1 | Planned | - |
 | 13. Mismatch Detection | v1.1 | 0/TBD | Not started | - |
 | 14. Validation Export | v1.1 | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-01-21 after Phase 11 execution complete*
+*Last updated: 2026-01-20 after Phase 12 planning complete*
