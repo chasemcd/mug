@@ -1,311 +1,350 @@
-# Feature Landscape: P2P Sync Validation & Desync Detection
+# Features Research: Participant Exclusion
 
-**Domain:** Sync validation for GGPO-style rollback netcode in research experiments
-**Researched:** 2026-01-20
-**Milestone:** v1.1 (subsequent to P2P multiplayer foundation)
-**Confidence:** HIGH (based on GGPO SDK documentation, fighting game implementations, RTS lockstep patterns, and community tooling)
+**Domain:** Browser-based research experiment platforms with participant screening
+**Researched:** 2026-01-21
+**Confidence:** MEDIUM-HIGH (verified with official documentation and platform guides)
 
-## Context
+## Executive Summary
 
-Sync validation ensures both peers in a P2P rollback system maintain identical simulations. In research contexts, this is critical: desync means invalid experimental data. Production netcode systems have evolved sophisticated desync detection and debugging capabilities that can inform this implementation.
+Research platforms implement participant screening at three levels: **pre-registration screening** (demographics/qualifications before study access), **entry-time technical checks** (device/browser validation at experiment start), and **continuous monitoring** (attention/behavior during experiment). The sophistication varies dramatically:
 
-**Current State (v1.0):**
-- MD5 hash of `env.get_state()` for state comparison
-- Server-authoritative fallback for recovery
-- Basic `diagnostics` object tracking rollback metrics
+- **Recruitment platforms** (Prolific, MTurk, CloudResearch) excel at pre-registration demographic screening with massive filter catalogs
+- **Experiment builders** (jsPsych, Gorilla, oTree) focus on entry-time technical validation with runtime behavior detection
+- **Interactive Gym's use case** requires both entry checks AND continuous real-time monitoring during gameplay, plus multiplayer-specific dropout handling
 
-**Goal (v1.1):**
-- Detect desync immediately when it occurs
-- Provide actionable debugging information for researchers
-- Enable determinism verification during development
+**Key insight:** No existing platform handles the "multiplayer game with continuous exclusion + partner impact" case well. oTree has dropout handling for turn-based economics experiments, but real-time game scenarios need tighter monitoring. This is a differentiator opportunity.
 
----
+## Table Stakes Features
 
-## Table Stakes
+Features users expect. Missing = platform unusable for serious research.
 
-Features that are essential for any production-quality desync detection system. Missing = desyncs go undetected or are undiagnosable.
+| Feature | Why Expected | Complexity | Notes |
+|---------|--------------|------------|-------|
+| **Device type detection** (mobile/desktop) | Mobile inputs differ fundamentally; many experiments require keyboard | Low | jsPsych, Gorilla have built-in. Modern devices can spoof (iPads as computers) |
+| **Browser type/version check** | WebRTC/WebGL/WebAudio support varies by browser | Low | jsPsych browser-check plugin does this well |
+| **Screen size minimum** | Experiments need consistent viewport; small screens break layouts | Low | jsPsych supports minimum_width/height with resize prompt |
+| **Configurable rejection messages** | Researchers need to explain why participant can't continue | Low | Every platform supports custom exclusion text |
+| **Consent flow integration** | IRB requires informed consent before any data collection | Medium | Must gate all screening after consent or use consent as implicit screening |
+| **Pre-screening demographic filters** | Core recruitment platform functionality | Medium | Prolific has 400+ prescreeners; MTurk has qualifications; SONA has prescreen questionnaires |
+| **Repeat participation prevention** | Within-subject designs need tracking; between-subjects need blocking | Medium | Session tracking, participant IDs, or browser fingerprinting |
 
-| Feature | Why Essential | Complexity | Real-World Example | Notes |
-|---------|---------------|------------|-------------------|-------|
-| **Per-Frame State Checksum** | Detect exact frame where divergence began | Low | GGPO `save_game_state` checksum param; SupCom once-per-second hash | Upgrade from periodic to every frame (or every N frames) |
-| **Checksum Exchange Protocol** | Compare checksums between peers to detect mismatch | Low | Spring RTS: each player sends checksum to server; majority determines "correct" | Need efficient wire format for checksums |
-| **Mismatch Frame Identification** | Know which frame first diverged (not just "desync occurred") | Medium | GeneralsGameCode: CRC per frame with player/frame logging | Critical for debugging - "desync on frame 83, detected frame 93" |
-| **Sync Test Mode (Single-Player)** | Run simulation twice per frame, verify determinism without network | Medium | GGPO `ggpo_start_synctest`: execute frame, rollback, re-execute, compare | Development-time determinism validation |
-| **State Dump on Mismatch** | Capture full state when checksum differs for post-mortem analysis | Medium | Godot Rollback: log inspector captures state at mismatch | Essential for debugging - "what was different?" |
-| **Deterministic RNG Seeding** | Ensure random operations produce identical results on both peers | Low | All lockstep engines: shared seed communicated at session start | Existing in v1.0 but needs verification tooling |
+**Implementation priority:** Device detection, browser check, and screen size are immediate needs for Interactive Gym. Consent flow already exists (StartScene). Pre-screening is handled by upstream recruitment platforms (Prolific/MTurk).
 
----
+## Advanced Features (Differentiators)
 
-## Differentiators
+Features that set product apart. Not expected, but valued.
 
-Advanced capabilities that distinguish production-quality debugging tools. Not required for basic detection but dramatically improve debugging efficiency.
+| Feature | Value Proposition | Complexity | Notes |
+|---------|-------------------|------------|-------|
+| **Connection quality monitoring** (ping, jitter, packet loss) | Ensures valid data for latency-sensitive experiments | Medium | No existing experiment platform does this well; Interactive Gym already has WebRTC metrics |
+| **Continuous real-time exclusion** | Exclude participant mid-experiment if criteria violated | High | oTree has timeout-based; jsPsych doesn't support mid-experiment exclusion |
+| **Multiplayer dropout coordination** | End experiment cleanly for partner when one participant excluded | High | oTree's dropout_handling reduces timeouts; no platform handles "end for both" well |
+| **Inactivity detection during gameplay** | Detect AFK participants in real-time games | Medium | oTree checks between pages; need continuous detection during game loop |
+| **Fullscreen enforcement with recovery** | Prevent tab-switching during attention-critical tasks | Medium | jsPsych tracks fullscreen exit events; can prompt re-entry |
+| **Tab visibility monitoring** | Detect when participant switches to other tabs | Low | Browser visibilitychange API; jsPsych records interaction data |
+| **Comprehension check gating** | Block experiment continuation until instructions understood | Medium | GuidedTrack pattern: repeat instructions until quiz passed |
+| **Attention check with auto-rejection** | Prolific allows rejection on 2 failed attention checks | Medium | Controversial: recent research questions validity |
+| **Connection type discrimination** | Distinguish direct P2P vs TURN relay vs WebSocket fallback | Low | Interactive Gym already tracks this; can exclude TURN-only participants |
+| **Custom callback exclusion rules** | Let researchers define arbitrary exclusion logic | Medium | jsPsych inclusion_function pattern is good model |
 
-| Feature | Value Proposition | Complexity | Real-World Example | Notes |
-|---------|-------------------|------------|-------------------|-------|
-| **Hierarchical/Incremental Checksums** | Narrow down which subsystem diverged (positions? health? inventory?) | Medium | GeneralsGameCode: separate CRCs for unit positions, health, locomotive forces | "Entity positions match, but entity health diverged" |
-| **Frame Diff Logging** | Side-by-side comparison of states at divergent frame | High | Godot Rollback Log Inspector: replay client shows state visually | Log format: `{frame: N, peer1: {...}, peer2: {...}, diff: [...]}` |
-| **Deterministic Replay Validation** | Re-run recorded inputs offline, verify same outcome | Medium | UFE Playback Tool: record what player saw vs post-rollback truth | Enables CI-based determinism regression tests |
-| **Binary Search Desync Localization** | Automated narrowing of which code path caused divergence | High | Demigod desync debugging: "binary search of printf-ing the hash" | Expensive but invaluable for rare desyncs |
-| **Per-Entity State Tracking** | Track each game entity's state separately for granular comparison | Medium | Bevy Turborand: per-entity RNG components for determinism | Helps identify "which entity went wrong" |
-| **Live Sync Debug Overlay** | Runtime visualization showing sync status, checksum matches, rollback frequency | Low | Godot Rollback: F11 overlay showing sync metrics | Developer tool for manual testing |
-| **Post-Rollback Frame Recording** | Record both predicted frame AND corrected frame after rollback | Medium | UFE: "Record Post-Rollback Frames" toggle | Helps understand what changed during rollback |
-| **Automated Desync Reproduction** | Given inputs + seed, reproduce the exact desync scenario | Medium | Logic frame dump: "re-run game inputs several times, assert identical" | Critical for fixing intermittent desyncs |
-| **Cross-Platform Determinism Validation** | Verify same inputs produce same state on different browser/OS | High | Box2D: 3 levels of determinism (algorithmic, multithreaded, cross-platform) | Browser differences can cause subtle desyncs |
-
----
+**Implementation priority:** Connection quality monitoring and multiplayer dropout coordination are the key differentiators for Interactive Gym's real-time game use case.
 
 ## Anti-Features
 
-Things that would hurt performance, add complexity without value, or are inappropriate for this use case.
+Features to explicitly NOT build. Common mistakes in this domain.
 
 | Anti-Feature | Why Avoid | What to Do Instead |
 |--------------|-----------|-------------------|
-| **Full State Sync Every Frame** | Massive bandwidth; defeats purpose of input-based sync | Checksum comparison only; full state only on mismatch |
-| **Cryptographic Hash Functions for Checksums** | Overkill security; slow; MD5/SHA unnecessary for integrity checking | Simple XOR hash, CRC32, or FNV-1a (fast, sufficient collision resistance) |
-| **Blocking Validation** | Stalling game loop for checksum comparison kills responsiveness | Async comparison; validation can trail simulation by frames |
-| **Automated Resync on Every Mismatch** | Hides bugs; research needs to KNOW when desyncs occurred | Log and alert; manual recovery decision or configurable policy |
-| **Unlimited State History** | Memory explosion storing every frame's state | Rolling window (e.g., last 60 frames); configurable retention |
-| **Complex Serialization Formats** | Protobuf/MessagePack add complexity; JSON variants across browsers | JSON with deterministic key ordering; or raw binary with spec |
-| **Attempting to "Merge" Divergent States** | No meaningful merge; both states are wrong from divergence point | Authoritative resync from server or match restart |
-| **Over-Detailed Logging in Production** | Performance overhead; storage costs | Verbose logging only in debug/development mode; metrics only in production |
-| **Synchronous Network Validation** | Waiting for peer checksum before advancing frame | Fire-and-forget checksum exchange; detect mismatch async |
+| **Duplicate all Prolific/MTurk prescreeners** | Recruitment platforms already do this; duplicating creates maintenance burden and sync issues | Accept that pre-screening is upstream; focus on technical criteria they can't check |
+| **Auto-rejection on first attention check failure** | Research shows 61% of failures may be deliberate non-compliance, not inattention; false positives harm data quality | Use attention checks for flagging, not auto-exclusion; require 2+ failures |
+| **Silent exclusion without explanation** | Participants deserve to know why they can't continue; platforms like Prolific require explanation | Always show configurable message explaining exclusion reason |
+| **Server-side browser fingerprinting for repeat detection** | Privacy concerns, GDPR issues, fingerprints change with browser updates | Use recruitment platform's built-in repeat detection (Prolific tracks this) |
+| **Complex rule engine with AND/OR/NOT operators** | Over-engineering; researchers want simple "check A, check B" not SQL-style predicates | Simple list of rules, all must pass; complex logic can use custom callbacks |
+| **Blocking based on ISP/geolocation** | False positives (VPN users, travelers); CloudResearch found this unreliable alone | Combine with other signals if needed; don't use as sole criterion |
+| **Mandatory fullscreen for all experiments** | Some experiments don't need it; Safari has keyboard issues in fullscreen; creates friction | Make fullscreen optional, configurable per experiment |
+| **Webcam/microphone permission blocking** | Many experiments don't need A/V; prompting for unused permissions is bad UX | Only check when experiment actually uses these features |
 
----
+## Platform Comparison
+
+### Prolific
+
+**Type:** Recruitment platform (participants pre-registered)
+**Screening approach:** Pre-registration demographic filters
+
+**Features:**
+- 400+ prescreening criteria (demographics, health, personality, etc.)
+- In-study custom screening (August 2025) with auto screen-out payment
+- Quota studies with demographic balancing (up to 120 strata)
+- "Exceptionally fast" submission detection for quality flagging
+- Attention check policy: can reject on 2 failed valid checks
+
+**Strengths:** Massive prescreener library, participant quality vetting, handles payment for screen-outs
+**Weaknesses:** Technical checks (device, browser, connection) must be done in your experiment
+
+**Sources:** [Prolific Prescreening](https://researcher-help.prolific.com/en/article/58ef2f), [In-Study Screening](https://researcher-help.prolific.com/en/articles/445165-can-i-screen-participants-within-my-study)
+
+### MTurk / CloudResearch
+
+**Type:** Recruitment platform with qualification system
+**Screening approach:** Qualifications (system + custom) and vetted participant lists
+
+**Features:**
+- System qualifications: HIT approval rate, # HITs approved, Masters status
+- Custom qualifications with qualification tests
+- CloudResearch Approved Participants (vetted for attention/engagement)
+- Sentry: Pre-survey behavioral + technological vetting
+- Suspicious geolocation blocking
+- 50+ panel criteria for demographic targeting
+
+**Strengths:** Experience-based qualifications (10K+ approved HITs), CloudResearch's patented vetting
+**Weaknesses:** Custom qualifications require API (not in UI), qualification request system is broken
+
+**Sources:** [MTurk Qualifications](https://docs.aws.amazon.com/AWSMechTurk/latest/AWSMechanicalTurkRequester/SelectingEligibleWorkers.html), [CloudResearch Data Quality](https://www.cloudresearch.com/resources/blog/new-tools-improve-research-data-quality-mturk/)
+
+### jsPsych
+
+**Type:** Experiment framework (JavaScript)
+**Screening approach:** Browser-check plugin at experiment start
+
+**Features:**
+- Browser type and version detection
+- Mobile device detection
+- Screen size requirements with resize prompts
+- WebAudio API support check
+- Fullscreen API support check
+- Display refresh rate measurement
+- Webcam/microphone availability detection
+- Custom inclusion_function for arbitrary logic
+- Custom exclusion_message based on which criterion failed
+- Interaction data recording (fullscreen exit, tab blur events)
+
+**Strengths:** Well-designed plugin API, comprehensive browser feature detection
+**Weaknesses:** Mid-experiment exclusion not supported (only at trial boundaries), mobile exclusion has known bugs on tablets
+
+**Code pattern:**
+```javascript
+var trial = {
+  type: jsPsychBrowserCheck,
+  inclusion_function: (data) => {
+    return data.browser == 'chrome' && data.mobile === false
+  },
+  exclusion_message: (data) => {
+    if(data.mobile){
+      return '<p>You must use a desktop/laptop computer.</p>';
+    } else if(data.browser !== 'chrome'){
+      return '<p>You must use Chrome.</p>'
+    }
+  }
+};
+```
+
+**Sources:** [jsPsych Browser Check Plugin](https://www.jspsych.org/v7/plugins/browser-check/), [Browser Device Support](https://www.jspsych.org/v8/overview/browser-device-support/)
+
+### oTree
+
+**Type:** Experiment framework (Python, focused on economics/game theory)
+**Screening approach:** Timeout-based dropout detection, consent-based filtering
+
+**Features:**
+- Activity detection: participants asked "are you still there?" after inactivity
+- Tab-switching detection: excludes participants who switch tabs on wait pages
+- Timeout-based dropout marking (timeout_happened flag)
+- Consent app filtering with group_by_arrival_time
+- Participant labels for duplicate participation prevention
+- PARTICIPANT_FIELDS for storing screening data across apps
+
+**Multiplayer dropout handling (third-party):**
+- Dynamically reduces timeouts to 1 second when dropout detected
+- Time-limited group matching (create single-player group if match timeout)
+- Reduces wait time from 90+ seconds to ~32 seconds
+
+**Strengths:** Built for multiplayer economics experiments, good dropout handling patterns
+**Weaknesses:** Page-based checking (not continuous), no real-time game support
+
+**Sources:** [oTree Wait Pages](https://otree.readthedocs.io/en/latest/multiplayer/waitpages.html), [oTree Dropout Handling](https://github.com/chkgk/dropout_handling)
+
+### Gorilla Experiment Builder
+
+**Type:** No-code experiment builder (web-based)
+**Screening approach:** Recruitment requirements + experiment tree reject nodes
+
+**Features:**
+- Device type restrictions (mobile/tablet/desktop)
+- Browser type restrictions
+- Location restrictions
+- Connection speed restrictions
+- Reject nodes in experiment tree for early screening
+- Rejection statuses: Rejected, RejectedManual, RejectedTimeLimit, RejectedQuality, RejectedOverQuota
+- Custom eligibility questions with branching
+
+**Strengths:** Visual experiment builder, granular rejection status tracking
+**Weaknesses:** Device spoofing (iPads identifying as computers) requires additional verification
+
+**Sources:** [Gorilla Recruitment Requirements](https://support.gorilla.sc/support/launching-your-study/recruitment-requirements)
+
+### Pavlovia
+
+**Type:** Experiment hosting platform (PsychoPy/jsPsych/lab.js)
+**Screening approach:** Inherits from experiment framework used
+
+**Features:**
+- Automatically saves frame rate and OS
+- Touch screen support via Mouse component
+- Integrates with Prolific screening
+- URL parameters for condition assignment
+- Git-based project management
+
+**Strengths:** Supports multiple experiment frameworks, good PsychoPy integration
+**Weaknesses:** No built-in screening; relies on underlying framework (jsPsych, etc.)
+
+**Sources:** [Pavlovia Integration](https://researcher-help.prolific.com/en/articles/445190-pavlovia-integration-guide)
+
+### SONA Systems
+
+**Type:** University participant pool management
+**Screening approach:** Prescreen questionnaire with eligibility restrictions
+
+**Features:**
+- Custom prescreen questionnaires
+- Restrictions based on single items or computed scores
+- Multiple criteria with logical AND
+- Real-time participant count for restrictions
+- Per-study restriction settings
+- Opt-out options for sensitive questions
+
+**Strengths:** Designed for university subject pools, handles course credit
+**Weaknesses:** Limited to demographics/questionnaire data, no technical checks
+
+**Sources:** [SONA Prescreen Restrictions](https://www.sona-systems.com/researcher/prescreen-participation-restrictions/)
 
 ## Feature Dependencies
 
 ```
-                    ┌─────────────────────────┐
-                    │ Deterministic RNG       │
-                    │ Seeding (existing)      │
-                    └───────────┬─────────────┘
-                                │
-                                ▼
-                    ┌─────────────────────────┐
-                    │ Per-Frame State         │
-                    │ Checksum                │
-                    └───────────┬─────────────┘
-                                │
-            ┌───────────────────┼───────────────────┐
-            ▼                   ▼                   ▼
-┌───────────────────┐ ┌─────────────────┐ ┌───────────────────┐
-│ Sync Test Mode    │ │ Checksum        │ │ State Dump on     │
-│ (Single-Player)   │ │ Exchange Proto  │ │ Mismatch          │
-└───────────────────┘ └────────┬────────┘ └─────────┬─────────┘
-                               │                    │
-                               ▼                    │
-                    ┌─────────────────────┐         │
-                    │ Mismatch Frame      │◄────────┘
-                    │ Identification      │
-                    └───────────┬─────────┘
-                                │
-            ┌───────────────────┼───────────────────┐
-            ▼                   ▼                   ▼
-┌───────────────────┐ ┌─────────────────┐ ┌───────────────────┐
-│ Hierarchical      │ │ Frame Diff      │ │ Live Sync Debug   │
-│ Checksums         │ │ Logging         │ │ Overlay           │
-└───────────────────┘ └─────────────────┘ └───────────────────┘
-            │                   │
-            └─────────┬─────────┘
-                      ▼
-            ┌─────────────────────────┐
-            │ Deterministic Replay    │
-            │ Validation              │
-            └─────────────────────────┘
+Pre-experiment (before game starts):
+  Consent → Browser Check → Connection Quality Check → Entry Allowed
+
+Entry checks:
+  ├── Device type (mobile/desktop)
+  ├── Browser type/version
+  ├── Screen size
+  ├── WebRTC support
+  └── Connection quality (ping test)
+
+Continuous monitoring (during game):
+  ├── Inactivity detection → Exclusion trigger
+  ├── Connection quality degradation → Exclusion trigger
+  ├── Tab visibility → Warning/Exclusion trigger
+  └── Fullscreen exit → Warning/Recovery prompt
+
+Multiplayer coordination:
+  Player A excluded → Notify Player B → End game for both → Collect partial data
 ```
 
-**Critical Path (build in order):**
-1. Per-Frame State Checksum (foundation)
-2. Checksum Exchange Protocol (peer communication)
-3. Mismatch Frame Identification (know when)
-4. State Dump on Mismatch (know what)
-5. Sync Test Mode (development validation)
+## Recommendations for Interactive Gym
 
-**Parallel Development (can build independently):**
-- Live Sync Debug Overlay (visual tooling)
-- Hierarchical Checksums (enhanced diagnostics)
-- Frame Diff Logging (debugging enhancement)
+### Phase 1: Entry Screening (Table Stakes)
 
----
+**Priority: HIGH** — Without these, researchers won't trust data quality
 
-## Implementation Patterns from Production Systems
+1. **Device type detection** — Exclude mobile unless explicitly allowed
+2. **Browser check** — Require WebRTC-capable browsers (Chrome, Firefox, Edge)
+3. **Screen size minimum** — Configurable per experiment
+4. **Configurable rejection messages** — Each rule has its own message
 
-### GGPO Sync Test Pattern
+### Phase 2: Connection Quality (Differentiator)
 
-From the [GGPO Developer Guide](https://github.com/pond3r/ggpo/blob/master/doc/DeveloperGuide.md):
+**Priority: HIGH** — This is where Interactive Gym can excel
 
-```
-Sync Test Session Flow:
-1. Execute frame normally
-2. Save state with checksum
-3. Force 1-frame rollback
-4. Re-execute same frame
-5. Save state with checksum
-6. Compare checksums
-7. If mismatch: desync bug exists
-```
+1. **Ping threshold check at entry** — "Your connection is too slow for this experiment"
+2. **Connection type detection** — Already exists; expose as exclusion criterion
+3. **Continuous latency monitoring** — Exclude if ping degrades past threshold
+4. **Packet loss detection** — WebRTC stats API provides this
 
-**Key insight:** Run this in development continuously. Catch determinism bugs immediately after introduction.
+### Phase 3: Behavior Monitoring (Differentiator)
 
-### RTS Checksum Pattern
+**Priority: MEDIUM** — Important for data quality, complex to implement
 
-From [Synchronous RTS Engines and a Tale of Desyncs](https://www.forrestthewoods.com/blog/synchronous_rts_engines_and_a_tale_of_desyncs/):
+1. **Inactivity detection** — No inputs for N seconds triggers warning, then exclusion
+2. **Tab visibility monitoring** — Record or warn on tab switches
+3. **Disconnect pattern detection** — Multiple reconnects may indicate unstable environment
 
-```
-Supreme Commander approach:
-- Hash entire game state once per second
-- If any client disagrees: game over (disconnect)
-- No recovery mechanism
-- Debugging: "binary search of printf-ing the current memory hash"
-```
+### Phase 4: Multiplayer Coordination (Critical Differentiator)
 
-**Key insight:** Simple detection is better than complex recovery. In research, we want to KNOW about desyncs, not hide them.
+**Priority: HIGH** — No other platform does this well
 
-### GeneralsGameCode CRC Pattern
+1. **Partner notification on exclusion** — "Your partner has been disconnected"
+2. **Clean game termination** — Save partial data, record exclusion reason
+3. **Exclusion propagation** — Both players see appropriate message
+4. **Partial data handling** — Don't discard valid data before exclusion
 
-From [GeneralsGameCode Issue #289](https://github.com/TheSuperHackers/GeneralsGameCode/issues/289):
+### Architecture Recommendation
 
 ```
-CRC logging strategy:
-- Log CRC evolution every logic frame
-- Collect logs from 2+ clients that mismatched
-- Compare logs to find divergence frame
-- Works for replays too: run twice, compare logs
+ExclusionRule interface:
+  - name: string
+  - checkAtEntry: boolean
+  - checkContinuously: boolean
+  - check(context): { passed: boolean, reason?: string }
+  - getMessage(): string
+
+Built-in rules:
+  - PingThresholdRule(maxPing: number)
+  - BrowserRequirementRule(allowed: string[])
+  - ScreenSizeRule(minWidth: number, minHeight: number)
+  - InactivityRule(timeoutSeconds: number)
+  - DeviceTypeRule(allowMobile: boolean)
+
+Custom rules:
+  - CustomCallbackRule(fn: (context) => { passed, reason })
+
+Exclusion flow:
+  1. Entry: Run all checkAtEntry rules
+  2. Game loop: Run all checkContinuously rules each tick (or interval)
+  3. Exclusion: Stop game, notify all players, collect partial data
 ```
 
-**Key insight:** Aggressive frame-by-frame logging enables post-mortem analysis.
+## Confidence Assessment
 
-### Godot Rollback Log Inspector
+| Area | Confidence | Reason |
+|------|------------|--------|
+| Platform capabilities | HIGH | Verified with official documentation for jsPsych, oTree, Gorilla, Prolific |
+| Attention check research | MEDIUM | Academic literature reviewed, but recommendations still evolving |
+| Multiplayer dropout patterns | MEDIUM | oTree patterns verified; real-time game scenarios less documented |
+| Connection quality thresholds | LOW | Gaming industry has standards (50-100ms acceptable), but research experiments may differ |
 
-From [Godot Rollback Netcode Addon](https://www.snopekgames.com/project/godot-rollback-netcode-addon/):
+## Open Questions
 
-```
-Features:
-- SyncReplay.gd singleton for replay from logs
-- Log Inspector in Godot editor
-- Replay client connects via TCP for live debugging
-- Visual state inspection at mismatch frame
-```
-
-**Key insight:** Tooling matters as much as detection. Being able to visually inspect divergent state accelerates debugging.
-
-### Universal Fighting Engine (UFE) Pattern
-
-From [UFE Network Options](http://www.ufe3d.com/doku.php/global:network):
-
-```
-Desync Detection Options:
-- Float Desync Threshold: compare values within tolerance
-- Log Sync Messages: report every successful sync check
-- Record Post-Rollback Frames: see what changed during rollback
-- Playback Tool: pause both players, enable replay comparison
-```
-
-**Key insight:** Configurable verbosity levels. Development needs detail; production needs minimal overhead.
-
----
-
-## Checksum Algorithm Recommendations
-
-| Algorithm | Speed | Collision Resistance | Use Case |
-|-----------|-------|---------------------|----------|
-| **XOR-based** | Fastest | Weak | Large state, performance-critical |
-| **CRC32** | Fast | Good | Balanced choice for game state |
-| **FNV-1a** | Fast | Good | Alternative to CRC32 |
-| **xxHash** | Very Fast | Very Good | If available, best overall |
-| **MD5** | Slow | Overkill | Current implementation; replace |
-| **SHA-256** | Slowest | Massive overkill | Never use for sync validation |
-
-**Recommendation:** Replace MD5 with CRC32 or FNV-1a. Existing MD5 is ~10x slower than needed.
-
----
-
-## MVP Recommendation for v1.1
-
-### Must Have (Table Stakes)
-
-1. **Per-Frame State Checksum** - Replace periodic MD5 with per-frame CRC32
-2. **Checksum Exchange Protocol** - Piggyback on existing input messages
-3. **Mismatch Frame Identification** - Log exact frame number of divergence
-4. **State Dump on Mismatch** - Capture both peer states when checksum differs
-5. **Sync Test Mode** - Single-player determinism validation
-
-### Should Have (Differentiators with High ROI)
-
-1. **Live Sync Debug Overlay** - Low complexity, high visibility during development
-2. **Deterministic Replay Validation** - Enable CI regression tests for determinism
-
-### Defer to v1.2+
-
-- **Hierarchical Checksums** - Optimization for complex state
-- **Frame Diff Logging** - Nice to have, complex to implement
-- **Binary Search Localization** - Rare desync edge case handling
-- **Cross-Platform Validation** - Verify need first with actual browser testing
-
----
-
-## Research-Specific Considerations
-
-| Consideration | Why Important for Research | Implementation |
-|---------------|---------------------------|----------------|
-| **Desync Logging to Server** | Researchers need to know which sessions had sync issues | Send desync event to server with frame, checksums, session ID |
-| **Session Validity Flag** | Mark sessions that experienced desync as potentially invalid data | Automatic flag in session metadata |
-| **Desync Frequency Metrics** | Aggregate statistics across experiments | Track desyncs per session, recovery rate, frames to detect |
-| **Post-Hoc Replay Validation** | Verify recorded data was deterministic | Replay inputs offline, compare to recorded outcomes |
-| **Determinism Test Suite** | Automated verification before experiments run | CI job: same seed + inputs = same final state |
-
----
-
-## Complexity Estimates
-
-| Feature | Complexity | Rationale |
-|---------|------------|-----------|
-| Per-Frame Checksum | **Low** | Replace hash function, call more frequently |
-| Checksum Exchange | **Low** | Add field to existing messages |
-| Mismatch Frame ID | **Low** | Logging enhancement |
-| State Dump on Mismatch | **Medium** | Need structured capture, storage strategy |
-| Sync Test Mode | **Medium** | New entry point, modified game loop |
-| Live Debug Overlay | **Low** | UI component with existing metrics |
-| Hierarchical Checksums | **Medium** | Requires state decomposition |
-| Replay Validation | **Medium** | Requires complete input capture, offline runner |
-| Frame Diff Logging | **High** | Complex state comparison, visualization |
-| Binary Search Localization | **High** | Automated instrumentation, iterative execution |
-
----
+1. **What ping threshold makes data invalid?** Gaming suggests >100ms is problematic, but research experiments may have different tolerances
+2. **Should inactivity warning precede exclusion?** Prolific policy requires warning before rejection in some cases
+3. **How to handle "border" cases?** Participant with 95ms ping when threshold is 100ms — binary or gradual?
+4. **Partial data retention policy?** If participant excluded at minute 3 of 5, is that data usable?
 
 ## Sources
 
-### HIGH Confidence (Official Documentation / Source Code)
+### Recruitment Platforms
+- [Prolific Prescreening](https://researcher-help.prolific.com/en/article/58ef2f)
+- [Prolific In-Study Screening](https://researcher-help.prolific.com/en/articles/445165-can-i-screen-participants-within-my-study)
+- [Prolific Attention Check Policy](https://researcher-help.prolific.com/en/articles/445153-prolific-s-attention-and-comprehension-check-policy)
+- [MTurk Qualification Requirements](https://docs.aws.amazon.com/AWSMechTurk/latest/AWSMturkAPI/ApiReference_QualificationRequirementDataStructureArticle.html)
+- [CloudResearch Data Quality](https://www.cloudresearch.com/resources/blog/new-tools-improve-research-data-quality-mturk/)
+- [SONA Prescreen Restrictions](https://www.sona-systems.com/researcher/prescreen-participation-restrictions/)
 
-- [GGPO Developer Guide](https://github.com/pond3r/ggpo/blob/master/doc/DeveloperGuide.md) - Sync test mode, checksum in save_game_state callback
-- [GGPO GitHub Repository](https://github.com/pond3r/ggpo) - Reference implementation
-- [GeneralsGameCode Issue #289](https://github.com/TheSuperHackers/GeneralsGameCode/issues/289) - CRC-based desync detection proposal
+### Experiment Frameworks
+- [jsPsych Browser Check Plugin](https://www.jspsych.org/v7/plugins/browser-check/)
+- [jsPsych Browser Device Support](https://www.jspsych.org/v8/overview/browser-device-support/)
+- [jsPsych Fullscreen Plugin](https://www.jspsych.org/v7/plugins/fullscreen/)
+- [oTree Wait Pages](https://otree.readthedocs.io/en/latest/multiplayer/waitpages.html)
+- [oTree Dropout Handling (third-party)](https://github.com/chkgk/dropout_handling)
+- [Gorilla Recruitment Requirements](https://support.gorilla.sc/support/launching-your-study/recruitment-requirements)
+- [Pavlovia Integration Guide](https://researcher-help.prolific.com/en/articles/445190-pavlovia-integration-guide)
 
-### MEDIUM Confidence (Industry Practice / Multiple Sources)
+### Research Literature
+- [Attention Checks Review and Recommendations](https://www.researchgate.net/publication/376340288_Attention_checks_and_how_to_use_them_Review_and_practical_recommendations)
+- [Statistical Analysis of Studies with Attention Checks (2025)](https://journals.sagepub.com/doi/full/10.1177/25152459251338041)
+- [Reducing Dropouts in Online Experiments](https://www.playstudies.com/reducing-dropouts-in-online-experiments/)
+- [Dropout Analysis R Package](https://link.springer.com/article/10.3758/s13428-025-02730-2)
 
-- [Synchronous RTS Engines and a Tale of Desyncs](https://www.forrestthewoods.com/blog/synchronous_rts_engines_and_a_tale_of_desyncs/) - SupCom/Demigod desync debugging
-- [Godot Rollback Netcode Addon](https://www.snopekgames.com/project/godot-rollback-netcode-addon/) - Log Inspector tooling
-- [UFE Network Options](http://www.ufe3d.com/doku.php/global:network) - Float threshold, playback tool
-- [Preparing Your Game for Deterministic Netcode](https://yal.cc/preparing-your-game-for-deterministic-netcode/) - Debugging strategies
-- [Game Networking Demystified Part II](https://ruoyusun.com/2019/03/29/game-networking-2.html) - Frame dump tools
-
-### LOW Confidence (Community Wisdom / Single Source)
-
-- [Deterministic Simulation for Lockstep Multiplayer](https://www.daydreamsoft.com/blog/deterministic-simulation-for-lockstep-multiplayer-engines) - General patterns
-- [Hacker News Discussion on Lockstep](https://news.ycombinator.com/item?id=8802461) - Checksum strategies
-
----
-
-## Summary
-
-Production netcode systems consistently implement these patterns for desync detection:
-
-1. **Checksum every frame** (or regularly) - CRC32/XOR, not MD5
-2. **Exchange checksums between peers** - Async, non-blocking
-3. **Identify exact divergence frame** - Frame number logging
-4. **Dump state on mismatch** - For post-mortem analysis
-5. **Sync test mode for development** - Catch determinism bugs early
-
-The most valuable insight from this research: **detection is cheap; debugging is expensive**. Invest in tooling that helps pinpoint WHY desyncs occur, not just that they occurred.
-
-For v1.1, focus on table stakes (detection + identification) and one differentiator (sync test mode for development). Advanced debugging tools can come in v1.2 as needed.
+### Technical References
+- [Ping and Latency in Gaming](https://www.bandwidthplace.com/article/ping-latency-in-gaming)
+- [Chrome Idle Detection API](https://developer.chrome.com/docs/capabilities/web-apis/idle-detection)
+- [Browser Fingerprinting Survey](https://www.researchgate.net/publication/332873650_Browser_Fingerprinting_A_survey)
