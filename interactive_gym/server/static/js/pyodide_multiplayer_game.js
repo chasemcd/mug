@@ -2014,8 +2014,21 @@ obs, rewards, terminateds, truncateds, infos, render_state
         const humanPlayerIds = this._getHumanPlayerIds();
         if (humanPlayerIds.length === 0) return;
 
+        // Determine starting frame for confirmation scan
+        let startFrame = this.confirmedFrame + 1;
+
+        // If confirmedFrame is behind the oldest frame in inputBuffer (due to pruning),
+        // skip ahead to the earliest available frame to avoid scanning empty range
+        if (this.inputBuffer.size > 0) {
+            const oldestBufferedFrame = Math.min(...this.inputBuffer.keys());
+            if (startFrame < oldestBufferedFrame) {
+                // Jump to oldest available frame - we can't confirm frames we don't have
+                startFrame = oldestBufferedFrame;
+            }
+        }
+
         // Find highest consecutive confirmed frame
-        for (let frame = this.confirmedFrame + 1; frame < this.frameNumber; frame++) {
+        for (let frame = startFrame; frame < this.frameNumber; frame++) {
             if (this._hasAllInputsForFrame(frame, humanPlayerIds)) {
                 // This frame is now confirmed (all inputs received)
                 this.confirmedFrame = frame;
