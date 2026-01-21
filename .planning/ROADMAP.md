@@ -77,7 +77,7 @@ Plans:
 **Research flag:** Unlikely (architecture documented, patterns from prior phases)
 **Plans:** 1 plan
 Plans:
-- [ ] 13-01-PLAN.md — verifiedFrame tracking, desyncEvents logging, comparison logic, rollback integration
+- [ ] 13-01-PLAN.md — verifiedFrame tracking, desyncEvents logging, comparison logic, rollback integration (planned)
 
 ### Phase 14: Validation Export
 **Goal:** Post-game JSON export with frame-by-frame validation data
@@ -100,7 +100,7 @@ Phases execute in numeric order: 11 -> 12 -> 13 -> 14
 |-------|-----------|----------------|--------|-----------|
 | 11. Hash Infrastructure | v1.1 | 1/1 | Complete | 2026-01-21 |
 | 12. P2P Hash Exchange | v1.1 | 1/1 | Complete | 2026-01-21 |
-| 13. Mismatch Detection | v1.1 | 0/1 | Planned | - |
+| 13. Mismatch Detection | v1.1 | 0/1 | Planning complete | - |
 | 14. Validation Export | v1.1 | 0/TBD | Not started | - |
 
 ---
