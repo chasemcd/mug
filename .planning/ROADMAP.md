@@ -130,10 +130,9 @@ Plans:
   3. Tab switch detected when participant leaves experiment window
   4. Tab switch triggers configurable warning or exclusion
 **Research flag:** Likely (power-saving mode pitfall P10 needs careful handling)
-**Plans:** TBD
-
+**Plans:** 1 plan
 Plans:
-- [ ] 16-01-PLAN.md - TBD
+- [ ] 16-01-PLAN.md - GymScene.continuous_monitoring() config, ContinuousMonitor class, game loop integration
 
 ### Phase 17: Multiplayer Exclusion Handling
 **Goal:** Coordinated game termination when one player excluded
@@ -175,10 +174,10 @@ Phases execute in numeric order: 15 -> 16 -> 17 -> 18
 | 13. Mismatch Detection | v1.1 | 1/1 | Complete | 2026-01-21 |
 | 14. Validation Export | v1.1 | 1/1 | Complete | 2026-01-21 |
 | 15. Entry Screening Rules | v1.2 | 1/1 | Complete | 2026-01-21 |
-| 16. Continuous Monitoring | v1.2 | 0/1 | Not started | - |
+| 16. Continuous Monitoring | v1.2 | 0/1 | Planned | - |
 | 17. Multiplayer Exclusion | v1.2 | 0/1 | Not started | - |
 | 18. Custom Callbacks | v1.2 | 0/1 | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-01-21 after Phase 15 complete*
+*Last updated: 2026-01-21 after Phase 16 planned*
