@@ -85,7 +85,7 @@ if __name__ == "__main__":
         # $ export TURN_USERNAME=<open-relay-username>
         # $ export TURN_CREDENTIAL=<open-relay-password>
         # Or pass them in below.
-        .webrtc(force_relay=False)
+        .webrtc(force_relay=True)
     )
 		
     app.run(experiment_config)
