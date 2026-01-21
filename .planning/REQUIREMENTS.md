@@ -1,57 +1,58 @@
-# Requirements: Interactive Gym v1.1 Sync Validation
+# Requirements: Interactive Gym v1.2 Participant Exclusion
 
-**Defined:** 2026-01-20
+**Defined:** 2026-01-21
 **Core Value:** Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
 
-## v1.1 Requirements
+## v1.2 Requirements
 
-Requirements for sync validation milestone. Each maps to roadmap phases.
+Requirements for v1.2 Participant Exclusion milestone. Each maps to roadmap phases.
 
-### State Hashing
+### Entry Screening
 
-- [x] **HASH-01**: System computes state hash only on confirmed frames (not predicted)
-- [x] **HASH-02**: System normalizes floats to 10 decimal places before hashing
-- [x] **HASH-03**: System uses SHA-256 (truncated to 16 chars) for deterministic cross-platform hashing
-- [x] **HASH-04**: System maintains confirmedHashHistory with frame-to-hash mapping
+- [ ] **ENTRY-01**: Researcher can configure device type exclusion (mobile/desktop/both allowed)
+- [ ] **ENTRY-02**: Researcher can configure browser type requirements (e.g., require Chrome/Firefox, block Safari)
+- [ ] **ENTRY-03**: Researcher can configure ping threshold for entry (exclude if latency > N ms)
+- [ ] **ENTRY-04**: Participant sees configurable message explaining why they were excluded at entry
 
-### Hash Exchange
+### Continuous Monitoring
 
-- [x] **EXCH-01**: System sends state hashes via P2P DataChannel (message type 0x07)
-- [x] **EXCH-02**: System exchanges hashes asynchronously without blocking frame advancement
-- [x] **EXCH-03**: System invalidates hash history entries when rollback occurs (frames >= target)
-- [x] **EXCH-04**: System encodes hash messages in binary format (13 bytes: type + frame + hash)
+- [ ] **MONITOR-01**: System continuously monitors participant ping during gameplay
+- [ ] **MONITOR-02**: Participant excluded mid-game if ping exceeds threshold for sustained period
+- [ ] **MONITOR-03**: System detects when participant switches to another tab
+- [ ] **MONITOR-04**: Tab switch triggers configurable warning or exclusion
 
-### Mismatch Detection
+### Multiplayer Handling
 
-- [x] **DETECT-01**: System identifies exact frame number where mismatch occurred
-- [x] **DETECT-02**: System buffers peer hashes until local confirmation catches up
-- [x] **DETECT-03**: System logs desync events with frame, both hashes, and timestamp
-- [x] **DETECT-04**: System tracks verifiedFrame as highest mutually-verified frame
-- [x] **DETECT-05**: System captures full state dump when mismatch detected
+- [ ] **MULTI-01**: When one player excluded, the other player receives clear notification ("Your partner experienced a technical issue")
+- [ ] **MULTI-02**: Game terminates cleanly for both players when one is excluded
+- [ ] **MULTI-03**: Valid game data up to exclusion point is preserved and marked as partial session
 
-### Validation Export
+### Extensibility
 
-- [x] **EXPORT-01**: System exports post-game JSON with frame-by-frame hashes and actions
-- [x] **EXPORT-02**: System exports only confirmed-frame data (excludes predictions)
-- [x] **EXPORT-03**: System includes desync events in validation export
-- [x] **EXPORT-04**: System exports verified action sequences per player
+- [ ] **EXT-01**: Researcher can define custom exclusion rules via Python callback functions
+- [ ] **EXT-02**: Custom callbacks receive participant context (ping, browser, focus state, etc.)
+- [ ] **EXT-03**: Custom callbacks return exclusion decision with optional message
 
 ## v2 Requirements
 
-Deferred to future milestone. Tracked but not in current roadmap.
+Deferred to future release. Tracked but not in current roadmap.
 
-### Development Tools
+### Entry Screening
 
-- **TOOL-01**: Sync test mode for single-player determinism validation
-- **TOOL-02**: Live sync debug overlay showing validation metrics
-- **TOOL-03**: Hierarchical checksums for subsystem-level debugging
-- **TOOL-04**: Frame diff logging with side-by-side state comparison
+- **ENTRY-05**: Researcher can configure screen size minimum requirement
+- **ENTRY-06**: Researcher can exclude based on connection type (P2P vs TURN vs fallback)
 
-### Advanced Validation
+### Continuous Monitoring
 
-- **ADV-01**: Deterministic replay validation for CI regression tests
-- **ADV-02**: Cross-platform determinism validation (Chrome/Firefox/Safari)
-- **ADV-03**: Binary search desync localization
+- **MONITOR-05**: System detects participant inactivity (no inputs for N seconds)
+- **MONITOR-06**: System detects disconnect patterns (multiple reconnects indicate unstable environment)
+
+### Extensibility
+
+- **EXT-04**: Each built-in rule has its own configurable participant-facing message
+- **EXT-05**: GameCallback.on_exclusion() hook for researcher custom handling
+- **EXT-06**: Exclusion analytics export (rate by rule, time, browser)
+- **EXT-07**: Grace period warning system before exclusion (warn, then exclude if persists)
 
 ## Out of Scope
 
@@ -59,41 +60,39 @@ Explicitly excluded. Documented to prevent scope creep.
 
 | Feature | Reason |
 |---------|--------|
-| Full state sync every frame | Massive bandwidth; defeats purpose of input-based sync |
-| Blocking validation | Kills responsiveness; validation can trail simulation |
-| Automated resync on mismatch | Research needs to KNOW about desyncs, not hide them |
-| Cryptographic hash for security | Overkill — integrity checking, not security |
-| Complex serialization (protobuf) | JSON with deterministic ordering is sufficient |
+| Duplicate Prolific/MTurk prescreeners | Handled by recruitment platforms; duplicating creates maintenance burden |
+| Auto-rejection on first attention check | Research shows 61% of failures may be false positives |
+| Complex rule engine (AND/OR/NOT operators) | Over-engineering; custom callbacks handle complex logic |
+| Browser fingerprinting for repeat detection | Privacy/GDPR concerns; recruitment platforms track this |
+| Mandatory fullscreen enforcement | Safari has keyboard issues in fullscreen; creates friction |
+| Webcam/microphone permission blocking | Only check when experiment actually uses A/V |
 
 ## Traceability
 
-Which phases cover which requirements.
+Which phases cover which requirements. Updated by create-roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| HASH-01 | Phase 11 | Complete |
-| HASH-02 | Phase 11 | Complete |
-| HASH-03 | Phase 11 | Complete |
-| HASH-04 | Phase 11 | Complete |
-| EXCH-01 | Phase 12 | Complete |
-| EXCH-02 | Phase 12 | Complete |
-| EXCH-03 | Phase 12 | Complete |
-| EXCH-04 | Phase 12 | Complete |
-| DETECT-01 | Phase 13 | Complete |
-| DETECT-02 | Phase 13 | Complete |
-| DETECT-03 | Phase 13 | Complete |
-| DETECT-04 | Phase 13 | Complete |
-| DETECT-05 | Phase 13 | Complete |
-| EXPORT-01 | Phase 14 | Complete |
-| EXPORT-02 | Phase 14 | Complete |
-| EXPORT-03 | Phase 14 | Complete |
-| EXPORT-04 | Phase 14 | Complete |
+| ENTRY-01 | TBD | Pending |
+| ENTRY-02 | TBD | Pending |
+| ENTRY-03 | TBD | Pending |
+| ENTRY-04 | TBD | Pending |
+| MONITOR-01 | TBD | Pending |
+| MONITOR-02 | TBD | Pending |
+| MONITOR-03 | TBD | Pending |
+| MONITOR-04 | TBD | Pending |
+| MULTI-01 | TBD | Pending |
+| MULTI-02 | TBD | Pending |
+| MULTI-03 | TBD | Pending |
+| EXT-01 | TBD | Pending |
+| EXT-02 | TBD | Pending |
+| EXT-03 | TBD | Pending |
 
 **Coverage:**
-- v1.1 requirements: 17 total
-- Mapped to phases: 17 ✓
-- Unmapped: 0
+- v1.2 requirements: 14 total
+- Mapped to phases: 0 (pending roadmap)
+- Unmapped: 14
 
 ---
-*Requirements defined: 2026-01-20*
-*Last updated: 2026-01-21 after Phase 14 execution complete — all v1.1 requirements satisfied*
+*Requirements defined: 2026-01-21*
+*Last updated: 2026-01-21 after initial definition*
