@@ -43,6 +43,7 @@ const P2P_MSG_PONG = 0x03;
 const P2P_MSG_KEEPALIVE = 0x04;
 const P2P_MSG_EPISODE_END = 0x05;  // Episode reset synchronization
 const P2P_MSG_EPISODE_READY = 0x06;  // Episode start synchronization
+const P2P_MSG_STATE_HASH = 0x07;  // State hash for sync validation
 
 /**
  * Encode an input packet for P2P transmission.
@@ -219,6 +220,52 @@ function decodeEpisodeReady(buffer) {
         episodeNumber: view.getUint32(1, false),
         stateHash: stateHash
     };
+}
+
+/**
+ * Encode a state hash message for P2P transmission.
+ * Used for sync validation - peers exchange hashes of confirmed frames.
+ * Format: 13 bytes
+ *   Byte 0: Message type (0x07)
+ *   Bytes 1-4: Frame number (uint32, big-endian)
+ *   Bytes 5-12: Hash value (8 bytes from 16 hex chars)
+ *
+ * @param {number} frameNumber - Frame this hash corresponds to
+ * @param {string} hash - 16-char hex hash (SHA-256 truncated)
+ * @returns {ArrayBuffer} Encoded packet (13 bytes)
+ */
+function encodeStateHash(frameNumber, hash) {
+    const buffer = new ArrayBuffer(13);
+    const view = new DataView(buffer);
+    view.setUint8(0, P2P_MSG_STATE_HASH);
+    view.setUint32(1, frameNumber, false);  // big-endian
+    // Write 8 bytes of hash (16 hex chars = 8 bytes)
+    for (let i = 0; i < 8; i++) {
+        const hexPair = hash.substring(i * 2, i * 2 + 2);
+        view.setUint8(5 + i, parseInt(hexPair, 16));
+    }
+    return buffer;
+}
+
+/**
+ * Decode a state hash message from P2P transmission.
+ *
+ * @param {ArrayBuffer} buffer - Received packet
+ * @returns {{frameNumber: number, hash: string}|null} Decoded data or null if wrong type
+ */
+function decodeStateHash(buffer) {
+    const view = new DataView(buffer);
+    const type = view.getUint8(0);
+    if (type !== P2P_MSG_STATE_HASH) return null;
+
+    const frameNumber = view.getUint32(1, false);
+    // Read 8 bytes and convert back to 16-char hex string
+    let hash = '';
+    for (let i = 0; i < 8; i++) {
+        const byte = view.getUint8(5 + i);
+        hash += byte.toString(16).padStart(2, '0');
+    }
+    return { frameNumber, hash };
 }
 
 /**
