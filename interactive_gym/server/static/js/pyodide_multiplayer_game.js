@@ -2120,6 +2120,26 @@ obs, rewards, terminateds, truncateds, infos, render_state
         }
     }
 
+    /**
+     * Handle received state hash from peer.
+     * Stores hash in pendingPeerHashes for later comparison (Phase 13: DETECT-02).
+     * @param {ArrayBuffer} buffer - Received P2P message
+     */
+    _handleStateHash(buffer) {
+        const decoded = decodeStateHash(buffer);
+        if (!decoded) {
+            p2pLog.warn('Failed to decode state hash message');
+            return;
+        }
+
+        const { frameNumber, hash } = decoded;
+
+        // Store for later comparison (Phase 13 will implement comparison logic)
+        this.pendingPeerHashes.set(frameNumber, hash);
+
+        p2pLog.debug(`Received peer hash for frame ${frameNumber}: ${hash}`);
+    }
+
     async computeQuickStateHash() {
         /**
          * Compute SHA-256 hash of env_state with float normalization.
@@ -2944,6 +2964,17 @@ json.dumps({
         }
         p2pLog.debug(`Invalidated confirmed hashes >= frame ${targetFrame}`);
 
+        // Invalidate pending peer hashes from rollback point onward (EXCH-03)
+        // These will be re-received when peer re-confirms after their rollback
+        for (const frame of this.pendingPeerHashes.keys()) {
+            if (frame >= targetFrame) {
+                this.pendingPeerHashes.delete(frame);
+            }
+        }
+
+        // Clear outbound queue - these hashes are for states being overwritten
+        this.pendingHashExchange = this.pendingHashExchange.filter(h => h.frame < targetFrame);
+
         // Also reset confirmedFrame to before rollback point
         // (it will be recalculated after replay completes via _updateConfirmedFrame)
         this.confirmedFrame = Math.min(this.confirmedFrame, targetFrame - 1);
@@ -3305,6 +3336,10 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
         // Clear confirmed hash history on episode reset (HASH-04)
         this.confirmedHashHistory.clear();
 
+        // Clear hash exchange structures for new episode (EXCH-03)
+        this.pendingHashExchange = [];
+        this.pendingPeerHashes.clear();
+
         // Clear debug delayed input queue
         this.debugDelayedInputQueue = [];
 
@@ -3586,6 +3621,9 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
                 break;
             case P2P_MSG_EPISODE_READY:
                 this._handleEpisodeReady(buffer);
+                break;
+            case P2P_MSG_STATE_HASH:
+                this._handleStateHash(buffer);
                 break;
             default:
                 p2pLog.warn(`Unknown binary message type: ${messageType}`);
