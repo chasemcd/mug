@@ -8,7 +8,17 @@ A framework for running browser-based reinforcement learning experiments with hu
 
 Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
 
-## Current State (v1.0)
+## Current Milestone: v1.1 Sync Validation
+
+**Goal:** Build a validation system that confirms verified action sequences and state hashes are identical across all peers, enabling debugging of non-deterministic environments and networking issues.
+
+**Target features:**
+- Live state hash comparison after confirmed inputs are applied
+- Action sequence verification between peers
+- Mismatch logging (continue gameplay, don't interrupt)
+- Post-game JSON export with frame-by-frame validation data
+
+## Previous State (v1.0)
 
 **Shipped:** 2026-01-19
 
@@ -53,6 +63,14 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 
 ### Active
 
+- [ ] Deterministic state hashing via env.get_state()
+- [ ] Live state hash exchange between peers after confirmed inputs
+- [ ] Action sequence verification (compare verified input histories)
+- [ ] Mismatch detection and logging (non-blocking)
+- [ ] Post-game validation JSON export (frame-by-frame hashes and actions)
+
+### Deferred
+
 - [ ] Rollback visual smoothing (tween objects after corrections)
 - [ ] N-player support with hybrid topology (mesh for small N, relay for large N)
 - [ ] Adaptive input delay based on RTT
@@ -96,4 +114,4 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 | Open Relay Project for TURN | Free 20GB/month tier sufficient for research | ✓ Good |
 
 ---
-*Last updated: 2026-01-19 after v1.0 milestone*
+*Last updated: 2026-01-20 after v1.1 milestone start*
