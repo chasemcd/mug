@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import os
 import time
 from collections import deque
 from dataclasses import dataclass, field
@@ -46,6 +47,9 @@ class AdminEventAggregator:
     # Maximum number of console log entries to retain
     MAX_CONSOLE_LOG_SIZE = 1000
 
+    # Directory for persisted console logs
+    CONSOLE_LOGS_DIR = "data/console_logs"
+
     def __init__(
         self,
         sio: flask_socketio.SocketIO,
@@ -53,7 +57,8 @@ class AdminEventAggregator:
         stagers: dict,               # STAGERS
         game_managers: dict,         # GAME_MANAGERS
         pyodide_coordinator: PyodideGameCoordinator | None = None,
-        processed_subjects: list | None = None  # PROCESSED_SUBJECT_NAMES
+        processed_subjects: list | None = None,  # PROCESSED_SUBJECT_NAMES
+        save_console_logs: bool = True
     ):
         """
         Initialize the aggregator with references to experiment state.
@@ -65,6 +70,7 @@ class AdminEventAggregator:
             game_managers: Reference to GAME_MANAGERS dict
             pyodide_coordinator: Optional PyodideGameCoordinator reference
             processed_subjects: Optional list of completed subject IDs
+            save_console_logs: Whether to persist console logs to disk
         """
         # Store references (read-only access)
         # Do NOT modify these - observer pattern only
@@ -80,6 +86,15 @@ class AdminEventAggregator:
 
         # Console log - capped FIFO queue for participant console output
         self._console_logs: deque[dict] = deque(maxlen=self.MAX_CONSOLE_LOG_SIZE)
+
+        # Console log file persistence
+        self._save_console_logs = save_console_logs
+        self._console_log_files: dict[str, Any] = {}  # subject_id -> file handle
+
+        # Create console logs directory if saving enabled
+        if self._save_console_logs:
+            os.makedirs(self.CONSOLE_LOGS_DIR, exist_ok=True)
+            logger.info(f"Console logs will be saved to {self.CONSOLE_LOGS_DIR}/")
 
         # Broadcast loop state
         self._broadcast_running = False
@@ -336,6 +351,8 @@ class AdminEventAggregator:
         """
         Receive and store a console log from a participant, emit to admins immediately.
 
+        Also persists to disk for retrospective analysis.
+
         Args:
             subject_id: The participant's subject ID
             level: Log level (log, info, warn, error)
@@ -352,8 +369,73 @@ class AdminEventAggregator:
         # Append to console log (deque auto-removes old entries when full)
         self._console_logs.append(log_entry)
 
+        # Persist to disk (non-blocking)
+        if self._save_console_logs:
+            self._persist_console_log(subject_id, log_entry)
+
         # Immediately emit to admins for real-time log view
         self.emit_console_log(log_entry)
+
+    def _persist_console_log(self, subject_id: str, log_entry: dict) -> None:
+        """
+        Persist a console log entry to disk.
+
+        Uses JSON Lines format (.jsonl) for efficient appending.
+        Each participant gets their own log file.
+
+        Args:
+            subject_id: The participant's subject ID
+            log_entry: The log entry dict to persist
+        """
+        try:
+            # Get or create file handle for this subject
+            if subject_id not in self._console_log_files:
+                filepath = os.path.join(
+                    self.CONSOLE_LOGS_DIR,
+                    f"{subject_id}_console.jsonl"
+                )
+                self._console_log_files[subject_id] = open(filepath, 'a', encoding='utf-8')
+                logger.debug(f"Opened console log file for {subject_id}: {filepath}")
+
+            # Write log entry as JSON line
+            file_handle = self._console_log_files[subject_id]
+            file_handle.write(json.dumps(log_entry) + '\n')
+            file_handle.flush()  # Ensure data is written immediately
+
+        except Exception as e:
+            logger.warning(f"Failed to persist console log for {subject_id}: {e}")
+
+    def close_console_log_files(self) -> None:
+        """
+        Close all open console log file handles.
+
+        Should be called during server shutdown or when cleaning up.
+        """
+        for subject_id, file_handle in list(self._console_log_files.items()):
+            try:
+                file_handle.close()
+                logger.debug(f"Closed console log file for {subject_id}")
+            except Exception as e:
+                logger.warning(f"Error closing console log file for {subject_id}: {e}")
+        self._console_log_files.clear()
+        logger.info("All console log files closed")
+
+    def close_subject_console_log(self, subject_id: str) -> None:
+        """
+        Close the console log file for a specific subject.
+
+        Called when a participant completes their session.
+
+        Args:
+            subject_id: The participant's subject ID
+        """
+        if subject_id in self._console_log_files:
+            try:
+                self._console_log_files[subject_id].close()
+                del self._console_log_files[subject_id]
+                logger.debug(f"Closed console log file for completed subject: {subject_id}")
+            except Exception as e:
+                logger.warning(f"Error closing console log file for {subject_id}: {e}")
 
     def emit_console_log(self, log_entry: dict) -> None:
         """
@@ -448,8 +530,9 @@ class AdminEventAggregator:
         logger.info("Admin broadcast loop spawned")
 
     def stop_broadcast_loop(self) -> None:
-        """Stop the periodic broadcast loop."""
+        """Stop the periodic broadcast loop and clean up resources."""
         self._broadcast_running = False
+        self.close_console_log_files()
         logger.info("Admin broadcast loop stopped")
 
     def _broadcast_state(self) -> None:

@@ -528,6 +528,10 @@ def leave_game(data):
         game_manager.leave_game(subject_id=subject_id)
         PROCESSED_SUBJECT_NAMES.append(subject_id)
 
+        # Close console log file for completed subject
+        if ADMIN_AGGREGATOR:
+            ADMIN_AGGREGATOR.close_subject_console_log(subject_id)
+
 
 # @socketio.on("disconnect")
 # def on_disconnect():
@@ -1755,7 +1759,8 @@ def run(config):
         stagers=STAGERS,
         game_managers=GAME_MANAGERS,
         pyodide_coordinator=PYODIDE_COORDINATOR,
-        processed_subjects=PROCESSED_SUBJECT_NAMES
+        processed_subjects=PROCESSED_SUBJECT_NAMES,
+        save_console_logs=CONFIG.save_experiment_data
     )
     ADMIN_AGGREGATOR.start_broadcast_loop(interval_seconds=1.0)
     logger.info("Admin event aggregator initialized and broadcast loop started")
