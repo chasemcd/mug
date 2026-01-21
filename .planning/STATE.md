@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-21)
 ## Current Position
 
 Phase: 15 of 18 (Entry Screening Rules)
-Plan: 15-01-PLAN.md (1 plan, verified)
-Status: Ready to execute
-Last activity: 2026-01-21 — Phase 15 planned
+Plan: 15-01 complete
+Status: Phase 15 complete
+Last activity: 2026-01-21 - Completed 15-01-PLAN.md
 
-Progress: [          ] 0% (v1.2 - 0/4 phases complete)
+Progress: [##........] 25% (v1.2 - 1/4 phases complete)
 
 ## Milestone History
 
@@ -41,6 +41,9 @@ Progress: [          ] 0% (v1.2 - 0/4 phases complete)
 - `.planning/phases/14-validation-export/14-01-SUMMARY.md`
 - `.planning/research/SUMMARY.md`
 - `.planning/research/ARCHITECTURE.md`
+
+**v1.2 Execution:**
+- `.planning/phases/15-entry-screening-rules/15-01-SUMMARY.md`
 
 ### Decisions
 
@@ -72,6 +75,12 @@ See: .planning/PROJECT.md Key Decisions table
 - Filter actions to verifiedFrame for mutually-confirmed sequences (EXPORT-04)
 - Include hasStateDump flag instead of full dump for manageable export size (EXPORT-03)
 
+**v1.2 decisions (Phase 15):**
+- ua-parser-js via CDN for browser/device detection (ENTRY-01)
+- Browser blocklist takes precedence over requirements for stricter safety (ENTRY-02)
+- Default exclusion messages provided, researcher can customize (ENTRY-03)
+- Entry screening runs before Pyodide initialization to fail fast (ENTRY-04)
+
 ### Pending Todos
 
 (None)
@@ -85,9 +94,9 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-01-21
-Stopped at: v1.2 roadmap created
+Stopped at: Completed 15-01-PLAN.md
 Resume file: None
 
 ### Next Steps
 
-1. `/gsd:execute-phase 15` — execute Entry Screening Rules phase
+1. `/gsd:execute-phase 16` - execute In-Game Exclusion Events phase
