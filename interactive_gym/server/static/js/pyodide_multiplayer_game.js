@@ -1501,6 +1501,9 @@ hashlib.md5(json.dumps(_state, sort_keys=True).encode()).hexdigest()[:8]
         // This triggers hash computation for any newly confirmed frames (HASH-01)
         await this._updateConfirmedFrame();
 
+        // Exchange any pending hashes with peer (EXCH-01, EXCH-02)
+        this._exchangePendingHashes();
+
         // 3. Build final action dict - ALL human players use delayed inputs from buffer
         // This is true GGPO: local player also experiences input delay
         const finalActions = {};
@@ -2076,6 +2079,44 @@ obs, rewards, terminateds, truncateds, infos, render_state
         }
         for (const key of keysToDelete) {
             this.confirmedHashHistory.delete(key);
+        }
+    }
+
+    /**
+     * Send pending state hashes to peer via P2P DataChannel.
+     * Called from step loop after _updateConfirmedFrame completes.
+     * Skipped during rollback to avoid sending hashes from mid-replay state.
+     * (EXCH-01: P2P DataChannel, EXCH-02: non-blocking, EXCH-04: binary format)
+     */
+    _exchangePendingHashes() {
+        // Skip if rollback in progress (hash would be from mid-replay state)
+        if (this.rollbackInProgress) {
+            return;
+        }
+
+        // Skip if no P2P connection ready
+        if (!this.webrtcManager?.isReady()) {
+            // Keep hashes queued - will send when connection recovers
+            return;
+        }
+
+        // Drain pending hash queue
+        while (this.pendingHashExchange.length > 0) {
+            const { frame, hash } = this.pendingHashExchange.shift();
+
+            // Encode and send via P2P
+            const packet = encodeStateHash(frame, hash);
+            const sent = this.webrtcManager.send(packet);
+
+            if (sent) {
+                p2pLog.debug(`Sent hash for frame ${frame}: ${hash}`);
+            } else {
+                // Send failed (buffer full) - re-queue at front and stop
+                // Better to delay than to lose hash data
+                this.pendingHashExchange.unshift({ frame, hash });
+                p2pLog.debug(`Hash send buffer full, re-queued frame ${frame}`);
+                break;
+            }
         }
     }
 
