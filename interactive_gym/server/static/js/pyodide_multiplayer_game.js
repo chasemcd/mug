@@ -2144,6 +2144,94 @@ obs, rewards, terminateds, truncateds, infos, render_state
         p2pLog.debug(`Received peer hash for frame ${frameNumber}: ${hash}`);
     }
 
+    /**
+     * Attempt to compare hashes for a given frame.
+     * Called when either local hash is stored or peer hash is received.
+     * Requires both hashes to exist for comparison. (DETECT-01, DETECT-02)
+     * @param {number} frameNumber - Frame to compare
+     */
+    _attemptHashComparison(frameNumber) {
+        // Skip during rollback - state is in flux
+        if (this.rollbackInProgress) {
+            return;
+        }
+
+        const ourHash = this.confirmedHashHistory.get(frameNumber);
+        const peerHash = this.pendingPeerHashes.get(frameNumber);
+
+        // Need both hashes to compare (DETECT-02: peer hash buffered until we catch up)
+        if (!ourHash || !peerHash) {
+            return;
+        }
+
+        // Remove from pending - we're about to process it
+        this.pendingPeerHashes.delete(frameNumber);
+
+        // Compare hashes
+        if (ourHash === peerHash) {
+            this._markFrameVerified(frameNumber);
+        } else {
+            this._handleDesync(frameNumber, ourHash, peerHash);
+        }
+    }
+
+    /**
+     * Mark a frame as mutually verified (both peers agree on hash).
+     * Updates verifiedFrame to track highest verified frame. (DETECT-04)
+     * @param {number} frameNumber - Frame that was verified
+     */
+    _markFrameVerified(frameNumber) {
+        // Only update if this is a new high-water mark
+        if (frameNumber > this.verifiedFrame) {
+            this.verifiedFrame = frameNumber;
+            p2pLog.debug(`Frame ${frameNumber} verified - hashes match`);
+        }
+    }
+
+    /**
+     * Handle a desync (hash mismatch) event.
+     * Logs detailed event with frame, both hashes, timestamp, and state dump. (DETECT-01, DETECT-03, DETECT-05)
+     * @param {number} frameNumber - Frame where mismatch occurred
+     * @param {string} ourHash - Our computed hash for this frame
+     * @param {string} peerHash - Peer's hash for this frame
+     */
+    async _handleDesync(frameNumber, ourHash, peerHash) {
+        // Capture current state for debugging (DETECT-05)
+        let stateDump = null;
+        try {
+            if (this.stateSyncSupported) {
+                const stateJson = await this.pyodide.runPythonAsync(`
+import json
+_env_state_dump = env.get_state()
+json.dumps(_env_state_dump, sort_keys=True, default=str)
+`);
+                stateDump = JSON.parse(stateJson);
+            }
+        } catch (e) {
+            p2pLog.warn(`Failed to capture state dump for desync: ${e.message}`);
+        }
+
+        // Create desync event (DETECT-03)
+        const desyncEvent = {
+            frame: frameNumber,
+            ourHash: ourHash,
+            peerHash: peerHash,
+            timestamp: Date.now(),
+            stateDump: stateDump,
+            currentFrame: this.frameNumber,
+            verifiedFrameAtDesync: this.verifiedFrame
+        };
+
+        this.desyncEvents.push(desyncEvent);
+
+        // Log with high visibility (DETECT-01: exact frame identified)
+        p2pLog.warn(
+            `DESYNC DETECTED at frame ${frameNumber}: ` +
+            `ourHash=${ourHash}, peerHash=${peerHash}, ` +
+            `currentFrame=${this.frameNumber}, lastVerified=${this.verifiedFrame}`
+        );
+    }
+
     async computeQuickStateHash() {
         /**
          * Compute SHA-256 hash of env_state with float normalization.
