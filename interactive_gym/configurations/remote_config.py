@@ -371,16 +371,46 @@ class RemoteConfig:
         """
         Configure WebRTC settings for P2P multiplayer.
 
+        Credentials can be provided directly or via environment variables:
+            - TURN_USERNAME: TURN server username
+            - TURN_CREDENTIAL: TURN server credential/password
+
         Args:
-            turn_username: TURN server username (from metered.ca or similar)
-            turn_credential: TURN server credential/password
+            turn_username: TURN server username (from metered.ca or similar).
+                          Falls back to TURN_USERNAME env var if not provided.
+            turn_credential: TURN server credential/password.
+                            Falls back to TURN_CREDENTIAL env var if not provided.
             force_relay: Force relay mode (for testing TURN without direct P2P)
         """
-        if turn_username is not None:
-            self.turn_username = turn_username
-        if turn_credential is not None:
-            self.turn_credential = turn_credential
+        import os
+        import logging
+
+        logger = logging.getLogger(__name__)
+
+        # Use provided values, fall back to environment variables
+        resolved_username = turn_username or os.environ.get("TURN_USERNAME")
+        resolved_credential = turn_credential or os.environ.get("TURN_CREDENTIAL")
+
+        if resolved_username and resolved_credential:
+            self.turn_username = resolved_username
+            self.turn_credential = resolved_credential
+            logger.info(
+                f"TURN credentials loaded (username: {resolved_username[:4]}...)"
+            )
+        elif resolved_username or resolved_credential:
+            logger.warning(
+                "Partial TURN config: both TURN_USERNAME and TURN_CREDENTIAL required"
+            )
+        else:
+            logger.warning(
+                "No TURN credentials found. Set TURN_USERNAME and TURN_CREDENTIAL "
+                "env vars for NAT traversal fallback."
+            )
+
         self.force_turn_relay = force_relay
+        if force_relay:
+            logger.info("TURN force_relay enabled - all connections will use TURN")
+
         return self
 
     @property

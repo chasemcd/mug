@@ -140,6 +140,16 @@ class GameManager:
                 num_episodes = getattr(self.scene, 'num_episodes', 1)
                 max_steps = getattr(self.scene, 'max_steps', 10000)
 
+                # WebRTC TURN configuration from experiment config
+                turn_username = getattr(self.experiment_config, 'turn_username', None)
+                turn_credential = getattr(self.experiment_config, 'turn_credential', None)
+                force_turn_relay = getattr(self.experiment_config, 'force_turn_relay', False)
+
+                if turn_username:
+                    logger.info(f"TURN config will be passed to game {game_id}: username={turn_username[:4]}..., force_relay={force_turn_relay}")
+                else:
+                    logger.warning(f"No TURN credentials for game {game_id}")
+
                 self.pyodide_coordinator.create_game(
                     game_id=game_id,
                     num_players=num_players,
@@ -153,6 +163,9 @@ class GameManager:
                     input_buffer_size=input_buffer_size,
                     max_episodes=num_episodes,
                     max_steps=max_steps,
+                    turn_username=turn_username,
+                    turn_credential=turn_credential,
+                    force_turn_relay=force_turn_relay,
                 )
                 logger.info(
                     f"Created multiplayer Pyodide game state for {game_id} "

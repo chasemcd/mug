@@ -43,6 +43,7 @@ const P2P_MSG_PONG = 0x03;
 const P2P_MSG_KEEPALIVE = 0x04;
 const P2P_MSG_EPISODE_END = 0x05;  // Episode reset synchronization
 const P2P_MSG_EPISODE_READY = 0x06;  // Episode start synchronization
+const P2P_MSG_STATE_HASH = 0x07;  // State hash for sync validation
 
 /**
  * Encode an input packet for P2P transmission.
@@ -219,6 +220,52 @@ function decodeEpisodeReady(buffer) {
         episodeNumber: view.getUint32(1, false),
         stateHash: stateHash
     };
+}
+
+/**
+ * Encode a state hash message for P2P transmission.
+ * Used for sync validation - peers exchange hashes of confirmed frames.
+ * Format: 13 bytes
+ *   Byte 0: Message type (0x07)
+ *   Bytes 1-4: Frame number (uint32, big-endian)
+ *   Bytes 5-12: Hash value (8 bytes from 16 hex chars)
+ *
+ * @param {number} frameNumber - Frame this hash corresponds to
+ * @param {string} hash - 16-char hex hash (SHA-256 truncated)
+ * @returns {ArrayBuffer} Encoded packet (13 bytes)
+ */
+function encodeStateHash(frameNumber, hash) {
+    const buffer = new ArrayBuffer(13);
+    const view = new DataView(buffer);
+    view.setUint8(0, P2P_MSG_STATE_HASH);
+    view.setUint32(1, frameNumber, false);  // big-endian
+    // Write 8 bytes of hash (16 hex chars = 8 bytes)
+    for (let i = 0; i < 8; i++) {
+        const hexPair = hash.substring(i * 2, i * 2 + 2);
+        view.setUint8(5 + i, parseInt(hexPair, 16));
+    }
+    return buffer;
+}
+
+/**
+ * Decode a state hash message from P2P transmission.
+ *
+ * @param {ArrayBuffer} buffer - Received packet
+ * @returns {{frameNumber: number, hash: string}|null} Decoded data or null if wrong type
+ */
+function decodeStateHash(buffer) {
+    const view = new DataView(buffer);
+    const type = view.getUint8(0);
+    if (type !== P2P_MSG_STATE_HASH) return null;
+
+    const frameNumber = view.getUint32(1, false);
+    // Read 8 bytes and convert back to 16-char hex string
+    let hash = '';
+    for (let i = 0; i < 8; i++) {
+        const byte = view.getUint8(5 + i);
+        hash += byte.toString(16).padStart(2, '0');
+    }
+    return { frameNumber, hash };
 }
 
 /**
@@ -507,9 +554,38 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         this.stateHashHistory = new Map();
         this.stateHashHistoryMaxSize = 60;  // Keep ~6 seconds at 10 FPS
 
+        // Confirmed hash history: hashes for frames where ALL players' inputs are confirmed
+        // This is separate from stateHashHistory which may include predicted frames
+        // Uses SHA-256 (truncated to 16 chars) with float normalization for cross-platform reliability
+        this.confirmedHashHistory = new Map();  // frameNumber -> hash (SHA-256 truncated)
+        this.confirmedHashHistoryMaxSize = 120;  // Keep ~4 seconds at 30fps
+
+        // Pending hash exchange: hashes computed but not yet sent to peer
+        // [{frame: number, hash: string}, ...]
+        this.pendingHashExchange = [];
+
+        // Pending peer hashes: hashes received from peer awaiting comparison (Phase 13)
+        // Map<frameNumber, hash>
+        this.pendingPeerHashes = new Map();
+
+        // Mismatch detection state (Phase 13: DETECT-04, DETECT-03)
+        this.verifiedFrame = -1;  // Highest frame mutually verified by both peers
+        this.desyncEvents = [];   // [{frame, ourHash, peerHash, timestamp, stateDump}, ...]
+
         // Action tracking for sync verification
         this.actionSequence = [];  // [{frame: N, actions: {player: action}}]
         this.actionCounts = {};    // {playerId: {action: count}}
+
+        // Cumulative validation data - persists across episodes for full session export
+        // This data is NOT cleared on episode reset, only when scene ends
+        this.cumulativeValidation = {
+            episodes: [],           // Per-episode summaries
+            allHashes: [],          // All confirmed hashes across all episodes
+            allActions: [],         // All verified actions across all episodes
+            allDesyncEvents: [],    // All desync events across all episodes
+            allRollbacks: [],       // All rollback events across all episodes
+            sessionStartTime: Date.now()
+        };
 
         // Sync epoch - received from server, included in actions to prevent stale action matching
         this.syncEpoch = 0;
@@ -1436,6 +1512,13 @@ hashlib.md5(json.dumps(_state, sort_keys=True).encode()).hexdigest()[:8]
             rollbackOccurred = await this.performRollback(rollbackFrame, humanPlayerIds);
         }
 
+        // After rollback completes (or if no rollback), update confirmed frame tracking
+        // This triggers hash computation for any newly confirmed frames (HASH-01)
+        await this._updateConfirmedFrame();
+
+        // Exchange any pending hashes with peer (EXCH-01, EXCH-02)
+        this._exchangePendingHashes();
+
         // 3. Build final action dict - ALL human players use delayed inputs from buffer
         // This is true GGPO: local player also experiences input delay
         const finalActions = {};
@@ -1899,11 +1982,351 @@ obs, rewards, terminateds, truncateds, infos, render_state
         return this.stateHashHistory.get(frameNumber) || null;
     }
 
+    // ========== Confirmed Hash Infrastructure (HASH-01 through HASH-04) ==========
+
+    /**
+     * Get list of human player IDs from policy mapping.
+     * @returns {Array<string>} Array of player IDs where policy is 'human'
+     */
+    _getHumanPlayerIds() {
+        const humanIds = [];
+        for (const [agentId, policy] of Object.entries(this.policyMapping)) {
+            if (policy === 'human') {
+                humanIds.push(String(agentId));
+            }
+        }
+        return humanIds;
+    }
+
+    /**
+     * Check if all specified players have confirmed inputs for a frame.
+     * @param {number} frameNumber - Frame to check
+     * @param {Array<string>} playerIds - Player IDs to check
+     * @returns {boolean} True if all players have inputs for this frame
+     */
+    _hasAllInputsForFrame(frameNumber, playerIds) {
+        const frameInputs = this.inputBuffer.get(frameNumber);
+        if (!frameInputs) return false;
+
+        for (const playerId of playerIds) {
+            if (!frameInputs.has(String(playerId))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Update confirmedFrame to the highest frame where ALL players have confirmed inputs.
+     * Called after processing inputs and after rollback completion.
+     * Triggers hash computation for newly confirmed frames (HASH-01).
+     */
+    async _updateConfirmedFrame() {
+        const humanPlayerIds = this._getHumanPlayerIds();
+        if (humanPlayerIds.length === 0) return;
+
+        // Determine starting frame for confirmation scan
+        let startFrame = this.confirmedFrame + 1;
+
+        // If confirmedFrame is behind the oldest frame in inputBuffer (due to pruning),
+        // skip ahead to the earliest available frame to avoid scanning empty range
+        if (this.inputBuffer.size > 0) {
+            const oldestBufferedFrame = Math.min(...this.inputBuffer.keys());
+            if (startFrame < oldestBufferedFrame) {
+                // Jump to oldest available frame - we can't confirm frames we don't have
+                startFrame = oldestBufferedFrame;
+            }
+        }
+
+        // Find highest consecutive confirmed frame
+        for (let frame = startFrame; frame < this.frameNumber; frame++) {
+            if (this._hasAllInputsForFrame(frame, humanPlayerIds)) {
+                // This frame is now confirmed (all inputs received)
+                this.confirmedFrame = frame;
+
+                // Remove from predictedFrames if it was there
+                this.predictedFrames.delete(frame);
+
+                // Compute and store hash for this confirmed frame
+                await this._computeAndStoreConfirmedHash(frame);
+            } else {
+                // Gap in confirmation - stop here
+                break;
+            }
+        }
+    }
+
+    /**
+     * Compute and store hash for a confirmed frame.
+     * Only called when frame is fully confirmed (all inputs received, no rollback pending).
+     * IMPORTANT: Uses the snapshot for that frame, not current state, to ensure
+     * both peers hash the same state even if they confirm at different times.
+     * @param {number} frameNumber - The confirmed frame to hash
+     */
+    async _computeAndStoreConfirmedHash(frameNumber) {
+        // Skip if hash already exists (e.g., from prior confirmation)
+        if (this.confirmedHashHistory.has(frameNumber)) {
+            return;
+        }
+
+        // Skip if state sync not supported
+        if (!this.stateSyncSupported) {
+            return;
+        }
+
+        // Get the snapshot for this frame - we MUST hash the state from that frame,
+        // not the current state, to ensure deterministic comparison between peers
+        const snapshotJson = this.stateSnapshots.get(frameNumber);
+        if (!snapshotJson) {
+            // No snapshot available for this frame - can happen if:
+            // - Frame is older than maxSnapshots
+            // - Snapshot was never saved (shouldn't happen in normal flow)
+            p2pLog.debug(`No snapshot for confirmed frame ${frameNumber}, skipping hash`);
+            return;
+        }
+
+        try {
+            // Parse snapshot and hash only the env_state portion
+            const snapshot = JSON.parse(snapshotJson);
+            const hash = await this._computeHashFromState(snapshot.env_state);
+
+            if (!hash) {
+                p2pLog.warn(`Failed to compute hash from snapshot for frame ${frameNumber}`);
+                return;
+            }
+
+            this.confirmedHashHistory.set(frameNumber, hash);
+
+            // Queue hash for P2P exchange (EXCH-02: async, non-blocking)
+            this.pendingHashExchange.push({ frame: frameNumber, hash: hash });
+
+            p2pLog.debug(`Confirmed hash for frame ${frameNumber}: ${hash}`);
+
+            // Attempt comparison - will succeed if we have peer hash (DETECT-01)
+            this._attemptHashComparison(frameNumber);
+
+            // Prune old entries to prevent unbounded growth
+            this._pruneConfirmedHashHistory();
+        } catch (e) {
+            p2pLog.warn(`Failed to compute confirmed hash for frame ${frameNumber}: ${e}`);
+        }
+    }
+
+    /**
+     * Compute SHA-256 hash from a given state object (not current env state).
+     * Used for hashing snapshots of past frames.
+     * @param {Object} envState - The environment state to hash
+     * @returns {string|null} 16-char truncated SHA-256 hash, or null on failure
+     * @private
+     */
+    async _computeHashFromState(envState) {
+        if (!envState) {
+            return null;
+        }
+
+        const stateJson = JSON.stringify(envState);
+        const hashResult = await this.pyodide.runPythonAsync(`
+import json
+import hashlib
+
+def _normalize_floats(obj, precision=10):
+    """Recursively normalize floats to fixed precision for deterministic hashing."""
+    if isinstance(obj, float):
+        return round(obj, precision)
+    elif isinstance(obj, dict):
+        return {k: _normalize_floats(v, precision) for k, v in obj.items()}
+    elif isinstance(obj, (list, tuple)):
+        return [_normalize_floats(item, precision) for item in obj]
+    return obj
+
+_state_to_hash = json.loads('''${stateJson.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}''')
+_normalized_state = _normalize_floats(_state_to_hash)
+
+# SHA-256 hash with deterministic JSON serialization (HASH-03)
+_json_str = json.dumps(_normalized_state, sort_keys=True, separators=(',', ':'))
+_hash = hashlib.sha256(_json_str.encode()).hexdigest()[:16]
+_hash
+        `);
+        return hashResult;
+    }
+
+    /**
+     * Remove old entries from confirmedHashHistory to prevent memory growth.
+     * Keeps most recent confirmedHashHistoryMaxSize entries.
+     */
+    _pruneConfirmedHashHistory() {
+        if (this.confirmedHashHistory.size <= this.confirmedHashHistoryMaxSize) {
+            return;
+        }
+
+        // Map maintains insertion order - delete oldest entries
+        const keysToDelete = [];
+        for (const key of this.confirmedHashHistory.keys()) {
+            if (this.confirmedHashHistory.size - keysToDelete.length <= this.confirmedHashHistoryMaxSize) {
+                break;
+            }
+            keysToDelete.push(key);
+        }
+        for (const key of keysToDelete) {
+            this.confirmedHashHistory.delete(key);
+        }
+    }
+
+    /**
+     * Send pending state hashes to peer via P2P DataChannel.
+     * Called from step loop after _updateConfirmedFrame completes.
+     * Skipped during rollback to avoid sending hashes from mid-replay state.
+     * (EXCH-01: P2P DataChannel, EXCH-02: non-blocking, EXCH-04: binary format)
+     */
+    _exchangePendingHashes() {
+        // Skip if rollback in progress (hash would be from mid-replay state)
+        if (this.rollbackInProgress) {
+            return;
+        }
+
+        // Skip if no P2P connection ready
+        if (!this.webrtcManager?.isReady()) {
+            // Keep hashes queued - will send when connection recovers
+            return;
+        }
+
+        // Drain pending hash queue
+        while (this.pendingHashExchange.length > 0) {
+            const { frame, hash } = this.pendingHashExchange.shift();
+
+            // Encode and send via P2P
+            const packet = encodeStateHash(frame, hash);
+            const sent = this.webrtcManager.send(packet);
+
+            if (sent) {
+                p2pLog.debug(`Sent hash for frame ${frame}: ${hash}`);
+            } else {
+                // Send failed (buffer full) - re-queue at front and stop
+                // Better to delay than to lose hash data
+                this.pendingHashExchange.unshift({ frame, hash });
+                p2pLog.debug(`Hash send buffer full, re-queued frame ${frame}`);
+                break;
+            }
+        }
+    }
+
+    /**
+     * Handle received state hash from peer.
+     * Stores hash in pendingPeerHashes for later comparison (Phase 13: DETECT-02).
+     * @param {ArrayBuffer} buffer - Received P2P message
+     */
+    _handleStateHash(buffer) {
+        const decoded = decodeStateHash(buffer);
+        if (!decoded) {
+            p2pLog.warn('Failed to decode state hash message');
+            return;
+        }
+
+        const { frameNumber, hash } = decoded;
+
+        // Store for comparison (DETECT-02: buffer until local catches up)
+        this.pendingPeerHashes.set(frameNumber, hash);
+
+        p2pLog.debug(`Received peer hash for frame ${frameNumber}: ${hash}`);
+
+        // Attempt comparison - will succeed if we have local hash (DETECT-01)
+        this._attemptHashComparison(frameNumber);
+    }
+
+    /**
+     * Attempt to compare hashes for a given frame.
+     * Called when either local hash is stored or peer hash is received.
+     * Requires both hashes to exist for comparison. (DETECT-01, DETECT-02)
+     * @param {number} frameNumber - Frame to compare
+     */
+    _attemptHashComparison(frameNumber) {
+        // Skip during rollback - state is in flux
+        if (this.rollbackInProgress) {
+            return;
+        }
+
+        const ourHash = this.confirmedHashHistory.get(frameNumber);
+        const peerHash = this.pendingPeerHashes.get(frameNumber);
+
+        // Need both hashes to compare (DETECT-02: peer hash buffered until we catch up)
+        if (!ourHash || !peerHash) {
+            return;
+        }
+
+        // Remove from pending - we're about to process it
+        this.pendingPeerHashes.delete(frameNumber);
+
+        // Compare hashes
+        if (ourHash === peerHash) {
+            this._markFrameVerified(frameNumber);
+        } else {
+            this._handleDesync(frameNumber, ourHash, peerHash);
+        }
+    }
+
+    /**
+     * Mark a frame as mutually verified (both peers agree on hash).
+     * Updates verifiedFrame to track highest verified frame. (DETECT-04)
+     * @param {number} frameNumber - Frame that was verified
+     */
+    _markFrameVerified(frameNumber) {
+        // Only update if this is a new high-water mark
+        if (frameNumber > this.verifiedFrame) {
+            this.verifiedFrame = frameNumber;
+            p2pLog.debug(`Frame ${frameNumber} verified - hashes match`);
+        }
+    }
+
+    /**
+     * Handle a desync (hash mismatch) event.
+     * Logs detailed event with frame, both hashes, timestamp, and state dump. (DETECT-01, DETECT-03, DETECT-05)
+     * @param {number} frameNumber - Frame where mismatch occurred
+     * @param {string} ourHash - Our computed hash for this frame
+     * @param {string} peerHash - Peer's hash for this frame
+     */
+    async _handleDesync(frameNumber, ourHash, peerHash) {
+        // Capture current state for debugging (DETECT-05)
+        let stateDump = null;
+        try {
+            if (this.stateSyncSupported) {
+                const stateJson = await this.pyodide.runPythonAsync(`
+import json
+_env_state_dump = env.get_state()
+json.dumps(_env_state_dump, sort_keys=True, default=str)
+`);
+                stateDump = JSON.parse(stateJson);
+            }
+        } catch (e) {
+            p2pLog.warn(`Failed to capture state dump for desync: ${e.message}`);
+        }
+
+        // Create desync event (DETECT-03)
+        const desyncEvent = {
+            frame: frameNumber,
+            ourHash: ourHash,
+            peerHash: peerHash,
+            timestamp: Date.now(),
+            stateDump: stateDump,
+            currentFrame: this.frameNumber,
+            verifiedFrameAtDesync: this.verifiedFrame
+        };
+
+        this.desyncEvents.push(desyncEvent);
+
+        // Log with high visibility (DETECT-01: exact frame identified)
+        p2pLog.warn(
+            `DESYNC DETECTED at frame ${frameNumber}: ` +
+            `ourHash=${ourHash}, peerHash=${peerHash}, ` +
+            `currentFrame=${this.frameNumber}, lastVerified=${this.verifiedFrame}`
+        );
+    }
+
     async computeQuickStateHash() {
         /**
-         * Compute MD5 hash of env_state only (matches server's state_hash).
-         * This is used for quick comparison to avoid unnecessary state corrections.
-         * Returns first 16 chars of MD5 hash to match server format.
+         * Compute SHA-256 hash of env_state with float normalization.
+         * Uses SHA-256 for cross-platform reliability (HASH-03).
+         * Normalizes floats to 10 decimal places before hashing for determinism (HASH-02).
+         * Returns first 16 chars of SHA-256 hash for efficient storage/transmission.
          *
          * Requires the environment to implement get_state() returning a
          * JSON-serializable dict. Returns null if not supported.
@@ -1917,11 +2340,23 @@ obs, rewards, terminateds, truncateds, infos, render_state
 import json
 import hashlib
 
-_env_state_for_hash = env.get_state()
+def _normalize_floats(obj, precision=10):
+    """Recursively normalize floats to fixed precision for deterministic hashing."""
+    if isinstance(obj, float):
+        return round(obj, precision)
+    elif isinstance(obj, dict):
+        return {k: _normalize_floats(v, precision) for k, v in obj.items()}
+    elif isinstance(obj, (list, tuple)):
+        return [_normalize_floats(item, precision) for item in obj]
+    return obj
 
-# Compute MD5 hash matching server's format (sort_keys=True for consistency)
-_json_str = json.dumps(_env_state_for_hash, sort_keys=True)
-_hash = hashlib.md5(_json_str.encode()).hexdigest()[:16]
+_env_state_for_hash = env.get_state()
+_normalized_state = _normalize_floats(_env_state_for_hash)
+
+# SHA-256 hash with deterministic JSON serialization (HASH-03)
+# Using separators=(',', ':') for compact, consistent JSON output
+_json_str = json.dumps(_normalized_state, sort_keys=True, separators=(',', ':'))
+_hash = hashlib.sha256(_json_str.encode()).hexdigest()[:16]
 _hash
         `);
         return hashResult;
@@ -2256,6 +2691,18 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
         if (getLogLevel() >= LOG_LEVELS.debug) {
             const sessionMetrics = this.exportSessionMetrics();
             p2pLog.debug('Session metrics:', JSON.stringify(sessionMetrics, null, 2));
+        }
+
+        // Validation data export for sync analysis
+        if (getLogLevel() >= LOG_LEVELS.debug) {
+            const validationData = this.exportValidationData();
+            p2pLog.debug('Validation export:', JSON.stringify(validationData, null, 2));
+
+            // Log summary at info level always
+            p2pLog.info(
+                `Sync validation: ${validationData.summary.verifiedFrame}/${validationData.summary.totalFrames} frames verified, ` +
+                `${validationData.summary.desyncCount} desyncs, ${validationData.summary.hashesComputed} hashes`
+            );
         }
     }
 
@@ -2701,6 +3148,33 @@ json.dumps({
         // Set rollback guard to prevent nested rollbacks
         this.rollbackInProgress = true;
 
+        // Invalidate confirmed hashes from rollback point onward
+        // These hashes are for states that are about to be overwritten
+        for (const frame of this.confirmedHashHistory.keys()) {
+            if (frame >= targetFrame) {
+                this.confirmedHashHistory.delete(frame);
+            }
+        }
+        p2pLog.debug(`Invalidated confirmed hashes >= frame ${targetFrame}`);
+
+        // Invalidate pending peer hashes from rollback point onward (EXCH-03)
+        // These will be re-received when peer re-confirms after their rollback
+        for (const frame of this.pendingPeerHashes.keys()) {
+            if (frame >= targetFrame) {
+                this.pendingPeerHashes.delete(frame);
+            }
+        }
+
+        // Clear outbound queue - these hashes are for states being overwritten
+        this.pendingHashExchange = this.pendingHashExchange.filter(h => h.frame < targetFrame);
+
+        // Also reset confirmedFrame to before rollback point
+        // (it will be recalculated after replay completes via _updateConfirmedFrame)
+        this.confirmedFrame = Math.min(this.confirmedFrame, targetFrame - 1);
+
+        // Reset verifiedFrame - cannot verify frames that are being replayed (DETECT-04)
+        this.verifiedFrame = Math.min(this.verifiedFrame, targetFrame - 1);
+
         try {
             this.rollbackCount++;
             this.maxRollbackFrames = Math.max(this.maxRollbackFrames, rollbackFrames);
@@ -3043,8 +3517,12 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
 
     /**
      * Clear GGPO state for episode reset.
+     * Preserves cumulative validation data for full session export.
      */
     clearGGPOState() {
+        // Archive current episode data to cumulative validation before clearing
+        this._archiveEpisodeValidationData();
+
         this.inputBuffer.clear();
         this.localInputQueue = [];
         this.stateSnapshots.clear();
@@ -3054,6 +3532,17 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
         this.pendingRollbackFrame = null;
         this.rollbackCount = 0;
         this.maxRollbackFrames = 0;
+
+        // Clear confirmed hash history on episode reset (HASH-04)
+        this.confirmedHashHistory.clear();
+
+        // Clear hash exchange structures for new episode (EXCH-03)
+        this.pendingHashExchange = [];
+        this.pendingPeerHashes.clear();
+
+        // Clear mismatch detection state for new episode (DETECT-03, DETECT-04)
+        this.verifiedFrame = -1;
+        this.desyncEvents = [];
 
         // Clear debug delayed input queue
         this.debugDelayedInputQueue = [];
@@ -3072,6 +3561,91 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
         }
 
         p2pLog.debug('GGPO state cleared for new episode');
+    }
+
+    /**
+     * Archive current episode's validation data to cumulative storage.
+     * Called before clearGGPOState() clears per-episode data.
+     * @private
+     */
+    _archiveEpisodeValidationData() {
+        // Only archive if we have meaningful data (episode actually ran)
+        if (this.frameNumber <= 0 && this.confirmedHashHistory.size === 0) {
+            return;
+        }
+
+        const episodeNum = this.num_episodes;
+
+        // Archive episode summary
+        const episodeSummary = {
+            episodeNum: episodeNum,
+            totalFrames: this.frameNumber,
+            confirmedFrame: this.confirmedFrame,
+            verifiedFrame: this.verifiedFrame,
+            hashCount: this.confirmedHashHistory.size,
+            desyncCount: this.desyncEvents.length,
+            rollbackCount: this.rollbackCount,
+            maxRollbackFrames: this.maxRollbackFrames,
+            timestamp: Date.now()
+        };
+        this.cumulativeValidation.episodes.push(episodeSummary);
+
+        // Archive all confirmed hashes with episode tag
+        for (const [frame, hash] of this.confirmedHashHistory.entries()) {
+            this.cumulativeValidation.allHashes.push({
+                episode: episodeNum,
+                frame: frame,
+                hash: hash
+            });
+        }
+
+        // Archive all verified actions with episode tag
+        // Actions from inputBuffer up to verifiedFrame
+        // Each action is stored as separate entry for easier cross-client comparison
+        const humanPlayerIds = this._getHumanPlayerIds();
+        const verifiedFrames = Array.from(this.inputBuffer.keys())
+            .filter(f => f <= this.verifiedFrame)
+            .sort((a, b) => a - b);
+
+        for (const frame of verifiedFrames) {
+            const frameInputs = this.inputBuffer.get(frame);
+            if (frameInputs) {
+                for (const playerId of humanPlayerIds) {
+                    const action = frameInputs.get(playerId);
+                    if (action !== undefined) {
+                        // Store one entry per player per frame for easy comparison
+                        this.cumulativeValidation.allActions.push({
+                            episode: episodeNum,
+                            frame: frame,
+                            playerId: playerId,
+                            action: action
+                        });
+                    }
+                }
+            }
+        }
+
+        // Archive all desync events with episode tag
+        for (const evt of this.desyncEvents) {
+            this.cumulativeValidation.allDesyncEvents.push({
+                episode: episodeNum,
+                ...evt
+            });
+        }
+
+        // Archive rollback summary for this episode
+        if (this.rollbackCount > 0) {
+            this.cumulativeValidation.allRollbacks.push({
+                episode: episodeNum,
+                count: this.rollbackCount,
+                maxFrames: this.maxRollbackFrames
+            });
+        }
+
+        p2pLog.debug(
+            `Archived episode ${episodeNum} validation: ` +
+            `${this.confirmedHashHistory.size} hashes, ${verifiedFrames.length} actions, ${this.desyncEvents.length} desyncs`
+        );
     }
 
     convertRGBArrayToImage(rgbArray) {
@@ -3336,6 +3910,9 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
                 break;
             case P2P_MSG_EPISODE_READY:
                 this._handleEpisodeReady(buffer);
+                break;
+            case P2P_MSG_STATE_HASH:
+                this._handleStateHash(buffer);
                 break;
             default:
                 p2pLog.warn(`Unknown binary message type: ${messageType}`);
@@ -3797,6 +4374,213 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
                 total: this.frameNumber
             }
         };
+    }
+
+    /**
+     * Export validation data for sync analysis.
+     * Call at episode end or from browser console: window.game.exportValidationData()
+     * Returns JSON-serializable object with confirmed hashes, verified actions, and desyncs.
+     * @returns {Object} Validation data for research analysis
+     */
+    exportValidationData() {
+        return {
+            // Session identification
+            gameId: this.gameId,
+            playerId: this.myPlayerId,
+            exportTimestamp: Date.now(),
+
+            // Sync summary
+            summary: {
+                totalFrames: this.frameNumber,
+                verifiedFrame: this.verifiedFrame,
+                desyncCount: this.desyncEvents.length,
+                hashesComputed: this.confirmedHashHistory.size
+            },
+
+            // Frame-by-frame confirmed hashes (EXPORT-01, EXPORT-02)
+            confirmedHashes: this._exportConfirmedHashes(),
+
+            // Verified action sequences per player (EXPORT-04)
+            verifiedActions: this._exportVerifiedActions(),
+
+            // All desync events with full context (EXPORT-03)
+            desyncEvents: this.desyncEvents.map(evt => ({
+                frame: evt.frame,
+                ourHash: evt.ourHash,
+                peerHash: evt.peerHash,
+                timestamp: evt.timestamp,
+                verifiedFrameAtDesync: evt.verifiedFrameAtDesync,
+                // Include state dump only if present and not too large
+                hasStateDump: !!evt.stateDump
+            }))
+        };
+    }
+
+    /**
+     * Extract confirmed hashes from confirmedHashHistory for export.
+     * @returns {Array<{frame: number, hash: string}>} Sorted array of frame/hash pairs
+     * @private
+     */
+    _exportConfirmedHashes() {
+        // Convert Map to sorted array of {frame, hash} objects
+        const hashes = [];
+        for (const [frame, hash] of this.confirmedHashHistory.entries()) {
+            hashes.push({ frame, hash });
+        }
+        // Sort by frame number for consistent output
+        return hashes.sort((a, b) => a.frame - b.frame);
+    }
+
+    /**
+     * Extract verified actions per player up to verifiedFrame for export.
+     * @returns {Object} Per-player action sequences {playerId: [{frame, action}, ...]}
+     * @private
+     */
+    _exportVerifiedActions() {
+        // Build per-player action sequences from inputBuffer
+        // Only include frames up to verifiedFrame (mutually confirmed)
+        const result = {};
+        const humanPlayerIds = this._getHumanPlayerIds();
+
+        for (const playerId of humanPlayerIds) {
+            result[playerId] = [];
+        }
+
+        // Get frames in sorted order
+        const frames = Array.from(this.inputBuffer.keys())
+            .filter(f => f <= this.verifiedFrame)
+            .sort((a, b) => a - b);
+
+        for (const frame of frames) {
+            const frameInputs = this.inputBuffer.get(frame);
+            if (frameInputs) {
+                for (const playerId of humanPlayerIds) {
+                    const action = frameInputs.get(playerId);
+                    if (action !== undefined) {
+                        result[playerId].push({ frame, action });
+                    }
+                }
+            }
+        }
+
+        return result;
+    }
+
+    /**
+     * Export all multiplayer metrics for persistence.
+     * Uses cumulative data across all episodes for complete session export.
+     * Call at scene termination.
+     * @returns {Object} Complete multiplayer metrics for research data export
+     */
+    exportMultiplayerMetrics() {
+        // Archive current episode data first (in case not yet archived)
+        this._archiveEpisodeValidationData();
+
+        // Get connection health if available
+        const connectionHealth = this.connectionHealth?.getHealthStatus() || null;
+
+        return {
+            // Session identification
+            gameId: this.gameId,
+            playerId: this.myPlayerId,
+            peerPlayerId: this._getHumanPlayerIds().find(id => id !== this.myPlayerId) || null,
+            exportTimestamp: Date.now(),
+            sessionStartTime: this.cumulativeValidation.sessionStartTime,
+            sessionDurationMs: Date.now() - this.cumulativeValidation.sessionStartTime,
+
+            // P2P connection metrics
+            connection: {
+                type: this.p2pMetrics.connectionType || 'unknown',
+                connectionDetails: this.p2pMetrics.connectionDetails || {},
+                p2pConnected: this.p2pConnected,
+                health: connectionHealth ? {
+                    rtt: connectionHealth.rtt,
+                    latency: connectionHealth.latency,
+                    packetsReceived: connectionHealth.packetsReceived,
+                    gapCount: connectionHealth.gapCount,
+                    status: connectionHealth.status
+                } : null,
+                fallback: {
+                    triggered: this.p2pMetrics.p2pFallbackTriggered,
+                    frame: this.p2pMetrics.p2pFallbackFrame
+                }
+            },
+
+            // Input delivery stats (cumulative across session)
+            inputDelivery: {
+                sentViaP2P: this.p2pMetrics.inputsSentViaP2P,
+                sentViaSocketIO: this.p2pMetrics.inputsSentViaSocketIO,
+                receivedViaP2P: this.p2pMetrics.inputsReceivedViaP2P,
+                receivedViaSocketIO: this.p2pMetrics.inputsReceivedViaSocketIO,
+                p2pReceiveRatio: this._calculateP2PReceiveRatio()
+            },
+
+            // Cumulative validation data across ALL episodes
+            validation: {
+                // Per-episode summaries
+                episodes: this.cumulativeValidation.episodes,
+
+                // Aggregate stats
+                totalEpisodes: this.cumulativeValidation.episodes.length,
+                totalHashes: this.cumulativeValidation.allHashes.length,
+                totalActions: this.cumulativeValidation.allActions.length,
+                totalDesyncs: this.cumulativeValidation.allDesyncEvents.length,
+                totalRollbacks: this.cumulativeValidation.allRollbacks.reduce(
+                    (sum, r) => sum + r.count, 0
+                ),
+
+                // All frame hashes across all episodes
+                allHashes: this.cumulativeValidation.allHashes,
+
+                // All verified actions across all episodes
+                // Format: [{episode, frame, actions: {playerId: action, ...}}, ...]
+                allActions: this.cumulativeValidation.allActions,
+
+                // All desync events across all episodes
+                allDesyncEvents: this.cumulativeValidation.allDesyncEvents.map(evt => ({
+                    episode: evt.episode,
+                    frame: evt.frame,
+                    ourHash: evt.ourHash,
+                    peerHash: evt.peerHash,
+                    timestamp: evt.timestamp,
+                    verifiedFrameAtDesync: evt.verifiedFrameAtDesync,
+                    hasStateDump: !!evt.stateDump
+                })),
+
+                // All rollback events across all episodes
+                allRollbacks: this.cumulativeValidation.allRollbacks
+            }
+        };
+    }
+
+    /**
+     * Emit multiplayer metrics to server via socket.
+     * Call at scene termination to send validation data for server-side storage.
+     * @param {string} sceneId - The scene ID for file organization
+     */
+    emitMultiplayerMetrics(sceneId) {
+        const metrics = this.exportMultiplayerMetrics();
+
+        socket.emit('emit_multiplayer_metrics', {
+            scene_id: sceneId,
+            metrics: metrics
+        });
+
+        p2pLog.info(
+            `Emitted multiplayer metrics: ${metrics.validation.totalEpisodes} episodes, ` +
+            `${metrics.validation.totalHashes} hashes, ${metrics.validation.totalDesyncs} desyncs`
+        );
+    }
+
+    /**
+     * Calculate the P2P receive ratio (percentage of inputs received via P2P).
+     * @returns {number} Ratio from 0-100, or null if no inputs received
+     * @private
+     */
+    _calculateP2PReceiveRatio() {
+        const totalReceived = this.p2pMetrics.inputsReceivedViaP2P + this.p2pMetrics.inputsReceivedViaSocketIO;
+        if (totalReceived === 0) return null;
+        return (this.p2pMetrics.inputsReceivedViaP2P / totalReceived * 100);
     }
 
     /**

@@ -1,177 +1,145 @@
-# Project Research Summary
+# Research Summary: v1.1 Sync Validation
 
 **Project:** Interactive Gym P2P Multiplayer
-**Domain:** Browser-based P2P GGPO rollback netcode for RL research experiments
-**Researched:** 2026-01-16
-**Confidence:** MEDIUM-HIGH
+**Milestone:** v1.1 Sync Validation
+**Researched:** 2026-01-20
+**Confidence:** HIGH
 
 ## Executive Summary
 
-The interactive-gym codebase already contains a comprehensive GGPO-style rollback netcode implementation (2600+ lines in `pyodide_multiplayer_game.js`) with input delay, state snapshots, rollback/replay, prediction, and state hash verification. The missing piece is **true P2P communication via WebRTC DataChannels** to replace the current SocketIO server relay. This architectural change will reduce input latency from 100-200ms (server round-trip) to direct peer-to-peer latency (typically 20-50ms for geographically close players).
+Adding sync validation to an existing GGPO-style rollback system requires careful integration with the confirmation flow. The key insight: **compute hashes only on confirmed frames** (not predicted) and **exchange via P2P DataChannel** (not SocketIO).
 
-The recommended approach is to use the native WebRTC API directly (no wrapper libraries like simple-peer or PeerJS) with SocketIO remaining as the signaling channel for ICE/SDP exchange. This leverages existing infrastructure while adding near-UDP latency for input exchange. TURN servers (Metered.ca recommended) are necessary for ~15-20% of connections where direct P2P fails due to NAT configurations.
+The existing codebase has partial infrastructure (`computeQuickStateHash()`, `stateHashHistory`) but it operates on potentially-predicted frames. v1.1 needs to tighten the integration so validation happens at the right time in the frame lifecycle.
 
-The primary risks are: (1) non-deterministic environment execution causing desyncs that rollback cannot fix, (2) input buffer pruning race conditions during rollback, and (3) DataChannel reliability mode misconfiguration. All critical GGPO features already exist; the work is primarily transport layer replacement and integration testing. For research validity, connection type (direct vs TURN relay) must be recorded in session data.
+**Critical finding:** Production netcode systems use fast checksums (CRC32), not cryptographic hashes (MD5). However, for this research use case with small state objects, SHA-256 (truncated) provides better cross-platform consistency and sufficient performance.
 
-## Key Findings
+---
 
-### Recommended Stack
+## Key Findings by Dimension
 
-The existing stack (Flask, SocketIO, Pyodide, Gymnasium, Phaser.js) remains unchanged. WebRTC DataChannels are added as a new transport layer for game inputs.
+### Stack
 
-**Core technologies:**
-- **Native WebRTC API**: P2P DataChannel connections -- browser-native, well-documented, no dependency maintenance
-- **SocketIO (existing)**: ICE candidate/SDP signaling -- already in place, proven reliable
-- **Metered.ca TURN**: NAT traversal fallback -- pay-as-you-go, ~$5/month for research scale
-- **msgpack (existing)**: Binary serialization -- 3x smaller messages than JSON
+| Choice | Recommendation | Rationale |
+|--------|----------------|-----------|
+| Hash algorithm | SHA-256 (truncated to 16 chars) | More reliable in Pyodide than MD5; guaranteed available |
+| Serialization | `json.dumps(state, sort_keys=True, separators=(',', ':'))` | Already in use, deterministic with sort_keys |
+| Float normalization | Round to 10 decimal places | Prevents cross-platform float representation differences |
+| Hash location | Compute in Python/Pyodide | Ensures consistency with any server-side validation |
 
-**DataChannel configuration for GGPO:**
-```javascript
-{ ordered: false, maxRetransmits: 0 }  // UDP-like behavior
-```
+### Features
 
-### Expected Features
+| Category | Features |
+|----------|----------|
+| **Table Stakes** | Per-frame state checksum, checksum exchange protocol, mismatch frame identification, state dump on mismatch, sync test mode |
+| **Should Have** | Live sync debug overlay, deterministic replay validation |
+| **Anti-Features** | Full state sync every frame, blocking validation, automated resync on every mismatch |
 
-**Must have (table stakes -- all exist):**
-- Deterministic simulation via Pyodide + seeded RNG
-- Configurable input delay (0-5 frames)
-- Frame-indexed input buffer with prediction
-- State snapshots with RNG capture
-- Rollback/replay mechanism
-- State hash verification for desync detection
-- Server-authoritative fallback
-- Sync epoch for episode boundaries
+### Architecture
 
-**Should have (differentiators for P2P milestone):**
-- WebRTC DataChannels for input exchange (PENDING)
-- TURN server fallback for NAT traversal (PENDING)
-- Symmetric peer architecture -- no host concept (PENDING)
-- Connection type detection and logging (PENDING)
+**Integration point:** Hash computation should occur in `processConfirmedFrame()` or equivalent, AFTER:
+1. All players' inputs are confirmed for that frame
+2. Rollback (if any) has completed
+3. State has been stepped
 
-**Defer (v2+):**
-- Adaptive input delay based on RTT
-- Frame interpolation for smoother rendering
-- Rollback visualization for debugging
-- N-player mesh topology (start with 2-player)
-- Spectator mode (out of scope per PROJECT.md)
+**Hash exchange:** Add new binary message type `P2P_MSG_STATE_HASH` (0x07, 13 bytes) to existing DataChannel protocol.
 
-### Architecture Approach
+**Mismatch handling:** Log and continue for research (need to KNOW about desyncs, not hide them).
 
-The target architecture separates concerns into: WebRTCManager (connection lifecycle), P2PTransport (message protocol), GGPOManager (input sync/rollback), and PyodideEnv (deterministic simulation). The server role changes from input relay to signaling-only, with optional data logging.
+### Pitfalls
 
-**Major components:**
-1. **WebRTCManager (new)** -- establish/manage peer connections, handle ICE negotiation
-2. **P2PTransport (new)** -- serialize/deserialize messages, send/receive over DataChannel
-3. **GGPOManager (existing)** -- input buffering, prediction, rollback orchestration
-4. **PyodideEnv (existing)** -- deterministic game simulation with get_state/set_state
-5. **SignalingRelay (modify)** -- server-side forwarding of WebRTC offer/answer/ICE
+| Priority | Pitfall | Prevention |
+|----------|---------|------------|
+| P0 | Frame alignment mismatch | Compare hashes only for exact same frame number |
+| P0 | Rollback invalidates hashes | Clear hash history entries >= rollback target frame |
+| P1 | JSON serialization non-determinism | Round floats, sort sets, use compact separators |
+| P1 | Python set iteration order | Convert to sorted lists in `get_state()` |
+| P2 | Validation export includes predictions | Export only confirmed-frame data |
 
-### Critical Pitfalls
-
-1. **Non-deterministic environment execution** -- Validate environments produce identical states given identical inputs. Test CPython vs Pyodide hash equivalence before any P2P work. Use `sort_keys=True` in JSON, seed all RNG.
-
-2. **Input buffer pruning during rollback** -- Never prune frames >= pending rollback frame. Keep 60+ frames of history. Prune AFTER rollback completion, not before.
-
-3. **RNG state not in snapshots** -- Already implemented but verify completeness. Must capture both NumPy and Python random state. Critical for games with AI/bot players.
-
-4. **DataChannel reliability mode mismatch** -- Use unreliable/unordered for game inputs (UDP-like). Use reliable channel or SocketIO for control messages (episode sync, connection management).
-
-5. **TURN latency hidden in metrics** -- Detect connection type via RTCPeerConnection.getStats(). Record in session data for research validity. Adjust input delay when TURN detected.
+---
 
 ## Implications for Roadmap
 
 Based on research, suggested phase structure:
 
-### Phase 1: WebRTC Foundation
-**Rationale:** Creates the P2P connection infrastructure that all subsequent work depends on. No changes to GGPO logic yet.
-**Delivers:** Working P2P DataChannel between two browser clients
-**Addresses:** WebRTC signaling, ICE negotiation, connection establishment
-**Avoids:** Pitfall #4 by configuring DataChannel correctly from the start
-**New files:** `webrtc_manager.js`, signaling handlers in `pyodide_game_coordinator.py`
+### Phase 1: Hash Infrastructure
 
-### Phase 2: P2P Transport Layer
-**Rationale:** Builds the message protocol on top of Phase 1 connection. Keeps existing GGPO untouched until transport is proven.
-**Delivers:** Bidirectional game input exchange over DataChannel
-**Addresses:** Message serialization (msgpack), keepalive/ping, connection health monitoring
-**Avoids:** Pitfall #9 by implementing redundant input sending (each message includes last N inputs)
-**New files:** `p2p_transport.js`
+**Build:** Deterministic state hashing with float normalization, confirmed frame tracking.
 
-### Phase 3: GGPO P2P Integration
-**Rationale:** Replaces SocketIO relay path with P2P transport. Most impactful change -- requires careful testing.
-**Delivers:** Full game playable over P2P with rollback netcode
-**Addresses:** Input relay replacement, fallback to SocketIO when P2P fails
-**Avoids:** Pitfall #2 by validating rollback still works correctly with new transport
-**Modifies:** `pyodide_multiplayer_game.js` to use P2P instead of server relay
+- Addresses: Pitfalls #22 (JSON non-determinism), #24 (set iteration)
+- Uses: SHA-256 via Python hashlib, `round(x, 10)` normalization
+- Deliverable: `_computeConfirmedHash()` function, `confirmedHashHistory` data structure
 
-### Phase 4: TURN and Resilience
-**Rationale:** Handles the ~20% of connections that fail direct P2P. Production-readiness for diverse networks.
-**Delivers:** Reliable connections across NAT configurations, graceful degradation
-**Addresses:** TURN credential configuration, connection quality metrics, automatic fallback
-**Avoids:** Pitfall #11 by detecting and logging TURN usage, adjusting input delay
-**Config:** TURN server credentials, ICE timeout settings
+### Phase 2: P2P Hash Exchange
 
-### Phase 5: Validation and Polish
-**Rationale:** Ensures research data validity and improves developer experience.
-**Delivers:** Determinism test suite, connection type logging, performance monitoring
-**Addresses:** Research-specific concerns (silent desync detection, rollback event logging)
-**Avoids:** Pitfalls #17-19 by recording all sync events and connection metadata
+**Build:** Binary hash message protocol, exchange over DataChannel.
 
-### Phase Ordering Rationale
+- Implements: New message type 0x07, encoder/decoder
+- Addresses: Moving from SocketIO to P2P for hash exchange
+- Deliverable: `encodeStateHash()`, `decodeStateHash()`, message handler
 
-- **Foundation first:** WebRTC setup is prerequisite for all P2P features; isolated testing possible
-- **Transport before integration:** Prove the message protocol works before touching complex GGPO code
-- **Integration is the critical path:** Phase 3 is highest risk; earlier phases de-risk it
-- **TURN after core works:** Optimization/resilience after basic functionality proven
-- **Validation last:** Can only validate after system is functional
+### Phase 3: Mismatch Detection
 
-### Research Flags
+**Build:** Comparison logic, peer hash buffering, desync event logging.
 
-Phases likely needing deeper research during planning:
-- **Phase 1:** May need research on WebRTC browser quirks (Safari iOS has known issues)
-- **Phase 4:** Verify TURN provider pricing and evaluate alternatives to Metered.ca
+- Addresses: Pitfall #20 (frame alignment), #21 (rollback invalidation)
+- Integrates with: Rollback system (clear hashes on rollback)
+- Deliverable: `_handleReceivedHash()`, `desyncEvents` array, `verifiedFrame` tracking
 
-Phases with standard patterns (skip research-phase):
-- **Phase 2:** Message serialization is straightforward, msgpack already in codebase
-- **Phase 3:** GGPO integration follows documented patterns; existing code is well-structured
-- **Phase 5:** Testing patterns are standard; main work is defining test cases
+### Phase 4: Validation Export
 
-## Confidence Assessment
+**Build:** Post-game JSON export with frame-by-frame validation data.
 
-| Area | Confidence | Notes |
-|------|------------|-------|
-| Stack | HIGH | WebRTC is standard browser API; verified via MDN documentation |
-| Features | HIGH | Based on direct codebase analysis of 2600+ lines of existing GGPO implementation |
-| Architecture | MEDIUM | Target architecture is sound; integration complexity may reveal unknowns |
-| Pitfalls | HIGH | Critical pitfalls identified from codebase patterns and domain expertise |
+- Addresses: Pitfall #28 (predicted state in export)
+- Deliverable: Export function producing `{frames: [{frame, localHash, peerHash, status}]}`
 
-**Overall confidence:** MEDIUM-HIGH
+**Phase ordering rationale:**
+- Phase 1 is foundation: can't exchange hashes until we can compute them correctly
+- Phase 2 before 3: need transport before comparison logic
+- Phase 3 before 4: need detection before export
+- Each phase is independently testable
 
-The existing GGPO implementation is mature and well-tested. The primary uncertainty is WebRTC integration complexity and browser-specific edge cases.
-
-### Gaps to Address
-
-- **TURN provider selection:** Verify Metered.ca current pricing; evaluate Twilio as alternative
-- **Mobile browser WebRTC:** Safari iOS has WebRTC quirks; test needed if mobile support matters
-- **N>2 players:** Current design assumes 2-player; mesh vs relay topology decision needed for N>2
-- **Pyodide rollback performance:** Need empirical testing of rapid `set_state` calls under rollback load
-
-## Sources
-
-### Primary (HIGH confidence)
-- MDN WebRTC Data Channels documentation
-- MDN RTCDataChannel API reference
-- Direct codebase analysis: `pyodide_multiplayer_game.js` (2600+ lines)
-- Direct codebase analysis: `pyodide_game_coordinator.py`, `server_game_runner.py`
-
-### Secondary (MEDIUM confidence)
-- GGPO algorithm specification (well-documented fighting game netcode pattern)
-- WebRTC browser compatibility tables (Can I Use)
-- Existing project documentation: `multiplayer-sync-optimization.md`, `server-authoritative-architecture.md`
-
-### Tertiary (LOW confidence)
-- TURN provider pricing (from training knowledge, verify current rates)
-- Mobile browser WebRTC behavior (needs testing)
+**Research flags:**
+- Phase 1: Standard patterns, low risk
+- Phase 2: Extension of existing P2P protocol, low risk
+- Phase 3: Integration with rollback requires careful testing
+- Phase 4: Straightforward JSON export
 
 ---
-*Research completed: 2026-01-16*
-*Ready for roadmap: yes*
+
+## Success Criteria
+
+- [ ] Hashes computed only on confirmed frames (not predicted)
+- [ ] Hash exchange uses P2P DataChannel (not SocketIO for this)
+- [ ] Rollback invalidates affected hashes correctly
+- [ ] Peer hash buffering handles async confirmation
+- [ ] Desync detection logs frame, both hashes, and timestamp
+- [ ] verifiedFrame tracks highest mutually-verified frame
+- [ ] Post-game JSON export available for analysis
+- [ ] No false positives from frame misalignment or float precision
+
+---
+
+## Open Questions (Resolved)
+
+| Question | Resolution |
+|----------|------------|
+| Hash algorithm? | SHA-256 truncated to 16 chars |
+| Where to compute? | In Python/Pyodide via `env.get_state()` |
+| Exchange transport? | P2P DataChannel with new message type |
+| Mismatch response? | Log and continue (research needs data, not recovery) |
+| Export format? | JSON with frame-by-frame hashes and actions |
+
+---
+
+## Files Created
+
+| File | Purpose |
+|------|---------|
+| [STACK.md](STACK.md) | Hashing technology choices, serialization patterns |
+| [FEATURES.md](FEATURES.md) | Feature landscape with table stakes, differentiators, anti-features |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Integration with GGPO confirmation flow, data structures |
+| [PITFALLS.md](PITFALLS.md) | Updated with 9 v1.1-specific validation pitfalls (#20-#28) |
+
+---
+
+*Research complete: 2026-01-20*

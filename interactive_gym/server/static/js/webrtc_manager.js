@@ -289,9 +289,18 @@ class WebRTCManager {
                 this._sendSignal('ice-candidate', event.candidate);
                 console.log('[WebRTC] Sent ICE candidate:', {
                     type: event.candidate.type,
-                    protocol: event.candidate.protocol
+                    protocol: event.candidate.protocol,
+                    address: event.candidate.address
                 });
+            } else {
+                console.log('[WebRTC] ICE candidate gathering complete');
             }
+        };
+
+        // Monitor ICE gathering state
+        this.peerConnection.onicegatheringstatechange = () => {
+            const state = this.peerConnection.iceGatheringState;
+            console.log(`[WebRTC] ICE gathering state: ${state}`);
         };
 
         // Handle connection state changes
@@ -374,7 +383,9 @@ class WebRTCManager {
                 });
             }
 
-            console.log('[WebRTC] TURN servers configured');
+            console.log('[WebRTC] TURN servers configured with username:', this.turnUsername.substring(0, 4) + '...');
+        } else {
+            console.warn('[WebRTC] No TURN credentials - only STUN servers available');
         }
 
         return servers;

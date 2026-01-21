@@ -1,168 +1,237 @@
-# Technology Stack: P2P GGPO Rollback in Browser
+# Technology Stack: Deterministic State Hashing for P2P Sync Validation
 
-**Project:** Interactive Gym P2P Multiplayer
-**Researched:** 2026-01-16
-**Confidence:** MEDIUM (WebRTC DataChannel options verified via MDN; GGPO libraries assessed from training knowledge + codebase analysis)
+**Project:** Interactive Gym P2P Multiplayer - v1.1 Sync Validation
+**Researched:** 2026-01-20
+**Confidence:** MEDIUM-HIGH (Core approach verified against existing codebase and official documentation)
 
 ## Executive Summary
 
-The existing codebase already implements GGPO-style rollback netcode in JavaScript (`pyodide_multiplayer_game.js`) with input delay, state snapshots, rollback/replay, and prediction. The missing piece is **true P2P communication via WebRTC DataChannels** to replace SocketIO relay through the server.
+The existing codebase already implements state hashing using Python's `hashlib.md5()` with `json.dumps(state, sort_keys=True)` executed in Pyodide. This approach is fundamentally sound and should be retained. This research focuses on hardening the implementation for production-quality desync detection.
 
-**Recommendation:** Use the native WebRTC API directly (no wrapper library) with SocketIO as the signaling channel. This leverages existing infrastructure while adding near-UDP latency for input exchange.
+**Key finding:** The current implementation is correct in principle but has potential edge cases around floating-point serialization and hash algorithm availability. The recommended stack builds on what exists while addressing these gaps.
+
+---
+
+## Current Implementation Analysis
+
+### What Already Works
+
+The codebase at `pyodide_multiplayer_game.js` implements state hashing:
+
+```python
+# Current approach (lines 1916-1925 in pyodide_multiplayer_game.js)
+import json
+import hashlib
+
+_env_state_for_hash = env.get_state()
+_json_str = json.dumps(_env_state_for_hash, sort_keys=True)
+_hash = hashlib.md5(_json_str.encode()).hexdigest()[:16]
+```
+
+This is executed via `pyodide.runPythonAsync()` and returns a 16-character hex hash.
+
+**Strengths of current approach:**
+- Uses `sort_keys=True` for deterministic key ordering (correct)
+- Environment's `get_state()` returns primitive-only dicts (correct)
+- Hash computed in Python ensures consistency with any server-side validation
+- 16-char truncated MD5 is sufficient for desync detection (not cryptographic)
+
+### Identified Gaps
+
+| Gap | Risk | Mitigation |
+|-----|------|------------|
+| `hashlib` may need explicit loading in Pyodide | Hashing silently fails | Pre-load hashlib package |
+| Floating-point representation edge cases | Hash mismatch on identical states | Normalize floats before serialization |
+| No fallback if `get_state()` not implemented | Runtime error | Already handled via `stateSyncSupported` flag |
+| Hash computation is async Python call | Performance overhead | Consider caching strategy |
 
 ---
 
 ## Recommended Stack
 
-### WebRTC Layer (NEW)
+### Serialization Layer
 
-| Technology | Version | Purpose | Confidence |
-|------------|---------|---------|------------|
-| Native WebRTC API | Browser-native | P2P DataChannel connections | HIGH |
-| SocketIO | Existing | ICE candidate/SDP signaling | HIGH |
-| Metered TURN | Service | NAT traversal fallback | MEDIUM |
+| Component | Choice | Confidence | Rationale |
+|-----------|--------|------------|-----------|
+| **Object Serialization** | `json.dumps(state, sort_keys=True)` (Python) | HIGH | Already in use, deterministic with `sort_keys=True` |
+| **Float Normalization** | Round to fixed precision before hashing | MEDIUM | Prevents platform-specific float repr differences |
+| **Encoding** | UTF-8 via `.encode()` | HIGH | Standard, deterministic |
 
-**Why native WebRTC instead of a wrapper library:**
+**Why NOT to change serialization:**
+- **msgpack**: Would require additional package loading in Pyodide and coordination with JavaScript side
+- **CBOR**: Same concerns as msgpack, no benefit for this use case
+- **Custom binary format**: Unnecessary complexity
 
-1. **Simple-peer**: Popular but not actively maintained (last npm release 2021). The project already has complex networking code; adding another layer of abstraction with uncertain maintenance is risky.
+### Hashing Layer
 
-2. **PeerJS**: Higher-level abstraction, but opinionated about signaling (wants its own server). Doesn't integrate well with existing SocketIO infrastructure.
+| Component | Choice | Confidence | Rationale |
+|-----------|--------|------------|-----------|
+| **Primary Hash** | SHA-256 via Python `hashlib` | HIGH | More reliably available in Pyodide than MD5 |
+| **Hash Truncation** | First 16 characters (64 bits) | HIGH | Sufficient for desync detection, reduces message size |
+| **Fallback Hash** | Keep MD5 as fallback | MEDIUM | Backwards compatibility |
 
-3. **Native API**: Modern browsers have excellent WebRTC support. The API is well-documented, and for this use case (two peers, one DataChannel, known topology) the complexity is manageable. No dependency to maintain.
+**Why SHA-256 over MD5:**
+- SHA-256 is guaranteed available in Python's hashlib without OpenSSL (via HACL* fallback in Python 3.12+)
+- MD5 may require loading the `hashlib` package explicitly in Pyodide for OpenSSL algorithms
+- Performance difference negligible for small state objects (< 10KB)
 
-**WebRTC DataChannel Configuration for Game Inputs:**
+**Why NOT xxHash/other fast hashes:**
+- Would require loading additional Python packages in Pyodide
+- State objects are small (typically < 5KB), cryptographic hash overhead is negligible
+- Cross-platform consistency is more important than raw speed
 
-```javascript
-// Optimal settings for GGPO input exchange
-const dataChannelOptions = {
-  ordered: false,           // Accept out-of-order (GGPO handles ordering via frame numbers)
-  maxRetransmits: 0,        // No retries - if input is late, GGPO handles via prediction
-  // Note: maxPacketLifeTime is mutually exclusive with maxRetransmits
-};
+### JavaScript Side (if needed)
 
-// Alternative: slightly more reliable
-const reliableOptions = {
-  ordered: false,
-  maxRetransmits: 2,        // Allow 2 retries before giving up
-};
-```
+If JavaScript-side hashing is ever needed (currently not required):
 
-**Rationale:** GGPO is designed for unreliable transport. Inputs carry frame numbers, so out-of-order delivery is fine. Late inputs trigger rollback, so retransmission is unnecessary (GGPO already predicts and corrects). This matches classic GGPO over UDP.
-
-### STUN/TURN Infrastructure (NEW)
-
-| Provider | Purpose | Cost | Confidence |
-|----------|---------|------|------------|
-| Google STUN | ICE candidate gathering | Free | HIGH |
-| Metered.ca TURN | NAT traversal relay | ~$0.40/GB | MEDIUM |
-
-**ICE Configuration:**
-
-```javascript
-const iceConfig = {
-  iceServers: [
-    // Free STUN servers (sufficient for most connections)
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-
-    // TURN fallback (required for ~15-20% of connections)
-    {
-      urls: 'turn:relay.metered.ca:443?transport=tcp',
-      username: 'YOUR_API_KEY',
-      credential: 'YOUR_SECRET'
-    }
-  ],
-  iceCandidatePoolSize: 10  // Pre-gather candidates for faster connection
-};
-```
-
-**Why TURN is needed:**
-- Symmetric NAT (common in corporate networks, mobile carriers) blocks direct P2P
-- ~15-20% of connections require TURN relay
-- Without TURN: some player pairs will fail to connect entirely
-- Cost is minimal for research use case (inputs are small, ~50 bytes/frame)
-
-**TURN Provider Options:**
-1. **Metered.ca** (recommended): Pay-as-you-go, easy API, reasonable pricing
-2. **Twilio TURN**: More expensive but enterprise support
-3. **Self-hosted Coturn**: Free but requires server ops, not recommended for research focus
-
-### Existing Stack (KEEP)
-
-| Technology | Version | Purpose | Notes |
-|------------|---------|---------|-------|
-| Flask | 2.x | HTTP server, experiment orchestration | No change |
-| Flask-SocketIO | Existing | WebSocket signaling for WebRTC | Extend for ICE/SDP |
-| Pyodide | Latest stable | Python environment in browser | No change |
-| Gymnasium | Latest | RL environment interface | No change |
-| Phaser.js | Existing | Game rendering | No change |
-| msgpack | Existing | Binary serialization | Use for DataChannel messages |
-
-### GGPO Implementation (EXISTING - ENHANCE)
-
-The codebase already has comprehensive GGPO:
-
-| Feature | File | Status |
-|---------|------|--------|
-| Input delay (configurable frames) | `pyodide_multiplayer_game.js` | DONE |
-| State snapshots with RNG | `pyodide_multiplayer_game.js` | DONE |
-| Rollback and replay | `pyodide_multiplayer_game.js` | DONE |
-| Prediction (configurable method) | `pyodide_multiplayer_game.js` | DONE |
-| Frame-indexed input buffer | `pyodide_multiplayer_game.js` | DONE |
-| State hash verification | `pyodide_multiplayer_game.js` | DONE |
-
-**Enhancement needed:** Replace SocketIO input relay with WebRTC DataChannel. The GGPO logic stays the same; only the transport changes.
+| Component | Choice | Confidence | Rationale |
+|-----------|--------|------------|-----------|
+| **Deterministic JSON** | `json-stringify-deterministic` or `safe-stable-stringify` | HIGH | Handles key ordering correctly |
+| **Hashing** | Web Crypto API `crypto.subtle.digest('SHA-256', ...)` | HIGH | Native browser API, optimal performance |
+| **Alternative** | `hash-wasm` xxHash64 | MEDIUM | For high-frequency hashing if performance becomes issue |
 
 ---
 
-## Integration Architecture
+## Implementation Details
 
-### Signaling Flow (SocketIO)
+### Pre-loading hashlib in Pyodide
 
-```
-Player A                    Server                     Player B
-   |                          |                           |
-   |-- join_game ------------>|                           |
-   |                          |<--------- join_game ------|
-   |                          |                           |
-   |<-- webrtc_offer_request -|                           |
-   |                          |                           |
-   |-- webrtc_offer --------->|-- webrtc_offer ---------->|
-   |                          |                           |
-   |<-- webrtc_answer --------|<--------- webrtc_answer --|
-   |                          |                           |
-   |-- ice_candidate -------->|-- ice_candidate --------->|
-   |<-- ice_candidate --------|<--------- ice_candidate --|
-   |                          |                           |
-   |============ WebRTC DataChannel Established ==========|
-   |                          |                           |
-   |<-- INPUT (P2P) ---------------------------------->---|
-```
+**Problem:** OpenSSL-dependent hash algorithms (including MD5) may not be available until `hashlib` package is explicitly loaded.
 
-### Message Format (DataChannel)
+**Solution:** Add to Pyodide initialization:
 
 ```javascript
-// Input message (sent every frame)
-{
-  type: 'input',
-  frame: 42,           // Target frame (sender's frame + INPUT_DELAY)
-  player: 0,           // Sender's player ID
-  action: 3,           // Action value
-  ts: 1705408800000    // Timestamp for latency measurement
-}
+// During Pyodide setup, before game starts
+await pyodide.loadPackage('hashlib');
+```
 
-// Optional: State sync for P2P mode (no server authority)
-{
-  type: 'state_hash',
-  frame: 30,
-  hash: 'abc123...'    // 16-char MD5 prefix
+**Verification:** After loading, verify availability:
+
+```python
+import hashlib
+print(f"MD5 available: {hasattr(hashlib, 'md5')}")
+print(f"SHA256 available: {hasattr(hashlib, 'sha256')}")
+```
+
+### Float Normalization Strategy
+
+**Problem:** Floating-point representation can vary between platforms. `repr(0.1)` might produce different string lengths on different Python builds.
+
+**Solution:** Normalize floats to fixed precision before serialization:
+
+```python
+import json
+import hashlib
+
+def normalize_for_hash(obj):
+    """Recursively normalize an object for deterministic hashing.
+
+    Rounds floats to 10 decimal places to avoid platform-specific
+    representation differences while preserving sufficient precision
+    for game state comparison.
+    """
+    if isinstance(obj, float):
+        # Round to 10 decimal places, then truncate trailing zeros
+        return round(obj, 10)
+    elif isinstance(obj, dict):
+        return {k: normalize_for_hash(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [normalize_for_hash(item) for item in obj]
+    elif isinstance(obj, tuple):
+        return tuple(normalize_for_hash(item) for item in obj)
+    else:
+        return obj
+
+def compute_state_hash(state):
+    """Compute deterministic hash of game state."""
+    normalized = normalize_for_hash(state)
+    json_str = json.dumps(normalized, sort_keys=True, separators=(',', ':'))
+    return hashlib.sha256(json_str.encode()).hexdigest()[:16]
+```
+
+**Why 10 decimal places:**
+- Sufficient for game physics (sub-pixel precision)
+- Avoids accumulating floating-point noise across platforms
+- Matches typical game coordinate systems
+
+### Optimized Hash Computation
+
+For production, the hash computation can be inlined to reduce Python call overhead:
+
+```javascript
+async computeQuickStateHash() {
+    if (!this.stateSyncSupported) return null;
+
+    const hashResult = await this.pyodide.runPythonAsync(`
+import json
+import hashlib
+
+def _normalize(obj):
+    if isinstance(obj, float):
+        return round(obj, 10)
+    elif isinstance(obj, dict):
+        return {k: _normalize(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [_normalize(item) for item in obj]
+    return obj
+
+_state = env.get_state()
+_normalized = _normalize(_state)
+_json = json.dumps(_normalized, sort_keys=True, separators=(',', ':'))
+hashlib.sha256(_json.encode()).hexdigest()[:16]
+    `);
+    return hashResult;
 }
 ```
 
-**Serialization:** Use msgpack (already in codebase) for smaller messages:
-- JSON input message: ~80 bytes
-- msgpack input message: ~25 bytes
-- At 30 FPS for 2 players: JSON = 4.8 KB/s, msgpack = 1.5 KB/s
+### Compact JSON Serialization
+
+Use `separators=(',', ':')` to remove whitespace from JSON output:
+
+```python
+# Default (with whitespace)
+json.dumps({'a': 1, 'b': 2})  # '{"a": 1, "b": 2}' (18 bytes)
+
+# Compact (no whitespace)
+json.dumps({'a': 1, 'b': 2}, separators=(',', ':'))  # '{"a":1,"b":2}' (13 bytes)
+```
+
+This reduces serialization time and ensures consistent output across platforms.
+
+---
+
+## Environment Requirements
+
+### get_state() Contract
+
+Environments must implement `get_state()` returning a JSON-serializable dict with:
+
+| Type | Allowed | Notes |
+|------|---------|-------|
+| `dict` | Yes | Must have string keys |
+| `list` | Yes | Ordered |
+| `str` | Yes | UTF-8 encodable |
+| `int` | Yes | No size limit in JSON |
+| `float` | Yes | Will be normalized |
+| `bool` | Yes | Serializes as `true`/`false` |
+| `None` | Yes | Serializes as `null` |
+| `numpy.ndarray` | **No** | Must convert to list |
+| `numpy.int64` etc | **No** | Must convert to Python int/float |
+| Custom objects | **No** | Must convert to primitives |
+
+**Example compliant implementation** (from `slimevb_env.py`):
+
+```python
+def get_state(self) -> dict[str, int | float | str]:
+    return {
+        "t": self.t,
+        "ball_x": self.game.ball.x,
+        "ball_y": self.game.ball.y,
+        "ball_vx": self.game.ball.vx,
+        "ball_vy": self.game.ball.vy,
+        # ... all primitive types
+    }
+```
 
 ---
 
@@ -170,114 +239,100 @@ Player A                    Server                     Player B
 
 | Technology | Why Avoid |
 |------------|-----------|
-| simple-peer | Not actively maintained; adds abstraction layer that complicates debugging |
-| PeerJS | Wants own signaling server; doesn't fit existing SocketIO architecture |
-| WebSocket for P2P | Not possible; WebSocket is client-server only |
-| WebTransport | Newer API with less browser support; WebRTC DataChannel is sufficient |
-| GGPO-JS libraries | Existing implementation is already comprehensive and tailored to Pyodide |
-| Coturn self-hosted | Operations overhead not justified for research project |
+| `JSON.stringify()` in JavaScript | Not deterministic for object key order |
+| `pickle` | Platform-dependent, not JSON-compatible |
+| `numpy.save()`/`.tobytes()` | Platform-dependent byte order |
+| `hash()` Python builtin | Randomized per-process (PYTHONHASHSEED) |
+| CRC32 | Insufficient collision resistance for state comparison |
+| Raw object identity (`id()`) | Memory address, not content-based |
 
 ---
 
-## Browser Compatibility
+## Performance Considerations
 
-WebRTC DataChannel baseline support since January 2020:
+### Hash Computation Overhead
 
-| Browser | DataChannel | Unreliable Mode |
-|---------|-------------|-----------------|
-| Chrome 80+ | Yes | Yes |
-| Firefox 75+ | Yes | Yes |
-| Safari 13+ | Yes | Yes |
-| Edge 80+ | Yes | Yes |
+| State Size | JSON Serialize | SHA-256 Hash | Total | Notes |
+|------------|---------------|--------------|-------|-------|
+| 1 KB | ~0.1 ms | ~0.1 ms | ~0.2 ms | Typical small game |
+| 5 KB | ~0.3 ms | ~0.2 ms | ~0.5 ms | Complex game state |
+| 20 KB | ~1 ms | ~0.5 ms | ~1.5 ms | Large state (consider optimization) |
 
-**Confidence:** HIGH (MDN verified)
+At 30 FPS with hash every 30 frames (1 Hz sync):
+- Overhead: 0.5 ms per second = 0.05% of frame budget
+- Acceptable for desync detection
 
----
+### When to Optimize
 
-## Implementation Roadmap Impact
+If hash computation becomes a bottleneck (> 2ms):
 
-Based on this stack, suggested phase structure:
-
-### Phase 1: WebRTC Signaling Infrastructure
-- Add SocketIO events for SDP/ICE exchange
-- Server-side `PyodideGameCoordinator` extensions
-- Minimal client-side RTCPeerConnection setup
-
-### Phase 2: DataChannel Integration
-- Replace SocketIO input relay with DataChannel
-- Maintain SocketIO as fallback when P2P fails
-- Add connection quality monitoring
-
-### Phase 3: TURN Integration
-- Configure TURN credentials
-- Implement fallback logic
-- Test with various NAT configurations
-
-### Phase 4: Remove Server-Authoritative Dependency
-- P2P state hash verification (already exists as `p2p_state_sync`)
-- Clean up server-side env runner for pure P2P mode
-- Keep server-authoritative as optional mode for research flexibility
+1. **Reduce sync frequency**: Hash every 60 frames instead of 30
+2. **Partial state hashing**: Hash only critical state fields
+3. **Incremental hashing**: Track changed fields, hash only deltas
+4. **Move to JavaScript**: Use Web Crypto API (native speed)
 
 ---
 
-## Configuration Additions
+## Integration with Existing Code
+
+### Required Changes
+
+1. **Pre-load hashlib** in Pyodide initialization
+2. **Add float normalization** to hash computation
+3. **Switch to SHA-256** for better Pyodide compatibility
+4. **Add compact JSON separators** for consistency
+
+### Backwards Compatibility
+
+The hash algorithm change (MD5 to SHA-256) means:
+- Old and new clients will compute different hashes for same state
+- Clients must agree on hash algorithm at connection time
+- Recommend version field in P2P handshake
+
+### Configuration
 
 ```python
-# New config options for GymScene
-class GymScene:
-    def p2p_multiplayer(
-        self,
-        enable_webrtc: bool = True,           # Use WebRTC for input exchange
-        turn_server: str | None = None,        # TURN server URL
-        turn_credentials: dict | None = None,  # {username, credential}
-        fallback_to_socketio: bool = True,     # Fall back if P2P fails
-        ice_timeout_ms: int = 5000,            # ICE gathering timeout
-    ):
-        ...
+# Suggested configuration additions
+class SyncValidationConfig:
+    hash_algorithm: str = 'sha256'  # 'sha256' or 'md5'
+    hash_truncate_length: int = 16  # characters
+    float_precision: int = 10       # decimal places
+    sync_interval_frames: int = 30  # frames between hash broadcasts
 ```
-
-```javascript
-// New JS config in MultiplayerPyodideGame
-const p2pConfig = {
-  enableWebRTC: true,
-  iceServers: [...],
-  dataChannelOptions: {
-    ordered: false,
-    maxRetransmits: 0
-  },
-  fallbackToSocketIO: true,
-  connectionTimeout: 5000
-};
-```
-
----
-
-## Cost Estimate (Research Use)
-
-| Item | Estimate | Notes |
-|------|----------|-------|
-| STUN | Free | Google public servers |
-| TURN (Metered) | ~$5/month | Assuming 100 sessions @ 10MB each |
-| Server hosting | Existing | No change |
 
 ---
 
 ## Sources
 
-- [MDN: Using WebRTC Data Channels](https://developer.mozilla.org/en-US/docs/Web/API/WebRTC_API/Using_data_channels) - HIGH confidence
-- [MDN: RTCDataChannel](https://developer.mozilla.org/en-US/docs/Web/API/RTCDataChannel) - HIGH confidence
-- Existing codebase analysis: `pyodide_multiplayer_game.js`, `pyodide_game_coordinator.py` - HIGH confidence
-- GGPO principles from training knowledge - MEDIUM confidence (classic algorithm, well-documented)
-- TURN provider pricing from training knowledge - LOW confidence (verify current rates)
+### HIGH Confidence (Official Documentation)
+
+- [Pyodide Python compatibility](https://pyodide.org/en/stable/usage/wasm-constraints.html) - hashlib constraints
+- [Python hashlib documentation](https://docs.python.org/3/library/hashlib.html) - Algorithm availability
+- [Python json documentation](https://docs.python.org/3/library/json.html) - `sort_keys` behavior
+- [MDN SubtleCrypto.digest()](https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto/digest) - Web Crypto API
+
+### MEDIUM Confidence (Technical Analysis)
+
+- [Exploring SHA-256 Performance on the Browser](https://medium.com/@ronantech/exploring-sha-256-performance-on-the-browser-browser-apis-javascript-libraries-wasm-webgpu-9d9e8e681c81) - Browser hashing performance
+- [Floating Point Determinism (Gaffer On Games)](https://gafferongames.com/post/floating_point_determinism/) - Cross-platform float challenges
+- [Preparing your game for deterministic netcode](https://yal.cc/preparing-your-game-for-deterministic-netcode/) - Desync detection patterns
+
+### LOW Confidence (Community Sources)
+
+- [json-stringify-deterministic npm](https://www.npmjs.com/package/json-stringify-deterministic) - JavaScript deterministic JSON
+- [safe-stable-stringify GitHub](https://github.com/BridgeAR/safe-stable-stringify) - Alternative JS JSON library
+- [hash-wasm GitHub](https://github.com/Daninet/hash-wasm) - Fast WASM hashing (if needed)
+- [xxhash-wasm npm](https://www.npmjs.com/package/xxhash-wasm) - Fast non-cryptographic hash (if needed)
 
 ---
 
 ## Open Questions
 
-1. **TURN provider selection:** Need to verify Metered.ca current pricing and evaluate Twilio as alternative
-2. **Mobile browser WebRTC:** Safari iOS has some WebRTC quirks; test needed if mobile support matters
-3. **N>2 players:** Current design assumes 2-player. Mesh vs. relay topology decision needed for N>2
+1. **Pyodide hashlib version**: Verify actual algorithm availability in the Pyodide version used by the project
+2. **Float precision requirements**: Validate 10 decimal places is sufficient for all environment types
+3. **Large state handling**: Profile hash computation for environments with larger state dicts (> 20KB)
+4. **Hash algorithm negotiation**: Design protocol for clients to agree on hash algorithm during P2P handshake
 
 ---
 
-*Stack research: 2026-01-16*
+*Stack research for sync validation: 2026-01-20*
