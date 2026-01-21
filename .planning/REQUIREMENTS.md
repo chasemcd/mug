@@ -31,10 +31,10 @@ Requirements for sync validation milestone. Each maps to roadmap phases.
 
 ### Validation Export
 
-- [ ] **EXPORT-01**: System exports post-game JSON with frame-by-frame hashes and actions
-- [ ] **EXPORT-02**: System exports only confirmed-frame data (excludes predictions)
-- [ ] **EXPORT-03**: System includes desync events in validation export
-- [ ] **EXPORT-04**: System exports verified action sequences per player
+- [x] **EXPORT-01**: System exports post-game JSON with frame-by-frame hashes and actions
+- [x] **EXPORT-02**: System exports only confirmed-frame data (excludes predictions)
+- [x] **EXPORT-03**: System includes desync events in validation export
+- [x] **EXPORT-04**: System exports verified action sequences per player
 
 ## v2 Requirements
 
@@ -84,10 +84,10 @@ Which phases cover which requirements.
 | DETECT-03 | Phase 13 | Complete |
 | DETECT-04 | Phase 13 | Complete |
 | DETECT-05 | Phase 13 | Complete |
-| EXPORT-01 | Phase 14 | Pending |
-| EXPORT-02 | Phase 14 | Pending |
-| EXPORT-03 | Phase 14 | Pending |
-| EXPORT-04 | Phase 14 | Pending |
+| EXPORT-01 | Phase 14 | Complete |
+| EXPORT-02 | Phase 14 | Complete |
+| EXPORT-03 | Phase 14 | Complete |
+| EXPORT-04 | Phase 14 | Complete |
 
 **Coverage:**
 - v1.1 requirements: 17 total
@@ -96,4 +96,4 @@ Which phases cover which requirements.
 
 ---
 *Requirements defined: 2026-01-20*
-*Last updated: 2026-01-21 after Phase 13 execution complete*
+*Last updated: 2026-01-21 after Phase 14 execution complete — all v1.1 requirements satisfied*

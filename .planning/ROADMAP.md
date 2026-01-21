@@ -3,7 +3,7 @@
 ## Milestones
 
 - **v1.0 P2P Multiplayer** - Phases 1-10 (shipped 2026-01-19)
-- **v1.1 Sync Validation** - Phases 11-14 (in progress)
+- **v1.1 Sync Validation** - Phases 11-14 (complete, pending audit)
 
 ## Phases
 
@@ -25,14 +25,14 @@ Key deliverables:
 
 </details>
 
-### v1.1 Sync Validation (In Progress)
+### v1.1 Sync Validation (Complete)
 
 **Milestone Goal:** Build a validation system that confirms verified action sequences and state hashes are identical across all peers, enabling debugging of non-deterministic environments and networking issues.
 
 - [x] **Phase 11: Hash Infrastructure** - Deterministic state hashing with confirmed frame tracking
 - [x] **Phase 12: P2P Hash Exchange** - Binary hash message protocol over DataChannel
 - [x] **Phase 13: Mismatch Detection** - Comparison logic, peer buffering, desync logging
-- [ ] **Phase 14: Validation Export** - Post-game JSON export with frame-by-frame data
+- [x] **Phase 14: Validation Export** - Post-game JSON export with frame-by-frame data
 
 ## Phase Details
 
@@ -91,7 +91,7 @@ Plans:
 **Research flag:** Unlikely (straightforward JSON export)
 **Plans:** 1 plan
 Plans:
-- [ ] 14-01-PLAN.md — exportValidationData method, confirmed hash export, verified actions, desync events
+- [x] 14-01-PLAN.md — exportValidationData method, confirmed hash export, verified actions, desync events
 
 ## Progress
 
@@ -103,8 +103,8 @@ Phases execute in numeric order: 11 -> 12 -> 13 -> 14
 | 11. Hash Infrastructure | v1.1 | 1/1 | Complete | 2026-01-21 |
 | 12. P2P Hash Exchange | v1.1 | 1/1 | Complete | 2026-01-21 |
 | 13. Mismatch Detection | v1.1 | 1/1 | Complete | 2026-01-21 |
-| 14. Validation Export | v1.1 | 0/1 | Planned | - |
+| 14. Validation Export | v1.1 | 1/1 | Complete | 2026-01-21 |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-01-21 after Phase 14 planning complete*
+*Last updated: 2026-01-21 after Phase 14 execution complete*
