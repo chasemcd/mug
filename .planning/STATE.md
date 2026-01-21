@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 ## Current Position
 
 Phase: 11 of 14 (Hash Infrastructure)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-01-20 — Roadmap created
+Plan: 11-01 planned, ready for execution
+Status: Ready to execute
+Last activity: 2026-01-20 — Phase 11 planned
 
-Progress: ░░░░░░░░░░ 0% (v1.1)
+Progress: [=         ] 10% (v1.1 - Phase 11 planned)
 
 ## Milestone History
 
@@ -33,9 +33,20 @@ Progress: ░░░░░░░░░░ 0% (v1.1)
 - `interactive_gym/server/pyodide_game_coordinator.py`
 - `interactive_gym/configurations/remote_config.py`
 
+**v1.1 Planning:**
+- `.planning/phases/11-hash-infrastructure/11-01-PLAN.md`
+- `.planning/research/SUMMARY.md`
+- `.planning/research/ARCHITECTURE.md`
+
 ### Decisions
 
 See: .planning/PROJECT.md Key Decisions table
+
+**v1.1 decisions:**
+- SHA-256 (not MD5) for cross-platform hash reliability
+- Float normalization to 10 decimal places before hashing
+- Hash computation only on confirmed frames (not predicted)
+- confirmedHashHistory separate from stateHashHistory (legacy)
 
 ### Pending Todos
 
@@ -50,10 +61,10 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-01-20
-Stopped at: Roadmap created
+Stopped at: Phase 11 planning complete
 Resume file: None
 
 ### Next Steps
 
-1. `/gsd:plan-phase 11` — plan Hash Infrastructure phase
-2. `/gsd:execute-phase 11` — execute the plan
+1. `/gsd:execute-phase 11` — execute Hash Infrastructure plan
+2. After Phase 11 complete: `/gsd:plan-phase 12` — plan P2P Hash Exchange

@@ -2,8 +2,8 @@
 
 ## Milestones
 
-- ✅ **v1.0 P2P Multiplayer** - Phases 1-10 (shipped 2026-01-19)
-- 🚧 **v1.1 Sync Validation** - Phases 11-14 (in progress)
+- **v1.0 P2P Multiplayer** - Phases 1-10 (shipped 2026-01-19)
+- **v1.1 Sync Validation** - Phases 11-14 (in progress)
 
 ## Phases
 
@@ -12,7 +12,7 @@
 - Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
 
 <details>
-<summary>✅ v1.0 P2P Multiplayer (Phases 1-10) - SHIPPED 2026-01-19</summary>
+<summary>v1.0 P2P Multiplayer (Phases 1-10) - SHIPPED 2026-01-19</summary>
 
 See `.planning/archive/v1.0/` for completed phase details.
 
@@ -25,7 +25,7 @@ Key deliverables:
 
 </details>
 
-### 🚧 v1.1 Sync Validation (In Progress)
+### v1.1 Sync Validation (In Progress)
 
 **Milestone Goal:** Build a validation system that confirms verified action sequences and state hashes are identical across all peers, enabling debugging of non-deterministic environments and networking issues.
 
@@ -46,7 +46,9 @@ Key deliverables:
   3. SHA-256 hash produces identical results across browsers
   4. confirmedHashHistory tracks frame-to-hash mapping
 **Research flag:** Unlikely (standard patterns)
-**Plans:** TBD
+**Plans:** 1 plan
+Plans:
+- [ ] 11-01-PLAN.md — SHA-256 hashing, float normalization, confirmedHashHistory, rollback invalidation
 
 ### Phase 12: P2P Hash Exchange
 **Goal:** Binary hash message protocol over DataChannel
@@ -89,15 +91,15 @@ Key deliverables:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 11 → 12 → 13 → 14
+Phases execute in numeric order: 11 -> 12 -> 13 -> 14
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 11. Hash Infrastructure | v1.1 | 0/TBD | Not started | - |
+| 11. Hash Infrastructure | v1.1 | 0/1 | Planned | - |
 | 12. P2P Hash Exchange | v1.1 | 0/TBD | Not started | - |
 | 13. Mismatch Detection | v1.1 | 0/TBD | Not started | - |
 | 14. Validation Export | v1.1 | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-01-20 after v1.1 roadmap creation*
+*Last updated: 2026-01-20 after Phase 11 planning*
