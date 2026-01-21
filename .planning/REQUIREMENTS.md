@@ -23,11 +23,11 @@ Requirements for sync validation milestone. Each maps to roadmap phases.
 
 ### Mismatch Detection
 
-- [ ] **DETECT-01**: System identifies exact frame number where mismatch occurred
-- [ ] **DETECT-02**: System buffers peer hashes until local confirmation catches up
-- [ ] **DETECT-03**: System logs desync events with frame, both hashes, and timestamp
-- [ ] **DETECT-04**: System tracks verifiedFrame as highest mutually-verified frame
-- [ ] **DETECT-05**: System captures full state dump when mismatch detected
+- [x] **DETECT-01**: System identifies exact frame number where mismatch occurred
+- [x] **DETECT-02**: System buffers peer hashes until local confirmation catches up
+- [x] **DETECT-03**: System logs desync events with frame, both hashes, and timestamp
+- [x] **DETECT-04**: System tracks verifiedFrame as highest mutually-verified frame
+- [x] **DETECT-05**: System captures full state dump when mismatch detected
 
 ### Validation Export
 
@@ -79,11 +79,11 @@ Which phases cover which requirements.
 | EXCH-02 | Phase 12 | Complete |
 | EXCH-03 | Phase 12 | Complete |
 | EXCH-04 | Phase 12 | Complete |
-| DETECT-01 | Phase 13 | Pending |
-| DETECT-02 | Phase 13 | Pending |
-| DETECT-03 | Phase 13 | Pending |
-| DETECT-04 | Phase 13 | Pending |
-| DETECT-05 | Phase 13 | Pending |
+| DETECT-01 | Phase 13 | Complete |
+| DETECT-02 | Phase 13 | Complete |
+| DETECT-03 | Phase 13 | Complete |
+| DETECT-04 | Phase 13 | Complete |
+| DETECT-05 | Phase 13 | Complete |
 | EXPORT-01 | Phase 14 | Pending |
 | EXPORT-02 | Phase 14 | Pending |
 | EXPORT-03 | Phase 14 | Pending |
@@ -96,4 +96,4 @@ Which phases cover which requirements.
 
 ---
 *Requirements defined: 2026-01-20*
-*Last updated: 2026-01-21 after Phase 12 execution complete*
+*Last updated: 2026-01-21 after Phase 13 execution complete*
