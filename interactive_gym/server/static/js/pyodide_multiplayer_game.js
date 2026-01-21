@@ -2609,6 +2609,18 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
             const sessionMetrics = this.exportSessionMetrics();
             p2pLog.debug('Session metrics:', JSON.stringify(sessionMetrics, null, 2));
         }
+
+        // Validation data export for sync analysis
+        if (getLogLevel() >= LOG_LEVELS.debug) {
+            const validationData = this.exportValidationData();
+            p2pLog.debug('Validation export:', JSON.stringify(validationData, null, 2));
+
+            // Log summary at info level always
+            p2pLog.info(
+                `Sync validation: ${validationData.summary.verifiedFrame}/${validationData.summary.totalFrames} frames verified, ` +
+                `${validationData.summary.desyncCount} desyncs, ${validationData.summary.hashesComputed} hashes`
+            );
+        }
     }
 
     // ========== P2P State Resync Methods ==========
