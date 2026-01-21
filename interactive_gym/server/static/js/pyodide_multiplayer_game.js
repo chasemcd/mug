@@ -2057,6 +2057,9 @@ obs, rewards, terminateds, truncateds, infos, render_state
 
             p2pLog.debug(`Confirmed hash for frame ${frameNumber}: ${hash}`);
 
+            // Attempt comparison - will succeed if we have peer hash (DETECT-01)
+            this._attemptHashComparison(frameNumber);
+
             // Prune old entries to prevent unbounded growth
             this._pruneConfirmedHashHistory();
         } catch (e) {
@@ -2138,10 +2141,13 @@ obs, rewards, terminateds, truncateds, infos, render_state
 
         const { frameNumber, hash } = decoded;
 
-        // Store for later comparison (Phase 13 will implement comparison logic)
+        // Store for comparison (DETECT-02: buffer until local catches up)
         this.pendingPeerHashes.set(frameNumber, hash);
 
         p2pLog.debug(`Received peer hash for frame ${frameNumber}: ${hash}`);
+
+        // Attempt comparison - will succeed if we have local hash (DETECT-01)
+        this._attemptHashComparison(frameNumber);
     }
 
     /**
@@ -3070,6 +3076,9 @@ json.dumps({
         // Also reset confirmedFrame to before rollback point
         // (it will be recalculated after replay completes via _updateConfirmedFrame)
         this.confirmedFrame = Math.min(this.confirmedFrame, targetFrame - 1);
+
+        // Reset verifiedFrame - cannot verify frames that are being replayed (DETECT-04)
+        this.verifiedFrame = Math.min(this.verifiedFrame, targetFrame - 1);
 
         try {
             this.rollbackCount++;
