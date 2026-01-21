@@ -581,6 +581,7 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         this.cumulativeValidation = {
             episodes: [],           // Per-episode summaries
             allHashes: [],          // All confirmed hashes across all episodes
+            allActions: [],         // All verified actions across all episodes
             allDesyncEvents: [],    // All desync events across all episodes
             allRollbacks: [],       // All rollback events across all episodes
             sessionStartTime: Date.now()
@@ -3598,6 +3599,32 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
             });
         }
 
+        // Archive all verified actions with episode tag
+        // Actions from inputBuffer up to verifiedFrame
+        // Each action is stored as separate entry for easier cross-client comparison
+        const humanPlayerIds = this._getHumanPlayerIds();
+        const verifiedFrames = Array.from(this.inputBuffer.keys())
+            .filter(f => f <= this.verifiedFrame)
+            .sort((a, b) => a - b);
+
+        for (const frame of verifiedFrames) {
+            const frameInputs = this.inputBuffer.get(frame);
+            if (frameInputs) {
+                for (const playerId of humanPlayerIds) {
+                    const action = frameInputs.get(playerId);
+                    if (action !== undefined) {
+                        // Store one entry per player per frame for easy comparison
+                        this.cumulativeValidation.allActions.push({
+                            episode: episodeNum,
+                            frame: frame,
+                            playerId: playerId,
+                            action: action
+                        });
+                    }
+                }
+            }
+        }
+
         // Archive all desync events with episode tag
         for (const evt of this.desyncEvents) {
             this.cumulativeValidation.allDesyncEvents.push({
@@ -3617,7 +3644,7 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
 
         p2pLog.debug(
             `Archived episode ${episodeNum} validation: ` +
-            `${this.confirmedHashHistory.size} hashes, ${this.desyncEvents.length} desyncs`
+            `${this.confirmedHashHistory.size} hashes, ${verifiedFrames.length} actions, ${this.desyncEvents.length} desyncs`
         );
     }
 
@@ -4496,6 +4523,7 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
                 // Aggregate stats
                 totalEpisodes: this.cumulativeValidation.episodes.length,
                 totalHashes: this.cumulativeValidation.allHashes.length,
+                totalActions: this.cumulativeValidation.allActions.length,
                 totalDesyncs: this.cumulativeValidation.allDesyncEvents.length,
                 totalRollbacks: this.cumulativeValidation.allRollbacks.reduce(
                     (sum, r) => sum + r.count, 0
@@ -4503,6 +4531,10 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
 
                 // All frame hashes across all episodes
                 allHashes: this.cumulativeValidation.allHashes,
+
+                // All verified actions across all episodes
+                // Format: [{episode, frame, actions: {playerId: action, ...}}, ...]
+                allActions: this.cumulativeValidation.allActions,
 
                 // All desync events across all episodes
                 allDesyncEvents: this.cumulativeValidation.allDesyncEvents.map(evt => ({

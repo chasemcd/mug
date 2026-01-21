@@ -903,9 +903,10 @@ def _create_aggregated_metrics(scene_id: str, game_id: str, player_metrics: dict
 
     Combines:
     - Both players' hashes for frame-by-frame comparison
+    - Both players' actions for frame-by-frame comparison
     - Both players' episode summaries
     - Desync events from both perspectives
-    - Hash comparison showing matches/mismatches
+    - Summary statistics for quick verification
     """
     players = list(player_metrics.keys())
     if len(players) < 2:
@@ -928,11 +929,45 @@ def _create_aggregated_metrics(scene_id: str, game_id: str, player_metrics: dict
         player_b_id
     )
 
+    # Build action comparison
+    action_comparison = _compare_actions(
+        metrics_a.get("validation", {}).get("allActions", []),
+        metrics_b.get("validation", {}).get("allActions", []),
+        player_a_id,
+        player_b_id
+    )
+
+    # Compute top-level summary
+    hashes_match = hash_comparison["mismatchingFrames"] == 0 and hash_comparison["matchingFrames"] > 0
+    actions_match = action_comparison["mismatchingFrames"] == 0 and action_comparison["matchingFrames"] > 0
+    fully_synced = hashes_match and actions_match
+
+    # Get first mismatch frames
+    first_hash_mismatch = _get_first_mismatch_frame(hash_comparison["frames"])
+    first_action_mismatch = _get_first_mismatch_frame(action_comparison["frames"])
+
+    # Get all divergence frames
+    hash_divergence_frames = _get_divergence_frames(hash_comparison["frames"])
+    action_divergence_frames = _get_divergence_frames(action_comparison["frames"])
+
     # Build aggregated structure
     aggregated = {
         "gameId": game_id,
         "sceneId": scene_id,
         "aggregatedAt": int(time.time() * 1000),
+
+        # Top-level summary for quick verification
+        "summary": {
+            "fullySynced": fully_synced,
+            "hashesMatch": hashes_match,
+            "actionsMatch": actions_match,
+            "totalHashesCompared": hash_comparison["matchingFrames"] + hash_comparison["mismatchingFrames"],
+            "totalActionsCompared": action_comparison["matchingFrames"] + action_comparison["mismatchingFrames"],
+            "firstHashMismatchFrame": first_hash_mismatch,
+            "firstActionMismatchFrame": first_action_mismatch,
+            "hashDivergenceFrames": hash_divergence_frames,
+            "actionDivergenceFrames": action_divergence_frames,
+        },
 
         "players": {
             player_a_id: {
@@ -952,13 +987,22 @@ def _create_aggregated_metrics(scene_id: str, game_id: str, player_metrics: dict
         },
 
         "validation": {
-            "summary": {
+            "hashSummary": {
                 "totalFramesCompared": hash_comparison["totalFrames"],
                 "matchingFrames": hash_comparison["matchingFrames"],
                 "mismatchingFrames": hash_comparison["mismatchingFrames"],
                 "playerAOnlyFrames": hash_comparison["playerAOnly"],
                 "playerBOnlyFrames": hash_comparison["playerBOnly"],
                 "matchRate": hash_comparison["matchRate"],
+            },
+
+            "actionSummary": {
+                "totalFramesCompared": action_comparison["totalFrames"],
+                "matchingFrames": action_comparison["matchingFrames"],
+                "mismatchingFrames": action_comparison["mismatchingFrames"],
+                "playerAOnlyFrames": action_comparison["playerAOnly"],
+                "playerBOnlyFrames": action_comparison["playerBOnly"],
+                "matchRate": action_comparison["matchRate"],
             },
 
             # Episode summaries from both players
@@ -969,6 +1013,9 @@ def _create_aggregated_metrics(scene_id: str, game_id: str, player_metrics: dict
 
             # Frame-by-frame hash comparison
             "hashComparison": hash_comparison["frames"],
+
+            # Frame-by-frame action comparison
+            "actionComparison": action_comparison["frames"],
 
             # Desync events from both perspectives
             "desyncEvents": {
@@ -1060,6 +1107,118 @@ def _compare_hashes(hashes_a: list, hashes_b: list, player_a_id: str, player_b_i
         "matchRate": match_rate,
         "frames": frames
     }
+
+
+def _compare_actions(actions_a: list, actions_b: list, player_a_id: str, player_b_id: str) -> dict:
+    """
+    Compare actions from both players frame by frame.
+
+    Actions are keyed by (episode, frame, playerId) since each frame has actions
+    for both players recorded by each client.
+
+    Returns comparison structure with:
+    - Per-frame comparison showing both players' recorded actions and match status
+    - Summary statistics
+    """
+    # Build lookup by (episode, frame, actionPlayerId)
+    # Each entry in allActions has: {episode, frame, playerId, action}
+    # where playerId is the player who TOOK the action (not who recorded it)
+    lookup_a = {}
+    for a in actions_a:
+        key = (a.get("episode"), a.get("frame"), a.get("playerId"))
+        lookup_a[key] = a.get("action")
+
+    lookup_b = {}
+    for a in actions_b:
+        key = (a.get("episode"), a.get("frame"), a.get("playerId"))
+        lookup_b[key] = a.get("action")
+
+    all_keys = set(lookup_a.keys()) | set(lookup_b.keys())
+
+    frames = []
+    matching = 0
+    mismatching = 0
+    a_only = 0
+    b_only = 0
+
+    for key in sorted(all_keys):
+        episode, frame, action_player_id = key
+        action_a = lookup_a.get(key)
+        action_b = lookup_b.get(key)
+
+        if action_a is not None and action_b is not None:
+            # Compare actions - they should be identical
+            match = action_a == action_b
+            if match:
+                matching += 1
+            else:
+                mismatching += 1
+            frames.append({
+                "episode": episode,
+                "frame": frame,
+                "actionPlayerId": action_player_id,
+                f"recordedBy_{player_a_id}": action_a,
+                f"recordedBy_{player_b_id}": action_b,
+                "match": match
+            })
+        elif action_a is not None:
+            a_only += 1
+            frames.append({
+                "episode": episode,
+                "frame": frame,
+                "actionPlayerId": action_player_id,
+                f"recordedBy_{player_a_id}": action_a,
+                f"recordedBy_{player_b_id}": None,
+                "match": None
+            })
+        else:
+            b_only += 1
+            frames.append({
+                "episode": episode,
+                "frame": frame,
+                "actionPlayerId": action_player_id,
+                f"recordedBy_{player_a_id}": None,
+                f"recordedBy_{player_b_id}": action_b,
+                "match": None
+            })
+
+    total = matching + mismatching
+    match_rate = (matching / total * 100) if total > 0 else None
+
+    return {
+        "totalFrames": len(frames),
+        "matchingFrames": matching,
+        "mismatchingFrames": mismatching,
+        "playerAOnly": a_only,
+        "playerBOnly": b_only,
+        "matchRate": match_rate,
+        "frames": frames
+    }
+
+
+def _get_first_mismatch_frame(frames: list) -> dict | None:
+    """
+    Find the first frame where match is False.
+
+    Returns dict with episode and frame number, or None if all match.
+    """
+    for f in frames:
+        if f.get("match") is False:
+            return {"episode": f.get("episode"), "frame": f.get("frame")}
+    return None
+
+
+def _get_divergence_frames(frames: list) -> list:
+    """
+    Get all frames where match is False.
+
+    Returns list of {episode, frame} dicts for divergent frames.
+    """
+    divergent = []
+    for f in frames:
+        if f.get("match") is False:
+            divergent.append({"episode": f.get("episode"), "frame": f.get("frame")})
+    return divergent
 
 
 #####################################
