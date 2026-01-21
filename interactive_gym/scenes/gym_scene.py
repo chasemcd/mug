@@ -163,6 +163,17 @@ class GymScene(scene.Scene):
         # Set to None to disable, or a positive integer (ms) to enable with that duration.
         self.rollback_smoothing_duration: int | None = 100  # Tween duration in ms, None to disable
 
+        # Entry screening (Phase 15)
+        self.device_exclusion: str | None = None  # "mobile", "desktop", or None (allow all)
+        self.browser_requirements: list[str] | None = None  # Allowed browsers, e.g., ["Chrome", "Firefox"]
+        self.browser_blocklist: list[str] | None = None  # Blocked browsers, e.g., ["Safari"]
+        self.exclusion_messages: dict[str, str] = {
+            "mobile": "This study requires a desktop or laptop computer. Please return on a non-mobile device.",
+            "desktop": "This study requires a mobile device. Please return on a phone or tablet.",
+            "browser": "Your browser is not supported for this study. Please use a different browser.",
+            "ping": "Your internet connection is too slow for this study. Please try again with a stronger connection."
+        }
+
     def environment(
         self,
         env_creator: Callable = NotProvided,
@@ -618,6 +629,75 @@ class GymScene(scene.Scene):
         if group_wait_timeout is not NotProvided:
             assert isinstance(group_wait_timeout, int) and group_wait_timeout > 0
             self.group_wait_timeout = group_wait_timeout
+
+        return self
+
+    def entry_screening(
+        self,
+        device_exclusion: str = NotProvided,
+        browser_requirements: list[str] = NotProvided,
+        browser_blocklist: list[str] = NotProvided,
+        max_ping: int = NotProvided,
+        min_ping_measurements: int = NotProvided,
+        exclusion_messages: dict[str, str] = NotProvided,
+    ):
+        """Configure entry screening rules for the GymScene.
+
+        Entry screening runs before the participant can start the game.
+        If any check fails, the participant sees the appropriate exclusion message
+        and cannot proceed.
+
+        :param device_exclusion: Device type to exclude. "mobile" excludes phones/tablets,
+            "desktop" excludes desktop/laptop computers, None allows all. defaults to NotProvided
+        :type device_exclusion: str, optional
+        :param browser_requirements: List of allowed browser names (case-insensitive).
+            If provided, only these browsers are allowed. e.g., ["Chrome", "Firefox"]. defaults to NotProvided
+        :type browser_requirements: list[str], optional
+        :param browser_blocklist: List of blocked browser names (case-insensitive).
+            These browsers are excluded even if in requirements. e.g., ["Safari"]. defaults to NotProvided
+        :type browser_blocklist: list[str], optional
+        :param max_ping: Maximum allowed latency in milliseconds. Participants with
+            ping exceeding this are excluded. defaults to NotProvided
+        :type max_ping: int, optional
+        :param min_ping_measurements: Minimum number of ping measurements required
+            before checking latency. defaults to NotProvided
+        :type min_ping_measurements: int, optional
+        :param exclusion_messages: Custom messages for each exclusion type.
+            Keys: "mobile", "desktop", "browser", "ping". defaults to NotProvided
+        :type exclusion_messages: dict[str, str], optional
+        :return: The GymScene instance (self)
+        :rtype: GymScene
+        """
+        if device_exclusion is not NotProvided:
+            assert device_exclusion in [None, "mobile", "desktop"], \
+                "device_exclusion must be None, 'mobile', or 'desktop'"
+            self.device_exclusion = device_exclusion
+
+        if browser_requirements is not NotProvided:
+            assert browser_requirements is None or isinstance(browser_requirements, list), \
+                "browser_requirements must be None or a list of browser names"
+            self.browser_requirements = browser_requirements
+
+        if browser_blocklist is not NotProvided:
+            assert browser_blocklist is None or isinstance(browser_blocklist, list), \
+                "browser_blocklist must be None or a list of browser names"
+            self.browser_blocklist = browser_blocklist
+
+        if max_ping is not NotProvided:
+            assert max_ping is None or (isinstance(max_ping, int) and max_ping > 0), \
+                "max_ping must be None or a positive integer"
+            self.max_ping = max_ping
+
+        if min_ping_measurements is not NotProvided:
+            assert isinstance(min_ping_measurements, int) and min_ping_measurements >= 1, \
+                "min_ping_measurements must be a positive integer"
+            self.min_ping_measurements = min_ping_measurements
+
+        if exclusion_messages is not NotProvided:
+            assert isinstance(exclusion_messages, dict), \
+                "exclusion_messages must be a dictionary"
+            # Merge with defaults (user messages override defaults)
+            self.exclusion_messages = {**self.exclusion_messages, **exclusion_messages}
 
         return self
 
