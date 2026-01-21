@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-01-21)
 ## Current Position
 
 Phase: 16 of 18 (Continuous Monitoring)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-01-21 — Phase 15 verified complete
+Plan: 16-01-PLAN.md (1 plan, verified)
+Status: Ready to execute
+Last activity: 2026-01-21 — Phase 16 planned
 
 Progress: [##........] 25% (v1.2 - 1/4 phases complete)
 
@@ -94,9 +94,9 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-01-21
-Stopped at: Phase 15 verified complete
+Stopped at: Phase 16 planned
 Resume file: None
 
 ### Next Steps
 
-1. `/gsd:plan-phase 16` — plan Continuous Monitoring phase
+1. `/gsd:execute-phase 16` — execute Continuous Monitoring phase
