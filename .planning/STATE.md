@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-21)
 ## Current Position
 
 Phase: 16 of 18 (Continuous Monitoring)
-Plan: 16-01-PLAN.md (1 plan, verified)
-Status: Ready to execute
-Last activity: 2026-01-21 — Phase 16 planned
+Plan: 16-01-PLAN.md (1 plan, complete)
+Status: Phase complete
+Last activity: 2026-01-21 - Completed 16-01-PLAN.md
 
-Progress: [##........] 25% (v1.2 - 1/4 phases complete)
+Progress: [####......] 50% (v1.2 - 2/4 phases complete)
 
 ## Milestone History
 
@@ -29,7 +29,7 @@ Progress: [##........] 25% (v1.2 - 1/4 phases complete)
 ### Key Files
 
 **P2P Core (created/heavily modified in v1.0):**
-- `interactive_gym/server/static/js/pyodide_multiplayer_game.js` (4,400+ LOC)
+- `interactive_gym/server/static/js/pyodide_multiplayer_game.js` (4,600+ LOC)
 - `interactive_gym/server/static/js/webrtc_manager.js` (759 LOC)
 - `interactive_gym/server/pyodide_game_coordinator.py`
 - `interactive_gym/configurations/remote_config.py`
@@ -44,6 +44,11 @@ Progress: [##........] 25% (v1.2 - 1/4 phases complete)
 
 **v1.2 Execution:**
 - `.planning/phases/15-entry-screening-rules/15-01-SUMMARY.md`
+- `.planning/phases/16-continuous-monitoring/16-01-SUMMARY.md`
+
+**Phase 16 Key Files:**
+- `interactive_gym/server/static/js/continuous_monitor.js` (277 LOC) - New module
+- `interactive_gym/scenes/gym_scene.py` - continuous_monitoring() method added
 
 ### Decisions
 
@@ -81,6 +86,12 @@ See: .planning/PROJECT.md Key Decisions table
 - Default exclusion messages provided, researcher can customize (ENTRY-03)
 - Entry screening runs before Pyodide initialization to fail fast (ENTRY-04)
 
+**v1.2 decisions (Phase 16):**
+- Frame-throttled checking every 30 frames (~1s) for performance (MONITOR-01)
+- Rolling window with N-of-M consecutive violations for ping (MONITOR-02)
+- Page Visibility API visibilitychange event for immediate tab detection (MONITOR-03)
+- Warning before exclusion with configurable thresholds (MONITOR-04)
+
 ### Pending Todos
 
 (None)
@@ -94,9 +105,9 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-01-21
-Stopped at: Phase 16 planned
+Stopped at: Completed 16-01-PLAN.md
 Resume file: None
 
 ### Next Steps
 
-1. `/gsd:execute-phase 16` — execute Continuous Monitoring phase
+1. `/gsd:execute-phase 17` - execute Partner Notification phase
