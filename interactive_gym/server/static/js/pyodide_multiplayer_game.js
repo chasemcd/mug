@@ -568,6 +568,10 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         // Map<frameNumber, hash>
         this.pendingPeerHashes = new Map();
 
+        // Mismatch detection state (Phase 13: DETECT-04, DETECT-03)
+        this.verifiedFrame = -1;  // Highest frame mutually verified by both peers
+        this.desyncEvents = [];   // [{frame, ourHash, peerHash, timestamp, stateDump}, ...]
+
         // Action tracking for sync verification
         this.actionSequence = [];  // [{frame: N, actions: {player: action}}]
         this.actionCounts = {};    // {playerId: {action: count}}
@@ -3339,6 +3343,10 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
         // Clear hash exchange structures for new episode (EXCH-03)
         this.pendingHashExchange = [];
         this.pendingPeerHashes.clear();
+
+        // Clear mismatch detection state for new episode (DETECT-03, DETECT-04)
+        this.verifiedFrame = -1;
+        this.desyncEvents = [];
 
         // Clear debug delayed input queue
         this.debugDelayedInputQueue = [];
