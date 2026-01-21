@@ -4193,6 +4193,46 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
     }
 
     /**
+     * Export validation data for sync analysis.
+     * Call at episode end or from browser console: window.game.exportValidationData()
+     * Returns JSON-serializable object with confirmed hashes, verified actions, and desyncs.
+     * @returns {Object} Validation data for research analysis
+     */
+    exportValidationData() {
+        return {
+            // Session identification
+            gameId: this.gameId,
+            playerId: this.myPlayerId,
+            exportTimestamp: Date.now(),
+
+            // Sync summary
+            summary: {
+                totalFrames: this.frameNumber,
+                verifiedFrame: this.verifiedFrame,
+                desyncCount: this.desyncEvents.length,
+                hashesComputed: this.confirmedHashHistory.size
+            },
+
+            // Frame-by-frame confirmed hashes (EXPORT-01, EXPORT-02)
+            confirmedHashes: this._exportConfirmedHashes(),
+
+            // Verified action sequences per player (EXPORT-04)
+            verifiedActions: this._exportVerifiedActions(),
+
+            // All desync events with full context (EXPORT-03)
+            desyncEvents: this.desyncEvents.map(evt => ({
+                frame: evt.frame,
+                ourHash: evt.ourHash,
+                peerHash: evt.peerHash,
+                timestamp: evt.timestamp,
+                verifiedFrameAtDesync: evt.verifiedFrameAtDesync,
+                // Include state dump only if present and not too large
+                hasStateDump: !!evt.stateDump
+            }))
+        };
+    }
+
+    /**
      * Export action history for debugging divergence.
      * Call from browser console: window.game.exportActionHistory()
      * Compare output between two clients to find where they diverged.
