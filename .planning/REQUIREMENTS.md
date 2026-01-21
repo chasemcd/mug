@@ -16,10 +16,10 @@ Requirements for sync validation milestone. Each maps to roadmap phases.
 
 ### Hash Exchange
 
-- [ ] **EXCH-01**: System sends state hashes via P2P DataChannel (message type 0x07)
-- [ ] **EXCH-02**: System exchanges hashes asynchronously without blocking frame advancement
-- [ ] **EXCH-03**: System invalidates hash history entries when rollback occurs (frames >= target)
-- [ ] **EXCH-04**: System encodes hash messages in binary format (13 bytes: type + frame + hash)
+- [x] **EXCH-01**: System sends state hashes via P2P DataChannel (message type 0x07)
+- [x] **EXCH-02**: System exchanges hashes asynchronously without blocking frame advancement
+- [x] **EXCH-03**: System invalidates hash history entries when rollback occurs (frames >= target)
+- [x] **EXCH-04**: System encodes hash messages in binary format (13 bytes: type + frame + hash)
 
 ### Mismatch Detection
 
@@ -75,10 +75,10 @@ Which phases cover which requirements.
 | HASH-02 | Phase 11 | Complete |
 | HASH-03 | Phase 11 | Complete |
 | HASH-04 | Phase 11 | Complete |
-| EXCH-01 | Phase 12 | Pending |
-| EXCH-02 | Phase 12 | Pending |
-| EXCH-03 | Phase 12 | Pending |
-| EXCH-04 | Phase 12 | Pending |
+| EXCH-01 | Phase 12 | Complete |
+| EXCH-02 | Phase 12 | Complete |
+| EXCH-03 | Phase 12 | Complete |
+| EXCH-04 | Phase 12 | Complete |
 | DETECT-01 | Phase 13 | Pending |
 | DETECT-02 | Phase 13 | Pending |
 | DETECT-03 | Phase 13 | Pending |
@@ -96,4 +96,4 @@ Which phases cover which requirements.
 
 ---
 *Requirements defined: 2026-01-20*
-*Last updated: 2026-01-21 after Phase 11 execution complete*
+*Last updated: 2026-01-21 after Phase 12 execution complete*
