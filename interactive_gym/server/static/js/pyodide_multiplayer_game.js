@@ -1442,6 +1442,10 @@ hashlib.md5(json.dumps(_state, sort_keys=True).encode()).hexdigest()[:8]
             rollbackOccurred = await this.performRollback(rollbackFrame, humanPlayerIds);
         }
 
+        // After rollback completes (or if no rollback), update confirmed frame tracking
+        // This triggers hash computation for any newly confirmed frames (HASH-01)
+        await this._updateConfirmedFrame();
+
         // 3. Build final action dict - ALL human players use delayed inputs from buffer
         // This is true GGPO: local player also experiences input delay
         const finalActions = {};
@@ -2832,6 +2836,19 @@ json.dumps({
         // Set rollback guard to prevent nested rollbacks
         this.rollbackInProgress = true;
 
+        // Invalidate confirmed hashes from rollback point onward
+        // These hashes are for states that are about to be overwritten
+        for (const frame of this.confirmedHashHistory.keys()) {
+            if (frame >= targetFrame) {
+                this.confirmedHashHistory.delete(frame);
+            }
+        }
+        p2pLog.debug(`Invalidated confirmed hashes >= frame ${targetFrame}`);
+
+        // Also reset confirmedFrame to before rollback point
+        // (it will be recalculated after replay completes via _updateConfirmedFrame)
+        this.confirmedFrame = Math.min(this.confirmedFrame, targetFrame - 1);
+
         try {
             this.rollbackCount++;
             this.maxRollbackFrames = Math.max(this.maxRollbackFrames, rollbackFrames);
@@ -3185,6 +3202,9 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
         this.pendingRollbackFrame = null;
         this.rollbackCount = 0;
         this.maxRollbackFrames = 0;
+
+        // Clear confirmed hash history on episode reset (HASH-04)
+        this.confirmedHashHistory.clear();
 
         // Clear debug delayed input queue
         this.debugDelayedInputQueue = [];
