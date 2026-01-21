@@ -14,6 +14,7 @@ import { convertUndefinedToNull } from './pyodide_remote_game.js';
 import * as seeded_random from './seeded_random.js';
 import * as ui_utils from './ui_utils.js';
 import { WebRTCManager } from './webrtc_manager.js';
+import { ContinuousMonitor } from './continuous_monitor.js';
 
 // ========== Logging Configuration ==========
 // Control verbosity via browser console: window.p2pLogLevel = 'info' or 'debug'
@@ -682,6 +683,11 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         this.pendingSocketIOInputs = [];   // Queued SocketIO inputs
         this.rollbackInProgress = false;   // Guard against nested rollbacks
 
+        // Continuous monitoring (Phase 16)
+        this.continuousMonitor = null;  // Initialized in pyodide_game_ready when config available
+        this.monitorCheckCounter = 0;   // Check every N frames to reduce overhead
+        this.monitorCheckInterval = 30; // Check once per second at 30fps
+
         this.setupMultiplayerHandlers();
     }
 
@@ -727,6 +733,12 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
 
             // Server-authoritative mode
             this.serverAuthoritative = data.server_authoritative || false;
+
+            // Initialize continuous monitoring if configured (Phase 16)
+            if (data.scene_metadata?.continuous_monitoring_enabled) {
+                this.continuousMonitor = new ContinuousMonitor(data.scene_metadata);
+                p2pLog.info('Continuous monitoring enabled');
+            }
 
             // Initialize action queues for other players
             for (const playerId of data.players) {
@@ -1655,6 +1667,30 @@ hashlib.md5(json.dumps(_st, sort_keys=True).encode()).hexdigest()[:8]
 
         // Log diagnostics periodically
         this.logDiagnostics();
+
+        // Continuous monitoring check (Phase 16)
+        // Check less frequently than every frame to reduce overhead
+        if (this.continuousMonitor && !inEpisodeTransition) {
+            // Record ping for continuous monitoring
+            if (window.currentPing !== undefined) {
+                this.continuousMonitor.recordPing(window.currentPing);
+            }
+
+            this.monitorCheckCounter++;
+            if (this.monitorCheckCounter >= this.monitorCheckInterval) {
+                this.monitorCheckCounter = 0;
+                const monitorResult = this.continuousMonitor.check();
+
+                if (monitorResult.exclude) {
+                    await this._handleMidGameExclusion(monitorResult.reason, monitorResult.message);
+                    return null;  // Stop game loop
+                }
+
+                if (monitorResult.warn) {
+                    this._showMonitorWarning(monitorResult.message);
+                }
+            }
+        }
 
         // 5. Check if episode is complete (only trigger once)
         // Episode ends when: environment terminates/truncates OR max_steps reached
@@ -2704,6 +2740,130 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
                 `${validationData.summary.desyncCount} desyncs, ${validationData.summary.hashesComputed} hashes`
             );
         }
+    }
+
+    // ========== Continuous Monitoring Methods (Phase 16) ==========
+
+    /**
+     * Handle mid-game exclusion from continuous monitoring.
+     * Stops game, shows message, notifies server.
+     *
+     * @param {string} reason - Exclusion reason ('sustained_ping', 'tab_hidden')
+     * @param {string} message - Message to display to participant
+     */
+    async _handleMidGameExclusion(reason, message) {
+        p2pLog.warn(`Mid-game exclusion: ${reason}`);
+
+        // Stop game loop
+        this.state = "done";
+        this.episodeComplete = true;
+
+        // Pause monitoring
+        if (this.continuousMonitor) {
+            this.continuousMonitor.pause();
+        }
+
+        // Show exclusion message
+        this._showMidGameExclusionUI(message);
+
+        // Notify server (which will notify partner in Phase 17)
+        socket.emit('mid_game_exclusion', {
+            game_id: this.gameId,
+            player_id: this.myPlayerId,
+            reason: reason,
+            frame_number: this.frameNumber,
+            timestamp: Date.now()
+        });
+
+        // Clean up WebRTC
+        if (this.webrtcManager) {
+            this.webrtcManager.close();
+        }
+
+        // Trigger end game redirect
+        socket.emit('leave_game', { session_id: window.sessionId });
+        socket.emit('end_game_request_redirect', {
+            mid_game_exclusion: true,
+            reason: reason
+        });
+    }
+
+    /**
+     * Show mid-game exclusion UI overlay.
+     * @param {string} message - Exclusion message
+     */
+    _showMidGameExclusionUI(message) {
+        // Create overlay if it doesn't exist
+        let overlay = document.getElementById('monitorExclusionOverlay');
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.id = 'monitorExclusionOverlay';
+            overlay.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.85);
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                z-index: 10000;
+            `;
+            document.body.appendChild(overlay);
+        }
+
+        overlay.innerHTML = `
+            <div style="
+                background: white;
+                padding: 40px;
+                border-radius: 8px;
+                max-width: 500px;
+                text-align: center;
+            ">
+                <h2 style="color: #c00; margin-bottom: 20px;">Game Ended</h2>
+                <p style="font-size: 16px; margin-bottom: 20px;">${message}</p>
+                <p style="color: #666; font-size: 14px;">You will be redirected shortly...</p>
+            </div>
+        `;
+        overlay.style.display = 'flex';
+    }
+
+    /**
+     * Show warning overlay (semi-transparent, doesn't block game).
+     * @param {string} message - Warning message
+     */
+    _showMonitorWarning(message) {
+        // Create warning banner if it doesn't exist
+        let banner = document.getElementById('monitorWarningBanner');
+        if (!banner) {
+            banner = document.createElement('div');
+            banner.id = 'monitorWarningBanner';
+            banner.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                padding: 15px;
+                background: rgba(255, 200, 0, 0.95);
+                color: #000;
+                text-align: center;
+                font-weight: bold;
+                z-index: 9999;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            `;
+            document.body.appendChild(banner);
+        }
+
+        banner.textContent = message;
+        banner.style.display = 'block';
+
+        // Auto-hide after 5 seconds
+        setTimeout(() => {
+            if (banner) {
+                banner.style.display = 'none';
+            }
+        }, 5000);
     }
 
     // ========== P2P State Resync Methods ==========
@@ -4056,6 +4216,9 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
          * Send episode end notification to peer.
          * Called when we detect episode end locally (environment terminated/truncated).
          */
+        // Pause continuous monitoring during episode transition (Phase 16)
+        this.continuousMonitor?.pause();
+
         if (!this.webrtcManager?.isReady()) {
             p2pLog.debug('Cannot broadcast episode end - WebRTC not ready');
             return;
@@ -4266,6 +4429,9 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
             clearTimeout(sync.retryTimeoutId);
             sync.retryTimeoutId = null;
         }
+
+        // Resume continuous monitoring after episode sync complete (Phase 16)
+        this.continuousMonitor?.resume();
 
         // Resolve the start promise to unblock the game loop
         if (sync.startResolve) {

@@ -59,6 +59,9 @@ socket.on('pong', function(data) {
     document.getElementById('latencyContainer').style.display = 'block'; // Show the latency (ping) display
     curLatency = medianLatency;
     maxLatency = data.max_latency;
+
+    // Expose for continuous monitoring (Phase 16)
+    window.currentPing = medianLatency;
 });
 
 function calculateMedian(arr) {
