@@ -930,6 +930,33 @@ def receive_multiplayer_metrics(data):
             del PENDING_MULTIPLAYER_METRICS[key]
 
 
+@socketio.on("client_console_log")
+def on_client_console_log(data):
+    """
+    Receive console log from participant browser for admin dashboard.
+
+    Args:
+        data: {
+            'level': str (log, info, warn, error),
+            'message': str,
+            'timestamp': float (optional, Unix timestamp)
+        }
+    """
+    global ADMIN_AGGREGATOR
+
+    subject_id = get_subject_id_from_session_id(flask.request.sid)
+    if subject_id is None:
+        return
+
+    if ADMIN_AGGREGATOR:
+        ADMIN_AGGREGATOR.receive_console_log(
+            subject_id=subject_id,
+            level=data.get("level", "log"),
+            message=data.get("message", ""),
+            timestamp=data.get("timestamp")
+        )
+
+
 def _create_aggregated_metrics(scene_id: str, game_id: str, player_metrics: dict):
     """
     Create aggregated comparison file from both players' metrics.

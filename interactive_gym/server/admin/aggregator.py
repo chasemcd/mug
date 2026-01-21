@@ -43,6 +43,8 @@ class AdminEventAggregator:
 
     # Maximum number of activity events to retain
     MAX_ACTIVITY_LOG_SIZE = 500
+    # Maximum number of console log entries to retain
+    MAX_CONSOLE_LOG_SIZE = 1000
 
     def __init__(
         self,
@@ -76,6 +78,9 @@ class AdminEventAggregator:
         # Activity log - capped FIFO queue
         self._activity_log: deque[ActivityEvent] = deque(maxlen=self.MAX_ACTIVITY_LOG_SIZE)
 
+        # Console log - capped FIFO queue for participant console output
+        self._console_logs: deque[dict] = deque(maxlen=self.MAX_CONSOLE_LOG_SIZE)
+
         # Broadcast loop state
         self._broadcast_running = False
         self._last_state_hash: str | None = None
@@ -107,10 +112,9 @@ class AdminEventAggregator:
             if room_state:
                 waiting_rooms.append(room_state)
 
-        # Get active games count
-        active_games = 0
-        if self.pyodide_coordinator:
-            active_games = len(self.pyodide_coordinator.games)
+        # Get active multiplayer games
+        multiplayer_games = self._get_multiplayer_games_state()
+        active_games = len(multiplayer_games)
 
         # Get recent activity (last 100 for display)
         recent_activity = [
@@ -151,10 +155,15 @@ class AdminEventAggregator:
             'timestamp': time.time()
         }
 
+        # Get recent console logs (last 100 for display)
+        recent_console_logs = list(self._console_logs)[-100:]
+
         return {
             'participants': participants,
             'waiting_rooms': waiting_rooms,
+            'multiplayer_games': multiplayer_games,
             'activity_log': recent_activity,
+            'console_logs': recent_console_logs,
             'summary': summary
         }
 
@@ -290,6 +299,78 @@ class AdminEventAggregator:
         except Exception as e:
             logger.debug(f"Error getting waiting room state for {scene_id}: {e}")
             return None
+
+    def _get_multiplayer_games_state(self) -> list[dict]:
+        """
+        Extract active multiplayer game states.
+
+        Returns:
+            List of dicts with game_id, players, host_id, etc.
+        """
+        games = []
+        if not self.pyodide_coordinator:
+            return games
+
+        try:
+            for game_id, game_state in list(self.pyodide_coordinator.games.items()):
+                games.append({
+                    'game_id': game_id,
+                    'players': list(game_state.players.keys()),
+                    'host_id': game_state.host_id,
+                    'current_frame': getattr(game_state, 'current_frame', None),
+                    'is_server_authoritative': game_state.server_authoritative,
+                    'created_at': getattr(game_state, 'created_at', None),
+                })
+        except Exception as e:
+            logger.debug(f"Error getting multiplayer games state: {e}")
+
+        return games
+
+    def receive_console_log(
+        self,
+        subject_id: str,
+        level: str,
+        message: str,
+        timestamp: float | None = None
+    ) -> None:
+        """
+        Receive and store a console log from a participant, emit to admins immediately.
+
+        Args:
+            subject_id: The participant's subject ID
+            level: Log level (log, info, warn, error)
+            message: The log message
+            timestamp: Optional timestamp (defaults to now)
+        """
+        log_entry = {
+            'timestamp': timestamp or time.time(),
+            'subject_id': subject_id,
+            'level': level,
+            'message': message[:500] if message else ''  # Truncate long messages
+        }
+
+        # Append to console log (deque auto-removes old entries when full)
+        self._console_logs.append(log_entry)
+
+        # Immediately emit to admins for real-time log view
+        self.emit_console_log(log_entry)
+
+    def emit_console_log(self, log_entry: dict) -> None:
+        """
+        Immediately emit single console log entry to admins.
+
+        Args:
+            log_entry: The log entry dict to emit
+        """
+        try:
+            self.sio.emit(
+                'console_log',
+                log_entry,
+                namespace='/admin',
+                room='admin_broadcast'
+            )
+        except Exception as e:
+            logger.debug(f"Error emitting console log: {e}")
 
     def log_activity(self, event_type: str, subject_id: str, details: dict | None = None) -> None:
         """

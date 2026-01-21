@@ -114,6 +114,21 @@
                     </div>
                 </div>
 
+                <!-- Multiplayer Games -->
+                <div class="card bg-base-100 shadow-sm">
+                    <div class="card-body p-0">
+                        <div class="flex items-center justify-between p-4 border-b border-base-200">
+                            <h2 class="text-lg font-semibold">Multiplayer Games</h2>
+                            <span class="badge badge-ghost badge-sm" id="games-count">0 active</span>
+                        </div>
+                        <div class="p-4" id="multiplayer-games-container">
+                            <div class="empty-state-sm">
+                                <p class="text-base-content/50 text-sm">No active games</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Activity Timeline -->
                 <div class="card bg-base-100 shadow-sm">
                     <div class="card-body p-0">
@@ -124,6 +139,32 @@
                         <div class="activity-timeline" id="activity-timeline">
                             <div class="empty-state-sm">
                                 <p class="text-base-content/50 text-sm">No activity yet</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Console Logs -->
+                <div class="card bg-base-100 shadow-sm">
+                    <div class="card-body p-0">
+                        <div class="flex items-center justify-between p-4 border-b border-base-200">
+                            <h2 class="text-lg font-semibold">Console Logs</h2>
+                            <div class="flex gap-2 items-center">
+                                <select id="log-level-filter" class="select select-xs select-bordered">
+                                    <option value="all">All</option>
+                                    <option value="error">Errors</option>
+                                    <option value="warn">Warnings</option>
+                                    <option value="info">Info</option>
+                                </select>
+                                <select id="log-participant-filter" class="select select-xs select-bordered">
+                                    <option value="all">All Participants</option>
+                                </select>
+                                <span class="badge badge-ghost badge-sm" id="logs-count">0</span>
+                            </div>
+                        </div>
+                        <div class="console-logs-container" id="console-logs-container">
+                            <div class="empty-state-sm">
+                                <p class="text-base-content/50 text-sm">No logs captured</p>
                             </div>
                         </div>
                     </div>

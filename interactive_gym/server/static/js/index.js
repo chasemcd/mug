@@ -10,6 +10,82 @@ window.socket = io({
 });
 var socket = window.socket;
 
+// ============================================
+// Console log capture for admin dashboard
+// Intercepts console.log/warn/error/info and sends to server
+// ============================================
+(function() {
+    const originalConsole = {
+        log: console.log.bind(console),
+        warn: console.warn.bind(console),
+        error: console.error.bind(console),
+        info: console.info.bind(console)
+    };
+
+    // Rate limiting: max 10 logs per second to avoid flooding
+    let logCount = 0;
+    let lastResetTime = Date.now();
+    const MAX_LOGS_PER_SECOND = 10;
+
+    function sendToAdmin(level, args) {
+        // Rate limiting
+        const now = Date.now();
+        if (now - lastResetTime >= 1000) {
+            logCount = 0;
+            lastResetTime = now;
+        }
+        if (logCount >= MAX_LOGS_PER_SECOND) {
+            return; // Skip this log
+        }
+        logCount++;
+
+        // Only send if socket is connected
+        if (typeof socket !== 'undefined' && socket.connected) {
+            try {
+                const message = args.map(a => {
+                    if (typeof a === 'object') {
+                        try {
+                            return JSON.stringify(a);
+                        } catch (e) {
+                            return String(a);
+                        }
+                    }
+                    return String(a);
+                }).join(' ');
+
+                socket.emit('client_console_log', {
+                    level: level,
+                    message: message.substring(0, 500), // Truncate long messages
+                    timestamp: Date.now() / 1000
+                });
+            } catch (e) {
+                // Silently fail - don't want to cause infinite loops
+            }
+        }
+    }
+
+    // Override console methods
+    console.log = function(...args) {
+        originalConsole.log.apply(console, args);
+        sendToAdmin('log', args);
+    };
+
+    console.warn = function(...args) {
+        originalConsole.warn.apply(console, args);
+        sendToAdmin('warn', args);
+    };
+
+    console.error = function(...args) {
+        originalConsole.error.apply(console, args);
+        sendToAdmin('error', args);
+    };
+
+    console.info = function(...args) {
+        originalConsole.info.apply(console, args);
+        sendToAdmin('info', args);
+    };
+})();
+
 var latencyMeasurements = [];
 var curLatency;
 var maxLatency;

@@ -12,9 +12,16 @@ const adminSocket = io('/admin', {
 let currentState = {
     participants: [],
     waiting_rooms: [],
+    multiplayer_games: [],
     activity_log: [],
+    console_logs: [],
     summary: {}
 };
+
+// Console log filtering state
+let logLevelFilter = 'all';
+let logParticipantFilter = 'all';
+let consoleLogs = [];
 
 // ============================================
 // Connection status handlers
@@ -75,11 +82,22 @@ adminSocket.on('activity_event', (event) => {
     addActivityEvent(event);
 });
 
+adminSocket.on('console_log', (log) => {
+    addConsoleLog(log);
+});
+
 function updateDashboard(state) {
     updateSummaryStats(state.summary);
     updateParticipants(state.participants);
     updateWaitingRooms(state.waiting_rooms);
+    updateMultiplayerGames(state.multiplayer_games);
     updateActivityTimeline(state.activity_log);
+    // Initialize console logs from state on first load
+    if (state.console_logs && consoleLogs.length === 0) {
+        consoleLogs = [...state.console_logs];
+        renderConsoleLogs();
+    }
+    updateParticipantFilter(state.participants);
 }
 
 // ============================================
@@ -234,6 +252,48 @@ function updateWaitingRooms(waitingRooms) {
 }
 
 // ============================================
+// Multiplayer games
+// ============================================
+
+function updateMultiplayerGames(games) {
+    const container = document.getElementById('multiplayer-games-container');
+    const countBadge = document.getElementById('games-count');
+    if (!container) return;
+
+    if (countBadge) {
+        countBadge.textContent = `${games?.length || 0} active`;
+    }
+
+    if (!games || games.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state-sm">
+                <p class="text-base-content/50 text-sm">No active games</p>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = games.map(game => `
+        <div class="multiplayer-game-card">
+            <div class="multiplayer-game-header">
+                <span class="multiplayer-game-id" title="${escapeHtml(game.game_id)}">Game ${truncateId(game.game_id)}</span>
+                ${game.is_server_authoritative ?
+                    '<span class="badge badge-warning badge-xs">Server Auth</span>' :
+                    '<span class="badge badge-success badge-xs">P2P</span>'}
+            </div>
+            <div class="multiplayer-game-players">
+                ${game.players.map(player => `
+                    <span class="multiplayer-player ${player === game.host_id ? 'host' : ''}">
+                        ${escapeHtml(truncateId(String(player)))}
+                        ${player === game.host_id ? '<span class="host-badge">Host</span>' : ''}
+                    </span>
+                `).join('')}
+            </div>
+        </div>
+    `).join('');
+}
+
+// ============================================
 // Activity timeline
 // ============================================
 
@@ -307,6 +367,101 @@ function getEventDescription(event) {
     };
     return descriptions[event.event_type] || event.event_type;
 }
+
+// ============================================
+// Console logs
+// ============================================
+
+function addConsoleLog(log) {
+    consoleLogs.unshift(log);
+    // Keep only last 500
+    if (consoleLogs.length > 500) {
+        consoleLogs = consoleLogs.slice(0, 500);
+    }
+    renderConsoleLogs();
+}
+
+function renderConsoleLogs() {
+    const container = document.getElementById('console-logs-container');
+    const countBadge = document.getElementById('logs-count');
+    if (!container) return;
+
+    // Apply filters
+    let filtered = consoleLogs;
+    if (logLevelFilter !== 'all') {
+        filtered = filtered.filter(l => l.level === logLevelFilter);
+    }
+    if (logParticipantFilter !== 'all') {
+        filtered = filtered.filter(l => l.subject_id === logParticipantFilter);
+    }
+
+    if (countBadge) {
+        countBadge.textContent = `${filtered.length}`;
+    }
+
+    if (!filtered || filtered.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state-sm">
+                <p class="text-base-content/50 text-sm">No logs captured</p>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = filtered.slice(0, 100).map(log => `
+        <div class="log-entry log-${log.level}">
+            <span class="log-time">${formatTime(log.timestamp)}</span>
+            <span class="log-level log-level-${log.level}">${log.level.toUpperCase()}</span>
+            <span class="log-subject">${escapeHtml(truncateId(log.subject_id))}</span>
+            <span class="log-message">${escapeHtml(log.message)}</span>
+        </div>
+    `).join('');
+}
+
+function updateParticipantFilter(participants) {
+    const select = document.getElementById('log-participant-filter');
+    if (!select) return;
+
+    // Get current selection
+    const currentValue = select.value;
+
+    // Build unique participant list
+    const participantIds = [...new Set(consoleLogs.map(l => l.subject_id))];
+
+    // Rebuild options
+    select.innerHTML = '<option value="all">All Participants</option>';
+    participantIds.forEach(id => {
+        const option = document.createElement('option');
+        option.value = id;
+        option.textContent = truncateId(id);
+        select.appendChild(option);
+    });
+
+    // Restore selection if still valid
+    if (participantIds.includes(currentValue) || currentValue === 'all') {
+        select.value = currentValue;
+    }
+}
+
+// Set up filter event listeners
+document.addEventListener('DOMContentLoaded', () => {
+    const levelFilter = document.getElementById('log-level-filter');
+    const participantFilter = document.getElementById('log-participant-filter');
+
+    if (levelFilter) {
+        levelFilter.addEventListener('change', (e) => {
+            logLevelFilter = e.target.value;
+            renderConsoleLogs();
+        });
+    }
+
+    if (participantFilter) {
+        participantFilter.addEventListener('change', (e) => {
+            logParticipantFilter = e.target.value;
+            renderConsoleLogs();
+        });
+    }
+});
 
 // ============================================
 // Utility functions
