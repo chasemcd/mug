@@ -9,10 +9,10 @@ Requirements for sync validation milestone. Each maps to roadmap phases.
 
 ### State Hashing
 
-- [ ] **HASH-01**: System computes state hash only on confirmed frames (not predicted)
-- [ ] **HASH-02**: System normalizes floats to 10 decimal places before hashing
-- [ ] **HASH-03**: System uses SHA-256 (truncated to 16 chars) for deterministic cross-platform hashing
-- [ ] **HASH-04**: System maintains confirmedHashHistory with frame-to-hash mapping
+- [x] **HASH-01**: System computes state hash only on confirmed frames (not predicted)
+- [x] **HASH-02**: System normalizes floats to 10 decimal places before hashing
+- [x] **HASH-03**: System uses SHA-256 (truncated to 16 chars) for deterministic cross-platform hashing
+- [x] **HASH-04**: System maintains confirmedHashHistory with frame-to-hash mapping
 
 ### Hash Exchange
 
@@ -71,10 +71,10 @@ Which phases cover which requirements.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| HASH-01 | Phase 11 | Pending |
-| HASH-02 | Phase 11 | Pending |
-| HASH-03 | Phase 11 | Pending |
-| HASH-04 | Phase 11 | Pending |
+| HASH-01 | Phase 11 | Complete |
+| HASH-02 | Phase 11 | Complete |
+| HASH-03 | Phase 11 | Complete |
+| HASH-04 | Phase 11 | Complete |
 | EXCH-01 | Phase 12 | Pending |
 | EXCH-02 | Phase 12 | Pending |
 | EXCH-03 | Phase 12 | Pending |
@@ -96,4 +96,4 @@ Which phases cover which requirements.
 
 ---
 *Requirements defined: 2026-01-20*
-*Last updated: 2026-01-20 after roadmap creation*
+*Last updated: 2026-01-21 after Phase 11 execution complete*
