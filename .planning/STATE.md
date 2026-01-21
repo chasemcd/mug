@@ -5,22 +5,22 @@
 See: .planning/PROJECT.md (updated 2026-01-20)
 
 **Core value:** Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
-**Current focus:** v1.1 Sync Validation
+**Current focus:** v1.1 Sync Validation (complete, pending audit)
 
 ## Current Position
 
 Phase: 14 of 14 (Validation Export)
-Plan: 14-01 planned
-Status: Ready for execution
-Last activity: 2026-01-21 - Phase 14 plan created and verified
+Plan: 14-01 complete
+Status: v1.1 milestone complete, ready for audit
+Last activity: 2026-01-21 - Completed 14-01-PLAN.md
 
-Progress: [=======   ] 75% (v1.1 - Phase 14 planned)
+Progress: [==========] 100% (v1.1 - all phases complete)
 
 ## Milestone History
 
 | Milestone | Phases | Status | Shipped |
 |-----------|--------|--------|---------|
-| v1.1 Sync Validation | 11-14 | In Progress | - |
+| v1.1 Sync Validation | 11-14 | Complete (pending audit) | - |
 | v1.0 P2P Multiplayer | 1-10 | Complete | 2026-01-19 |
 
 ## Accumulated Context
@@ -28,7 +28,7 @@ Progress: [=======   ] 75% (v1.1 - Phase 14 planned)
 ### Key Files
 
 **P2P Core (created/heavily modified in v1.0):**
-- `interactive_gym/server/static/js/pyodide_multiplayer_game.js` (4,300+ LOC)
+- `interactive_gym/server/static/js/pyodide_multiplayer_game.js` (4,400+ LOC)
 - `interactive_gym/server/static/js/webrtc_manager.js` (759 LOC)
 - `interactive_gym/server/pyodide_game_coordinator.py`
 - `interactive_gym/configurations/remote_config.py`
@@ -37,6 +37,7 @@ Progress: [=======   ] 75% (v1.1 - Phase 14 planned)
 - `.planning/phases/11-hash-infrastructure/11-01-SUMMARY.md`
 - `.planning/phases/12-p2p-hash-exchange/12-01-SUMMARY.md`
 - `.planning/phases/13-mismatch-detection/13-01-SUMMARY.md`
+- `.planning/phases/14-validation-export/14-01-SUMMARY.md`
 - `.planning/research/SUMMARY.md`
 - `.planning/research/ARCHITECTURE.md`
 
@@ -64,6 +65,12 @@ See: .planning/PROJECT.md Key Decisions table
 - Async state dump capture in _handleDesync to avoid blocking game loop (DETECT-05)
 - Reset verifiedFrame on rollback to maintain verification invariant (DETECT-04)
 
+**v1.1 decisions (Phase 14):**
+- Export only confirmed data (confirmedHashHistory, not stateHashHistory) (EXPORT-02)
+- Sort hashes by frame number for consistent output (EXPORT-01)
+- Filter actions to verifiedFrame for mutually-confirmed sequences (EXPORT-04)
+- Include hasStateDump flag instead of full dump for manageable export size (EXPORT-03)
+
 ### Pending Todos
 
 (None)
@@ -77,10 +84,9 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-01-21
-Stopped at: Completed 13-01-PLAN.md
+Stopped at: Completed 14-01-PLAN.md
 Resume file: None
 
 ### Next Steps
 
-1. `/gsd:execute-phase 14` - execute Validation Export plan
-2. After Phase 14 complete: `/gsd:audit-milestone` - v1.1 Sync Validation milestone audit
+1. `/gsd:audit-milestone` - v1.1 Sync Validation milestone audit
