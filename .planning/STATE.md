@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 ## Current Position
 
 Phase: 13 of 14 (Mismatch Detection)
-Plan: 13-01 planned
-Status: Ready for execution
-Last activity: 2026-01-21 - Phase 13 plan created and verified
+Plan: 13-01 complete
+Status: Phase 13 complete - ready for Phase 14
+Last activity: 2026-01-21 - Completed 13-01-PLAN.md
 
-Progress: [=====     ] 50% (v1.1 - Phase 13 planned)
+Progress: [=======   ] 75% (v1.1 - Phase 13 complete)
 
 ## Milestone History
 
@@ -28,7 +28,7 @@ Progress: [=====     ] 50% (v1.1 - Phase 13 planned)
 ### Key Files
 
 **P2P Core (created/heavily modified in v1.0):**
-- `interactive_gym/server/static/js/pyodide_multiplayer_game.js` (4,200+ LOC)
+- `interactive_gym/server/static/js/pyodide_multiplayer_game.js` (4,300+ LOC)
 - `interactive_gym/server/static/js/webrtc_manager.js` (759 LOC)
 - `interactive_gym/server/pyodide_game_coordinator.py`
 - `interactive_gym/configurations/remote_config.py`
@@ -36,6 +36,7 @@ Progress: [=====     ] 50% (v1.1 - Phase 13 planned)
 **v1.1 Execution:**
 - `.planning/phases/11-hash-infrastructure/11-01-SUMMARY.md`
 - `.planning/phases/12-p2p-hash-exchange/12-01-SUMMARY.md`
+- `.planning/phases/13-mismatch-detection/13-01-SUMMARY.md`
 - `.planning/research/SUMMARY.md`
 - `.planning/research/ARCHITECTURE.md`
 
@@ -57,6 +58,12 @@ See: .planning/PROJECT.md Key Decisions table
 - Re-queue on buffer full instead of dropping hashes
 - Skip hash exchange during rollback to avoid invalid state hashes
 
+**v1.1 decisions (Phase 13):**
+- Dual-trigger comparison: call _attemptHashComparison from both hash storage paths (DETECT-01)
+- Skip comparison during rollback (state is in flux) (DETECT-02)
+- Async state dump capture in _handleDesync to avoid blocking game loop (DETECT-05)
+- Reset verifiedFrame on rollback to maintain verification invariant (DETECT-04)
+
 ### Pending Todos
 
 (None)
@@ -70,10 +77,10 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-01-21
-Stopped at: Completed 12-01-PLAN.md
+Stopped at: Completed 13-01-PLAN.md
 Resume file: None
 
 ### Next Steps
 
-1. `/gsd:execute-phase 13` - execute Mismatch Detection plan
-2. After Phase 13 complete: `/gsd:plan-phase 14` - plan Validation Export phase
+1. `/gsd:plan-phase 14` - plan Validation Export phase
+2. After Phase 14 complete: v1.1 Sync Validation milestone complete
