@@ -1,326 +1,144 @@
-# Architecture Patterns: Browser-Based P2P GGPO Systems
+# Architecture: Sync Validation Integration with GGPO Rollback
 
-**Domain:** P2P multiplayer with GGPO rollback netcode in browser
-**Researched:** 2026-01-16
-**Confidence:** MEDIUM (based on existing codebase analysis and established GGPO patterns)
+**Domain:** P2P multiplayer sync validation for v1.1
+**Researched:** 2026-01-20
+**Confidence:** HIGH (based on existing codebase analysis, GGPO patterns, and industry best practices)
 
 ## Executive Summary
 
-Browser-based P2P GGPO systems follow a well-established architecture pattern from fighting games, adapted for web constraints. The system separates concerns into: (1) Transport layer for peer communication, (2) Input synchronization layer for timing/buffering, (3) Simulation layer for deterministic game state, and (4) Rollback layer for misprediction correction.
+Sync validation in GGPO-style rollback netcode requires careful integration with the input confirmation flow. The key architectural principle: **compute hashes only on confirmed frames** (frames where all players' inputs have been received), and **exchange hashes after rollback completion** (not during). This ensures hash comparisons are deterministic and meaningful.
 
-The existing interactive-gym codebase already implements GGPO fundamentals (input delay, prediction, rollback) in `pyodide_multiplayer_game.js`. The primary architectural change needed is replacing server-relayed communication with true P2P via WebRTC DataChannels.
+The existing `pyodide_multiplayer_game.js` already has partial sync validation infrastructure (state hashes, periodic broadcasting via SocketIO), but it operates on potentially-predicted frames and doesn't integrate tightly with the GGPO confirmation flow. The v1.1 enhancement should compute hashes **at confirmation time** and exchange them **over the P2P DataChannel** as a lightweight binary message.
+
+---
 
 ## Current Architecture Analysis
 
-### Existing Components and Their Roles
+### Existing State Hash Infrastructure
+
+The codebase already implements several hash-related features:
+
+| Component | Location | Current Behavior |
+|-----------|----------|------------------|
+| `computeQuickStateHash()` | Line ~1900 | MD5 hash of `env.get_state()` JSON |
+| `stateHashHistory` | Line 506-508 | Map of frameNumber to hash (max 60 entries) |
+| `recordStateHashForFrame()` | Line ~1860 | Records hash for a frame (currently disabled) |
+| `p2p_state_sync` SocketIO | Line 719-787 | Periodic hash broadcast via server |
+| `confirmedFrame` | Line 434, 522 | Tracks last frame with all inputs confirmed |
+
+**Current Gap:** Hash computation happens on potentially-predicted frames, and hash exchange goes through SocketIO (server relay) rather than P2P DataChannel.
+
+### GGPO Input Confirmation Flow
+
+The existing input confirmation flow in `step()`:
 
 ```
-+-------------------+     SocketIO      +-------------------+
-|   Client A        |<----------------->|    Flask Server   |
-|                   |                   |                   |
-| Pyodide (Python)  |                   | PyodideGame-      |
-| GymEnvironment    |                   | Coordinator       |
-| GGPO Logic        |                   |                   |
-| Phaser Renderer   |<----------------->| ServerGameRunner  |
-+-------------------+     SocketIO      | (optional)        |
-                                        +-------------------+
-                                               ^
-                                               | SocketIO
-                                               v
-+-------------------+
-|   Client B        |<------------------+
-|                   |
-| Pyodide (Python)  |
-| GymEnvironment    |
-| GGPO Logic        |
-| Phaser Renderer   |
-+-------------------+
+1. _processQueuedInputs()        // Drain network buffers synchronously
+2. processDelayedInputs()        // Handle debug-delayed inputs
+3. Check pendingRollbackFrame    // If set, execute rollback BEFORE stepping
+4. performRollback() if needed   // Restore snapshot, replay with confirmed inputs
+5. getInputsForFrame()           // Get confirmed OR predicted inputs
+6. stepWithActions()             // Execute frame
+7. frameNumber++                 // Advance frame counter
 ```
 
-**Current Data Flow:**
-1. Client A captures input, schedules for frame N+INPUT_DELAY
-2. Client A sends action to server via `pyodide_player_action` SocketIO event
-3. Server relays to Client B via `pyodide_other_player_action`
-4. Both clients execute same action on target frame (or predict + rollback)
-
-**Latency Path (Current):**
-```
-Input -> Client A -> Server -> Client B
-         ~0ms        50-100ms   50-100ms
-Total: 100-200ms RTT for action to reach peer
-```
-
-### What Already Works Well
-
-| Component | Location | Status |
-|-----------|----------|--------|
-| GGPO Input Delay | `pyodide_multiplayer_game.js:INPUT_DELAY` | Complete |
-| Frame-indexed Input Buffer | `pyodide_multiplayer_game.js:inputBuffer` | Complete |
-| State Snapshots | `pyodide_multiplayer_game.js:stateSnapshots` | Complete |
-| Rollback/Replay | `pyodide_multiplayer_game.js:performRollback()` | Complete |
-| Prediction Logic | `pyodide_multiplayer_game.js:getPredictedAction()` | Complete |
-| Hash-based Desync Detection | `pyodide_multiplayer_game.js:computeQuickStateHash()` | Complete |
-| Deterministic Environments | `env.get_state()`, `env.set_state()` | Required by env |
-
-### What Needs to Change
-
-| Current | Target | Impact |
-|---------|--------|--------|
-| Server-relayed actions | P2P DataChannel | New component |
-| SocketIO signaling only | SocketIO signaling + WebRTC data | Transport change |
-| Implicit host (first joiner) | Symmetric peers | Remove host concept |
-| Server state authority | Peer consensus or no authority | Mode selection |
+**Key insight:** A frame is "confirmed" when `getInputsForFrame()` returns only confirmed inputs (no predictions). Currently tracked via `predictedFrames` Set, but no explicit `confirmedFrame` advancement during normal stepping.
 
 ---
 
-## Target Architecture: P2P GGPO
+## Recommended Architecture: Hash-on-Confirm
 
-### Component Diagram
+### Core Principle
 
-```
-+---------------------------+          WebRTC          +---------------------------+
-|       Client A            |<------------------------>|       Client B            |
-|                           |       DataChannel        |                           |
-| +-------+   +----------+  |                          |  +----------+   +-------+ |
-| |Phaser |<->| GGPO     |  |   Signaling (SocketIO)   |  | GGPO     |<->|Phaser | |
-| |Render |   | Manager  |<-|------------------------->|->| Manager  |   |Render | |
-| +-------+   +----------+  |                          |  +----------+   +-------+ |
-|                 |         |                          |         |                 |
-|            +----v----+    |                          |    +----v----+            |
-|            | Pyodide |    |                          |    | Pyodide |            |
-|            |   Env   |    |                          |    |   Env   |            |
-|            +---------+    |                          |    +---------+            |
-+---------------------------+                          +---------------------------+
-         |                                                          |
-         |                   +----------------+                     |
-         +------------------>|  Flask Server  |<--------------------+
-           Signaling only    |  (signaling,   |    Signaling only
-                             |  data logging) |
-                             +----------------+
-```
-
-### Component Boundaries
-
-| Component | Responsibility | Inputs | Outputs |
-|-----------|---------------|--------|---------|
-| **WebRTCManager** | Establish and manage P2P connections | Signaling messages | DataChannel events |
-| **P2PTransport** | Send/receive game data over DataChannels | GGPO messages | Received messages |
-| **GGPOManager** | Input synchronization, rollback orchestration | Local inputs, remote inputs | Simulation commands |
-| **PyodideEnv** | Deterministic game simulation | Actions per frame | State, render data |
-| **SignalingRelay** | WebRTC offer/answer/ICE via server | WebRTC signaling | Forwarded signals |
-
-### Suggested Class/Module Structure
+**Hash computation should only occur on frames where ALL players' inputs are confirmed.**
 
 ```
-interactive_gym/
-  server/
-    static/js/
-      webrtc_manager.js      # NEW: WebRTC connection management
-      p2p_transport.js       # NEW: P2P message protocol
-      ggpo_manager.js        # REFACTOR: Extract from pyodide_multiplayer_game.js
-      pyodide_multiplayer_game.js  # MODIFY: Use P2P instead of server relay
-    pyodide_game_coordinator.py  # MODIFY: Add WebRTC signaling handlers
+Frame state lifecycle:
+  PREDICTED → CONFIRMED → HASHED → EXCHANGED → VERIFIED
+
+Only transition to HASHED when:
+  - Frame has exited PREDICTED state (not in predictedFrames)
+  - All players' inputs are in inputBuffer for that frame
+  - Frame has been stepped (post-step state is what gets hashed)
 ```
 
----
-
-## Data Flow: P2P GGPO
-
-### Connection Establishment
-
-```
-1. Both clients connect to server via SocketIO
-2. Server pairs players, assigns game_id
-3. Server sends "start_p2p_connection" with peer info
-4. Initiator (lower player_id) creates WebRTC offer
-5. Offer/answer exchange via SocketIO signaling
-6. ICE candidates exchanged via SocketIO
-7. DataChannel established
-8. Clients confirm ready via "p2p_connected" event
-9. Server sends "game_ready" to start simulation
-```
-
-### Per-Frame Input Flow
-
-```
-Frame N, Client A (local player):
-
-1. Capture input from Phaser (e.g., key press)
-2. Schedule input for frame N + INPUT_DELAY
-3. Store in local inputBuffer[N + INPUT_DELAY]
-4. Send to peer via DataChannel: {type: 'input', frame: N+DELAY, action: X}
-5. Check inputBuffer for frame N inputs
-6. If both players' inputs available: use confirmed
-   Else: use prediction (last confirmed action)
-7. Step Pyodide environment with actions
-8. Save state snapshot every K frames
-9. Render via Phaser
-```
-
-### Rollback Flow
-
-```
-Late input arrives for frame M (M < current frame N):
-
-1. Receive input via DataChannel: {type: 'input', frame: M, action: X}
-2. Store in inputBuffer[M]
-3. Check if prediction at frame M was wrong:
-   - Look up what we executed at frame M (actionSequence)
-   - Compare to confirmed input X
-4. If different:
-   a. Find nearest snapshot at or before frame M
-   b. Load snapshot (env.set_state + RNG restore)
-   c. Replay frames M through N-1 with confirmed inputs
-   d. Continue simulation
-5. If same: no rollback needed
-```
-
-### P2P Message Protocol
+### Integration Points in Frame Processing Pipeline
 
 ```javascript
-// Input message (most common)
-{
-  type: 'input',
-  frame: number,        // Target frame (with delay applied)
-  playerId: string,     // Sender's player ID
-  action: any,          // Action value
-  timestamp: number     // For diagnostics
-}
+// Modified step() flow with sync validation
 
-// State hash verification (periodic)
-{
-  type: 'state_hash',
-  frame: number,
-  hash: string          // MD5 of env.get_state()
-}
+async step() {
+    // 1. Process queued inputs (existing)
+    this._processQueuedInputs();
 
-// Full state sync (on desync or join)
-{
-  type: 'state_sync',
-  frame: number,
-  state: object,        // env.get_state() result
-  rngState: object      // numpy + random state
-}
-
-// Keepalive/ping
-{
-  type: 'ping',
-  timestamp: number
-}
-
-// Pong response
-{
-  type: 'pong',
-  timestamp: number,
-  echoTimestamp: number // Original ping timestamp
-}
-```
-
----
-
-## Integration with Existing Codebase
-
-### Files to Modify
-
-| File | Changes |
-|------|---------|
-| `pyodide_multiplayer_game.js` | Replace server relay with P2P transport; extract GGPO to separate module |
-| `pyodide_game_coordinator.py` | Add WebRTC signaling handlers; keep for data logging/fallback |
-| `gym_scene.py` | Add `p2p_mode: bool` configuration option |
-| `index.js` | Initialize WebRTC connection on `start_game` |
-| `socket_handlers.js` | Add handlers for signaling messages |
-
-### New Files to Create
-
-| File | Purpose |
-|------|---------|
-| `webrtc_manager.js` | WebRTC peer connection lifecycle |
-| `p2p_transport.js` | Message serialization, send/receive over DataChannel |
-| `ggpo_manager.js` | Extracted GGPO logic (optional refactor) |
-
-### GymScene Configuration
-
-```python
-# Existing pattern in gym_scene.py
-scene.pyodide(
-    run_through_pyodide=True,
-    multiplayer=True,
-    server_authoritative=False,  # Already exists
-    # NEW OPTIONS:
-    p2p_mode=True,               # Enable WebRTC P2P
-    p2p_turn_servers=[...],      # TURN server config for NAT traversal
-    p2p_ice_servers=[...],       # Additional ICE servers
-)
-```
-
-### Server-Side Signaling
-
-```python
-# New handlers in pyodide_game_coordinator.py
-
-@sio.on('webrtc_offer')
-def handle_offer(data):
-    """Relay WebRTC offer to peer"""
-    game_id = data['game_id']
-    target_player = data['target_player']
-    # Forward to target player's socket
-
-@sio.on('webrtc_answer')
-def handle_answer(data):
-    """Relay WebRTC answer to peer"""
-    # Similar to offer
-
-@sio.on('webrtc_ice')
-def handle_ice_candidate(data):
-    """Relay ICE candidate to peer"""
-    # Forward to target player
-```
-
-### Client-Side WebRTC Manager
-
-```javascript
-// webrtc_manager.js (new file)
-
-export class WebRTCManager {
-    constructor(gameId, playerId, signalingSocket) {
-        this.gameId = gameId;
-        this.playerId = playerId;
-        this.socket = signalingSocket;
-        this.peerConnections = new Map();  // peerId -> RTCPeerConnection
-        this.dataChannels = new Map();     // peerId -> RTCDataChannel
-        this.onMessage = null;             // Callback for received messages
+    // 2. Check for and execute rollback (existing)
+    if (this.pendingRollbackFrame !== null) {
+        await this.performRollback(...);
+        // IMPORTANT: After rollback, recalculate confirmed frame
+        this._updateConfirmedFrame();
     }
 
-    async connectToPeer(peerId, isInitiator) {
-        const pc = new RTCPeerConnection(this.iceConfig);
-        this.peerConnections.set(peerId, pc);
+    // 3. Get inputs for current frame (existing)
+    const inputs = this.getInputsForFrame(this.frameNumber, playerIds);
 
-        if (isInitiator) {
-            const dc = pc.createDataChannel('game', {
-                ordered: false,  // UDP-like for lowest latency
-                maxRetransmits: 0
-            });
-            this.setupDataChannel(dc, peerId);
+    // 4. Step environment (existing)
+    await this.stepWithActions(finalActions);
+
+    // 5. Save snapshot (existing, every snapshotInterval frames)
+    if (this.frameNumber % this.snapshotInterval === 0) {
+        await this.saveStateSnapshot(this.frameNumber);
+    }
+
+    // 6. NEW: Check if previous frames are now fully confirmed
+    this._processNewlyConfirmedFrames();
+
+    // 7. Advance frame (existing)
+    this.frameNumber++;
+
+    // 8. NEW: Exchange hashes for confirmed frames (batched)
+    this._exchangePendingHashes();
+}
+```
+
+### When State is "Final" for a Frame
+
+A frame's state is final for hashing when:
+
+1. **Frame has been stepped** - We have post-step state
+2. **No rollback will touch it** - All players' inputs are confirmed
+3. **Snapshot exists** (if applicable) - State can be reproduced
+
+The mathematical condition:
+
+```
+Frame N is hashable IFF:
+  - N < currentFrame (already stepped)
+  - inputBuffer.has(N) && allPlayersHaveInput(N) (all inputs confirmed)
+  - N not in pendingRollbackFrame..currentFrame range (won't be replayed)
+```
+
+### Confirmed Frame Advancement Logic
+
+```javascript
+_updateConfirmedFrame() {
+    // Find the highest frame where ALL players have confirmed inputs
+    // and we've already stepped past it
+
+    const humanPlayerIds = this._getHumanPlayerIds();
+
+    for (let frame = this.confirmedFrame + 1; frame < this.frameNumber; frame++) {
+        if (this.hasAllInputsForFrame(frame, humanPlayerIds)) {
+            // This frame is now confirmed
+            this.confirmedFrame = frame;
+
+            // Remove from predictedFrames if it was there
+            this.predictedFrames.delete(frame);
+
+            // Queue for hash computation
+            this._queueFrameForHashing(frame);
         } else {
-            pc.ondatachannel = (event) => {
-                this.setupDataChannel(event.channel, peerId);
-            };
-        }
-
-        // ICE handling...
-        // Offer/answer exchange via signaling socket...
-    }
-
-    send(peerId, message) {
-        const dc = this.dataChannels.get(peerId);
-        if (dc && dc.readyState === 'open') {
-            dc.send(JSON.stringify(message));
-        }
-    }
-
-    broadcast(message) {
-        for (const peerId of this.dataChannels.keys()) {
-            this.send(peerId, message);
+            // Gap in confirmation - stop here
+            break;
         }
     }
 }
@@ -328,168 +146,392 @@ export class WebRTCManager {
 
 ---
 
-## Anti-Patterns to Avoid
+## Hash Exchange Protocol
 
-### 1. Synchronous State Sync on Every Frame
+### New Binary Message Type
 
-**What goes wrong:** Sending full state every frame kills performance
-**Instead:** Use periodic hash comparison (every ~30 frames), only sync on mismatch
+Add to P2P protocol (currently has INPUT=0x01, PING=0x02, PONG=0x03, KEEPALIVE=0x04, EPISODE_END=0x05, EPISODE_READY=0x06):
 
-### 2. Blocking on Peer Input
+```javascript
+const P2P_MSG_STATE_HASH = 0x07;
 
-**What goes wrong:** If one peer lags, both freeze (lockstep anti-pattern)
-**Instead:** GGPO predicts missing inputs, steps immediately, rollbacks later
+// Format: 13 bytes
+//   Byte 0: Message type (0x07)
+//   Bytes 1-4: Frame number (uint32)
+//   Bytes 5-12: Hash value (8 bytes, first 16 hex chars of MD5)
 
-### 3. TCP-like Reliable Ordered Channels
-
-**What goes wrong:** Head-of-line blocking causes input bunching
-**Instead:** Use unreliable unordered DataChannel for inputs (like UDP)
-
-### 4. Large State in Snapshots
-
-**What goes wrong:** Snapshot serialization becomes bottleneck
-**Instead:** Optimize `get_state()` to return minimal JSON-serializable dict
-
-### 5. Ignoring NAT Traversal
-
-**What goes wrong:** P2P fails for many users behind symmetric NAT
-**Instead:** Always configure TURN servers as fallback
-
-### 6. Single Point of Trust
-
-**What goes wrong:** If "host" cheats, other players suffer
-**Instead:** Either all peers verify (no host) or accept research context (controlled environment)
-
----
-
-## Build Order and Dependencies
-
-### Phase 1: WebRTC Foundation (Prerequisites: None)
-
-1. Create `webrtc_manager.js` with connection lifecycle
-2. Add signaling handlers to `pyodide_game_coordinator.py`
-3. Test: Two browsers can establish DataChannel
-
-**Deliverable:** P2P connection works, can send test messages
-
-### Phase 2: P2P Transport Layer (Prerequisites: Phase 1)
-
-1. Create `p2p_transport.js` with message protocol
-2. Implement input message serialization
-3. Add keepalive/ping for connection health
-4. Test: Inputs sent/received over DataChannel
-
-**Deliverable:** Game inputs flow peer-to-peer
-
-### Phase 3: GGPO Integration (Prerequisites: Phase 2)
-
-1. Modify `pyodide_multiplayer_game.js` to use P2P transport
-2. Remove server relay path when P2P connected
-3. Keep server as fallback when P2P fails
-4. Test: Two-player game runs with P2P inputs
-
-**Deliverable:** Full game playable over P2P with GGPO
-
-### Phase 4: Fallback and Resilience (Prerequisites: Phase 3)
-
-1. Add TURN server configuration
-2. Implement connection quality monitoring
-3. Add automatic fallback to server relay
-4. Test: Game continues when P2P degrades
-
-**Deliverable:** Robust multiplayer across network conditions
-
-### Phase 5: N-Player Support (Prerequisites: Phase 4)
-
-1. Extend WebRTCManager for mesh topology
-2. Add relay mode for N > 4 players
-3. Handle partial mesh (some peers via relay)
-4. Test: 3+ player games
-
-**Deliverable:** Scalable P2P topology
-
----
-
-## Scalability Considerations
-
-| Concern | 2 Players | 4 Players | 8+ Players |
-|---------|-----------|-----------|------------|
-| Topology | Full mesh | Full mesh | Hybrid (mesh + relay) |
-| Connections | 1 | 6 | Too many; use relay server |
-| Bandwidth | ~1KB/s | ~3KB/s | Server relays high-volume |
-| Latency | Optimal P2P | Acceptable | Variable |
-| Rollback complexity | Simple | Moderate | High (consider lockstep) |
-
-### Hybrid Topology for N > 4
-
+function encodeStateHash(frameNumber, hash) {
+    const buffer = new ArrayBuffer(13);
+    const view = new DataView(buffer);
+    view.setUint8(0, P2P_MSG_STATE_HASH);
+    view.setUint32(1, frameNumber, false);  // big-endian
+    // Write 8 bytes of hash (16 hex chars = 8 bytes)
+    for (let i = 0; i < 8; i++) {
+        const hexPair = hash.substring(i * 2, i * 2 + 2);
+        view.setUint8(5 + i, parseInt(hexPair, 16));
+    }
+    return buffer;
+}
 ```
-Players 1-4: Full mesh P2P
-Players 5+: Connect to server relay only
 
-Server receives from all, broadcasts to all 5+
-Players 1-4 get relay from server for player 5+ actions
+### Exchange Timing
+
+Hashes should be exchanged:
+
+1. **After frame confirmation** - Not after every step, only when confirmedFrame advances
+2. **Batched if multiple frames confirm** - Avoid flooding peer with individual messages
+3. **With priority lower than inputs** - Input delivery is time-critical, hashes are not
+4. **Separate from rollback** - Never send hashes during `performRollback()`
+
+```javascript
+_exchangePendingHashes() {
+    // Skip if rollback in progress (hash would be from mid-replay state)
+    if (this.rollbackInProgress) {
+        return;
+    }
+
+    // Drain pending hash queue
+    while (this.pendingHashExchange.length > 0) {
+        const { frame, hash } = this.pendingHashExchange.shift();
+
+        // Send via P2P if available, otherwise queue for later
+        if (this.webrtcManager?.isReady()) {
+            const packet = encodeStateHash(frame, hash);
+            this.webrtcManager.send(packet);
+        } else {
+            // Fallback: use SocketIO (existing p2p_state_sync path)
+            this._sendHashViaSocketIO(frame, hash);
+        }
+    }
+}
 ```
 
 ---
 
-## GGPO Parameter Tuning
+## Mismatch Detection and Rollback Interaction
 
-| Parameter | Recommended Value | Rationale |
-|-----------|-------------------|-----------|
-| INPUT_DELAY | 2-3 frames | Balances responsiveness vs rollback frequency |
-| snapshotInterval | 5 frames | Every ~167ms at 30fps; memory vs rollback speed |
-| maxSnapshots | 30 | ~5 seconds of history; sufficient for typical RTT |
-| inputBufferMaxSize | 120 | ~4 seconds; handles connection hiccups |
-| pruneThreshold | frameNumber - 60 | ~2 seconds behind current; memory management |
+### Detection Flow
 
-**Tuning Guidelines:**
-- Higher INPUT_DELAY = fewer rollbacks but more input lag
-- Lower snapshotInterval = faster rollback but more memory
-- Adjust based on observed RTT distribution in your user population
+```
+Peer A sends hash for frame N → Peer B receives
+Peer B checks:
+  1. Do we have a hash for frame N? (confirmedHashHistory)
+     - If no: Buffer peer's hash until we confirm frame N
+  2. Do hashes match?
+     - If yes: Frame N is mutually verified, update verifiedFrame
+     - If no: DESYNC DETECTED
+
+On desync:
+  - Log event with both hashes and frame number
+  - If frame N < currentFrame: We've already diverged
+  - Decision: Request resync OR continue and report
+```
+
+### Critical: Never Rollback During Hash Comparison
+
+The existing `performRollback()` sets `rollbackInProgress = true` as a guard. Hash comparison must respect this:
+
+```javascript
+async _handleReceivedHash(frame, peerHash) {
+    // DO NOT process hashes during rollback - state is in flux
+    if (this.rollbackInProgress) {
+        this.pendingHashComparisons.push({ frame, peerHash });
+        return;
+    }
+
+    // Get our hash for this frame
+    const ourHash = this.confirmedHashHistory.get(frame);
+
+    if (!ourHash) {
+        // We haven't confirmed this frame yet - buffer for later
+        this.pendingPeerHashes.set(frame, peerHash);
+        return;
+    }
+
+    // Compare
+    if (ourHash === peerHash) {
+        this._markFrameVerified(frame);
+    } else {
+        this._handleDesync(frame, ourHash, peerHash);
+    }
+}
+```
+
+### Desync Handling Options
+
+When mismatch detected, ordered from least to most disruptive:
+
+1. **Log and continue** - For research, just record the desync
+2. **Request state from peer** - Lower player ID defers to higher (existing pattern)
+3. **Pause game** - Wait for state resync before continuing
+4. **Disconnect** - If desync is unrecoverable
+
+For v1.1, recommend option 1 (log) with option 2 as configurable fallback.
 
 ---
 
-## Testing Strategy
+## Data Structures
 
-### Unit Tests
+### New State Tracking
 
-- WebRTC signaling message format
-- GGPO input buffer operations
-- Rollback/replay determinism
-- State hash computation
+```javascript
+// Add to MultiplayerPyodideGame constructor
 
-### Integration Tests
+// Confirmed hash history: hashes for frames where all inputs are verified
+this.confirmedHashHistory = new Map();  // frameNumber -> hash
+this.confirmedHashHistoryMaxSize = 120;  // Keep ~4 seconds at 30fps
 
-- P2P connection establishment
-- Full game loop over DataChannel
-- Fallback to server relay
-- Reconnection after disconnect
+// Pending hash exchange: frames that need hash sent to peer
+this.pendingHashExchange = [];  // [{frame, hash}, ...]
 
-### Load Tests
+// Pending peer hashes: peer's hashes we received before confirming that frame
+this.pendingPeerHashes = new Map();  // frameNumber -> peerHash
 
-- Simulate various network conditions (latency, jitter, packet loss)
-- Measure rollback frequency at different INPUT_DELAY values
-- Test N-player scaling
+// Verified frame: highest frame where both peers agree on hash
+this.verifiedFrame = -1;
+
+// Desync tracking
+this.desyncEvents = [];  // [{frame, ourHash, peerHash, timestamp}, ...]
+```
+
+### Hash History Management
+
+```javascript
+_recordConfirmedHash(frame) {
+    // Compute hash for this confirmed frame
+    const hash = await this.computeQuickStateHash();
+
+    // Store in confirmed history
+    this.confirmedHashHistory.set(frame, hash);
+
+    // Queue for exchange
+    this.pendingHashExchange.push({ frame, hash });
+
+    // Check if peer already sent their hash for this frame
+    const peerHash = this.pendingPeerHashes.get(frame);
+    if (peerHash) {
+        this.pendingPeerHashes.delete(frame);
+        this._compareHashes(frame, hash, peerHash);
+    }
+
+    // Prune old entries
+    this._pruneHashHistory();
+}
+```
 
 ---
 
-## Sources and Confidence
+## Timing Considerations
 
-**HIGH confidence:**
-- Existing codebase analysis (`pyodide_multiplayer_game.js` demonstrates working GGPO)
-- WebRTC DataChannel is standard browser API (MDN documentation)
-- GGPO algorithm is well-documented (original GGPO library, GDC talks)
+### Hash Computation Cost
 
-**MEDIUM confidence:**
-- Specific parameter recommendations (would benefit from empirical testing)
-- N-player topology thresholds (depends on real-world network conditions)
-- TURN server necessity rates (varies by user population)
+`computeQuickStateHash()` involves:
+1. `env.get_state()` - Python call, ~1-5ms typical
+2. `JSON.stringify()` - Serialization, depends on state size
+3. MD5 hash - Fast, <1ms
 
-**Needs validation:**
-- Pyodide performance under rapid rollback (many `set_state` calls)
-- DataChannel reliability for game inputs in production
-- Browser compatibility edge cases
+**Total: 2-10ms per hash computation**
+
+### When to Compute (Performance Trade-off)
+
+| Strategy | Frequency | CPU Cost | Detection Latency |
+|----------|-----------|----------|-------------------|
+| Every frame | 30/sec | High (~150-300ms/sec) | Immediate |
+| On confirm | Variable | Medium | Low (input delay + RTT) |
+| Periodic | Every N frames | Low | N frames |
+| On snapshot | Every 5 frames | Low | 5 frames |
+
+**Recommendation:** Compute on confirmation (matches input delay + RTT naturally) OR piggyback on snapshot interval for minimal overhead.
+
+### Integration with Snapshot Interval
+
+Since snapshots are already computed every `snapshotInterval` (5) frames, hash computation can piggyback:
+
+```javascript
+// In step(), after snapshot save
+if (this.frameNumber % this.snapshotInterval === 0) {
+    await this.saveStateSnapshot(this.frameNumber);
+
+    // Also compute and store hash (state is already in memory)
+    await this._recordConfirmedHashIfReady(this.frameNumber);
+}
+```
 
 ---
 
-*Architecture analysis: 2026-01-16*
+## Edge Cases and Pitfalls
+
+### 1. Rollback Invalidates Hashes
+
+When rollback occurs for frame N:
+- All hashes for frames >= N are invalid
+- Must recompute after replay completes
+- Don't compare peer hashes against pre-rollback values
+
+```javascript
+async performRollback(targetFrame, playerIds) {
+    // ... existing rollback code ...
+
+    // Invalidate hashes from rollback point onward
+    for (const frame of this.confirmedHashHistory.keys()) {
+        if (frame >= targetFrame) {
+            this.confirmedHashHistory.delete(frame);
+        }
+    }
+
+    // Also clear any pending comparisons for these frames
+    for (const frame of this.pendingPeerHashes.keys()) {
+        if (frame >= targetFrame) {
+            this.pendingPeerHashes.delete(frame);
+        }
+    }
+
+    // Verified frame cannot be beyond rollback point
+    this.verifiedFrame = Math.min(this.verifiedFrame, targetFrame - 1);
+}
+```
+
+### 2. Asymmetric Confirmation Timing
+
+Peers may confirm frames at different times due to:
+- Different network latency
+- Different local processing time
+- Packet loss causing retransmission
+
+**Solution:** Buffer peer hashes until local confirmation catches up.
+
+### 3. Hash Computation During Async Operations
+
+`computeQuickStateHash()` is async (Python call). Must ensure:
+- State doesn't change during computation
+- No race with rollback starting
+
+**Solution:** Call from synchronous context within step(), never concurrently.
+
+### 4. Episode Reset Clears Everything
+
+On episode reset, must clear:
+- confirmedHashHistory
+- pendingHashExchange
+- pendingPeerHashes
+- verifiedFrame
+
+This is already partially handled in `clearGGPOState()`.
+
+---
+
+## Implementation Phases
+
+### Phase A: Hash-on-Confirm Infrastructure (Foundation)
+
+1. Add `confirmedHashHistory` and related data structures
+2. Implement `_updateConfirmedFrame()` to track confirmation
+3. Implement `_recordConfirmedHash()` for hash computation
+4. Add hash invalidation to `performRollback()`
+
+**Verification:** Log confirmed frames and hashes, compare manually between peers.
+
+### Phase B: P2P Hash Exchange (Transport)
+
+1. Add P2P_MSG_STATE_HASH message type
+2. Implement `encodeStateHash()` / `decodeStateHash()`
+3. Add `_exchangePendingHashes()` to step loop
+4. Add `_handleReceivedHash()` message handler
+
+**Verification:** Both peers exchange hashes, log shows symmetric values.
+
+### Phase C: Mismatch Detection (Detection)
+
+1. Implement hash comparison logic
+2. Add buffering for out-of-order peer hashes
+3. Track `verifiedFrame` as highest mutually-verified frame
+4. Log desync events with full context
+
+**Verification:** Deliberately cause desync (different action), observe detection.
+
+### Phase D: Response Mechanism (Response)
+
+1. Add desync response configuration (log-only, resync, disconnect)
+2. Implement state request/response for resync
+3. Add UI indication of sync status (optional)
+4. Integrate desync events into session metrics
+
+**Verification:** Desync triggers configured response, game recovers or reports.
+
+---
+
+## Component Interaction Diagram
+
+```
++------------------+     +------------------+
+|  Step Loop       |     |  Message Handler |
+|                  |     |                  |
+| 1. processInputs |     | onDataChannel    |
+| 2. rollback?     |     |   message        |
+| 3. getInputs     |     |                  |
+| 4. step          |     |                  |
+| 5. snapshot?     |     |                  |
+| 6. updateConfirm |<----|---[input arrives]|
+| 7. frameNumber++ |     |                  |
+| 8. exchangeHash--|---->|---[hash arrives]-+
++------------------+     +-----|------------+
+        |                      |
+        v                      v
++------------------+     +------------------+
+| confirmedHash    |     | pendingPeerHash  |
+| History          |     | Buffer           |
++------------------+     +------------------+
+        |                      |
+        +----------+-----------+
+                   |
+                   v
+           +---------------+
+           | _compareHashes|
+           | - match: OK   |
+           | - mismatch:   |
+           |   DESYNC      |
+           +---------------+
+                   |
+                   v
+           +---------------+
+           | verifiedFrame |
+           | desyncEvents  |
+           +---------------+
+```
+
+---
+
+## Success Criteria
+
+Sync validation integration is complete when:
+
+- [ ] Hashes computed only on confirmed frames (not predicted)
+- [ ] Hash exchange uses P2P DataChannel (not SocketIO)
+- [ ] Rollback invalidates affected hashes correctly
+- [ ] Peer hash buffering handles async confirmation
+- [ ] Desync detection logs frame, both hashes, and timestamp
+- [ ] verifiedFrame tracks highest mutually-verified frame
+- [ ] Session metrics include desync count and details
+- [ ] No performance regression (< 10% step time increase)
+- [ ] Works correctly with existing rollback flow
+
+---
+
+## Sources
+
+**HIGH confidence (direct code analysis):**
+- `pyodide_multiplayer_game.js` - Existing GGPO implementation, hash infrastructure
+- `webrtc_manager.js` - P2P DataChannel protocol
+
+**MEDIUM confidence (industry patterns):**
+- [GGPO Developer Guide](https://github.com/pond3r/ggpo/blob/master/doc/DeveloperGuide.md) - Sync test methodology
+- [Coherence Documentation](https://docs.coherence.io/manual/advanced-topics/competitive-games/determinism-prediction-rollback) - AckFrame concept
+- [SnapNet Rollback Article](https://www.snapnet.dev/blog/netcode-architectures-part-2-rollback/) - Rollback architecture patterns
+
+**LOW confidence (general patterns):**
+- [Gaffer On Games - Deterministic Lockstep](https://gafferongames.com/post/deterministic_lockstep/) - Checksum timing
+- [Factorio Wiki - Desynchronization](https://wiki.factorio.com/Desynchronization) - Desync detection approaches
+
+---
+
+*Architecture analysis for v1.1 Sync Validation: 2026-01-20*

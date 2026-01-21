@@ -2,7 +2,7 @@
 
 **Domain:** P2P multiplayer with GGPO-style rollback netcode
 **Research focus:** Pitfalls specific to browser, WebRTC, and Pyodide contexts
-**Researched:** 2026-01-16
+**Researched:** 2026-01-16 (updated 2026-01-20 for v1.1 sync validation)
 **Confidence:** HIGH (based on existing codebase implementation + domain expertise)
 
 ---
@@ -545,6 +545,382 @@ Issues unique to running Python in WebAssembly in the browser.
 
 ---
 
+## Sync Validation Pitfalls (v1.1)
+
+**Added:** 2026-01-20 for v1.1 Sync Validation milestone
+
+These pitfalls are specific to implementing desync detection and validation systems. They focus on false positives (incorrectly detecting desyncs that didn't happen) and subtle bugs in validation logic.
+
+### Pitfall 20: Frame Alignment Mismatch in Hash Comparison
+
+**What goes wrong:** Peers compare state hashes at different simulation frames, producing false positive desync detection. Peer A computes hash at frame 100, peer B receives it but is now at frame 105, and computes current hash to compare - hashes differ due to 5 frames of evolution, not desync.
+
+**Why it happens:**
+- WebRTC message delivery has variable latency (10-200ms)
+- Peers advance frames independently between message exchanges
+- Comparing "current hash" to received hash ignores frame number
+- State hash history might not contain the exact frame needed for comparison
+
+**Consequences:**
+- Constant false positive desync warnings that obscure real issues
+- Unnecessary rollback or correction attempts
+- Invalid metrics (p2pHashMismatches inflated)
+- Research data flagged as "desynced" when actually synchronized
+
+**Warning signs:**
+- High mismatch count but states converge when manually compared at same frame
+- Mismatches correlate with high RTT, not actual divergence
+- Mismatches disappear when both peers are idle (same frame)
+
+**Prevention:**
+1. Always compare hashes for the SAME frame number
+2. Store hash history keyed by frame number (already in `stateHashHistory`)
+3. Skip comparison if local hash for that exact frame isn't available - don't compute current and compare
+4. Consider: only compare hashes for frames where BOTH peers have confirmed (non-predicted) inputs
+5. Log frame numbers alongside hashes in all desync warnings
+
+**Detection before shipping:**
+- Unit test: simulate 50ms delivery delay, verify no false positives
+- Log `comparing_frame=X local_hash=Y remote_hash=Z local_frame=W` to verify alignment
+- If `local_frame != comparing_frame`, the comparison is invalid
+
+**Phase to address:** Sync validation core implementation
+**Severity:** CRITICAL for validation - defeats the purpose of detection
+
+**Codebase reference:** Current logic in `socket.on('p2p_state_sync')` at lines 721-757 attempts frame alignment via `stateHashHistory.get(frame_number)` but falls back to computing current hash if not found, which is incorrect.
+
+---
+
+### Pitfall 21: Rollback Invalidates Pre-Computed Hashes
+
+**What goes wrong:** State hash was computed and stored for frame N, but then a rollback occurred that changed frame N's state. The stored hash is now stale and will cause false positive mismatches.
+
+**Why it happens:**
+- Hash recorded immediately after stepping to frame N
+- Rollback later corrects a predicted input for frame N-5
+- Replay to current frame changes what frame N looked like
+- Old hash for frame N still in history, now incorrect
+
+**Consequences:**
+- False desync detection when peer sends correct hash
+- Stored validation data contains incorrect hashes
+- Post-game analysis shows "desyncs" that were actually rollback corrections
+
+**Warning signs:**
+- Mismatches appear after rollbacks complete
+- Re-comparing states manually shows they match
+- Mismatch count correlates with rollback count
+
+**Prevention:**
+1. Clear or update hash history after rollback completes
+2. Only compare hashes for frames AFTER confirmed frame (no outstanding predictions)
+3. Track `confirmedFrame` and reject hash comparisons for frames < confirmedFrame that have pending rollbacks
+4. Alternatively: recompute hashes for replayed frames during rollback (expensive)
+5. For validation export: only include hashes for confirmed-input frames
+
+**Detection before shipping:**
+- Intentionally trigger rollback, verify hash history updated
+- Compare hash at frame N before and after rollback that affects N
+- Add assertion: if rollback touched frame N, hash for N must be invalidated
+
+**Phase to address:** Sync validation, integrate with rollback system
+**Severity:** HIGH - causes systematic false positives after every rollback
+
+**Codebase reference:** `stateHashHistory` is not cleared in rollback path. Need to invalidate entries >= rollback target frame. See `performGGPORollback()` implementation.
+
+---
+
+### Pitfall 22: JSON Serialization Non-Determinism for State Hashing
+
+**What goes wrong:** Identical logical states produce different JSON strings (and thus different hashes) due to:
+- Floating-point representation differences (`0.30000000000000004` vs `0.3`)
+- Object key insertion order after dynamic updates
+- Set/dict iteration order in Python state
+- NumPy array dtype or shape representation
+
+**Why it happens:**
+- `json.dumps()` represents floats with full precision, and IEEE 754 has platform-specific rounding
+- Python 3.7+ dicts are insertion-ordered, but that order can differ if code paths differ
+- Pyodide (WASM) and CPython may format floats slightly differently
+- NumPy array serialization may include metadata that varies
+
+**Consequences:**
+- Hashes differ between Pyodide peers or between Pyodide and CPython
+- States are semantically identical but byte-level different
+- Constant false positives between browser types (Chrome vs Firefox) or Python versions
+
+**Warning signs:**
+- Mismatches from first frame even with identical seeds
+- Dumping state JSON shows subtle differences in float formatting
+- Hash matches in same browser, fails cross-browser
+
+**Prevention:**
+1. Round floats to fixed precision before hashing: `round(x, 6)`
+2. Sort dict keys explicitly before serialization (already using `sort_keys=True`)
+3. For NumPy arrays: `.tolist()` before serialization, avoid raw array serialization
+4. Convert sets to sorted lists before hashing
+5. Use custom JSON encoder that normalizes types
+6. Test hash equivalence: same state, Pyodide vs Pyodide in different browsers
+
+**Detection before shipping:**
+- Cross-browser test: Chrome peer vs Firefox peer, verify hash match on frame 0
+- Dump raw JSON on hash mismatch to inspect exact differences
+- Add environment test: `get_state()` -> `json.dumps()` -> compare byte-for-byte across platforms
+
+**Phase to address:** State hashing implementation
+**Severity:** HIGH - systematic false positives for certain environments
+
+**Codebase reference:** `computeQuickStateHash()` uses `json.dumps(_state, sort_keys=True)` but no float rounding. Environment-specific; some environments may have problematic state shapes.
+
+---
+
+### Pitfall 23: WebAssembly Floating-Point NaN Non-Determinism
+
+**What goes wrong:** WebAssembly floating-point operations produce NaN values with non-deterministic bit patterns. If environment state includes NaN (from division by zero, invalid operations), hash differs between peers even for "same" NaN.
+
+**Why it happens:**
+- WASM spec allows non-deterministic NaN payloads and sign bits
+- Different browser engines (V8 vs SpiderMonkey) may produce different NaN bit patterns
+- NaN != NaN in IEEE 754, so comparison fails
+- JSON.stringify(NaN) produces "null" which loses information
+
+**Consequences:**
+- Rare but catastrophic: random false positives when NaN appears in state
+- Debugging nightmare - state "looks" identical but hashes differ
+- Browser-specific failures that don't reproduce in same browser
+
+**Warning signs:**
+- Intermittent mismatches with no clear pattern
+- Mismatch occurs after specific game events (physics collision, etc.)
+- State inspection shows `NaN` or `null` in unexpected places
+
+**Prevention:**
+1. Environments should avoid producing NaN in state (validate inputs, use defaults)
+2. Before hashing: detect and normalize NaN values to a consistent representation
+3. Consider: skip hash comparison if state contains NaN (log warning instead)
+4. Use fixed-point arithmetic for critical calculations
+5. Test environments for NaN production under edge cases
+
+**Detection before shipping:**
+- Search environment code for operations that could produce NaN: `/0`, `sqrt(-1)`, `log(0)`, etc.
+- Add state validation: flag if any state value is NaN before hashing
+- Cross-browser smoke test with physics-heavy environments
+
+**Phase to address:** State hashing robustness
+**Severity:** MEDIUM - rare but hard to debug when it occurs
+
+**Codebase reference:** Python `json.dumps()` turns NaN to `null`, losing the value. This masks the problem but can cause subtle state corruption.
+
+**Sources:**
+- [WebAssembly Determinism with NaN](https://github.com/WebAssembly/design/issues/619)
+- [WebAssembly Numerics Specification](https://webassembly.github.io/spec/core/exec/numerics.html)
+
+---
+
+### Pitfall 24: Python Set Iteration Order in Environment State
+
+**What goes wrong:** Environment `get_state()` returns a set (or dict created from set-like iteration), and iteration order differs between invocations or peers, causing hash difference for identical logical state.
+
+**Why it happens:**
+- Python sets have no guaranteed iteration order
+- With PYTHONHASHSEED randomization, order changes between processes
+- Even without randomization, order depends on insertion history
+- Common pattern: `{entity.id for entity in entities}` captures correct data but wrong order
+
+**Consequences:**
+- False positive desync detection for environments with set-based state
+- Intermittent: sometimes orders happen to match, sometimes don't
+- Hard to reproduce because order is "random" per-process
+
+**Warning signs:**
+- Mismatches appear randomly even with identical inputs
+- JSON diff shows same elements but different array order
+- Setting `PYTHONHASHSEED=0` fixes the issue (confirms cause)
+
+**Prevention:**
+1. Convert sets to sorted lists before returning from `get_state()`: `sorted(my_set)`
+2. Use lists instead of sets for state that needs determinism
+3. Environment review: grep for `set(` and `{...}` in state-related code
+4. Validate environments: call `get_state()` twice with same state, verify JSON identical
+
+**Detection before shipping:**
+- Add to environment test suite: `get_state()` must produce identical JSON when called twice
+- Log warning if environment state contains set types (detect via `isinstance()` before serialization)
+- Flag in environment documentation that `get_state()` must be deterministic
+
+**Phase to address:** Environment validation / state hashing
+**Severity:** HIGH - common mistake, causes intermittent false positives
+
+**Codebase reference:** Environment-dependent. Affects any environment where `get_state()` includes set iteration.
+
+**Sources:**
+- [Python Set Ordering](https://praful932.dev/blog-1-ordered-sets/)
+- [PYTHONHASHSEED](http://jimmycallin.com/2016/01/03/make-your-python3-code-reproducible/)
+
+---
+
+### Pitfall 25: Timing-Based Comparison Race (TOCTOU)
+
+**What goes wrong:** Time-of-check to time-of-use race: hash is computed, then state changes before comparison completes or message is sent, so the hash sent doesn't match current state.
+
+**Why it happens:**
+- `computeQuickStateHash()` is async - state can change during execution
+- Peer sends hash for frame N, but continues stepping to frame N+1 before send completes
+- Message queue delays between computing hash and receiving comparison
+
+**Consequences:**
+- Rare false positives when hash computation races with state changes
+- Hard to reproduce: depends on exact timing of async operations
+- More common under high CPU load or with slow environments
+
+**Warning signs:**
+- Sporadic mismatches that don't reproduce consistently
+- Mismatch logs show frame numbers that don't align with expectations
+- Issue appears more frequently under load
+
+**Prevention:**
+1. Capture state atomically: compute hash synchronously or lock state during computation
+2. Associate frame number with hash at computation time, not send time
+3. Don't compare hash if local frame has advanced past the frame being compared
+4. Serialize validation operations: don't start new step while hash comparison pending
+5. For async hash computation: save frame number at start, validate still at that frame at end
+
+**Detection before shipping:**
+- Stress test: high step rate (60+ FPS) with validation enabled
+- Log timing: `hash_compute_start`, `hash_compute_end`, `frame_at_send`
+- Add assertion: frame at hash compute end == frame at hash compute start
+
+**Phase to address:** Sync validation implementation
+**Severity:** MEDIUM - rare but real
+
+**Codebase reference:** `computeQuickStateHash()` is async (`runPythonAsync`). Frame can advance during execution. Need to record frameNumber at call start.
+
+---
+
+### Pitfall 26: NumPy Random Generator State Platform Differences
+
+**What goes wrong:** NumPy random state captured on one peer doesn't restore identically on another peer due to:
+- Different NumPy versions (API changes)
+- Different underlying PRNG implementations
+- Platform-specific bit representations in state arrays
+
+**Why it happens:**
+- NumPy doesn't guarantee RNG stream compatibility across versions
+- Pyodide may use different NumPy version than expected
+- `RandomState` vs `Generator` API differences
+- Internal state arrays may have platform-specific padding or ordering
+
+**Consequences:**
+- RNG-dependent environments produce different random sequences after restore
+- Bot actions diverge after rollback
+- False "desync" that's actually RNG desync
+
+**Warning signs:**
+- Desync only after rollback in environments with randomness
+- Bot-vs-bot games desync while human-vs-human games don't
+- RNG state looks different when logged on each peer
+
+**Prevention:**
+1. Pin NumPy version exactly in Pyodide packages
+2. Use `np.random.default_rng(seed)` instead of `np.random.seed()` for reproducibility
+3. Capture and restore using `generator.bit_generator.state` (new API)
+4. Test RNG restore: capture state, step, compare sequence on both peers
+5. Consider: use Python `random` module only (simpler, more portable)
+
+**Detection before shipping:**
+- Unit test: save RNG state, restore, generate 1000 numbers, verify identical
+- Cross-version test: Pyodide NumPy vs CPython NumPy state compatibility
+- Add RNG sequence logging for first 10 numbers after restore
+
+**Phase to address:** Snapshot/restore implementation, environment validation
+**Severity:** MEDIUM - affects RNG-heavy environments
+
+**Codebase reference:** RNG state capture in `saveStateSnapshot()` uses both `numpy.random.get_state()` and `random.getstate()`. Verify restoration produces identical sequences.
+
+**Sources:**
+- [NumPy RNG Policy NEP-19](https://numpy.org/neps/nep-0019-rng-policy.html)
+
+---
+
+### Pitfall 27: Action Sequence Comparison Off-By-One Errors
+
+**What goes wrong:** Action sequence verification fails due to off-by-one errors in frame numbering:
+- Actions recorded at frame N-1 vs frame N
+- Input for frame N recorded before vs after step
+- Frame 0 vs frame 1 indexing confusion
+
+**Why it happens:**
+- GGPO uses "input for frame N is collected during frame N-1"
+- Different conventions for when frame number increments (before/after step)
+- Episode boundaries reset frame numbers inconsistently
+
+**Consequences:**
+- Action sequences appear to differ by one frame offset
+- "Desync" detection triggers for perfectly synchronized peers
+- Debugging shows all actions present, just misaligned
+
+**Warning signs:**
+- Action sequence mismatch logs show same actions, different frame numbers
+- Mismatch is always by 1 frame (or consistent N frames)
+- Actions match when manually shifted
+
+**Prevention:**
+1. Define clear convention: "action for frame N" means action applied during step N
+2. Record action WITH its frame number, not position in array
+3. Compare by frame number, not by array index
+4. Add frame number to every action record: `{frame: N, player: P, action: A}`
+5. Validate: local action sequence for frames 0-100 should match remote for frames 0-100
+
+**Detection before shipping:**
+- Unit test: two peers, compare action sequences after 100 frames
+- Log format: `FRAME=N PLAYER=P ACTION=A` - easy to diff between peers
+- Assertion: action at frame N exists in both sequences with same value
+
+**Phase to address:** Action sequence verification implementation
+**Severity:** MEDIUM - confusing but fixable once identified
+
+**Codebase reference:** `actionSequence` array at line 511. Need to verify frame numbering convention is consistent with GGPO input queue.
+
+---
+
+### Pitfall 28: Validation Data Export Contains Uncommitted/Predicted State
+
+**What goes wrong:** Post-game validation JSON export includes hashes and actions from frames that were predicted and later rolled back. This makes analysis appear to show desyncs that were actually corrected.
+
+**Why it happens:**
+- Hash recorded immediately after step, before knowing if rollback will occur
+- Export doesn't distinguish confirmed vs predicted frames
+- Rollback doesn't update already-recorded validation data
+
+**Consequences:**
+- Research analysis shows false "desync" rates
+- Post-hoc validation appears to find issues that weren't there
+- Confusing data where "desync" corrected itself
+
+**Warning signs:**
+- Exported data shows hash mismatch at frame N, but game continued successfully
+- Mismatch followed by match at frame N+k after rollback
+- More "desyncs" in export than `p2pHashMismatches` counter showed live
+
+**Prevention:**
+1. Only export hashes for confirmed frames (all inputs verified, no pending rollback)
+2. Mark each record with `confirmed: true/false` status
+3. Update or remove records during rollback
+4. Alternative: export raw data including predictions, but clearly label it
+5. Include rollback events in export so analysis can filter
+
+**Detection before shipping:**
+- Compare live mismatch count to exported mismatch count - should match
+- Verify export only contains frames <= confirmedFrame
+- Add test: trigger rollback, verify rolled-back frame's hash updated in export
+
+**Phase to address:** Validation data export
+**Severity:** MEDIUM - affects research data quality
+
+**Codebase reference:** Validation export structure TBD. Will need `confirmedFrame` tracking integration.
+
+---
+
 ## Phase-Specific Risk Matrix
 
 | Phase | Likely Pitfalls | Mitigation Strategy |
@@ -555,6 +931,8 @@ Issues unique to running Python in WebAssembly in the browser.
 | Performance | #8 (Pyodide step), #13 (memory leaks), #16 (WASM limits) | Profiling; long-session testing |
 | Episode Management | #10 (boundary sync) | Server-authoritative episode transitions |
 | Network Reliability | #9 (lost messages), #7 (input delay tuning) | Redundant input sending; per-connection RTT |
+| **Sync Validation (v1.1)** | #20 (frame alignment), #21 (rollback invalidates hash), #22 (JSON non-determinism), #24 (set iteration) | Frame-aligned comparison only; clear hash history on rollback; normalize floats; sort sets |
+| **Validation Export (v1.1)** | #28 (predicted state in export), #27 (off-by-one) | Confirmed-only export; clear frame numbering convention |
 
 ---
 
@@ -591,19 +969,56 @@ Since this is a research platform where data validity is critical:
 
 ---
 
+## v1.1 Validation Pitfalls Summary
+
+For the v1.1 Sync Validation milestone, the highest-priority pitfalls to address are:
+
+| Priority | Pitfall | Why Critical |
+|----------|---------|--------------|
+| P0 | #20 Frame Alignment | Comparing hashes at different frames defeats entire validation purpose |
+| P0 | #21 Rollback Invalidation | Every rollback produces false positive if hash history not updated |
+| P1 | #22 JSON Non-Determinism | Will cause cross-browser false positives |
+| P1 | #24 Set Iteration Order | Common environment mistake, intermittent false positives |
+| P2 | #28 Predicted State Export | Affects research data quality |
+| P2 | #27 Off-By-One | Confusing but easy to fix once found |
+| P3 | #23 NaN Non-Determinism | Rare edge case |
+| P3 | #25 TOCTOU Race | Rare timing issue |
+| P3 | #26 NumPy RNG State | Affects rollback in RNG-heavy envs |
+
+**Recommended Implementation Order:**
+1. Ensure frame-aligned comparison (#20)
+2. Clear hash history on rollback (#21)
+3. Add float normalization to hash (#22)
+4. Document environment requirements re: sets (#24)
+5. Implement confirmed-only export (#28)
+
+---
+
 ## Sources
 
-- Existing codebase implementation in `pyodide_multiplayer_game.js` (~2100 lines)
+- Existing codebase implementation in `pyodide_multiplayer_game.js` (~3900 lines)
 - CONCERNS.md analysis (2026-01-16)
 - ARCHITECTURE.md patterns
 - Domain expertise on GGPO/rollback netcode (verified against implementation)
 - WebRTC specification behavior (DataChannel reliability modes)
 
+**v1.1 research sources:**
+- [Gaffer on Games: Floating Point Determinism](https://gafferongames.com/post/floating_point_determinism/)
+- [ForrestTheWoods: Synchronous RTS Engines and Desyncs](https://www.forrestthewoods.com/blog/synchronous_rts_engines_and_a_tale_of_desyncs/)
+- [yal.cc: Preparing for Deterministic Netcode](https://yal.cc/preparing-your-game-for-deterministic-netcode/)
+- [Deterministic.js](https://deterministic.js.org/)
+- [WebAssembly NaN Determinism](https://github.com/WebAssembly/design/issues/619)
+- [NumPy NEP-19: RNG Policy](https://numpy.org/neps/nep-0019-rng-policy.html)
+- [Python Hash Randomization](http://jimmycallin.com/2016/01/03/make-your-python3-code-reproducible/)
+- [Godot Rollback Netcode: State Hashing](https://github.com/maximkulkin/godot-rollback-netcode)
+- [INVERSUS Rollback Networking Post-Mortem](https://www.gamedeveloper.com/design/rollback-networking-in-inversus)
+
 **Confidence levels:**
 - Pitfalls #1-3, #5-6, #10, #12-13: HIGH (directly observed in codebase)
-- Pitfalls #4, #9, #11: MEDIUM (WebRTC not yet implemented, based on spec)
+- Pitfalls #4, #9, #11: MEDIUM (WebRTC implemented, based on spec)
 - Pitfalls #7-8, #14-19: MEDIUM (inferred from architecture and domain knowledge)
+- Pitfalls #20-28: HIGH (domain expertise + web search verification + codebase analysis)
 
 ---
 
-*Pitfalls research: 2026-01-16*
+*Pitfalls research: 2026-01-16, updated 2026-01-20 for v1.1 Sync Validation*
