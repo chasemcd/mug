@@ -1428,6 +1428,95 @@ def handle_p2p_validation_failed(data):
             break
 
 
+# ========== Mid-Game Reconnection Handlers (Phase 20) ==========
+
+
+@socketio.on("p2p_connection_lost")
+def handle_p2p_connection_lost(data):
+    """Handle P2P connection loss - coordinate bilateral pause (Phase 20)."""
+    global PYODIDE_COORDINATOR
+
+    if PYODIDE_COORDINATOR is None:
+        logger.error("PYODIDE_COORDINATOR not initialized")
+        return
+
+    game_id = data.get("game_id")
+    player_id = data.get("player_id")
+    frame_number = data.get("frame_number")
+
+    logger.warning(
+        f"P2P connection lost in game {game_id} "
+        f"detected by player {player_id} at frame {frame_number}"
+    )
+
+    result = PYODIDE_COORDINATOR.handle_connection_lost(game_id, player_id, frame_number)
+
+    if result == 'pause':
+        # Emit pause to ALL players via SocketIO (works even when P2P down)
+        socketio.emit(
+            "p2p_pause",
+            {
+                "game_id": game_id,
+                "pause_frame": frame_number,
+                "detecting_player": player_id
+            },
+            room=game_id
+        )
+
+
+@socketio.on("p2p_reconnection_success")
+def handle_p2p_reconnection_success(data):
+    """Handle successful P2P reconnection (Phase 20)."""
+    global PYODIDE_COORDINATOR
+
+    if PYODIDE_COORDINATOR is None:
+        return
+
+    game_id = data.get("game_id")
+    player_id = data.get("player_id")
+
+    result = PYODIDE_COORDINATOR.handle_reconnection_success(game_id, player_id)
+
+    if result == 'resume':
+        logger.info(f"All players reconnected in game {game_id}")
+        socketio.emit(
+            "p2p_resume",
+            {"game_id": game_id},
+            room=game_id
+        )
+
+
+@socketio.on("p2p_reconnection_timeout")
+def handle_p2p_reconnection_timeout(data):
+    """Handle reconnection timeout - end game cleanly (Phase 20)."""
+    global PYODIDE_COORDINATOR
+
+    if PYODIDE_COORDINATOR is None:
+        return
+
+    game_id = data.get("game_id")
+    player_id = data.get("player_id")
+
+    logger.warning(f"P2P reconnection timeout in game {game_id}")
+
+    # Get reconnection data for logging
+    reconnection_data = PYODIDE_COORDINATOR.handle_reconnection_timeout(game_id)
+
+    # Emit game ended to all players
+    socketio.emit(
+        "p2p_game_ended",
+        {
+            "game_id": game_id,
+            "reason": "reconnection_timeout",
+            "reconnection_data": reconnection_data
+        },
+        room=game_id
+    )
+
+    # Clean up game
+    PYODIDE_COORDINATOR.remove_game(game_id)
+
+
 @socketio.on('execute_entry_callback')
 def handle_execute_entry_callback(data):
     """Execute researcher-defined entry screening callback.

@@ -60,6 +60,14 @@ class PyodideGameState:
     p2p_validated_players: set = dataclasses.field(default_factory=set)
     validation_start_time: float | None = None
 
+    # Mid-game reconnection state (Phase 20)
+    reconnection_in_progress: bool = False
+    reconnection_start_time: float | None = None
+    reconnection_timeout_s: float = 30.0  # Configurable (RECON-04)
+    reconnection_lost_players: set = dataclasses.field(default_factory=set)
+    reconnection_recovered_players: set = dataclasses.field(default_factory=set)
+    total_pause_duration_ms: float = 0.0
+
 
 class PyodideGameCoordinator:
     """
@@ -711,3 +719,134 @@ class PyodideGameCoordinator:
             'total_games_created': self.total_games_created,
             'total_desyncs_detected': self.total_desyncs_detected,
         }
+
+    # ========== Mid-Game Reconnection Methods (Phase 20) ==========
+
+    def handle_connection_lost(
+        self, game_id: str, player_id: str | int, frame_number: int
+    ) -> str | None:
+        """
+        Handle P2P connection loss from a client (Phase 20 - RECON-01, RECON-02).
+
+        Args:
+            game_id: Game identifier
+            player_id: Player who detected the disconnection
+            frame_number: Frame number when disconnection detected
+
+        Returns:
+            'pause' if this triggers bilateral pause
+            'already_pausing' if reconnection already in progress
+            None if game not found
+        """
+        with self.lock:
+            game = self.games.get(game_id)
+            if not game:
+                logger.warning(f"Connection lost for non-existent game {game_id}")
+                return None
+
+            game.reconnection_lost_players.add(str(player_id))
+
+            if not game.reconnection_in_progress:
+                game.reconnection_in_progress = True
+                game.reconnection_start_time = time.time()
+                game.reconnection_recovered_players = set()
+
+                logger.info(
+                    f"P2P reconnection started for game {game_id} "
+                    f"(detected by player {player_id} at frame {frame_number})"
+                )
+                return 'pause'
+
+            logger.debug(
+                f"Player {player_id} also detected disconnection in game {game_id}"
+            )
+            return 'already_pausing'
+
+    def handle_reconnection_success(
+        self, game_id: str, player_id: str | int
+    ) -> str | None:
+        """
+        Handle successful P2P reconnection from a client (Phase 20 - RECON-05).
+
+        Returns:
+            'resume' if all lost players have recovered
+            'waiting' if still waiting for other players
+            None if game not found
+        """
+        with self.lock:
+            game = self.games.get(game_id)
+            if not game:
+                logger.warning(f"Reconnection success for non-existent game {game_id}")
+                return None
+
+            if not game.reconnection_in_progress:
+                logger.warning(
+                    f"Reconnection success but no reconnection in progress for {game_id}"
+                )
+                return None
+
+            game.reconnection_recovered_players.add(str(player_id))
+
+            # Check if all lost players have recovered
+            if game.reconnection_lost_players <= game.reconnection_recovered_players:
+                # Calculate pause duration
+                pause_duration = (time.time() - game.reconnection_start_time) * 1000
+                game.total_pause_duration_ms += pause_duration
+
+                logger.info(
+                    f"All players reconnected in game {game_id} "
+                    f"(pause duration: {pause_duration:.0f}ms)"
+                )
+
+                # Reset reconnection state
+                game.reconnection_in_progress = False
+                game.reconnection_start_time = None
+                game.reconnection_lost_players = set()
+                game.reconnection_recovered_players = set()
+
+                return 'resume'
+
+            logger.debug(
+                f"Player {player_id} reconnected in game {game_id}, "
+                f"waiting for {len(game.reconnection_lost_players - game.reconnection_recovered_players)} more"
+            )
+            return 'waiting'
+
+    def handle_reconnection_timeout(self, game_id: str) -> dict | None:
+        """
+        Handle reconnection timeout - game ends (Phase 20 - RECON-06).
+
+        Returns reconnection data for logging, or None if game not found.
+        """
+        with self.lock:
+            game = self.games.get(game_id)
+            if not game:
+                return None
+
+            # Calculate final pause duration
+            if game.reconnection_start_time:
+                final_pause = (time.time() - game.reconnection_start_time) * 1000
+                game.total_pause_duration_ms += final_pause
+
+            logger.warning(
+                f"Reconnection timeout for game {game_id} "
+                f"(total pause: {game.total_pause_duration_ms:.0f}ms)"
+            )
+
+            return {
+                'total_pause_duration_ms': game.total_pause_duration_ms,
+                'lost_players': list(game.reconnection_lost_players),
+                'recovered_players': list(game.reconnection_recovered_players)
+            }
+
+    def get_reconnection_data(self, game_id: str) -> dict | None:
+        """Get reconnection data for a game (Phase 20 - LOG-03)."""
+        with self.lock:
+            game = self.games.get(game_id)
+            if not game:
+                return None
+
+            return {
+                'in_progress': game.reconnection_in_progress,
+                'total_pause_duration_ms': game.total_pause_duration_ms
+            }
