@@ -197,8 +197,17 @@ async function runEntryScreening(sceneMetadata) {
     if (sceneMetadata.browser_blocklist && sceneMetadata.browser_blocklist.length > 0) {
         const blockedLower = sceneMetadata.browser_blocklist.map(b => b.toLowerCase());
         if (browserName && blockedLower.includes(browserName.toLowerCase())) {
-            const message = sceneMetadata.exclusion_messages?.browser ||
+            // Build helpful message with allowed browsers
+            let message = sceneMetadata.exclusion_messages?.browser ||
                 "Your browser is not supported for this study.";
+
+            // Add allowed browsers info if requirements exist
+            if (sceneMetadata.browser_requirements && sceneMetadata.browser_requirements.length > 0) {
+                const allowedList = sceneMetadata.browser_requirements.join(", ");
+                message += ` Supported browsers: ${allowedList}.`;
+            }
+            message += " You can open this same link in a different browser to continue.";
+
             return { passed: false, failedRule: "browser", message: message };
         }
     }
@@ -207,8 +216,10 @@ async function runEntryScreening(sceneMetadata) {
     if (sceneMetadata.browser_requirements && sceneMetadata.browser_requirements.length > 0) {
         const allowedLower = sceneMetadata.browser_requirements.map(b => b.toLowerCase());
         if (!browserName || !allowedLower.includes(browserName.toLowerCase())) {
-            const message = sceneMetadata.exclusion_messages?.browser ||
+            const allowedList = sceneMetadata.browser_requirements.join(", ");
+            let message = sceneMetadata.exclusion_messages?.browser ||
                 "Your browser is not supported for this study.";
+            message += ` Supported browsers: ${allowedList}. You can open this same link in a different browser to continue.`;
             return { passed: false, failedRule: "browser", message: message };
         }
     }
@@ -278,14 +289,30 @@ function executeEntryCallback(sceneMetadata) {
 }
 
 /**
- * Display exclusion message and hide start button.
+ * Display exclusion message and hide all interactive elements.
+ * Shows only the exclusion message to the participant.
  */
 function showExclusionMessage(message) {
+    // Hide all interactive elements
     $("#instructions").hide();
     $("#startButton").hide();
     $("#startButton").attr("disabled", true);
+    $("#advanceButton").hide();
+    $("#redirectButton").hide();
+    $("#sceneBody").hide();
+    $("#waitroomText").hide();
+    $("#gameContainer").hide();
+
+    // Update header to indicate exclusion
+    $("#sceneSubHeader").text("Unable to Continue");
+
+    // Show the exclusion message
     $('#errorText').text(message);
-    $('#errorText').show();
+    $('#errorText').css({
+        'display': 'block',
+        'text-align': 'left',
+        'line-height': '1.6'
+    });
 }
 
 // Track entry screening result (experiment-level, runs once at experiment start)
