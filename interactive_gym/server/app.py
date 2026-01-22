@@ -284,6 +284,14 @@ def register_subject(data):
         room=sid,
     )
 
+    # Send experiment-level entry screening config to client
+    if CONFIG is not None:
+        flask_socketio.emit(
+            "experiment_config",
+            {"entry_screening": CONFIG.get_entry_screening_config()},
+            room=sid,
+        )
+
     participant_stager = STAGERS.get(subject_id)
     if participant_stager is None:
         logger.error(f"No stager found for subject {subject_id} during registration")
@@ -1591,6 +1599,7 @@ def handle_p2p_reconnection_timeout(data):
 def handle_execute_entry_callback(data):
     """Execute researcher-defined entry screening callback.
 
+    Checks experiment-level callback first, then falls back to scene-level.
     Receives participant context from client, executes callback if configured,
     returns exclusion decision.
 
@@ -1618,26 +1627,31 @@ def handle_execute_entry_callback(data):
         flask_socketio.emit('entry_callback_result', {'exclude': False, 'message': None})
         return
 
-    # Get the current scene from participant's stager
-    participant_stager = STAGERS.get(subject_id)
-    if participant_stager is None:
-        logger.warning(f"Entry callback: No stager found for {subject_id}")
-        flask_socketio.emit('entry_callback_result', {'exclude': False, 'message': None})
-        return
+    # Add subject_id to context
+    context['subject_id'] = subject_id
 
-    scene = participant_stager.current_scene
-    if scene is None or not hasattr(scene, 'entry_exclusion_callback') or scene.entry_exclusion_callback is None:
+    # Check experiment-level callback first
+    callback = None
+    if CONFIG is not None and CONFIG.entry_exclusion_callback is not None:
+        callback = CONFIG.entry_exclusion_callback
+        context['scene_id'] = scene_id
+    else:
+        # Fall back to scene-level callback (deprecated)
+        participant_stager = STAGERS.get(subject_id)
+        if participant_stager is not None:
+            scene = participant_stager.current_scene
+            if scene is not None and hasattr(scene, 'entry_exclusion_callback') and scene.entry_exclusion_callback is not None:
+                callback = scene.entry_exclusion_callback
+                context['scene_id'] = scene.scene_id if hasattr(scene, 'scene_id') else scene_id
+
+    if callback is None:
         # No callback configured, pass through
         flask_socketio.emit('entry_callback_result', {'exclude': False, 'message': None})
         return
 
     try:
-        # Add subject_id and scene_id to context
-        context['subject_id'] = subject_id
-        context['scene_id'] = scene.scene_id if hasattr(scene, 'scene_id') else scene_id
-
         # Execute the callback
-        result = scene.entry_exclusion_callback(context)
+        result = callback(context)
 
         # Validate result format
         exclude = result.get('exclude', False)

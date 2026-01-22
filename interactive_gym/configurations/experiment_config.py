@@ -1,6 +1,7 @@
 from __future__ import annotations
 import copy
 import json
+from typing import Callable
 
 from interactive_gym.scenes.stager import Stager
 from interactive_gym.scenes.utils import NotProvided
@@ -26,6 +27,20 @@ class ExperimentConfig:
         self.turn_username: str | None = None
         self.turn_credential: str | None = None
         self.force_turn_relay: bool = False
+
+        # Entry screening configuration (experiment-level)
+        self.device_exclusion: str | None = None
+        self.browser_requirements: list[str] | None = None
+        self.browser_blocklist: list[str] | None = None
+        self.entry_max_ping: int | None = None
+        self.entry_min_ping_measurements: int = 5
+        self.exclusion_messages: dict[str, str] = {
+            "mobile": "This study requires a desktop or laptop computer.",
+            "desktop": "This study requires a mobile device.",
+            "browser": "Your browser is not supported for this study.",
+            "ping": "Your connection is too slow for this study.",
+        }
+        self.entry_exclusion_callback: Callable | None = None
 
     def experiment(
         self,
@@ -110,11 +125,100 @@ class ExperimentConfig:
         if force_relay:
             logger.info("TURN force_relay enabled - all connections will use TURN")
 
-        print("self.turn_username:", self.turn_username)
-        print("self.turn_credential:", self.turn_credential)
-        print("self.force_turn_relay:", self.force_turn_relay)
+        return self
+
+    def entry_screening(
+        self,
+        device_exclusion: str = NotProvided,
+        browser_requirements: list[str] = NotProvided,
+        browser_blocklist: list[str] = NotProvided,
+        max_ping: int = NotProvided,
+        min_ping_measurements: int = NotProvided,
+        exclusion_messages: dict[str, str] = NotProvided,
+        entry_callback: Callable = NotProvided,
+    ):
+        """Configure entry screening rules at the experiment level.
+
+        Entry screening runs once when a participant first connects to the experiment.
+        If any check fails, the participant sees the appropriate exclusion message
+        and cannot proceed to any scene.
+
+        :param device_exclusion: Device type to exclude. "mobile" excludes phones/tablets,
+            "desktop" excludes desktop/laptop computers, None allows all.
+        :type device_exclusion: str, optional
+        :param browser_requirements: List of allowed browser names (case-insensitive).
+            If provided, only these browsers are allowed. e.g., ["Chrome", "Firefox"].
+        :type browser_requirements: list[str], optional
+        :param browser_blocklist: List of blocked browser names (case-insensitive).
+            These browsers are excluded even if in requirements. e.g., ["Safari"].
+        :type browser_blocklist: list[str], optional
+        :param max_ping: Maximum allowed latency in milliseconds. Participants with
+            ping exceeding this are excluded.
+        :type max_ping: int, optional
+        :param min_ping_measurements: Minimum number of ping measurements required
+            before checking latency. Defaults to 5.
+        :type min_ping_measurements: int, optional
+        :param exclusion_messages: Custom messages for each exclusion type.
+            Keys: "mobile", "desktop", "browser", "ping".
+        :type exclusion_messages: dict[str, str], optional
+        :param entry_callback: Custom callback function for additional exclusion logic.
+            Receives participant context dict, returns dict with 'exclude' and optional 'message'.
+        :type entry_callback: Callable, optional
+        :return: The ExperimentConfig instance (self)
+        :rtype: ExperimentConfig
+        """
+        if device_exclusion is not NotProvided:
+            assert device_exclusion in [None, "mobile", "desktop"], \
+                "device_exclusion must be None, 'mobile', or 'desktop'"
+            self.device_exclusion = device_exclusion
+
+        if browser_requirements is not NotProvided:
+            assert browser_requirements is None or isinstance(browser_requirements, list), \
+                "browser_requirements must be None or a list of browser names"
+            self.browser_requirements = browser_requirements
+
+        if browser_blocklist is not NotProvided:
+            assert browser_blocklist is None or isinstance(browser_blocklist, list), \
+                "browser_blocklist must be None or a list of browser names"
+            self.browser_blocklist = browser_blocklist
+
+        if max_ping is not NotProvided:
+            assert max_ping is None or (isinstance(max_ping, int) and max_ping > 0), \
+                "max_ping must be None or a positive integer"
+            self.entry_max_ping = max_ping
+
+        if min_ping_measurements is not NotProvided:
+            assert isinstance(min_ping_measurements, int) and min_ping_measurements >= 1, \
+                "min_ping_measurements must be a positive integer"
+            self.entry_min_ping_measurements = min_ping_measurements
+
+        if exclusion_messages is not NotProvided:
+            assert isinstance(exclusion_messages, dict), \
+                "exclusion_messages must be a dictionary"
+            self.exclusion_messages = {**self.exclusion_messages, **exclusion_messages}
+
+        if entry_callback is not NotProvided:
+            assert callable(entry_callback), \
+                "entry_callback must be a callable function"
+            self.entry_exclusion_callback = entry_callback
 
         return self
+
+    def get_entry_screening_config(self) -> dict:
+        """Get the entry screening configuration for sending to the client.
+
+        :return: Dictionary with entry screening settings
+        :rtype: dict
+        """
+        return {
+            "device_exclusion": self.device_exclusion,
+            "browser_requirements": self.browser_requirements,
+            "browser_blocklist": self.browser_blocklist,
+            "max_ping": self.entry_max_ping,
+            "min_ping_measurements": self.entry_min_ping_measurements,
+            "exclusion_messages": self.exclusion_messages,
+            "has_entry_callback": self.entry_exclusion_callback is not None,
+        }
 
     def to_dict(self, serializable=False):
         config = copy.deepcopy(vars(self))

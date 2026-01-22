@@ -288,7 +288,14 @@ function showExclusionMessage(message) {
     $('#errorText').show();
 }
 
-// Track entry screening result for the current scene
+// Track entry screening result
+// Experiment-level screening runs once at experiment start
+// Scene-level screening (deprecated) runs per-scene as fallback
+var experimentScreeningPassed = null;  // null = not yet checked, true/false = result
+var experimentScreeningMessage = null;
+var experimentScreeningConfig = null;  // Stores experiment-level config
+
+// Legacy: Track scene-level entry screening (deprecated, for backwards compat)
 var entryScreeningPassed = true;
 var entryScreeningMessage = null;
 
@@ -323,6 +330,40 @@ $(function() {
 
 socket.on('server_session_id', function(data) {
     window.sessionId = data.session_id;
+});
+
+// Experiment-level configuration (including entry screening)
+socket.on('experiment_config', async function(data) {
+    console.log("[ExperimentConfig] Received experiment configuration");
+
+    if (data.entry_screening) {
+        experimentScreeningConfig = data.entry_screening;
+        console.log("[ExperimentConfig] Entry screening config:", experimentScreeningConfig);
+
+        // Run experiment-level screening immediately if configured
+        const hasScreeningRules = experimentScreeningConfig.device_exclusion ||
+            (experimentScreeningConfig.browser_requirements && experimentScreeningConfig.browser_requirements.length > 0) ||
+            (experimentScreeningConfig.browser_blocklist && experimentScreeningConfig.browser_blocklist.length > 0) ||
+            experimentScreeningConfig.max_ping ||
+            experimentScreeningConfig.has_entry_callback;
+
+        if (hasScreeningRules) {
+            console.log("[ExperimentConfig] Running experiment-level entry screening...");
+            const result = await runEntryScreening(experimentScreeningConfig);
+            experimentScreeningPassed = result.passed;
+            experimentScreeningMessage = result.message;
+
+            if (!result.passed) {
+                console.log("[ExperimentConfig] Screening failed:", result.failedRule, result.message);
+                showExclusionMessage(result.message);
+            } else {
+                console.log("[ExperimentConfig] Screening passed");
+            }
+        } else {
+            // No screening rules configured at experiment level
+            experimentScreeningPassed = true;
+        }
+    }
 });
 
 socket.on('connect', function() {
@@ -902,17 +943,37 @@ function startEndScene(data) {
 async function startGymScene(data) {
     enableStartRefreshInterval();
 
-    // Run entry screening checks (Phase 15 + Phase 18 callbacks)
-    const screeningResult = await runEntryScreening(data);
-    entryScreeningPassed = screeningResult.passed;
-    entryScreeningMessage = screeningResult.message;
-
-    if (!screeningResult.passed) {
-        console.log("[EntryScreening] Failed:", screeningResult.failedRule, screeningResult.message);
-        showExclusionMessage(screeningResult.message);
-        // Clear the refresh interval since we're not enabling the start button
+    // Check experiment-level screening first (runs once at experiment start)
+    if (experimentScreeningPassed === false) {
+        // Already failed experiment-level screening
+        console.log("[EntryScreening] Blocked by experiment-level screening");
+        showExclusionMessage(experimentScreeningMessage);
         clearInterval(refreshStartButton);
-        return; // Don't proceed with scene setup
+        return;
+    }
+
+    // If experiment-level screening passed (or wasn't configured), check scene-level
+    // Scene-level screening is deprecated but supported for backwards compatibility
+    const hasSceneLevelScreening = data.device_exclusion ||
+        (data.browser_requirements && data.browser_requirements.length > 0) ||
+        (data.browser_blocklist && data.browser_blocklist.length > 0) ||
+        data.max_ping ||
+        data.has_entry_callback;
+
+    // Only run scene-level screening if experiment-level wasn't configured
+    // AND scene has its own screening rules
+    if (experimentScreeningPassed === null && hasSceneLevelScreening) {
+        console.log("[EntryScreening] Running scene-level screening (deprecated)...");
+        const screeningResult = await runEntryScreening(data);
+        entryScreeningPassed = screeningResult.passed;
+        entryScreeningMessage = screeningResult.message;
+
+        if (!screeningResult.passed) {
+            console.log("[EntryScreening] Failed:", screeningResult.failedRule, screeningResult.message);
+            showExclusionMessage(screeningResult.message);
+            clearInterval(refreshStartButton);
+            return;
+        }
     }
 
     // Initialize or increment the gym scene counter

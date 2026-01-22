@@ -665,6 +665,11 @@ class GymScene(scene.Scene):
     ):
         """Configure entry screening rules for the GymScene.
 
+        .. deprecated::
+            Scene-level entry screening is deprecated. Use ExperimentConfig.entry_screening()
+            instead to configure screening at the experiment level. Experiment-level screening
+            runs once when the participant first connects, not per-scene.
+
         Entry screening runs before the participant can start the game.
         If any check fails, the participant sees the appropriate exclusion message
         and cannot proceed.
@@ -690,6 +695,12 @@ class GymScene(scene.Scene):
         :return: The GymScene instance (self)
         :rtype: GymScene
         """
+        import warnings
+        warnings.warn(
+            "GymScene.entry_screening() is deprecated. Use ExperimentConfig.entry_screening() instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
         if device_exclusion is not NotProvided:
             assert device_exclusion in [None, "mobile", "desktop"], \
                 "device_exclusion must be None, 'mobile', or 'desktop'"
@@ -829,7 +840,8 @@ class GymScene(scene.Scene):
                 # Return: {"exclude": bool, "warn": bool, "message": str | None}
                 return {"exclude": False, "warn": False, "message": None}
 
-        :param entry_callback: Function called at entry screening, defaults to NotProvided
+        :param entry_callback: Function called at entry screening, defaults to NotProvided.
+            .. deprecated:: Use ExperimentConfig.entry_screening(entry_callback=...) instead.
         :type entry_callback: Callable, optional
         :param continuous_callback: Function called periodically during gameplay, defaults to NotProvided
         :type continuous_callback: Callable, optional
@@ -839,6 +851,13 @@ class GymScene(scene.Scene):
         :rtype: GymScene
         """
         if entry_callback is not NotProvided:
+            import warnings
+            warnings.warn(
+                "GymScene.exclusion_callbacks(entry_callback=...) is deprecated. "
+                "Use ExperimentConfig.entry_screening(entry_callback=...) instead.",
+                DeprecationWarning,
+                stacklevel=2
+            )
             if entry_callback is not None and not callable(entry_callback):
                 raise ValueError("entry_callback must be callable or None")
             self.entry_exclusion_callback = entry_callback
