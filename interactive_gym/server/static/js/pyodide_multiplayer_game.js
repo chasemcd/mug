@@ -1635,6 +1635,11 @@ hashlib.md5(json.dumps(_state, sort_keys=True).encode()).hexdigest()[:8]
             return null;
         }
 
+        // Don't step while paused for reconnection (Phase 20)
+        if (this.reconnectionState.isPaused) {
+            return null;
+        }
+
         // GGPO Order of Operations:
         // 1. Clear stale rollback flag (prevents stale rollbacks from previous frames)
         // 2. Process queued inputs synchronously (drains network buffers)
