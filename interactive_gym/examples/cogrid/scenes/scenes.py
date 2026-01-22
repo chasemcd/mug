@@ -464,7 +464,7 @@ cramped_room_human_human = (
         </center>
         <br><br>
         """,
-        waitroom_timeout=120000,  # 2 minutes
+        waitroom_timeout=300000,  # 5 minutes
     )
     .pyodide(
         run_through_pyodide=True,
@@ -584,7 +584,7 @@ multiplayer_feedback_scene = (
             [str(i+1) for i in range(7)],
             [str(i+1) for i in range(7)],
         ],
-        text_box_header="Please provide any additional feedback you would like to share.",
+        text_box_header="Please provide any additional feedback you would like to share. If you had any technical issues with the tasi, please describe them here.",
         scale_size=7,
     )
     .scene(scene_id="multiplayer_feedback_scene", experiment_config={})
