@@ -10,16 +10,17 @@ See: .planning/PROJECT.md (updated 2026-01-21)
 ## Current Position
 
 Phase: 19 of 22 (Waiting Room Validation)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-01-21 — Roadmap created (4 phases, 16 requirements)
+Plan: 01 complete
+Status: Phase complete
+Last activity: 2026-01-22 — Completed 19-01-PLAN.md
 
-Progress: [----------] 0% (v1.3 - 0/4 phases complete)
+Progress: [##--------] 25% (v1.3 - 1/4 phases complete)
 
 ## Milestone History
 
 | Milestone | Phases | Status | Shipped |
 |-----------|--------|--------|---------|
+| v1.3 P2P Connection Validation | 19-22 | In progress | - |
 | v1.2 Participant Exclusion | 15-18 | Complete | 2026-01-22 |
 | v1.1 Sync Validation | 11-14 | Complete | - |
 | v1.0 P2P Multiplayer | 1-10 | Complete | 2026-01-19 |
@@ -48,6 +49,9 @@ Progress: [----------] 0% (v1.3 - 0/4 phases complete)
 - `.planning/phases/17-multiplayer-exclusion/17-01-SUMMARY.md`
 - `.planning/phases/18-custom-callbacks/18-01-SUMMARY.md`
 
+**v1.3 Execution:**
+- `.planning/phases/19-waiting-room-validation/19-01-SUMMARY.md`
+
 **Phase 16 Key Files:**
 - `interactive_gym/server/static/js/continuous_monitor.js` (320+ LOC) - Extended with callback support
 - `interactive_gym/scenes/gym_scene.py` - continuous_monitoring() and exclusion_callbacks() methods
@@ -62,6 +66,12 @@ Progress: [----------] 0% (v1.3 - 0/4 phases complete)
 - `interactive_gym/server/static/js/index.js` - executeEntryCallback() function
 - `interactive_gym/server/static/js/continuous_monitor.js` - shouldExecuteCallback(), setCallbackResult()
 - `interactive_gym/server/static/js/pyodide_multiplayer_game.js` - _executeContinuousCallback()
+
+**Phase 19 Key Files:**
+- `interactive_gym/server/static/js/pyodide_multiplayer_game.js` - P2P validation state machine, validation handshake
+- `interactive_gym/server/pyodide_game_coordinator.py` - record_validation_success(), handle_validation_failure()
+- `interactive_gym/server/app.py` - p2p_validation_* socket handlers
+- `interactive_gym/server/static/js/index.js` - p2p_validation_* UI handlers
 
 ### Decisions
 
@@ -118,6 +128,12 @@ See: .planning/PROJECT.md Key Decisions table
 - Async continuous callback with non-blocking game loop (CALLBACK-04)
 - 5-second timeout for entry callback (CALLBACK-05)
 
+**v1.3 decisions (Phase 19):**
+- Bidirectional validation requiring ping AND pong in both directions (WAIT-01)
+- Re-pool both players on any validation failure, no retry (WAIT-02)
+- Server coordinates validation complete to ensure both peers agree (WAIT-03)
+- 10-second validation timeout separate from 5s P2P ready gate (WAIT-04)
+
 ### Pending Todos
 
 (None)
@@ -130,10 +146,10 @@ See: .planning/PROJECT.md Key Decisions table
 
 ## Session Continuity
 
-Last session: 2026-01-21
-Stopped at: Roadmap created
+Last session: 2026-01-22
+Stopped at: Completed 19-01-PLAN.md
 Resume file: None
 
 ### Next Steps
 
-1. `/gsd:plan-phase 19` — plan Waiting Room Validation phase
+1. `/gsd:plan-phase 20` - plan Connection Quality Metrics phase
