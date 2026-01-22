@@ -8,17 +8,29 @@ A framework for running browser-based reinforcement learning experiments with hu
 
 Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
 
-## Current Milestone: v1.3 P2P Connection Validation
+## Current Milestone: v1.4 Partner Disconnection Handling
 
-**Goal:** Ensure reliable P2P connections throughout experiments with pre-game validation, per-round health checks, reconnection handling, and comprehensive latency/connection telemetry.
+**Goal:** Improve the experience when a partner disconnects mid-game — stay on the same page with a configurable message, ensure data is exported with disconnection metadata.
 
 **Target features:**
-- Waiting room P2P validation — confirm successful P2P connection before experiment starts; failed pairs re-enter matchmaking pool
-- Per-round connection check — verify DataChannel is open before each round begins
-- Mid-game reconnection with pause — pause gameplay and show reconnecting overlay for both clients; configurable timeout before ending game
-- Connection event logging — log disconnection events, reconnection attempts, pause durations
-- Async latency monitoring — non-blocking periodic P2P latency measurements during gameplay
-- Latency stats export — min, median, mean, max P2P latency in summary aggregation logs
+- No redirect on partner disconnect — stay on same page instead of redirecting to `/partner-disconnected`
+- Clean UI update — hide game container and displays, show disconnection message
+- Data export before termination — ensure all gameplay data collected so far is exported
+- Session metadata — mark session as partial with disconnection reason and which player disconnected
+- Configurable message — allow researchers to set custom partner disconnection message via GymScene config
+
+## Previous Milestone: v1.3 P2P Connection Validation (Shipped: 2026-01-22)
+
+**Delivered:** Reliable P2P connections throughout experiments with pre-game validation, per-round health checks, reconnection handling, and comprehensive latency/connection telemetry.
+
+**Key accomplishments:**
+- Waiting room P2P validation before experiment starts
+- Per-round DataChannel health check
+- Mid-game reconnection with gameplay pause and ICE restart
+- Connection event logging (disconnections, reconnection attempts, pause durations)
+- Async periodic P2P latency monitoring
+- Latency stats export (min, median, mean, max)
+- Fast connection loss detection (500ms grace period)
 
 ## Previous Milestone: v1.2 Participant Exclusion (Shipped: 2026-01-22)
 
@@ -79,17 +91,24 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 - ✓ Custom callback support for exclusion logic — v1.2
 - ✓ Multiplayer exclusion handling — v1.2
 
+*Shipped in v1.3:*
+- ✓ Waiting room P2P validation before experiment starts — v1.3
+- ✓ Failed P2P pairs re-enter matchmaking pool — v1.3
+- ✓ Per-round DataChannel health check — v1.3
+- ✓ Mid-game reconnection with gameplay pause — v1.3
+- ✓ Reconnecting overlay for both clients during reconnection — v1.3
+- ✓ Configurable reconnection timeout before ending game — v1.3
+- ✓ Connection event logging (disconnections, reconnection attempts, pause durations) — v1.3
+- ✓ Async periodic P2P latency monitoring — v1.3
+- ✓ Latency stats export (min, median, mean, max) — v1.3
+
 ### Active
 
-- [ ] Waiting room P2P validation before experiment starts
-- [ ] Failed P2P pairs re-enter matchmaking pool
-- [ ] Per-round DataChannel health check
-- [ ] Mid-game reconnection with gameplay pause
-- [ ] Reconnecting overlay for both clients during reconnection
-- [ ] Configurable reconnection timeout before ending game
-- [ ] Connection event logging (disconnections, reconnection attempts, pause durations)
-- [ ] Async periodic P2P latency monitoring
-- [ ] Latency stats export (min, median, mean, max)
+- [ ] No redirect on partner disconnect (stay on same page)
+- [ ] Clean UI update on disconnect (hide game, show message)
+- [ ] Data export before termination
+- [ ] Session metadata with disconnection reason and disconnected player ID
+- [ ] Configurable partner disconnect message via GymScene config
 
 ### Deferred
 
@@ -110,10 +129,12 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 - P2P multiplayer fully functional for 2-player games
 - Tested with SlimeVolleyball and Overcooked environments
 - Research metrics export API captures connection type, rollback events, sync status
+- v1.3 added latency telemetry and fast disconnect detection (500ms grace)
 
 **Known issues:**
 - Episode start sync can timeout on slow connections (mitigated with retry mechanism)
 - Rollback visual corrections cause brief teleporting (smoothing not yet implemented)
+- Partner disconnect currently redirects to separate page (addressing in v1.4)
 
 ## Constraints
 
@@ -136,4 +157,4 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 | Open Relay Project for TURN | Free 20GB/month tier sufficient for research | ✓ Good |
 
 ---
-*Last updated: 2026-01-21 after v1.3 milestone start*
+*Last updated: 2026-01-22 after v1.4 milestone start*
