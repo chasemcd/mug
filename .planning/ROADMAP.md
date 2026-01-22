@@ -251,9 +251,9 @@ Plans:
   7. `sessionPartialInfo` populated with `isPartial: true` and `terminationReason: 'partner_disconnected'`
   8. `sessionPartialInfo` includes `disconnectedPlayerId` with the partner's player ID
 **Research flag:** Unlikely (builds on existing overlay patterns from Phases 17, 20)
-**Plans:** TBD
+**Plans:** 1 plan
 Plans:
-- [ ] 23-01-PLAN.md — Partner disconnection handling
+- [ ] 23-01-PLAN.md — In-page overlay, config API, data export with disconnectedPlayerId
 
 ## Progress
 
@@ -274,8 +274,8 @@ Phases execute in numeric order: 23
 | 20. Mid-Game Reconnection | v1.3 | 2/2 | Complete | 2026-01-22 |
 | 21. Per-Round Health Check | v1.3 | 1/1 | Complete | 2026-01-22 |
 | 22. Latency Telemetry | v1.3 | 1/1 | Complete | 2026-01-22 |
-| 23. Partner Disconnection | v1.4 | 0/1 | Pending | — |
+| 23. Partner Disconnection | v1.4 | 0/1 | Planned | — |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-01-22 after v1.4 roadmap creation*
+*Last updated: 2026-01-22 after Phase 23 planning*
