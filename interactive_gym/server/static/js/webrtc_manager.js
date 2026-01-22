@@ -893,6 +893,140 @@ class WebRTCManager {
     }
 }
 
+/**
+ * Collects P2P latency telemetry by polling RTCPeerConnection.getStats().
+ * Provides aggregate statistics (min, median, mean, max) for research data export.
+ *
+ * Phase 22 - Latency Telemetry (LAT-01, LAT-02)
+ */
+class LatencyTelemetry {
+    /**
+     * Create a latency telemetry collector.
+     * @param {RTCPeerConnection} peerConnection - The peer connection to monitor
+     * @param {Object} options - Telemetry options
+     * @param {number} options.pollInterval - Polling interval in ms (default: 1000 for ~1Hz)
+     * @param {number} options.maxSamples - Max samples to retain (default: 600 for ~10 min at 1Hz)
+     */
+    constructor(peerConnection, options = {}) {
+        this.pc = peerConnection;
+        this.pollInterval = options.pollInterval || 1000;
+        this.maxSamples = options.maxSamples || 600;
+
+        this.samples = [];
+        this.intervalId = null;
+    }
+
+    /**
+     * Start polling for latency samples.
+     */
+    start() {
+        if (this.intervalId) return;  // Already running
+        this.intervalId = setInterval(() => this._poll(), this.pollInterval);
+    }
+
+    /**
+     * Stop polling.
+     */
+    stop() {
+        if (this.intervalId) {
+            clearInterval(this.intervalId);
+            this.intervalId = null;
+        }
+    }
+
+    /**
+     * Poll getStats() and extract RTT sample.
+     * @private
+     */
+    async _poll() {
+        if (!this.pc || this.pc.connectionState !== 'connected') return;
+
+        try {
+            const stats = await this.pc.getStats();
+            const rttMs = this._extractRtt(stats);
+
+            if (rttMs !== null) {
+                this.samples.push({
+                    timestamp: Date.now(),
+                    rttMs: rttMs
+                });
+
+                // Trim to maxSamples
+                if (this.samples.length > this.maxSamples) {
+                    this.samples.shift();
+                }
+            }
+        } catch (e) {
+            console.warn('[LatencyTelemetry] Poll failed:', e);
+        }
+    }
+
+    /**
+     * Extract RTT from getStats() results.
+     * @private
+     * @param {RTCStatsReport} stats - Stats from getStats()
+     * @returns {number|null} RTT in milliseconds or null if unavailable
+     */
+    _extractRtt(stats) {
+        // Find selected candidate pair via transport stats
+        let selectedPairId = null;
+        stats.forEach(report => {
+            if (report.type === 'transport' && report.selectedCandidatePairId) {
+                selectedPairId = report.selectedCandidatePairId;
+            }
+        });
+
+        if (!selectedPairId) return null;
+
+        // Get the candidate pair stats
+        let pairStats = null;
+        stats.forEach(report => {
+            if (report.type === 'candidate-pair' && report.id === selectedPairId) {
+                pairStats = report;
+            }
+        });
+
+        if (!pairStats || pairStats.currentRoundTripTime === undefined) return null;
+
+        // currentRoundTripTime is in seconds, convert to ms
+        return pairStats.currentRoundTripTime * 1000;
+    }
+
+    /**
+     * Get aggregate latency statistics.
+     * @returns {Object|null} Latency stats or null if no samples
+     */
+    getStats() {
+        if (this.samples.length === 0) return null;
+
+        const rtts = this.samples.map(s => s.rttMs);
+
+        // Sort a copy for median calculation
+        const sorted = [...rtts].sort((a, b) => a - b);
+        const mid = Math.floor(sorted.length / 2);
+        const medianMs = sorted.length % 2 === 0
+            ? (sorted[mid - 1] + sorted[mid]) / 2
+            : sorted[mid];
+
+        return {
+            sampleCount: this.samples.length,
+            minMs: Math.min(...rtts),
+            maxMs: Math.max(...rtts),
+            meanMs: rtts.reduce((sum, v) => sum + v, 0) / rtts.length,
+            medianMs: medianMs,
+            samples: this.samples
+        };
+    }
+
+    /**
+     * Get a copy of the raw samples array.
+     * @returns {Array} Copy of samples [{timestamp, rttMs}, ...]
+     */
+    getSamples() {
+        return [...this.samples];
+    }
+}
+
 // Export for ES modules and global access
-export { WebRTCManager, ConnectionQualityMonitor };
+export { WebRTCManager, ConnectionQualityMonitor, LatencyTelemetry };
 export default WebRTCManager;
