@@ -812,6 +812,11 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
                 p2pLog.info(`Reconnection timeout: ${this.reconnectionState.timeoutMs}ms`);
             }
 
+            // Store partner disconnect message config (Phase 23 - CFG-01, CFG-02)
+            if (data.scene_metadata?.partner_disconnect_message !== undefined) {
+                this.config.partner_disconnect_message = data.scene_metadata.partner_disconnect_message;
+            }
+
             // Initialize action queues for other players
             for (const playerId of data.players) {
                 if (playerId != this.myPlayerId) {
@@ -4535,37 +4540,112 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
     }
 
     /**
-     * Handle game end due to reconnection failure (Phase 20 - RECON-06).
-     * Shows partner disconnected message instead of auto-advancing.
+     * Handle game end due to reconnection failure (Phase 20 - RECON-06, Phase 23).
+     * Shows in-page partner disconnected overlay instead of redirect.
+     * Exports all data before showing overlay.
+     * @param {Object} data - Game end data from server
+     * @param {string} data.game_id - Game identifier
+     * @param {string} data.reason - Reason for game end
+     * @param {string|number} data.disconnected_player_id - ID of player who disconnected
      */
     _handleReconnectionGameEnd(data) {
-        p2pLog.warn('Game ended due to reconnection failure', data);
+        p2pLog.warn('Game ended due to partner disconnection', data);
 
         this._clearReconnectionTimeout();
         this.reconnectionState.state = 'terminated';
 
-        // Mark session as partial (reuse Phase 17 pattern)
+        // Stop game state
+        this.state = "done";
+        this.episodeComplete = true;
+
+        // Pause continuous monitoring if active
+        if (this.continuousMonitor) {
+            this.continuousMonitor.pause();
+        }
+
+        // Mark session as partial with disconnection metadata (Phase 23 - DATA-02, DATA-03, DATA-04)
         this.sessionPartialInfo = {
-            reason: 'reconnection_timeout',
-            frame: this.frameNumber,
-            timestamp: Date.now(),
+            isPartial: true,
+            terminationReason: 'partner_disconnected',
+            terminationFrame: this.frameNumber,
+            disconnectedPlayerId: data.disconnected_player_id || this.p2pPeerId,
             reconnectionData: this.getReconnectionData()
         };
 
-        // Show partner disconnected overlay instead of auto-advancing
-        this._showPartnerDisconnectedOverlay();
+        // Export all metrics BEFORE showing overlay (Phase 23 - DATA-01)
+        if (this.gameId && this.sceneId) {
+            this.emitMultiplayerMetrics(this.sceneId);
+        }
+
+        // Get custom message from config, or use default
+        const customMessage = this.config?.partner_disconnect_message;
+        const message = customMessage || "Your partner has disconnected. The game has ended.";
+
+        // Show in-page overlay (Phase 23 - UI-01, UI-02, UI-03, UI-04)
+        this._showPartnerDisconnectedOverlay(message);
+
+        // Close P2P connection
+        if (this.webrtcManager) {
+            this.webrtcManager.close();
+        }
     }
 
     /**
-     * Show partner disconnected page.
-     * Redirects the participant to a disconnection page informing them their partner disconnected.
+     * Show partner disconnected overlay (Phase 23 - UI-01 through UI-04).
+     * Hides game container and HUD, shows in-page overlay with message.
+     * Page stays displayed indefinitely (no redirect, no Continue button).
+     * @param {string} message - Message to display
      */
-    _showPartnerDisconnectedOverlay() {
+    _showPartnerDisconnectedOverlay(message) {
         // Remove reconnecting overlay if present
         this._hideReconnectingOverlay();
 
-        // Redirect to partner disconnected page
-        window.location.href = '/partner-disconnected';
+        // Hide game container and HUD (Phase 23 - UI-02)
+        const gameContainer = document.getElementById('gameContainer');
+        if (gameContainer) {
+            gameContainer.style.display = 'none';
+        }
+
+        const hudText = document.getElementById('hudText');
+        if (hudText) {
+            hudText.style.display = 'none';
+        }
+
+        // Create overlay (reuse styling from _showPartnerExcludedUI)
+        let overlay = document.getElementById('partnerDisconnectedOverlay');
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.id = 'partnerDisconnectedOverlay';
+            overlay.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.75);
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                z-index: 10000;
+            `;
+            document.body.appendChild(overlay);
+        }
+
+        // Use neutral styling (same as partner excluded UI)
+        overlay.innerHTML = `
+            <div style="
+                background: white;
+                padding: 40px;
+                border-radius: 8px;
+                max-width: 500px;
+                text-align: center;
+            ">
+                <h2 style="color: #333; margin-bottom: 20px;">Game Ended</h2>
+                <p style="font-size: 16px; margin-bottom: 20px;">${message}</p>
+                <p style="color: #666; font-size: 14px;">Your game data has been saved. Thank you for participating.</p>
+            </div>
+        `;
+        overlay.style.display = 'flex';
     }
 
     /**
@@ -5592,12 +5672,13 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
                 allRollbacks: this.cumulativeValidation.allRollbacks
             },
 
-            // Session status (Phase 17: partial session marking)
+            // Session status (Phase 17: partial session marking, Phase 23: disconnectedPlayerId)
             sessionStatus: {
                 isPartial: this.sessionPartialInfo?.isPartial || false,
                 terminationReason: this.sessionPartialInfo?.terminationReason || 'normal',
                 terminationFrame: this.sessionPartialInfo?.terminationFrame || this.frameNumber,
-                completedEpisodes: this.cumulativeValidation?.episodes?.length || 0
+                completedEpisodes: this.cumulativeValidation?.episodes?.length || 0,
+                disconnectedPlayerId: this.sessionPartialInfo?.disconnectedPlayerId || null
             },
 
             // P2P latency telemetry (Phase 22 - LAT-01, LAT-02)
