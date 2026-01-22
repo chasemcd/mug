@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-22)
 
 ## Current Position
 
-Phase: Not started (run /gsd:create-roadmap)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-01-22 — Milestone v1.4 started
+Phase: 23 (Partner Disconnection Handling)
+Plan: Not started (run /gsd:plan-phase 23)
+Status: Ready to plan
+Last activity: 2026-01-22 — Roadmap created with Phase 23
 
-Progress: [----------] 0% (v1.4 - 0/? phases)
+Progress: [----------] 0% (v1.4 - 0/1 phases)
 
 ## Milestone History
 
@@ -89,4 +89,4 @@ Resume file: None
 
 ### Next Steps
 
-Run `/gsd:define-requirements` to specify checkable requirements for v1.4, then `/gsd:create-roadmap` to create phases.
+Run `/gsd:plan-phase 23` to create the execution plan for Partner Disconnection Handling.

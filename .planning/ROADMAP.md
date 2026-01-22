@@ -5,7 +5,8 @@
 - **v1.0 P2P Multiplayer** - Phases 1-10 (shipped 2026-01-19)
 - **v1.1 Sync Validation** - Phases 11-14 (complete)
 - **v1.2 Participant Exclusion** - Phases 15-18 (shipped 2026-01-22)
-- **v1.3 P2P Connection Validation** - Phases 19-22 (complete)
+- **v1.3 P2P Connection Validation** - Phases 19-22 (shipped 2026-01-22)
+- **v1.4 Partner Disconnection Handling** - Phase 23 (in progress)
 
 ## Phases
 
@@ -51,7 +52,8 @@ Key deliverables:
 
 </details>
 
-### ✓ v1.3 P2P Connection Validation (Complete)
+<details>
+<summary>v1.3 P2P Connection Validation (Phases 19-22) - SHIPPED 2026-01-22</summary>
 
 **Milestone Goal:** Ensure reliable P2P connections throughout experiments with pre-game validation, per-round health checks, reconnection handling, and comprehensive latency/connection telemetry.
 
@@ -59,6 +61,14 @@ Key deliverables:
 - [x] **Phase 20: Mid-Game Reconnection** - Detect drops, pause gameplay, reconnection overlay, configurable timeout
 - [x] **Phase 21: Per-Round Health Check** - DataChannel verification before each round begins
 - [x] **Phase 22: Latency Telemetry** - Async latency monitoring and stats export
+
+</details>
+
+### v1.4 Partner Disconnection Handling (In Progress)
+
+**Milestone Goal:** Improve the experience when a partner disconnects mid-game — stay on the same page with a configurable message, ensure data is exported with disconnection metadata.
+
+- [ ] **Phase 23: Partner Disconnection Handling** - In-page overlay, data export, disconnection metadata
 
 ## Phase Details
 
@@ -227,10 +237,28 @@ Plans:
 Plans:
 - [x] 22-01-PLAN.md — LatencyTelemetry class, async RTT sampling, stats export integration
 
+### Phase 23: Partner Disconnection Handling
+**Goal:** When a partner disconnects mid-game, stay on the same page (no redirect), hide game UI, show a configurable message, export all collected data with disconnection metadata including the disconnected player's ID.
+**Depends on:** v1.3 complete (existing reconnection infrastructure)
+**Requirements:** UI-01, UI-02, UI-03, UI-04, DATA-01, DATA-02, DATA-03, DATA-04, CFG-01, CFG-02
+**Success Criteria** (what must be TRUE):
+  1. Partner disconnect triggers in-page overlay instead of redirect to `/partner-disconnected`
+  2. Game container and HUD are hidden when overlay appears
+  3. Default message shown when no custom message configured
+  4. Custom message from `GymScene.partner_disconnect_message()` displayed when configured
+  5. Page stays displayed indefinitely (no auto-redirect, no Continue button)
+  6. `emitMultiplayerMetrics()` called before overlay display to export collected data
+  7. `sessionPartialInfo` populated with `isPartial: true` and `terminationReason: 'partner_disconnected'`
+  8. `sessionPartialInfo` includes `disconnectedPlayerId` with the partner's player ID
+**Research flag:** Unlikely (builds on existing overlay patterns from Phases 17, 20)
+**Plans:** TBD
+Plans:
+- [ ] 23-01-PLAN.md — Partner disconnection handling
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 19 -> 20 -> 21 -> 22
+Phases execute in numeric order: 23
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -246,7 +274,8 @@ Phases execute in numeric order: 19 -> 20 -> 21 -> 22
 | 20. Mid-Game Reconnection | v1.3 | 2/2 | Complete | 2026-01-22 |
 | 21. Per-Round Health Check | v1.3 | 1/1 | Complete | 2026-01-22 |
 | 22. Latency Telemetry | v1.3 | 1/1 | Complete | 2026-01-22 |
+| 23. Partner Disconnection | v1.4 | 0/1 | Pending | — |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-01-22 after Phase 22 complete — v1.3 milestone complete*
+*Last updated: 2026-01-22 after v1.4 roadmap creation*

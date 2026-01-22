@@ -48,21 +48,21 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| UI-01 | — | Pending |
-| UI-02 | — | Pending |
-| UI-03 | — | Pending |
-| UI-04 | — | Pending |
-| DATA-01 | — | Pending |
-| DATA-02 | — | Pending |
-| DATA-03 | — | Pending |
-| DATA-04 | — | Pending |
-| CFG-01 | — | Pending |
-| CFG-02 | — | Pending |
+| UI-01 | 23 | Pending |
+| UI-02 | 23 | Pending |
+| UI-03 | 23 | Pending |
+| UI-04 | 23 | Pending |
+| DATA-01 | 23 | Pending |
+| DATA-02 | 23 | Pending |
+| DATA-03 | 23 | Pending |
+| DATA-04 | 23 | Pending |
+| CFG-01 | 23 | Pending |
+| CFG-02 | 23 | Pending |
 
 **Coverage:**
 - v1.4 requirements: 10 total
-- Mapped to phases: 0 (run /gsd:create-roadmap)
-- Unmapped: 10
+- Mapped to phases: 10
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-01-22*
