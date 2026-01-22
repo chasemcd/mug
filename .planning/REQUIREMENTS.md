@@ -23,9 +23,9 @@ Requirements for v1.2 Participant Exclusion milestone. Each maps to roadmap phas
 
 ### Multiplayer Handling
 
-- [ ] **MULTI-01**: When one player excluded, the other player receives clear notification ("Your partner experienced a technical issue")
-- [ ] **MULTI-02**: Game terminates cleanly for both players when one is excluded
-- [ ] **MULTI-03**: Valid game data up to exclusion point is preserved and marked as partial session
+- [x] **MULTI-01**: When one player excluded, the other player receives clear notification ("Your partner experienced a technical issue")
+- [x] **MULTI-02**: Game terminates cleanly for both players when one is excluded
+- [x] **MULTI-03**: Valid game data up to exclusion point is preserved and marked as partial session
 
 ### Extensibility
 
@@ -81,9 +81,9 @@ Which phases cover which requirements.
 | MONITOR-02 | Phase 16 | Complete |
 | MONITOR-03 | Phase 16 | Complete |
 | MONITOR-04 | Phase 16 | Complete |
-| MULTI-01 | Phase 17 | Pending |
-| MULTI-02 | Phase 17 | Pending |
-| MULTI-03 | Phase 17 | Pending |
+| MULTI-01 | Phase 17 | Complete |
+| MULTI-02 | Phase 17 | Complete |
+| MULTI-03 | Phase 17 | Complete |
 | EXT-01 | Phase 18 | Pending |
 | EXT-02 | Phase 18 | Pending |
 | EXT-03 | Phase 18 | Pending |
@@ -95,4 +95,4 @@ Which phases cover which requirements.
 
 ---
 *Requirements defined: 2026-01-21*
-*Last updated: 2026-01-21 after Phase 16 complete*
+*Last updated: 2026-01-21 after Phase 17 complete*

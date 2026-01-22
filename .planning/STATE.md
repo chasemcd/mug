@@ -121,4 +121,4 @@ Resume file: None
 
 ### Next Steps
 
-1. `/gsd:execute-phase 18` — execute Session Data Export phase
+1. `/gsd:plan-phase 18` — plan Custom Exclusion Callbacks phase
