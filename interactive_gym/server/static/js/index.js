@@ -81,21 +81,16 @@ function calculateMedian(arr) {
 }
 
 // ============================================
-// Entry Screening (Phase 15)
+// Entry Screening (Phase 15 + Phase 18 Callbacks)
 // ============================================
 
 /**
  * Run entry screening checks based on scene metadata.
+ * Now async to support server-side callback execution (Phase 18).
  * Returns an object with { passed: boolean, failedRule: string | null, message: string | null }
  */
-function runEntryScreening(sceneMetadata) {
-    // If no screening rules configured, pass immediately
-    if (!sceneMetadata.device_exclusion &&
-        !sceneMetadata.browser_requirements &&
-        !sceneMetadata.browser_blocklist) {
-        return { passed: true, failedRule: null, message: null };
-    }
-
+async function runEntryScreening(sceneMetadata) {
+    // Run built-in checks first
     const parser = new UAParser();
     const result = parser.getResult();
     const deviceType = result.device.type; // "mobile", "tablet", or undefined (desktop)
@@ -141,8 +136,67 @@ function runEntryScreening(sceneMetadata) {
         }
     }
 
+    // Phase 18: If built-in checks pass and entry callback is configured, call server
+    if (sceneMetadata.has_entry_callback) {
+        console.debug("[EntryScreening] Executing server-side entry callback...");
+        const callbackResult = await executeEntryCallback(sceneMetadata);
+        if (callbackResult.exclude) {
+            return {
+                passed: false,
+                failedRule: 'custom_callback',
+                message: callbackResult.message || 'You do not meet the requirements for this study.'
+            };
+        }
+    }
+
     // All checks passed
     return { passed: true, failedRule: null, message: null };
+}
+
+/**
+ * Execute server-side entry callback (Phase 18).
+ * Sends participant context to server and awaits exclusion decision.
+ *
+ * @param {Object} sceneMetadata - Scene configuration
+ * @returns {Promise<{exclude: boolean, message: string|null}>}
+ */
+function executeEntryCallback(sceneMetadata) {
+    return new Promise((resolve) => {
+        // Gather participant context
+        const parser = new UAParser();
+        const result = parser.getResult();
+
+        const context = {
+            ping: curLatency || 0,
+            browser_name: result.browser.name || 'Unknown',
+            browser_version: result.browser.version || 'Unknown',
+            device_type: result.device.type || 'desktop',
+            os_name: result.os.name || 'Unknown',
+            os_version: result.os.version || 'Unknown'
+        };
+
+        // Set up one-time listener for response
+        socket.once('entry_callback_result', (data) => {
+            console.debug("[EntryScreening] Callback result:", data);
+            resolve({
+                exclude: data.exclude || false,
+                message: data.message || null
+            });
+        });
+
+        // Send to server
+        socket.emit('execute_entry_callback', {
+            session_id: window.sessionId,
+            scene_id: sceneMetadata.scene_id,
+            context: context
+        });
+
+        // Timeout after 5 seconds (fail open - allow entry)
+        setTimeout(() => {
+            console.warn("[EntryScreening] Entry callback timeout, allowing entry");
+            resolve({ exclude: false, message: null });
+        }, 5000);
+    });
 }
 
 /**
@@ -735,11 +789,11 @@ function startEndScene(data) {
 
 };
 
-function startGymScene(data) {
+async function startGymScene(data) {
     enableStartRefreshInterval();
 
-    // Run entry screening checks (Phase 15)
-    const screeningResult = runEntryScreening(data);
+    // Run entry screening checks (Phase 15 + Phase 18 callbacks)
+    const screeningResult = await runEntryScreening(data);
     entryScreeningPassed = screeningResult.passed;
     entryScreeningMessage = screeningResult.message;
 
