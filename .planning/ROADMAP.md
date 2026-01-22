@@ -128,7 +128,7 @@ Plans:
   1. Participant ping monitored continuously during gameplay
   2. Participant excluded mid-game if ping exceeds threshold for sustained period
   3. Tab switch detected when participant leaves experiment window
-  4. Tab switch triggers configurable warning or exclusion
+  4. Tab visibility triggers configurable warning or exclusion
 **Research flag:** Likely (power-saving mode pitfall P10 needs careful handling)
 **Plans:** 1 plan
 Plans:
@@ -156,10 +156,9 @@ Plans:
   2. Callbacks receive full participant context (ping, browser, focus state, etc.)
   3. Callbacks return exclusion decision with optional message
 **Research flag:** Unlikely (standard callback patterns)
-**Plans:** TBD
-
+**Plans:** 1 plan
 Plans:
-- [ ] 18-01-PLAN.md - TBD
+- [ ] 18-01-PLAN.md - GymScene.exclusion_callbacks() config, server-side callback execution, client-server integration
 
 ## Progress
 
@@ -175,8 +174,8 @@ Phases execute in numeric order: 15 -> 16 -> 17 -> 18
 | 15. Entry Screening Rules | v1.2 | 1/1 | Complete | 2026-01-21 |
 | 16. Continuous Monitoring | v1.2 | 1/1 | Complete | 2026-01-21 |
 | 17. Multiplayer Exclusion | v1.2 | 1/1 | Complete | 2026-01-21 |
-| 18. Custom Callbacks | v1.2 | 0/1 | Not started | - |
+| 18. Custom Callbacks | v1.2 | 0/1 | Planned | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-01-21 after Phase 17 complete*
+*Last updated: 2026-01-21 after Phase 18 planning*
