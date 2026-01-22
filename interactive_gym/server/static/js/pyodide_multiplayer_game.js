@@ -5255,6 +5255,13 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
 
             frames: {
                 total: this.frameNumber
+            },
+
+            // Reconnection events (Phase 20)
+            reconnection: {
+                disconnections: this.reconnectionState.disconnections,
+                attempts: this.reconnectionState.reconnectionAttempts,
+                totalPauseDurationMs: this.reconnectionState.totalPauseDuration
             }
         };
     }
@@ -5295,7 +5302,10 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
                 verifiedFrameAtDesync: evt.verifiedFrameAtDesync,
                 // Include state dump only if present and not too large
                 hasStateDump: !!evt.stateDump
-            }))
+            })),
+
+            // Reconnection events (Phase 20 - LOG-01, LOG-02, LOG-03)
+            reconnection: this.getReconnectionData()
         };
     }
 

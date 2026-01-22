@@ -193,6 +193,9 @@ class GymScene(scene.Scene):
         self.continuous_exclusion_callback: Callable | None = None  # Called during gameplay
         self.continuous_callback_interval_frames: int = 30  # Frames between callback checks (~1s at 30fps)
 
+        # Mid-game reconnection config (Phase 20)
+        self.reconnection_timeout_ms: int = 30000  # Default 30 seconds (RECON-04)
+
     def environment(
         self,
         env_creator: Callable = NotProvided,
@@ -849,6 +852,26 @@ class GymScene(scene.Scene):
             if not isinstance(continuous_callback_interval_frames, int) or continuous_callback_interval_frames < 1:
                 raise ValueError("continuous_callback_interval_frames must be a positive integer")
             self.continuous_callback_interval_frames = continuous_callback_interval_frames
+
+        return self
+
+    def reconnection_config(
+        self,
+        timeout_ms: int = NotProvided,
+    ) -> "GymScene":
+        """Configure mid-game reconnection behavior.
+
+        Args:
+            timeout_ms: Time in milliseconds to wait for reconnection before
+                       ending the game. Default is 30000 (30 seconds).
+
+        Returns:
+            self for chaining.
+        """
+        if timeout_ms is not NotProvided:
+            if not isinstance(timeout_ms, int) or timeout_ms <= 0:
+                raise ValueError("timeout_ms must be a positive integer")
+            self.reconnection_timeout_ms = timeout_ms
 
         return self
 
