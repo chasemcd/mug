@@ -447,6 +447,12 @@ socket.on('connect', function() {
 socket.on('session_restored', function(data) {
     console.log("Session restored from server:", data);
 
+    // If screening failed, don't restore session - keep showing exclusion message
+    if (experimentScreeningPassed === false) {
+        console.log("[SessionRestore] Blocked by failed screening");
+        return;
+    }
+
     // Restore interactiveGymGlobals from server (server state is authoritative)
     if (data.interactiveGymGlobals) {
         window.interactiveGymGlobals = data.interactiveGymGlobals;
@@ -502,6 +508,12 @@ socket.on('invalid_session', function(data) {
 });
 
 socket.on('start_game', function(data) {
+    // Don't start game if screening failed
+    if (experimentScreeningPassed === false) {
+        console.log("[StartGame] Blocked by failed screening");
+        return;
+    }
+
     // Clear the waitroomInterval to stop the waiting room timer
     if (waitroomInterval) {
         clearInterval(waitroomInterval);
@@ -1232,6 +1244,12 @@ function enableCheckPyodideDone() {
 var refreshStartButton;
 function enableStartRefreshInterval() {
     refreshStartButton = setInterval(() => {
+        // Don't process if screening failed
+        if (experimentScreeningPassed === false) {
+            clearInterval(refreshStartButton);
+            return;
+        }
+
         // Use configured min_ping_measurements or default to 5
         const minPingMeasurements = currentSceneMetadata.min_ping_measurements || 5;
 
