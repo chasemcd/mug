@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-21)
 ## Current Position
 
 Phase: 20 of 22 (Mid-Game Reconnection)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-01-22 — Phase 19 complete (Waiting Room Validation)
+Plan: 01 of 02 complete
+Status: In progress
+Last activity: 2026-01-22 — Completed 20-01-PLAN.md (Connection Drop Detection + Pause)
 
-Progress: [██░░░░░░░░] 25% (v1.3 - 1/4 phases complete)
+Progress: [███░░░░░░░] 30% (v1.3 - 1.5/4 phases complete)
 
 ## Milestone History
 
@@ -72,6 +72,12 @@ Progress: [██░░░░░░░░] 25% (v1.3 - 1/4 phases complete)
 - `interactive_gym/server/pyodide_game_coordinator.py` - record_validation_success(), handle_validation_failure()
 - `interactive_gym/server/app.py` - p2p_validation_* socket handlers
 - `interactive_gym/server/static/js/index.js` - p2p_validation_* UI handlers
+
+**Phase 20 Key Files (Plan 01):**
+- `interactive_gym/server/static/js/webrtc_manager.js` - onConnectionLost/onConnectionRestored callbacks, 3s grace period
+- `interactive_gym/server/static/js/pyodide_multiplayer_game.js` - reconnectionState object, pause handling
+- `interactive_gym/server/pyodide_game_coordinator.py` - handle_connection_lost(), handle_reconnection_success/timeout()
+- `interactive_gym/server/app.py` - p2p_connection_lost, p2p_reconnection_* socket handlers
 
 ### Decisions
 
@@ -134,6 +140,12 @@ See: .planning/PROJECT.md Key Decisions table
 - Server coordinates validation complete to ensure both peers agree (WAIT-03)
 - 10-second validation timeout separate from 5s P2P ready gate (WAIT-04)
 
+**v1.3 decisions (Phase 20, Plan 01):**
+- 3-second grace period before declaring connection lost (RECON-GRACE)
+- ICE 'failed' triggers onConnectionLost immediately (terminal state)
+- Bilateral pause coordinated via server SocketIO (works when P2P down)
+- First player to report triggers pause for both players
+
 ### Pending Todos
 
 (None)
@@ -147,9 +159,10 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-01-22
-Stopped at: Phase 19 verified and complete
+Stopped at: Completed 20-01-PLAN.md
 Resume file: None
 
 ### Next Steps
 
-1. `/gsd:plan-phase 20` — plan Mid-Game Reconnection phase
+1. Execute 20-02-PLAN.md (ICE Restart and Resume) if it exists
+2. Or plan 20-02 if not yet planned
