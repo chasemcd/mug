@@ -193,8 +193,8 @@ class GymScene(scene.Scene):
         self.continuous_exclusion_callback: Callable | None = None  # Called during gameplay
         self.continuous_callback_interval_frames: int = 30  # Frames between callback checks (~1s at 30fps)
 
-        # Mid-game reconnection config (Phase 20)
-        self.reconnection_timeout_ms: int = 30000  # Default 30 seconds (RECON-04)
+        # Mid-game reconnection config
+        self.reconnection_timeout_ms: int = 5000  # Default 5 seconds (RECON-04)
 
     def environment(
         self,
