@@ -20,18 +20,18 @@ Requirements for v1.3 P2P Connection Validation milestone. Each maps to roadmap 
 
 ### Mid-Game Reconnection
 
-- [ ] **RECON-01**: System detects when P2P DataChannel connection drops
-- [ ] **RECON-02**: Gameplay pauses immediately for both clients on connection drop
-- [ ] **RECON-03**: Both players see reconnecting overlay during reconnection attempts
-- [ ] **RECON-04**: Reconnection timeout is configurable by researcher
-- [ ] **RECON-05**: Gameplay resumes if reconnection succeeds within timeout
-- [ ] **RECON-06**: Game ends cleanly for both players if reconnection times out
+- [x] **RECON-01**: System detects when P2P DataChannel connection drops
+- [x] **RECON-02**: Gameplay pauses immediately for both clients on connection drop
+- [x] **RECON-03**: Both players see reconnecting overlay during reconnection attempts
+- [x] **RECON-04**: Reconnection timeout is configurable by researcher
+- [x] **RECON-05**: Gameplay resumes if reconnection succeeds within timeout
+- [x] **RECON-06**: Game ends cleanly for both players if reconnection times out
 
 ### Connection Logging
 
-- [ ] **LOG-01**: Disconnection events logged with timestamp and detecting peer
-- [ ] **LOG-02**: Reconnection attempts logged with duration and outcome
-- [ ] **LOG-03**: Total pause duration per session recorded in data export
+- [x] **LOG-01**: Disconnection events logged with timestamp and detecting peer
+- [x] **LOG-02**: Reconnection attempts logged with duration and outcome
+- [x] **LOG-03**: Total pause duration per session recorded in data export
 
 ### Latency Monitoring
 
@@ -75,15 +75,15 @@ Which phases cover which requirements.
 | WAIT-03 | Phase 19 | Complete |
 | ROUND-01 | Phase 21 | Pending |
 | ROUND-02 | Phase 21 | Pending |
-| RECON-01 | Phase 20 | Pending |
-| RECON-02 | Phase 20 | Pending |
-| RECON-03 | Phase 20 | Pending |
-| RECON-04 | Phase 20 | Pending |
-| RECON-05 | Phase 20 | Pending |
-| RECON-06 | Phase 20 | Pending |
-| LOG-01 | Phase 20 | Pending |
-| LOG-02 | Phase 20 | Pending |
-| LOG-03 | Phase 20 | Pending |
+| RECON-01 | Phase 20 | Complete |
+| RECON-02 | Phase 20 | Complete |
+| RECON-03 | Phase 20 | Complete |
+| RECON-04 | Phase 20 | Complete |
+| RECON-05 | Phase 20 | Complete |
+| RECON-06 | Phase 20 | Complete |
+| LOG-01 | Phase 20 | Complete |
+| LOG-02 | Phase 20 | Complete |
+| LOG-03 | Phase 20 | Complete |
 | LAT-01 | Phase 22 | Pending |
 | LAT-02 | Phase 22 | Pending |
 

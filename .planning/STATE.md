@@ -9,10 +9,10 @@ See: .planning/PROJECT.md (updated 2026-01-21)
 
 ## Current Position
 
-Phase: 20 of 22 (Mid-Game Reconnection)
-Plan: 02 of 02 complete
-Status: Phase complete
-Last activity: 2026-01-22 — Completed 20-02-PLAN.md (ICE Restart and Resume)
+Phase: 21 of 22 (Per-Round Health Check)
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-01-22 — Phase 20 complete (Mid-Game Reconnection)
 
 Progress: [█████░░░░░] 50% (v1.3 - 2/4 phases complete)
 
@@ -170,10 +170,9 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-01-22
-Stopped at: Completed 20-02-PLAN.md (Phase 20 complete)
+Stopped at: Phase 20 verified and complete
 Resume file: None
 
 ### Next Steps
 
-1. Plan Phase 21 (Graceful Session Ending) if not yet planned
-2. Execute Phase 21 plans
+1. `/gsd:plan-phase 21` — plan Per-Round Health Check phase
