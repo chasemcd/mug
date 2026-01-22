@@ -304,10 +304,14 @@ function showExclusionMessage(message) {
     $("#gameContainer").hide();
     $("#invalidSession").hide();
 
-    // Make sure headers are visible
+    // Set headers - use existing header if present, otherwise use default
+    const currentHeader = $("#sceneHeader").text().trim();
+    if (!currentHeader) {
+        $("#sceneHeader").text("Browser Not Supported");
+    }
     $("#sceneHeader").show();
-    $("#sceneSubHeader").show();
     $("#sceneSubHeader").text("Unable to Continue");
+    $("#sceneSubHeader").show();
 
     // Show the exclusion message in errorText
     $('#errorText').text(message);
