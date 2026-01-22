@@ -68,7 +68,7 @@ Key deliverables:
 
 **Milestone Goal:** Improve the experience when a partner disconnects mid-game — stay on the same page with a configurable message, ensure data is exported with disconnection metadata.
 
-- [ ] **Phase 23: Partner Disconnection Handling** - In-page overlay, data export, disconnection metadata
+- [x] **Phase 23: Partner Disconnection Handling** - In-page overlay, data export, disconnection metadata
 
 ## Phase Details
 
@@ -253,7 +253,7 @@ Plans:
 **Research flag:** Unlikely (builds on existing overlay patterns from Phases 17, 20)
 **Plans:** 1 plan
 Plans:
-- [ ] 23-01-PLAN.md — In-page overlay, config API, data export with disconnectedPlayerId
+- [x] 23-01-PLAN.md — In-page overlay, config API, data export with disconnectedPlayerId
 
 ## Progress
 
@@ -274,8 +274,8 @@ Phases execute in numeric order: 23
 | 20. Mid-Game Reconnection | v1.3 | 2/2 | Complete | 2026-01-22 |
 | 21. Per-Round Health Check | v1.3 | 1/1 | Complete | 2026-01-22 |
 | 22. Latency Telemetry | v1.3 | 1/1 | Complete | 2026-01-22 |
-| 23. Partner Disconnection | v1.4 | 0/1 | Planned | — |
+| 23. Partner Disconnection | v1.4 | 1/1 | Complete | 2026-01-22 |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-01-22 after Phase 23 planning*
+*Last updated: 2026-01-22 after Phase 23 complete*
