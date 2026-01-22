@@ -722,6 +722,22 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
             peerPingSeen: false
         };
 
+        // Mid-game reconnection state (Phase 20)
+        // States: 'connected' -> 'pausing' -> 'paused' -> 'reconnecting' -> 'connected' | 'terminated'
+        this.reconnectionState = {
+            state: 'connected',              // Current reconnection state
+            isPaused: false,                 // Game loop paused?
+            pauseStartTime: null,            // When pause started
+            pauseFrame: null,                // Frame number when paused
+            timeoutMs: 30000,                // Configurable timeout (RECON-04)
+            timeoutId: null,                 // Timeout handle
+
+            // Event logging (LOG-01, LOG-02, LOG-03)
+            disconnections: [],              // [{timestamp, frame, detectingPeer, iceState, dcState}]
+            reconnectionAttempts: [],        // [{timestamp, duration, outcome, attempts}]
+            totalPauseDuration: 0            // Cumulative ms paused (LOG-03)
+        };
+
         // GGPO-style input queuing: inputs are queued during network reception
         // and processed synchronously at frame start to prevent race conditions
         this.pendingInputPackets = [];     // Queued P2P input packets
@@ -787,6 +803,12 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
             if (data.scene_metadata?.continuous_monitoring_enabled) {
                 this.continuousMonitor = new ContinuousMonitor(data.scene_metadata);
                 p2pLog.info('Continuous monitoring enabled');
+            }
+
+            // Reconnection timeout config (Phase 20 - RECON-04)
+            if (data.scene_metadata?.reconnection_timeout_ms) {
+                this.reconnectionState.timeoutMs = data.scene_metadata.reconnection_timeout_ms;
+                p2pLog.info(`Reconnection timeout: ${this.reconnectionState.timeoutMs}ms`);
             }
 
             // Initialize action queues for other players
@@ -1164,6 +1186,26 @@ env.get_state()
             if (this.continuousMonitor) {
                 this.continuousMonitor.setCallbackPending(false);
                 this.continuousMonitor.setCallbackResult(data);
+            }
+        });
+
+        // P2P reconnection handlers (Phase 20)
+        socket.on('p2p_pause', (data) => {
+            if (data.game_id === this.gameId) {
+                this._handleServerPause(data);
+            }
+        });
+
+        socket.on('p2p_resume', (data) => {
+            if (data.game_id === this.gameId) {
+                // Plan 02 will add full resume implementation
+                p2pLog.info('Server requested resume', data);
+            }
+        });
+
+        socket.on('p2p_game_ended', (data) => {
+            if (data.game_id === this.gameId) {
+                this._handleReconnectionGameEnd(data);
             }
         });
     }
@@ -4133,6 +4175,17 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
             p2pLog.warn('Quality degraded:', info.reason);
         };
 
+        // Connection drop detection (Phase 20)
+        this.webrtcManager.onConnectionLost = (info) => {
+            this._onP2PConnectionLost(info);
+        };
+
+        this.webrtcManager.onConnectionRestored = () => {
+            // Connection self-recovered before ICE restart needed
+            // Plan 02 will add full resume handling
+            p2pLog.info('Connection self-recovered');
+        };
+
         // Start the connection (role determined by player ID comparison)
         this.webrtcManager.connectToPeer(this.p2pPeerId);
     }
@@ -4297,6 +4350,164 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
         });
 
         // Server will emit p2p_validation_repool, handled by index.js
+    }
+
+    // ========== Mid-Game Reconnection Methods (Phase 20) ==========
+
+    /**
+     * Handle P2P connection lost (Phase 20 - RECON-01, RECON-02).
+     * Called from WebRTCManager callback when connection drop detected.
+     */
+    _onP2PConnectionLost(info) {
+        // Skip if already paused or game is done
+        if (this.reconnectionState.isPaused || this.state === 'done') {
+            return;
+        }
+
+        p2pLog.warn('P2P connection lost, requesting bilateral pause', info);
+
+        // Update state
+        this.reconnectionState.state = 'pausing';
+
+        // Log disconnection event (LOG-01)
+        this.reconnectionState.disconnections.push({
+            timestamp: Date.now(),
+            frame: this.frameNumber,
+            detectingPeer: this.myPlayerId,
+            iceState: info.iceState,
+            dcState: info.dcState
+        });
+
+        // Notify server to coordinate bilateral pause
+        socket.emit('p2p_connection_lost', {
+            game_id: this.gameId,
+            player_id: this.myPlayerId,
+            frame_number: this.frameNumber,
+            timestamp: Date.now()
+        });
+
+        // Apply local pause immediately (server will confirm)
+        this._pauseForReconnection(this.frameNumber);
+    }
+
+    /**
+     * Pause game for reconnection (Phase 20 - RECON-02).
+     * Stops game loop and prepares for reconnection attempt.
+     */
+    _pauseForReconnection(pauseFrame) {
+        if (this.reconnectionState.isPaused) {
+            return;  // Already paused
+        }
+
+        p2pLog.info(`Pausing game for reconnection at frame ${pauseFrame}`);
+
+        this.reconnectionState.isPaused = true;
+        this.reconnectionState.pauseStartTime = Date.now();
+        this.reconnectionState.pauseFrame = pauseFrame;
+        this.reconnectionState.state = 'paused';
+
+        // Pause continuous monitoring if active
+        if (this.continuousMonitor) {
+            this.continuousMonitor.pause();
+        }
+
+        // Note: Overlay will be shown by Plan 02
+    }
+
+    /**
+     * Handle server pause command (Phase 20).
+     * Server coordinates pause to ensure both clients pause together.
+     */
+    _handleServerPause(data) {
+        p2pLog.info('Server requested pause for reconnection', data);
+
+        if (!this.reconnectionState.isPaused) {
+            this._pauseForReconnection(data.pause_frame);
+        }
+
+        // Start reconnection timeout (RECON-04, RECON-06)
+        this._startReconnectionTimeout();
+    }
+
+    /**
+     * Start reconnection timeout (Phase 20 - RECON-04).
+     */
+    _startReconnectionTimeout() {
+        this._clearReconnectionTimeout();
+
+        this.reconnectionState.timeoutId = setTimeout(() => {
+            this._onReconnectionTimeout();
+        }, this.reconnectionState.timeoutMs);
+
+        p2pLog.debug(`Reconnection timeout started: ${this.reconnectionState.timeoutMs}ms`);
+    }
+
+    _clearReconnectionTimeout() {
+        if (this.reconnectionState.timeoutId) {
+            clearTimeout(this.reconnectionState.timeoutId);
+            this.reconnectionState.timeoutId = null;
+        }
+    }
+
+    /**
+     * Handle reconnection timeout (Phase 20 - RECON-06).
+     * Game ends cleanly for both players.
+     */
+    _onReconnectionTimeout() {
+        p2pLog.warn('Reconnection timeout reached');
+
+        // Calculate pause duration for logging (LOG-02)
+        const duration = this.reconnectionState.pauseStartTime ?
+            Date.now() - this.reconnectionState.pauseStartTime : 0;
+
+        this.reconnectionState.reconnectionAttempts.push({
+            timestamp: Date.now(),
+            duration: duration,
+            outcome: 'timeout',
+            attempts: this.webrtcManager?.iceRestartAttempts || 0
+        });
+
+        this.reconnectionState.totalPauseDuration += duration;
+        this.reconnectionState.state = 'terminated';
+
+        // Notify server of timeout
+        socket.emit('p2p_reconnection_timeout', {
+            game_id: this.gameId,
+            player_id: this.myPlayerId,
+            pause_duration_ms: duration
+        });
+    }
+
+    /**
+     * Handle game end due to reconnection failure (Phase 20 - RECON-06).
+     */
+    _handleReconnectionGameEnd(data) {
+        p2pLog.warn('Game ended due to reconnection failure', data);
+
+        this._clearReconnectionTimeout();
+        this.reconnectionState.state = 'terminated';
+
+        // Mark session as partial (reuse Phase 17 pattern)
+        this.sessionPartialInfo = {
+            reason: 'reconnection_timeout',
+            frame: this.frameNumber,
+            timestamp: Date.now(),
+            reconnectionData: this.getReconnectionData()
+        };
+
+        // Transition to done state
+        this.state = 'done';
+    }
+
+    /**
+     * Get reconnection event data for export (Phase 20 - LOG-01, LOG-02, LOG-03).
+     */
+    getReconnectionData() {
+        return {
+            disconnections: this.reconnectionState.disconnections,
+            reconnectionAttempts: this.reconnectionState.reconnectionAttempts,
+            totalPauseDurationMs: this.reconnectionState.totalPauseDuration
+        };
     }
 
     /**
