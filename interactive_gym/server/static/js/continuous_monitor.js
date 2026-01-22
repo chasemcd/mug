@@ -68,10 +68,19 @@ export class ContinuousMonitor {
         this.onWarning = null;
         this.onExclude = null;
 
+        // Custom callback config (Phase 18)
+        this.hasCallback = config.has_continuous_callback ?? false;
+        this.callbackIntervalFrames = config.continuous_callback_interval_frames ?? 30;
+        this.framesSinceCallback = 0;
+        this.callbackPending = false;  // Prevent overlapping calls
+
+        // Callback result (set by game when server responds)
+        this.callbackResult = null;
+
         // Set up tab visibility listener
         this._setupTabListener();
 
-        monitorLog.info(`ContinuousMonitor initialized: ping=${this.maxPing}ms, tab_warn=${this.tabWarningMs}ms, tab_exclude=${this.tabExcludeMs}ms`);
+        monitorLog.info(`ContinuousMonitor initialized: ping=${this.maxPing}ms, tab_warn=${this.tabWarningMs}ms, tab_exclude=${this.tabExcludeMs}ms, has_callback=${this.hasCallback}`);
     }
 
     /**
@@ -116,7 +125,7 @@ export class ContinuousMonitor {
      * @returns {Object} Result with status
      *   - exclude: boolean - Should participant be excluded?
      *   - warn: boolean - Should warning be shown?
-     *   - reason: string|null - 'sustained_ping', 'tab_hidden', or null
+     *   - reason: string|null - 'sustained_ping', 'tab_hidden', 'custom_callback', etc.
      *   - message: string|null - Message to display
      */
     check() {
@@ -129,6 +138,29 @@ export class ContinuousMonitor {
 
         if (!this.enabled || this.paused) {
             return result;
+        }
+
+        // Check callback result first if present (Phase 18)
+        if (this.callbackResult) {
+            const cbResult = this.callbackResult;
+            this.callbackResult = null;  // Clear after reading
+
+            if (cbResult.exclude) {
+                return {
+                    exclude: true,
+                    warn: false,
+                    reason: 'custom_callback',
+                    message: cbResult.message || 'You have been excluded from this study.'
+                };
+            }
+            if (cbResult.warn) {
+                return {
+                    exclude: false,
+                    warn: true,
+                    reason: 'custom_callback_warning',
+                    message: cbResult.message || 'Please follow the study instructions.'
+                };
+            }
         }
 
         // Check tab visibility first (higher priority)
@@ -150,6 +182,40 @@ export class ContinuousMonitor {
         }
 
         return result;
+    }
+
+    /**
+     * Check if it's time to execute the continuous callback.
+     * Call this each frame. Returns true when callback should be executed.
+     * @returns {boolean}
+     */
+    shouldExecuteCallback() {
+        if (!this.enabled || this.paused || !this.hasCallback || this.callbackPending) {
+            return false;
+        }
+
+        this.framesSinceCallback++;
+        if (this.framesSinceCallback >= this.callbackIntervalFrames) {
+            this.framesSinceCallback = 0;
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Set the callback pending state.
+     * @param {boolean} pending - Whether a callback is pending
+     */
+    setCallbackPending(pending) {
+        this.callbackPending = pending;
+    }
+
+    /**
+     * Set the result from server callback execution.
+     * @param {Object} result - {exclude: bool, warn: bool, message: string|null}
+     */
+    setCallbackResult(result) {
+        this.callbackResult = result;
     }
 
     /**

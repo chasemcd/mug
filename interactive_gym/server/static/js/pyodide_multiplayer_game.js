@@ -1094,6 +1094,15 @@ env.get_state()
                 partner_exclusion: true
             });
         });
+
+        // Continuous callback result (Phase 18)
+        // Received when server executes researcher-defined callback
+        socket.on('continuous_callback_result', (data) => {
+            if (this.continuousMonitor) {
+                this.continuousMonitor.setCallbackPending(false);
+                this.continuousMonitor.setCallbackResult(data);
+            }
+        });
     }
 
     async initialize() {
@@ -1737,6 +1746,11 @@ hashlib.md5(json.dumps(_st, sort_keys=True).encode()).hexdigest()[:8]
                 if (monitorResult.warn) {
                     this._showMonitorWarning(monitorResult.message);
                 }
+            }
+
+            // Check if we should execute continuous callback (Phase 18)
+            if (this.continuousMonitor.shouldExecuteCallback()) {
+                this._executeContinuousCallback();
             }
         }
 
@@ -2845,6 +2859,32 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
         socket.emit('end_game_request_redirect', {
             mid_game_exclusion: true,
             reason: reason
+        });
+    }
+
+    /**
+     * Execute continuous callback by sending context to server (Phase 18).
+     * Async - sends request and continues game loop. Result handled by socket listener.
+     */
+    _executeContinuousCallback() {
+        if (!this.continuousMonitor) return;
+
+        this.continuousMonitor.setCallbackPending(true);
+
+        const context = {
+            ping: window.currentPing || 0,
+            is_tab_hidden: document.hidden,
+            tab_hidden_duration_ms: this.continuousMonitor.tabHiddenAt
+                ? Date.now() - this.continuousMonitor.tabHiddenAt
+                : 0,
+            frame_number: this.frameNumber,
+            episode_number: this.currentEpisode || 0
+        };
+
+        socket.emit('execute_continuous_callback', {
+            session_id: window.sessionId,
+            scene_id: this.sceneId,
+            context: context
         });
     }
 
