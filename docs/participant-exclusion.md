@@ -2,7 +2,10 @@
 
 ## Overview
 
-Interactive Gym provides a configurable, extensible system to exclude participants who don't meet experiment requirements. Exclusion checks happen both at entry (before the game starts) and continuously during gameplay.
+Interactive Gym provides a configurable, extensible system to exclude participants who don't meet experiment requirements. Exclusion checks happen at two levels:
+
+1. **Entry screening** (experiment-level): Runs once when a participant first connects, before any scene starts
+2. **Continuous monitoring** (scene-level): Runs during gameplay to detect connection issues or tab switching
 
 This system enables researchers to:
 - Filter participants by device type, browser, or connection quality
@@ -14,18 +17,26 @@ This system enables researchers to:
 
 ## Quick Start
 
-All exclusion configuration uses fluent method chaining on `GymScene`:
+Entry screening is configured on `ExperimentConfig`, while continuous monitoring is configured on `GymScene`:
 
 ```python
+from interactive_gym.configurations import ExperimentConfig
 from interactive_gym.scenes import GymScene
 
-scene = GymScene(
-    scene_id="my_experiment",
+# Experiment-level entry screening (runs once at experiment start)
+config = ExperimentConfig().experiment(
     experiment_id="exp_001",
     ...
 ).entry_screening(
     device_exclusion="mobile",
     max_ping=150
+)
+
+# Scene-level continuous monitoring (runs during gameplay)
+scene = GymScene(
+    scene_id="my_experiment",
+    experiment_id="exp_001",
+    ...
 ).continuous_monitoring(
     max_ping=200,
     tab_exclude_ms=10000
@@ -36,7 +47,7 @@ scene = GymScene(
 
 ## Entry Screening
 
-Pre-game checks that run before the participant can start. Use `entry_screening()` to configure.
+Pre-experiment checks that run once when a participant first connects to the experiment. Use `ExperimentConfig.entry_screening()` to configure.
 
 ### Method Signature
 
@@ -47,9 +58,10 @@ def entry_screening(
     browser_requirements: list[str] = None,  # Allowlist of browsers
     browser_blocklist: list[str] = None,     # Blocklist (takes precedence)
     max_ping: int = None,                    # Maximum latency in milliseconds
-    min_ping_measurements: int = 3,          # Samples before checking ping
+    min_ping_measurements: int = 5,          # Samples before checking ping
     exclusion_messages: dict[str, str] = None,  # Custom messages per rule
-) -> GymScene
+    entry_callback: Callable = None,         # Custom exclusion logic
+) -> ExperimentConfig
 ```
 
 ### Parameters
@@ -60,24 +72,28 @@ def entry_screening(
 | `browser_requirements` | `list[str]` | `None` | Allowlist of browsers (e.g., `["Chrome", "Firefox"]`) |
 | `browser_blocklist` | `list[str]` | `None` | Blocklist of browsers (takes precedence over allowlist) |
 | `max_ping` | `int` | `None` | Maximum allowed latency in milliseconds |
-| `min_ping_measurements` | `int` | `3` | Number of ping samples before enforcing threshold |
+| `min_ping_measurements` | `int` | `5` | Number of ping samples before enforcing threshold |
 | `exclusion_messages` | `dict` | See below | Custom messages for each exclusion rule |
+| `entry_callback` | `Callable` | `None` | Custom callback for arbitrary exclusion logic |
 
 ### Default Exclusion Messages
 
 ```python
 {
-    "mobile": "This experiment requires a desktop or laptop computer. Please return on a non-mobile device.",
-    "desktop": "This experiment requires a mobile device. Please return on a phone or tablet.",
-    "browser": "Your browser is not supported. Please use one of the following browsers: {browsers}",
-    "ping": "Your connection latency is too high for this experiment. Please try again with a faster connection."
+    "mobile": "This study requires a desktop or laptop computer.",
+    "desktop": "This study requires a mobile device.",
+    "browser": "Your browser is not supported for this study.",
+    "ping": "Your connection is too slow for this study."
 }
 ```
 
 ### Example
 
 ```python
-scene.entry_screening(
+config = ExperimentConfig().experiment(
+    experiment_id="exp_001",
+    ...
+).entry_screening(
     device_exclusion="mobile",
     browser_blocklist=["Safari"],  # Safari has WebRTC issues
     max_ping=150,
@@ -94,7 +110,7 @@ scene.entry_screening(
 
 ## Continuous Monitoring
 
-Real-time checks during gameplay. Use `continuous_monitoring()` to configure.
+Real-time checks during gameplay. Use `GymScene.continuous_monitoring()` to configure.
 
 ### Method Signature
 
@@ -159,22 +175,11 @@ scene.continuous_monitoring(
 
 ## Custom Exclusion Callbacks
 
-For arbitrary exclusion logic, use Python callbacks. Use `exclusion_callbacks()` to configure.
-
-### Method Signature
-
-```python
-def exclusion_callbacks(
-    self,
-    entry_callback: Callable[[dict], dict] = None,
-    continuous_callback: Callable[[dict], dict] = None,
-    continuous_callback_interval_frames: int = 30,
-) -> GymScene
-```
+For arbitrary exclusion logic, use Python callbacks.
 
 ### Entry Callback
 
-Called once before the game starts, after built-in entry screening passes.
+Configure on `ExperimentConfig.entry_screening()`. Called once when a participant connects, after built-in entry screening passes.
 
 **Input Context:**
 ```python
@@ -208,12 +213,17 @@ def my_entry_check(context: dict) -> dict:
         }
     return {"exclude": False, "message": None}
 
-scene.exclusion_callbacks(entry_callback=my_entry_check)
+config = ExperimentConfig().experiment(
+    experiment_id="exp_001",
+    ...
+).entry_screening(
+    entry_callback=my_entry_check
+)
 ```
 
 ### Continuous Callback
 
-Called periodically during gameplay (default: every 30 frames, ~1 second at 30 FPS).
+Configure on `GymScene.exclusion_callbacks()`. Called periodically during gameplay (default: every 30 frames, ~1 second at 30 FPS).
 
 **Input Context:**
 ```python
@@ -280,8 +290,7 @@ This prevents researcher code bugs from blocking all participants.
 
 When one player is excluded mid-game in a multiplayer session:
 
-1. **Partner Notification**: The non-excluded player sees a neutral message:
-   > "Your partner experienced a technical issue. The game has ended."
+1. **Partner Notification**: The non-excluded player is redirected to a "partner disconnected" page
 
 2. **Clean Termination**: Both players' game loops stop gracefully
 
@@ -304,6 +313,7 @@ This ensures researchers can identify and handle partial sessions in their analy
 ## Complete Example
 
 ```python
+from interactive_gym.configurations import ExperimentConfig
 from interactive_gym.scenes import GymScene
 
 def custom_entry_check(context: dict) -> dict:
@@ -325,19 +335,27 @@ def custom_continuous_check(context: dict) -> dict:
         }
     return {"exclude": False, "warn": False, "message": None}
 
-scene = GymScene(
-    scene_id="my_multiplayer_experiment",
+# Experiment-level configuration
+config = ExperimentConfig().experiment(
     experiment_id="exp_001",
     # ... other config ...
 ).entry_screening(
     device_exclusion="mobile",
     browser_blocklist=["Safari"],
     max_ping=150,
-    min_ping_measurements=3,
+    min_ping_measurements=5,
     exclusion_messages={
         "mobile": "Desktop required for this study.",
         "ping": "Connection too slow for real-time play."
-    }
+    },
+    entry_callback=custom_entry_check
+)
+
+# Scene-level configuration
+scene = GymScene(
+    scene_id="my_multiplayer_experiment",
+    experiment_id="exp_001",
+    # ... other config ...
 ).continuous_monitoring(
     max_ping=200,
     ping_violation_window=5,
@@ -345,7 +363,6 @@ scene = GymScene(
     tab_warning_ms=3000,
     tab_exclude_ms=10000
 ).exclusion_callbacks(
-    entry_callback=custom_entry_check,
     continuous_callback=custom_continuous_check,
     continuous_callback_interval_frames=30
 )
@@ -369,4 +386,4 @@ scene = GymScene(
 
 ---
 
-*Documentation for Interactive Gym v1.2*
+*Documentation for Interactive Gym v1.3*

@@ -1627,31 +1627,19 @@ def handle_execute_entry_callback(data):
         flask_socketio.emit('entry_callback_result', {'exclude': False, 'message': None})
         return
 
-    # Add subject_id to context
+    # Add subject_id and scene_id to context
     context['subject_id'] = subject_id
+    context['scene_id'] = scene_id
 
-    # Check experiment-level callback first
-    callback = None
-    if CONFIG is not None and CONFIG.entry_exclusion_callback is not None:
-        callback = CONFIG.entry_exclusion_callback
-        context['scene_id'] = scene_id
-    else:
-        # Fall back to scene-level callback (deprecated)
-        participant_stager = STAGERS.get(subject_id)
-        if participant_stager is not None:
-            scene = participant_stager.current_scene
-            if scene is not None and hasattr(scene, 'entry_exclusion_callback') and scene.entry_exclusion_callback is not None:
-                callback = scene.entry_exclusion_callback
-                context['scene_id'] = scene.scene_id if hasattr(scene, 'scene_id') else scene_id
-
-    if callback is None:
+    # Check experiment-level callback
+    if CONFIG is None or CONFIG.entry_exclusion_callback is None:
         # No callback configured, pass through
         flask_socketio.emit('entry_callback_result', {'exclude': False, 'message': None})
         return
 
     try:
         # Execute the callback
-        result = callback(context)
+        result = CONFIG.entry_exclusion_callback(context)
 
         # Validate result format
         exclude = result.get('exclude', False)

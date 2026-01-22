@@ -163,17 +163,6 @@ class GymScene(scene.Scene):
         # Set to None to disable, or a positive integer (ms) to enable with that duration.
         self.rollback_smoothing_duration: int | None = 100  # Tween duration in ms, None to disable
 
-        # Entry screening (Phase 15)
-        self.device_exclusion: str | None = None  # "mobile", "desktop", or None (allow all)
-        self.browser_requirements: list[str] | None = None  # Allowed browsers, e.g., ["Chrome", "Firefox"]
-        self.browser_blocklist: list[str] | None = None  # Blocked browsers, e.g., ["Safari"]
-        self.exclusion_messages: dict[str, str] = {
-            "mobile": "This study requires a desktop or laptop computer. Please return on a non-mobile device.",
-            "desktop": "This study requires a mobile device. Please return on a phone or tablet.",
-            "browser": "Your browser is not supported for this study. Please use a different browser.",
-            "ping": "Your internet connection is too slow for this study. Please try again with a stronger connection."
-        }
-
         # Continuous monitoring (Phase 16)
         self.continuous_max_ping: int | None = None  # Max ping during gameplay (ms)
         self.continuous_ping_violation_window: int = 5  # Measurements to track
@@ -189,7 +178,6 @@ class GymScene(scene.Scene):
         }
 
         # Custom exclusion callbacks (Phase 18)
-        self.entry_exclusion_callback: Callable | None = None  # Called at entry
         self.continuous_exclusion_callback: Callable | None = None  # Called during gameplay
         self.continuous_callback_interval_frames: int = 30  # Frames between callback checks (~1s at 30fps)
 
@@ -654,86 +642,6 @@ class GymScene(scene.Scene):
 
         return self
 
-    def entry_screening(
-        self,
-        device_exclusion: str = NotProvided,
-        browser_requirements: list[str] = NotProvided,
-        browser_blocklist: list[str] = NotProvided,
-        max_ping: int = NotProvided,
-        min_ping_measurements: int = NotProvided,
-        exclusion_messages: dict[str, str] = NotProvided,
-    ):
-        """Configure entry screening rules for the GymScene.
-
-        .. deprecated::
-            Scene-level entry screening is deprecated. Use ExperimentConfig.entry_screening()
-            instead to configure screening at the experiment level. Experiment-level screening
-            runs once when the participant first connects, not per-scene.
-
-        Entry screening runs before the participant can start the game.
-        If any check fails, the participant sees the appropriate exclusion message
-        and cannot proceed.
-
-        :param device_exclusion: Device type to exclude. "mobile" excludes phones/tablets,
-            "desktop" excludes desktop/laptop computers, None allows all. defaults to NotProvided
-        :type device_exclusion: str, optional
-        :param browser_requirements: List of allowed browser names (case-insensitive).
-            If provided, only these browsers are allowed. e.g., ["Chrome", "Firefox"]. defaults to NotProvided
-        :type browser_requirements: list[str], optional
-        :param browser_blocklist: List of blocked browser names (case-insensitive).
-            These browsers are excluded even if in requirements. e.g., ["Safari"]. defaults to NotProvided
-        :type browser_blocklist: list[str], optional
-        :param max_ping: Maximum allowed latency in milliseconds. Participants with
-            ping exceeding this are excluded. defaults to NotProvided
-        :type max_ping: int, optional
-        :param min_ping_measurements: Minimum number of ping measurements required
-            before checking latency. defaults to NotProvided
-        :type min_ping_measurements: int, optional
-        :param exclusion_messages: Custom messages for each exclusion type.
-            Keys: "mobile", "desktop", "browser", "ping". defaults to NotProvided
-        :type exclusion_messages: dict[str, str], optional
-        :return: The GymScene instance (self)
-        :rtype: GymScene
-        """
-        import warnings
-        warnings.warn(
-            "GymScene.entry_screening() is deprecated. Use ExperimentConfig.entry_screening() instead.",
-            DeprecationWarning,
-            stacklevel=2
-        )
-        if device_exclusion is not NotProvided:
-            assert device_exclusion in [None, "mobile", "desktop"], \
-                "device_exclusion must be None, 'mobile', or 'desktop'"
-            self.device_exclusion = device_exclusion
-
-        if browser_requirements is not NotProvided:
-            assert browser_requirements is None or isinstance(browser_requirements, list), \
-                "browser_requirements must be None or a list of browser names"
-            self.browser_requirements = browser_requirements
-
-        if browser_blocklist is not NotProvided:
-            assert browser_blocklist is None or isinstance(browser_blocklist, list), \
-                "browser_blocklist must be None or a list of browser names"
-            self.browser_blocklist = browser_blocklist
-
-        if max_ping is not NotProvided:
-            assert max_ping is None or (isinstance(max_ping, int) and max_ping > 0), \
-                "max_ping must be None or a positive integer"
-            self.max_ping = max_ping
-
-        if min_ping_measurements is not NotProvided:
-            assert isinstance(min_ping_measurements, int) and min_ping_measurements >= 1, \
-                "min_ping_measurements must be a positive integer"
-            self.min_ping_measurements = min_ping_measurements
-
-        if exclusion_messages is not NotProvided:
-            assert isinstance(exclusion_messages, dict), \
-                "exclusion_messages must be a dictionary"
-            # Merge with defaults (user messages override defaults)
-            self.exclusion_messages = {**self.exclusion_messages, **exclusion_messages}
-
-        return self
-
     def continuous_monitoring(
         self,
         max_ping: int = NotProvided,
@@ -816,7 +724,6 @@ class GymScene(scene.Scene):
 
     def exclusion_callbacks(
         self,
-        entry_callback: Callable = NotProvided,
         continuous_callback: Callable = NotProvided,
         continuous_callback_interval_frames: int = NotProvided,
     ):
@@ -826,13 +733,6 @@ class GymScene(scene.Scene):
         the built-in rules. Callbacks execute on the server and receive participant
         context from the client.
 
-        Entry callback signature:
-            def my_entry_callback(context: dict) -> dict:
-                # context contains: ping, browser_name, browser_version, device_type,
-                #                   os_name, subject_id, scene_id
-                # Return: {"exclude": bool, "message": str | None}
-                return {"exclude": False, "message": None}
-
         Continuous callback signature:
             def my_continuous_callback(context: dict) -> dict:
                 # context contains: ping, is_tab_hidden, tab_hidden_duration_ms,
@@ -840,9 +740,6 @@ class GymScene(scene.Scene):
                 # Return: {"exclude": bool, "warn": bool, "message": str | None}
                 return {"exclude": False, "warn": False, "message": None}
 
-        :param entry_callback: Function called at entry screening, defaults to NotProvided.
-            .. deprecated:: Use ExperimentConfig.entry_screening(entry_callback=...) instead.
-        :type entry_callback: Callable, optional
         :param continuous_callback: Function called periodically during gameplay, defaults to NotProvided
         :type continuous_callback: Callable, optional
         :param continuous_callback_interval_frames: Frames between continuous callback checks (default 30 ~1s), defaults to NotProvided
@@ -850,18 +747,6 @@ class GymScene(scene.Scene):
         :return: The GymScene instance (self)
         :rtype: GymScene
         """
-        if entry_callback is not NotProvided:
-            import warnings
-            warnings.warn(
-                "GymScene.exclusion_callbacks(entry_callback=...) is deprecated. "
-                "Use ExperimentConfig.entry_screening(entry_callback=...) instead.",
-                DeprecationWarning,
-                stacklevel=2
-            )
-            if entry_callback is not None and not callable(entry_callback):
-                raise ValueError("entry_callback must be callable or None")
-            self.entry_exclusion_callback = entry_callback
-
         if continuous_callback is not NotProvided:
             if continuous_callback is not None and not callable(continuous_callback):
                 raise ValueError("continuous_callback must be callable or None")
@@ -953,7 +838,6 @@ class GymScene(scene.Scene):
 
         # Add custom callback flags (Phase 18)
         # Only include boolean flags, not the actual callback functions (they run server-side only)
-        metadata["has_entry_callback"] = self.entry_exclusion_callback is not None
         metadata["has_continuous_callback"] = self.continuous_exclusion_callback is not None
         metadata["continuous_callback_interval_frames"] = self.continuous_callback_interval_frames
 
