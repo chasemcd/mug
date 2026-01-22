@@ -467,6 +467,58 @@ socket.on("waiting_room_player_left", function(data) {
 })
 
 
+// P2P Validation Status (Phase 19)
+socket.on('p2p_validation_status', function(data) {
+    var status = data.status;
+    var message = '';
+
+    switch (status) {
+        case 'connecting':
+            message = 'Connecting with your partner...';
+            break;
+        case 'validating':
+            message = 'Verifying connection quality...';
+            break;
+        case 'validated':
+            message = 'Connection established! Starting game...';
+            break;
+        default:
+            return;  // Unknown status, don't update UI
+    }
+
+    // Update waiting room text
+    $("#waitroomText").text(message);
+    $("#waitroomText").show();
+});
+
+// P2P Validation Re-pool (Phase 19)
+socket.on('p2p_validation_repool', function(data) {
+    console.log("[P2P] Re-pool requested:", data.reason);
+
+    // Clear any existing waitroom intervals
+    if (waitroomInterval) {
+        clearInterval(waitroomInterval);
+        waitroomInterval = null;
+    }
+
+    // Show message to user
+    var message = data.message || "Finding new partner...";
+    $("#waitroomText").text(message);
+    $("#waitroomText").show();
+
+    // Brief delay, then re-emit join_game to re-enter matchmaking
+    setTimeout(function() {
+        console.log("[P2P] Re-joining matchmaking pool");
+        socket.emit("join_game", {session_id: window.sessionId});
+    }, 2000);
+});
+
+// P2P Validation Complete (Phase 19)
+socket.on('p2p_validation_complete', function(data) {
+    console.log("[P2P] Validation complete, game starting");
+    $("#waitroomText").text("Connection verified! Starting game...");
+});
+
 
 function updateWaitroomText(data, timer) {
     var minutes = parseInt(timer / 60, 10);
