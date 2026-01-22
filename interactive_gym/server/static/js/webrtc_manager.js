@@ -188,7 +188,7 @@ class WebRTCManager {
         this.qualityMonitor = null;
 
         // Connection drop detection (Phase 20)
-        this.disconnectGracePeriodMs = 3000;  // 3 second grace before declaring lost
+        this.disconnectGracePeriodMs = 500;  // 500ms grace before declaring lost (fast detection)
         this.disconnectGraceId = null;        // Grace period timeout handle
         this.wasDisconnected = false;         // Track if we were in disconnected state
 

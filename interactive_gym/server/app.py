@@ -152,6 +152,9 @@ socketio = flask_socketio.SocketIO(
     cors_allowed_origins="*",
     logger=app.config["DEBUG"],
     # engineio_logger=False,
+    # More aggressive ping settings for faster disconnect detection
+    ping_interval=2,  # Ping every 2 seconds (default: 25)
+    ping_timeout=2,   # Wait 2 seconds for pong before disconnect (default: 5)
 )
 
 # Flask-Login setup for admin authentication
