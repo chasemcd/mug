@@ -9,9 +9,9 @@ Requirements for v1.3 P2P Connection Validation milestone. Each maps to roadmap 
 
 ### Waiting Room Validation
 
-- [ ] **WAIT-01**: P2P connection must be validated before experiment starts
-- [ ] **WAIT-02**: Failed P2P pairs re-enter matchmaking pool to find new partners
-- [ ] **WAIT-03**: Participants see clear status messaging during P2P validation
+- [x] **WAIT-01**: P2P connection must be validated before experiment starts
+- [x] **WAIT-02**: Failed P2P pairs re-enter matchmaking pool to find new partners
+- [x] **WAIT-03**: Participants see clear status messaging during P2P validation
 
 ### Per-Round Health
 
@@ -70,9 +70,9 @@ Which phases cover which requirements.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| WAIT-01 | Phase 19 | Pending |
-| WAIT-02 | Phase 19 | Pending |
-| WAIT-03 | Phase 19 | Pending |
+| WAIT-01 | Phase 19 | Complete |
+| WAIT-02 | Phase 19 | Complete |
+| WAIT-03 | Phase 19 | Complete |
 | ROUND-01 | Phase 21 | Pending |
 | ROUND-02 | Phase 21 | Pending |
 | RECON-01 | Phase 20 | Pending |

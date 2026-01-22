@@ -55,7 +55,7 @@ Key deliverables:
 
 **Milestone Goal:** Ensure reliable P2P connections throughout experiments with pre-game validation, per-round health checks, reconnection handling, and comprehensive latency/connection telemetry.
 
-- [ ] **Phase 19: Waiting Room Validation** - P2P connection validation before experiment starts
+- [x] **Phase 19: Waiting Room Validation** - P2P connection validation before experiment starts
 - [ ] **Phase 20: Mid-Game Reconnection** - Detect drops, pause gameplay, reconnection overlay, configurable timeout
 - [ ] **Phase 21: Per-Round Health Check** - DataChannel verification before each round begins
 - [ ] **Phase 22: Latency Telemetry** - Async latency monitoring and stats export
@@ -184,7 +184,7 @@ Plans:
 **Research flag:** Unlikely (WebRTC connection state APIs well-documented)
 **Plans:** 1 plan
 Plans:
-- [ ] 19-01-PLAN.md - P2P validation protocol, server coordination, re-pool on failure, status UI
+- [x] 19-01-PLAN.md - P2P validation protocol, server coordination, re-pool on failure, status UI
 
 ### Phase 20: Mid-Game Reconnection
 **Goal:** Handle P2P drops with pause, overlay, and configurable recovery
@@ -241,11 +241,11 @@ Phases execute in numeric order: 19 -> 20 -> 21 -> 22
 | 16. Continuous Monitoring | v1.2 | 1/1 | Complete | 2026-01-21 |
 | 17. Multiplayer Exclusion | v1.2 | 1/1 | Complete | 2026-01-21 |
 | 18. Custom Callbacks | v1.2 | 1/1 | Complete | 2026-01-22 |
-| 19. Waiting Room Validation | v1.3 | 0/1 | Planned | - |
+| 19. Waiting Room Validation | v1.3 | 1/1 | Complete | 2026-01-22 |
 | 20. Mid-Game Reconnection | v1.3 | 0/1 | Not started | - |
 | 21. Per-Round Health Check | v1.3 | 0/1 | Not started | - |
 | 22. Latency Telemetry | v1.3 | 0/1 | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-01-22 after Phase 19 planned*
+*Last updated: 2026-01-22 after Phase 19 complete*
