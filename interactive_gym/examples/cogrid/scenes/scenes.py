@@ -571,18 +571,20 @@ multiplayer_feedback_scene = (
     static_scene.ScalesAndTextBox(
         pre_scale_header="",
         scale_questions=[
-            "My partner and I coordinated our actions well together.",
-            "My partner perceived accurately what tasks I was trying to accomplish.",
-            "I was able to understand and predict what tasks my partner was trying to accomplish.",
-            "The game felt synchronized and responsive.",
+    "On a scale from 1-7, with 1 being detrimental and 7 being beneficial to your success, how effective was your partner as a teammate?",
+    "On a scale from 1-7, with 1 being not at all and 7 being very much, rate how much you enjoyed playing the game with your partner.",
+    "On a scale of 1-7, rate how much you think that your partner contributed to the success of your team. With 1 meaning they made your team worse off and 7 being that they made a very positive contribution.",
+    "On a scale of 1-7, rate how much you think that you contributed to the success of your team. With 1 meaning you made your team worse off and 7 being you made a very positive contribution.",
+    "On a scale from 1 to 7, where 1 is definitely a bot, 4 is unsure, and 7 is definitely a human, indicate how likely you think that your partner is a human or a bot build to play this game?",
         ],
         scale_labels=[
-            ["Strongly Disagree", "Neutral", "Strongly Agree"],
-            ["Strongly Disagree", "Neutral", "Strongly Agree"],
-            ["Strongly Disagree", "Neutral", "Strongly Agree"],
-            ["Strongly Disagree", "Neutral", "Strongly Agree"],
+            [str(i+1) for i in range(7)],
+            [str(i+1) for i in range(7)],
+            [str(i+1) for i in range(7)],
+            [str(i+1) for i in range(7)],
+            [str(i+1) for i in range(7)],
         ],
-        text_box_header="Please describe your experience playing with your partner. What coordination strategies did you use?",
+        text_box_header="Please provide any additional feedback you would like to share.",
         scale_size=7,
     )
     .scene(scene_id="multiplayer_feedback_scene", experiment_config={})
