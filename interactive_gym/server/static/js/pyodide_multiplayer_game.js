@@ -4557,45 +4557,15 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
     }
 
     /**
-     * Show partner disconnected overlay.
-     * Informs the participant that their partner disconnected and the experiment has ended.
-     * Does NOT auto-advance - participant must be handled by researcher.
+     * Show partner disconnected page.
+     * Redirects the participant to a disconnection page informing them their partner disconnected.
      */
     _showPartnerDisconnectedOverlay() {
         // Remove reconnecting overlay if present
         this._hideReconnectingOverlay();
 
-        const overlay = document.createElement('div');
-        overlay.id = 'partner-disconnected-overlay';
-        overlay.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.85);
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            z-index: 10000;
-            color: white;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            text-align: center;
-        `;
-        overlay.innerHTML = `
-            <div style="font-size: 28px; margin-bottom: 20px; color: #ff6b6b;">
-                Partner Disconnected
-            </div>
-            <div style="font-size: 18px; color: #ccc; max-width: 400px; line-height: 1.5;">
-                Your partner has disconnected from the experiment.
-                The session has ended.
-            </div>
-            <div style="margin-top: 30px; font-size: 14px; color: #888;">
-                Please wait for further instructions from the researcher.
-            </div>
-        `;
-        document.body.appendChild(overlay);
+        // Redirect to partner disconnected page
+        window.location.href = '/partner-disconnected';
     }
 
     /**
@@ -4612,6 +4582,7 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
     /**
      * Show reconnecting overlay (Phase 20 - RECON-03).
      * Displays centered overlay with spinner and status message.
+     * Styled to match Interactive Gym aesthetic.
      */
     _showReconnectingOverlay() {
         // Remove existing overlay if any
@@ -4625,28 +4596,38 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0, 0, 0, 0.7);
+            background: rgba(0, 0, 0, 0.75);
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
             z-index: 10000;
-            color: white;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         `;
         overlay.innerHTML = `
-            <div style="font-size: 24px; margin-bottom: 20px;">
+            <div style="
+                font-family: 'Press Start 2P', cursive;
+                font-size: 18px;
+                color: #ffffff;
+                text-align: center;
+                margin-bottom: 20px;
+                text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+            ">
                 Connection Lost
             </div>
             <div class="reconnect-spinner" style="
                 width: 40px;
                 height: 40px;
-                border: 4px solid #444;
-                border-top: 4px solid #fff;
+                border: 4px solid #34495e;
+                border-top: 4px solid #3498db;
                 border-radius: 50%;
                 animation: reconnect-spin 1s linear infinite;
             "></div>
-            <div id="reconnect-status" style="margin-top: 20px; font-size: 16px; color: #ccc;">
+            <div id="reconnect-status" style="
+                margin-top: 20px;
+                font-family: 'Roboto', sans-serif;
+                font-size: 16px;
+                color: #ecf0f1;
+            ">
                 Reconnecting...
             </div>
             <style>
