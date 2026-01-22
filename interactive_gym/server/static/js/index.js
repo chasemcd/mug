@@ -91,7 +91,8 @@ function calculateMedian(arr) {
  */
 async function runEntryScreening(sceneMetadata) {
     // Run built-in checks first
-    const parser = new UAParser();
+    // UAParser is loaded via CDN as a global script, access via window in ES module context
+    const parser = new window.UAParser();
     const result = parser.getResult();
     const deviceType = result.device.type; // "mobile", "tablet", or undefined (desktop)
     const browserName = result.browser.name; // "Chrome", "Safari", "Firefox", etc.
@@ -163,7 +164,8 @@ async function runEntryScreening(sceneMetadata) {
 function executeEntryCallback(sceneMetadata) {
     return new Promise((resolve) => {
         // Gather participant context
-        const parser = new UAParser();
+        // UAParser is loaded via CDN as a global script, access via window in ES module context
+        const parser = new window.UAParser();
         const result = parser.getResult();
 
         const context = {
