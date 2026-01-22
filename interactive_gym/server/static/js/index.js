@@ -302,11 +302,14 @@ function showExclusionMessage(message) {
     $("#sceneBody").hide();
     $("#waitroomText").hide();
     $("#gameContainer").hide();
+    $("#invalidSession").hide();
 
-    // Update header to indicate exclusion
+    // Make sure headers are visible
+    $("#sceneHeader").show();
+    $("#sceneSubHeader").show();
     $("#sceneSubHeader").text("Unable to Continue");
 
-    // Show the exclusion message
+    // Show the exclusion message in errorText
     $('#errorText').text(message);
     $('#errorText').css({
         'display': 'block',
