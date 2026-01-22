@@ -709,14 +709,27 @@ class ScalesAndTextBox(StaticScene):
             '<div id="scale-questions-container" style="margin-top: 20px;">\n'
         )
         for i, question in enumerate(self.scale_questions):
+            # Build label spans for all labels, evenly distributed
+            labels = self.scale_labels[i]
+            num_labels = len(labels)
+            label_spans = ""
+            for j, label in enumerate(labels):
+                if num_labels == 1:
+                    text_align = "center"
+                elif j == 0:
+                    text_align = "left"
+                elif j == num_labels - 1:
+                    text_align = "right"
+                else:
+                    text_align = "center"
+                label_spans += f'<span style="text-align: {text_align}; font-size: 12px;">{label}</span>\n'
+
             html += f"""
             <div class="scale-question" style="margin-bottom: 15px; text-align: center;">
                 <div style="border: 1px solid #ccc; padding: 10px; display: inline-block; margin: 0 auto; width: 80%;">
                     <p style="margin: 0 0 10px 0;">{question} <span style="color: red;">*</span></p>
                     <div style="display: flex; align-items: center; justify-content: space-between;">
-                        <span style="flex: 1; text-align: left; font-size: 12px;">{self.scale_labels[i][0]}</span>
-                        <span style="flex: 1; text-align: center; font-size: 12px;">{self.scale_labels[i][len(self.scale_labels[i])//2]}</span>
-                        <span style="flex: 1; text-align: right; font-size: 12px;">{self.scale_labels[i][-1]}</span>
+                        {label_spans}
                     </div>
                     <div style="display: flex; align-items: center; justify-content: center;">
                         <input type="range" id="scale-{i}" class="scale-input" min="0" max="{self.scale_size - 1}" value="{(self.scale_size - 1) // 2}" style="margin: 10px 0; -webkit-appearance: none; appearance: none; width: 100%; height: 2px; background: #d3d3d3; outline: none; opacity: 0.7; transition: opacity .2s;">
