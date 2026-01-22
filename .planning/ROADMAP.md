@@ -4,7 +4,8 @@
 
 - **v1.0 P2P Multiplayer** - Phases 1-10 (shipped 2026-01-19)
 - **v1.1 Sync Validation** - Phases 11-14 (complete)
-- **v1.2 Participant Exclusion** - Phases 15-18 (complete)
+- **v1.2 Participant Exclusion** - Phases 15-18 (shipped 2026-01-22)
+- 🚧 **v1.3 P2P Connection Validation** - Phases 19-22 (in progress)
 
 ## Phases
 
@@ -38,7 +39,8 @@ Key deliverables:
 
 </details>
 
-### v1.2 Participant Exclusion (In Progress)
+<details>
+<summary>v1.2 Participant Exclusion (Phases 15-18) - SHIPPED 2026-01-22</summary>
 
 **Milestone Goal:** A configurable, extensible system to exclude participants who don't meet experiment requirements - checked both at entry and continuously during play.
 
@@ -46,6 +48,17 @@ Key deliverables:
 - [x] **Phase 16: Continuous Monitoring** - Real-time ping and tab visibility monitoring during gameplay
 - [x] **Phase 17: Multiplayer Exclusion Handling** - Coordinated game termination when one player excluded
 - [x] **Phase 18: Custom Exclusion Callbacks** - Researcher-defined arbitrary exclusion logic
+
+</details>
+
+### 🚧 v1.3 P2P Connection Validation (In Progress)
+
+**Milestone Goal:** Ensure reliable P2P connections throughout experiments with pre-game validation, per-round health checks, reconnection handling, and comprehensive latency/connection telemetry.
+
+- [ ] **Phase 19: Waiting Room Validation** - P2P connection validation before experiment starts
+- [ ] **Phase 20: Mid-Game Reconnection** - Detect drops, pause gameplay, reconnection overlay, configurable timeout
+- [ ] **Phase 21: Per-Round Health Check** - DataChannel verification before each round begins
+- [ ] **Phase 22: Latency Telemetry** - Async latency monitoring and stats export
 
 ## Phase Details
 
@@ -160,10 +173,63 @@ Plans:
 Plans:
 - [x] 18-01-PLAN.md - GymScene.exclusion_callbacks() config, server-side callback execution, client-server integration
 
+### Phase 19: Waiting Room Validation
+**Goal:** P2P connection validated before experiment starts
+**Depends on:** v1.2 complete (existing exclusion infrastructure)
+**Requirements:** WAIT-01, WAIT-02, WAIT-03
+**Success Criteria** (what must be TRUE):
+  1. P2P connection established and validated before proceeding to experiment
+  2. Failed P2P pairs automatically returned to matchmaking pool
+  3. Participants see clear status messaging during P2P validation attempt
+**Research flag:** Unlikely (WebRTC connection state APIs well-documented)
+**Plans:** TBD
+Plans:
+- [ ] 19-01-PLAN.md - P2P validation in waiting room, re-pool on failure, status UI
+
+### Phase 20: Mid-Game Reconnection
+**Goal:** Handle P2P drops with pause, overlay, and configurable recovery
+**Depends on:** Phase 19
+**Requirements:** RECON-01, RECON-02, RECON-03, RECON-04, RECON-05, RECON-06, LOG-01, LOG-02, LOG-03
+**Success Criteria** (what must be TRUE):
+  1. DataChannel drop detected immediately by both clients
+  2. Gameplay pauses for both players when connection drops
+  3. Both players see reconnecting overlay during recovery attempts
+  4. Gameplay resumes seamlessly if reconnection succeeds
+  5. Game ends cleanly if reconnection times out (configurable)
+  6. Disconnection and reconnection events logged with timestamps
+**Research flag:** Likely (WebRTC reconnection patterns vary, state machine complexity)
+**Plans:** TBD
+Plans:
+- [ ] 20-01-PLAN.md - Drop detection, pause state, reconnection overlay, timeout handling, event logging
+
+### Phase 21: Per-Round Health Check
+**Goal:** Verify DataChannel before each round
+**Depends on:** Phase 20
+**Requirements:** ROUND-01, ROUND-02
+**Success Criteria** (what must be TRUE):
+  1. DataChannel connection verified before each round begins
+  2. Round start blocked until P2P connection confirmed healthy
+**Research flag:** Unlikely (builds on Phase 20 infrastructure)
+**Plans:** TBD
+Plans:
+- [ ] 21-01-PLAN.md - Round-start DataChannel verification, blocking until healthy
+
+### Phase 22: Latency Telemetry
+**Goal:** Async latency monitoring and stats export
+**Depends on:** Phase 21
+**Requirements:** LAT-01, LAT-02
+**Success Criteria** (what must be TRUE):
+  1. P2P latency measured periodically during gameplay (non-blocking)
+  2. Latency stats (min, median, mean, max) exported in session data
+**Research flag:** Unlikely (WebRTC getStats() well-documented)
+**Plans:** TBD
+Plans:
+- [ ] 22-01-PLAN.md - Async latency measurement, stats aggregation, export integration
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 15 -> 16 -> 17 -> 18
+Phases execute in numeric order: 19 -> 20 -> 21 -> 22
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -175,7 +241,11 @@ Phases execute in numeric order: 15 -> 16 -> 17 -> 18
 | 16. Continuous Monitoring | v1.2 | 1/1 | Complete | 2026-01-21 |
 | 17. Multiplayer Exclusion | v1.2 | 1/1 | Complete | 2026-01-21 |
 | 18. Custom Callbacks | v1.2 | 1/1 | Complete | 2026-01-22 |
+| 19. Waiting Room Validation | v1.3 | 0/1 | Not started | - |
+| 20. Mid-Game Reconnection | v1.3 | 0/1 | Not started | - |
+| 21. Per-Round Health Check | v1.3 | 0/1 | Not started | - |
+| 22. Latency Telemetry | v1.3 | 0/1 | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-01-22 after Phase 18 complete - v1.2 milestone complete*
+*Last updated: 2026-01-21 after v1.3 phases added*

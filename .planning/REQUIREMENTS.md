@@ -66,32 +66,32 @@ Explicitly excluded. Documented to prevent scope creep.
 
 ## Traceability
 
-Which phases cover which requirements. Updated by create-roadmap.
+Which phases cover which requirements.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| WAIT-01 | — | Pending |
-| WAIT-02 | — | Pending |
-| WAIT-03 | — | Pending |
-| ROUND-01 | — | Pending |
-| ROUND-02 | — | Pending |
-| RECON-01 | — | Pending |
-| RECON-02 | — | Pending |
-| RECON-03 | — | Pending |
-| RECON-04 | — | Pending |
-| RECON-05 | — | Pending |
-| RECON-06 | — | Pending |
-| LOG-01 | — | Pending |
-| LOG-02 | — | Pending |
-| LOG-03 | — | Pending |
-| LAT-01 | — | Pending |
-| LAT-02 | — | Pending |
+| WAIT-01 | Phase 19 | Pending |
+| WAIT-02 | Phase 19 | Pending |
+| WAIT-03 | Phase 19 | Pending |
+| ROUND-01 | Phase 21 | Pending |
+| ROUND-02 | Phase 21 | Pending |
+| RECON-01 | Phase 20 | Pending |
+| RECON-02 | Phase 20 | Pending |
+| RECON-03 | Phase 20 | Pending |
+| RECON-04 | Phase 20 | Pending |
+| RECON-05 | Phase 20 | Pending |
+| RECON-06 | Phase 20 | Pending |
+| LOG-01 | Phase 20 | Pending |
+| LOG-02 | Phase 20 | Pending |
+| LOG-03 | Phase 20 | Pending |
+| LAT-01 | Phase 22 | Pending |
+| LAT-02 | Phase 22 | Pending |
 
 **Coverage:**
 - v1.3 requirements: 16 total
-- Mapped to phases: 0
-- Unmapped: 16 ⚠️
+- Mapped to phases: 16 ✓
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-01-21*
-*Last updated: 2026-01-21 after initial definition*
+*Last updated: 2026-01-21 after roadmap created*
