@@ -63,7 +63,7 @@ class PyodideGameState:
     # Mid-game reconnection state (Phase 20)
     reconnection_in_progress: bool = False
     reconnection_start_time: float | None = None
-    reconnection_timeout_s: float = 30.0  # Configurable (RECON-04)
+    reconnection_timeout_s: float = 5.0  # Configurable (RECON-04)
     reconnection_lost_players: set = dataclasses.field(default_factory=set)
     reconnection_recovered_players: set = dataclasses.field(default_factory=set)
     total_pause_duration_ms: float = 0.0
