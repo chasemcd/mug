@@ -68,6 +68,9 @@ class PyodideGameState:
     reconnection_recovered_players: set = dataclasses.field(default_factory=set)
     total_pause_duration_ms: float = 0.0
 
+    # Track disconnected player ID (Phase 23)
+    disconnected_player_id: str | int | None = None
+
 
 class PyodideGameCoordinator:
     """
@@ -746,6 +749,15 @@ class PyodideGameCoordinator:
 
             game.reconnection_lost_players.add(str(player_id))
 
+            # Track which player disconnected (Phase 23 - DATA-04)
+            # The player who reports the loss DETECTED it, so the OTHER player disconnected
+            if game.disconnected_player_id is None:
+                for pid in game.players:
+                    if str(pid) != str(player_id):
+                        game.disconnected_player_id = pid
+                        logger.info(f"Disconnected player identified: {pid}")
+                        break
+
             if not game.reconnection_in_progress:
                 game.reconnection_in_progress = True
                 game.reconnection_start_time = time.time()
@@ -850,3 +862,17 @@ class PyodideGameCoordinator:
                 'in_progress': game.reconnection_in_progress,
                 'total_pause_duration_ms': game.total_pause_duration_ms
             }
+
+    def get_disconnected_player_id(self, game_id: str) -> str | int | None:
+        """Get the ID of the player who disconnected from a game (Phase 23 - DATA-04).
+
+        Args:
+            game_id: Game identifier
+
+        Returns:
+            Player ID of disconnected player, or None if unknown
+        """
+        with self.lock:
+            if game_id not in self.games:
+                return None
+            return self.games[game_id].disconnected_player_id

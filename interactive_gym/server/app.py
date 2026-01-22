@@ -1569,7 +1569,7 @@ def handle_p2p_reconnection_success(data):
 
 @socketio.on("p2p_reconnection_timeout")
 def handle_p2p_reconnection_timeout(data):
-    """Handle reconnection timeout - end game cleanly (Phase 20)."""
+    """Handle reconnection timeout - end game cleanly (Phase 20, Phase 23)."""
     global PYODIDE_COORDINATOR
 
     if PYODIDE_COORDINATOR is None:
@@ -1580,6 +1580,9 @@ def handle_p2p_reconnection_timeout(data):
 
     logger.warning(f"P2P reconnection timeout in game {game_id}")
 
+    # Get the disconnected player ID from the coordinator (Phase 23 - DATA-04)
+    disconnected_player_id = PYODIDE_COORDINATOR.get_disconnected_player_id(game_id)
+
     # Get reconnection data for logging
     reconnection_data = PYODIDE_COORDINATOR.handle_reconnection_timeout(game_id)
 
@@ -1589,7 +1592,8 @@ def handle_p2p_reconnection_timeout(data):
         {
             "game_id": game_id,
             "reason": "reconnection_timeout",
-            "reconnection_data": reconnection_data
+            "reconnection_data": reconnection_data,
+            "disconnected_player_id": disconnected_player_id  # Phase 23 - DATA-04
         },
         room=game_id
     )
