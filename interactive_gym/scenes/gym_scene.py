@@ -184,6 +184,9 @@ class GymScene(scene.Scene):
         # Mid-game reconnection config
         self.reconnection_timeout_ms: int = 5000  # Default 5 seconds (RECON-04)
 
+        # Partner disconnection message (Phase 23)
+        self.partner_disconnect_message: str | None = None  # Custom message, None uses default
+
     def environment(
         self,
         env_creator: Callable = NotProvided,
@@ -776,6 +779,30 @@ class GymScene(scene.Scene):
             if not isinstance(timeout_ms, int) or timeout_ms <= 0:
                 raise ValueError("timeout_ms must be a positive integer")
             self.reconnection_timeout_ms = timeout_ms
+
+        return self
+
+    def partner_disconnect_message_config(
+        self,
+        message: str = NotProvided,
+    ):
+        """Configure the message shown when partner disconnects mid-game.
+
+        If not configured, a default message is shown:
+        "Your partner has disconnected. The game has ended."
+
+        :param message: Custom message to display when partner disconnects
+        :type message: str
+        :return: This scene object
+        :rtype: GymScene
+
+        Example:
+            scene.partner_disconnect_message_config(
+                message="Your partner left the experiment. Thank you for participating."
+            )
+        """
+        if message is not NotProvided:
+            self.partner_disconnect_message = message
 
         return self
 
