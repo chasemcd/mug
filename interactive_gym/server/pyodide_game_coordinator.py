@@ -54,6 +54,12 @@ class PyodideGameState:
     turn_credential: str | None = None
     force_turn_relay: bool = False
 
+    # P2P validation state (Phase 19)
+    p2p_validation_enabled: bool = True
+    p2p_validation_timeout_s: float = 10.0
+    p2p_validated_players: set = dataclasses.field(default_factory=set)
+    validation_start_time: float | None = None
+
 
 class PyodideGameCoordinator:
     """
@@ -627,6 +633,76 @@ class PyodideGameCoordinator:
 
             del self.games[game_id]
             logger.info(f"Cleaned up game {game_id} after player exclusion")
+
+    def start_validation(self, game_id: str) -> bool:
+        """Mark validation phase started for a game (Phase 19)."""
+        with self.lock:
+            game = self.games.get(game_id)
+            if not game:
+                return False
+
+            game.validation_start_time = time.time()
+            game.p2p_validated_players = set()
+            logger.info(f"P2P validation started for game {game_id}")
+            return True
+
+    def record_validation_success(self, game_id: str, player_id: str | int) -> str | None:
+        """
+        Record that a player validated their P2P connection (Phase 19).
+
+        Returns:
+            'complete' if all players validated
+            'waiting' if still waiting for other players
+            None if game not found
+        """
+        with self.lock:
+            game = self.games.get(game_id)
+            if not game:
+                logger.warning(f"Validation success for non-existent game {game_id}")
+                return None
+
+            game.p2p_validated_players.add(str(player_id))
+            logger.info(
+                f"Player {player_id} validated P2P in game {game_id} "
+                f"({len(game.p2p_validated_players)}/{game.num_expected_players})"
+            )
+
+            # Check if all players validated
+            if len(game.p2p_validated_players) >= game.num_expected_players:
+                return 'complete'
+            return 'waiting'
+
+    def handle_validation_failure(self, game_id: str, player_id: str | int, reason: str) -> list:
+        """
+        Handle P2P validation failure - prepare for re-pool (Phase 19).
+
+        Returns list of socket_ids that need to be notified for re-pool.
+        Game is NOT removed yet - caller should emit events first.
+        """
+        with self.lock:
+            game = self.games.get(game_id)
+            if not game:
+                logger.warning(f"Validation failure for non-existent game {game_id}")
+                return []
+
+            logger.warning(
+                f"P2P validation failed for game {game_id}, "
+                f"player {player_id}: {reason}"
+            )
+
+            # Return all player socket_ids for notification
+            return list(game.players.values())
+
+    def remove_game(self, game_id: str) -> None:
+        """Remove a game from the coordinator (Phase 19)."""
+        with self.lock:
+            if game_id in self.games:
+                game = self.games[game_id]
+                # Stop server runner if exists
+                if game.server_authoritative and game.server_runner:
+                    game.server_runner.stop()
+                del self.games[game_id]
+                logger.info(f"Removed game {game_id} from coordinator")
 
     def get_stats(self) -> dict:
         """Get coordinator statistics for monitoring/debugging."""

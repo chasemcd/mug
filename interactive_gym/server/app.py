@@ -1337,6 +1337,97 @@ def on_mid_game_exclusion(data):
     )
 
 
+@socketio.on("p2p_validation_status")
+def handle_p2p_validation_status(data):
+    """Handle P2P validation status update (Phase 19).
+
+    Relays status to all players in game room for UI update.
+    """
+    game_id = data.get("game_id")
+    status = data.get("status")
+
+    # Relay status to all players in game room for UI update
+    socketio.emit(
+        "p2p_validation_status",
+        {"status": status},
+        room=game_id,
+    )
+
+
+@socketio.on("p2p_validation_success")
+def handle_p2p_validation_success(data):
+    """Handle successful P2P validation from a client (Phase 19)."""
+    global PYODIDE_COORDINATOR
+
+    if PYODIDE_COORDINATOR is None:
+        logger.error("PYODIDE_COORDINATOR not initialized")
+        return
+
+    game_id = data.get("game_id")
+    player_id = data.get("player_id")
+
+    result = PYODIDE_COORDINATOR.record_validation_success(game_id, player_id)
+
+    if result == 'complete':
+        # All players validated - emit completion to all
+        logger.info(f"All players validated in game {game_id}")
+        socketio.emit(
+            "p2p_validation_complete",
+            {"game_id": game_id},
+            room=game_id,
+        )
+    # If 'waiting', do nothing - other player(s) still validating
+
+
+@socketio.on("p2p_validation_failed")
+def handle_p2p_validation_failed(data):
+    """Handle P2P validation failure - re-pool both players (Phase 19)."""
+    global PYODIDE_COORDINATOR, GAME_MANAGERS, STAGERS
+
+    if PYODIDE_COORDINATOR is None:
+        logger.error("PYODIDE_COORDINATOR not initialized")
+        return
+
+    game_id = data.get("game_id")
+    player_id = data.get("player_id")
+    reason = data.get("reason", "unknown")
+
+    logger.warning(f"P2P validation failed for game {game_id}: {reason}")
+
+    # Get socket IDs before cleanup
+    socket_ids = PYODIDE_COORDINATOR.handle_validation_failure(game_id, player_id, reason)
+
+    # Emit re-pool event to all players in the game
+    for socket_id in socket_ids:
+        socketio.emit(
+            "p2p_validation_repool",
+            {
+                "message": "Connection could not be established. Finding new partner...",
+                "reason": reason,
+            },
+            room=socket_id,
+        )
+
+    # Clean up game from coordinator
+    PYODIDE_COORDINATOR.remove_game(game_id)
+
+    # Clean up game from game manager
+    # Find the scene's game manager and remove the game
+    for scene_id, game_manager in GAME_MANAGERS.items():
+        if game_id in game_manager.games:
+            # Remove subjects from game tracking
+            game = game_manager.games.get(game_id)
+            if game:
+                for subject_id in list(game.human_players.values()):
+                    if subject_id in game_manager.subject_games:
+                        del game_manager.subject_games[subject_id]
+                    if subject_id in game_manager.subject_rooms:
+                        del game_manager.subject_rooms[subject_id]
+            game_manager._remove_game(game_id)
+            logger.info(f"Cleaned up game {game_id} from GameManager for scene {scene_id}")
+            break
+
+
 @socketio.on('execute_entry_callback')
 def handle_execute_entry_callback(data):
     """Execute researcher-defined entry screening callback.
