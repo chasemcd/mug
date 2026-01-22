@@ -188,6 +188,11 @@ class GymScene(scene.Scene):
             "tab_exclude": "You left the experiment window for too long. The game has ended."
         }
 
+        # Custom exclusion callbacks (Phase 18)
+        self.entry_exclusion_callback: Callable | None = None  # Called at entry
+        self.continuous_exclusion_callback: Callable | None = None  # Called during gameplay
+        self.continuous_callback_interval_frames: int = 30  # Frames between callback checks (~1s at 30fps)
+
     def environment(
         self,
         env_creator: Callable = NotProvided,
@@ -795,6 +800,58 @@ class GymScene(scene.Scene):
 
         return self
 
+    def exclusion_callbacks(
+        self,
+        entry_callback: Callable = NotProvided,
+        continuous_callback: Callable = NotProvided,
+        continuous_callback_interval_frames: int = NotProvided,
+    ):
+        """Configure custom exclusion callbacks for the GymScene.
+
+        Callbacks allow researchers to implement arbitrary exclusion logic beyond
+        the built-in rules. Callbacks execute on the server and receive participant
+        context from the client.
+
+        Entry callback signature:
+            def my_entry_callback(context: dict) -> dict:
+                # context contains: ping, browser_name, browser_version, device_type,
+                #                   os_name, subject_id, scene_id
+                # Return: {"exclude": bool, "message": str | None}
+                return {"exclude": False, "message": None}
+
+        Continuous callback signature:
+            def my_continuous_callback(context: dict) -> dict:
+                # context contains: ping, is_tab_hidden, tab_hidden_duration_ms,
+                #                   frame_number, episode_number, subject_id, scene_id
+                # Return: {"exclude": bool, "warn": bool, "message": str | None}
+                return {"exclude": False, "warn": False, "message": None}
+
+        :param entry_callback: Function called at entry screening, defaults to NotProvided
+        :type entry_callback: Callable, optional
+        :param continuous_callback: Function called periodically during gameplay, defaults to NotProvided
+        :type continuous_callback: Callable, optional
+        :param continuous_callback_interval_frames: Frames between continuous callback checks (default 30 ~1s), defaults to NotProvided
+        :type continuous_callback_interval_frames: int, optional
+        :return: The GymScene instance (self)
+        :rtype: GymScene
+        """
+        if entry_callback is not NotProvided:
+            if entry_callback is not None and not callable(entry_callback):
+                raise ValueError("entry_callback must be callable or None")
+            self.entry_exclusion_callback = entry_callback
+
+        if continuous_callback is not NotProvided:
+            if continuous_callback is not None and not callable(continuous_callback):
+                raise ValueError("continuous_callback must be callable or None")
+            self.continuous_exclusion_callback = continuous_callback
+
+        if continuous_callback_interval_frames is not NotProvided:
+            if not isinstance(continuous_callback_interval_frames, int) or continuous_callback_interval_frames < 1:
+                raise ValueError("continuous_callback_interval_frames must be a positive integer")
+            self.continuous_callback_interval_frames = continuous_callback_interval_frames
+
+        return self
+
     # Backwards compatibility alias
     def player_pairing(
         self,
@@ -851,5 +908,11 @@ class GymScene(scene.Scene):
                     metadata[k] = v.__dict__
                 else:
                     metadata[k] = str(v)
+
+        # Add custom callback flags (Phase 18)
+        # Only include boolean flags, not the actual callback functions (they run server-side only)
+        metadata["has_entry_callback"] = self.entry_exclusion_callback is not None
+        metadata["has_continuous_callback"] = self.continuous_exclusion_callback is not None
+        metadata["continuous_callback_interval_frames"] = self.continuous_callback_interval_frames
 
         return metadata
