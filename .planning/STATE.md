@@ -5,22 +5,22 @@
 See: .planning/PROJECT.md (updated 2026-01-21)
 
 **Core value:** Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
-**Current focus:** v1.2 Participant Exclusion
+**Current focus:** v1.2 Participant Exclusion - COMPLETE
 
 ## Current Position
 
-Phase: 17 of 18 (Multiplayer Exclusion Handling)
-Plan: 17-01-PLAN.md complete
-Status: Phase 17 complete
-Last activity: 2026-01-22 — Completed 17-01-PLAN.md
+Phase: 18 of 18 (Custom Exclusion Callbacks)
+Plan: 18-01-PLAN.md complete
+Status: Phase 18 complete, v1.2 milestone complete
+Last activity: 2026-01-22 - Completed 18-01-PLAN.md (Custom Exclusion Callbacks)
 
-Progress: [######....] 75% (v1.2 - 3/4 phases complete)
+Progress: [##########] 100% (v1.2 - 4/4 phases complete)
 
 ## Milestone History
 
 | Milestone | Phases | Status | Shipped |
 |-----------|--------|--------|---------|
-| v1.2 Participant Exclusion | 15-18 | In progress | - |
+| v1.2 Participant Exclusion | 15-18 | Complete | 2026-01-22 |
 | v1.1 Sync Validation | 11-14 | Complete | - |
 | v1.0 P2P Multiplayer | 1-10 | Complete | 2026-01-19 |
 
@@ -46,14 +46,22 @@ Progress: [######....] 75% (v1.2 - 3/4 phases complete)
 - `.planning/phases/15-entry-screening-rules/15-01-SUMMARY.md`
 - `.planning/phases/16-continuous-monitoring/16-01-SUMMARY.md`
 - `.planning/phases/17-multiplayer-exclusion/17-01-SUMMARY.md`
+- `.planning/phases/18-custom-callbacks/18-01-SUMMARY.md`
 
 **Phase 16 Key Files:**
-- `interactive_gym/server/static/js/continuous_monitor.js` (277 LOC) - New module
-- `interactive_gym/scenes/gym_scene.py` - continuous_monitoring() method added
+- `interactive_gym/server/static/js/continuous_monitor.js` (320+ LOC) - Extended with callback support
+- `interactive_gym/scenes/gym_scene.py` - continuous_monitoring() and exclusion_callbacks() methods
 
 **Phase 17 Key Files:**
 - `interactive_gym/server/app.py` - mid_game_exclusion socket handler
 - `interactive_gym/server/pyodide_game_coordinator.py` - handle_player_exclusion() method
+
+**Phase 18 Key Files:**
+- `interactive_gym/scenes/gym_scene.py` - exclusion_callbacks() method added
+- `interactive_gym/server/app.py` - execute_entry_callback, execute_continuous_callback handlers
+- `interactive_gym/server/static/js/index.js` - executeEntryCallback() function
+- `interactive_gym/server/static/js/continuous_monitor.js` - shouldExecuteCallback(), setCallbackResult()
+- `interactive_gym/server/static/js/pyodide_multiplayer_game.js` - _executeContinuousCallback()
 
 ### Decisions
 
@@ -103,6 +111,13 @@ See: .planning/PROJECT.md Key Decisions table
 - eventlet.sleep(0.1) before cleanup ensures message delivery (EXCL-03)
 - sessionStatus object in metrics export for partial session analysis (EXCL-04)
 
+**v1.2 decisions (Phase 18):**
+- Callbacks execute server-side, not client-side (CALLBACK-01)
+- Entry callback runs AFTER built-in checks pass (CALLBACK-02)
+- Fail-open on callback errors (CALLBACK-03)
+- Async continuous callback with non-blocking game loop (CALLBACK-04)
+- 5-second timeout for entry callback (CALLBACK-05)
+
 ### Pending Todos
 
 (None)
@@ -116,9 +131,14 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-01-22
-Stopped at: Completed 17-01-PLAN.md
+Stopped at: Completed 18-01-PLAN.md (v1.2 milestone complete)
 Resume file: None
 
 ### Next Steps
 
-1. `/gsd:plan-phase 18` — plan Custom Exclusion Callbacks phase
+v1.2 Participant Exclusion milestone is complete. All planned phases (1-18) have been executed.
+
+Potential future work:
+- v1.3: Enhanced analytics and debugging tools
+- v1.4: Performance optimizations for larger groups
+- v1.5: Additional game modes or coordination patterns
