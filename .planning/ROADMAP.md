@@ -143,10 +143,9 @@ Plans:
   2. Game terminates cleanly for both players when one is excluded
   3. Valid game data up to exclusion point is preserved and marked as partial session
 **Research flag:** Likely (no existing patterns for real-time multiplayer exclusion)
-**Plans:** TBD
-
+**Plans:** 1 plan
 Plans:
-- [ ] 17-01-PLAN.md - TBD
+- [ ] 17-01-PLAN.md - Server handler, partner notification, partial session marking
 
 ### Phase 18: Custom Exclusion Callbacks
 **Goal:** Researcher-defined arbitrary exclusion logic via Python callbacks
@@ -175,9 +174,9 @@ Phases execute in numeric order: 15 -> 16 -> 17 -> 18
 | 14. Validation Export | v1.1 | 1/1 | Complete | 2026-01-21 |
 | 15. Entry Screening Rules | v1.2 | 1/1 | Complete | 2026-01-21 |
 | 16. Continuous Monitoring | v1.2 | 1/1 | Complete | 2026-01-21 |
-| 17. Multiplayer Exclusion | v1.2 | 0/1 | Not started | - |
+| 17. Multiplayer Exclusion | v1.2 | 0/1 | Planned | - |
 | 18. Custom Callbacks | v1.2 | 0/1 | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-01-21 after Phase 16 complete*
+*Last updated: 2026-01-21 after Phase 17 planning*
