@@ -5,22 +5,22 @@
 See: .planning/PROJECT.md (updated 2026-01-21)
 
 **Core value:** Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
-**Current focus:** v1.3 P2P Connection Validation
+**Current focus:** v1.3 P2P Connection Validation - COMPLETE
 
 ## Current Position
 
 Phase: 22 of 22 (Latency Telemetry)
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-01-22 - Phase 22 planned (final phase of v1.3)
+Plan: 1 of 1 (complete)
+Status: Phase complete, v1.3 milestone complete
+Last activity: 2026-01-22 - Completed 22-01-PLAN.md (Latency Telemetry)
 
-Progress: [███████░░░] 75% (v1.3 - 3/4 phases complete, Phase 22 planned)
+Progress: [##########] 100% (v1.3 - 4/4 phases complete)
 
 ## Milestone History
 
 | Milestone | Phases | Status | Shipped |
 |-----------|--------|--------|---------|
-| v1.3 P2P Connection Validation | 19-22 | In progress | - |
+| v1.3 P2P Connection Validation | 19-22 | Complete | 2026-01-22 |
 | v1.2 Participant Exclusion | 15-18 | Complete | 2026-01-22 |
 | v1.1 Sync Validation | 11-14 | Complete | - |
 | v1.0 P2P Multiplayer | 1-10 | Complete | 2026-01-19 |
@@ -31,7 +31,7 @@ Progress: [███████░░░] 75% (v1.3 - 3/4 phases complete, Phas
 
 **P2P Core (created/heavily modified in v1.0):**
 - `interactive_gym/server/static/js/pyodide_multiplayer_game.js` (4,900+ LOC)
-- `interactive_gym/server/static/js/webrtc_manager.js` (759 LOC)
+- `interactive_gym/server/static/js/webrtc_manager.js` (1,030+ LOC)
 - `interactive_gym/server/pyodide_game_coordinator.py`
 - `interactive_gym/configurations/remote_config.py`
 
@@ -54,6 +54,7 @@ Progress: [███████░░░] 75% (v1.3 - 3/4 phases complete, Phas
 - `.planning/phases/20-mid-game-reconnection/20-01-SUMMARY.md`
 - `.planning/phases/20-mid-game-reconnection/20-02-SUMMARY.md`
 - `.planning/phases/21-per-round-health-check/21-01-SUMMARY.md`
+- `.planning/phases/22-latency-telemetry/22-01-SUMMARY.md`
 
 **Phase 16 Key Files:**
 - `interactive_gym/server/static/js/continuous_monitor.js` (320+ LOC) - Extended with callback support
@@ -89,6 +90,10 @@ Progress: [███████░░░] 75% (v1.3 - 3/4 phases complete, Phas
 
 **Phase 21 Key Files:**
 - `interactive_gym/server/static/js/pyodide_multiplayer_game.js` - _waitForHealthyConnection() method, reset() health check gating
+
+**Phase 22 Key Files:**
+- `interactive_gym/server/static/js/webrtc_manager.js` - LatencyTelemetry class
+- `interactive_gym/server/static/js/pyodide_multiplayer_game.js` - latencyTelemetry integration, getLatencyStats()
 
 ### Decisions
 
@@ -169,6 +174,11 @@ See: .planning/PROJECT.md Key Decisions table
 - Health check uses polling (100ms interval) with state-aware behavior
 - Early return on failure lets reconnection flow handle termination
 
+**v1.3 decisions (Phase 22):**
+- 1Hz polling interval for RTT sampling (LAT-01)
+- 600 max samples for ~10 minutes coverage (LAT-02)
+- currentRoundTripTime from selected candidate pair for RTT measurement (LAT-03)
+
 ### Pending Todos
 
 (None)
@@ -182,9 +192,13 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-01-22
-Stopped at: Phase 22 planned
+Stopped at: Completed 22-01-PLAN.md (v1.3 milestone complete)
 Resume file: None
 
 ### Next Steps
 
-1. `/gsd:execute-phase 22` - execute Latency Telemetry phase (final phase of v1.3)
+v1.3 P2P Connection Validation milestone is complete. All features implemented:
+- Waiting room P2P validation (Phase 19)
+- Mid-game reconnection with ICE restart (Phase 20)
+- Per-round health check gating (Phase 21)
+- Latency telemetry for research data (Phase 22)
