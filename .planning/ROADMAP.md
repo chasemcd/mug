@@ -223,9 +223,9 @@ Plans:
   1. P2P latency measured periodically during gameplay (non-blocking)
   2. Latency stats (min, median, mean, max) exported in session data
 **Research flag:** Unlikely (WebRTC getStats() well-documented)
-**Plans:** TBD
+**Plans:** 1 plan
 Plans:
-- [ ] 22-01-PLAN.md - Async latency measurement, stats aggregation, export integration
+- [ ] 22-01-PLAN.md — LatencyTelemetry class, async RTT sampling, stats export integration
 
 ## Progress
 
@@ -249,4 +249,4 @@ Phases execute in numeric order: 19 -> 20 -> 21 -> 22
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-01-22 after Phase 21 complete*
+*Last updated: 2026-01-22 after Phase 22 planned*
