@@ -1296,6 +1296,47 @@ def on_pyodide_player_action(data):
     )
 
 
+@socketio.on('mid_game_exclusion')
+def on_mid_game_exclusion(data):
+    """
+    Handle mid-game exclusion from continuous monitoring.
+
+    Called when a player is excluded due to sustained ping violations
+    or tab visibility issues during gameplay.
+
+    Args:
+        data: {
+            'game_id': str,
+            'player_id': str | int,
+            'reason': str ('sustained_ping', 'tab_hidden'),
+            'frame_number': int,
+            'timestamp': float
+        }
+    """
+    global PYODIDE_COORDINATOR
+
+    if PYODIDE_COORDINATOR is None:
+        logger.error("Pyodide coordinator not initialized for mid_game_exclusion")
+        return
+
+    game_id = data.get("game_id")
+    excluded_player_id = data.get("player_id")
+    reason = data.get("reason")
+    frame_number = data.get("frame_number")
+
+    logger.info(
+        f"Mid-game exclusion: player {excluded_player_id} in game {game_id} "
+        f"(reason: {reason}, frame: {frame_number})"
+    )
+
+    PYODIDE_COORDINATOR.handle_player_exclusion(
+        game_id=game_id,
+        excluded_player_id=excluded_player_id,
+        reason=reason,
+        frame_number=frame_number
+    )
+
+
 @socketio.on("pyodide_hud_update")
 def on_pyodide_hud_update(data):
     """

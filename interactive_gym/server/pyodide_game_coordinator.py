@@ -551,6 +551,83 @@ class PyodideGameCoordinator:
                 f"to player {target_player_id} in game {game_id}"
             )
 
+    def handle_player_exclusion(
+        self,
+        game_id: str,
+        excluded_player_id: str | int,
+        reason: str,
+        frame_number: int
+    ):
+        """
+        Handle player exclusion from continuous monitoring.
+
+        Notifies partner with clear message, triggers data export,
+        and cleans up game state.
+
+        Args:
+            game_id: Game identifier
+            excluded_player_id: ID of excluded player
+            reason: Exclusion reason ('sustained_ping', 'tab_hidden')
+            frame_number: Frame number when exclusion occurred
+        """
+        with self.lock:
+            if game_id not in self.games:
+                logger.warning(f"Exclusion for non-existent game {game_id}")
+                return
+
+            game = self.games[game_id]
+
+            if excluded_player_id not in game.players:
+                logger.warning(
+                    f"Excluded player {excluded_player_id} not in game {game_id}"
+                )
+                return
+
+            # Find partner socket(s) before any cleanup
+            partner_sockets = [
+                socket_id for pid, socket_id in game.players.items()
+                if pid != excluded_player_id
+            ]
+
+            # Notify partner(s) with clear, non-alarming message
+            for socket_id in partner_sockets:
+                self.sio.emit(
+                    'partner_excluded',
+                    {
+                        'message': 'Your partner experienced a technical issue. The game has ended.',
+                        'frame_number': frame_number,
+                        'reason': 'partner_exclusion'
+                    },
+                    room=socket_id
+                )
+
+                # Trigger data export for partner before cleanup
+                self.sio.emit(
+                    'trigger_data_export',
+                    {
+                        'is_partial': True,
+                        'termination_reason': 'partner_exclusion',
+                        'termination_frame': frame_number
+                    },
+                    room=socket_id
+                )
+
+            logger.info(
+                f"Notified {len(partner_sockets)} partner(s) of exclusion "
+                f"in game {game_id}"
+            )
+
+            # Brief delay to ensure messages are delivered
+            eventlet.sleep(0.1)
+
+            # Now clean up the game
+            # Stop server runner if it exists
+            if game.server_runner:
+                game.server_runner.stop()
+
+            del self.games[game_id]
+            logger.info(f"Cleaned up game {game_id} after player exclusion")
+
     def get_stats(self) -> dict:
         """Get coordinator statistics for monitoring/debugging."""
         return {
