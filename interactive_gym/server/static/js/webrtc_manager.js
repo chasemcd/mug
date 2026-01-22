@@ -187,6 +187,11 @@ class WebRTCManager {
         this.disconnectTimeoutId = null;
         this.qualityMonitor = null;
 
+        // Connection drop detection (Phase 20)
+        this.disconnectGracePeriodMs = 3000;  // 3 second grace before declaring lost
+        this.disconnectGraceId = null;        // Grace period timeout handle
+        this.wasDisconnected = false;         // Track if we were in disconnected state
+
         // Callbacks (set by consumer)
         this.onDataChannelOpen = null;
         this.onDataChannelMessage = null;
@@ -194,6 +199,9 @@ class WebRTCManager {
         this.onConnectionFailed = null;
         this.onConnectionTypeDetected = null;
         this.onQualityDegraded = null;
+        // Connection drop callbacks (Phase 20)
+        this.onConnectionLost = null;       // Called on disconnect detected (after grace period)
+        this.onConnectionRestored = null;   // Called if connection self-recovers
 
         // Bound handler reference for cleanup
         this._boundSignalHandler = null;
@@ -327,17 +335,35 @@ class WebRTCManager {
 
             switch (state) {
                 case 'failed':
-                    console.warn('[WebRTC] ICE failed, attempting restart');
+                    // ICE failed is terminal - call onConnectionLost immediately
+                    console.warn('[WebRTC] ICE failed');
+                    this._cancelDisconnectGracePeriod();
+                    this._cancelDisconnectTimeout();
+                    this.onConnectionLost?.({
+                        iceState: state,
+                        dcState: this.dataChannel?.readyState,
+                        timestamp: Date.now()
+                    });
                     this._handleIceFailure();
                     break;
                 case 'disconnected':
-                    // May recover on its own - start timeout
+                    // May recover on its own - start grace period (Phase 20)
+                    this.wasDisconnected = true;
+                    this._startDisconnectGracePeriod();
                     this._startDisconnectTimeout();
                     break;
                 case 'connected':
                 case 'completed':
+                    // Connection recovered or established
+                    this._cancelDisconnectGracePeriod();
                     this._cancelDisconnectTimeout();
                     this.iceRestartAttempts = 0;  // Reset restart counter on successful connection
+                    // Notify if we were previously disconnected (connection self-recovered)
+                    if (this.wasDisconnected) {
+                        console.log('[WebRTC] Connection restored');
+                        this.onConnectionRestored?.();
+                        this.wasDisconnected = false;
+                    }
                     break;
             }
         };
@@ -506,6 +532,47 @@ class WebRTCManager {
     }
 
     /**
+     * Start disconnect grace period (Phase 20).
+     * After grace period elapses, check if still disconnected and notify.
+     * @private
+     */
+    _startDisconnectGracePeriod() {
+        this._cancelDisconnectGracePeriod();
+        this.disconnectGraceId = setTimeout(() => {
+            this._checkConnectionAfterGrace();
+        }, this.disconnectGracePeriodMs);
+    }
+
+    /**
+     * Cancel disconnect grace period (Phase 20).
+     * @private
+     */
+    _cancelDisconnectGracePeriod() {
+        if (this.disconnectGraceId) {
+            clearTimeout(this.disconnectGraceId);
+            this.disconnectGraceId = null;
+        }
+    }
+
+    /**
+     * Check connection state after grace period (Phase 20).
+     * If still disconnected, notify via onConnectionLost callback.
+     * @private
+     */
+    async _checkConnectionAfterGrace() {
+        // Verify still disconnected
+        if (this.peerConnection?.iceConnectionState !== 'connected' &&
+            this.peerConnection?.iceConnectionState !== 'completed') {
+            console.log('[WebRTC] Connection lost (grace period elapsed)');
+            this.onConnectionLost?.({
+                iceState: this.peerConnection?.iceConnectionState,
+                dcState: this.dataChannel?.readyState,
+                timestamp: Date.now()
+            });
+        }
+    }
+
+    /**
      * Start connection quality monitoring.
      * @private
      */
@@ -547,6 +614,14 @@ class WebRTCManager {
         dc.onclose = () => {
             console.log('[WebRTC] DataChannel closed');
             this.onDataChannelClose?.();
+            // If DataChannel closes unexpectedly during active game, notify (Phase 20)
+            if (this.peerConnection?.iceConnectionState === 'connected') {
+                this.onConnectionLost?.({
+                    iceState: this.peerConnection?.iceConnectionState,
+                    dcState: 'closed',
+                    timestamp: Date.now()
+                });
+            }
         };
 
         dc.onerror = (error) => {
@@ -739,6 +814,9 @@ class WebRTCManager {
 
         // Cancel disconnect timeout
         this._cancelDisconnectTimeout();
+
+        // Cancel disconnect grace period (Phase 20)
+        this._cancelDisconnectGracePeriod();
 
         // Remove signaling event listener
         if (this._boundSignalHandler) {
