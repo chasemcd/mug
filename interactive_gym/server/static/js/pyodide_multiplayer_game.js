@@ -4690,6 +4690,76 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
     }
 
     /**
+     * Wait for a healthy P2P connection before proceeding (Phase 21 - ROUND-01, ROUND-02).
+     * Used by reset() to ensure connection is healthy before each round starts.
+     *
+     * @param {number} timeoutMs - Maximum time to wait for healthy connection (default 10000ms)
+     * @returns {Promise<void>} - Resolves when connection is healthy, rejects on timeout/termination
+     */
+    async _waitForHealthyConnection(timeoutMs = 10000) {
+        // Fast path: connection is already usable (ROUND-01)
+        if (this.webrtcManager?.isConnectionUsable()) {
+            p2pLog.debug('Per-round health check: connection usable');
+            return;
+        }
+
+        // Check reconnection state to determine behavior
+        const state = this.reconnectionState.state;
+
+        // If terminated, game should end - don't proceed
+        if (state === 'terminated') {
+            throw new Error('Connection terminated - cannot start round');
+        }
+
+        // If connected but isConnectionUsable() is false, connection may be transitioning
+        // Log warning but continue with polling - this is an edge case
+        if (state === 'connected') {
+            p2pLog.warn('Per-round health check: connection state is connected but not usable, may be transitioning');
+        }
+
+        // If paused or reconnecting, wait for recovery
+        if (state === 'paused' || state === 'reconnecting' || state === 'connected') {
+            p2pLog.info('Per-round health check: waiting for connection recovery...');
+
+            return new Promise((resolve, reject) => {
+                const startTime = Date.now();
+                const pollInterval = 100;  // Check every 100ms
+
+                const checkConnection = () => {
+                    // Check for timeout
+                    if (Date.now() - startTime >= timeoutMs) {
+                        p2pLog.warn('Per-round health check: timeout waiting for connection');
+                        reject(new Error('Health check timeout - connection not recovered'));
+                        return;
+                    }
+
+                    // Check for termination during wait
+                    if (this.reconnectionState.state === 'terminated') {
+                        reject(new Error('Connection terminated during health check'));
+                        return;
+                    }
+
+                    // Check if connection is now usable
+                    if (this.webrtcManager?.isConnectionUsable()) {
+                        p2pLog.info('Per-round health check: connection recovered, proceeding');
+                        resolve();
+                        return;
+                    }
+
+                    // Continue polling
+                    setTimeout(checkConnection, pollInterval);
+                };
+
+                // Start polling
+                checkConnection();
+            });
+        }
+
+        // Fallback: unknown state - log and proceed (shouldn't happen)
+        p2pLog.warn(`Per-round health check: unexpected state '${state}', proceeding anyway`);
+    }
+
+    /**
      * Check if the game is ready to start (P2P established or gate disabled/timeout).
      * Used by the game loop to wait for P2P before processing frames.
      */
