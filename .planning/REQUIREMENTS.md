@@ -1,58 +1,36 @@
-# Requirements: Interactive Gym v1.3 P2P Connection Validation
+# Requirements: Interactive Gym v1.4 Partner Disconnection Handling
 
-**Defined:** 2026-01-21
+**Defined:** 2026-01-22
 **Core Value:** Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
 
-## v1.3 Requirements
+## v1.4 Requirements
 
-Requirements for v1.3 P2P Connection Validation milestone. Each maps to roadmap phases.
+Requirements for v1.4 Partner Disconnection Handling milestone. Each maps to roadmap phases.
 
-### Waiting Room Validation
+### UI Handling
 
-- [x] **WAIT-01**: P2P connection must be validated before experiment starts
-- [x] **WAIT-02**: Failed P2P pairs re-enter matchmaking pool to find new partners
-- [x] **WAIT-03**: Participants see clear status messaging during P2P validation
+- [ ] **UI-01**: Participant stays on same page when partner disconnects (no redirect)
+- [ ] **UI-02**: Game container and HUD hidden when partner disconnection detected
+- [ ] **UI-03**: Disconnection message displayed on same page after partner disconnects
+- [ ] **UI-04**: Page remains displayed indefinitely (participant closes when done)
 
-### Per-Round Health
+### Data Export
 
-- [x] **ROUND-01**: DataChannel connection verified before each round begins
-- [x] **ROUND-02**: Round start blocked until P2P connection confirmed healthy
+- [ ] **DATA-01**: All gameplay data collected before disconnection is exported to server
+- [ ] **DATA-02**: Session marked as partial in exported data when partner disconnects
+- [ ] **DATA-03**: Disconnection reason included in session metadata
+- [ ] **DATA-04**: Disconnected player ID included in session metadata
 
-### Mid-Game Reconnection
+### Configuration
 
-- [x] **RECON-01**: System detects when P2P DataChannel connection drops
-- [x] **RECON-02**: Gameplay pauses immediately for both clients on connection drop
-- [x] **RECON-03**: Both players see reconnecting overlay during reconnection attempts
-- [x] **RECON-04**: Reconnection timeout is configurable by researcher
-- [x] **RECON-05**: Gameplay resumes if reconnection succeeds within timeout
-- [x] **RECON-06**: Game ends cleanly for both players if reconnection times out
-
-### Connection Logging
-
-- [x] **LOG-01**: Disconnection events logged with timestamp and detecting peer
-- [x] **LOG-02**: Reconnection attempts logged with duration and outcome
-- [x] **LOG-03**: Total pause duration per session recorded in data export
-
-### Latency Monitoring
-
-- [x] **LAT-01**: P2P latency measured periodically during gameplay (non-blocking)
-- [x] **LAT-02**: Latency stats exported: min, median, mean, max
+- [ ] **CFG-01**: Researchers can set custom partner disconnect message via GymScene config
+- [ ] **CFG-02**: Default message provided when no custom message configured
 
 ## v2 Requirements
 
 Deferred to future release. Tracked but not in current roadmap.
 
-### Latency
-
-- **LAT-03**: Configurable latency threshold with exclusion (not just logging)
-
-### Reconnection
-
-- **RECON-07**: Automatic reconnection retry count limit before giving up
-
-### Waiting Room
-
-- **WAIT-04**: Connection quality pre-check (latency threshold) before matchmaking completes
+(None for v1.4)
 
 ## Out of Scope
 
@@ -60,38 +38,32 @@ Explicitly excluded. Documented to prevent scope creep.
 
 | Feature | Reason |
 |---------|--------|
-| Latency-based exclusion | v1.3 focuses on data collection; exclusion deferred to v2 |
-| Adaptive input delay based on RTT | Deferred to future milestone |
-| N-player reconnection handling | Current scope is 2-player only |
+| Auto-advance to next scene after disconnect | User specified staying on page indefinitely |
+| Continue button after disconnect | User specified page stays indefinitely |
+| Reconnection attempts after partner leaves | Partner leaving is terminal (different from connection drop) |
 
 ## Traceability
 
-Which phases cover which requirements.
+Which phases cover which requirements. Updated by create-roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| WAIT-01 | Phase 19 | Complete |
-| WAIT-02 | Phase 19 | Complete |
-| WAIT-03 | Phase 19 | Complete |
-| ROUND-01 | Phase 21 | Complete |
-| ROUND-02 | Phase 21 | Complete |
-| RECON-01 | Phase 20 | Complete |
-| RECON-02 | Phase 20 | Complete |
-| RECON-03 | Phase 20 | Complete |
-| RECON-04 | Phase 20 | Complete |
-| RECON-05 | Phase 20 | Complete |
-| RECON-06 | Phase 20 | Complete |
-| LOG-01 | Phase 20 | Complete |
-| LOG-02 | Phase 20 | Complete |
-| LOG-03 | Phase 20 | Complete |
-| LAT-01 | Phase 22 | Complete |
-| LAT-02 | Phase 22 | Complete |
+| UI-01 | — | Pending |
+| UI-02 | — | Pending |
+| UI-03 | — | Pending |
+| UI-04 | — | Pending |
+| DATA-01 | — | Pending |
+| DATA-02 | — | Pending |
+| DATA-03 | — | Pending |
+| DATA-04 | — | Pending |
+| CFG-01 | — | Pending |
+| CFG-02 | — | Pending |
 
 **Coverage:**
-- v1.3 requirements: 16 total
-- Mapped to phases: 16 ✓
-- Unmapped: 0
+- v1.4 requirements: 10 total
+- Mapped to phases: 0 (run /gsd:create-roadmap)
+- Unmapped: 10
 
 ---
-*Requirements defined: 2026-01-21*
-*Last updated: 2026-01-22 after Phase 22 complete — v1.3 milestone complete*
+*Requirements defined: 2026-01-22*
+*Last updated: 2026-01-22 after initial definition*
