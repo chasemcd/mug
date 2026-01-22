@@ -211,9 +211,9 @@ Plans:
   1. DataChannel connection verified before each round begins
   2. Round start blocked until P2P connection confirmed healthy
 **Research flag:** Unlikely (builds on Phase 20 infrastructure)
-**Plans:** TBD
+**Plans:** 1 plan
 Plans:
-- [ ] 21-01-PLAN.md - Round-start DataChannel verification, blocking until healthy
+- [ ] 21-01-PLAN.md — Per-round health check with connection blocking before episode sync
 
 ### Phase 22: Latency Telemetry
 **Goal:** Async latency monitoring and stats export
@@ -249,4 +249,4 @@ Phases execute in numeric order: 19 -> 20 -> 21 -> 22
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-01-22 after Phase 20 complete*
+*Last updated: 2026-01-22 after Phase 21 planned*
