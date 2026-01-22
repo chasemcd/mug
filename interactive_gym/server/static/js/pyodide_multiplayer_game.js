@@ -13,7 +13,7 @@ import * as pyodide_remote_game from './pyodide_remote_game.js';
 import { convertUndefinedToNull } from './pyodide_remote_game.js';
 import * as seeded_random from './seeded_random.js';
 import * as ui_utils from './ui_utils.js';
-import { WebRTCManager } from './webrtc_manager.js';
+import { WebRTCManager, LatencyTelemetry } from './webrtc_manager.js';
 import { ContinuousMonitor } from './continuous_monitor.js';
 
 // ========== Logging Configuration ==========
@@ -656,6 +656,7 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         this.p2pInputSender = null;
         this.connectionHealth = null;
         this.pingIntervalId = null;
+        this.latencyTelemetry = null;  // Phase 22 - Latency telemetry
 
         // P2P metrics for observability
         this.p2pMetrics = {
@@ -1152,6 +1153,11 @@ env.get_state()
 
             // Show notification (neutral, not alarming like own exclusion)
             this._showPartnerExcludedUI(data.message);
+
+            // Stop latency telemetry (Phase 22) - keep data for export
+            if (this.latencyTelemetry) {
+                this.latencyTelemetry.stop();
+            }
 
             // Clean up WebRTC
             if (this.webrtcManager) {
@@ -2954,6 +2960,11 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
             timestamp: Date.now()
         });
 
+        // Stop latency telemetry (Phase 22) - keep data for export
+        if (this.latencyTelemetry) {
+            this.latencyTelemetry.stop();
+        }
+
         // Clean up WebRTC
         if (this.webrtcManager) {
             this.webrtcManager.close();
@@ -4146,6 +4157,16 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
                 this.connectionHealth = new ConnectionHealthMonitor();
             }
 
+            // Start latency telemetry (Phase 22 - LAT-01)
+            if (!this.latencyTelemetry && this.webrtcManager?.peerConnection) {
+                this.latencyTelemetry = new LatencyTelemetry(this.webrtcManager.peerConnection, {
+                    pollInterval: 1000,  // 1Hz sampling
+                    maxSamples: 600      // ~10 minutes of data
+                });
+                this.latencyTelemetry.start();
+                p2pLog.info('Latency telemetry started');
+            }
+
             // Start P2P validation handshake (Phase 19) - only on initial connection
             if (this.p2pValidation.state === 'connecting') {
                 if (this.p2pValidation.enabled) {
@@ -5304,6 +5325,15 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
     }
 
     /**
+     * Get P2P latency statistics for export.
+     * Phase 22 - Latency Telemetry (LAT-02)
+     * @returns {Object|null} Latency stats or null if unavailable
+     */
+    getLatencyStats() {
+        return this.latencyTelemetry?.getStats() || null;
+    }
+
+    /**
      * Export session metrics for research data analysis.
      * Call at episode end to get structured metrics for persistence.
      * @returns {Object} Session metrics including connection info, inputs, rollbacks, etc.
@@ -5345,7 +5375,10 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
                 disconnections: this.reconnectionState.disconnections,
                 attempts: this.reconnectionState.reconnectionAttempts,
                 totalPauseDurationMs: this.reconnectionState.totalPauseDuration
-            }
+            },
+
+            // P2P latency telemetry (Phase 22 - LAT-01, LAT-02)
+            latency: this.getLatencyStats()
         };
     }
 
@@ -5388,7 +5421,10 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
             })),
 
             // Reconnection events (Phase 20 - LOG-01, LOG-02, LOG-03)
-            reconnection: this.getReconnectionData()
+            reconnection: this.getReconnectionData(),
+
+            // P2P latency telemetry (Phase 22 - LAT-01, LAT-02)
+            latency: this.getLatencyStats()
         };
     }
 
@@ -5533,7 +5569,10 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
                 terminationReason: this.sessionPartialInfo?.terminationReason || 'normal',
                 terminationFrame: this.sessionPartialInfo?.terminationFrame || this.frameNumber,
                 completedEpisodes: this.cumulativeValidation?.episodes?.length || 0
-            }
+            },
+
+            // P2P latency telemetry (Phase 22 - LAT-01, LAT-02)
+            latency: this.getLatencyStats()
         };
     }
 
