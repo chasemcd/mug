@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-21)
 ## Current Position
 
 Phase: 20 of 22 (Mid-Game Reconnection)
-Plan: 01 of 02 complete
-Status: In progress
-Last activity: 2026-01-22 — Completed 20-01-PLAN.md (Connection Drop Detection + Pause)
+Plan: 02 of 02 complete
+Status: Phase complete
+Last activity: 2026-01-22 — Completed 20-02-PLAN.md (ICE Restart and Resume)
 
-Progress: [███░░░░░░░] 30% (v1.3 - 1.5/4 phases complete)
+Progress: [█████░░░░░] 50% (v1.3 - 2/4 phases complete)
 
 ## Milestone History
 
@@ -78,6 +78,11 @@ Progress: [███░░░░░░░] 30% (v1.3 - 1.5/4 phases complete)
 - `interactive_gym/server/static/js/pyodide_multiplayer_game.js` - reconnectionState object, pause handling
 - `interactive_gym/server/pyodide_game_coordinator.py` - handle_connection_lost(), handle_reconnection_success/timeout()
 - `interactive_gym/server/app.py` - p2p_connection_lost, p2p_reconnection_* socket handlers
+
+**Phase 20 Key Files (Plan 02):**
+- `interactive_gym/server/static/js/webrtc_manager.js` - attemptIceRestart(), isConnectionUsable()
+- `interactive_gym/server/static/js/pyodide_multiplayer_game.js` - overlay UI, reconnection success/resume handlers
+- `interactive_gym/scenes/gym_scene.py` - reconnection_config() builder, reconnection_timeout_ms attribute
 
 ### Decisions
 
@@ -146,6 +151,12 @@ See: .planning/PROJECT.md Key Decisions table
 - Bilateral pause coordinated via server SocketIO (works when P2P down)
 - First player to report triggers pause for both players
 
+**v1.3 decisions (Phase 20, Plan 02):**
+- ICE restart with iceRestart flag for proper WebRTC renegotiation (RECON-05)
+- Deterministic initiator role (lower player ID) for restart offers
+- Server coordinates resume to ensure both clients resume together
+- Reconnection data included in both validation and session exports
+
 ### Pending Todos
 
 (None)
@@ -159,10 +170,10 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-01-22
-Stopped at: Completed 20-01-PLAN.md
+Stopped at: Completed 20-02-PLAN.md (Phase 20 complete)
 Resume file: None
 
 ### Next Steps
 
-1. Execute 20-02-PLAN.md (ICE Restart and Resume) if it exists
-2. Or plan 20-02 if not yet planned
+1. Plan Phase 21 (Graceful Session Ending) if not yet planned
+2. Execute Phase 21 plans
