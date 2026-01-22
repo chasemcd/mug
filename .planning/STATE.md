@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-21)
 ## Current Position
 
 Phase: 17 of 18 (Multiplayer Exclusion Handling)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-01-21 — Phase 16 verified complete
+Plan: 17-01-PLAN.md complete
+Status: Phase 17 complete
+Last activity: 2026-01-22 — Completed 17-01-PLAN.md
 
-Progress: [####......] 50% (v1.2 - 2/4 phases complete)
+Progress: [######....] 75% (v1.2 - 3/4 phases complete)
 
 ## Milestone History
 
@@ -29,7 +29,7 @@ Progress: [####......] 50% (v1.2 - 2/4 phases complete)
 ### Key Files
 
 **P2P Core (created/heavily modified in v1.0):**
-- `interactive_gym/server/static/js/pyodide_multiplayer_game.js` (4,600+ LOC)
+- `interactive_gym/server/static/js/pyodide_multiplayer_game.js` (4,800+ LOC)
 - `interactive_gym/server/static/js/webrtc_manager.js` (759 LOC)
 - `interactive_gym/server/pyodide_game_coordinator.py`
 - `interactive_gym/configurations/remote_config.py`
@@ -45,10 +45,15 @@ Progress: [####......] 50% (v1.2 - 2/4 phases complete)
 **v1.2 Execution:**
 - `.planning/phases/15-entry-screening-rules/15-01-SUMMARY.md`
 - `.planning/phases/16-continuous-monitoring/16-01-SUMMARY.md`
+- `.planning/phases/17-multiplayer-exclusion/17-01-SUMMARY.md`
 
 **Phase 16 Key Files:**
 - `interactive_gym/server/static/js/continuous_monitor.js` (277 LOC) - New module
 - `interactive_gym/scenes/gym_scene.py` - continuous_monitoring() method added
+
+**Phase 17 Key Files:**
+- `interactive_gym/server/app.py` - mid_game_exclusion socket handler
+- `interactive_gym/server/pyodide_game_coordinator.py` - handle_player_exclusion() method
 
 ### Decisions
 
@@ -92,6 +97,12 @@ See: .planning/PROJECT.md Key Decisions table
 - Page Visibility API visibilitychange event for immediate tab detection (MONITOR-03)
 - Warning before exclusion with configurable thresholds (MONITOR-04)
 
+**v1.2 decisions (Phase 17):**
+- Distinct partner_excluded event (not reuse end_game) for appropriate UI (EXCL-01)
+- Neutral gray UI styling for partner notification (less alarming) (EXCL-02)
+- eventlet.sleep(0.1) before cleanup ensures message delivery (EXCL-03)
+- sessionStatus object in metrics export for partial session analysis (EXCL-04)
+
 ### Pending Todos
 
 (None)
@@ -104,10 +115,10 @@ See: .planning/PROJECT.md Key Decisions table
 
 ## Session Continuity
 
-Last session: 2026-01-21
-Stopped at: Phase 16 verified complete
+Last session: 2026-01-22
+Stopped at: Completed 17-01-PLAN.md
 Resume file: None
 
 ### Next Steps
 
-1. `/gsd:plan-phase 17` — plan Multiplayer Exclusion Handling phase
+1. `/gsd:execute-phase 18` — execute Session Data Export phase
