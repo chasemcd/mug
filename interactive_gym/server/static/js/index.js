@@ -518,7 +518,6 @@ socket.on('p2p_validation_repool', function(data) {
 // P2P Validation Complete (Phase 19)
 socket.on('p2p_validation_complete', function(data) {
     console.log("[P2P] Validation complete, game starting");
-    $("#waitroomText").text("Connection verified! Starting game...");
 });
 
 
