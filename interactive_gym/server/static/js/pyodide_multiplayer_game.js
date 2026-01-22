@@ -45,6 +45,8 @@ const P2P_MSG_KEEPALIVE = 0x04;
 const P2P_MSG_EPISODE_END = 0x05;  // Episode reset synchronization
 const P2P_MSG_EPISODE_READY = 0x06;  // Episode start synchronization
 const P2P_MSG_STATE_HASH = 0x07;  // State hash for sync validation
+const P2P_MSG_VALIDATION_PING = 0x10;  // Validation request (Phase 19)
+const P2P_MSG_VALIDATION_PONG = 0x11;  // Validation response (Phase 19)
 
 /**
  * Encode an input packet for P2P transmission.
@@ -267,6 +269,37 @@ function decodeStateHash(buffer) {
         hash += byte.toString(16).padStart(2, '0');
     }
     return { frameNumber, hash };
+}
+
+/**
+ * Encode a validation ping message (Phase 19).
+ * Format: 9 bytes
+ *   Byte 0: Message type (0x10)
+ *   Bytes 1-8: Timestamp (float64)
+ *
+ * @returns {ArrayBuffer} Encoded ping
+ */
+function encodeValidationPing() {
+    const buffer = new ArrayBuffer(9);
+    const view = new DataView(buffer);
+    view.setUint8(0, P2P_MSG_VALIDATION_PING);
+    view.setFloat64(1, performance.now(), false);
+    return buffer;
+}
+
+/**
+ * Encode a validation pong response (Phase 19).
+ * Echoes back the original timestamp.
+ *
+ * @param {number} originalTimestamp - Timestamp from received ping
+ * @returns {ArrayBuffer} Encoded pong
+ */
+function encodeValidationPong(originalTimestamp) {
+    const buffer = new ArrayBuffer(9);
+    const view = new DataView(buffer);
+    view.setUint8(0, P2P_MSG_VALIDATION_PONG);
+    view.setFloat64(1, originalTimestamp, false);
+    return buffer;
 }
 
 /**
@@ -677,6 +710,18 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
             timeoutId: null          // Timeout handle
         };
 
+        // P2P validation state machine (Phase 19)
+        // States: 'idle' -> 'connecting' -> 'validating' -> 'validated' | 'failed'
+        this.p2pValidation = {
+            enabled: true,                  // Can be disabled via config
+            state: 'idle',
+            timeoutMs: 10000,               // Default 10 seconds for validation
+            timeoutId: null,
+            pingSentAt: null,               // Timestamp when ping sent
+            pongReceived: false,
+            peerPingSeen: false
+        };
+
         // GGPO-style input queuing: inputs are queued during network reception
         // and processed synchronously at frame start to prevent race conditions
         this.pendingInputPackets = [];     // Queued P2P input packets
@@ -763,8 +808,19 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
                     p2pLog.debug(`Waiting for P2P connection (max ${this.p2pReadyGate.timeoutMs}ms)...`);
                     this.p2pReadyGate.timeoutId = setTimeout(() => {
                         if (!this.p2pReadyGate.resolved) {
-                            p2pLog.warn(`P2P connection timeout - starting game with SocketIO fallback`);
-                            this._resolveP2PReadyGate();
+                            // Phase 19: On timeout without validation, emit failure instead of fallback
+                            if (this.p2pValidation.enabled && this.p2pValidation.state !== 'validated') {
+                                p2pLog.error('P2P connection timeout - validation not complete');
+                                socket.emit('p2p_validation_failed', {
+                                    game_id: this.gameId,
+                                    player_id: this.myPlayerId,
+                                    reason: 'connection_timeout'
+                                });
+                            } else {
+                                // Validation disabled - allow SocketIO fallback (legacy behavior)
+                                p2pLog.warn('P2P connection timeout - starting with SocketIO fallback');
+                                this._resolveP2PReadyGate();
+                            }
                         }
                     }, this.p2pReadyGate.timeoutMs);
                 }
@@ -1049,6 +1105,13 @@ env.get_state()
             if (data.cumulative_rewards) {
                 this.cumulative_rewards = data.cumulative_rewards;
             }
+        });
+
+        // P2P validation complete (Phase 19)
+        // Both peers validated - proceed to game
+        socket.on('p2p_validation_complete', (data) => {
+            p2pLog.warn('P2P validation complete - proceeding to game');
+            this._resolveP2PReadyGate();
         });
 
         // Partner excluded (Phase 17)
@@ -3989,6 +4052,7 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
          * Initialize WebRTC P2P connection to peer.
          * Called after pyodide_game_ready when we know the other player's ID.
          */
+        this.p2pValidation.state = 'connecting';
         p2pLog.debug(`Initiating connection to peer ${this.p2pPeerId}`);
 
         // Build WebRTC options with TURN config if available
@@ -4004,7 +4068,7 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
 
         // Set up callbacks
         this.webrtcManager.onDataChannelOpen = () => {
-            p2pLog.warn('DataChannel OPEN - P2P connection established');
+            p2pLog.warn('DataChannel OPEN - starting P2P validation');
             this.p2pConnected = true;
 
             // Initialize P2P input sending (use numeric index for binary protocol)
@@ -4018,14 +4082,15 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
             // Initialize connection health monitoring
             this.connectionHealth = new ConnectionHealthMonitor();
 
-            // Start periodic ping for RTT measurement
-            this._startPingInterval();
-
-            // Send a test message to verify connection
-            this._sendP2PTestMessage();
-
-            // Resolve P2P ready gate - game can now start with P2P
-            this._resolveP2PReadyGate();
+            // Start P2P validation handshake (Phase 19)
+            if (this.p2pValidation.enabled) {
+                this._startValidation();
+            } else {
+                // Validation disabled - resolve immediately
+                this._startPingInterval();
+                this._sendP2PTestMessage();
+                this._resolveP2PReadyGate();
+            }
         };
 
         this.webrtcManager.onDataChannelMessage = (data) => {
@@ -4118,6 +4183,120 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
 
         const status = this.p2pConnected ? 'P2P ready' : 'SocketIO fallback';
         p2pLog.debug(`P2P ready gate resolved: ${status}`);
+    }
+
+    /**
+     * Start P2P validation handshake (Phase 19).
+     * Both peers send ping, wait for pong, confirm bidirectional data flow.
+     */
+    _startValidation() {
+        this.p2pValidation.state = 'validating';
+        p2pLog.info('Starting P2P validation handshake');
+
+        // Emit status to server for UI update
+        socket.emit('p2p_validation_status', {
+            game_id: this.gameId,
+            status: 'validating'
+        });
+
+        // Set validation timeout
+        this.p2pValidation.timeoutId = setTimeout(() => {
+            if (this.p2pValidation.state === 'validating') {
+                this._onValidationTimeout();
+            }
+        }, this.p2pValidation.timeoutMs);
+
+        // Small delay to ensure DataChannel is stable, then send ping
+        setTimeout(() => {
+            if (this.p2pValidation.state === 'validating') {
+                this._sendValidationPing();
+            }
+        }, 100);
+    }
+
+    _sendValidationPing() {
+        const packet = encodeValidationPing();
+        if (this.webrtcManager?.isReady()) {
+            this.webrtcManager.send(packet);
+            this.p2pValidation.pingSentAt = performance.now();
+            p2pLog.debug('Sent validation ping');
+        }
+    }
+
+    _handleValidationPing(buffer) {
+        const view = new DataView(buffer);
+        const timestamp = view.getFloat64(1, false);
+
+        // Mark that peer's ping was received
+        this.p2pValidation.peerPingSeen = true;
+
+        // Respond with pong
+        const pong = encodeValidationPong(timestamp);
+        this.webrtcManager?.send(pong);
+        p2pLog.debug('Received validation ping, sent pong');
+
+        // Check if validation complete
+        this._checkValidationComplete();
+    }
+
+    _handleValidationPong(buffer) {
+        const view = new DataView(buffer);
+        const originalTimestamp = view.getFloat64(1, false);
+
+        // Measure RTT from validation handshake
+        if (this.p2pValidation.pingSentAt) {
+            const rtt = performance.now() - this.p2pValidation.pingSentAt;
+            p2pLog.debug(`Validation pong received, RTT: ${rtt.toFixed(1)}ms`);
+        }
+
+        this.p2pValidation.pongReceived = true;
+        this._checkValidationComplete();
+    }
+
+    _checkValidationComplete() {
+        // Validation complete when we've sent ping, received pong, and seen peer's ping
+        if (this.p2pValidation.pingSentAt &&
+            this.p2pValidation.pongReceived &&
+            this.p2pValidation.peerPingSeen) {
+            this._onValidationSuccess();
+        }
+    }
+
+    _onValidationSuccess() {
+        // Clear timeout
+        if (this.p2pValidation.timeoutId) {
+            clearTimeout(this.p2pValidation.timeoutId);
+            this.p2pValidation.timeoutId = null;
+        }
+
+        this.p2pValidation.state = 'validated';
+        p2pLog.warn('P2P validation successful');
+
+        // Notify server
+        socket.emit('p2p_validation_success', {
+            game_id: this.gameId,
+            player_id: this.myPlayerId
+        });
+
+        // Start ping interval now that validation is complete
+        this._startPingInterval();
+        this._sendP2PTestMessage();
+
+        // Don't resolve gate yet - wait for server to confirm both players validated
+    }
+
+    _onValidationTimeout() {
+        this.p2pValidation.state = 'failed';
+        p2pLog.error('P2P validation timeout');
+
+        // Notify server of failure
+        socket.emit('p2p_validation_failed', {
+            game_id: this.gameId,
+            player_id: this.myPlayerId,
+            reason: 'timeout'
+        });
+
+        // Server will emit p2p_validation_repool, handled by index.js
     }
 
     /**
@@ -4215,6 +4394,12 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
                 break;
             case P2P_MSG_STATE_HASH:
                 this._handleStateHash(buffer);
+                break;
+            case P2P_MSG_VALIDATION_PING:
+                this._handleValidationPing(buffer);
+                break;
+            case P2P_MSG_VALIDATION_PONG:
+                this._handleValidationPong(buffer);
                 break;
             default:
                 p2pLog.warn(`Unknown binary message type: ${messageType}`);
