@@ -1337,6 +1337,135 @@ def on_mid_game_exclusion(data):
     )
 
 
+@socketio.on('execute_entry_callback')
+def handle_execute_entry_callback(data):
+    """Execute researcher-defined entry screening callback.
+
+    Receives participant context from client, executes callback if configured,
+    returns exclusion decision.
+
+    Args:
+        data: {
+            'session_id': str,
+            'scene_id': str,
+            'context': {
+                'ping': number,
+                'browser_name': str,
+                'browser_version': str,
+                'device_type': str,
+                'os_name': str,
+                'os_version': str
+            }
+        }
+    """
+    session_id = data.get('session_id')
+    scene_id = data.get('scene_id')
+    context = data.get('context', {})
+
+    # Get subject ID from session
+    subject_id = get_subject_id_from_session_id(flask.request.sid)
+    if subject_id is None:
+        flask_socketio.emit('entry_callback_result', {'exclude': False, 'message': None})
+        return
+
+    # Get the current scene from participant's stager
+    participant_stager = STAGERS.get(subject_id)
+    if participant_stager is None:
+        logger.warning(f"Entry callback: No stager found for {subject_id}")
+        flask_socketio.emit('entry_callback_result', {'exclude': False, 'message': None})
+        return
+
+    scene = participant_stager.current_scene
+    if scene is None or not hasattr(scene, 'entry_exclusion_callback') or scene.entry_exclusion_callback is None:
+        # No callback configured, pass through
+        flask_socketio.emit('entry_callback_result', {'exclude': False, 'message': None})
+        return
+
+    try:
+        # Add subject_id and scene_id to context
+        context['subject_id'] = subject_id
+        context['scene_id'] = scene.scene_id if hasattr(scene, 'scene_id') else scene_id
+
+        # Execute the callback
+        result = scene.entry_exclusion_callback(context)
+
+        # Validate result format
+        exclude = result.get('exclude', False)
+        message = result.get('message', None)
+
+        logger.info(f"Entry callback for {subject_id}: exclude={exclude}")
+        flask_socketio.emit('entry_callback_result', {'exclude': exclude, 'message': message})
+    except Exception as e:
+        logger.error(f"[Callback Error] Entry callback failed for {subject_id}: {e}")
+        # On error, allow entry (fail open) but log
+        flask_socketio.emit('entry_callback_result', {'exclude': False, 'message': None, 'error': str(e)})
+
+
+@socketio.on('execute_continuous_callback')
+def handle_execute_continuous_callback(data):
+    """Execute researcher-defined continuous monitoring callback.
+
+    Receives participant context from client during gameplay, executes callback,
+    returns exclusion/warning decision.
+
+    Args:
+        data: {
+            'session_id': str,
+            'scene_id': str,
+            'context': {
+                'ping': number,
+                'is_tab_hidden': bool,
+                'tab_hidden_duration_ms': number,
+                'frame_number': number,
+                'episode_number': number
+            }
+        }
+    """
+    session_id = data.get('session_id')
+    scene_id = data.get('scene_id')
+    context = data.get('context', {})
+
+    # Get subject ID from session
+    subject_id = get_subject_id_from_session_id(flask.request.sid)
+    if subject_id is None:
+        flask_socketio.emit('continuous_callback_result', {'exclude': False, 'warn': False, 'message': None})
+        return
+
+    # Get the current scene from participant's stager
+    participant_stager = STAGERS.get(subject_id)
+    if participant_stager is None:
+        logger.warning(f"Continuous callback: No stager found for {subject_id}")
+        flask_socketio.emit('continuous_callback_result', {'exclude': False, 'warn': False, 'message': None})
+        return
+
+    scene = participant_stager.current_scene
+    if scene is None or not hasattr(scene, 'continuous_exclusion_callback') or scene.continuous_exclusion_callback is None:
+        # No callback configured, pass through
+        flask_socketio.emit('continuous_callback_result', {'exclude': False, 'warn': False, 'message': None})
+        return
+
+    try:
+        # Add subject_id and scene_id to context
+        context['subject_id'] = subject_id
+        context['scene_id'] = scene.scene_id if hasattr(scene, 'scene_id') else scene_id
+
+        # Execute the callback
+        result = scene.continuous_exclusion_callback(context)
+
+        # Validate result format
+        exclude = result.get('exclude', False)
+        warn = result.get('warn', False)
+        message = result.get('message', None)
+
+        if exclude or warn:
+            logger.info(f"Continuous callback for {subject_id}: exclude={exclude}, warn={warn}")
+        flask_socketio.emit('continuous_callback_result', {'exclude': exclude, 'warn': warn, 'message': message})
+    except Exception as e:
+        logger.error(f"[Callback Error] Continuous callback failed for {subject_id}: {e}")
+        # On error, don't exclude (fail open) but log
+        flask_socketio.emit('continuous_callback_result', {'exclude': False, 'warn': False, 'message': None, 'error': str(e)})
+
+
 @socketio.on("pyodide_hud_update")
 def on_pyodide_hud_update(data):
     """
