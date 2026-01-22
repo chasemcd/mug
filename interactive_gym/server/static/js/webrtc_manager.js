@@ -357,13 +357,13 @@ class WebRTCManager {
                     // Connection recovered or established
                     this._cancelDisconnectGracePeriod();
                     this._cancelDisconnectTimeout();
-                    this.iceRestartAttempts = 0;  // Reset restart counter on successful connection
-                    // Notify if we were previously disconnected (connection self-recovered)
-                    if (this.wasDisconnected) {
-                        console.log('[WebRTC] Connection restored');
+                    // Check if this is a recovery (had restart attempts or was disconnected) vs initial connection
+                    if (this.iceRestartAttempts > 0 || this.wasDisconnected) {
+                        console.log('[WebRTC] Connection restored after ICE restart');
                         this.onConnectionRestored?.();
-                        this.wasDisconnected = false;
                     }
+                    this.iceRestartAttempts = 0;  // Reset restart counter on successful connection
+                    this.wasDisconnected = false;
                     break;
             }
         };
@@ -493,16 +493,66 @@ class WebRTCManager {
      * Handle ICE failure by attempting restart.
      * @private
      */
-    _handleIceFailure() {
+    async _handleIceFailure() {
+        const success = await this.attemptIceRestart();
+        if (!success) {
+            this.onConnectionFailed?.();
+        }
+    }
+
+    /**
+     * Attempt ICE restart to recover connection (Phase 20).
+     * Creates new offer with iceRestart flag and sends via signaling.
+     *
+     * @returns {Promise<boolean>} True if restart initiated, false on failure
+     */
+    async attemptIceRestart() {
+        if (!this.peerConnection) {
+            console.error('[WebRTC] Cannot restart ICE - no peer connection');
+            return false;
+        }
+
         if (this.iceRestartAttempts >= this.maxIceRestarts) {
             console.error('[WebRTC] Max ICE restart attempts reached');
             this.onConnectionFailed?.();
-            return;
+            return false;
         }
 
         this.iceRestartAttempts++;
         console.log(`[WebRTC] ICE restart attempt ${this.iceRestartAttempts}/${this.maxIceRestarts}`);
-        this.peerConnection.restartIce();
+
+        try {
+            // Request ICE restart
+            this.peerConnection.restartIce();
+
+            // Only initiator creates offer (use same deterministic role as initial connection)
+            const isInitiator = this._comparePlayerIds(this.myPlayerId, this.targetPeerId) < 0;
+
+            if (isInitiator) {
+                // Create new offer with ICE restart flag
+                const offer = await this.peerConnection.createOffer({ iceRestart: true });
+                await this.peerConnection.setLocalDescription(offer);
+                this._sendSignal('offer', this.peerConnection.localDescription);
+                console.log('[WebRTC] Sent ICE restart offer');
+            }
+            // Answerer will respond when they receive the offer
+
+            return true;
+        } catch (error) {
+            console.error('[WebRTC] ICE restart failed:', error);
+            return false;
+        }
+    }
+
+    /**
+     * Check if the connection is in a usable state.
+     * @returns {boolean} True if connected and DataChannel is open
+     */
+    isConnectionUsable() {
+        return (
+            this.peerConnection?.iceConnectionState === 'connected' ||
+            this.peerConnection?.iceConnectionState === 'completed'
+        ) && this.dataChannel?.readyState === 'open';
     }
 
     /**
