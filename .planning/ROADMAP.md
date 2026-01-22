@@ -57,7 +57,7 @@ Key deliverables:
 
 - [x] **Phase 19: Waiting Room Validation** - P2P connection validation before experiment starts
 - [x] **Phase 20: Mid-Game Reconnection** - Detect drops, pause gameplay, reconnection overlay, configurable timeout
-- [ ] **Phase 21: Per-Round Health Check** - DataChannel verification before each round begins
+- [x] **Phase 21: Per-Round Health Check** - DataChannel verification before each round begins
 - [ ] **Phase 22: Latency Telemetry** - Async latency monitoring and stats export
 
 ## Phase Details
@@ -213,7 +213,7 @@ Plans:
 **Research flag:** Unlikely (builds on Phase 20 infrastructure)
 **Plans:** 1 plan
 Plans:
-- [ ] 21-01-PLAN.md — Per-round health check with connection blocking before episode sync
+- [x] 21-01-PLAN.md — Per-round health check with connection blocking before episode sync
 
 ### Phase 22: Latency Telemetry
 **Goal:** Async latency monitoring and stats export
@@ -244,9 +244,9 @@ Phases execute in numeric order: 19 -> 20 -> 21 -> 22
 | 18. Custom Callbacks | v1.2 | 1/1 | Complete | 2026-01-22 |
 | 19. Waiting Room Validation | v1.3 | 1/1 | Complete | 2026-01-22 |
 | 20. Mid-Game Reconnection | v1.3 | 2/2 | Complete | 2026-01-22 |
-| 21. Per-Round Health Check | v1.3 | 0/1 | Not started | - |
+| 21. Per-Round Health Check | v1.3 | 1/1 | Complete | 2026-01-22 |
 | 22. Latency Telemetry | v1.3 | 0/1 | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-01-22 after Phase 21 planned*
+*Last updated: 2026-01-22 after Phase 21 complete*

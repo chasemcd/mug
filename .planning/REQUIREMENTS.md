@@ -15,8 +15,8 @@ Requirements for v1.3 P2P Connection Validation milestone. Each maps to roadmap 
 
 ### Per-Round Health
 
-- [ ] **ROUND-01**: DataChannel connection verified before each round begins
-- [ ] **ROUND-02**: Round start blocked until P2P connection confirmed healthy
+- [x] **ROUND-01**: DataChannel connection verified before each round begins
+- [x] **ROUND-02**: Round start blocked until P2P connection confirmed healthy
 
 ### Mid-Game Reconnection
 
@@ -73,8 +73,8 @@ Which phases cover which requirements.
 | WAIT-01 | Phase 19 | Complete |
 | WAIT-02 | Phase 19 | Complete |
 | WAIT-03 | Phase 19 | Complete |
-| ROUND-01 | Phase 21 | Pending |
-| ROUND-02 | Phase 21 | Pending |
+| ROUND-01 | Phase 21 | Complete |
+| ROUND-02 | Phase 21 | Complete |
 | RECON-01 | Phase 20 | Complete |
 | RECON-02 | Phase 20 | Complete |
 | RECON-03 | Phase 20 | Complete |
@@ -94,4 +94,4 @@ Which phases cover which requirements.
 
 ---
 *Requirements defined: 2026-01-21*
-*Last updated: 2026-01-21 after roadmap created*
+*Last updated: 2026-01-22 after Phase 21 complete*
