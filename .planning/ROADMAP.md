@@ -182,9 +182,9 @@ Plans:
   2. Failed P2P pairs automatically returned to matchmaking pool
   3. Participants see clear status messaging during P2P validation attempt
 **Research flag:** Unlikely (WebRTC connection state APIs well-documented)
-**Plans:** TBD
+**Plans:** 1 plan
 Plans:
-- [ ] 19-01-PLAN.md - P2P validation in waiting room, re-pool on failure, status UI
+- [ ] 19-01-PLAN.md - P2P validation protocol, server coordination, re-pool on failure, status UI
 
 ### Phase 20: Mid-Game Reconnection
 **Goal:** Handle P2P drops with pause, overlay, and configurable recovery
@@ -241,11 +241,11 @@ Phases execute in numeric order: 19 -> 20 -> 21 -> 22
 | 16. Continuous Monitoring | v1.2 | 1/1 | Complete | 2026-01-21 |
 | 17. Multiplayer Exclusion | v1.2 | 1/1 | Complete | 2026-01-21 |
 | 18. Custom Callbacks | v1.2 | 1/1 | Complete | 2026-01-22 |
-| 19. Waiting Room Validation | v1.3 | 0/1 | Not started | - |
+| 19. Waiting Room Validation | v1.3 | 0/1 | Planned | - |
 | 20. Mid-Game Reconnection | v1.3 | 0/1 | Not started | - |
 | 21. Per-Round Health Check | v1.3 | 0/1 | Not started | - |
 | 22. Latency Telemetry | v1.3 | 0/1 | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-01-21 after v1.3 phases added*
+*Last updated: 2026-01-22 after Phase 19 planned*
