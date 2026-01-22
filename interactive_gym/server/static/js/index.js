@@ -469,28 +469,9 @@ socket.on("waiting_room_player_left", function(data) {
 })
 
 
-// P2P Validation Status (Phase 19)
+// P2P Validation Status (Phase 19) - log only, no UI updates
 socket.on('p2p_validation_status', function(data) {
-    var status = data.status;
-    var message = '';
-
-    switch (status) {
-        case 'connecting':
-            message = 'Connecting with your partner...';
-            break;
-        case 'validating':
-            message = 'Verifying connection quality...';
-            break;
-        case 'validated':
-            message = 'Connection established! Starting game...';
-            break;
-        default:
-            return;  // Unknown status, don't update UI
-    }
-
-    // Update waiting room text
-    $("#waitroomText").text(message);
-    $("#waitroomText").show();
+    console.log("[P2P] Validation status:", data.status);
 });
 
 // P2P Validation Re-pool (Phase 19)
