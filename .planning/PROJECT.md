@@ -8,21 +8,27 @@ A framework for running browser-based reinforcement learning experiments with hu
 
 Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
 
-## Current Milestone: v1.2 Participant Exclusion
+## Current Milestone: v1.3 P2P Connection Validation
 
-**Goal:** A configurable, extensible system to exclude participants who don't meet experiment requirements — checked both at entry and continuously during play.
+**Goal:** Ensure reliable P2P connections throughout experiments with pre-game validation, per-round health checks, reconnection handling, and comprehensive latency/connection telemetry.
 
 **Target features:**
-- Pre-experiment screening — check criteria before experiment starts, block with configurable message
-- Continuous monitoring — re-check criteria during experiment, exclude if violated
-- Configurable exclusion rules — hybrid approach: built-in rules via config + custom callback functions
-- Per-rule messaging — each exclusion criterion defines its own participant-facing message
-- Multiplayer handling — when one player excluded mid-experiment, end game for both
+- Waiting room P2P validation — confirm successful P2P connection before experiment starts; failed pairs re-enter matchmaking pool
+- Per-round connection check — verify DataChannel is open before each round begins
+- Mid-game reconnection with pause — pause gameplay and show reconnecting overlay for both clients; configurable timeout before ending game
+- Connection event logging — log disconnection events, reconnection attempts, pause durations
+- Async latency monitoring — non-blocking periodic P2P latency measurements during gameplay
+- Latency stats export — min, median, mean, max P2P latency in summary aggregation logs
 
-**Example criteria categories:**
-- Connection quality (ping threshold, packet loss, connection type)
-- Device/browser (browser type, screen size, mobile detection)
-- Behavior-based (inactivity timeout, disconnect patterns)
+## Previous Milestone: v1.2 Participant Exclusion (Shipped: 2026-01-22)
+
+**Delivered:** A configurable, extensible system to exclude participants who don't meet experiment requirements — checked both at entry and continuously during play.
+
+**Key accomplishments:**
+- Entry screening with browser/device detection via ua-parser-js
+- Continuous monitoring with frame-throttled checking and warning system
+- Custom callback support for arbitrary server-side exclusion logic
+- Multiplayer exclusion handling (end game for both, distinct partner notification)
 
 ## Previous State (v1.0)
 
@@ -67,15 +73,23 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 - ✓ Legacy host-based sync code removed — v1.0
 - ✓ GGPO-style synchronous input processing — v1.0
 
+*Shipped in v1.2:*
+- ✓ Entry screening with browser/device detection — v1.2
+- ✓ Continuous monitoring during experiment — v1.2
+- ✓ Custom callback support for exclusion logic — v1.2
+- ✓ Multiplayer exclusion handling — v1.2
+
 ### Active
 
-- [ ] Exclusion rule framework with pluggable criteria
-- [ ] Pre-experiment screening system
-- [ ] Continuous monitoring during experiment
-- [ ] Built-in rules: ping threshold, browser exclusion, inactivity detection
-- [ ] Custom callback support for arbitrary exclusion logic
-- [ ] Per-rule configurable messaging
-- [ ] Multiplayer exclusion handling (end game for both players)
+- [ ] Waiting room P2P validation before experiment starts
+- [ ] Failed P2P pairs re-enter matchmaking pool
+- [ ] Per-round DataChannel health check
+- [ ] Mid-game reconnection with gameplay pause
+- [ ] Reconnecting overlay for both clients during reconnection
+- [ ] Configurable reconnection timeout before ending game
+- [ ] Connection event logging (disconnections, reconnection attempts, pause durations)
+- [ ] Async periodic P2P latency monitoring
+- [ ] Latency stats export (min, median, mean, max)
 
 ### Deferred
 
@@ -122,4 +136,4 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 | Open Relay Project for TURN | Free 20GB/month tier sufficient for research | ✓ Good |
 
 ---
-*Last updated: 2026-01-21 after v1.2 milestone start*
+*Last updated: 2026-01-21 after v1.3 milestone start*
