@@ -9,10 +9,10 @@ See: .planning/PROJECT.md (updated 2026-01-21)
 
 ## Current Position
 
-Phase: 16 of 18 (Continuous Monitoring)
-Plan: 16-01-PLAN.md (1 plan, complete)
-Status: Phase complete
-Last activity: 2026-01-21 - Completed 16-01-PLAN.md
+Phase: 17 of 18 (Multiplayer Exclusion Handling)
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-01-21 — Phase 16 verified complete
 
 Progress: [####......] 50% (v1.2 - 2/4 phases complete)
 
@@ -105,9 +105,9 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-01-21
-Stopped at: Completed 16-01-PLAN.md
+Stopped at: Phase 16 verified complete
 Resume file: None
 
 ### Next Steps
 
-1. `/gsd:execute-phase 17` - execute Partner Notification phase
+1. `/gsd:plan-phase 17` — plan Multiplayer Exclusion Handling phase

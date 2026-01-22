@@ -16,10 +16,10 @@ Requirements for v1.2 Participant Exclusion milestone. Each maps to roadmap phas
 
 ### Continuous Monitoring
 
-- [ ] **MONITOR-01**: System continuously monitors participant ping during gameplay
-- [ ] **MONITOR-02**: Participant excluded mid-game if ping exceeds threshold for sustained period
-- [ ] **MONITOR-03**: System detects when participant switches to another tab
-- [ ] **MONITOR-04**: Tab switch triggers configurable warning or exclusion
+- [x] **MONITOR-01**: System continuously monitors participant ping during gameplay
+- [x] **MONITOR-02**: Participant excluded mid-game if ping exceeds threshold for sustained period
+- [x] **MONITOR-03**: System detects when participant switches to another tab
+- [x] **MONITOR-04**: Tab switch triggers configurable warning or exclusion
 
 ### Multiplayer Handling
 
@@ -77,10 +77,10 @@ Which phases cover which requirements.
 | ENTRY-02 | Phase 15 | Complete |
 | ENTRY-03 | Phase 15 | Complete |
 | ENTRY-04 | Phase 15 | Complete |
-| MONITOR-01 | Phase 16 | Pending |
-| MONITOR-02 | Phase 16 | Pending |
-| MONITOR-03 | Phase 16 | Pending |
-| MONITOR-04 | Phase 16 | Pending |
+| MONITOR-01 | Phase 16 | Complete |
+| MONITOR-02 | Phase 16 | Complete |
+| MONITOR-03 | Phase 16 | Complete |
+| MONITOR-04 | Phase 16 | Complete |
 | MULTI-01 | Phase 17 | Pending |
 | MULTI-02 | Phase 17 | Pending |
 | MULTI-03 | Phase 17 | Pending |
@@ -95,4 +95,4 @@ Which phases cover which requirements.
 
 ---
 *Requirements defined: 2026-01-21*
-*Last updated: 2026-01-21 after Phase 15 complete*
+*Last updated: 2026-01-21 after Phase 16 complete*
