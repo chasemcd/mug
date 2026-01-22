@@ -319,6 +319,8 @@ function showExclusionMessage(message) {
 var experimentScreeningPassed = null;  // null = not yet checked, true/false = result
 var experimentScreeningMessage = null;
 var experimentScreeningConfig = null;  // Stores experiment-level config
+var experimentScreeningComplete = false;  // True when screening is done (passed or failed)
+var pendingSceneData = null;  // Store scene data if it arrives before screening completes
 
 function sendPing() {
     window.lastPingTime = Date.now();
@@ -373,32 +375,53 @@ socket.on('experiment_config', async function(data) {
             const result = await runEntryScreening(experimentScreeningConfig);
             experimentScreeningPassed = result.passed;
             experimentScreeningMessage = result.message;
+            experimentScreeningComplete = true;
 
             if (!result.passed) {
                 console.log("[ExperimentConfig] Screening failed:", result.failedRule, result.message);
                 showExclusionMessage(result.message);
             } else {
                 console.log("[ExperimentConfig] Screening passed");
-                showLandingPageContent();
+                // Process any pending scene that arrived during screening
+                if (pendingSceneData) {
+                    console.log("[ExperimentConfig] Processing pending scene");
+                    processPendingScene();
+                }
             }
         } else {
             // No screening rules configured at experiment level
             experimentScreeningPassed = true;
-            showLandingPageContent();
+            experimentScreeningComplete = true;
+            if (pendingSceneData) {
+                processPendingScene();
+            }
         }
     } else {
-        // No entry screening config, show content immediately
-        showLandingPageContent();
+        // No entry screening config, mark as complete and process pending scene
+        experimentScreeningPassed = true;
+        experimentScreeningComplete = true;
+        if (pendingSceneData) {
+            processPendingScene();
+        }
     }
 });
 
 /**
- * Show the landing page content after screening passes.
- * Called when experiment-level screening succeeds or is not configured.
+ * Process a pending scene that was queued while screening was in progress.
  */
-function showLandingPageContent() {
-    $("#sceneBody").show();
-    $("#advanceButton").show();
+function processPendingScene() {
+    if (!pendingSceneData) return;
+    const data = pendingSceneData;
+    pendingSceneData = null;
+
+    // Re-dispatch to the appropriate scene handler
+    if (data.scene_type === 'GymScene' || data.scene_type === 'gym') {
+        startGymScene(data);
+    } else if (data.scene_type === 'EndScene' || data.scene_type === 'end') {
+        startEndScene(data);
+    } else {
+        startStaticScene(data);
+    }
 }
 
 socket.on('connect', function() {
@@ -795,6 +818,9 @@ socket.on('end_game_request_redirect', function(data) {
 
 
 socket.on('update_game_page_text', function(data) {
+    // Don't update if screening failed
+    if (experimentScreeningPassed === false) return;
+
     $("#sceneBody").html(data.game_page_text);
     $("#sceneBody").show();
 })
@@ -905,6 +931,19 @@ function activateScene(data) {
     console.log(data);
     currentSceneMetadata = data;
 
+    // If screening is still in progress, queue the scene for later
+    if (!experimentScreeningComplete) {
+        console.log("[Scene] Screening in progress, queueing scene:", data.scene_type);
+        pendingSceneData = data;
+        return;
+    }
+
+    // If screening failed, don't proceed with any scene
+    if (experimentScreeningPassed === false) {
+        console.log("[Scene] Blocked by failed screening");
+        return;
+    }
+
     if (data.scene_type == "EndScene" || data.scene_type == "CompletionCodeScene") {
         startEndScene(data);
     } else if (data.scene_type == "GymScene") {
@@ -919,6 +958,12 @@ function activateScene(data) {
 
 
 function startStaticScene(data) {
+    // Don't proceed if screening failed
+    if (experimentScreeningPassed === false) {
+        console.log("[Scene] Blocked by experiment-level screening");
+        return;
+    }
+
     // In the Static and Start scenes, we only show
     // the advanceButton, sceneHeader, and sceneBody
     // Hide other buttons that shouldn't be visible
@@ -940,6 +985,12 @@ function startStaticScene(data) {
 };
 
 function startEndScene(data) {
+    // Don't proceed if screening failed
+    if (experimentScreeningPassed === false) {
+        console.log("[Scene] Blocked by experiment-level screening");
+        return;
+    }
+
     // Hide buttons that shouldn't be visible in EndScene
     $("#startButton").hide();
     $("#startButton").attr("disabled", true);
