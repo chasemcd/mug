@@ -35,8 +35,8 @@ Requirements for v1.3 P2P Connection Validation milestone. Each maps to roadmap 
 
 ### Latency Monitoring
 
-- [ ] **LAT-01**: P2P latency measured periodically during gameplay (non-blocking)
-- [ ] **LAT-02**: Latency stats exported: min, median, mean, max
+- [x] **LAT-01**: P2P latency measured periodically during gameplay (non-blocking)
+- [x] **LAT-02**: Latency stats exported: min, median, mean, max
 
 ## v2 Requirements
 
@@ -84,8 +84,8 @@ Which phases cover which requirements.
 | LOG-01 | Phase 20 | Complete |
 | LOG-02 | Phase 20 | Complete |
 | LOG-03 | Phase 20 | Complete |
-| LAT-01 | Phase 22 | Pending |
-| LAT-02 | Phase 22 | Pending |
+| LAT-01 | Phase 22 | Complete |
+| LAT-02 | Phase 22 | Complete |
 
 **Coverage:**
 - v1.3 requirements: 16 total
@@ -94,4 +94,4 @@ Which phases cover which requirements.
 
 ---
 *Requirements defined: 2026-01-21*
-*Last updated: 2026-01-22 after Phase 21 complete*
+*Last updated: 2026-01-22 after Phase 22 complete — v1.3 milestone complete*

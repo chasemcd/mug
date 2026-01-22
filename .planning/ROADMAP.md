@@ -5,7 +5,7 @@
 - **v1.0 P2P Multiplayer** - Phases 1-10 (shipped 2026-01-19)
 - **v1.1 Sync Validation** - Phases 11-14 (complete)
 - **v1.2 Participant Exclusion** - Phases 15-18 (shipped 2026-01-22)
-- 🚧 **v1.3 P2P Connection Validation** - Phases 19-22 (in progress)
+- **v1.3 P2P Connection Validation** - Phases 19-22 (complete)
 
 ## Phases
 
@@ -51,14 +51,14 @@ Key deliverables:
 
 </details>
 
-### 🚧 v1.3 P2P Connection Validation (In Progress)
+### ✓ v1.3 P2P Connection Validation (Complete)
 
 **Milestone Goal:** Ensure reliable P2P connections throughout experiments with pre-game validation, per-round health checks, reconnection handling, and comprehensive latency/connection telemetry.
 
 - [x] **Phase 19: Waiting Room Validation** - P2P connection validation before experiment starts
 - [x] **Phase 20: Mid-Game Reconnection** - Detect drops, pause gameplay, reconnection overlay, configurable timeout
 - [x] **Phase 21: Per-Round Health Check** - DataChannel verification before each round begins
-- [ ] **Phase 22: Latency Telemetry** - Async latency monitoring and stats export
+- [x] **Phase 22: Latency Telemetry** - Async latency monitoring and stats export
 
 ## Phase Details
 
@@ -225,7 +225,7 @@ Plans:
 **Research flag:** Unlikely (WebRTC getStats() well-documented)
 **Plans:** 1 plan
 Plans:
-- [ ] 22-01-PLAN.md — LatencyTelemetry class, async RTT sampling, stats export integration
+- [x] 22-01-PLAN.md — LatencyTelemetry class, async RTT sampling, stats export integration
 
 ## Progress
 
@@ -245,8 +245,8 @@ Phases execute in numeric order: 19 -> 20 -> 21 -> 22
 | 19. Waiting Room Validation | v1.3 | 1/1 | Complete | 2026-01-22 |
 | 20. Mid-Game Reconnection | v1.3 | 2/2 | Complete | 2026-01-22 |
 | 21. Per-Round Health Check | v1.3 | 1/1 | Complete | 2026-01-22 |
-| 22. Latency Telemetry | v1.3 | 0/1 | Not started | - |
+| 22. Latency Telemetry | v1.3 | 1/1 | Complete | 2026-01-22 |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-01-22 after Phase 22 planned*
+*Last updated: 2026-01-22 after Phase 22 complete — v1.3 milestone complete*
