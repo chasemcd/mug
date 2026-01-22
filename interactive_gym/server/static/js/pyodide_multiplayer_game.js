@@ -1198,8 +1198,7 @@ env.get_state()
 
         socket.on('p2p_resume', (data) => {
             if (data.game_id === this.gameId) {
-                // Plan 02 will add full resume implementation
-                p2pLog.info('Server requested resume', data);
+                this._handleServerResume(data);
             }
         });
 
@@ -4113,25 +4112,37 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
             p2pLog.warn('DataChannel OPEN - starting P2P validation');
             this.p2pConnected = true;
 
+            // If we were reconnecting, DataChannel reopen means reconnection succeeded (Phase 20)
+            if (this.reconnectionState.state === 'reconnecting') {
+                p2pLog.info('DataChannel reopened during reconnection');
+                this._onP2PReconnectionSuccess();
+            }
+
             // Initialize P2P input sending (use numeric index for binary protocol)
             const myPlayerIndex = this.playerIdToIndex[this.myPlayerId];
-            this.p2pInputSender = new P2PInputSender(
-                this.webrtcManager,
-                myPlayerIndex,
-                3  // redundancy count
-            );
+            if (!this.p2pInputSender) {
+                this.p2pInputSender = new P2PInputSender(
+                    this.webrtcManager,
+                    myPlayerIndex,
+                    3  // redundancy count
+                );
+            }
 
             // Initialize connection health monitoring
-            this.connectionHealth = new ConnectionHealthMonitor();
+            if (!this.connectionHealth) {
+                this.connectionHealth = new ConnectionHealthMonitor();
+            }
 
-            // Start P2P validation handshake (Phase 19)
-            if (this.p2pValidation.enabled) {
-                this._startValidation();
-            } else {
-                // Validation disabled - resolve immediately
-                this._startPingInterval();
-                this._sendP2PTestMessage();
-                this._resolveP2PReadyGate();
+            // Start P2P validation handshake (Phase 19) - only on initial connection
+            if (this.p2pValidation.state === 'connecting') {
+                if (this.p2pValidation.enabled) {
+                    this._startValidation();
+                } else {
+                    // Validation disabled - resolve immediately
+                    this._startPingInterval();
+                    this._sendP2PTestMessage();
+                    this._resolveP2PReadyGate();
+                }
             }
         };
 
@@ -4180,10 +4191,11 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
             this._onP2PConnectionLost(info);
         };
 
+        // Connection restored callback (Phase 20)
         this.webrtcManager.onConnectionRestored = () => {
-            // Connection self-recovered before ICE restart needed
-            // Plan 02 will add full resume handling
-            p2pLog.info('Connection self-recovered');
+            p2pLog.info('Connection restored');
+            // Trigger reconnection success flow
+            this._onP2PReconnectionSuccess();
         };
 
         // Start the connection (role determined by player ID comparison)
@@ -4411,7 +4423,12 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
             this.continuousMonitor.pause();
         }
 
-        // Note: Overlay will be shown by Plan 02
+        // Show reconnecting overlay (RECON-03)
+        this._showReconnectingOverlay();
+
+        // Transition to reconnecting state and attempt ICE restart
+        this.reconnectionState.state = 'reconnecting';
+        this._attemptReconnection();
     }
 
     /**
@@ -4508,6 +4525,168 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
             reconnectionAttempts: this.reconnectionState.reconnectionAttempts,
             totalPauseDurationMs: this.reconnectionState.totalPauseDuration
         };
+    }
+
+    /**
+     * Show reconnecting overlay (Phase 20 - RECON-03).
+     * Displays centered overlay with spinner and status message.
+     */
+    _showReconnectingOverlay() {
+        // Remove existing overlay if any
+        this._hideReconnectingOverlay();
+
+        const overlay = document.createElement('div');
+        overlay.id = 'reconnect-overlay';
+        overlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+            color: white;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        `;
+        overlay.innerHTML = `
+            <div style="font-size: 24px; margin-bottom: 20px;">
+                Connection Lost
+            </div>
+            <div class="reconnect-spinner" style="
+                width: 40px;
+                height: 40px;
+                border: 4px solid #444;
+                border-top: 4px solid #fff;
+                border-radius: 50%;
+                animation: reconnect-spin 1s linear infinite;
+            "></div>
+            <div id="reconnect-status" style="margin-top: 20px; font-size: 16px; color: #ccc;">
+                Reconnecting...
+            </div>
+            <style>
+                @keyframes reconnect-spin {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                }
+            </style>
+        `;
+        document.body.appendChild(overlay);
+    }
+
+    /**
+     * Hide reconnecting overlay.
+     */
+    _hideReconnectingOverlay() {
+        const overlay = document.getElementById('reconnect-overlay');
+        if (overlay) {
+            overlay.remove();
+        }
+    }
+
+    /**
+     * Update reconnecting overlay status message.
+     */
+    _updateReconnectingStatus(message) {
+        const status = document.getElementById('reconnect-status');
+        if (status) {
+            status.textContent = message;
+        }
+    }
+
+    /**
+     * Attempt to reconnect via ICE restart (Phase 20 - RECON-05).
+     */
+    async _attemptReconnection() {
+        if (!this.webrtcManager) {
+            p2pLog.error('Cannot attempt reconnection - no WebRTC manager');
+            return;
+        }
+
+        this._updateReconnectingStatus('Attempting to reconnect...');
+
+        const started = await this.webrtcManager.attemptIceRestart();
+        if (started) {
+            p2pLog.info('ICE restart initiated');
+            this._updateReconnectingStatus('Restoring connection...');
+        } else {
+            p2pLog.warn('ICE restart failed to start');
+            this._updateReconnectingStatus('Connection cannot be restored...');
+        }
+    }
+
+    /**
+     * Handle successful P2P reconnection (Phase 20 - RECON-05).
+     * Called when ICE restart succeeds and DataChannel reopens.
+     */
+    _onP2PReconnectionSuccess() {
+        if (!this.reconnectionState.isPaused) {
+            p2pLog.debug('Reconnection success but not paused - ignoring');
+            return;
+        }
+
+        p2pLog.info('P2P reconnection successful');
+
+        // Calculate duration for logging (LOG-02)
+        const duration = this.reconnectionState.pauseStartTime ?
+            Date.now() - this.reconnectionState.pauseStartTime : 0;
+
+        // Log reconnection attempt (LOG-02)
+        this.reconnectionState.reconnectionAttempts.push({
+            timestamp: Date.now(),
+            duration: duration,
+            outcome: 'success',
+            attempts: this.webrtcManager?.iceRestartAttempts || 0
+        });
+
+        // Update total pause duration (LOG-03)
+        this.reconnectionState.totalPauseDuration += duration;
+
+        this._updateReconnectingStatus('Connection restored!');
+
+        // Notify server that we've reconnected
+        socket.emit('p2p_reconnection_success', {
+            game_id: this.gameId,
+            player_id: this.myPlayerId,
+            duration_ms: duration
+        });
+
+        // Server will emit p2p_resume when all players reconnected
+    }
+
+    /**
+     * Handle server resume command (Phase 20 - RECON-05).
+     * Server coordinates resume to ensure both clients resume together.
+     */
+    _handleServerResume(data) {
+        if (!this.reconnectionState.isPaused) {
+            p2pLog.debug('Server resume received but not paused');
+            return;
+        }
+
+        p2pLog.info('Server requested resume - restoring gameplay');
+
+        // Clear timeout first (prevent race condition - Pitfall 4 from research)
+        this._clearReconnectionTimeout();
+
+        // Reset reconnection state
+        this.reconnectionState.isPaused = false;
+        this.reconnectionState.pauseStartTime = null;
+        this.reconnectionState.pauseFrame = null;
+        this.reconnectionState.state = 'connected';
+
+        // Hide overlay
+        this._hideReconnectingOverlay();
+
+        // Resume continuous monitoring if it was active
+        if (this.continuousMonitor) {
+            this.continuousMonitor.resume();
+        }
+
+        p2pLog.info('Gameplay resumed successfully');
     }
 
     /**
