@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-21)
 ## Current Position
 
 Phase: 21 of 22 (Per-Round Health Check)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-01-22 — Phase 20 complete (Mid-Game Reconnection)
+Plan: 01 of 01 complete
+Status: Phase complete
+Last activity: 2026-01-22 - Completed 21-01-PLAN.md (Per-Round Health Check)
 
-Progress: [█████░░░░░] 50% (v1.3 - 2/4 phases complete)
+Progress: [███████░░░] 75% (v1.3 - 3/4 phases complete)
 
 ## Milestone History
 
@@ -30,7 +30,7 @@ Progress: [█████░░░░░] 50% (v1.3 - 2/4 phases complete)
 ### Key Files
 
 **P2P Core (created/heavily modified in v1.0):**
-- `interactive_gym/server/static/js/pyodide_multiplayer_game.js` (4,800+ LOC)
+- `interactive_gym/server/static/js/pyodide_multiplayer_game.js` (4,900+ LOC)
 - `interactive_gym/server/static/js/webrtc_manager.js` (759 LOC)
 - `interactive_gym/server/pyodide_game_coordinator.py`
 - `interactive_gym/configurations/remote_config.py`
@@ -51,6 +51,9 @@ Progress: [█████░░░░░] 50% (v1.3 - 2/4 phases complete)
 
 **v1.3 Execution:**
 - `.planning/phases/19-waiting-room-validation/19-01-SUMMARY.md`
+- `.planning/phases/20-mid-game-reconnection/20-01-SUMMARY.md`
+- `.planning/phases/20-mid-game-reconnection/20-02-SUMMARY.md`
+- `.planning/phases/21-per-round-health-check/21-01-SUMMARY.md`
 
 **Phase 16 Key Files:**
 - `interactive_gym/server/static/js/continuous_monitor.js` (320+ LOC) - Extended with callback support
@@ -83,6 +86,9 @@ Progress: [█████░░░░░] 50% (v1.3 - 2/4 phases complete)
 - `interactive_gym/server/static/js/webrtc_manager.js` - attemptIceRestart(), isConnectionUsable()
 - `interactive_gym/server/static/js/pyodide_multiplayer_game.js` - overlay UI, reconnection success/resume handlers
 - `interactive_gym/scenes/gym_scene.py` - reconnection_config() builder, reconnection_timeout_ms attribute
+
+**Phase 21 Key Files:**
+- `interactive_gym/server/static/js/pyodide_multiplayer_game.js` - _waitForHealthyConnection() method, reset() health check gating
 
 ### Decisions
 
@@ -157,6 +163,12 @@ See: .planning/PROJECT.md Key Decisions table
 - Server coordinates resume to ensure both clients resume together
 - Reconnection data included in both validation and session exports
 
+**v1.3 decisions (Phase 21):**
+- Fast path returns immediately when connection usable (ROUND-01)
+- 10-second health check timeout before round start (ROUND-02)
+- Health check uses polling (100ms interval) with state-aware behavior
+- Early return on failure lets reconnection flow handle termination
+
 ### Pending Todos
 
 (None)
@@ -170,9 +182,9 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-01-22
-Stopped at: Phase 20 verified and complete
+Stopped at: Completed 21-01-PLAN.md (Per-Round Health Check)
 Resume file: None
 
 ### Next Steps
 
-1. `/gsd:plan-phase 21` — plan Per-Round Health Check phase
+1. `/gsd:plan-phase 22` - plan Connection Health Metrics phase (final phase of v1.3)
