@@ -1523,6 +1523,19 @@ obs, infos, render_state
         ui_utils.showHUD();
         ui_utils.updateHUDText(this.getHUDText());
 
+        // P2P per-round health check (Phase 21 - ROUND-01, ROUND-02)
+        // Verify DataChannel connection is healthy before starting round
+        if (!this.serverAuthoritative && this.webrtcManager) {
+            try {
+                await this._waitForHealthyConnection(10000);  // 10 second timeout
+            } catch (e) {
+                p2pLog.error(`Per-round health check failed: ${e.message}`);
+                // Don't proceed with round - reconnection handler will end game if terminated
+                // Or timeout will have elapsed - let the game end naturally via existing flow
+                return [obs, infos, render_state];  // Return early, let caller handle state
+            }
+        }
+
         // P2P episode start synchronization
         // Compute state hash and wait for peer to be ready before starting
         if (!this.serverAuthoritative && this.webrtcManager?.isReady()) {
