@@ -379,13 +379,27 @@ socket.on('experiment_config', async function(data) {
                 showExclusionMessage(result.message);
             } else {
                 console.log("[ExperimentConfig] Screening passed");
+                showLandingPageContent();
             }
         } else {
             // No screening rules configured at experiment level
             experimentScreeningPassed = true;
+            showLandingPageContent();
         }
+    } else {
+        // No entry screening config, show content immediately
+        showLandingPageContent();
     }
 });
+
+/**
+ * Show the landing page content after screening passes.
+ * Called when experiment-level screening succeeds or is not configured.
+ */
+function showLandingPageContent() {
+    $("#sceneBody").show();
+    $("#advanceButton").show();
+}
 
 socket.on('connect', function() {
     console.debug("connecting")
