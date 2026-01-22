@@ -198,9 +198,10 @@ Plans:
   5. Game ends cleanly if reconnection times out (configurable)
   6. Disconnection and reconnection events logged with timestamps
 **Research flag:** Likely (WebRTC reconnection patterns vary, state machine complexity)
-**Plans:** TBD
+**Plans:** 2 plans
 Plans:
-- [ ] 20-01-PLAN.md - Drop detection, pause state, reconnection overlay, timeout handling, event logging
+- [ ] 20-01-PLAN.md - Connection drop detection, bilateral pause coordination, server-side state tracking
+- [ ] 20-02-PLAN.md - Reconnecting overlay UI, ICE restart recovery, resume handling, config API, data export
 
 ### Phase 21: Per-Round Health Check
 **Goal:** Verify DataChannel before each round
@@ -242,10 +243,10 @@ Phases execute in numeric order: 19 -> 20 -> 21 -> 22
 | 17. Multiplayer Exclusion | v1.2 | 1/1 | Complete | 2026-01-21 |
 | 18. Custom Callbacks | v1.2 | 1/1 | Complete | 2026-01-22 |
 | 19. Waiting Room Validation | v1.3 | 1/1 | Complete | 2026-01-22 |
-| 20. Mid-Game Reconnection | v1.3 | 0/1 | Not started | - |
+| 20. Mid-Game Reconnection | v1.3 | 0/2 | Planned | - |
 | 21. Per-Round Health Check | v1.3 | 0/1 | Not started | - |
 | 22. Latency Telemetry | v1.3 | 0/1 | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-01-22 after Phase 19 complete*
+*Last updated: 2026-01-22 after Phase 20 planned*
