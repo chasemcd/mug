@@ -688,6 +688,10 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         this.monitorCheckCounter = 0;   // Check every N frames to reduce overhead
         this.monitorCheckInterval = 30; // Check once per second at 30fps
 
+        // Partial session tracking (Phase 17)
+        // Set when session ends due to exclusion (self or partner)
+        this.sessionPartialInfo = null;
+
         this.setupMultiplayerHandlers();
     }
 
@@ -1045,6 +1049,50 @@ env.get_state()
             if (data.cumulative_rewards) {
                 this.cumulative_rewards = data.cumulative_rewards;
             }
+        });
+
+        // Partner excluded (Phase 17)
+        // Received when the other player was excluded by continuous monitoring
+        socket.on('partner_excluded', (data) => {
+            p2pLog.warn(`Partner excluded: ${data.message}`);
+
+            // Stop game loop
+            this.state = "done";
+            this.episodeComplete = true;
+
+            // Pause monitoring
+            if (this.continuousMonitor) {
+                this.continuousMonitor.pause();
+            }
+
+            // Show notification (neutral, not alarming like own exclusion)
+            this._showPartnerExcludedUI(data.message);
+
+            // Clean up WebRTC
+            if (this.webrtcManager) {
+                this.webrtcManager.close();
+            }
+        });
+
+        // Trigger data export (Phase 17)
+        // Received when partner is excluded - export our data before redirect
+        socket.on('trigger_data_export', (data) => {
+            // Mark session as partial in our metrics
+            this.sessionPartialInfo = {
+                isPartial: true,
+                terminationReason: data.termination_reason,
+                terminationFrame: data.termination_frame
+            };
+
+            // Export metrics immediately (before redirect)
+            if (this.gameId) {
+                this.emitMultiplayerMetrics(this.sceneId);
+            }
+
+            // Now request redirect
+            socket.emit('end_game_request_redirect', {
+                partner_exclusion: true
+            });
         });
     }
 
@@ -2824,6 +2872,48 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
                 <h2 style="color: #c00; margin-bottom: 20px;">Game Ended</h2>
                 <p style="font-size: 16px; margin-bottom: 20px;">${message}</p>
                 <p style="color: #666; font-size: 14px;">You will be redirected shortly...</p>
+            </div>
+        `;
+        overlay.style.display = 'flex';
+    }
+
+    /**
+     * Show partner excluded notification (less alarming than own exclusion).
+     * Uses neutral styling - gray header instead of red.
+     * @param {string} message - Notification message
+     */
+    _showPartnerExcludedUI(message) {
+        let overlay = document.getElementById('partnerExcludedOverlay');
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.id = 'partnerExcludedOverlay';
+            overlay.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.75);
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                z-index: 10000;
+            `;
+            document.body.appendChild(overlay);
+        }
+
+        // Use neutral styling (not red like exclusion)
+        overlay.innerHTML = `
+            <div style="
+                background: white;
+                padding: 40px;
+                border-radius: 8px;
+                max-width: 500px;
+                text-align: center;
+            ">
+                <h2 style="color: #333; margin-bottom: 20px;">Game Ended</h2>
+                <p style="font-size: 16px; margin-bottom: 20px;">${message}</p>
+                <p style="color: #666; font-size: 14px;">Your game data has been saved. You will be redirected shortly...</p>
             </div>
         `;
         overlay.style.display = 'flex';
