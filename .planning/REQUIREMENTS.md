@@ -1,58 +1,58 @@
-# Requirements: Interactive Gym v1.2 Participant Exclusion
+# Requirements: Interactive Gym v1.3 P2P Connection Validation
 
 **Defined:** 2026-01-21
 **Core Value:** Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
 
-## v1.2 Requirements
+## v1.3 Requirements
 
-Requirements for v1.2 Participant Exclusion milestone. Each maps to roadmap phases.
+Requirements for v1.3 P2P Connection Validation milestone. Each maps to roadmap phases.
 
-### Entry Screening
+### Waiting Room Validation
 
-- [x] **ENTRY-01**: Researcher can configure device type exclusion (mobile/desktop/both allowed)
-- [x] **ENTRY-02**: Researcher can configure browser type requirements (e.g., require Chrome/Firefox, block Safari)
-- [x] **ENTRY-03**: Researcher can configure ping threshold for entry (exclude if latency > N ms)
-- [x] **ENTRY-04**: Participant sees configurable message explaining why they were excluded at entry
+- [ ] **WAIT-01**: P2P connection must be validated before experiment starts
+- [ ] **WAIT-02**: Failed P2P pairs re-enter matchmaking pool to find new partners
+- [ ] **WAIT-03**: Participants see clear status messaging during P2P validation
 
-### Continuous Monitoring
+### Per-Round Health
 
-- [x] **MONITOR-01**: System continuously monitors participant ping during gameplay
-- [x] **MONITOR-02**: Participant excluded mid-game if ping exceeds threshold for sustained period
-- [x] **MONITOR-03**: System detects when participant switches to another tab
-- [x] **MONITOR-04**: Tab switch triggers configurable warning or exclusion
+- [ ] **ROUND-01**: DataChannel connection verified before each round begins
+- [ ] **ROUND-02**: Round start blocked until P2P connection confirmed healthy
 
-### Multiplayer Handling
+### Mid-Game Reconnection
 
-- [x] **MULTI-01**: When one player excluded, the other player receives clear notification ("Your partner experienced a technical issue")
-- [x] **MULTI-02**: Game terminates cleanly for both players when one is excluded
-- [x] **MULTI-03**: Valid game data up to exclusion point is preserved and marked as partial session
+- [ ] **RECON-01**: System detects when P2P DataChannel connection drops
+- [ ] **RECON-02**: Gameplay pauses immediately for both clients on connection drop
+- [ ] **RECON-03**: Both players see reconnecting overlay during reconnection attempts
+- [ ] **RECON-04**: Reconnection timeout is configurable by researcher
+- [ ] **RECON-05**: Gameplay resumes if reconnection succeeds within timeout
+- [ ] **RECON-06**: Game ends cleanly for both players if reconnection times out
 
-### Extensibility
+### Connection Logging
 
-- [x] **EXT-01**: Researcher can define custom exclusion rules via Python callback functions
-- [x] **EXT-02**: Custom callbacks receive participant context (ping, browser, focus state, etc.)
-- [x] **EXT-03**: Custom callbacks return exclusion decision with optional message
+- [ ] **LOG-01**: Disconnection events logged with timestamp and detecting peer
+- [ ] **LOG-02**: Reconnection attempts logged with duration and outcome
+- [ ] **LOG-03**: Total pause duration per session recorded in data export
+
+### Latency Monitoring
+
+- [ ] **LAT-01**: P2P latency measured periodically during gameplay (non-blocking)
+- [ ] **LAT-02**: Latency stats exported: min, median, mean, max
 
 ## v2 Requirements
 
 Deferred to future release. Tracked but not in current roadmap.
 
-### Entry Screening
+### Latency
 
-- **ENTRY-05**: Researcher can configure screen size minimum requirement
-- **ENTRY-06**: Researcher can exclude based on connection type (P2P vs TURN vs fallback)
+- **LAT-03**: Configurable latency threshold with exclusion (not just logging)
 
-### Continuous Monitoring
+### Reconnection
 
-- **MONITOR-05**: System detects participant inactivity (no inputs for N seconds)
-- **MONITOR-06**: System detects disconnect patterns (multiple reconnects indicate unstable environment)
+- **RECON-07**: Automatic reconnection retry count limit before giving up
 
-### Extensibility
+### Waiting Room
 
-- **EXT-04**: Each built-in rule has its own configurable participant-facing message
-- **EXT-05**: GameCallback.on_exclusion() hook for researcher custom handling
-- **EXT-06**: Exclusion analytics export (rate by rule, time, browser)
-- **EXT-07**: Grace period warning system before exclusion (warn, then exclude if persists)
+- **WAIT-04**: Connection quality pre-check (latency threshold) before matchmaking completes
 
 ## Out of Scope
 
@@ -60,39 +60,38 @@ Explicitly excluded. Documented to prevent scope creep.
 
 | Feature | Reason |
 |---------|--------|
-| Duplicate Prolific/MTurk prescreeners | Handled by recruitment platforms; duplicating creates maintenance burden |
-| Auto-rejection on first attention check | Research shows 61% of failures may be false positives |
-| Complex rule engine (AND/OR/NOT operators) | Over-engineering; custom callbacks handle complex logic |
-| Browser fingerprinting for repeat detection | Privacy/GDPR concerns; recruitment platforms track this |
-| Mandatory fullscreen enforcement | Safari has keyboard issues in fullscreen; creates friction |
-| Webcam/microphone permission blocking | Only check when experiment actually uses A/V |
+| Latency-based exclusion | v1.3 focuses on data collection; exclusion deferred to v2 |
+| Adaptive input delay based on RTT | Deferred to future milestone |
+| N-player reconnection handling | Current scope is 2-player only |
 
 ## Traceability
 
-Which phases cover which requirements.
+Which phases cover which requirements. Updated by create-roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| ENTRY-01 | Phase 15 | Complete |
-| ENTRY-02 | Phase 15 | Complete |
-| ENTRY-03 | Phase 15 | Complete |
-| ENTRY-04 | Phase 15 | Complete |
-| MONITOR-01 | Phase 16 | Complete |
-| MONITOR-02 | Phase 16 | Complete |
-| MONITOR-03 | Phase 16 | Complete |
-| MONITOR-04 | Phase 16 | Complete |
-| MULTI-01 | Phase 17 | Complete |
-| MULTI-02 | Phase 17 | Complete |
-| MULTI-03 | Phase 17 | Complete |
-| EXT-01 | Phase 18 | Complete |
-| EXT-02 | Phase 18 | Complete |
-| EXT-03 | Phase 18 | Complete |
+| WAIT-01 | — | Pending |
+| WAIT-02 | — | Pending |
+| WAIT-03 | — | Pending |
+| ROUND-01 | — | Pending |
+| ROUND-02 | — | Pending |
+| RECON-01 | — | Pending |
+| RECON-02 | — | Pending |
+| RECON-03 | — | Pending |
+| RECON-04 | — | Pending |
+| RECON-05 | — | Pending |
+| RECON-06 | — | Pending |
+| LOG-01 | — | Pending |
+| LOG-02 | — | Pending |
+| LOG-03 | — | Pending |
+| LAT-01 | — | Pending |
+| LAT-02 | — | Pending |
 
 **Coverage:**
-- v1.2 requirements: 14 total
-- Mapped to phases: 14 ✓
-- Unmapped: 0
+- v1.3 requirements: 16 total
+- Mapped to phases: 0
+- Unmapped: 16 ⚠️
 
 ---
 *Requirements defined: 2026-01-21*
-*Last updated: 2026-01-22 after Phase 18 complete - v1.2 milestone complete (14/14 requirements)*
+*Last updated: 2026-01-21 after initial definition*
