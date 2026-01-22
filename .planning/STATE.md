@@ -136,9 +136,5 @@ Resume file: None
 
 ### Next Steps
 
-v1.2 Participant Exclusion milestone is complete. All planned phases (1-18) have been executed.
-
-Potential future work:
-- v1.3: Enhanced analytics and debugging tools
-- v1.4: Performance optimizations for larger groups
-- v1.5: Additional game modes or coordination patterns
+1. `/gsd:audit-milestone` — verify requirements, cross-phase integration, E2E flows
+2. `/gsd:complete-milestone` — archive v1.2 and prepare for next milestone

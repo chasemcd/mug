@@ -29,9 +29,9 @@ Requirements for v1.2 Participant Exclusion milestone. Each maps to roadmap phas
 
 ### Extensibility
 
-- [ ] **EXT-01**: Researcher can define custom exclusion rules via Python callback functions
-- [ ] **EXT-02**: Custom callbacks receive participant context (ping, browser, focus state, etc.)
-- [ ] **EXT-03**: Custom callbacks return exclusion decision with optional message
+- [x] **EXT-01**: Researcher can define custom exclusion rules via Python callback functions
+- [x] **EXT-02**: Custom callbacks receive participant context (ping, browser, focus state, etc.)
+- [x] **EXT-03**: Custom callbacks return exclusion decision with optional message
 
 ## v2 Requirements
 
@@ -84,9 +84,9 @@ Which phases cover which requirements.
 | MULTI-01 | Phase 17 | Complete |
 | MULTI-02 | Phase 17 | Complete |
 | MULTI-03 | Phase 17 | Complete |
-| EXT-01 | Phase 18 | Pending |
-| EXT-02 | Phase 18 | Pending |
-| EXT-03 | Phase 18 | Pending |
+| EXT-01 | Phase 18 | Complete |
+| EXT-02 | Phase 18 | Complete |
+| EXT-03 | Phase 18 | Complete |
 
 **Coverage:**
 - v1.2 requirements: 14 total
@@ -95,4 +95,4 @@ Which phases cover which requirements.
 
 ---
 *Requirements defined: 2026-01-21*
-*Last updated: 2026-01-21 after Phase 17 complete*
+*Last updated: 2026-01-22 after Phase 18 complete - v1.2 milestone complete (14/14 requirements)*

@@ -4,7 +4,7 @@
 
 - **v1.0 P2P Multiplayer** - Phases 1-10 (shipped 2026-01-19)
 - **v1.1 Sync Validation** - Phases 11-14 (complete)
-- **v1.2 Participant Exclusion** - Phases 15-18 (in progress)
+- **v1.2 Participant Exclusion** - Phases 15-18 (complete)
 
 ## Phases
 
@@ -45,7 +45,7 @@ Key deliverables:
 - [x] **Phase 15: Entry Screening Rules** - Pre-game device/browser/ping checks with exclusion messaging
 - [x] **Phase 16: Continuous Monitoring** - Real-time ping and tab visibility monitoring during gameplay
 - [x] **Phase 17: Multiplayer Exclusion Handling** - Coordinated game termination when one player excluded
-- [ ] **Phase 18: Custom Exclusion Callbacks** - Researcher-defined arbitrary exclusion logic
+- [x] **Phase 18: Custom Exclusion Callbacks** - Researcher-defined arbitrary exclusion logic
 
 ## Phase Details
 
@@ -158,7 +158,7 @@ Plans:
 **Research flag:** Unlikely (standard callback patterns)
 **Plans:** 1 plan
 Plans:
-- [ ] 18-01-PLAN.md - GymScene.exclusion_callbacks() config, server-side callback execution, client-server integration
+- [x] 18-01-PLAN.md - GymScene.exclusion_callbacks() config, server-side callback execution, client-server integration
 
 ## Progress
 
@@ -174,8 +174,8 @@ Phases execute in numeric order: 15 -> 16 -> 17 -> 18
 | 15. Entry Screening Rules | v1.2 | 1/1 | Complete | 2026-01-21 |
 | 16. Continuous Monitoring | v1.2 | 1/1 | Complete | 2026-01-21 |
 | 17. Multiplayer Exclusion | v1.2 | 1/1 | Complete | 2026-01-21 |
-| 18. Custom Callbacks | v1.2 | 0/1 | Planned | - |
+| 18. Custom Callbacks | v1.2 | 1/1 | Complete | 2026-01-22 |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-01-21 after Phase 18 planning*
+*Last updated: 2026-01-22 after Phase 18 complete - v1.2 milestone complete*
