@@ -2828,6 +2828,18 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
             this.webrtcManager.close();
         }
 
+        // Mark own session as partial before export
+        this.sessionPartialInfo = {
+            isPartial: true,
+            terminationReason: reason,  // 'sustained_ping' or 'tab_hidden'
+            terminationFrame: this.frameNumber
+        };
+
+        // Export metrics before leaving game
+        if (this.gameId && this.sceneId) {
+            this.emitMultiplayerMetrics(this.sceneId);
+        }
+
         // Trigger end game redirect
         socket.emit('leave_game', { session_id: window.sessionId });
         socket.emit('end_game_request_redirect', {
@@ -4805,6 +4817,14 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
 
                 // All rollback events across all episodes
                 allRollbacks: this.cumulativeValidation.allRollbacks
+            },
+
+            // Session status (Phase 17: partial session marking)
+            sessionStatus: {
+                isPartial: this.sessionPartialInfo?.isPartial || false,
+                terminationReason: this.sessionPartialInfo?.terminationReason || 'normal',
+                terminationFrame: this.sessionPartialInfo?.terminationFrame || this.frameNumber,
+                completedEpisodes: this.cumulativeValidation?.episodes?.length || 0
             }
         };
     }
