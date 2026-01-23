@@ -4163,6 +4163,122 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
     }
 
     /**
+     * Fast-forward through buffered inputs when returning from background state.
+     * Phase 26: Called on first tick after tab is foregrounded.
+     *
+     * Similar to performRollback, but processes buffered partner inputs
+     * to catch up to current game state after being backgrounded.
+     *
+     * Safety limits prevent browser freeze on long background periods.
+     */
+    async _performFastForward() {
+        // Drain buffered inputs from FocusManager
+        const bufferedInputs = this.focusManager.drainBufferedInputs();
+        if (bufferedInputs.length === 0) {
+            p2pLog.debug('Fast-forward: no buffered inputs to process');
+            return;
+        }
+
+        const startTime = performance.now();
+        const startFrame = this.frameNumber;
+
+        // Safety limits
+        const MAX_FRAMES = 300;  // ~30 seconds at 10fps
+        const MAX_MS = 1000;     // Max 1 second of processing time
+
+        p2pLog.warn(`FAST-FORWARD: starting from frame ${startFrame}, ${bufferedInputs.length} buffered packets`);
+
+        // 1. Inject buffered inputs into GGPO input buffer
+        let maxFrame = this.frameNumber;
+        for (const packet of bufferedInputs) {
+            // Packets have format: {playerId, inputs: [{action, frame}, ...], currentFrame}
+            for (const input of packet.inputs) {
+                this.storeRemoteInput(packet.playerId, input.action, input.frame);
+                maxFrame = Math.max(maxFrame, input.frame);
+            }
+        }
+
+        // 2. Determine how many frames to process
+        const framesToProcess = maxFrame - this.frameNumber;
+        if (framesToProcess <= 0) {
+            p2pLog.debug('Fast-forward: already caught up or ahead');
+            return;
+        }
+
+        // 3. Set rollback guard to prevent nested operations
+        this.rollbackInProgress = true;
+
+        // Get human player IDs for input retrieval
+        const humanPlayerIds = Object.entries(this.policyMapping)
+            .filter(([_, policy]) => policy === 'human')
+            .map(([id, _]) => String(id));
+
+        let framesProcessed = 0;
+
+        try {
+            // 4. Fast-forward loop: step each frame without rendering
+            while (this.frameNumber < maxFrame &&
+                   framesProcessed < MAX_FRAMES &&
+                   (performance.now() - startTime) < MAX_MS) {
+
+                // Get inputs for this frame (confirmed from buffer, predicted if missing)
+                // Pass trackPredictions=false to avoid marking frames during fast-forward
+                const inputs = this.getInputsForFrame(this.frameNumber, humanPlayerIds, false);
+
+                // Build final actions for all agents
+                const finalActions = {};
+                for (const [agentId, policy] of Object.entries(this.policyMapping)) {
+                    if (policy === 'human') {
+                        finalActions[agentId] = inputs[String(agentId)] ?? this.defaultAction;
+                    } else {
+                        // Bot: use last executed action or default
+                        finalActions[agentId] = this.lastExecutedActions[agentId] ?? this.defaultAction;
+                    }
+                }
+
+                // Step environment without rendering
+                await this.stepWithActions(finalActions);
+
+                // Track last executed actions for fallback
+                for (const [agentId, action] of Object.entries(finalActions)) {
+                    this.lastExecutedActions[agentId] = action;
+                }
+
+                // Record in action sequence (same pattern as normal step)
+                this.actionSequence.push({
+                    frame: this.frameNumber,
+                    actions: {...finalActions}
+                });
+
+                this.frameNumber++;
+                framesProcessed++;
+
+                // Prune input buffer periodically during fast-forward
+                if (framesProcessed % 20 === 0) {
+                    this.pruneInputBuffer();
+                }
+            }
+
+            // Log if we hit limits
+            if (framesProcessed >= MAX_FRAMES) {
+                p2pLog.warn(`Fast-forward hit frame limit (${MAX_FRAMES}), remaining frames will catch up normally`);
+            } else if ((performance.now() - startTime) >= MAX_MS) {
+                p2pLog.warn(`Fast-forward hit time limit (${MAX_MS}ms), remaining frames will catch up normally`);
+            }
+
+        } finally {
+            // 5. Always clear rollback guard
+            this.rollbackInProgress = false;
+        }
+
+        const elapsed = performance.now() - startTime;
+        p2pLog.warn(
+            `FAST-FORWARD: ${startFrame} -> ${this.frameNumber} ` +
+            `(${framesProcessed} frames in ${elapsed.toFixed(1)}ms)`
+        );
+    }
+
+    /**
      * Process any delayed inputs that are ready.
      * Used for debug testing of rollback behavior.
      */
