@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-22)
 
 ## Current Position
 
-Phase: 25 of 27 (Focus Detection)
+Phase: 26 of 27 (Resync & Partner UX)
 Plan: 01 complete
 Status: Phase complete
-Last activity: 2026-01-23 - Completed 25-01-PLAN.md
+Last activity: 2026-01-23 - Completed 26-01-PLAN.md
 
-Progress: [#####-----] 50% (v1.5 - 2/4 phases)
+Progress: [#######---] 75% (v1.5 - 3/4 phases)
 
 ## Milestone History
 
@@ -36,6 +36,9 @@ Progress: [#####-----] 50% (v1.5 - 2/4 phases)
 - `interactive_gym/server/static/js/webrtc_manager.js` (1,030+ LOC)
 - `interactive_gym/server/pyodide_game_coordinator.py`
 - `interactive_gym/configurations/remote_config.py`
+
+**Fast-Forward Resync (v1.5 Phase 26 - added):**
+- `interactive_gym/server/static/js/pyodide_multiplayer_game.js` - _performFastForward(), _pendingFastForward flag, FocusManager._onForegrounded hook
 
 **Focus Management (v1.5 Phase 25 - added):**
 - `interactive_gym/server/static/js/pyodide_multiplayer_game.js` - FocusManager class, focusManager property, background checks in _handleWorkerTick and _handleInputPacket
@@ -77,10 +80,17 @@ Progress: [#####-----] 50% (v1.5 - 2/4 phases)
 **v1.5 Execution:**
 - `.planning/phases/24-web-worker-timer/24-01-SUMMARY.md`
 - `.planning/phases/25-focus-detection/25-01-SUMMARY.md`
+- `.planning/phases/26-resync-partner-ux/26-01-SUMMARY.md`
 
 ### Decisions
 
 See: .planning/PROJECT.md Key Decisions table
+
+**v1.5 Phase 26 decisions:**
+- Fast-forward is async with error handling to not block tick processing
+- Safety limits: MAX_FRAMES=300, MAX_MS=1000 prevent browser freeze
+- Bot actions use lastExecutedActions or defaultAction during fast-forward
+- Snapshots and hashes skipped during fast-forward for performance
 
 **v1.5 Phase 25 decisions:**
 - Worker keeps ticking when backgrounded (for elapsed time tracking), but frames don't advance
@@ -112,9 +122,9 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-01-23
-Stopped at: Completed 25-01-PLAN.md (Focus Detection)
+Stopped at: Completed 26-01-PLAN.md (Resync & Partner UX)
 Resume file: None
 
 ### Next Steps
 
-Run `/gsd:plan-phase 26` to plan Fast-Forward Resume (catch up buffered inputs on refocus).
+Run `/gsd:plan-phase 27` to plan Telemetry Export (export focus loss data for analysis).
