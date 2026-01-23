@@ -153,6 +153,116 @@ class GameTimerWorker {
     }
 }
 
+// ========== Focus Management (Phase 25) ==========
+// Detects tab visibility changes and manages background state for multiplayer sync.
+
+/**
+ * FocusManager - Detects tab visibility changes and manages background state.
+ *
+ * When tab is backgrounded:
+ * - Local player's actions default to idle/no-op (defaultAction)
+ * - Partner inputs are buffered for fast-forward on refocus (Phase 26)
+ * - Game loop continues via Web Worker (Phase 24)
+ *
+ * Different from ContinuousMonitor which handles exclusion. FocusManager
+ * handles graceful background operation for multiplayer sync.
+ */
+class FocusManager {
+    constructor() {
+        this.isBackgrounded = document.hidden;
+        this.backgroundStartTime = document.hidden ? performance.now() : null;
+        this.backgroundPeriods = [];  // [{start: number, end: number, durationMs: number}]
+        this.backgroundInputBuffer = [];  // Inputs received while backgrounded
+
+        this._setupVisibilityListener();
+    }
+
+    _setupVisibilityListener() {
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                this._onBackgrounded();
+            } else {
+                this._onForegrounded();
+            }
+        });
+    }
+
+    _onBackgrounded() {
+        this.isBackgrounded = true;
+        this.backgroundStartTime = performance.now();
+        p2pLog.info('Tab backgrounded - local inputs will use defaultAction');
+    }
+
+    _onForegrounded() {
+        if (this.backgroundStartTime !== null) {
+            const end = performance.now();
+            const durationMs = end - this.backgroundStartTime;
+            this.backgroundPeriods.push({
+                start: this.backgroundStartTime,
+                end: end,
+                durationMs: durationMs
+            });
+            p2pLog.info(`Tab foregrounded after ${durationMs.toFixed(0)}ms - buffered ${this.backgroundInputBuffer.length} inputs`);
+        }
+        this.isBackgrounded = false;
+        this.backgroundStartTime = null;
+    }
+
+    /**
+     * Get current background duration in ms, or 0 if not backgrounded.
+     */
+    getCurrentBackgroundDuration() {
+        if (!this.isBackgrounded || this.backgroundStartTime === null) {
+            return 0;
+        }
+        return performance.now() - this.backgroundStartTime;
+    }
+
+    /**
+     * Buffer a partner input packet received while backgrounded.
+     * @param {Object} packet - Decoded input packet {playerId, inputs, currentFrame}
+     */
+    bufferInput(packet) {
+        this.backgroundInputBuffer.push(packet);
+    }
+
+    /**
+     * Drain all buffered inputs (for fast-forward on refocus).
+     * @returns {Array} Array of buffered packets
+     */
+    drainBufferedInputs() {
+        const buffered = this.backgroundInputBuffer;
+        this.backgroundInputBuffer = [];
+        return buffered;
+    }
+
+    /**
+     * Get background periods for telemetry export.
+     * @returns {Array} Array of {start, end, durationMs}
+     */
+    getBackgroundPeriods() {
+        return [...this.backgroundPeriods];
+    }
+
+    /**
+     * Reset state (e.g., on new episode).
+     */
+    reset() {
+        this.backgroundPeriods = [];
+        this.backgroundInputBuffer = [];
+        // Don't reset isBackgrounded or backgroundStartTime - those reflect current state
+    }
+
+    /**
+     * Destroy the manager (cleanup).
+     */
+    destroy() {
+        // Listener cleanup not strictly needed since page will unload,
+        // but good practice for testing scenarios
+        this.backgroundInputBuffer = [];
+    }
+}
+
 // ========== P2P Binary Message Protocol ==========
 // Message Types
 const P2P_MSG_INPUT = 0x01;
