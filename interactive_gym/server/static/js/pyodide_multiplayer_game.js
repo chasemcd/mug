@@ -2706,7 +2706,7 @@ obs, rewards, terminateds, truncateds, infos, render_state
      * @param {number} renderBeginTimestamp - performance.now() when render started (DIAG-05)
      * @param {number} renderCompleteTimestamp - performance.now() when render finished (DIAG-06)
      */
-    logPipelineLatency(renderBeginTimestamp, renderCompleteTimestamp) {
+    logPipelineLatency(_renderBeginTimestamp, _renderCompleteTimestamp) {
         // Check if metrics are enabled
         if (!this.pipelineMetrics.enabled) return;
         if (typeof window !== 'undefined' && window.pipelineMetricsEnabled === false) return;
@@ -2732,19 +2732,6 @@ obs, rewards, terminateds, truncateds, infos, render_state
         }
 
         this.pipelineMetrics.framesSinceLastLog = 0;
-
-        const ts = this.pipelineMetrics.lastInputTimestamps;
-        const stepCall = this.pipelineMetrics.stepCallTimestamp;
-        const stepReturn = this.pipelineMetrics.stepReturnTimestamp;
-
-        // Compute breakdown
-        const queueTime = ts.queueExitTimestamp - ts.keypressTimestamp;
-        const stepTime = (stepCall && stepReturn) ? (stepReturn - stepCall) : 0;
-        const renderTime = renderCompleteTimestamp - renderBeginTimestamp;
-        const totalLatency = renderCompleteTimestamp - ts.keypressTimestamp;
-
-        // Log in the required format
-        console.log(`[LATENCY] frame=${this.frameNumber} total=${totalLatency.toFixed(1)}ms | queue=${queueTime.toFixed(1)}ms step=${stepTime.toFixed(1)}ms render=${renderTime.toFixed(1)}ms`);
 
         // Clear for next input
         this.pipelineMetrics.lastInputTimestamps = null;
@@ -5276,22 +5263,7 @@ _cumulative_rewards
      * @param {number} timestamp - performance.now() timestamp from Worker
      */
     _handleWorkerTick(timestamp) {
-        // Track tick intervals for debugging
         const now = performance.now();
-        const targetInterval = 1000 / (this.config.fps || 10);
-
-        if (this._lastTickTime) {
-            const tickInterval = now - this._lastTickTime;
-            // Log every tick for first 100 frames, then every 50
-            const shouldLog = this.frameNumber < 100 || this.frameNumber % 50 === 0;
-            if (shouldLog) {
-                console.log(`[TICK] frame=${this.frameNumber} interval=${tickInterval.toFixed(1)}ms (target=${targetInterval.toFixed(0)}ms) isProcessing=${this.isProcessingTick}`);
-            }
-            // Warn if interval is significantly off (>50% deviation)
-            if (tickInterval > targetInterval * 1.5 && this.frameNumber > 10) {
-                console.warn(`[TICK-SLOW] frame=${this.frameNumber} interval=${tickInterval.toFixed(1)}ms is ${((tickInterval/targetInterval - 1) * 100).toFixed(0)}% over target`);
-            }
-        }
         this._lastTickTime = now;
         this._tickStartTime = now;  // Track when tick processing started
 
@@ -5367,18 +5339,7 @@ _cumulative_rewards
 
         // Skip if already processing a tick (prevents overlapping async operations)
         if (this.isProcessingTick) {
-            // Track skipped ticks
-            if (!this._skippedTickCount) this._skippedTickCount = 0;
-            this._skippedTickCount++;
-            // Log EVERY skipped tick - this is likely our latency source
-            console.warn(`[TICK-SKIPPED] frame=${this.frameNumber} tick skipped because previous tick still processing (total skipped: ${this._skippedTickCount})`);
             return;
-        }
-
-        // Log skipped tick count periodically
-        if (this.frameNumber % 50 === 0 && this._skippedTickCount > 0) {
-            console.log(`[TICK] skipped=${this._skippedTickCount} ticks in last 50 frames`);
-            this._skippedTickCount = 0;
         }
 
         // Mark as processing - will be cleared by callback when complete

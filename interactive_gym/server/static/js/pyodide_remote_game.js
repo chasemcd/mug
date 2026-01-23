@@ -415,7 +415,7 @@ obs, rewards, terminateds, truncateds, infos, render_state
      * @param {number} renderBeginTimestamp - performance.now() when render started (DIAG-05)
      * @param {number} renderCompleteTimestamp - performance.now() when render finished (DIAG-06)
      */
-    logPipelineLatency(renderBeginTimestamp, renderCompleteTimestamp) {
+    logPipelineLatency(_renderBeginTimestamp, _renderCompleteTimestamp) {
         // Check if metrics are enabled
         if (!this.pipelineMetrics.enabled) return;
         if (typeof window !== 'undefined' && window.pipelineMetricsEnabled === false) return;
@@ -435,19 +435,6 @@ obs, rewards, terminateds, truncateds, infos, render_state
         }
 
         this.pipelineMetrics.framesSinceLastLog = 0;
-
-        const ts = this.pipelineMetrics.lastInputTimestamps;
-        const stepCall = this.pipelineMetrics.stepCallTimestamp;
-        const stepReturn = this.pipelineMetrics.stepReturnTimestamp;
-
-        // Compute breakdown
-        const queueTime = ts.queueExitTimestamp - ts.keypressTimestamp;
-        const stepTime = (stepCall && stepReturn) ? (stepReturn - stepCall) : 0;
-        const renderTime = renderCompleteTimestamp - renderBeginTimestamp;
-        const totalLatency = renderCompleteTimestamp - ts.keypressTimestamp;
-
-        // Log in the required format
-        console.log(`[LATENCY] frame=${this.frameNumber} total=${totalLatency.toFixed(1)}ms | queue=${queueTime.toFixed(1)}ms step=${stepTime.toFixed(1)}ms render=${renderTime.toFixed(1)}ms`);
 
         // Clear for next input
         this.pipelineMetrics.lastInputTimestamps = null;

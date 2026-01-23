@@ -48,14 +48,12 @@ export function addHumanKeyPressToBuffer(input) {
             key: input.key,
             keypressTimestamp: input.keypressTimestamp
         });
-        console.log(`[INPUT-BUFFERED] key=${input.key} bufferLen=${humanKeyPressBuffer.length}`);
     } else {
         // Legacy format - use current time as timestamp
         humanKeyPressBuffer.push({
             key: input,
             keypressTimestamp: performance.now()
         });
-        console.log(`[INPUT-BUFFERED] key=${input} (legacy) bufferLen=${humanKeyPressBuffer.length}`);
     }
 }
 
@@ -359,14 +357,9 @@ class GymScene extends Phaser.Scene {
         if (this.pyodide_remote_game) {
             this.pyodide_remote_game.isProcessingTick = false;
 
-            // Log tick processing time for first 100 frames, then periodically
+            // Warn if processing took longer than the frame budget
             const frame = this.pyodide_remote_game.frameNumber;
             const targetInterval = 1000 / (this.pyodide_remote_game.config?.fps || 10);
-            const shouldLog = frame < 100 || frame % 50 === 0;
-            if (shouldLog) {
-                console.log(`[TICK-DONE] frame=${frame} processTime=${tickProcessTime.toFixed(1)}ms (budget=${targetInterval.toFixed(0)}ms)`);
-            }
-            // Warn if processing took longer than the frame budget
             if (tickProcessTime > targetInterval) {
                 console.warn(`[TICK-OVERRUN] frame=${frame} processTime=${tickProcessTime.toFixed(1)}ms EXCEEDS budget=${targetInterval.toFixed(0)}ms - WILL CAUSE LAG`);
             }
@@ -589,12 +582,6 @@ class GymScene extends Phaser.Scene {
         let hasRealInput = false;  // True if this is from actual user input (not default action)
         const queueExitTimestamp = performance.now();  // DIAG-02: Capture exit time
 
-        // DEBUG: Log input state periodically
-        const frame = this.pyodide_remote_game?.frameNumber || 0;
-        if (frame < 200 || frame % 100 === 0) {
-            console.log(`[INPUT-DEBUG] frame=${frame} mode=${this.scene_metadata.input_mode} bufferLen=${humanKeyPressBuffer.length} pressedKeys=${JSON.stringify(Object.keys(pressedKeys))}`);
-        }
-
         // If single_keystroke, we'll get the action that was added to the buffer when the key was pressed
         if (this.scene_metadata.input_mode === "single_keystroke") {
             if (humanKeyPressBuffer.length > 0) {
@@ -603,7 +590,6 @@ class GymScene extends Phaser.Scene {
                 keypressTimestamp = bufferedInput.keypressTimestamp;
                 const key = bufferedInput.key;
                 human_action = this.scene_metadata.action_mapping[key];
-                console.log(`[INPUT-CONSUMED] frame=${frame} key=${key} action=${human_action} age=${(queueExitTimestamp - keypressTimestamp).toFixed(1)}ms`);
                 if (human_action == undefined) {
                     human_action = this.scene_metadata.default_action;
                 } else {
