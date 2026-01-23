@@ -2,19 +2,19 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-01-22)
+See: .planning/PROJECT.md (updated 2026-01-23)
 
 **Core value:** Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
-**Current focus:** v1.5 Focus Loss Handling
+**Current focus:** v1.6 Input Latency Diagnosis & Fix
 
 ## Current Position
 
-Phase: 27 of 27 (Timeout & Telemetry)
-Plan: 01 complete
-Status: Milestone complete
-Last activity: 2026-01-23 - Completed 27-01-PLAN.md
+Phase: Not started (run /gsd:create-roadmap)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-01-23 — Milestone v1.6 started
 
-Progress: [##########] 100% (v1.5 - 4/4 phases)
+Progress: [----------] 0% (v1.6 - 0/? phases)
 
 ## Milestone History
 
@@ -130,12 +130,17 @@ See: .planning/PROJECT.md Key Decisions table
 - Episode start sync can timeout on slow connections (mitigated with retry + two-way ack)
 - Rollback visual corrections cause brief teleporting (smoothing not yet implemented)
 
+**[CRITICAL] v1.6 focus:**
+- Users report 1-2 second local input lag in Overcooked
+- Unknown if single-player, multiplayer, or both affected
+- Unknown if consistent or intermittent
+
 ## Session Continuity
 
 Last session: 2026-01-23
-Stopped at: Completed 27-01-PLAN.md (Timeout & Telemetry) - v1.5 Focus Loss Handling milestone complete
+Stopped at: Started v1.6 Input Latency Diagnosis & Fix milestone
 Resume file: None
 
 ### Next Steps
 
-v1.5 Focus Loss Handling milestone complete. Ready for shipping or next milestone planning.
+Run `/gsd:define-requirements` to formalize v1.6 requirements, then `/gsd:create-roadmap` for phase planning.

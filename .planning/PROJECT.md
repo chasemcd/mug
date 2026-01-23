@@ -8,11 +8,23 @@ A framework for running browser-based reinforcement learning experiments with hu
 
 Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
 
-## Current Milestone: v1.5 Focus Loss Handling
+## Current Milestone: v1.6 Input Latency Diagnosis & Fix
 
-**Goal:** Prevent desync when a participant tabs away by using Web Workers for timing and gracefully handling the backgrounded state.
+**Goal:** Diagnose and fix reported 1-2 second local input lag, with tooling to measure input→execute→render latency at each pipeline stage.
 
 **Target features:**
+- Diagnostic instrumentation for input→execute→render pipeline timing
+- Latency measurement at each stage (keypress capture, action queuing, Pyodide execution, render update)
+- Root cause identification for 1-2 second delay
+- Fix for identified latency source(s)
+- Validation metrics confirming acceptable input responsiveness
+- Exportable latency telemetry for research analysis
+
+## Previous Milestone: v1.5 Focus Loss Handling (Shipped: 2026-01-23)
+
+**Delivered:** Resilient focus loss handling with Web Worker timing, graceful backgrounded state, and fast-forward resync on refocus.
+
+**Key accomplishments:**
 - Web Worker-based timing to maintain clock accuracy when tab is backgrounded
 - Page Visibility API detection of focus loss
 - Backgrounded player's actions default to idle/no-op
@@ -20,8 +32,7 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 - On refocus: fast-forward simulation using queued inputs
 - Focused partner experiences no interruption (sees other player go idle)
 - Configurable timeout before ending game (default 30s)
-- Configurable message when game ends due to focus loss timeout
-- Session metadata includes focus-loss events for research analysis
+- Focus loss events in session metadata for research analysis
 
 ## Previous Milestone: v1.4 Partner Disconnection Handling (Shipped: 2026-01-22)
 
@@ -126,13 +137,21 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 
 ### Active
 
-- [ ] Web Worker-based timing for background tab resilience
-- [ ] Page Visibility API focus loss detection
-- [ ] Backgrounded player actions default to idle/no-op
-- [ ] Partner input queuing and resync on refocus
-- [ ] Configurable focus loss timeout (default 30s)
-- [ ] Configurable focus loss timeout message
-- [ ] Focus loss events in session metadata
+- [ ] Diagnostic instrumentation for input→execute→render pipeline
+- [ ] Latency measurement at each pipeline stage
+- [ ] Root cause identification for reported 1-2s delay
+- [ ] Fix for identified latency source(s)
+- [ ] Validation metrics confirming acceptable responsiveness
+- [ ] Exportable latency telemetry for research
+
+*Shipped in v1.5:*
+- ✓ Web Worker-based timing for background tab resilience — v1.5
+- ✓ Page Visibility API focus loss detection — v1.5
+- ✓ Backgrounded player actions default to idle/no-op — v1.5
+- ✓ Partner input queuing and resync on refocus — v1.5
+- ✓ Configurable focus loss timeout (default 30s) — v1.5
+- ✓ Configurable focus loss timeout message — v1.5
+- ✓ Focus loss events in session metadata — v1.5
 
 ### Deferred
 
@@ -158,7 +177,7 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 **Known issues:**
 - Episode start sync can timeout on slow connections (mitigated with retry mechanism)
 - Rollback visual corrections cause brief teleporting (smoothing not yet implemented)
-- Browser tab throttling causes desync when participant tabs away (addressing in v1.5)
+- **[CRITICAL]** Users report 1-2 second local input lag in Overcooked (investigating in v1.6)
 
 ## Constraints
 
@@ -181,4 +200,4 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 | Open Relay Project for TURN | Free 20GB/month tier sufficient for research | ✓ Good |
 
 ---
-*Last updated: 2026-01-22 after v1.5 milestone start*
+*Last updated: 2026-01-23 after v1.6 milestone start*
