@@ -319,7 +319,9 @@ Plans:
   4. Focus loss events recorded in session metadata
   5. Duration of each focus loss period included in exported data
 **Research flag:** Unlikely (builds on existing timeout/messaging patterns from v1.3/v1.4)
-**Plans:** TBD
+**Plans:** 1 plan
+Plans:
+- [ ] 27-01-PLAN.md — Config API, timeout enforcement, telemetry export
 
 ## Progress
 
@@ -344,8 +346,8 @@ Phases execute in numeric order: 24 -> 25 -> 26 -> 27
 | 24. Web Worker Timer | v1.5 | 1/1 | Complete | 2026-01-23 |
 | 25. Focus Detection | v1.5 | 1/1 | Complete | 2026-01-23 |
 | 26. Resync & Partner UX | v1.5 | 1/1 | Complete | 2026-01-23 |
-| 27. Timeout & Telemetry | v1.5 | 0/? | Not started | — |
+| 27. Timeout & Telemetry | v1.5 | 0/1 | Not started | — |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-01-23 after Phase 26 execution*
+*Last updated: 2026-01-23 after Phase 27 planning*
