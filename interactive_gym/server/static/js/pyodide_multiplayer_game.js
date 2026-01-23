@@ -6223,7 +6223,16 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
             },
 
             // P2P latency telemetry (Phase 22 - LAT-01, LAT-02)
-            latency: this.getLatencyStats()
+            latency: this.getLatencyStats(),
+
+            // Focus loss telemetry (Phase 27 - TELEM-01, TELEM-02)
+            focusLoss: this.focusManager ? {
+                backgroundPeriods: this.focusManager.getBackgroundPeriods(),
+                totalBackgroundMs: this.focusManager.getTelemetry().totalBackgroundMs,
+                periodCount: this.focusManager.getTelemetry().periodCount,
+                timeoutMs: this.focusManager.timeoutMs,
+                wasTimeoutTriggered: this.focusLossTimeoutTerminal || false
+            } : null
         };
     }
 
@@ -6269,7 +6278,16 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
             reconnection: this.getReconnectionData(),
 
             // P2P latency telemetry (Phase 22 - LAT-01, LAT-02)
-            latency: this.getLatencyStats()
+            latency: this.getLatencyStats(),
+
+            // Focus loss telemetry (Phase 27 - TELEM-01, TELEM-02)
+            focusLoss: this.focusManager ? {
+                backgroundPeriods: this.focusManager.getBackgroundPeriods(),
+                totalBackgroundMs: this.focusManager.getTelemetry().totalBackgroundMs,
+                periodCount: this.focusManager.getTelemetry().periodCount,
+                timeoutMs: this.focusManager.timeoutMs,
+                wasTimeoutTriggered: this.focusLossTimeoutTerminal || false
+            } : null
         };
     }
 
@@ -6418,7 +6436,16 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
             },
 
             // P2P latency telemetry (Phase 22 - LAT-01, LAT-02)
-            latency: this.getLatencyStats()
+            latency: this.getLatencyStats(),
+
+            // Focus loss telemetry (Phase 27 - TELEM-01, TELEM-02)
+            focusLoss: this.focusManager ? {
+                backgroundPeriods: this.focusManager.getBackgroundPeriods(),
+                totalBackgroundMs: this.focusManager.getTelemetry().totalBackgroundMs,
+                periodCount: this.focusManager.getTelemetry().periodCount,
+                timeoutMs: this.focusManager.timeoutMs,
+                wasTimeoutTriggered: this.focusLossTimeoutTerminal || false
+            } : null
         };
     }
 
