@@ -10,7 +10,9 @@
       "Bash(npx acorn:*)",
       "Bash(node -e \"import\\(''file://'' + process.cwd\\(\\) + ''/interactive_gym/server/static/js/pyodide_multiplayer_game.js''\\)\")",
       "Bash(npx -y esprima-next:*)",
-      "Bash(python -m py_compile:*)"
+      "Bash(python -m py_compile:*)",
+      "Bash(git checkout:*)",
+      "Bash(npx eslint:*)"
     ],
     "deny": [],
     "ask": []
