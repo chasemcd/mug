@@ -2293,7 +2293,8 @@ hashlib.md5(json.dumps(_state, sort_keys=True).encode()).hexdigest()[:8]
         }
         this.actionSequence.push({
             frame: this.frameNumber,
-            actions: {...finalActions}  // Clone to avoid mutation
+            actions: {...finalActions},  // Clone to avoid mutation
+            isFocused: this.focusManager ? !this.focusManager.isBackgrounded : true
         });
 
         // Update action counts
@@ -4299,7 +4300,8 @@ json.dumps({
                 // Record the corrected actions in JavaScript
                 this.actionSequence.push({
                     frame: frame,
-                    actions: {...envActions}
+                    actions: {...envActions},
+                    isFocused: this.focusManager ? !this.focusManager.isBackgrounded : true
                 });
 
                 // Update action counts with corrected actions
@@ -4546,9 +4548,11 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
                 });
 
                 // Record in action sequence
+                // Note: During fast-forward we are foregrounded (just returned from background)
                 this.actionSequence.push({
                     frame: frame,
-                    actions: {...frameActions}
+                    actions: {...frameActions},
+                    isFocused: true
                 });
             }
 
@@ -4874,18 +4878,28 @@ _cumulative_rewards
             .filter(f => f <= this.verifiedFrame)
             .sort((a, b) => a - b);
 
+        // Build frame -> isFocused lookup from actionSequence
+        const frameFocusMap = new Map();
+        for (const record of this.actionSequence) {
+            if (record.isFocused !== undefined) {
+                frameFocusMap.set(record.frame, record.isFocused);
+            }
+        }
+
         for (const frame of verifiedFrames) {
             const frameInputs = this.inputBuffer.get(frame);
             if (frameInputs) {
                 for (const playerId of humanPlayerIds) {
                     const action = frameInputs.get(playerId);
                     if (action !== undefined) {
-                        // Store one entry per player per frame for easy comparison
+                        // Store one entry per player per frame for easier cross-client comparison
+                        // Include focus state for research analysis
                         this.cumulativeValidation.allActions.push({
                             episode: episodeNum,
                             frame: frame,
                             playerId: playerId,
-                            action: action
+                            action: action,
+                            isFocused: frameFocusMap.get(frame) !== undefined ? frameFocusMap.get(frame) : true
                         });
                     }
                 }
@@ -6840,6 +6854,30 @@ _cumulative_rewards
     }
 
     /**
+     * Get current focus state for all players.
+     * Returns an object mapping player IDs to their focus state (true = focused, false = backgrounded).
+     * Used for per-frame data logging in CSV exports.
+     * @returns {Object} {playerId: boolean, ...}
+     */
+    getFocusStatePerPlayer() {
+        const focusState = {};
+        const myFocused = this.focusManager ? !this.focusManager.isBackgrounded : true;
+        const partnerFocused = this.p2pEpisodeSync?.partnerFocused ?? true;
+
+        // Get all human player IDs
+        const humanPlayerIds = this._getHumanPlayerIds();
+        for (const playerId of humanPlayerIds) {
+            if (String(playerId) === String(this.myPlayerId)) {
+                focusState[playerId] = myFocused;
+            } else {
+                focusState[playerId] = partnerFocused;
+            }
+        }
+
+        return focusState;
+    }
+
+    /**
      * Export session metrics for research data analysis.
      * Call at episode end to get structured metrics for persistence.
      * @returns {Object} Session metrics including connection info, inputs, rollbacks, etc.
@@ -7164,7 +7202,10 @@ _cumulative_rewards
                 for (const [pid, action] of Object.entries(record.actions)) {
                     frameActions[pid] = action;
                 }
-                history.frames[record.frame] = frameActions;
+                history.frames[record.frame] = {
+                    actions: frameActions,
+                    isFocused: record.isFocused !== undefined ? record.isFocused : true
+                };
             }
         }
 

@@ -68,6 +68,7 @@ class RemoteGameDataLogger {
             terminateds: {},
             truncateds: {},
             infos: {},
+            isFocused: {},  // Per-player focus state (true = focused, false = backgrounded)
             episode_num: [],
             t: [],
             timestamp: [],
@@ -93,7 +94,7 @@ class RemoteGameDataLogger {
             }
         };
 
-        ['observations', 'actions', 'rewards', 'terminateds', 'truncateds'].forEach(logDataForField);
+        ['observations', 'actions', 'rewards', 'terminateds', 'truncateds', 'isFocused'].forEach(logDataForField);
         
         if (gameData.infos !== undefined) {
             const infos = gameData.infos instanceof Map ? Object.fromEntries(gameData.infos) : gameData.infos;
@@ -138,6 +139,7 @@ class RemoteGameDataLogger {
             terminateds: {},
             truncateds: {},
             infos: {},
+            isFocused: {},
             episode_num: [],
             t: [],
             timestamp: [],
@@ -358,7 +360,8 @@ class GymScene extends Phaser.Scene {
                         infos: infos,
                         episode_num: this.pyodide_remote_game.num_episodes,
                         t: this.pyodide_remote_game.step_num,
-                        player_subjects: this.pyodide_remote_game.playerSubjects
+                        player_subjects: this.pyodide_remote_game.playerSubjects,
+                        isFocused: this.pyodide_remote_game.getFocusStatePerPlayer?.() || {}
                     });
             } else {
                 const actions = await this.buildPyodideActionDict();
@@ -390,7 +393,8 @@ class GymScene extends Phaser.Scene {
                         infos: infos,
                         episode_num: this.pyodide_remote_game.num_episodes,
                         t: this.pyodide_remote_game.step_num,
-                        player_subjects: this.pyodide_remote_game.playerSubjects
+                        player_subjects: this.pyodide_remote_game.playerSubjects,
+                        isFocused: this.pyodide_remote_game.getFocusStatePerPlayer?.() || {}
                     });
             }
             addStateToBuffer(render_state);
