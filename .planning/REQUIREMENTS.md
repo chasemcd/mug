@@ -21,12 +21,12 @@ Requirements for v1.5 Focus Loss Handling milestone. Each maps to roadmap phases
 
 - [x] **BG-01**: Backgrounded player's actions default to idle/no-op
 - [x] **BG-02**: Partner inputs buffered via WebRTC while backgrounded
-- [ ] **BG-03**: On refocus, simulation fast-forwards using queued inputs to resync
+- [x] **BG-03**: On refocus, simulation fast-forwards using queued inputs to resync
 
 ### Partner Experience
 
-- [ ] **PARTNER-01**: Focused partner experiences no interruption when other player backgrounds
-- [ ] **PARTNER-02**: Focused partner sees backgrounded player go idle (inputs stop)
+- [x] **PARTNER-01**: Focused partner experiences no interruption when other player backgrounds
+- [x] **PARTNER-02**: Focused partner sees backgrounded player go idle (inputs stop)
 
 ### Timeout & Messaging
 
@@ -68,9 +68,9 @@ Which phases cover which requirements. Updated by create-roadmap.
 | FOCUS-02 | Phase 25 | Complete |
 | BG-01 | Phase 25 | Complete |
 | BG-02 | Phase 25 | Complete |
-| BG-03 | Phase 26 | Pending |
-| PARTNER-01 | Phase 26 | Pending |
-| PARTNER-02 | Phase 26 | Pending |
+| BG-03 | Phase 26 | Complete |
+| PARTNER-01 | Phase 26 | Complete |
+| PARTNER-02 | Phase 26 | Complete |
 | TIMEOUT-01 | Phase 27 | Pending |
 | TIMEOUT-02 | Phase 27 | Pending |
 | TIMEOUT-03 | Phase 27 | Pending |
@@ -84,4 +84,4 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 ---
 *Requirements defined: 2026-01-22*
-*Last updated: 2026-01-23 after Phase 25 execution*
+*Last updated: 2026-01-23 after Phase 26 execution*
