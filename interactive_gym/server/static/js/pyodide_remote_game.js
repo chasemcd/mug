@@ -347,7 +347,14 @@ obs, rewards, terminateds, truncateds, infos, render_state
         // Calculate score based on hud_display_mode
         let score;
 
-        score = this.cumulative_rewards[this.myPlayerId]
+        // For multiplayer, use myPlayerId; for single-player, use first available key or default to 0
+        if (this.myPlayerId !== undefined && this.cumulative_rewards[this.myPlayerId] !== undefined) {
+            score = this.cumulative_rewards[this.myPlayerId];
+        } else {
+            // Single-player fallback: use first reward value or 0
+            const rewardValues = Object.values(this.cumulative_rewards);
+            score = rewardValues.length > 0 ? rewardValues[0] : 0;
+        }
 
         let time_left = (this.max_steps - this.step_num) / this.config.fps;
 
