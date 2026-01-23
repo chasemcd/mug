@@ -9,18 +9,18 @@ See: .planning/PROJECT.md (updated 2026-01-22)
 
 ## Current Position
 
-Phase: 26 of 27 (Resync & Partner UX)
+Phase: 27 of 27 (Timeout & Telemetry)
 Plan: 01 complete
-Status: Phase complete
-Last activity: 2026-01-23 - Completed 26-01-PLAN.md
+Status: Milestone complete
+Last activity: 2026-01-23 - Completed 27-01-PLAN.md
 
-Progress: [#######---] 75% (v1.5 - 3/4 phases)
+Progress: [##########] 100% (v1.5 - 4/4 phases)
 
 ## Milestone History
 
 | Milestone | Phases | Status | Shipped |
 |-----------|--------|--------|---------|
-| v1.5 Focus Loss Handling | 24-27 | In Progress | - |
+| v1.5 Focus Loss Handling | 24-27 | Complete | 2026-01-23 |
 | v1.4 Partner Disconnection Handling | 23 | Complete | 2026-01-22 |
 | v1.3 P2P Connection Validation | 19-22 | Complete | 2026-01-22 |
 | v1.2 Participant Exclusion | 15-18 | Complete | 2026-01-22 |
@@ -36,6 +36,10 @@ Progress: [#######---] 75% (v1.5 - 3/4 phases)
 - `interactive_gym/server/static/js/webrtc_manager.js` (1,030+ LOC)
 - `interactive_gym/server/pyodide_game_coordinator.py`
 - `interactive_gym/configurations/remote_config.py`
+
+**Focus Loss Timeout & Telemetry (v1.5 Phase 27 - added):**
+- `interactive_gym/server/static/js/pyodide_multiplayer_game.js` - FocusManager.setTimeoutConfig(), isTimeoutExceeded(), _handleFocusLossTimeout(), _showFocusLossTimeoutOverlay(), focusLoss telemetry in exports
+- `interactive_gym/scenes/gym_scene.py` - focus_loss_config() method, focus_loss_timeout_ms, focus_loss_message attributes
 
 **Fast-Forward Resync (v1.5 Phase 26 - added):**
 - `interactive_gym/server/static/js/pyodide_multiplayer_game.js` - _performFastForward(), _pendingFastForward flag, FocusManager._onForegrounded hook
@@ -81,10 +85,17 @@ Progress: [#######---] 75% (v1.5 - 3/4 phases)
 - `.planning/phases/24-web-worker-timer/24-01-SUMMARY.md`
 - `.planning/phases/25-focus-detection/25-01-SUMMARY.md`
 - `.planning/phases/26-resync-partner-ux/26-01-SUMMARY.md`
+- `.planning/phases/27-timeout-telemetry/27-01-SUMMARY.md`
 
 ### Decisions
 
 See: .planning/PROJECT.md Key Decisions table
+
+**v1.5 Phase 27 decisions:**
+- Focus loss timeout defaults to 30 seconds, set to 0 to disable
+- Timeout only triggers while backgrounded (checked each worker tick)
+- Reuses partner disconnect overlay pattern for consistent UX
+- All three export methods include focus loss telemetry for research
 
 **v1.5 Phase 26 decisions:**
 - Fast-forward is async with error handling to not block tick processing
@@ -122,9 +133,9 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-01-23
-Stopped at: Completed 26-01-PLAN.md (Resync & Partner UX)
+Stopped at: Completed 27-01-PLAN.md (Timeout & Telemetry) - v1.5 Focus Loss Handling milestone complete
 Resume file: None
 
 ### Next Steps
 
-Run `/gsd:plan-phase 27` to plan Telemetry Export (export focus loss data for analysis).
+v1.5 Focus Loss Handling milestone complete. Ready for shipping or next milestone planning.
