@@ -173,6 +173,7 @@ class FocusManager {
         this.backgroundStartTime = document.hidden ? performance.now() : null;
         this.backgroundPeriods = [];  // [{start: number, end: number, durationMs: number}]
         this.backgroundInputBuffer = [];  // Inputs received while backgrounded
+        this.timeoutMs = 30000;  // Default 30s, overridden by config (Phase 27)
 
         this._setupVisibilityListener();
     }
@@ -208,6 +209,23 @@ class FocusManager {
         }
         this.isBackgrounded = false;
         this.backgroundStartTime = null;
+    }
+
+    /**
+     * Set timeout configuration from scene config (Phase 27).
+     * @param {number} timeoutMs - Timeout in milliseconds (0 to disable)
+     */
+    setTimeoutConfig(timeoutMs) {
+        this.timeoutMs = timeoutMs;
+    }
+
+    /**
+     * Check if timeout has been exceeded (Phase 27).
+     * @returns {boolean} True if backgrounded longer than timeout
+     */
+    isTimeoutExceeded() {
+        if (!this.timeoutMs || this.timeoutMs === 0) return false;
+        return this.getCurrentBackgroundDuration() > this.timeoutMs;
     }
 
     /**
@@ -1003,6 +1021,10 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         // When true, prevents scene advancement - the overlay is the final state
         this.partnerDisconnectedTerminal = false;
 
+        // Focus loss timeout terminal state (Phase 27)
+        // When true, prevents scene advancement - the overlay is the final state
+        this.focusLossTimeoutTerminal = false;
+
         // Web Worker Timer (Phase 24)
         // Worker runs setInterval exempt from browser throttling
         this.timerWorker = null;           // GameTimerWorker instance
@@ -1084,6 +1106,15 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
             // Store partner disconnect message config (Phase 23 - CFG-01, CFG-02)
             if (data.scene_metadata?.partner_disconnect_message !== undefined) {
                 this.config.partner_disconnect_message = data.scene_metadata.partner_disconnect_message;
+            }
+
+            // Configure focus loss timeout from scene config (Phase 27)
+            if (data.scene_metadata?.focus_loss_timeout_ms !== undefined) {
+                this.focusManager.setTimeoutConfig(data.scene_metadata.focus_loss_timeout_ms);
+                p2pLog.info(`Focus loss timeout: ${data.scene_metadata.focus_loss_timeout_ms}ms`);
+            }
+            if (data.scene_metadata?.focus_loss_message !== undefined) {
+                this.config.focus_loss_message = data.scene_metadata.focus_loss_message;
             }
 
             // Initialize action queues for other players
@@ -3174,14 +3205,18 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
     }
 
     /**
-     * Override isDone() to prevent scene advancement when partner disconnects.
-     * When partnerDisconnectedTerminal is true, the overlay is the final state -
+     * Override isDone() to prevent scene advancement when partner disconnects or focus loss timeout.
+     * When partnerDisconnectedTerminal or focusLossTimeoutTerminal is true, the overlay is the final state -
      * the participant should NOT be advanced to the next scene.
      * @returns {boolean} True if game is done AND we should advance to next scene
      */
     isDone() {
         // Partner disconnection is a terminal state - don't trigger scene advancement
         if (this.partnerDisconnectedTerminal) {
+            return false;
+        }
+        // Focus loss timeout is a terminal state - don't trigger scene advancement (Phase 27)
+        if (this.focusLossTimeoutTerminal) {
             return false;
         }
         // Normal game completion - allow scene advancement
@@ -4808,6 +4843,12 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
             // The rollbackInProgress guard in _performFastForward will prevent conflicts
         }
 
+        // Phase 27: Check focus loss timeout
+        if (this.focusManager?.isBackgrounded && this.focusManager.isTimeoutExceeded()) {
+            this._handleFocusLossTimeout();
+            return;  // Don't process tick - game is ending
+        }
+
         // Phase 25: Skip processing when tab is backgrounded
         // Worker keeps ticking (so we know elapsed time), but we don't advance frames.
         // Partner inputs are buffered; we'll fast-forward on refocus (Phase 26).
@@ -5208,6 +5249,113 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
         }
 
         // Simple centered message (not an overlay - this IS the page content now)
+        container.innerHTML = `
+            <div style="
+                padding: 40px;
+                max-width: 500px;
+                text-align: center;
+            ">
+                <h2 style="color: #333; margin-bottom: 20px;">Session Ended</h2>
+                <p style="font-size: 16px; color: #333;">${message}</p>
+            </div>
+        `;
+        container.style.display = 'flex';
+    }
+
+    /**
+     * Handle focus loss timeout (Phase 27 - TIMEOUT-02).
+     * Ends game for both players when focus loss exceeds configured timeout.
+     */
+    _handleFocusLossTimeout() {
+        const timeoutMs = this.focusManager.timeoutMs;
+        const actualMs = this.focusManager.getCurrentBackgroundDuration();
+        p2pLog.warn(`Focus loss timeout exceeded: ${actualMs.toFixed(0)}ms > ${timeoutMs}ms`);
+
+        // Stop game state - similar to _handleReconnectionGameEnd
+        this.state = "done";
+        this.episodeComplete = true;
+        this.focusLossTimeoutTerminal = true;  // Prevent scene advance
+
+        // Pause continuous monitoring if active
+        if (this.continuousMonitor) {
+            this.continuousMonitor.pause();
+        }
+
+        // Clean up Web Worker timer
+        this._destroyTimerWorker();
+
+        // Mark session as partial with focus loss metadata
+        this.sessionPartialInfo = {
+            isPartial: true,
+            terminationReason: 'focus_loss_timeout',
+            terminationFrame: this.frameNumber,
+            focusLossDurationMs: actualMs,
+            focusLossTimeoutMs: timeoutMs,
+            focusLossTelemetry: this.focusManager.getTelemetry()
+        };
+
+        // Export metrics before showing overlay
+        if (this.gameId && this.sceneId) {
+            this.emitMultiplayerMetrics(this.sceneId);
+        }
+
+        // Get custom message from config or use default
+        const customMessage = this.config?.focus_loss_message;
+        const message = customMessage || "You were away from the experiment for too long. The game has ended.";
+
+        // Show in-page overlay (reuse partner disconnect overlay pattern)
+        this._showFocusLossTimeoutOverlay(message);
+
+        // Close P2P connection
+        if (this.webrtcManager) {
+            this.webrtcManager.close();
+        }
+
+        // Notify server that game ended due to focus loss
+        socket.emit('p2p_game_ended', {
+            game_id: this.gameId,
+            reason: 'focus_loss_timeout',
+            player_id: this.myPlayerId,
+            focus_loss_duration_ms: actualMs
+        });
+    }
+
+    /**
+     * Show focus loss timeout message (Phase 27 - TIMEOUT-03).
+     * Reuses partner disconnected overlay pattern.
+     * @param {string} message - Message to display
+     */
+    _showFocusLossTimeoutOverlay(message) {
+        // Remove any existing overlays
+        this._hideReconnectingOverlay();
+
+        // Hide ALL direct children of body
+        Array.from(document.body.children).forEach(child => {
+            if (child.id !== 'focusLossContainer') {
+                child.style.display = 'none';
+            }
+        });
+
+        // Create container
+        let container = document.getElementById('focusLossContainer');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'focusLossContainer';
+            container.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: white;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                z-index: 10000;
+            `;
+            document.body.appendChild(container);
+        }
+
         container.innerHTML = `
             <div style="
                 padding: 40px;
