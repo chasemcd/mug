@@ -14,13 +14,13 @@ Requirements for v1.5 Focus Loss Handling milestone. Each maps to roadmap phases
 
 ### Focus Detection
 
-- [ ] **FOCUS-01**: Tab visibility changes detected via Page Visibility API
-- [ ] **FOCUS-02**: Duration of each background period tracked
+- [x] **FOCUS-01**: Tab visibility changes detected via Page Visibility API
+- [x] **FOCUS-02**: Duration of each background period tracked
 
 ### Backgrounded Player Behavior
 
-- [ ] **BG-01**: Backgrounded player's actions default to idle/no-op
-- [ ] **BG-02**: Partner inputs buffered via WebRTC while backgrounded
+- [x] **BG-01**: Backgrounded player's actions default to idle/no-op
+- [x] **BG-02**: Partner inputs buffered via WebRTC while backgrounded
 - [ ] **BG-03**: On refocus, simulation fast-forwards using queued inputs to resync
 
 ### Partner Experience
@@ -64,10 +64,10 @@ Which phases cover which requirements. Updated by create-roadmap.
 |-------------|-------|--------|
 | WORK-01 | Phase 24 | Complete |
 | WORK-02 | Phase 24 | Complete |
-| FOCUS-01 | Phase 25 | Pending |
-| FOCUS-02 | Phase 25 | Pending |
-| BG-01 | Phase 25 | Pending |
-| BG-02 | Phase 25 | Pending |
+| FOCUS-01 | Phase 25 | Complete |
+| FOCUS-02 | Phase 25 | Complete |
+| BG-01 | Phase 25 | Complete |
+| BG-02 | Phase 25 | Complete |
 | BG-03 | Phase 26 | Pending |
 | PARTNER-01 | Phase 26 | Pending |
 | PARTNER-02 | Phase 26 | Pending |
@@ -84,4 +84,4 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 ---
 *Requirements defined: 2026-01-22*
-*Last updated: 2026-01-23 after Phase 24 execution*
+*Last updated: 2026-01-23 after Phase 25 execution*
