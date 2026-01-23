@@ -291,7 +291,9 @@ Plans:
   3. When backgrounded, player's actions default to idle/no-op (no random inputs)
   4. Partner inputs received via WebRTC are buffered while player is backgrounded
 **Research flag:** Unlikely (Page Visibility API well-documented, builds on existing exclusion patterns)
-**Plans:** TBD
+**Plans:** 1 plan
+Plans:
+- [ ] 25-01-PLAN.md — FocusManager class with visibility detection, background tracking, input buffering
 
 ### Phase 26: Resync & Partner Experience
 **Goal:** Fast-forward on refocus while keeping focused partner uninterrupted
@@ -338,10 +340,10 @@ Phases execute in numeric order: 24 → 25 → 26 → 27
 | 22. Latency Telemetry | v1.3 | 1/1 | Complete | 2026-01-22 |
 | 23. Partner Disconnection | v1.4 | 1/1 | Complete | 2026-01-22 |
 | 24. Web Worker Timer | v1.5 | 1/1 | Complete | 2026-01-23 |
-| 25. Focus Detection | v1.5 | 0/? | Not started | — |
+| 25. Focus Detection | v1.5 | 0/1 | Not started | — |
 | 26. Resync & Partner UX | v1.5 | 0/? | Not started | — |
 | 27. Timeout & Telemetry | v1.5 | 0/? | Not started | — |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-01-23 after Phase 24 execution*
+*Last updated: 2026-01-23 after Phase 25 planning*
