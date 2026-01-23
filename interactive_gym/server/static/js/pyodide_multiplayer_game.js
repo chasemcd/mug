@@ -4234,22 +4234,28 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
 
         p2pLog.warn(`FAST-FORWARD: starting from frame ${startFrame}, ${bufferedInputs.length} buffered packets`);
 
-        // 1. Inject buffered inputs into GGPO input buffer
-        let maxFrame = this.frameNumber;
+        // 1. Inject buffered inputs into GGPO input buffer and find partner's current frame
+        // We need to catch up to partner's currentFrame, not the input target frames
+        // (input.frame is currentFrame + INPUT_DELAY, but we need to reach currentFrame)
+        let partnerCurrentFrame = this.frameNumber;
         for (const packet of bufferedInputs) {
             // Packets have format: {playerId, inputs: [{action, frame}, ...], currentFrame}
+            // currentFrame is partner's frame when they SENT the packet
+            partnerCurrentFrame = Math.max(partnerCurrentFrame, packet.currentFrame);
             for (const input of packet.inputs) {
                 this.storeRemoteInput(packet.playerId, input.action, input.frame);
-                maxFrame = Math.max(maxFrame, input.frame);
             }
         }
 
-        // 2. Determine how many frames to process
-        const framesToProcess = maxFrame - this.frameNumber;
+        // 2. Determine how many frames to process - catch up to partner's current frame
+        const framesToProcess = partnerCurrentFrame - this.frameNumber;
         if (framesToProcess <= 0) {
             p2pLog.debug('Fast-forward: already caught up or ahead');
             return;
         }
+
+        const targetFrame = partnerCurrentFrame;
+        p2pLog.warn(`FAST-FORWARD: target frame ${targetFrame} (partner's current), ${framesToProcess} frames behind`);
 
         // 3. Set rollback guard to prevent nested operations
         this.rollbackInProgress = true;
@@ -4263,7 +4269,7 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
 
         try {
             // 4. Fast-forward loop: step each frame without rendering
-            while (this.frameNumber < maxFrame &&
+            while (this.frameNumber < targetFrame &&
                    framesProcessed < MAX_FRAMES &&
                    (performance.now() - startTime) < MAX_MS) {
 
@@ -4835,12 +4841,22 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
         // MUST be checked BEFORE isBackgrounded (we're no longer backgrounded when this fires)
         if (this._pendingFastForward && !this.focusManager?.isBackgrounded) {
             this._pendingFastForward = false;
-            // Fast-forward is async but we don't await - it will complete and normal ticks continue
-            this._performFastForward().catch(err => {
+            // Mark as processing to block concurrent ticks during fast-forward
+            this.isProcessingTick = true;
+            // Fast-forward synchronously (block until complete) to ensure state consistency
+            this._performFastForward().then(() => {
+                // After fast-forward, process any inputs that arrived during fast-forward
+                // These went to pendingInputPackets since we were no longer backgrounded
+                this._processQueuedInputs();
+                // Clear processing flag to allow normal ticks to resume
+                this.isProcessingTick = false;
+                p2pLog.debug('Fast-forward complete, normal tick processing resumed');
+            }).catch(err => {
                 p2pLog.error('Fast-forward failed:', err);
+                this.isProcessingTick = false;
             });
-            // Don't return - continue to normal tick after scheduling fast-forward
-            // The rollbackInProgress guard in _performFastForward will prevent conflicts
+            // Return - don't process normal tick until fast-forward is complete
+            return;
         }
 
         // Phase 27: Check focus loss timeout
