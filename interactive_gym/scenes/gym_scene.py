@@ -187,6 +187,10 @@ class GymScene(scene.Scene):
         # Partner disconnection message (Phase 23)
         self.partner_disconnect_message: str | None = None  # Custom message, None uses default
 
+        # Focus loss handling (Phase 27)
+        self.focus_loss_timeout_ms: int = 30000  # Default 30 seconds
+        self.focus_loss_message: str | None = None  # Custom message, None uses default
+
     def environment(
         self,
         env_creator: Callable = NotProvided,
@@ -803,6 +807,41 @@ class GymScene(scene.Scene):
         """
         if message is not NotProvided:
             self.partner_disconnect_message = message
+
+        return self
+
+    def focus_loss_config(
+        self,
+        timeout_ms: int = NotProvided,
+        message: str = NotProvided,
+    ) -> "GymScene":
+        """Configure focus loss handling for multiplayer games.
+
+        When a participant tabs away for longer than timeout_ms, the game
+        ends for both players and a message is displayed.
+
+        Args:
+            timeout_ms: Time in milliseconds before focus loss ends the game.
+                       Default is 30000 (30 seconds). Set to 0 to disable.
+            message: Custom message to display when game ends due to focus loss.
+                    If not set, a default message is shown.
+
+        Returns:
+            self for chaining.
+
+        Example:
+            scene.focus_loss_config(
+                timeout_ms=20000,  # 20 seconds
+                message="Please stay focused on the experiment."
+            )
+        """
+        if timeout_ms is not NotProvided:
+            if not isinstance(timeout_ms, int) or timeout_ms < 0:
+                raise ValueError("timeout_ms must be a non-negative integer")
+            self.focus_loss_timeout_ms = timeout_ms
+
+        if message is not NotProvided:
+            self.focus_loss_message = message
 
         return self
 
