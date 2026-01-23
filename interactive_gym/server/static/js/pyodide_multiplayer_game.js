@@ -754,6 +754,10 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         // Set when session ends due to exclusion (self or partner)
         this.sessionPartialInfo = null;
 
+        // Partner disconnection terminal state (Phase 23)
+        // When true, prevents scene advancement - the overlay is the final state
+        this.partnerDisconnectedTerminal = false;
+
         this.setupMultiplayerHandlers();
     }
 
@@ -2897,6 +2901,21 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
         }
     }
 
+    /**
+     * Override isDone() to prevent scene advancement when partner disconnects.
+     * When partnerDisconnectedTerminal is true, the overlay is the final state -
+     * the participant should NOT be advanced to the next scene.
+     * @returns {boolean} True if game is done AND we should advance to next scene
+     */
+    isDone() {
+        // Partner disconnection is a terminal state - don't trigger scene advancement
+        if (this.partnerDisconnectedTerminal) {
+            return false;
+        }
+        // Normal game completion - allow scene advancement
+        return this.state === "done";
+    }
+
     _logEpisodeEndMetrics() {
         /**
          * Log episode end metrics. Called when episode end is first detected,
@@ -3439,10 +3458,15 @@ _snapshot = {
 
 json.dumps(_snapshot)
             `);
-            this.stateSnapshots.set(frameNumber, stateJson);
+
+            // Parse the Python snapshot and add JavaScript-side state
+            const snapshotData = JSON.parse(stateJson);
+            snapshotData.cumulative_rewards = {...this.cumulative_rewards};  // Clone rewards
+            snapshotData.step_num = this.step_num;
+
+            this.stateSnapshots.set(frameNumber, JSON.stringify(snapshotData));
 
             // Log snapshot save with agent state summary for debugging
-            const snapshotData = JSON.parse(stateJson);
             const agentStates = snapshotData.env_state?.agents || {};
             const agentSummary = Object.entries(agentStates).map(([id, a]) =>
                 `${id}:pos=${a.pos},inv=${a.inventory?.length || 0}`
@@ -3555,6 +3579,16 @@ json.dumps({
             `);
             const verify = JSON.parse(verifyResult);
             p2pLog.debug(`VERIFY_RESTORE: snapshot_t=${verify.snapshot_t} before_t=${verify.before_t} after_t=${verify.after_t} match=${verify.match}`);
+
+            // Restore JavaScript-side state (cumulative_rewards, step_num)
+            if (snapshotData.cumulative_rewards) {
+                this.cumulative_rewards = {...snapshotData.cumulative_rewards};
+                p2pLog.debug(`RESTORE_REWARDS: frame=${frameNumber} rewards=${JSON.stringify(this.cumulative_rewards)}`);
+            }
+            if (snapshotData.step_num !== undefined) {
+                this.step_num = snapshotData.step_num;
+            }
+
             return true;
         } catch (e) {
             p2pLog.error(`Failed to load snapshot for frame ${frameNumber}: ${e}`);
@@ -3773,6 +3807,7 @@ _snapshot_interval = ${this.snapshotInterval}
 _t_before_replay = env.t if hasattr(env, 't') else 'N/A'
 _replay_log = []
 _snapshots_to_save = {}
+_cumulative_rewards = {}  # Track rewards accumulated during replay
 for _rf in _replay_frames:
     _frame = _rf['frame']
     _pre_state = env.get_state()
@@ -3797,14 +3832,20 @@ for _rf in _replay_frames:
         }
 
     _actions = {int(k) if str(k).isdigit() else k: v for k, v in _rf['actions'].items()}
-    env.step(_actions)
+    _obs, _rewards, _term, _trunc, _info = env.step(_actions)
+    # Accumulate rewards from replay (critical for HUD sync)
+    if isinstance(_rewards, dict):
+        for _k, _v in _rewards.items():
+            _cumulative_rewards[str(_k)] = _cumulative_rewards.get(str(_k), 0) + _v
+    elif isinstance(_rewards, (int, float)):
+        _cumulative_rewards['human'] = _cumulative_rewards.get('human', 0) + _rewards
     _post_state = env.get_state()
     _post_hash = hashlib.md5(json.dumps(_post_state, sort_keys=True).encode()).hexdigest()[:8]
     _replay_log.append({'frame': _frame, 'actions': _rf['actions'], 'pre_hash': _pre_hash, 'post_hash': _post_hash})
 _t_after_replay = env.t if hasattr(env, 't') else 'N/A'
 _state_after = env.get_state()
 _state_hash = hashlib.md5(json.dumps(_state_after, sort_keys=True).encode()).hexdigest()[:8]
-json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps': len(_replay_frames), 'state_hash': _state_hash, 'replay_log': _replay_log, 'snapshots': {str(k): v for k, v in _snapshots_to_save.items()}})
+json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps': len(_replay_frames), 'state_hash': _state_hash, 'replay_log': _replay_log, 'snapshots': {str(k): v for k, v in _snapshots_to_save.items()}, 'replay_rewards': _cumulative_rewards})
                 `);
                 const replayInfo = JSON.parse(replayVerify);
                 // Log each replay frame for comparison with client A
@@ -3819,10 +3860,31 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
                 if (replayInfo.snapshots) {
                     for (const [frameStr, snapshotData] of Object.entries(replayInfo.snapshots)) {
                         const frame = parseInt(frameStr);
+                        // Add cumulative_rewards to snapshot for future rollbacks
+                        snapshotData.cumulative_rewards = {...this.cumulative_rewards};
+                        snapshotData.step_num = this.step_num;
                         this.stateSnapshots.set(frame, JSON.stringify(snapshotData));
                         p2pLog.debug(`SNAPSHOT_UPDATED: frame=${frame} (corrected after rollback)`);
                     }
                 }
+
+                // Add rewards accumulated during replay to cumulative_rewards
+                // This is critical: rewards from replayed frames were lost when we rolled back
+                if (replayInfo.replay_rewards) {
+                    for (const [playerId, reward] of Object.entries(replayInfo.replay_rewards)) {
+                        if (this.cumulative_rewards[playerId] !== undefined) {
+                            this.cumulative_rewards[playerId] += reward;
+                        } else {
+                            this.cumulative_rewards[playerId] = reward;
+                        }
+                    }
+                    p2pLog.debug(`REPLAY_REWARDS: added ${JSON.stringify(replayInfo.replay_rewards)} -> total=${JSON.stringify(this.cumulative_rewards)}`);
+                    // Update HUD to reflect corrected rewards
+                    ui_utils.updateHUDText(this.getHUDText());
+                }
+
+                // Update step_num to account for replayed frames
+                this.step_num += replayInfo.num_steps;
             }
 
             // Update JS frame counter to match Python state
@@ -4554,9 +4616,11 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
         this._clearReconnectionTimeout();
         this.reconnectionState.state = 'terminated';
 
-        // Stop game state
+        // Stop game state but mark as terminal to prevent scene advancement
+        // The in-page overlay is the final state - participant should NOT advance to next scene
         this.state = "done";
         this.episodeComplete = true;
+        this.partnerDisconnectedTerminal = true;  // Phase 23: prevents isDone() from triggering scene advance
 
         // Pause continuous monitoring if active
         if (this.continuousMonitor) {
@@ -4579,7 +4643,7 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
 
         // Get custom message from config, or use default
         const customMessage = this.config?.partner_disconnect_message;
-        const message = customMessage || "Your partner has disconnected. The game has ended.";
+        const message = customMessage || "Your partner has disconnected.";
 
         // Show in-page overlay (Phase 23 - UI-01, UI-02, UI-03, UI-04)
         this._showPartnerDisconnectedOverlay(message);
@@ -4591,8 +4655,8 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
     }
 
     /**
-     * Show partner disconnected overlay (Phase 23 - UI-01 through UI-04).
-     * Hides game container and HUD, shows in-page overlay with message.
+     * Show partner disconnected message (Phase 23 - UI-01 through UI-04).
+     * Hides ALL page content and replaces with disconnect message.
      * Page stays displayed indefinitely (no redirect, no Continue button).
      * @param {string} message - Message to display
      */
@@ -4600,52 +4664,45 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
         // Remove reconnecting overlay if present
         this._hideReconnectingOverlay();
 
-        // Hide game container and HUD (Phase 23 - UI-02)
-        const gameContainer = document.getElementById('gameContainer');
-        if (gameContainer) {
-            gameContainer.style.display = 'none';
-        }
+        // Hide ALL direct children of body (Phase 23 - UI-02)
+        Array.from(document.body.children).forEach(child => {
+            if (child.id !== 'partnerDisconnectedContainer') {
+                child.style.display = 'none';
+            }
+        });
 
-        const hudText = document.getElementById('hudText');
-        if (hudText) {
-            hudText.style.display = 'none';
-        }
-
-        // Create overlay (reuse styling from _showPartnerExcludedUI)
-        let overlay = document.getElementById('partnerDisconnectedOverlay');
-        if (!overlay) {
-            overlay = document.createElement('div');
-            overlay.id = 'partnerDisconnectedOverlay';
-            overlay.style.cssText = `
+        // Create container for disconnect message (replaces page content, not overlay)
+        let container = document.getElementById('partnerDisconnectedContainer');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'partnerDisconnectedContainer';
+            container.style.cssText = `
                 position: fixed;
                 top: 0;
                 left: 0;
                 width: 100%;
                 height: 100%;
-                background: rgba(0, 0, 0, 0.75);
+                background: white;
                 display: flex;
                 justify-content: center;
                 align-items: center;
                 z-index: 10000;
             `;
-            document.body.appendChild(overlay);
+            document.body.appendChild(container);
         }
 
-        // Use neutral styling (same as partner excluded UI)
-        overlay.innerHTML = `
+        // Simple centered message (not an overlay - this IS the page content now)
+        container.innerHTML = `
             <div style="
-                background: white;
                 padding: 40px;
-                border-radius: 8px;
                 max-width: 500px;
                 text-align: center;
             ">
-                <h2 style="color: #333; margin-bottom: 20px;">Game Ended</h2>
-                <p style="font-size: 16px; margin-bottom: 20px;">${message}</p>
-                <p style="color: #666; font-size: 14px;">Your game data has been saved. Thank you for participating.</p>
+                <h2 style="color: #333; margin-bottom: 20px;">Session Ended</h2>
+                <p style="font-size: 16px; color: #333;">${message}</p>
             </div>
         `;
-        overlay.style.display = 'flex';
+        container.style.display = 'flex';
     }
 
     /**
