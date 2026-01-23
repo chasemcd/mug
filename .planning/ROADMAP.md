@@ -304,7 +304,9 @@ Plans:
   2. Focused partner's game loop never pauses or stutters when other player tabs away
   3. Focused partner sees backgrounded player go idle (their inputs stop affecting game)
 **Research flag:** Likely (fast-forward resync patterns, GGPO integration with background state)
-**Plans:** TBD
+**Plans:** 1 plan
+Plans:
+- [ ] 26-01-PLAN.md — Fast-forward resync on refocus, partner experience verification
 
 ### Phase 27: Timeout, Messaging & Telemetry
 **Goal:** Configurable timeout with graceful game ending and research data capture
@@ -322,7 +324,7 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 24 → 25 → 26 → 27
+Phases execute in numeric order: 24 -> 25 -> 26 -> 27
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -341,9 +343,9 @@ Phases execute in numeric order: 24 → 25 → 26 → 27
 | 23. Partner Disconnection | v1.4 | 1/1 | Complete | 2026-01-22 |
 | 24. Web Worker Timer | v1.5 | 1/1 | Complete | 2026-01-23 |
 | 25. Focus Detection | v1.5 | 1/1 | Complete | 2026-01-23 |
-| 26. Resync & Partner UX | v1.5 | 0/? | Not started | — |
+| 26. Resync & Partner UX | v1.5 | 0/1 | Not started | — |
 | 27. Timeout & Telemetry | v1.5 | 0/? | Not started | — |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-01-23 after Phase 25 execution*
+*Last updated: 2026-01-23 after Phase 26 planning*
