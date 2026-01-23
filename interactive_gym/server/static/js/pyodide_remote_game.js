@@ -24,6 +24,19 @@ export class RemoteGame {
         this.max_steps = config.max_steps;
         this.cumulative_rewards = {};
         this.shouldReset = true;
+
+        // Pipeline latency metrics (Phase 28 - DIAG-01 to DIAG-07)
+        // Tracks timestamps at each stage: keypress -> queue -> step -> render
+        this.pipelineMetrics = {
+            lastInputTimestamps: null,       // {keypressTimestamp, queueExitTimestamp}
+            stepCallTimestamp: null,         // DIAG-03: When step() called
+            stepReturnTimestamp: null,       // DIAG-04: When step() returns
+            enabled: true,                   // Can be toggled via console: window.pipelineMetricsEnabled = false
+            framesSinceLastLog: 0,           // Counter for throttled logging after initial frames
+            initialLogFrames: 50             // Log every frame for first N frames
+        };
+        // Frame counter for single-player (multiplayer has this.frameNumber)
+        this.frameNumber = 0;
     }
 
     isDone(){
@@ -232,7 +245,10 @@ obs, infos, render_state
 
     async step(actions) {
         const pyActions = this.pyodide.toPy(actions);
-        // const startTime = performance.now();
+
+        // DIAG-03: Capture timestamp when env.step() is called
+        this.pipelineMetrics.stepCallTimestamp = performance.now();
+
         const result = await this.pyodide.runPythonAsync(`
 ${this.config.on_game_step_code}
 agent_actions = {int(k) if k.isnumeric() or isinstance(k, (float, int)) else k: v for k, v in ${pyActions}.items()}
@@ -262,8 +278,9 @@ if not isinstance(truncateds, dict):
 
 obs, rewards, terminateds, truncateds, infos, render_state
         `);
-        // const endTime = performance.now();
-        // console.log(`Step operation took ${endTime - startTime} milliseconds`);
+
+        // DIAG-04: Capture timestamp when env.step() returns
+        this.pipelineMetrics.stepReturnTimestamp = performance.now();
 
         // Convert everything from python objects to JS objects
         let [obs, rewards, terminateds, truncateds, infos, render_state] = await this.pyodide.toPy(result).toJs();
@@ -337,8 +354,11 @@ obs, rewards, terminateds, truncateds, infos, render_state
             } else {
                 this.shouldReset = true;
             }
-            
+
         }
+
+        // Increment frame number for latency logging (multiplayer has its own frameNumber)
+        this.frameNumber++;
 
         return [obs, rewards, terminateds, truncateds, infos, render_state]
     };
@@ -370,6 +390,68 @@ obs, rewards, terminateds, truncateds, infos, render_state
 
         return hud_text
     };
+
+    // ========== Pipeline Latency Instrumentation (Phase 28) ==========
+
+    /**
+     * Set input timestamps for pipeline latency tracking (DIAG-01, DIAG-02).
+     * Called by phaser_gym_graphics.js before step() with timestamps from keypress.
+     * @param {Object} timestamps - {playerId, keypressTimestamp, queueExitTimestamp}
+     */
+    setInputTimestamps(timestamps) {
+        if (!this.pipelineMetrics.enabled) return;
+        // Allow console override
+        if (typeof window !== 'undefined' && window.pipelineMetricsEnabled === false) return;
+
+        this.pipelineMetrics.lastInputTimestamps = {
+            keypressTimestamp: timestamps.keypressTimestamp,
+            queueExitTimestamp: timestamps.queueExitTimestamp
+        };
+    }
+
+    /**
+     * Log pipeline latency breakdown (DIAG-07).
+     * Called by phaser_gym_graphics.js after rendering completes with render timestamps.
+     * @param {number} renderBeginTimestamp - performance.now() when render started (DIAG-05)
+     * @param {number} renderCompleteTimestamp - performance.now() when render finished (DIAG-06)
+     */
+    logPipelineLatency(renderBeginTimestamp, renderCompleteTimestamp) {
+        // Check if metrics are enabled
+        if (!this.pipelineMetrics.enabled) return;
+        if (typeof window !== 'undefined' && window.pipelineMetricsEnabled === false) return;
+
+        // Skip if no input timestamps (no real user input this frame)
+        if (!this.pipelineMetrics.lastInputTimestamps) return;
+
+        // Throttle logging after initial frames
+        this.pipelineMetrics.framesSinceLastLog++;
+        const shouldLog = this.frameNumber <= this.pipelineMetrics.initialLogFrames ||
+                          this.pipelineMetrics.framesSinceLastLog >= 10;
+
+        if (!shouldLog) {
+            // Clear timestamps but don't log
+            this.pipelineMetrics.lastInputTimestamps = null;
+            return;
+        }
+
+        this.pipelineMetrics.framesSinceLastLog = 0;
+
+        const ts = this.pipelineMetrics.lastInputTimestamps;
+        const stepCall = this.pipelineMetrics.stepCallTimestamp;
+        const stepReturn = this.pipelineMetrics.stepReturnTimestamp;
+
+        // Compute breakdown
+        const queueTime = ts.queueExitTimestamp - ts.keypressTimestamp;
+        const stepTime = (stepCall && stepReturn) ? (stepReturn - stepCall) : 0;
+        const renderTime = renderCompleteTimestamp - renderBeginTimestamp;
+        const totalLatency = renderCompleteTimestamp - ts.keypressTimestamp;
+
+        // Log in the required format
+        console.log(`[LATENCY] frame=${this.frameNumber} total=${totalLatency.toFixed(1)}ms | queue=${queueTime.toFixed(1)}ms step=${stepTime.toFixed(1)}ms render=${renderTime.toFixed(1)}ms`);
+
+        // Clear for next input
+        this.pipelineMetrics.lastInputTimestamps = null;
+    }
 };
 
 
