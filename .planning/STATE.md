@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-23)
 ## Current Position
 
 Phase: 28 of 31 (Pipeline Instrumentation)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-01-23 — v1.6 roadmap created
+Plan: 01 of 01 (Complete)
+Status: Phase complete
+Last activity: 2026-01-23 — Completed 28-01-PLAN.md
 
-Progress: [----------] 0% (v1.6 - 0/4 phases)
+Progress: [===-------] 25% (v1.6 - 1/4 phases)
 
 ## Milestone History
 
@@ -87,6 +87,15 @@ Progress: [----------] 0% (v1.6 - 0/4 phases)
 - `.planning/phases/26-resync-partner-ux/26-01-SUMMARY.md`
 - `.planning/phases/27-timeout-telemetry/27-01-SUMMARY.md`
 
+**v1.6 Execution:**
+- `.planning/phases/28-pipeline-instrumentation/28-01-SUMMARY.md`
+
+**Pipeline Instrumentation (v1.6 Phase 28 - added):**
+- `interactive_gym/server/static/js/ui_utils.js` - Keypress timestamp capture (DIAG-01)
+- `interactive_gym/server/static/js/phaser_gym_graphics.js` - Input queue timestamps, render timestamps, timestamp propagation
+- `interactive_gym/server/static/js/pyodide_multiplayer_game.js` - pipelineMetrics object, setInputTimestamps(), logPipelineLatency()
+- `interactive_gym/server/static/js/pyodide_remote_game.js` - Same instrumentation for single-player
+
 ### Decisions
 
 See: .planning/PROJECT.md Key Decisions table
@@ -113,6 +122,12 @@ See: .planning/PROJECT.md Key Decisions table
 - Worker ticks trigger game logic; RAF loop only renders
 - Processing guard (isProcessingTick) prevents overlapping async operations
 
+**v1.6 Phase 28 decisions:**
+- Console log format: `[LATENCY] frame=N total=Xms | queue=Yms step=Zms render=Wms`
+- Log every frame for first 50, then every 10th frame (reduce noise)
+- Pass timestamps via setInputTimestamps() method rather than step() parameter (backward compatible)
+- Skip logging during fast-forward or background states
+
 **v1.4 decisions:**
 - In-page overlay instead of redirect for partner disconnection (preserves data, better UX)
 
@@ -138,9 +153,18 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-01-23
-Stopped at: Created v1.6 roadmap (4 phases: 28-31)
+Stopped at: Completed 28-01-PLAN.md (Pipeline Instrumentation)
 Resume file: None
 
 ### Next Steps
 
-Run `/gsd:plan-phase 28` to plan Pipeline Instrumentation phase.
+Phase 29 (Diagnosis) can now analyze latency logs to identify the root cause of reported 1-2 second input lag.
+
+Expected workflow:
+1. Start game, open browser console
+2. Observe `[LATENCY]` logs with breakdown
+3. Identify which pipeline stage(s) contribute to lag:
+   - High queue time = input buffering issue
+   - High step time = Pyodide execution bottleneck
+   - High render time = Phaser rendering issue
+   - Total >> sum = frame timing/throttling issue
