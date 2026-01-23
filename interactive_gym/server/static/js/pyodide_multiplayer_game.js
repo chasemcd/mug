@@ -5275,14 +5275,22 @@ _cumulative_rewards
     _handleWorkerTick(timestamp) {
         // Track tick intervals for debugging
         const now = performance.now();
+        const targetInterval = 1000 / (this.config.fps || 10);
+
         if (this._lastTickTime) {
             const tickInterval = now - this._lastTickTime;
-            // Log if interval is significantly off from expected (100ms for 10 FPS)
-            if (this.frameNumber % 50 === 0) {
-                console.log(`[TICK] frame=${this.frameNumber} interval=${tickInterval.toFixed(1)}ms isProcessing=${this.isProcessingTick}`);
+            // Log every tick for first 100 frames, then every 50
+            const shouldLog = this.frameNumber < 100 || this.frameNumber % 50 === 0;
+            if (shouldLog) {
+                console.log(`[TICK] frame=${this.frameNumber} interval=${tickInterval.toFixed(1)}ms (target=${targetInterval.toFixed(0)}ms) isProcessing=${this.isProcessingTick}`);
+            }
+            // Warn if interval is significantly off (>50% deviation)
+            if (tickInterval > targetInterval * 1.5 && this.frameNumber > 10) {
+                console.warn(`[TICK-SLOW] frame=${this.frameNumber} interval=${tickInterval.toFixed(1)}ms is ${((tickInterval/targetInterval - 1) * 100).toFixed(0)}% over target`);
             }
         }
         this._lastTickTime = now;
+        this._tickStartTime = now;  // Track when tick processing started
 
         // Skip if game is done
         if (this.state === 'done') {
@@ -5359,6 +5367,8 @@ _cumulative_rewards
             // Track skipped ticks
             if (!this._skippedTickCount) this._skippedTickCount = 0;
             this._skippedTickCount++;
+            // Log EVERY skipped tick - this is likely our latency source
+            console.warn(`[TICK-SKIPPED] frame=${this.frameNumber} tick skipped because previous tick still processing (total skipped: ${this._skippedTickCount})`);
             return;
         }
 

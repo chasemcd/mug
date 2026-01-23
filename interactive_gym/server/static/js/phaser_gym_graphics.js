@@ -347,10 +347,25 @@ class GymScene extends Phaser.Scene {
      * Triggers game logic processing and clears the processing flag when done.
      */
     async onWorkerTick() {
+        const tickProcessStart = performance.now();
         await this.processPyodideGame();
+        const tickProcessTime = performance.now() - tickProcessStart;
+
         // Clear the processing flag after game step completes
         if (this.pyodide_remote_game) {
             this.pyodide_remote_game.isProcessingTick = false;
+
+            // Log tick processing time for first 100 frames, then periodically
+            const frame = this.pyodide_remote_game.frameNumber;
+            const targetInterval = 1000 / (this.pyodide_remote_game.config?.fps || 10);
+            const shouldLog = frame < 100 || frame % 50 === 0;
+            if (shouldLog) {
+                console.log(`[TICK-DONE] frame=${frame} processTime=${tickProcessTime.toFixed(1)}ms (budget=${targetInterval.toFixed(0)}ms)`);
+            }
+            // Warn if processing took longer than the frame budget
+            if (tickProcessTime > targetInterval) {
+                console.warn(`[TICK-OVERRUN] frame=${frame} processTime=${tickProcessTime.toFixed(1)}ms EXCEEDS budget=${targetInterval.toFixed(0)}ms - WILL CAUSE LAG`);
+            }
         }
     }
 
