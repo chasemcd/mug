@@ -15,7 +15,7 @@ import * as seeded_random from './seeded_random.js';
 import * as ui_utils from './ui_utils.js';
 import { WebRTCManager, LatencyTelemetry } from './webrtc_manager.js';
 import { ContinuousMonitor } from './continuous_monitor.js';
-import { clearHumanInputBuffers } from './phaser_gym_graphics.js';
+import { clearHumanInputBuffers, logFastForwardFrame } from './phaser_gym_graphics.js';
 
 // ========== Logging Configuration ==========
 // Control verbosity via browser console: window.p2pLogLevel = 'info' or 'debug'
@@ -4548,17 +4548,37 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
                 });
 
                 // Record in action sequence
-                // Note: During fast-forward we are foregrounded (just returned from background)
+                // Note: These frames occurred while we were backgrounded, so isFocused=false
                 this.actionSequence.push({
                     frame: frame,
                     actions: {...frameActions},
-                    isFocused: true
+                    isFocused: false
                 });
             }
 
             if (fastForwardFrames.length === 0) {
                 p2pLog.debug('Fast-forward: no frames to process');
                 return;
+            }
+
+            // 5b. Log each fast-forward frame to CSV with isFocused=false for local player
+            // These frames occurred while we were backgrounded, so mark our focus as false
+            const focusStateForFF = {};
+            for (const playerId of humanPlayerIds) {
+                // Local player was backgrounded; partner was focused (they sent us inputs)
+                focusStateForFF[playerId] = String(playerId) !== String(this.myPlayerId);
+            }
+
+            const startingStepNum = this.step_num;
+            for (let i = 0; i < fastForwardFrames.length; i++) {
+                const ff = fastForwardFrames[i];
+                logFastForwardFrame({
+                    actions: ff.actions,
+                    isFocused: focusStateForFF,
+                    episode_num: this.num_episodes,
+                    t: startingStepNum + i,
+                    player_subjects: this.playerSubjects
+                });
             }
 
             // 6. Execute ALL fast-forward steps in a single Python call (no rendering)
