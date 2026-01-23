@@ -6,7 +6,8 @@
 - **v1.1 Sync Validation** - Phases 11-14 (complete)
 - **v1.2 Participant Exclusion** - Phases 15-18 (shipped 2026-01-22)
 - **v1.3 P2P Connection Validation** - Phases 19-22 (shipped 2026-01-22)
-- **v1.4 Partner Disconnection Handling** - Phase 23 (in progress)
+- **v1.4 Partner Disconnection Handling** - Phase 23 (shipped 2026-01-22)
+- **v1.5 Focus Loss Handling** - Phases 24-27 (in progress)
 
 ## Phases
 
@@ -64,11 +65,23 @@ Key deliverables:
 
 </details>
 
-### v1.4 Partner Disconnection Handling (In Progress)
+<details>
+<summary>v1.4 Partner Disconnection Handling (Phase 23) - SHIPPED 2026-01-22</summary>
 
 **Milestone Goal:** Improve the experience when a partner disconnects mid-game — stay on the same page with a configurable message, ensure data is exported with disconnection metadata.
 
 - [x] **Phase 23: Partner Disconnection Handling** - In-page overlay, data export, disconnection metadata
+
+</details>
+
+### v1.5 Focus Loss Handling (In Progress)
+
+**Milestone Goal:** Prevent desync when a participant tabs away by using Web Workers for timing and gracefully handling the backgrounded state.
+
+- [ ] **Phase 24: Web Worker Timer Infrastructure** - Throttle-resistant timing in Web Worker
+- [ ] **Phase 25: Focus Detection & Background State** - Page Visibility API, idle defaults, input buffering
+- [ ] **Phase 26: Resync & Partner Experience** - Fast-forward on refocus, no partner interruption
+- [ ] **Phase 27: Timeout, Messaging & Telemetry** - Configurable timeout, messages, research data
 
 ## Phase Details
 
@@ -255,10 +268,57 @@ Plans:
 Plans:
 - [x] 23-01-PLAN.md — In-page overlay, config API, data export with disconnectedPlayerId
 
+### Phase 24: Web Worker Timer Infrastructure
+**Goal:** Move timing-critical code to Web Worker for throttle-resistant operation
+**Depends on:** v1.4 complete (existing P2P infrastructure)
+**Requirements:** WORK-01, WORK-02
+**Success Criteria** (what must be TRUE):
+  1. Game timing runs in a Web Worker, not main thread
+  2. When tab is backgrounded, Worker timer continues at accurate intervals (not throttled)
+  3. Main thread communicates with Worker via postMessage for game state updates
+**Research flag:** Likely (Web Worker timing patterns, main thread/Worker communication)
+**Plans:** TBD
+
+### Phase 25: Focus Detection & Background State
+**Goal:** Detect when participant tabs away and track background duration
+**Depends on:** Phase 24
+**Requirements:** FOCUS-01, FOCUS-02, BG-01, BG-02
+**Success Criteria** (what must be TRUE):
+  1. Tab visibility changes are detected immediately via Page Visibility API
+  2. Duration of each background period is tracked with start/end timestamps
+  3. When backgrounded, player's actions default to idle/no-op (no random inputs)
+  4. Partner inputs received via WebRTC are buffered while player is backgrounded
+**Research flag:** Unlikely (Page Visibility API well-documented, builds on existing exclusion patterns)
+**Plans:** TBD
+
+### Phase 26: Resync & Partner Experience
+**Goal:** Fast-forward on refocus while keeping focused partner uninterrupted
+**Depends on:** Phase 25
+**Requirements:** BG-03, PARTNER-01, PARTNER-02
+**Success Criteria** (what must be TRUE):
+  1. When backgrounded player refocuses, simulation fast-forwards using queued inputs
+  2. Focused partner's game loop never pauses or stutters when other player tabs away
+  3. Focused partner sees backgrounded player go idle (their inputs stop affecting game)
+**Research flag:** Likely (fast-forward resync patterns, GGPO integration with background state)
+**Plans:** TBD
+
+### Phase 27: Timeout, Messaging & Telemetry
+**Goal:** Configurable timeout with graceful game ending and research data capture
+**Depends on:** Phase 26
+**Requirements:** TIMEOUT-01, TIMEOUT-02, TIMEOUT-03, TELEM-01, TELEM-02
+**Success Criteria** (what must be TRUE):
+  1. Focus loss timeout is configurable (default 30s)
+  2. When timeout exceeded, game ends for both players
+  3. Custom message displayed when game ends due to focus loss timeout
+  4. Focus loss events recorded in session metadata
+  5. Duration of each focus loss period included in exported data
+**Research flag:** Unlikely (builds on existing timeout/messaging patterns from v1.3/v1.4)
+**Plans:** TBD
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 23
+Phases execute in numeric order: 24 → 25 → 26 → 27
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -275,7 +335,11 @@ Phases execute in numeric order: 23
 | 21. Per-Round Health Check | v1.3 | 1/1 | Complete | 2026-01-22 |
 | 22. Latency Telemetry | v1.3 | 1/1 | Complete | 2026-01-22 |
 | 23. Partner Disconnection | v1.4 | 1/1 | Complete | 2026-01-22 |
+| 24. Web Worker Timer | v1.5 | 0/? | Not started | — |
+| 25. Focus Detection | v1.5 | 0/? | Not started | — |
+| 26. Resync & Partner UX | v1.5 | 0/? | Not started | — |
+| 27. Timeout & Telemetry | v1.5 | 0/? | Not started | — |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-01-22 after Phase 23 complete*
+*Last updated: 2026-01-22 after v1.5 phases added*

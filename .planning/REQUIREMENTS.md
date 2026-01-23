@@ -62,26 +62,26 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| WORK-01 | TBD | Pending |
-| WORK-02 | TBD | Pending |
-| FOCUS-01 | TBD | Pending |
-| FOCUS-02 | TBD | Pending |
-| BG-01 | TBD | Pending |
-| BG-02 | TBD | Pending |
-| BG-03 | TBD | Pending |
-| PARTNER-01 | TBD | Pending |
-| PARTNER-02 | TBD | Pending |
-| TIMEOUT-01 | TBD | Pending |
-| TIMEOUT-02 | TBD | Pending |
-| TIMEOUT-03 | TBD | Pending |
-| TELEM-01 | TBD | Pending |
-| TELEM-02 | TBD | Pending |
+| WORK-01 | Phase 24 | Pending |
+| WORK-02 | Phase 24 | Pending |
+| FOCUS-01 | Phase 25 | Pending |
+| FOCUS-02 | Phase 25 | Pending |
+| BG-01 | Phase 25 | Pending |
+| BG-02 | Phase 25 | Pending |
+| BG-03 | Phase 26 | Pending |
+| PARTNER-01 | Phase 26 | Pending |
+| PARTNER-02 | Phase 26 | Pending |
+| TIMEOUT-01 | Phase 27 | Pending |
+| TIMEOUT-02 | Phase 27 | Pending |
+| TIMEOUT-03 | Phase 27 | Pending |
+| TELEM-01 | Phase 27 | Pending |
+| TELEM-02 | Phase 27 | Pending |
 
 **Coverage:**
 - v1.5 requirements: 14 total
-- Mapped to phases: 0
-- Unmapped: 14 (run /gsd:create-roadmap)
+- Mapped to phases: 14
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-01-22*
-*Last updated: 2026-01-22 after initial definition*
+*Last updated: 2026-01-22 after roadmap creation*
