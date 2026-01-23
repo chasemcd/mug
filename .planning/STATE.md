@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-22)
 
 ## Current Position
 
-Phase: 24 of 27 (Web Worker Timer Infrastructure)
+Phase: 25 of 27 (Focus Detection)
 Plan: 01 complete
 Status: Phase complete
-Last activity: 2026-01-23 - Completed 24-01-PLAN.md
+Last activity: 2026-01-23 - Completed 25-01-PLAN.md
 
-Progress: [##--------] 25% (v1.5 - 1/4 phases)
+Progress: [#####-----] 50% (v1.5 - 2/4 phases)
 
 ## Milestone History
 
@@ -32,10 +32,13 @@ Progress: [##--------] 25% (v1.5 - 1/4 phases)
 ### Key Files
 
 **P2P Core (created/heavily modified in v1.0):**
-- `interactive_gym/server/static/js/pyodide_multiplayer_game.js` (5,500+ LOC)
+- `interactive_gym/server/static/js/pyodide_multiplayer_game.js` (5,600+ LOC)
 - `interactive_gym/server/static/js/webrtc_manager.js` (1,030+ LOC)
 - `interactive_gym/server/pyodide_game_coordinator.py`
 - `interactive_gym/configurations/remote_config.py`
+
+**Focus Management (v1.5 Phase 25 - added):**
+- `interactive_gym/server/static/js/pyodide_multiplayer_game.js` - FocusManager class, focusManager property, background checks in _handleWorkerTick and _handleInputPacket
 
 **Web Worker Timer (v1.5 Phase 24 - modified):**
 - `interactive_gym/server/static/js/pyodide_multiplayer_game.js` - GameTimerWorker class, _initTimerWorker(), _handleWorkerTick()
@@ -73,10 +76,16 @@ Progress: [##--------] 25% (v1.5 - 1/4 phases)
 
 **v1.5 Execution:**
 - `.planning/phases/24-web-worker-timer/24-01-SUMMARY.md`
+- `.planning/phases/25-focus-detection/25-01-SUMMARY.md`
 
 ### Decisions
 
 See: .planning/PROJECT.md Key Decisions table
+
+**v1.5 Phase 25 decisions:**
+- Worker keeps ticking when backgrounded (for elapsed time tracking), but frames don't advance
+- Partner inputs buffered in FocusManager.backgroundInputBuffer for Phase 26 fast-forward
+- Periodic logging every ~50 ticks (5s at 10 FPS) during background state
 
 **v1.5 Phase 24 decisions:**
 - Inline Blob Worker instead of separate file (simpler deployment)
@@ -103,9 +112,9 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-01-23
-Stopped at: Completed 24-01-PLAN.md (Web Worker Timer Infrastructure)
+Stopped at: Completed 25-01-PLAN.md (Focus Detection)
 Resume file: None
 
 ### Next Steps
 
-Run `/gsd:plan-phase 25` to plan Focus Detection (detect when tab is backgrounded).
+Run `/gsd:plan-phase 26` to plan Fast-Forward Resume (catch up buffered inputs on refocus).
