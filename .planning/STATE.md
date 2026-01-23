@@ -5,25 +5,26 @@
 See: .planning/PROJECT.md (updated 2026-01-22)
 
 **Core value:** Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
-**Current focus:** v1.4 Partner Disconnection Handling - COMPLETE
+**Current focus:** v1.5 Focus Loss Handling
 
 ## Current Position
 
-Phase: 23 of 23 (Partner Disconnection Handling)
-Plan: 1 of 1 complete
-Status: Milestone complete
-Last activity: 2026-01-22 - Completed 23-01-PLAN.md
+Phase: Not started (run /gsd:create-roadmap)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-01-22 — Milestone v1.5 started
 
-Progress: [##########] 100% (v1.4 - 1/1 phases)
+Progress: [----------] 0% (v1.5 - 0/? phases)
 
 ## Milestone History
 
 | Milestone | Phases | Status | Shipped |
 |-----------|--------|--------|---------|
+| v1.5 Focus Loss Handling | TBD | In Progress | — |
 | v1.4 Partner Disconnection Handling | 23 | Complete | 2026-01-22 |
 | v1.3 P2P Connection Validation | 19-22 | Complete | 2026-01-22 |
 | v1.2 Participant Exclusion | 15-18 | Complete | 2026-01-22 |
-| v1.1 Sync Validation | 11-14 | Complete | -- |
+| v1.1 Sync Validation | 11-14 | Complete | — |
 | v1.0 P2P Multiplayer | 1-10 | Complete | 2026-01-19 |
 
 ## Accumulated Context
@@ -89,10 +90,10 @@ See: .planning/PROJECT.md Key Decisions table
 
 ## Session Continuity
 
-Last session: 2026-01-22 21:42 UTC
-Stopped at: Completed 23-01-PLAN.md (v1.4 milestone complete)
+Last session: 2026-01-22
+Stopped at: Started v1.5 Focus Loss Handling milestone
 Resume file: None
 
 ### Next Steps
 
-Milestone v1.4 complete. Ready for next milestone planning or release.
+Run `/gsd:define-requirements` to formalize requirements, or `/gsd:create-roadmap` to plan phases.

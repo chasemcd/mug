@@ -8,16 +8,31 @@ A framework for running browser-based reinforcement learning experiments with hu
 
 Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
 
-## Current Milestone: v1.4 Partner Disconnection Handling
+## Current Milestone: v1.5 Focus Loss Handling
 
-**Goal:** Improve the experience when a partner disconnects mid-game — stay on the same page with a configurable message, ensure data is exported with disconnection metadata.
+**Goal:** Prevent desync when a participant tabs away by using Web Workers for timing and gracefully handling the backgrounded state.
 
 **Target features:**
-- No redirect on partner disconnect — stay on same page instead of redirecting to `/partner-disconnected`
-- Clean UI update — hide game container and displays, show disconnection message
-- Data export before termination — ensure all gameplay data collected so far is exported
-- Session metadata — mark session as partial with disconnection reason and which player disconnected
-- Configurable message — allow researchers to set custom partner disconnection message via GymScene config
+- Web Worker-based timing to maintain clock accuracy when tab is backgrounded
+- Page Visibility API detection of focus loss
+- Backgrounded player's actions default to idle/no-op
+- Partner inputs continue flowing via WebRTC, queued for resync on refocus
+- On refocus: fast-forward simulation using queued inputs
+- Focused partner experiences no interruption (sees other player go idle)
+- Configurable timeout before ending game (default 30s)
+- Configurable message when game ends due to focus loss timeout
+- Session metadata includes focus-loss events for research analysis
+
+## Previous Milestone: v1.4 Partner Disconnection Handling (Shipped: 2026-01-22)
+
+**Delivered:** Improved partner disconnect experience with in-page overlay instead of redirect, data export before termination, and configurable messaging.
+
+**Key accomplishments:**
+- No redirect on partner disconnect — stay on same page with overlay
+- Clean UI update — hide game container, show disconnection message
+- Data export before termination
+- Session metadata with disconnection reason and disconnected player ID
+- Configurable partner disconnect message via GymScene config
 
 ## Previous Milestone: v1.3 P2P Connection Validation (Shipped: 2026-01-22)
 
@@ -102,13 +117,22 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 - ✓ Async periodic P2P latency monitoring — v1.3
 - ✓ Latency stats export (min, median, mean, max) — v1.3
 
+*Shipped in v1.4:*
+- ✓ No redirect on partner disconnect (in-page overlay) — v1.4
+- ✓ Clean UI update on disconnect (hide game, show message) — v1.4
+- ✓ Data export before termination — v1.4
+- ✓ Session metadata with disconnection reason and disconnected player ID — v1.4
+- ✓ Configurable partner disconnect message via GymScene config — v1.4
+
 ### Active
 
-- [ ] No redirect on partner disconnect (stay on same page)
-- [ ] Clean UI update on disconnect (hide game, show message)
-- [ ] Data export before termination
-- [ ] Session metadata with disconnection reason and disconnected player ID
-- [ ] Configurable partner disconnect message via GymScene config
+- [ ] Web Worker-based timing for background tab resilience
+- [ ] Page Visibility API focus loss detection
+- [ ] Backgrounded player actions default to idle/no-op
+- [ ] Partner input queuing and resync on refocus
+- [ ] Configurable focus loss timeout (default 30s)
+- [ ] Configurable focus loss timeout message
+- [ ] Focus loss events in session metadata
 
 ### Deferred
 
@@ -134,7 +158,7 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 **Known issues:**
 - Episode start sync can timeout on slow connections (mitigated with retry mechanism)
 - Rollback visual corrections cause brief teleporting (smoothing not yet implemented)
-- Partner disconnect currently redirects to separate page (addressing in v1.4)
+- Browser tab throttling causes desync when participant tabs away (addressing in v1.5)
 
 ## Constraints
 
@@ -157,4 +181,4 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 | Open Relay Project for TURN | Free 20GB/month tier sufficient for research | ✓ Good |
 
 ---
-*Last updated: 2026-01-22 after v1.4 milestone start*
+*Last updated: 2026-01-22 after v1.5 milestone start*
