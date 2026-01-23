@@ -36,6 +36,123 @@ const p2pLog = {
     debug: (...args) => { if (getLogLevel() >= LOG_LEVELS.debug) console.log('[P2P]', ...args); },
 };
 
+// ========== Web Worker Timer (Phase 24) ==========
+// Browsers throttle main-thread timers when tabs are backgrounded.
+// Web Workers are exempt from throttling, providing reliable timing.
+
+/**
+ * GameTimerWorker - Runs game timing in a dedicated Web Worker.
+ *
+ * Browsers (Chrome 88+) throttle setInterval/setTimeout in background tabs:
+ * - After 5 minutes: once per minute
+ * - Workers are exempt from this throttling
+ *
+ * This class creates an inline Worker via Blob URL that sends tick messages
+ * at the target frame rate. The main thread receives ticks via onTick callback.
+ *
+ * Usage:
+ *   const timer = new GameTimerWorker(10);  // 10 FPS
+ *   timer.onTick = (timestamp) => { ... };
+ *   timer.start();
+ *   // later:
+ *   timer.destroy();
+ */
+class GameTimerWorker {
+    /**
+     * @param {number} targetFps - Target frames per second (default: 10)
+     */
+    constructor(targetFps = 10) {
+        this.worker = null;
+        this.workerUrl = null;
+        this.targetInterval = 1000 / targetFps;  // ms between ticks
+        this.onTick = null;  // Callback: (timestamp: number) => void
+        this._createWorker();
+    }
+
+    /**
+     * Create the inline Worker from a Blob URL.
+     * Worker code runs setInterval and posts tick messages.
+     * @private
+     */
+    _createWorker() {
+        const workerCode = `
+            let intervalId = null;
+
+            self.onmessage = function(e) {
+                const { command, interval } = e.data;
+
+                if (command === 'start') {
+                    if (intervalId) clearInterval(intervalId);
+                    intervalId = setInterval(() => {
+                        self.postMessage({ type: 'tick', timestamp: performance.now() });
+                    }, interval);
+                } else if (command === 'stop') {
+                    if (intervalId) {
+                        clearInterval(intervalId);
+                        intervalId = null;
+                    }
+                } else if (command === 'setInterval') {
+                    if (intervalId) {
+                        clearInterval(intervalId);
+                        intervalId = setInterval(() => {
+                            self.postMessage({ type: 'tick', timestamp: performance.now() });
+                        }, interval);
+                    }
+                }
+            };
+        `;
+
+        const blob = new Blob([workerCode], { type: 'application/javascript' });
+        this.workerUrl = URL.createObjectURL(blob);
+        this.worker = new Worker(this.workerUrl);
+
+        this.worker.onmessage = (e) => {
+            if (e.data.type === 'tick' && this.onTick) {
+                this.onTick(e.data.timestamp);
+            }
+        };
+
+        this.worker.onerror = (err) => {
+            console.error('[GameTimerWorker] Error:', err.message);
+        };
+    }
+
+    /**
+     * Start the timer. Ticks will be sent at targetInterval rate.
+     */
+    start() {
+        this.worker.postMessage({ command: 'start', interval: this.targetInterval });
+    }
+
+    /**
+     * Stop the timer. No more ticks will be sent.
+     */
+    stop() {
+        this.worker.postMessage({ command: 'stop' });
+    }
+
+    /**
+     * Update the target FPS. Takes effect immediately if running.
+     * @param {number} fps - New target frames per second
+     */
+    setFps(fps) {
+        this.targetInterval = 1000 / fps;
+        this.worker.postMessage({ command: 'setInterval', interval: this.targetInterval });
+    }
+
+    /**
+     * Clean up the Worker and revoke the Blob URL.
+     * Call this when the game ends to prevent memory leaks.
+     */
+    destroy() {
+        this.stop();
+        this.worker.terminate();
+        URL.revokeObjectURL(this.workerUrl);
+        this.worker = null;
+        this.workerUrl = null;
+    }
+}
+
 // ========== P2P Binary Message Protocol ==========
 // Message Types
 const P2P_MSG_INPUT = 0x01;
