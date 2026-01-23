@@ -1,49 +1,40 @@
-# Requirements: Interactive Gym v1.5 Focus Loss Handling
+# Requirements: Interactive Gym v1.6 Input Latency Diagnosis & Fix
 
-**Defined:** 2026-01-22
+**Defined:** 2026-01-23
 **Core Value:** Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
 
-## v1.5 Requirements
+## v1.6 Requirements
 
-Requirements for v1.5 Focus Loss Handling milestone. Each maps to roadmap phases.
+Requirements for v1.6 Input Latency Diagnosis & Fix milestone. Each maps to roadmap phases.
 
-### Web Worker Timing
+### Diagnosis Infrastructure
 
-- [x] **WORK-01**: Game timing logic runs in Web Worker (unthrottled when backgrounded)
-- [x] **WORK-02**: Worker maintains accurate game clock even when main thread is throttled
+- [ ] **DIAG-01**: Timestamp captured at keypress event (performance.now())
+- [ ] **DIAG-02**: Timestamp captured when action enters input queue
+- [ ] **DIAG-03**: Timestamp captured when Pyodide env.step() called
+- [ ] **DIAG-04**: Timestamp captured when env.step() returns
+- [ ] **DIAG-05**: Timestamp captured when render update begins
+- [ ] **DIAG-06**: Timestamp captured when render update completes
+- [ ] **DIAG-07**: Per-input latency breakdown computed (queue time, step time, render time)
 
-### Focus Detection
+### Root Cause Fix
 
-- [x] **FOCUS-01**: Tab visibility changes detected via Page Visibility API
-- [x] **FOCUS-02**: Duration of each background period tracked
+- [ ] **FIX-01**: Local input latency consistently under 100ms (keypress to render)
+- [ ] **FIX-02**: Fix validated in both single-player and multiplayer modes
+- [ ] **FIX-03**: Fix validated specifically in Overcooked environment
 
-### Backgrounded Player Behavior
+### Validation & Telemetry
 
-- [x] **BG-01**: Backgrounded player's actions default to idle/no-op
-- [x] **BG-02**: Partner inputs buffered via WebRTC while backgrounded
-- [x] **BG-03**: On refocus, simulation fast-forwards using queued inputs to resync
-
-### Partner Experience
-
-- [x] **PARTNER-01**: Focused partner experiences no interruption when other player backgrounds
-- [x] **PARTNER-02**: Focused partner sees backgrounded player go idle (inputs stop)
-
-### Timeout & Messaging
-
-- [x] **TIMEOUT-01**: Configurable focus loss timeout before ending game (default 30s)
-- [x] **TIMEOUT-02**: Game ends for both players when timeout exceeded
-- [x] **TIMEOUT-03**: Configurable message displayed when game ends due to focus loss
-
-### Research Telemetry
-
-- [x] **TELEM-01**: Focus loss events recorded in session metadata
-- [x] **TELEM-02**: Duration of each focus loss period included in metadata
+- [ ] **TELEM-01**: Input latency metrics included in session data export
+- [ ] **TELEM-02**: Min/max/mean/median latency stats computed per session
+- [ ] **TELEM-03**: Latency outliers (>100ms) flagged and counted
+- [ ] **TELEM-04**: Latency breakdown by pipeline stage available for research analysis
 
 ## v2 Requirements
 
 Deferred to future release. Tracked but not in current roadmap.
 
-(None for v1.5)
+(None for v1.6)
 
 ## Out of Scope
 
@@ -51,9 +42,9 @@ Explicitly excluded. Documented to prevent scope creep.
 
 | Feature | Reason |
 |---------|--------|
-| Pause for both on focus loss | User specified focused partner keeps playing seamlessly |
-| Audio-based throttle prevention | No longer works in modern browsers (2025+) |
-| Fullscreen enforcement | Not related to focus loss handling |
+| Network latency optimization | This milestone is about local lag, not P2P latency |
+| Visual rollback smoothing | Separate issue, deferred to future milestone |
+| Real-time latency HUD | Telemetry is for export, not live display |
 | Adaptive input delay | Deferred to future milestone |
 
 ## Traceability
@@ -62,26 +53,26 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| WORK-01 | Phase 24 | Complete |
-| WORK-02 | Phase 24 | Complete |
-| FOCUS-01 | Phase 25 | Complete |
-| FOCUS-02 | Phase 25 | Complete |
-| BG-01 | Phase 25 | Complete |
-| BG-02 | Phase 25 | Complete |
-| BG-03 | Phase 26 | Complete |
-| PARTNER-01 | Phase 26 | Complete |
-| PARTNER-02 | Phase 26 | Complete |
-| TIMEOUT-01 | Phase 27 | Complete |
-| TIMEOUT-02 | Phase 27 | Complete |
-| TIMEOUT-03 | Phase 27 | Complete |
-| TELEM-01 | Phase 27 | Complete |
-| TELEM-02 | Phase 27 | Complete |
+| DIAG-01 | — | Pending |
+| DIAG-02 | — | Pending |
+| DIAG-03 | — | Pending |
+| DIAG-04 | — | Pending |
+| DIAG-05 | — | Pending |
+| DIAG-06 | — | Pending |
+| DIAG-07 | — | Pending |
+| FIX-01 | — | Pending |
+| FIX-02 | — | Pending |
+| FIX-03 | — | Pending |
+| TELEM-01 | — | Pending |
+| TELEM-02 | — | Pending |
+| TELEM-03 | — | Pending |
+| TELEM-04 | — | Pending |
 
 **Coverage:**
-- v1.5 requirements: 14 total
-- Mapped to phases: 14
-- Unmapped: 0 ✓
+- v1.6 requirements: 14 total
+- Mapped to phases: 0 (pending roadmap creation)
+- Unmapped: 14
 
 ---
-*Requirements defined: 2026-01-22*
-*Last updated: 2026-01-23 after Phase 27 execution*
+*Requirements defined: 2026-01-23*
+*Last updated: 2026-01-23 after initial definition*
