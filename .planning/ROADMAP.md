@@ -7,7 +7,7 @@
 - **v1.2 Participant Exclusion** - Phases 15-18 (shipped 2026-01-22)
 - **v1.3 P2P Connection Validation** - Phases 19-22 (shipped 2026-01-22)
 - **v1.4 Partner Disconnection Handling** - Phase 23 (shipped 2026-01-22)
-- **v1.5 Focus Loss Handling** - Phases 24-27 (in progress)
+- **v1.5 Focus Loss Handling** - Phases 24-27 (complete)
 
 ## Phases
 
@@ -74,14 +74,14 @@ Key deliverables:
 
 </details>
 
-### v1.5 Focus Loss Handling (In Progress)
+### v1.5 Focus Loss Handling (Complete)
 
 **Milestone Goal:** Prevent desync when a participant tabs away by using Web Workers for timing and gracefully handling the backgrounded state.
 
 - [x] **Phase 24: Web Worker Timer Infrastructure** - Throttle-resistant timing in Web Worker
 - [x] **Phase 25: Focus Detection & Background State** - Page Visibility API, idle defaults, input buffering
 - [x] **Phase 26: Resync & Partner Experience** - Fast-forward on refocus, no partner interruption
-- [ ] **Phase 27: Timeout, Messaging & Telemetry** - Configurable timeout, messages, research data
+- [x] **Phase 27: Timeout, Messaging & Telemetry** - Configurable timeout, messages, research data
 
 ## Phase Details
 
@@ -321,7 +321,7 @@ Plans:
 **Research flag:** Unlikely (builds on existing timeout/messaging patterns from v1.3/v1.4)
 **Plans:** 1 plan
 Plans:
-- [ ] 27-01-PLAN.md — Config API, timeout enforcement, telemetry export
+- [x] 27-01-PLAN.md — Config API, timeout enforcement, telemetry export
 
 ## Progress
 
@@ -346,8 +346,8 @@ Phases execute in numeric order: 24 -> 25 -> 26 -> 27
 | 24. Web Worker Timer | v1.5 | 1/1 | Complete | 2026-01-23 |
 | 25. Focus Detection | v1.5 | 1/1 | Complete | 2026-01-23 |
 | 26. Resync & Partner UX | v1.5 | 1/1 | Complete | 2026-01-23 |
-| 27. Timeout & Telemetry | v1.5 | 0/1 | Not started | — |
+| 27. Timeout & Telemetry | v1.5 | 1/1 | Complete | 2026-01-23 |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-01-23 after Phase 27 planning*
+*Last updated: 2026-01-23 after Phase 27 execution*

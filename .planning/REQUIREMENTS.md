@@ -30,14 +30,14 @@ Requirements for v1.5 Focus Loss Handling milestone. Each maps to roadmap phases
 
 ### Timeout & Messaging
 
-- [ ] **TIMEOUT-01**: Configurable focus loss timeout before ending game (default 30s)
-- [ ] **TIMEOUT-02**: Game ends for both players when timeout exceeded
-- [ ] **TIMEOUT-03**: Configurable message displayed when game ends due to focus loss
+- [x] **TIMEOUT-01**: Configurable focus loss timeout before ending game (default 30s)
+- [x] **TIMEOUT-02**: Game ends for both players when timeout exceeded
+- [x] **TIMEOUT-03**: Configurable message displayed when game ends due to focus loss
 
 ### Research Telemetry
 
-- [ ] **TELEM-01**: Focus loss events recorded in session metadata
-- [ ] **TELEM-02**: Duration of each focus loss period included in metadata
+- [x] **TELEM-01**: Focus loss events recorded in session metadata
+- [x] **TELEM-02**: Duration of each focus loss period included in metadata
 
 ## v2 Requirements
 
@@ -71,11 +71,11 @@ Which phases cover which requirements. Updated by create-roadmap.
 | BG-03 | Phase 26 | Complete |
 | PARTNER-01 | Phase 26 | Complete |
 | PARTNER-02 | Phase 26 | Complete |
-| TIMEOUT-01 | Phase 27 | Pending |
-| TIMEOUT-02 | Phase 27 | Pending |
-| TIMEOUT-03 | Phase 27 | Pending |
-| TELEM-01 | Phase 27 | Pending |
-| TELEM-02 | Phase 27 | Pending |
+| TIMEOUT-01 | Phase 27 | Complete |
+| TIMEOUT-02 | Phase 27 | Complete |
+| TIMEOUT-03 | Phase 27 | Complete |
+| TELEM-01 | Phase 27 | Complete |
+| TELEM-02 | Phase 27 | Complete |
 
 **Coverage:**
 - v1.5 requirements: 14 total
@@ -84,4 +84,4 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 ---
 *Requirements defined: 2026-01-22*
-*Last updated: 2026-01-23 after Phase 26 execution*
+*Last updated: 2026-01-23 after Phase 27 execution*
