@@ -476,6 +476,7 @@ cramped_room_human_human = (
         server_authoritative=False,  # Server-authoritative mode
         input_delay=3,
     )
+    .partner_disconnect_message_config(message="Your partner disconnected. The task will end here and you will be compensated for your performance so far.")
 )
 
 counter_circuit_human_human = (
