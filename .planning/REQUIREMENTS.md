@@ -9,8 +9,8 @@ Requirements for v1.5 Focus Loss Handling milestone. Each maps to roadmap phases
 
 ### Web Worker Timing
 
-- [ ] **WORK-01**: Game timing logic runs in Web Worker (unthrottled when backgrounded)
-- [ ] **WORK-02**: Worker maintains accurate game clock even when main thread is throttled
+- [x] **WORK-01**: Game timing logic runs in Web Worker (unthrottled when backgrounded)
+- [x] **WORK-02**: Worker maintains accurate game clock even when main thread is throttled
 
 ### Focus Detection
 
@@ -62,8 +62,8 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| WORK-01 | Phase 24 | Pending |
-| WORK-02 | Phase 24 | Pending |
+| WORK-01 | Phase 24 | Complete |
+| WORK-02 | Phase 24 | Complete |
 | FOCUS-01 | Phase 25 | Pending |
 | FOCUS-02 | Phase 25 | Pending |
 | BG-01 | Phase 25 | Pending |
@@ -84,4 +84,4 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 ---
 *Requirements defined: 2026-01-22*
-*Last updated: 2026-01-22 after roadmap creation*
+*Last updated: 2026-01-23 after Phase 24 execution*
