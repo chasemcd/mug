@@ -272,7 +272,26 @@ class GymScene extends Phaser.Scene {
             this.state = stateBuffer.shift(); // get the oldest state from the buffer
             this.drawState()
         }
+
+        // Register Worker tick callback for multiplayer games (Phase 24)
+        // Worker timing ensures game logic advances even when tab is backgrounded
+        if (this.pyodide_remote_game?.registerTickCallback) {
+            this.pyodide_remote_game.registerTickCallback(() => this.onWorkerTick());
+        }
     };
+
+    /**
+     * Handle a tick from the Web Worker timer (Phase 24).
+     * Called by MultiplayerPyodideGame when Worker sends a tick.
+     * Triggers game logic processing and clears the processing flag when done.
+     */
+    async onWorkerTick() {
+        await this.processPyodideGame();
+        // Clear the processing flag after game step completes
+        if (this.pyodide_remote_game) {
+            this.pyodide_remote_game.isProcessingTick = false;
+        }
+    }
 
     update() {
 
@@ -281,16 +300,26 @@ class GymScene extends Phaser.Scene {
             return;
         };
 
-        // Check if game is ready to process:
-        // 1. pyodide_remote_game exists
-        // 2. Not already processing
-        // 3. Pyodide is ready
-        // 4. P2P is ready (for multiplayer - waits for WebRTC connection or timeout)
-        const p2pReady = !this.pyodide_remote_game?.isP2PReady || this.pyodide_remote_game.isP2PReady();
-        if (this.pyodide_remote_game && !this.isProcessingPyodide && this.pyodide_remote_game.pyodideReady && p2pReady) {
-            this.processPyodideGame();
+        // For multiplayer games with Worker timing (Phase 24):
+        // Game logic (processPyodideGame) is triggered by Worker ticks, not Phaser's RAF loop.
+        // Worker ticks continue at full speed even when tab is backgrounded.
+        // Phaser's update() only handles rendering in this case.
+        const hasWorkerTiming = this.pyodide_remote_game?.timerWorker;
+
+        // For single-player games or games without Worker: use original RAF-driven processing
+        if (!hasWorkerTiming) {
+            // Check if game is ready to process:
+            // 1. pyodide_remote_game exists
+            // 2. Not already processing
+            // 3. Pyodide is ready
+            // 4. P2P is ready (for multiplayer - waits for WebRTC connection or timeout)
+            const p2pReady = !this.pyodide_remote_game?.isP2PReady || this.pyodide_remote_game.isP2PReady();
+            if (this.pyodide_remote_game && !this.isProcessingPyodide && this.pyodide_remote_game.pyodideReady && p2pReady) {
+                this.processPyodideGame();
+            }
         }
-        
+
+        // Rendering always happens (will pause naturally when tab is backgrounded via RAF)
         this.processRendering();
     };
 

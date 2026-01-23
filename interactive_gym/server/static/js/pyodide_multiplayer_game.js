@@ -875,6 +875,12 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         // When true, prevents scene advancement - the overlay is the final state
         this.partnerDisconnectedTerminal = false;
 
+        // Web Worker Timer (Phase 24)
+        // Worker runs setInterval exempt from browser throttling
+        this.timerWorker = null;           // GameTimerWorker instance
+        this.isProcessingTick = false;     // Guard against overlapping tick processing
+        this.tickCallback = null;          // Callback to trigger game step from external code
+
         this.setupMultiplayerHandlers();
     }
 
@@ -1250,6 +1256,9 @@ env.get_state()
             this.episodeComplete = true;
             this.num_episodes = episode_num;
 
+            // Clean up Web Worker timer (Phase 24)
+            this._destroyTimerWorker();
+
             // Sync final rewards if provided
             if (data.cumulative_rewards) {
                 this.cumulative_rewards = data.cumulative_rewards;
@@ -1279,6 +1288,9 @@ env.get_state()
 
             // Show notification (neutral, not alarming like own exclusion)
             this._showPartnerExcludedUI(data.message);
+
+            // Clean up Web Worker timer (Phase 24)
+            this._destroyTimerWorker();
 
             // Stop latency telemetry (Phase 22) - keep data for export
             if (this.latencyTelemetry) {
@@ -3011,6 +3023,7 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
 
         if (this.num_episodes >= this.max_episodes) {
             this.state = "done";
+            this._destroyTimerWorker();  // Clean up Web Worker timer (Phase 24)
             p2pLog.warn(`Game complete (${this.num_episodes}/${this.max_episodes} episodes)`);
         } else {
             this.shouldReset = true;
@@ -3096,6 +3109,9 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
 
         // Show exclusion message
         this._showMidGameExclusionUI(message);
+
+        // Clean up Web Worker timer (Phase 24)
+        this._destroyTimerWorker();
 
         // Notify server (which will notify partner in Phase 17)
         socket.emit('mid_game_exclusion', {
@@ -4471,6 +4487,87 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
 
         const status = this.p2pConnected ? 'P2P ready' : 'SocketIO fallback';
         p2pLog.debug(`P2P ready gate resolved: ${status}`);
+
+        // Initialize Web Worker timer now that P2P gate is resolved
+        this._initTimerWorker();
+    }
+
+    // ========== Web Worker Timer (Phase 24) ==========
+
+    /**
+     * Initialize the Web Worker timer for game logic ticks.
+     * Worker ticks are exempt from browser throttling when tab is backgrounded.
+     * Called after P2P setup completes.
+     */
+    _initTimerWorker() {
+        if (this.timerWorker) {
+            // Already initialized
+            return;
+        }
+
+        const targetFps = this.config.fps || 10;
+        this.timerWorker = new GameTimerWorker(targetFps);
+
+        this.timerWorker.onTick = (timestamp) => {
+            this._handleWorkerTick(timestamp);
+        };
+
+        this.timerWorker.start();
+        p2pLog.info(`Web Worker timer started at ${targetFps} FPS`);
+    }
+
+    /**
+     * Handle a tick from the Web Worker timer.
+     * This triggers game logic advancement via the registered callback.
+     * @param {number} timestamp - performance.now() timestamp from Worker
+     */
+    _handleWorkerTick(timestamp) {
+        // Skip if game is done
+        if (this.state === 'done') {
+            return;
+        }
+
+        // Skip if paused for reconnection (Phase 20)
+        if (this.reconnectionState.isPaused) {
+            return;
+        }
+
+        // Skip if already processing a tick (prevents overlapping async operations)
+        if (this.isProcessingTick) {
+            return;
+        }
+
+        // Mark as processing - will be cleared by callback when complete
+        this.isProcessingTick = true;
+
+        // Trigger the registered tick callback (Phaser's processPyodideGame)
+        if (this.tickCallback) {
+            this.tickCallback();
+        } else {
+            // No callback registered, clear processing flag
+            this.isProcessingTick = false;
+        }
+    }
+
+    /**
+     * Register a callback to receive Worker tick notifications.
+     * The callback is responsible for clearing isProcessingTick when done.
+     * @param {Function} callback - Function to call on each tick
+     */
+    registerTickCallback(callback) {
+        this.tickCallback = callback;
+    }
+
+    /**
+     * Destroy the Web Worker timer.
+     * Called during game cleanup to release resources.
+     */
+    _destroyTimerWorker() {
+        if (this.timerWorker) {
+            this.timerWorker.destroy();
+            this.timerWorker = null;
+            p2pLog.debug('Web Worker timer destroyed');
+        }
     }
 
     /**
@@ -4743,6 +4840,9 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
         if (this.continuousMonitor) {
             this.continuousMonitor.pause();
         }
+
+        // Clean up Web Worker timer (Phase 24)
+        this._destroyTimerWorker();
 
         // Mark session as partial with disconnection metadata (Phase 23 - DATA-02, DATA-03, DATA-04)
         this.sessionPartialInfo = {
