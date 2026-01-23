@@ -5610,6 +5610,11 @@ _cumulative_rewards
             return;  // Already paused
         }
 
+        // Don't show reconnecting overlay if we already showed focus loss timeout
+        if (this.focusLossTimeoutTerminal) {
+            return;
+        }
+
         p2pLog.info(`Pausing game for reconnection at frame ${pauseFrame}`);
 
         this.reconnectionState.isPaused = true;
@@ -5635,6 +5640,12 @@ _cumulative_rewards
      * Server coordinates pause to ensure both clients pause together.
      */
     _handleServerPause(data) {
+        // Don't process pause if we already ended due to focus loss timeout
+        if (this.focusLossTimeoutTerminal) {
+            p2pLog.info('Ignoring server pause - already terminated due to focus loss timeout');
+            return;
+        }
+
         p2pLog.info('Server requested pause for reconnection', data);
 
         if (!this.reconnectionState.isPaused) {
@@ -5704,6 +5715,13 @@ _cumulative_rewards
      * @param {string|number} data.disconnected_player_id - ID of player who disconnected
      */
     _handleReconnectionGameEnd(data) {
+        // If we already ended due to focus loss timeout, don't overwrite the message
+        // The player who timed out should keep seeing "you left too long", not "partner disconnected"
+        if (this.focusLossTimeoutTerminal) {
+            p2pLog.info('Ignoring p2p_game_ended - already terminated due to focus loss timeout');
+            return;
+        }
+
         p2pLog.warn('Game ended due to partner disconnection', data);
 
         this._clearReconnectionTimeout();
@@ -5840,7 +5858,7 @@ _cumulative_rewards
 
         // Get custom message from config or use default
         const customMessage = this.config?.focus_loss_message;
-        const message = customMessage || "You were away from the experiment for too long. The game has ended.";
+        const message = customMessage || "You were away from the experiment for too long. The session has been terminated.";
 
         // Show in-page overlay (reuse partner disconnect overlay pattern)
         this._showFocusLossTimeoutOverlay(message);
