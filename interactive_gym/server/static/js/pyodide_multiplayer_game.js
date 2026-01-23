@@ -5612,8 +5612,11 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
             return;
         }
 
-        // Phase 25: Buffer partner inputs when tab is backgrounded
+        // Phase 25: Buffer partner inputs when LOCAL tab is backgrounded
         // They'll be processed on refocus for fast-forward (Phase 26)
+        // NOTE: This checks OUR focus state, not partner's. We don't know or care if
+        // partner is backgrounded - we just process their inputs normally (PARTNER-01).
+        // If partner IS backgrounded, they stop sending inputs and we use prediction.
         if (this.focusManager && this.focusManager.isBackgrounded) {
             this.focusManager.bufferInput({
                 playerId: playerId,
