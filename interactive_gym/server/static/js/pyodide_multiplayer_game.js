@@ -1012,6 +1012,17 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         // Focus management (Phase 25)
         this.focusManager = new FocusManager();
 
+        // Phase 26: Fast-forward on refocus
+        this._pendingFastForward = false;
+
+        // Hook into FocusManager's foregrounded event to trigger fast-forward
+        const originalOnForegrounded = this.focusManager._onForegrounded.bind(this.focusManager);
+        this.focusManager._onForegrounded = () => {
+            originalOnForegrounded();
+            this._pendingFastForward = true;
+            p2pLog.info('Tab foregrounded - scheduling fast-forward');
+        };
+
         this.setupMultiplayerHandlers();
     }
 
@@ -4784,9 +4795,24 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
             return;
         }
 
+        // Phase 26: Fast-forward on refocus before normal tick processing
+        // This catches up frames missed while backgrounded using buffered partner inputs.
+        // MUST be checked BEFORE isBackgrounded (we're no longer backgrounded when this fires)
+        if (this._pendingFastForward && !this.focusManager?.isBackgrounded) {
+            this._pendingFastForward = false;
+            // Fast-forward is async but we don't await - it will complete and normal ticks continue
+            this._performFastForward().catch(err => {
+                p2pLog.error('Fast-forward failed:', err);
+            });
+            // Don't return - continue to normal tick after scheduling fast-forward
+            // The rollbackInProgress guard in _performFastForward will prevent conflicts
+        }
+
         // Phase 25: Skip processing when tab is backgrounded
         // Worker keeps ticking (so we know elapsed time), but we don't advance frames.
         // Partner inputs are buffered; we'll fast-forward on refocus (Phase 26).
+        // IMPORTANT: Partner's game loop is unaffected - they continue receiving our
+        // defaultAction inputs and stepping normally (PARTNER-01, PARTNER-02).
         if (this.focusManager && this.focusManager.isBackgrounded) {
             // Log background status periodically (every ~50 ticks at 10 FPS = 5 seconds)
             if (!this._backgroundLogCounter) this._backgroundLogCounter = 0;
