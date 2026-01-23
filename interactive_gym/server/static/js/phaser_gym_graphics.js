@@ -37,8 +37,10 @@ const MAX_KEY_PRESS_BUFFER_SIZE = 1;
 export function addHumanKeyPressToBuffer(input) {
     // TODO(chase): this should filter out actions that aren't allowed,
     // otherwise hitting an unrelated key could cancel out previous actions.
-    if (humanKeyPressBuffer >= MAX_KEY_PRESS_BUFFER_SIZE) {
-        humanKeyPressBuffer.shift(); // remove the oldest state
+    // BUG FIX: Was comparing array to number, should compare length
+    if (humanKeyPressBuffer.length >= MAX_KEY_PRESS_BUFFER_SIZE) {
+        const dropped = humanKeyPressBuffer.shift(); // remove the oldest state
+        console.warn(`[INPUT-DROPPED] key=${dropped.key} age=${(performance.now() - dropped.keypressTimestamp).toFixed(1)}ms - buffer full`);
     }
     // Support both new format {key, keypressTimestamp} and legacy string format
     if (typeof input === 'object' && input.key !== undefined) {
@@ -46,12 +48,14 @@ export function addHumanKeyPressToBuffer(input) {
             key: input.key,
             keypressTimestamp: input.keypressTimestamp
         });
+        console.log(`[INPUT-BUFFERED] key=${input.key} bufferLen=${humanKeyPressBuffer.length}`);
     } else {
         // Legacy format - use current time as timestamp
         humanKeyPressBuffer.push({
             key: input,
             keypressTimestamp: performance.now()
         });
+        console.log(`[INPUT-BUFFERED] key=${input} (legacy) bufferLen=${humanKeyPressBuffer.length}`);
     }
 }
 
@@ -585,6 +589,12 @@ class GymScene extends Phaser.Scene {
         let hasRealInput = false;  // True if this is from actual user input (not default action)
         const queueExitTimestamp = performance.now();  // DIAG-02: Capture exit time
 
+        // DEBUG: Log input state periodically
+        const frame = this.pyodide_remote_game?.frameNumber || 0;
+        if (frame < 200 || frame % 100 === 0) {
+            console.log(`[INPUT-DEBUG] frame=${frame} mode=${this.scene_metadata.input_mode} bufferLen=${humanKeyPressBuffer.length} pressedKeys=${JSON.stringify(Object.keys(pressedKeys))}`);
+        }
+
         // If single_keystroke, we'll get the action that was added to the buffer when the key was pressed
         if (this.scene_metadata.input_mode === "single_keystroke") {
             if (humanKeyPressBuffer.length > 0) {
@@ -593,6 +603,7 @@ class GymScene extends Phaser.Scene {
                 keypressTimestamp = bufferedInput.keypressTimestamp;
                 const key = bufferedInput.key;
                 human_action = this.scene_metadata.action_mapping[key];
+                console.log(`[INPUT-CONSUMED] frame=${frame} key=${key} action=${human_action} age=${(queueExitTimestamp - keypressTimestamp).toFixed(1)}ms`);
                 if (human_action == undefined) {
                     human_action = this.scene_metadata.default_action;
                 } else {
@@ -684,6 +695,15 @@ class GymScene extends Phaser.Scene {
     }
 
     processRendering() {
+        // DEBUG: Log state buffer size to detect accumulation
+        const frame = this.pyodide_remote_game?.frameNumber || 0;
+        if (stateBuffer.length > 1 || (frame < 200 && frame % 20 === 0)) {
+            console.log(`[RENDER-BUFFER] frame=${frame} stateBufferLen=${stateBuffer.length}`);
+        }
+        if (stateBuffer.length > 5) {
+            console.warn(`[RENDER-LAG] frame=${frame} stateBuffer has ${stateBuffer.length} queued states - rendering is behind!`);
+        }
+
         if (stateBuffer.length > 0) {
             // DIAG-05: Capture render begin timestamp
             const renderBeginTimestamp = performance.now();

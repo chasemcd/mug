@@ -4222,9 +4222,12 @@ json.dumps({
      * TODO: For full determinism, bot actions should be re-computed with correct RNG state.
      */
     async performRollback(targetFrame, playerIds) {
+        const rollbackStartTime = performance.now();
         const currentFrame = this.frameNumber;
         const rollbackFrames = currentFrame - targetFrame;
 
+        // Always log rollbacks - they're expensive and directly cause perceived lag
+        console.warn(`[ROLLBACK-START] frame=${currentFrame} → ${targetFrame} (${rollbackFrames} frames to replay)`);
         p2pLog.debug(`Performing rollback: ${currentFrame} → ${targetFrame} (${rollbackFrames} frames)`);
 
         // Skip rollback if state sync not supported - can't restore state
