@@ -1,36 +1,49 @@
-# Requirements: Interactive Gym v1.4 Partner Disconnection Handling
+# Requirements: Interactive Gym v1.5 Focus Loss Handling
 
 **Defined:** 2026-01-22
 **Core Value:** Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
 
-## v1.4 Requirements
+## v1.5 Requirements
 
-Requirements for v1.4 Partner Disconnection Handling milestone. Each maps to roadmap phases.
+Requirements for v1.5 Focus Loss Handling milestone. Each maps to roadmap phases.
 
-### UI Handling
+### Web Worker Timing
 
-- [x] **UI-01**: Participant stays on same page when partner disconnects (no redirect)
-- [x] **UI-02**: Game container and HUD hidden when partner disconnection detected
-- [x] **UI-03**: Disconnection message displayed on same page after partner disconnects
-- [x] **UI-04**: Page remains displayed indefinitely (participant closes when done)
+- [ ] **WORK-01**: Game timing logic runs in Web Worker (unthrottled when backgrounded)
+- [ ] **WORK-02**: Worker maintains accurate game clock even when main thread is throttled
 
-### Data Export
+### Focus Detection
 
-- [x] **DATA-01**: All gameplay data collected before disconnection is exported to server
-- [x] **DATA-02**: Session marked as partial in exported data when partner disconnects
-- [x] **DATA-03**: Disconnection reason included in session metadata
-- [x] **DATA-04**: Disconnected player ID included in session metadata
+- [ ] **FOCUS-01**: Tab visibility changes detected via Page Visibility API
+- [ ] **FOCUS-02**: Duration of each background period tracked
 
-### Configuration
+### Backgrounded Player Behavior
 
-- [x] **CFG-01**: Researchers can set custom partner disconnect message via GymScene config
-- [x] **CFG-02**: Default message provided when no custom message configured
+- [ ] **BG-01**: Backgrounded player's actions default to idle/no-op
+- [ ] **BG-02**: Partner inputs buffered via WebRTC while backgrounded
+- [ ] **BG-03**: On refocus, simulation fast-forwards using queued inputs to resync
+
+### Partner Experience
+
+- [ ] **PARTNER-01**: Focused partner experiences no interruption when other player backgrounds
+- [ ] **PARTNER-02**: Focused partner sees backgrounded player go idle (inputs stop)
+
+### Timeout & Messaging
+
+- [ ] **TIMEOUT-01**: Configurable focus loss timeout before ending game (default 30s)
+- [ ] **TIMEOUT-02**: Game ends for both players when timeout exceeded
+- [ ] **TIMEOUT-03**: Configurable message displayed when game ends due to focus loss
+
+### Research Telemetry
+
+- [ ] **TELEM-01**: Focus loss events recorded in session metadata
+- [ ] **TELEM-02**: Duration of each focus loss period included in metadata
 
 ## v2 Requirements
 
 Deferred to future release. Tracked but not in current roadmap.
 
-(None for v1.4)
+(None for v1.5)
 
 ## Out of Scope
 
@@ -38,9 +51,10 @@ Explicitly excluded. Documented to prevent scope creep.
 
 | Feature | Reason |
 |---------|--------|
-| Auto-advance to next scene after disconnect | User specified staying on page indefinitely |
-| Continue button after disconnect | User specified page stays indefinitely |
-| Reconnection attempts after partner leaves | Partner leaving is terminal (different from connection drop) |
+| Pause for both on focus loss | User specified focused partner keeps playing seamlessly |
+| Audio-based throttle prevention | No longer works in modern browsers (2025+) |
+| Fullscreen enforcement | Not related to focus loss handling |
+| Adaptive input delay | Deferred to future milestone |
 
 ## Traceability
 
@@ -48,22 +62,26 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| UI-01 | 23 | Complete |
-| UI-02 | 23 | Complete |
-| UI-03 | 23 | Complete |
-| UI-04 | 23 | Complete |
-| DATA-01 | 23 | Complete |
-| DATA-02 | 23 | Complete |
-| DATA-03 | 23 | Complete |
-| DATA-04 | 23 | Complete |
-| CFG-01 | 23 | Complete |
-| CFG-02 | 23 | Complete |
+| WORK-01 | TBD | Pending |
+| WORK-02 | TBD | Pending |
+| FOCUS-01 | TBD | Pending |
+| FOCUS-02 | TBD | Pending |
+| BG-01 | TBD | Pending |
+| BG-02 | TBD | Pending |
+| BG-03 | TBD | Pending |
+| PARTNER-01 | TBD | Pending |
+| PARTNER-02 | TBD | Pending |
+| TIMEOUT-01 | TBD | Pending |
+| TIMEOUT-02 | TBD | Pending |
+| TIMEOUT-03 | TBD | Pending |
+| TELEM-01 | TBD | Pending |
+| TELEM-02 | TBD | Pending |
 
 **Coverage:**
-- v1.4 requirements: 10 total
-- Mapped to phases: 10
-- Unmapped: 0
+- v1.5 requirements: 14 total
+- Mapped to phases: 0
+- Unmapped: 14 (run /gsd:create-roadmap)
 
 ---
 *Requirements defined: 2026-01-22*
-*Last updated: 2026-01-22 after Phase 23 complete*
+*Last updated: 2026-01-22 after initial definition*
