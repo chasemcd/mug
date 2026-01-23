@@ -26,6 +26,9 @@ var pressedKeys = {};
 export function enableKeyListener(input_mode) {
     pressedKeys = {};
     $(document).on('keydown', function(event) {
+        // DIAG-01: Capture timestamp at the very first line before any processing
+        const keypressTimestamp = performance.now();
+
         // List of keys to prevent default behavior for (scroll the window)
         var keysToPreventDefault = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ']; // Includes space (' ')
 
@@ -36,7 +39,7 @@ export function enableKeyListener(input_mode) {
         // If we're using the single keystroke input method, we just send the key when it's pressed.
         // This means no composite actions.
         if (input_mode == "single_keystroke") {
-            pgg.addHumanKeyPressToBuffer(event.key);
+            pgg.addHumanKeyPressToBuffer({key: event.key, keypressTimestamp: keypressTimestamp});
             socket.emit('send_pressed_keys', {'pressed_keys': Array(event.key), session_id: window.sessionId});
             return;
         }
@@ -47,7 +50,7 @@ export function enableKeyListener(input_mode) {
         }
 
         pressedKeys[event.key] = true; // Add key to pressedKeys when it is pressed
-        pgg.updatePressedKeys(pressedKeys);
+        pgg.updatePressedKeys(pressedKeys, keypressTimestamp);
     });
 
     $(document).on('keyup', function(event) {

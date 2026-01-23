@@ -30,17 +30,56 @@ let botActionBuffers = {};
 
 let humanKeyPressBuffer = [];
 const MAX_KEY_PRESS_BUFFER_SIZE = 1;
-export function addHumanKeyPressToBuffer(action) {
+/**
+ * Add a keypress to the buffer with timestamp (DIAG-01, DIAG-02).
+ * @param {Object|string} input - Either {key, keypressTimestamp} object or legacy action string
+ */
+export function addHumanKeyPressToBuffer(input) {
     // TODO(chase): this should filter out actions that aren't allowed,
     // otherwise hitting an unrelated key could cancel out previous actions.
     if (humanKeyPressBuffer >= MAX_KEY_PRESS_BUFFER_SIZE) {
         humanKeyPressBuffer.shift(); // remove the oldest state
     }
-    humanKeyPressBuffer.push(action);
+    // Support both new format {key, keypressTimestamp} and legacy string format
+    if (typeof input === 'object' && input.key !== undefined) {
+        humanKeyPressBuffer.push({
+            key: input.key,
+            keypressTimestamp: input.keypressTimestamp
+        });
+    } else {
+        // Legacy format - use current time as timestamp
+        humanKeyPressBuffer.push({
+            key: input,
+            keypressTimestamp: performance.now()
+        });
+    }
 }
 
 export var pressedKeys = {};
-export function updatePressedKeys(updatedPressedKeys) {
+// DIAG-01: Track timestamps for when each key was first pressed
+export var pressedKeyTimestamps = {};
+
+/**
+ * Update pressed keys with optional timestamp tracking (DIAG-01).
+ * @param {Object} updatedPressedKeys - Map of key -> true for pressed keys
+ * @param {number} keypressTimestamp - Optional timestamp for newly pressed keys
+ */
+export function updatePressedKeys(updatedPressedKeys, keypressTimestamp = null) {
+    // Track timestamps for newly pressed keys
+    if (keypressTimestamp !== null) {
+        for (const key of Object.keys(updatedPressedKeys)) {
+            // Only set timestamp if key is newly pressed (not already in pressedKeyTimestamps)
+            if (pressedKeyTimestamps[key] === undefined) {
+                pressedKeyTimestamps[key] = keypressTimestamp;
+            }
+        }
+    }
+    // Remove timestamps for released keys
+    for (const key of Object.keys(pressedKeyTimestamps)) {
+        if (!updatedPressedKeys[key]) {
+            delete pressedKeyTimestamps[key];
+        }
+    }
     pressedKeys = updatedPressedKeys;
 }
 
@@ -51,6 +90,7 @@ export function updatePressedKeys(updatedPressedKeys) {
 export function clearHumanInputBuffers() {
     humanKeyPressBuffer = [];
     pressedKeys = {};
+    pressedKeyTimestamps = {};
 }
 
 // Contains the last action submitted at each step
@@ -376,6 +416,16 @@ class GymScene extends Phaser.Scene {
             } else {
                 const actions = await this.buildPyodideActionDict();
                 previousSubmittedActions = actions;
+
+                // DIAG-02: Pass input timestamps to step() for pipeline tracking
+                const inputTimestamps = this._pendingInputTimestamps;
+                this._pendingInputTimestamps = null;  // Clear after reading
+
+                // Pass timestamps to pyodide_remote_game for latency tracking
+                if (inputTimestamps && this.pyodide_remote_game.setInputTimestamps) {
+                    this.pyodide_remote_game.setInputTimestamps(inputTimestamps);
+                }
+
                 const stepResult = await this.pyodide_remote_game.step(actions);
 
                 // Handle null return (e.g., game paused for resync)
@@ -414,6 +464,8 @@ class GymScene extends Phaser.Scene {
 
     async buildPyodideActionDict() {
         let actions = {};
+        // DIAG-02: Store input timestamps for pipeline latency tracking
+        this._pendingInputTimestamps = null;
 
         // In multiplayer mode, only collect keyboard input for THIS player's agent
         let isMultiplayer = this.pyodide_remote_game && this.pyodide_remote_game.myPlayerId !== undefined;
@@ -425,14 +477,32 @@ class GymScene extends Phaser.Scene {
                 // In multiplayer, only get keyboard input for MY player
                 if (isMultiplayer) {
                     if (agentID == myPlayerId) {
-                        actions[agentID] = this.getHumanAction();
+                        const humanActionResult = this.getHumanAction();
+                        actions[agentID] = humanActionResult.action;
+                        // Store timestamps if this was a real input (not default action)
+                        if (humanActionResult.hasRealInput && humanActionResult.keypressTimestamp !== null) {
+                            this._pendingInputTimestamps = {
+                                playerId: agentID,
+                                keypressTimestamp: humanActionResult.keypressTimestamp,
+                                queueExitTimestamp: humanActionResult.queueExitTimestamp
+                            };
+                        }
                     } else {
                         // Other human players - use default action (will be replaced by server)
                         actions[agentID] = this.scene_metadata.default_action || 0;
                     }
                 } else {
                     // Single player - get keyboard input for this human
-                    actions[agentID] = this.getHumanAction();
+                    const humanActionResult = this.getHumanAction();
+                    actions[agentID] = humanActionResult.action;
+                    // Store timestamps if this was a real input (not default action)
+                    if (humanActionResult.hasRealInput && humanActionResult.keypressTimestamp !== null) {
+                        this._pendingInputTimestamps = {
+                            playerId: agentID,
+                            keypressTimestamp: humanActionResult.keypressTimestamp,
+                            queueExitTimestamp: humanActionResult.queueExitTimestamp
+                        };
+                    }
                 }
             } else {
                 // Bot agent
@@ -490,15 +560,28 @@ class GymScene extends Phaser.Scene {
         botActionBuffers[agentID].push(action);
     }
 
+    /**
+     * Get the current human action with timestamps for latency tracking (DIAG-01, DIAG-02).
+     * @returns {Object} {action, keypressTimestamp, queueExitTimestamp, hasRealInput}
+     */
     getHumanAction() {
         let human_action;
+        let keypressTimestamp = null;
+        let hasRealInput = false;  // True if this is from actual user input (not default action)
+        const queueExitTimestamp = performance.now();  // DIAG-02: Capture exit time
 
         // If single_keystroke, we'll get the action that was added to the buffer when the key was pressed
         if (this.scene_metadata.input_mode === "single_keystroke") {
             if (humanKeyPressBuffer.length > 0) {
-                human_action = this.scene_metadata.action_mapping[humanKeyPressBuffer.shift()];
+                const bufferedInput = humanKeyPressBuffer.shift();
+                // Get keypress timestamp and key from the buffered object
+                keypressTimestamp = bufferedInput.keypressTimestamp;
+                const key = bufferedInput.key;
+                human_action = this.scene_metadata.action_mapping[key];
                 if (human_action == undefined) {
                     human_action = this.scene_metadata.default_action;
+                } else {
+                    hasRealInput = true;
                 }
             } else {
                 human_action = this.scene_metadata.default_action;
@@ -509,20 +592,36 @@ class GymScene extends Phaser.Scene {
                 // if no keys are pressed, we'll use the default action
                 human_action = this.scene_metadata.default_action;
             } else if (Object.keys(pressedKeys).length === 1) {
-                human_action = this.scene_metadata.action_mapping[Object.keys(pressedKeys)[0]];
+                const key = Object.keys(pressedKeys)[0];
+                human_action = this.scene_metadata.action_mapping[key];
+                // Get the earliest timestamp of currently pressed keys
+                keypressTimestamp = pressedKeyTimestamps[key] || null;
                 if (human_action == undefined) {
                     human_action = this.scene_metadata.default_action;
+                } else {
+                    hasRealInput = true;
                 }
             } else {
                 // multiple keys are pressed so check for a composite action
-                human_action = this.scene_metadata.action_mapping[this.generateCompositeAction()[0]];
+                const compositeKey = this.generateCompositeAction()[0];
+                human_action = this.scene_metadata.action_mapping[compositeKey];
+                // Get the earliest timestamp of all currently pressed keys
+                const timestamps = Object.values(pressedKeyTimestamps).filter(t => t !== undefined);
+                keypressTimestamp = timestamps.length > 0 ? Math.min(...timestamps) : null;
                 if (human_action == undefined) {
                     human_action = this.scene_metadata.default_action;
+                } else {
+                    hasRealInput = true;
                 }
             }
         }
 
-        return human_action;
+        return {
+            action: human_action,
+            keypressTimestamp: keypressTimestamp,
+            queueExitTimestamp: queueExitTimestamp,
+            hasRealInput: hasRealInput
+        };
     }
 
     generateCompositeAction() {
@@ -571,8 +670,19 @@ class GymScene extends Phaser.Scene {
 
     processRendering() {
         if (stateBuffer.length > 0) {
+            // DIAG-05: Capture render begin timestamp
+            const renderBeginTimestamp = performance.now();
+
             this.state = stateBuffer.shift(); // get the oldest state from the buffer
             this.drawState();
+
+            // DIAG-06: Capture render complete timestamp
+            const renderCompleteTimestamp = performance.now();
+
+            // DIAG-07: Log pipeline latency if pyodide_remote_game supports it
+            if (this.pyodide_remote_game?.logPipelineLatency) {
+                this.pyodide_remote_game.logPipelineLatency(renderBeginTimestamp, renderCompleteTimestamp);
+            }
         }
     }
 
