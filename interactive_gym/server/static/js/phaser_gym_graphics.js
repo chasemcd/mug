@@ -695,20 +695,32 @@ class GymScene extends Phaser.Scene {
     }
 
     processRendering() {
-        // DEBUG: Log state buffer size to detect accumulation
         const frame = this.pyodide_remote_game?.frameNumber || 0;
-        if (stateBuffer.length > 1 || (frame < 200 && frame % 20 === 0)) {
-            console.log(`[RENDER-BUFFER] frame=${frame} stateBufferLen=${stateBuffer.length}`);
-        }
-        if (stateBuffer.length > 5) {
-            console.warn(`[RENDER-LAG] frame=${frame} stateBuffer has ${stateBuffer.length} queued states - rendering is behind!`);
+
+        // FIX: Drain buffer by rendering multiple states when behind
+        // This catches up without skipping visual frames
+        const targetBufferSize = 1;  // Ideal: always render the latest
+        const maxRenderPerFrame = 5; // Safety limit to avoid long frames
+
+        let renderCount = 0;
+        const startBufferLen = stateBuffer.length;
+
+        while (stateBuffer.length > targetBufferSize && renderCount < maxRenderPerFrame) {
+            this.state = stateBuffer.shift();
+            this.drawState();
+            renderCount++;
         }
 
+        if (renderCount > 1) {
+            console.log(`[RENDER-CATCHUP] frame=${frame} rendered ${renderCount} states to catch up (was ${startBufferLen} behind)`);
+        }
+
+        // Render the final state with latency tracking
         if (stateBuffer.length > 0) {
             // DIAG-05: Capture render begin timestamp
             const renderBeginTimestamp = performance.now();
 
-            this.state = stateBuffer.shift(); // get the oldest state from the buffer
+            this.state = stateBuffer.shift();
             this.drawState();
 
             // DIAG-06: Capture render complete timestamp
