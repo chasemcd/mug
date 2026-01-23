@@ -9,13 +9,13 @@ Requirements for v1.6 Input Latency Diagnosis & Fix milestone. Each maps to road
 
 ### Diagnosis Infrastructure
 
-- [ ] **DIAG-01**: Timestamp captured at keypress event (performance.now())
-- [ ] **DIAG-02**: Timestamp captured when action enters input queue
-- [ ] **DIAG-03**: Timestamp captured when Pyodide env.step() called
-- [ ] **DIAG-04**: Timestamp captured when env.step() returns
-- [ ] **DIAG-05**: Timestamp captured when render update begins
-- [ ] **DIAG-06**: Timestamp captured when render update completes
-- [ ] **DIAG-07**: Per-input latency breakdown computed (queue time, step time, render time)
+- [x] **DIAG-01**: Timestamp captured at keypress event (performance.now())
+- [x] **DIAG-02**: Timestamp captured when action enters input queue
+- [x] **DIAG-03**: Timestamp captured when Pyodide env.step() called
+- [x] **DIAG-04**: Timestamp captured when env.step() returns
+- [x] **DIAG-05**: Timestamp captured when render update begins
+- [x] **DIAG-06**: Timestamp captured when render update completes
+- [x] **DIAG-07**: Per-input latency breakdown computed (queue time, step time, render time)
 
 ### Root Cause Fix
 
@@ -53,13 +53,13 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DIAG-01 | Phase 28 | Pending |
-| DIAG-02 | Phase 28 | Pending |
-| DIAG-03 | Phase 28 | Pending |
-| DIAG-04 | Phase 28 | Pending |
-| DIAG-05 | Phase 28 | Pending |
-| DIAG-06 | Phase 28 | Pending |
-| DIAG-07 | Phase 28 | Pending |
+| DIAG-01 | Phase 28 | Complete |
+| DIAG-02 | Phase 28 | Complete |
+| DIAG-03 | Phase 28 | Complete |
+| DIAG-04 | Phase 28 | Complete |
+| DIAG-05 | Phase 28 | Complete |
+| DIAG-06 | Phase 28 | Complete |
+| DIAG-07 | Phase 28 | Complete |
 | FIX-01 | Phase 30 | Pending |
 | FIX-02 | Phase 30 | Pending |
 | FIX-03 | Phase 30 | Pending |
@@ -75,4 +75,4 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 ---
 *Requirements defined: 2026-01-23*
-*Last updated: 2026-01-23 after roadmap creation*
+*Last updated: 2026-01-23 after Phase 28 completion*

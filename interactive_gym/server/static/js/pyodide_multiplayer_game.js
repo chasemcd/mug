@@ -15,7 +15,7 @@ import * as seeded_random from './seeded_random.js';
 import * as ui_utils from './ui_utils.js';
 import { WebRTCManager, LatencyTelemetry } from './webrtc_manager.js';
 import { ContinuousMonitor } from './continuous_monitor.js';
-import { clearHumanInputBuffers, logFastForwardFrame } from './phaser_gym_graphics.js';
+import { clearHumanInputBuffers, logFastForwardFrame, emitEpisodeData } from './phaser_gym_graphics.js';
 
 // ========== Logging Configuration ==========
 // Control verbosity via browser console: window.p2pLogLevel = 'info' or 'debug'
@@ -3482,6 +3482,13 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
          * on the scene and emits terminate_scene with full metadata.
          * That in turn calls terminateGymScene() which saves data via emit_remote_game_data.
          */
+
+        // Emit episode data incrementally to avoid large payloads at scene end
+        // This sends the current episode's data and resets the logger
+        if (this.sceneId) {
+            emitEpisodeData(this.sceneId, this.num_episodes);
+        }
+
         this.num_episodes += 1;
 
         if (this.num_episodes >= this.max_episodes) {

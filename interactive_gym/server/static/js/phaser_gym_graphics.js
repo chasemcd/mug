@@ -199,6 +199,42 @@ export function getRemoteGameData() {
 }
 
 /**
+ * Emit episode data incrementally to avoid large payloads at scene end.
+ * Called at the end of each episode to send data in manageable chunks.
+ * @param {string} sceneId - The scene ID for file organization
+ * @param {number} episodeNum - The episode number (0-indexed)
+ */
+export function emitEpisodeData(sceneId, episodeNum) {
+    if (!window.socket) {
+        console.error('[emitEpisodeData] Socket not available');
+        return;
+    }
+
+    // Get current data and reset logger for next episode
+    const episodeData = remoteGameLogger.getData();
+    remoteGameLogger.reset();
+
+    // Skip if no data to send
+    if (!episodeData || episodeData.t.length === 0) {
+        console.log(`[emitEpisodeData] No data to emit for episode ${episodeNum}`);
+        return;
+    }
+
+    // Encode to msgpack for efficient transmission
+    const binaryData = msgpack.encode(episodeData);
+
+    console.log(`[emitEpisodeData] Emitting episode ${episodeNum} data: ${episodeData.t.length} frames, ${binaryData.byteLength} bytes`);
+
+    window.socket.emit("emit_episode_data", {
+        data: binaryData,
+        scene_id: sceneId,
+        episode_num: episodeNum,
+        session_id: window.sessionId,
+        interactiveGymGlobals: window.interactiveGymGlobals
+    });
+}
+
+/**
  * Log fast-forward frame data to the remote game logger.
  * Called from multiplayer game during fast-forward to ensure these frames
  * are included in CSV exports with correct focus state (isFocused=false).

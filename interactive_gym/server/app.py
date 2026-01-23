@@ -834,6 +834,11 @@ def receive_remote_game_data(data):
     # Decode the msgpack data
     decoded_data = msgpack.unpackb(data["data"])
 
+    # Check if there's any data to save (may be empty if data was sent per-episode)
+    if not decoded_data or not decoded_data.get("t"):
+        logger.info(f"No final data to save for scene {data.get('scene_id')} (data was sent per-episode)")
+        return
+
     # Flatten any nested dictionaries
     flattened_data = flatten_dict.flatten(decoded_data, reducer="dot")
 
@@ -887,6 +892,79 @@ def receive_remote_game_data(data):
     # # save the metadata to a json file
     # with open(f"data/{data['scene_id']}/{subject_id}_metadata.json", "w") as f:
     #     json.dump(current_scene_metadata, f)
+
+
+@socketio.on("emit_episode_data")
+def receive_episode_data(data):
+    """
+    Receive and save episode data incrementally during gameplay.
+
+    This is called at the end of each episode to send data in manageable chunks,
+    avoiding large payloads that can fail to transmit at scene end.
+
+    Data includes:
+    - episode_num: The episode number (0-indexed)
+    - scene_id: The scene ID for file organization
+    - data: msgpack-encoded game data (observations, actions, rewards, etc.)
+    """
+    global PARTICIPANT_SESSIONS
+
+    subject_id = get_subject_id_from_session_id(flask.request.sid)
+    episode_num = data.get("episode_num", 0)
+
+    # Sync interactiveGymGlobals to session for persistence
+    client_globals = data.get("interactiveGymGlobals", {})
+    session = PARTICIPANT_SESSIONS.get(subject_id)
+    if session is not None and client_globals:
+        session.interactive_gym_globals.update(client_globals)
+        session.last_updated_at = time.time()
+
+    if not CONFIG.save_experiment_data:
+        return
+
+    # Decode the msgpack data
+    decoded_data = msgpack.unpackb(data["data"])
+
+    # Check if there's any data to save
+    if not decoded_data or not decoded_data.get("t"):
+        logger.info(f"No data to save for episode {episode_num}")
+        return
+
+    # Flatten any nested dictionaries
+    flattened_data = flatten_dict.flatten(decoded_data, reducer="dot")
+
+    # Find the maximum length among all values
+    max_length = max(
+        len(value) if isinstance(value, list) else 1
+        for value in flattened_data.values()
+    )
+
+    # Pad shorter lists with None and convert non-list values to lists
+    padded_data = {}
+    for key, value in flattened_data.items():
+        if not isinstance(value, list):
+            padded_data[key] = [value] + [None] * (max_length - 1)
+        else:
+            padded_data[key] = value + [None] * (max_length - len(value))
+
+    # Convert to DataFrame
+    df = pd.DataFrame(padded_data)
+
+    # Create a directory for the CSV files if it doesn't exist
+    os.makedirs(f"data/{data['scene_id']}/", exist_ok=True)
+
+    # Generate filename with episode number
+    filename = f"data/{data['scene_id']}/{subject_id}_ep{episode_num}.csv"
+
+    # Save as CSV
+    logger.info(f"Saving episode {episode_num} data: {filename} ({len(df)} rows)")
+
+    df.to_csv(filename, index=False)
+
+    # Also save globals (overwrite each episode to keep latest)
+    globals_filename = f"data/{data['scene_id']}/{subject_id}_globals.json"
+    with open(globals_filename, "w") as f:
+        json.dump(data.get("interactiveGymGlobals", {}), f)
 
 
 @socketio.on("emit_multiplayer_metrics")

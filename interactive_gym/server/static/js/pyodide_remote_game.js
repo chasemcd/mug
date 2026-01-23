@@ -1,4 +1,5 @@
 import * as ui_utils from './ui_utils.js';
+import { emitEpisodeData } from './phaser_gym_graphics.js';
 
 
 
@@ -12,6 +13,7 @@ export class RemoteGame {
     setAttributes(config) {
         this.config = config;
         this.interactive_gym_globals = config.interactive_gym_globals;
+        this.sceneId = config.scene_id;  // Store scene ID for incremental data export
         this.micropip = null;
         this.pyodideReady = false;
         this.state = null;
@@ -347,6 +349,12 @@ obs, rewards, terminateds, truncateds, infos, render_state
         const max_steps_reached = this.step_num >= this.max_steps;
 
         if (all_terminated || all_truncated || max_steps_reached) {
+            // Emit episode data incrementally to avoid large payloads at scene end
+            // This sends the current episode's data and resets the logger
+            if (this.sceneId) {
+                emitEpisodeData(this.sceneId, this.num_episodes);
+            }
+
             this.num_episodes += 1;
 
             if (this.num_episodes >= this.max_episodes) {
@@ -354,7 +362,6 @@ obs, rewards, terminateds, truncateds, infos, render_state
             } else {
                 this.shouldReset = true;
             }
-
         }
 
         // Increment frame number for latency logging (multiplayer has its own frameNumber)
