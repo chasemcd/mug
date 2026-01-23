@@ -347,7 +347,7 @@ Plans:
   4. Render begin/complete timestamps captured
   5. Per-input latency breakdown computed and logged to console
 **Research flag:** Unlikely (performance.now() API well-documented)
-**Plans:** TBD
+**Plans:** 1 plan
 Plans:
 - [ ] 28-01-PLAN.md — Pipeline instrumentation with per-stage timestamps
 
@@ -395,7 +395,7 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 24 -> 25 -> 26 -> 27
+Phases execute in numeric order: 28 -> 29 -> 30 -> 31
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -416,11 +416,11 @@ Phases execute in numeric order: 24 -> 25 -> 26 -> 27
 | 25. Focus Detection | v1.5 | 1/1 | Complete | 2026-01-23 |
 | 26. Resync & Partner UX | v1.5 | 1/1 | Complete | 2026-01-23 |
 | 27. Timeout & Telemetry | v1.5 | 1/1 | Complete | 2026-01-23 |
-| 28. Pipeline Instrumentation | v1.6 | 0/1 | Not started | - |
+| 28. Pipeline Instrumentation | v1.6 | 0/1 | Planned | - |
 | 29. Root Cause Diagnosis | v1.6 | 0/1 | Not started | - |
 | 30. Latency Fix | v1.6 | 0/1 | Not started | - |
 | 31. Telemetry Export | v1.6 | 0/1 | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-01-23 after v1.6 roadmap creation*
+*Last updated: 2026-01-23 after Phase 28 planning*
