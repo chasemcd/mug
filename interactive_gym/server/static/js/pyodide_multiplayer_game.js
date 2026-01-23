@@ -991,6 +991,9 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         this.isProcessingTick = false;     // Guard against overlapping tick processing
         this.tickCallback = null;          // Callback to trigger game step from external code
 
+        // Focus management (Phase 25)
+        this.focusManager = new FocusManager();
+
         this.setupMultiplayerHandlers();
     }
 
@@ -4305,6 +4308,11 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
             this.p2pInputSender.reset();
         }
 
+        // Phase 25: Reset focus tracking for new episode
+        if (this.focusManager) {
+            this.focusManager.reset();
+        }
+
         p2pLog.debug('GGPO state cleared for new episode');
     }
 
@@ -4642,6 +4650,13 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
             return;
         }
 
+        // Phase 25: Skip processing when tab is backgrounded
+        // Worker keeps ticking (so we know elapsed time), but we don't advance frames.
+        // Partner inputs are buffered; we'll fast-forward on refocus (Phase 26).
+        if (this.focusManager && this.focusManager.isBackgrounded) {
+            return;
+        }
+
         // Skip if already processing a tick (prevents overlapping async operations)
         if (this.isProcessingTick) {
             return;
@@ -4677,6 +4692,10 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
             this.timerWorker.destroy();
             this.timerWorker = null;
             p2pLog.debug('Web Worker timer destroyed');
+        }
+        // Phase 25: Clean up focus manager
+        if (this.focusManager) {
+            this.focusManager.destroy();
         }
     }
 
@@ -5420,6 +5439,18 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
         const playerId = this.indexToPlayerId[packet.playerId];
         if (playerId === undefined) {
             p2pLog.warn(`Unknown player index: ${packet.playerId}`);
+            return;
+        }
+
+        // Phase 25: Buffer partner inputs when tab is backgrounded
+        // They'll be processed on refocus for fast-forward (Phase 26)
+        if (this.focusManager && this.focusManager.isBackgrounded) {
+            this.focusManager.bufferInput({
+                playerId: playerId,
+                inputs: packet.inputs,
+                currentFrame: packet.currentFrame
+            });
+            p2pLog.debug(`Buffered input from player ${playerId} (backgrounded)`);
             return;
         }
 
