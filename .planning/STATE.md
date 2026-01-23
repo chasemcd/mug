@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-23)
 
 ## Current Position
 
-Phase: Not started (run /gsd:create-roadmap)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-01-23 — Milestone v1.6 started
+Phase: 28 of 31 (Pipeline Instrumentation)
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-01-23 — v1.6 roadmap created
 
-Progress: [----------] 0% (v1.6 - 0/? phases)
+Progress: [----------] 0% (v1.6 - 0/4 phases)
 
 ## Milestone History
 
@@ -138,9 +138,9 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-01-23
-Stopped at: Started v1.6 Input Latency Diagnosis & Fix milestone
+Stopped at: Created v1.6 roadmap (4 phases: 28-31)
 Resume file: None
 
 ### Next Steps
 
-Run `/gsd:define-requirements` to formalize v1.6 requirements, then `/gsd:create-roadmap` for phase planning.
+Run `/gsd:plan-phase 28` to plan Pipeline Instrumentation phase.

@@ -53,26 +53,26 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DIAG-01 | — | Pending |
-| DIAG-02 | — | Pending |
-| DIAG-03 | — | Pending |
-| DIAG-04 | — | Pending |
-| DIAG-05 | — | Pending |
-| DIAG-06 | — | Pending |
-| DIAG-07 | — | Pending |
-| FIX-01 | — | Pending |
-| FIX-02 | — | Pending |
-| FIX-03 | — | Pending |
-| TELEM-01 | — | Pending |
-| TELEM-02 | — | Pending |
-| TELEM-03 | — | Pending |
-| TELEM-04 | — | Pending |
+| DIAG-01 | Phase 28 | Pending |
+| DIAG-02 | Phase 28 | Pending |
+| DIAG-03 | Phase 28 | Pending |
+| DIAG-04 | Phase 28 | Pending |
+| DIAG-05 | Phase 28 | Pending |
+| DIAG-06 | Phase 28 | Pending |
+| DIAG-07 | Phase 28 | Pending |
+| FIX-01 | Phase 30 | Pending |
+| FIX-02 | Phase 30 | Pending |
+| FIX-03 | Phase 30 | Pending |
+| TELEM-01 | Phase 31 | Pending |
+| TELEM-02 | Phase 31 | Pending |
+| TELEM-03 | Phase 31 | Pending |
+| TELEM-04 | Phase 31 | Pending |
 
 **Coverage:**
 - v1.6 requirements: 14 total
-- Mapped to phases: 0 (pending roadmap creation)
-- Unmapped: 14
+- Mapped to phases: 14
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-01-23*
-*Last updated: 2026-01-23 after initial definition*
+*Last updated: 2026-01-23 after roadmap creation*

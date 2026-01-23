@@ -7,7 +7,8 @@
 - **v1.2 Participant Exclusion** - Phases 15-18 (shipped 2026-01-22)
 - **v1.3 P2P Connection Validation** - Phases 19-22 (shipped 2026-01-22)
 - **v1.4 Partner Disconnection Handling** - Phase 23 (shipped 2026-01-22)
-- **v1.5 Focus Loss Handling** - Phases 24-27 (complete)
+- **v1.5 Focus Loss Handling** - Phases 24-27 (shipped 2026-01-23)
+- 🚧 **v1.6 Input Latency Diagnosis & Fix** - Phases 28-31 (in progress)
 
 ## Phases
 
@@ -74,7 +75,8 @@ Key deliverables:
 
 </details>
 
-### v1.5 Focus Loss Handling (Complete)
+<details>
+<summary>v1.5 Focus Loss Handling (Phases 24-27) - SHIPPED 2026-01-23</summary>
 
 **Milestone Goal:** Prevent desync when a participant tabs away by using Web Workers for timing and gracefully handling the backgrounded state.
 
@@ -82,6 +84,17 @@ Key deliverables:
 - [x] **Phase 25: Focus Detection & Background State** - Page Visibility API, idle defaults, input buffering
 - [x] **Phase 26: Resync & Partner Experience** - Fast-forward on refocus, no partner interruption
 - [x] **Phase 27: Timeout, Messaging & Telemetry** - Configurable timeout, messages, research data
+
+</details>
+
+### 🚧 v1.6 Input Latency Diagnosis & Fix (In Progress)
+
+**Milestone Goal:** Diagnose and fix reported 1-2 second local input lag, with tooling to measure input→execute→render latency at each pipeline stage.
+
+- [ ] **Phase 28: Pipeline Instrumentation** - Timestamp capture at each pipeline stage
+- [ ] **Phase 29: Root Cause Diagnosis** - Use instrumentation to identify lag source
+- [ ] **Phase 30: Latency Fix** - Implement fix for <100ms local input response
+- [ ] **Phase 31: Telemetry Export** - Export latency metrics for research analysis
 
 ## Phase Details
 
@@ -323,6 +336,62 @@ Plans:
 Plans:
 - [x] 27-01-PLAN.md — Config API, timeout enforcement, telemetry export
 
+### Phase 28: Pipeline Instrumentation
+**Goal:** Add timestamps at each stage of the input→execute→render pipeline
+**Depends on:** v1.5 complete (existing timing infrastructure)
+**Requirements:** DIAG-01, DIAG-02, DIAG-03, DIAG-04, DIAG-05, DIAG-06, DIAG-07
+**Success Criteria** (what must be TRUE):
+  1. Keypress events record timestamp via performance.now()
+  2. Input queue entry/exit timestamps captured
+  3. Pyodide env.step() call and return timestamps captured
+  4. Render begin/complete timestamps captured
+  5. Per-input latency breakdown computed and logged to console
+**Research flag:** Unlikely (performance.now() API well-documented)
+**Plans:** TBD
+Plans:
+- [ ] 28-01-PLAN.md — Pipeline instrumentation with per-stage timestamps
+
+### Phase 29: Root Cause Diagnosis
+**Goal:** Use instrumentation data to identify where the 1-2 second delay occurs
+**Depends on:** Phase 28
+**Requirements:** (diagnostic work — uses DIAG-* outputs to inform FIX-*)
+**Success Criteria** (what must be TRUE):
+  1. Latency data collected from Overcooked gameplay sessions
+  2. Pipeline stage causing delay identified with supporting data
+  3. Root cause documented with evidence and proposed fix
+**Research flag:** Likely (may need to investigate Pyodide performance, browser quirks)
+**Plans:** TBD
+Plans:
+- [ ] 29-01-PLAN.md — Data collection, analysis, root cause identification
+
+### Phase 30: Latency Fix
+**Goal:** Implement fix for identified root cause to achieve <100ms local input response
+**Depends on:** Phase 29
+**Requirements:** FIX-01, FIX-02, FIX-03
+**Success Criteria** (what must be TRUE):
+  1. Local input latency consistently under 100ms (keypress to render)
+  2. Fix verified working in single-player mode
+  3. Fix verified working in multiplayer mode
+  4. Fix verified specifically in Overcooked environment
+**Research flag:** Unknown (depends on what root cause is found)
+**Plans:** TBD
+Plans:
+- [ ] 30-01-PLAN.md — Implement fix for identified root cause
+
+### Phase 31: Telemetry Export
+**Goal:** Export latency metrics for research analysis
+**Depends on:** Phase 30
+**Requirements:** TELEM-01, TELEM-02, TELEM-03, TELEM-04
+**Success Criteria** (what must be TRUE):
+  1. Session data export includes input latency metrics
+  2. Min/max/mean/median latency stats computed per session
+  3. Latency outliers (>100ms) flagged and counted in export
+  4. Per-stage latency breakdown available in exported data
+**Research flag:** Unlikely (extends existing telemetry patterns from v1.3/v1.5)
+**Plans:** TBD
+Plans:
+- [ ] 31-01-PLAN.md — Latency stats computation and export integration
+
 ## Progress
 
 **Execution Order:**
@@ -347,7 +416,11 @@ Phases execute in numeric order: 24 -> 25 -> 26 -> 27
 | 25. Focus Detection | v1.5 | 1/1 | Complete | 2026-01-23 |
 | 26. Resync & Partner UX | v1.5 | 1/1 | Complete | 2026-01-23 |
 | 27. Timeout & Telemetry | v1.5 | 1/1 | Complete | 2026-01-23 |
+| 28. Pipeline Instrumentation | v1.6 | 0/1 | Not started | - |
+| 29. Root Cause Diagnosis | v1.6 | 0/1 | Not started | - |
+| 30. Latency Fix | v1.6 | 0/1 | Not started | - |
+| 31. Telemetry Export | v1.6 | 0/1 | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-01-23 after Phase 27 execution*
+*Last updated: 2026-01-23 after v1.6 roadmap creation*
