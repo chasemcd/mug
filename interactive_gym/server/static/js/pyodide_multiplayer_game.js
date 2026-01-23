@@ -202,7 +202,9 @@ class FocusManager {
                 end: end,
                 durationMs: durationMs
             });
-            p2pLog.info(`Tab foregrounded after ${durationMs.toFixed(0)}ms - buffered ${this.backgroundInputBuffer.length} inputs`);
+            const totalPeriods = this.backgroundPeriods.length;
+            const totalDuration = this.backgroundPeriods.reduce((sum, p) => sum + p.durationMs, 0);
+            p2pLog.info(`Tab foregrounded after ${durationMs.toFixed(0)}ms - buffered ${this.backgroundInputBuffer.length} inputs (${totalPeriods} periods, ${(totalDuration/1000).toFixed(1)}s total)`);
         }
         this.isBackgrounded = false;
         this.backgroundStartTime = null;
@@ -242,6 +244,22 @@ class FocusManager {
      */
     getBackgroundPeriods() {
         return [...this.backgroundPeriods];
+    }
+
+    /**
+     * Get focus telemetry for session export.
+     * @returns {Object} {backgroundPeriods: Array, totalBackgroundMs: number, periodCount: number}
+     */
+    getTelemetry() {
+        const periods = this.getBackgroundPeriods();
+        const totalMs = periods.reduce((sum, p) => sum + p.durationMs, 0);
+        return {
+            backgroundPeriods: periods,
+            totalBackgroundMs: totalMs,
+            periodCount: periods.length,
+            currentlyBackgrounded: this.isBackgrounded,
+            bufferedInputCount: this.backgroundInputBuffer.length
+        };
     }
 
     /**
@@ -4654,8 +4672,18 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
         // Worker keeps ticking (so we know elapsed time), but we don't advance frames.
         // Partner inputs are buffered; we'll fast-forward on refocus (Phase 26).
         if (this.focusManager && this.focusManager.isBackgrounded) {
+            // Log background status periodically (every ~50 ticks at 10 FPS = 5 seconds)
+            if (!this._backgroundLogCounter) this._backgroundLogCounter = 0;
+            this._backgroundLogCounter++;
+            if (this._backgroundLogCounter % 50 === 0) {
+                const duration = this.focusManager.getCurrentBackgroundDuration();
+                const buffered = this.focusManager.backgroundInputBuffer.length;
+                p2pLog.info(`Still backgrounded: ${(duration/1000).toFixed(1)}s, ${buffered} inputs buffered`);
+            }
             return;
         }
+        // Reset counter when not backgrounded
+        this._backgroundLogCounter = 0;
 
         // Skip if already processing a tick (prevents overlapping async operations)
         if (this.isProcessingTick) {
