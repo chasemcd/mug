@@ -1175,17 +1175,27 @@ $(function() {
 // GymScene
 
 async function initializePyodideRemoteGame(data) {
-    // Only initialize a new RemoteGame if we don't already have one
-    if (pyodideRemoteGame === null || data.restart_pyodide === true) {
+    // Check if we need to create a new game instance:
+    // 1. No existing game
+    // 2. Explicit restart requested
+    // 3. Switching between single-player and multiplayer (different game types)
+    const needsNewInstance =
+        pyodideRemoteGame === null ||
+        data.restart_pyodide === true ||
+        (data.pyodide_multiplayer === true && !(pyodideRemoteGame instanceof MultiplayerPyodideGame)) ||
+        (data.pyodide_multiplayer !== true && pyodideRemoteGame instanceof MultiplayerPyodideGame);
+
+    if (needsNewInstance) {
         // Create MultiplayerPyodideGame if multiplayer, otherwise RemoteGame
         if (data.pyodide_multiplayer === true) {
             console.log("Initializing MultiplayerPyodideGame");
             pyodideRemoteGame = new MultiplayerPyodideGame(data);
         } else {
+            console.log("Initializing RemoteGame");
             pyodideRemoteGame = new RemoteGame(data);
         }
     } else {
-        console.log("Not initializing a new RemoteGame because one already exists");
+        console.log("Reusing existing game instance, reinitializing environment");
         await pyodideRemoteGame.reinitialize_environment(data);
     }
 };
