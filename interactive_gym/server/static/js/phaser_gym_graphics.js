@@ -31,7 +31,7 @@ let botActionBuffers = {};
 let humanKeyPressBuffer = [];
 const MAX_KEY_PRESS_BUFFER_SIZE = 1;
 export function addHumanKeyPressToBuffer(action) {
-    // TODO(chase): this should filter out actions that aren't allowed, 
+    // TODO(chase): this should filter out actions that aren't allowed,
     // otherwise hitting an unrelated key could cancel out previous actions.
     if (humanKeyPressBuffer >= MAX_KEY_PRESS_BUFFER_SIZE) {
         humanKeyPressBuffer.shift(); // remove the oldest state
@@ -42,6 +42,15 @@ export function addHumanKeyPressToBuffer(action) {
 export var pressedKeys = {};
 export function updatePressedKeys(updatedPressedKeys) {
     pressedKeys = updatedPressedKeys;
+}
+
+/**
+ * Clear all human input buffers.
+ * Called when game pauses (waiting for partner) to prevent input accumulation.
+ */
+export function clearHumanInputBuffers() {
+    humanKeyPressBuffer = [];
+    pressedKeys = {};
 }
 
 // Contains the last action submitted at each step

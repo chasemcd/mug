@@ -190,6 +190,7 @@ class GymScene(scene.Scene):
         # Focus loss handling (Phase 27)
         self.focus_loss_timeout_ms: int = 30000  # Default 30 seconds
         self.focus_loss_message: str | None = None  # Custom message, None uses default
+        self.pause_on_partner_background: bool = False  # If True, pause game when partner backgrounds
 
     def environment(
         self,
@@ -814,6 +815,7 @@ class GymScene(scene.Scene):
         self,
         timeout_ms: int = NotProvided,
         message: str = NotProvided,
+        pause_on_partner_background: bool = NotProvided,
     ) -> "GymScene":
         """Configure focus loss handling for multiplayer games.
 
@@ -825,6 +827,9 @@ class GymScene(scene.Scene):
                        Default is 30000 (30 seconds). Set to 0 to disable.
             message: Custom message to display when game ends due to focus loss.
                     If not set, a default message is shown.
+            pause_on_partner_background: If True, pause the game and show
+                    "Waiting for partner..." when partner tabs away mid-game.
+                    If False (default), only wait for partner at episode boundaries.
 
         Returns:
             self for chaining.
@@ -832,7 +837,8 @@ class GymScene(scene.Scene):
         Example:
             scene.focus_loss_config(
                 timeout_ms=20000,  # 20 seconds
-                message="Please stay focused on the experiment."
+                message="Please stay focused on the experiment.",
+                pause_on_partner_background=True
             )
         """
         if timeout_ms is not NotProvided:
@@ -842,6 +848,9 @@ class GymScene(scene.Scene):
 
         if message is not NotProvided:
             self.focus_loss_message = message
+
+        if pause_on_partner_background is not NotProvided:
+            self.pause_on_partner_background = pause_on_partner_background
 
         return self
 

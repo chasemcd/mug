@@ -61,7 +61,7 @@ stager = stager.Stager(
         # oc_scenes.tutorial_gym_scene,
         # For multiplayer, all players must be on the same scene
         # Using RandomizeOrder creates different scenes per player
-        oc_scenes.cramped_room_human_human.gameplay(num_episodes=20),
+        oc_scenes.cramped_room_human_human.gameplay(num_episodes=20).focus_loss_config(pause_on_partner_background=False),
         oc_scenes.multiplayer_feedback_scene,
         oc_scenes.end_scene,
     ]

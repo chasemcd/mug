@@ -58,6 +58,9 @@ class PyodideGameState:
     p2p_validation_enabled: bool = True
     p2p_validation_timeout_s: float = 10.0
     p2p_validated_players: set = dataclasses.field(default_factory=set)
+
+    # Scene metadata for client configuration
+    scene_metadata: dict = dataclasses.field(default_factory=dict)
     validation_start_time: float | None = None
 
     # Mid-game reconnection state (Phase 20)
@@ -118,6 +121,8 @@ class PyodideGameCoordinator:
         turn_username: str | None = None,
         turn_credential: str | None = None,
         force_turn_relay: bool = False,
+        # Scene metadata for client config
+        scene_metadata: dict | None = None,
     ) -> PyodideGameState:
         """
         Initialize a new Pyodide multiplayer game.
@@ -157,6 +162,7 @@ class PyodideGameCoordinator:
                 turn_username=turn_username,
                 turn_credential=turn_credential,
                 force_turn_relay=force_turn_relay,
+                scene_metadata=scene_metadata or {},
             )
 
             # Create server runner if server_authoritative mode enabled
@@ -285,6 +291,8 @@ class PyodideGameCoordinator:
                              'credential': game.turn_credential,
                              'force_relay': game.force_turn_relay,
                          } if game.turn_username else None,
+                         # Include scene metadata for client configuration
+                         'scene_metadata': game.scene_metadata,
                      },
                      room=game_id)
 

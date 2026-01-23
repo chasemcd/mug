@@ -15,6 +15,7 @@ import * as seeded_random from './seeded_random.js';
 import * as ui_utils from './ui_utils.js';
 import { WebRTCManager, LatencyTelemetry } from './webrtc_manager.js';
 import { ContinuousMonitor } from './continuous_monitor.js';
+import { clearHumanInputBuffers } from './phaser_gym_graphics.js';
 
 // ========== Logging Configuration ==========
 // Control verbosity via browser console: window.p2pLogLevel = 'info' or 'debug'
@@ -310,6 +311,9 @@ const P2P_MSG_EPISODE_READY = 0x06;  // Episode start synchronization
 const P2P_MSG_STATE_HASH = 0x07;  // State hash for sync validation
 const P2P_MSG_VALIDATION_PING = 0x10;  // Validation request (Phase 19)
 const P2P_MSG_VALIDATION_PONG = 0x11;  // Validation response (Phase 19)
+const P2P_MSG_INPUT_REQUEST = 0x12;  // Request missing inputs for frame range
+const P2P_MSG_INPUT_RESPONSE = 0x13;  // Response with requested inputs
+const P2P_MSG_FOCUS_STATE = 0x14;  // Focus state notification (focused/backgrounded)
 
 /**
  * Encode an input packet for P2P transmission.
@@ -563,6 +567,130 @@ function encodeValidationPong(originalTimestamp) {
     view.setUint8(0, P2P_MSG_VALIDATION_PONG);
     view.setFloat64(1, originalTimestamp, false);
     return buffer;
+}
+
+/**
+ * Encode an input request message.
+ * Used when fast-forwarding after refocus to request missing inputs from partner.
+ * Format:
+ *   Byte 0: Message type (0x12)
+ *   Bytes 1-4: Start frame (uint32)
+ *   Bytes 5-8: End frame (uint32)
+ *
+ * @param {number} startFrame - First frame to request inputs for
+ * @param {number} endFrame - Last frame to request inputs for (inclusive)
+ * @returns {ArrayBuffer} Encoded request
+ */
+function encodeInputRequest(startFrame, endFrame) {
+    const buffer = new ArrayBuffer(9);
+    const view = new DataView(buffer);
+    view.setUint8(0, P2P_MSG_INPUT_REQUEST);
+    view.setUint32(1, startFrame, false);
+    view.setUint32(5, endFrame, false);
+    return buffer;
+}
+
+/**
+ * Decode an input request message.
+ * @param {ArrayBuffer} buffer - Received message
+ * @returns {{startFrame: number, endFrame: number}|null}
+ */
+function decodeInputRequest(buffer) {
+    const view = new DataView(buffer);
+    if (view.getUint8(0) !== P2P_MSG_INPUT_REQUEST) return null;
+    return {
+        startFrame: view.getUint32(1, false),
+        endFrame: view.getUint32(5, false)
+    };
+}
+
+/**
+ * Encode an input response message.
+ * Contains inputs for a range of frames requested by partner.
+ * Format:
+ *   Byte 0: Message type (0x13)
+ *   Bytes 1-2: Player ID (uint16)
+ *   Bytes 3-4: Input count (uint16)
+ *   Each input (5 bytes):
+ *     Bytes 0-3: Frame number (uint32)
+ *     Byte 4: Action value (uint8)
+ *
+ * @param {number} playerId - The player whose inputs these are
+ * @param {Array<{frame: number, action: number}>} inputs - Inputs to send
+ * @returns {ArrayBuffer} Encoded response
+ */
+function encodeInputResponse(playerId, inputs) {
+    const inputCount = inputs.length;
+    const buffer = new ArrayBuffer(5 + inputCount * 5);
+    const view = new DataView(buffer);
+    view.setUint8(0, P2P_MSG_INPUT_RESPONSE);
+    view.setUint16(1, playerId, false);
+    view.setUint16(3, inputCount, false);
+
+    for (let i = 0; i < inputCount; i++) {
+        const offset = 5 + i * 5;
+        view.setUint32(offset, inputs[i].frame, false);
+        view.setUint8(offset + 4, inputs[i].action);
+    }
+    return buffer;
+}
+
+/**
+ * Decode an input response message.
+ * @param {ArrayBuffer} buffer - Received message
+ * @returns {{playerId: number, inputs: Array<{frame: number, action: number}>}|null}
+ */
+function decodeInputResponse(buffer) {
+    const view = new DataView(buffer);
+    if (view.getUint8(0) !== P2P_MSG_INPUT_RESPONSE) return null;
+
+    const playerId = view.getUint16(1, false);
+    const inputCount = view.getUint16(3, false);
+    const inputs = [];
+
+    for (let i = 0; i < inputCount; i++) {
+        const offset = 5 + i * 5;
+        inputs.push({
+            frame: view.getUint32(offset, false),
+            action: view.getUint8(offset + 4)
+        });
+    }
+    return { playerId, inputs };
+}
+
+/**
+ * Encode a focus state message.
+ * Used to notify partner when focus state changes (for episode sync).
+ * Format:
+ *   Byte 0: Message type (0x14)
+ *   Byte 1: Focus state (1 = focused, 0 = backgrounded)
+ *   Bytes 2-5: Current frame number (uint32)
+ *
+ * @param {boolean} isFocused - Whether the tab is focused
+ * @param {number} frameNumber - Current frame number
+ * @returns {ArrayBuffer} Encoded message
+ */
+function encodeFocusState(isFocused, frameNumber) {
+    const buffer = new ArrayBuffer(6);
+    const view = new DataView(buffer);
+    view.setUint8(0, P2P_MSG_FOCUS_STATE);
+    view.setUint8(1, isFocused ? 1 : 0);
+    view.setUint32(2, frameNumber, false);
+    return buffer;
+}
+
+/**
+ * Decode a focus state message.
+ * @param {ArrayBuffer} buffer - Received message
+ * @returns {{isFocused: boolean, frameNumber: number}|null}
+ */
+function decodeFocusState(buffer) {
+    const view = new DataView(buffer);
+    if (view.getUint8(0) !== P2P_MSG_FOCUS_STATE) return null;
+    return {
+        isFocused: view.getUint8(1) === 1,
+        frameNumber: view.getUint32(2, false)
+    };
 }
 
 /**
@@ -936,6 +1064,7 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         // P2P episode synchronization
         // Both peers must agree on episode end before resetting
         // AND both peers must agree on episode start before beginning
+        // AND both peers must be focused before starting new episode
         this.p2pEpisodeSync = {
             // Episode END sync
             localEpisodeEndDetected: false,   // We detected episode end
@@ -950,7 +1079,11 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
             localStateHash: null,             // Our initial state hash
             remoteStateHash: null,            // Peer's initial state hash
             startResolve: null,               // Promise resolve for start sync
-            startTimeoutId: null              // Timeout for start sync
+            startTimeoutId: null,             // Timeout for start sync
+            // Partner focus tracking (for episode sync)
+            partnerFocused: true,             // Assume focused until told otherwise
+            waitingForPartnerFocus: false,    // True when waiting for partner to refocus
+            retryTimeoutId: null              // Retry timeout for episode ready
         };
 
         // Session metrics for research data export
@@ -1036,13 +1169,28 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
 
         // Phase 26: Fast-forward on refocus
         this._pendingFastForward = false;
+        // Pending input request state for fast-forward resync
+        this._pendingInputRequest = null;  // {resolve, reject, startFrame, endFrame}
 
-        // Hook into FocusManager's foregrounded event to trigger fast-forward
+        // Phase 27: Waiting for partner to refocus (game paused)
+        this._waitingForPartnerFocus = false;
+
+        // Hook into FocusManager's foregrounded event to trigger fast-forward and broadcast state
         const originalOnForegrounded = this.focusManager._onForegrounded.bind(this.focusManager);
         this.focusManager._onForegrounded = () => {
             originalOnForegrounded();
             this._pendingFastForward = true;
             p2pLog.info('Tab foregrounded - scheduling fast-forward');
+            // Notify partner we're back
+            this._broadcastFocusState(true);
+        };
+
+        // Hook into FocusManager's backgrounded event to notify partner
+        const originalOnBackgrounded = this.focusManager._onBackgrounded.bind(this.focusManager);
+        this.focusManager._onBackgrounded = () => {
+            originalOnBackgrounded();
+            // Notify partner we're leaving
+            this._broadcastFocusState(false);
         };
 
         this.setupMultiplayerHandlers();
@@ -1068,6 +1216,7 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
 
         // Game ready to start
         socket.on('pyodide_game_ready', (data) => {
+            console.log('[DEBUG] pyodide_game_ready event received:', data);
             p2pLog.debug(`Game ready: ${data.players.length} players, server_auth=${data.server_authoritative || false}`);
 
             // Build player ID <-> index mapping for binary protocol
@@ -1115,6 +1264,10 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
             }
             if (data.scene_metadata?.focus_loss_message !== undefined) {
                 this.config.focus_loss_message = data.scene_metadata.focus_loss_message;
+            }
+            // Configure whether to pause game when partner backgrounds
+            if (data.scene_metadata?.pause_on_partner_background !== undefined) {
+                this.config.pause_on_partner_background = data.scene_metadata.pause_on_partner_background;
             }
 
             // Initialize action queues for other players
@@ -1920,6 +2073,63 @@ hashlib.md5(json.dumps(_state, sort_keys=True).encode()).hexdigest()[:8]
         p2pLog.debug('Cleared action queues after episode transition');
     }
 
+    /**
+     * Override showEpisodeTransition to wait for partner focus before countdown.
+     * In multiplayer P2P mode, we need both players focused before starting
+     * the next episode countdown.
+     */
+    async showEpisodeTransition(waitingMessage = null) {
+        // Check if this is a subsequent episode (not the first one)
+        const isSubsequentEpisode = this.num_episodes > 0;
+
+        if (!isSubsequentEpisode) {
+            // First episode - just ensure overlay is hidden
+            ui_utils.hideEpisodeOverlay();
+            return;
+        }
+
+        // For P2P multiplayer, wait for partner to be focused before showing countdown
+        if (!this.serverAuthoritative && this.webrtcManager?.isReady() && this.focusManager) {
+            const localFocused = !this.focusManager.isBackgrounded;
+            const partnerFocused = this.p2pEpisodeSync.partnerFocused;
+
+            if (!localFocused || !partnerFocused) {
+                // Show waiting overlay
+                const waitingFor = !localFocused ? 'you to return' : 'partner';
+                this._waitingForPartnerFocus = true;
+                this._showWaitingForPartnerOverlay(!partnerFocused);
+                p2pLog.info(`Waiting for ${waitingFor} to focus before episode countdown`);
+
+                // Wait for focus to be restored
+                await new Promise((resolve) => {
+                    const checkFocus = () => {
+                        const nowLocalFocused = !this.focusManager.isBackgrounded;
+                        const nowPartnerFocused = this.p2pEpisodeSync.partnerFocused;
+
+                        if (nowLocalFocused && nowPartnerFocused) {
+                            this._waitingForPartnerFocus = false;
+                            this._hideWaitingForPartnerOverlay();
+                            resolve();
+                        } else {
+                            // Check again on next tick
+                            setTimeout(checkFocus, 100);
+                        }
+                    };
+                    checkFocus();
+                });
+            }
+        }
+
+        // Show waiting message if provided
+        if (waitingMessage) {
+            ui_utils.showEpisodeWaiting(waitingMessage);
+        }
+
+        // Show countdown before starting
+        const episodeNum = this.num_episodes + 1;
+        await ui_utils.showEpisodeCountdown(3, `Round ${episodeNum} starting!`);
+    }
+
     async step(allActionsDict) {
         /**
          * Step environment in multiplayer mode (True GGPO)
@@ -1934,6 +2144,7 @@ hashlib.md5(json.dumps(_state, sort_keys=True).encode()).hexdigest()[:8]
          * 4. Step environment with delayed actions
          * 5. Save snapshots for potential rollback
          */
+        const _stepStartTime = performance.now();
 
         // Don't step until multiplayer setup is complete
         if (this.myPlayerId === null || this.myPlayerId === undefined) {
@@ -2259,6 +2470,12 @@ hashlib.md5(json.dumps(_st, sort_keys=True).encode()).hexdigest()[:8]
             } catch (e) {
                 p2pLog.warn(`Failed to get post-rollback render state: ${e}`);
             }
+        }
+
+        // Log step timing periodically (every 50 frames)
+        if (this.frameNumber % 50 === 0) {
+            const stepDuration = performance.now() - _stepStartTime;
+            console.log(`[TIMING] frame=${this.frameNumber} stepMs=${stepDuration.toFixed(1)}`);
         }
 
         // Return finalActions alongside step results so caller can log synchronized actions
@@ -3564,6 +3781,7 @@ env.set_state(env_state)
             // Input is stored above, but don't trigger new rollback during replay
             return;
         }
+
         if (frameNumber < this.frameNumber && this.predictedFrames.has(frameNumber)) {
             // Late input! Check what action we ACTUALLY used at that frame
             // by looking at actionSequence, not by calling getPredictedAction()
@@ -4228,92 +4446,185 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
         const startTime = performance.now();
         const startFrame = this.frameNumber;
 
-        // Safety limits
-        const MAX_FRAMES = 300;  // ~30 seconds at 10fps
-        const MAX_MS = 1000;     // Max 1 second of processing time
+        // Safety limit - generous since we're not rendering during fast-forward
+        const MAX_FRAMES = 1000;  // ~100 seconds at 10fps
 
         p2pLog.warn(`FAST-FORWARD: starting from frame ${startFrame}, ${bufferedInputs.length} buffered packets`);
 
         // 1. Inject buffered inputs into GGPO input buffer
+        // Track maxFrame from packet.currentFrame (partner's simulation frame at send time)
+        // This is more reliable than input.frame when packets are lost due to unreliable delivery
         let maxFrame = this.frameNumber;
         for (const packet of bufferedInputs) {
             // Packets have format: {playerId, inputs: [{action, frame}, ...], currentFrame}
+            // Use currentFrame as target - it's where partner's simulation actually is
+            maxFrame = Math.max(maxFrame, packet.currentFrame);
             for (const input of packet.inputs) {
                 this.storeRemoteInput(packet.playerId, input.action, input.frame);
-                maxFrame = Math.max(maxFrame, input.frame);
             }
         }
 
         // 2. Determine how many frames to process
         const framesToProcess = maxFrame - this.frameNumber;
+        p2pLog.info(`FAST-FORWARD: target frame ${maxFrame}, current ${this.frameNumber}, need ${framesToProcess} frames`);
         if (framesToProcess <= 0) {
             p2pLog.debug('Fast-forward: already caught up or ahead');
             return;
         }
-
-        // 3. Set rollback guard to prevent nested operations
-        this.rollbackInProgress = true;
 
         // Get human player IDs for input retrieval
         const humanPlayerIds = Object.entries(this.policyMapping)
             .filter(([_, policy]) => policy === 'human')
             .map(([id, _]) => String(id));
 
+        // Find the remote player ID (the partner whose inputs we need)
+        const remotePlayerId = humanPlayerIds.find(id => id !== String(this.myPlayerId));
+
+        // 3. Check for missing inputs and request them from partner
+        if (remotePlayerId) {
+            const missingFrames = [];
+            for (let frame = this.frameNumber; frame < maxFrame; frame++) {
+                const frameInputs = this.inputBuffer.get(frame);
+                if (!frameInputs || !frameInputs.has(remotePlayerId)) {
+                    missingFrames.push(frame);
+                }
+            }
+
+            if (missingFrames.length > 0) {
+                const missingStart = missingFrames[0];
+                const missingEnd = missingFrames[missingFrames.length - 1];
+                p2pLog.warn(`FAST-FORWARD: missing ${missingFrames.length} inputs for player ${remotePlayerId} (frames ${missingStart}-${missingEnd})`);
+
+                // Request missing inputs from partner
+                try {
+                    p2pLog.info(`FAST-FORWARD: requesting inputs from partner...`);
+                    const receivedCount = await this._requestMissingInputs(missingStart, missingEnd, 3000);
+                    p2pLog.info(`FAST-FORWARD: received ${receivedCount} inputs from partner`);
+                } catch (err) {
+                    p2pLog.error(`FAST-FORWARD: failed to get missing inputs: ${err.message}`);
+                    // Continue anyway - we'll use prediction for missing frames
+                    // This is not ideal but prevents getting stuck
+                }
+            } else {
+                p2pLog.info('FAST-FORWARD: all remote inputs available');
+            }
+        }
+
+        // 4. Set rollback guard to prevent nested operations
+        this.rollbackInProgress = true;
+
         let framesProcessed = 0;
 
         try {
-            // 4. Fast-forward loop: step each frame without rendering
-            while (this.frameNumber < maxFrame &&
-                   framesProcessed < MAX_FRAMES &&
-                   (performance.now() - startTime) < MAX_MS) {
+            // 5. Build batch of frames to process (like rollback replay)
+            const fastForwardFrames = [];
+            let lastBotActions = {...this.lastExecutedActions};
 
+            for (let frame = this.frameNumber; frame < maxFrame && fastForwardFrames.length < MAX_FRAMES; frame++) {
                 // Get inputs for this frame (confirmed from buffer, predicted if missing)
-                // Pass trackPredictions=false to avoid marking frames during fast-forward
-                const inputs = this.getInputsForFrame(this.frameNumber, humanPlayerIds, false);
+                const inputs = this.getInputsForFrame(frame, humanPlayerIds, false);
 
                 // Build final actions for all agents
-                const finalActions = {};
+                const frameActions = {};
                 for (const [agentId, policy] of Object.entries(this.policyMapping)) {
                     if (policy === 'human') {
-                        finalActions[agentId] = inputs[String(agentId)] ?? this.defaultAction;
+                        frameActions[agentId] = inputs[String(agentId)] ?? this.defaultAction;
                     } else {
                         // Bot: use last executed action or default
-                        finalActions[agentId] = this.lastExecutedActions[agentId] ?? this.defaultAction;
+                        frameActions[agentId] = lastBotActions[agentId] ?? this.defaultAction;
                     }
                 }
 
-                // Step environment without rendering
-                await this.stepWithActions(finalActions);
-
-                // Track last executed actions for fallback
-                for (const [agentId, action] of Object.entries(finalActions)) {
-                    this.lastExecutedActions[agentId] = action;
+                // Track for next frame's bot action prediction
+                for (const [agentId, action] of Object.entries(frameActions)) {
+                    lastBotActions[agentId] = action;
                 }
 
-                // Record in action sequence (same pattern as normal step)
-                this.actionSequence.push({
-                    frame: this.frameNumber,
-                    actions: {...finalActions}
+                fastForwardFrames.push({
+                    frame: frame,
+                    actions: frameActions
                 });
 
-                this.frameNumber++;
-                framesProcessed++;
+                // Record in action sequence
+                this.actionSequence.push({
+                    frame: frame,
+                    actions: {...frameActions}
+                });
+            }
 
-                // Prune input buffer periodically during fast-forward
-                if (framesProcessed % 20 === 0) {
-                    this.pruneInputBuffer();
+            if (fastForwardFrames.length === 0) {
+                p2pLog.debug('Fast-forward: no frames to process');
+                return;
+            }
+
+            // 6. Execute ALL fast-forward steps in a single Python call (no rendering)
+            // This is much faster than calling stepWithActions for each frame
+            // Track cumulative rewards across all frames for HUD update
+            p2pLog.info(`FAST-FORWARD: batch stepping ${fastForwardFrames.length} frames`);
+
+            const result = await this.pyodide.runPythonAsync(`
+import json
+import numpy as np
+_ff_frames = ${JSON.stringify(fastForwardFrames)}
+_cumulative_rewards = {}
+for _ff in _ff_frames:
+    _actions = {int(k) if str(k).isdigit() else k: v for k, v in _ff['actions'].items()}
+    _obs, _rewards, _terms, _truncs, _infos = env.step(_actions)
+    # Accumulate rewards
+    for _agent_id, _reward in _rewards.items():
+        if _agent_id not in _cumulative_rewards:
+            _cumulative_rewards[_agent_id] = 0
+        _cumulative_rewards[_agent_id] += _reward
+_cumulative_rewards
+            `);
+
+            // Update cumulative rewards from fast-forward
+            const ffRewards = await this.pyodide.toPy(result).toJs();
+            if (ffRewards instanceof Map) {
+                for (let [key, value] of ffRewards.entries()) {
+                    if (this.cumulative_rewards[key] !== undefined) {
+                        this.cumulative_rewards[key] += value;
+                    } else {
+                        this.cumulative_rewards[key] = value;
+                    }
                 }
             }
 
-            // Log if we hit limits
-            if (framesProcessed >= MAX_FRAMES) {
-                p2pLog.warn(`Fast-forward hit frame limit (${MAX_FRAMES}), remaining frames will catch up normally`);
-            } else if ((performance.now() - startTime) >= MAX_MS) {
-                p2pLog.warn(`Fast-forward hit time limit (${MAX_MS}ms), remaining frames will catch up normally`);
+            framesProcessed = fastForwardFrames.length;
+
+            // Update frame number, step count, and tracking
+            this.frameNumber = this.frameNumber + framesProcessed;
+            this.step_num += framesProcessed;
+            this.lastExecutedActions = lastBotActions;
+
+            // Update confirmedFrame to match - all fast-forwarded frames used real inputs
+            // This prevents GGPO from thinking we have many unconfirmed frames
+            this.confirmedFrame = this.frameNumber - 1;
+
+            // Update HUD to reflect fast-forwarded state
+            ui_utils.updateHUDText(this.getHUDText());
+
+            // Clear old snapshots that are now before our confirmed frame
+            // This prevents rollback to pre-fast-forward state
+            for (const [snapFrame, _] of this.stateSnapshots) {
+                if (snapFrame < this.confirmedFrame - 30) {  // Keep some buffer
+                    this.stateSnapshots.delete(snapFrame);
+                }
+            }
+
+            // Clear predicted frames - fast-forward resolved all predictions
+            this.predictedFrames.clear();
+
+            // Prune input buffer after batch processing
+            this.pruneInputBuffer();
+
+            // Log if we hit limit
+            if (framesProcessed >= MAX_FRAMES && this.frameNumber < maxFrame) {
+                p2pLog.warn(`Fast-forward hit frame limit (${MAX_FRAMES}), remaining ${maxFrame - this.frameNumber} frames will catch up normally`);
             }
 
         } finally {
-            // 5. Always clear rollback guard
+            // 7. Always clear rollback guard
             this.rollbackInProgress = false;
         }
 
@@ -4322,6 +4633,29 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
             `FAST-FORWARD: ${startFrame} -> ${this.frameNumber} ` +
             `(${framesProcessed} frames in ${elapsed.toFixed(1)}ms)`
         );
+
+        // Send catch-up inputs to partner so they can confirm our defaultAction frames
+        // During background, we sent nothing - partner predicted us as defaultAction
+        // Now we confirm that prediction was correct by sending the actual inputs
+        if (this.webrtcManager?.isReady() && framesProcessed > 0) {
+            const catchUpInputs = [];
+            for (let frame = startFrame; frame < this.frameNumber; frame++) {
+                catchUpInputs.push({ action: this.defaultAction, frame: frame });
+            }
+
+            // Send in batches to avoid oversized packets
+            const BATCH_SIZE = 50;
+            for (let i = 0; i < catchUpInputs.length; i += BATCH_SIZE) {
+                const batch = catchUpInputs.slice(i, i + BATCH_SIZE);
+                const packet = encodeInputPacket(
+                    this.myPlayerId,
+                    this.frameNumber,  // currentFrame for the packet
+                    batch
+                );
+                this.webrtcManager.send(packet);
+            }
+            p2pLog.info(`Sent ${catchUpInputs.length} catch-up inputs to partner (frames ${startFrame}-${this.frameNumber - 1})`);
+        }
     }
 
     /**
@@ -4820,6 +5154,17 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
      * @param {number} timestamp - performance.now() timestamp from Worker
      */
     _handleWorkerTick(timestamp) {
+        // Track tick intervals for debugging
+        const now = performance.now();
+        if (this._lastTickTime) {
+            const tickInterval = now - this._lastTickTime;
+            // Log if interval is significantly off from expected (100ms for 10 FPS)
+            if (this.frameNumber % 50 === 0) {
+                console.log(`[TICK] frame=${this.frameNumber} interval=${tickInterval.toFixed(1)}ms isProcessing=${this.isProcessingTick}`);
+            }
+        }
+        this._lastTickTime = now;
+
         // Skip if game is done
         if (this.state === 'done') {
             return;
@@ -4830,17 +5175,28 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
             return;
         }
 
+        // Skip if waiting for partner to refocus (Phase 27 - configurable pause)
+        if (this._waitingForPartnerFocus) {
+            return;
+        }
+
         // Phase 26: Fast-forward on refocus before normal tick processing
         // This catches up frames missed while backgrounded using buffered partner inputs.
         // MUST be checked BEFORE isBackgrounded (we're no longer backgrounded when this fires)
         if (this._pendingFastForward && !this.focusManager?.isBackgrounded) {
             this._pendingFastForward = false;
-            // Fast-forward is async but we don't await - it will complete and normal ticks continue
-            this._performFastForward().catch(err => {
-                p2pLog.error('Fast-forward failed:', err);
-            });
-            // Don't return - continue to normal tick after scheduling fast-forward
-            // The rollbackInProgress guard in _performFastForward will prevent conflicts
+            // Block this tick while fast-forward completes to prevent race conditions
+            // with frameNumber modification and input processing
+            this.isProcessingTick = true;
+            this._performFastForward()
+                .catch(err => {
+                    p2pLog.error('Fast-forward failed:', err);
+                })
+                .finally(() => {
+                    this.isProcessingTick = false;
+                });
+            // Return early - next tick will process normally after fast-forward completes
+            return;
         }
 
         // Phase 27: Check focus loss timeout
@@ -4868,9 +5224,29 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
         // Reset counter when not backgrounded
         this._backgroundLogCounter = 0;
 
+        // Periodic diagnostic logging (every ~50 ticks = 5 seconds at 10 FPS)
+        if (!this._diagLogCounter) this._diagLogCounter = 0;
+        this._diagLogCounter++;
+        if (this._diagLogCounter % 50 === 0) {
+            const inputBufferSize = this.inputBuffer.size;
+            const snapshotCount = this.stateSnapshots.size;
+            const predictedCount = this.predictedFrames.size;
+            const actionSeqLen = this.actionSequence?.length || 0;
+            console.log(`[DIAG] frame=${this.frameNumber} confirmed=${this.confirmedFrame} inputBuf=${inputBufferSize} snapshots=${snapshotCount} predicted=${predictedCount} rollbacks=${this.rollbackCount} actionSeq=${actionSeqLen}`);
+        }
+
         // Skip if already processing a tick (prevents overlapping async operations)
         if (this.isProcessingTick) {
+            // Track skipped ticks
+            if (!this._skippedTickCount) this._skippedTickCount = 0;
+            this._skippedTickCount++;
             return;
+        }
+
+        // Log skipped tick count periodically
+        if (this.frameNumber % 50 === 0 && this._skippedTickCount > 0) {
+            console.log(`[TICK] skipped=${this._skippedTickCount} ticks in last 50 frames`);
+            this._skippedTickCount = 0;
         }
 
         // Mark as processing - will be cleared by callback when complete
@@ -4976,6 +5352,169 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
 
         this.p2pValidation.pongReceived = true;
         this._checkValidationComplete();
+    }
+
+    /**
+     * Handle incoming input request from partner.
+     * Partner is fast-forwarding after refocus and needs our inputs for a frame range.
+     */
+    _handleInputRequest(buffer) {
+        const request = decodeInputRequest(buffer);
+        if (!request) {
+            p2pLog.warn('Failed to decode input request');
+            return;
+        }
+
+        const { startFrame, endFrame } = request;
+        p2pLog.info(`INPUT_REQUEST received: frames ${startFrame}-${endFrame}`);
+
+        // Collect inputs from our local input buffer for the requested range
+        const inputs = [];
+        const myPlayerIdStr = String(this.myPlayerId);
+
+        for (let frame = startFrame; frame <= endFrame; frame++) {
+            const frameInputs = this.inputBuffer.get(frame);
+            if (frameInputs && frameInputs.has(myPlayerIdStr)) {
+                inputs.push({
+                    frame: frame,
+                    action: frameInputs.get(myPlayerIdStr)
+                });
+            }
+        }
+
+        p2pLog.info(`INPUT_RESPONSE: sending ${inputs.length} inputs for frames ${startFrame}-${endFrame}`);
+
+        // Send response with our inputs
+        const response = encodeInputResponse(this.playerIdToIndex[this.myPlayerId], inputs);
+        if (this.webrtcManager?.isReady()) {
+            this.webrtcManager.send(response);
+        } else {
+            p2pLog.warn('Cannot send input response - WebRTC not ready');
+        }
+    }
+
+    /**
+     * Handle incoming input response from partner.
+     * This completes a pending input request during fast-forward.
+     */
+    _handleInputResponse(buffer) {
+        const response = decodeInputResponse(buffer);
+        if (!response) {
+            p2pLog.warn('Failed to decode input response');
+            return;
+        }
+
+        // Convert player index to ID
+        const playerId = this.indexToPlayerId[response.playerId];
+        if (playerId === undefined) {
+            p2pLog.warn(`Unknown player index in input response: ${response.playerId}`);
+            return;
+        }
+
+        p2pLog.info(`INPUT_RESPONSE received: ${response.inputs.length} inputs from player ${playerId}`);
+
+        // Store the received inputs in our buffer
+        for (const input of response.inputs) {
+            this.storeRemoteInput(playerId, input.action, input.frame);
+        }
+
+        // Resolve pending request if we have one
+        if (this._pendingInputRequest) {
+            this._pendingInputRequest.resolve(response.inputs.length);
+            this._pendingInputRequest = null;
+        }
+    }
+
+    /**
+     * Request missing inputs from partner for a frame range.
+     * Returns a promise that resolves when the response is received.
+     * @param {number} startFrame - First frame to request
+     * @param {number} endFrame - Last frame to request (inclusive)
+     * @param {number} timeoutMs - Timeout in milliseconds (default 2000)
+     * @returns {Promise<number>} Number of inputs received
+     */
+    _requestMissingInputs(startFrame, endFrame, timeoutMs = 2000) {
+        return new Promise((resolve, reject) => {
+            if (!this.webrtcManager?.isReady()) {
+                reject(new Error('WebRTC not ready'));
+                return;
+            }
+
+            // Store pending request state
+            this._pendingInputRequest = { resolve, reject, startFrame, endFrame };
+
+            // Set timeout
+            const timeoutId = setTimeout(() => {
+                if (this._pendingInputRequest) {
+                    p2pLog.warn(`Input request timed out for frames ${startFrame}-${endFrame}`);
+                    this._pendingInputRequest = null;
+                    reject(new Error('Input request timeout'));
+                }
+            }, timeoutMs);
+
+            // Clear timeout when resolved
+            const originalResolve = resolve;
+            this._pendingInputRequest.resolve = (count) => {
+                clearTimeout(timeoutId);
+                originalResolve(count);
+            };
+
+            // Send request
+            const request = encodeInputRequest(startFrame, endFrame);
+            this.webrtcManager.send(request);
+            p2pLog.info(`INPUT_REQUEST sent: frames ${startFrame}-${endFrame}`);
+        });
+    }
+
+    /**
+     * Handle incoming focus state message from partner.
+     * Updates partner focus tracking for episode sync.
+     * If pause_on_partner_background is enabled, pauses game when partner backgrounds.
+     */
+    _handleFocusState(buffer) {
+        const state = decodeFocusState(buffer);
+        if (!state) {
+            p2pLog.warn('Failed to decode focus state message');
+            return;
+        }
+
+        const wasFocused = this.p2pEpisodeSync.partnerFocused;
+        this.p2pEpisodeSync.partnerFocused = state.isFocused;
+
+        if (state.isFocused && !wasFocused) {
+            p2pLog.info(`Partner refocused at frame ${state.frameNumber}`);
+
+            // Resume game if we were paused waiting for partner (mid-episode pause)
+            if (this._waitingForPartnerFocus) {
+                this._waitingForPartnerFocus = false;
+                this._hideWaitingForPartnerOverlay();
+                p2pLog.info('Partner returned - resuming game');
+            }
+            // Note: Episode boundary focus waiting is handled by showEpisodeTransition()
+        } else if (!state.isFocused && wasFocused) {
+            p2pLog.info(`Partner backgrounded at frame ${state.frameNumber}`);
+
+            // If configured, pause game and show waiting overlay
+            if (this.config.pause_on_partner_background && !this._waitingForPartnerFocus) {
+                this._waitingForPartnerFocus = true;
+                this._showWaitingForPartnerOverlay(true);
+                p2pLog.info('Partner backgrounded - pausing game');
+            }
+        }
+    }
+
+    /**
+     * Broadcast our focus state to partner.
+     * Called when visibility changes.
+     */
+    _broadcastFocusState(isFocused) {
+        if (!this.webrtcManager?.isReady()) {
+            return;
+        }
+
+        const packet = encodeFocusState(isFocused, this.frameNumber);
+        this.webrtcManager.send(packet);
+        p2pLog.debug(`Broadcast focus state: ${isFocused ? 'focused' : 'backgrounded'} at frame ${this.frameNumber}`);
     }
 
     _checkValidationComplete() {
@@ -5462,6 +6001,80 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
     }
 
     /**
+     * Show "Waiting for partner..." overlay when partner is backgrounded during episode transition.
+     * @param {boolean} partnerBackgrounded - True if waiting for partner, false if waiting for self
+     */
+    _showWaitingForPartnerOverlay(partnerBackgrounded) {
+        // Remove existing overlay if any
+        this._hideWaitingForPartnerOverlay();
+
+        // Clear any accumulated human inputs to prevent them executing when game resumes
+        clearHumanInputBuffers();
+
+        const message = partnerBackgrounded
+            ? 'Waiting for partner to return...'
+            : 'Please return to the game window to continue.';
+
+        const overlay = document.createElement('div');
+        overlay.id = 'waiting-partner-overlay';
+        overlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.75);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+        `;
+
+        overlay.innerHTML = `
+            <div style="
+                background: white;
+                padding: 30px 50px;
+                border-radius: 8px;
+                text-align: center;
+                max-width: 400px;
+            ">
+                <div style="
+                    width: 40px;
+                    height: 40px;
+                    border: 4px solid #e0e0e0;
+                    border-top-color: #3498db;
+                    border-radius: 50%;
+                    animation: spin 1s linear infinite;
+                    margin: 0 auto 20px;
+                "></div>
+                <p style="font-size: 18px; color: #333; margin: 0;">${message}</p>
+            </div>
+            <style>
+                @keyframes spin {
+                    to { transform: rotate(360deg); }
+                }
+            </style>
+        `;
+
+        document.body.appendChild(overlay);
+        p2pLog.info(`Showing waiting for partner overlay: ${message}`);
+    }
+
+    /**
+     * Hide "Waiting for partner..." overlay.
+     */
+    _hideWaitingForPartnerOverlay() {
+        const overlay = document.getElementById('waiting-partner-overlay');
+        if (overlay) {
+            overlay.remove();
+            // Clear any inputs that accumulated while paused
+            clearHumanInputBuffers();
+            p2pLog.debug('Hiding waiting for partner overlay');
+        }
+    }
+
+    /**
      * Attempt to reconnect via ICE restart (Phase 20 - RECON-05).
      */
     async _attemptReconnection() {
@@ -5725,6 +6338,15 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
             case P2P_MSG_VALIDATION_PONG:
                 this._handleValidationPong(buffer);
                 break;
+            case P2P_MSG_INPUT_REQUEST:
+                this._handleInputRequest(buffer);
+                break;
+            case P2P_MSG_INPUT_RESPONSE:
+                this._handleInputResponse(buffer);
+                break;
+            case P2P_MSG_FOCUS_STATE:
+                this._handleFocusState(buffer);
+                break;
             default:
                 p2pLog.warn(`Unknown binary message type: ${messageType}`);
         }
@@ -5772,6 +6394,16 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
                 currentFrame: packet.currentFrame
             });
             p2pLog.debug(`Buffered input from player ${playerId} (backgrounded)`);
+            return;
+        }
+
+        // Also buffer inputs when waiting for partner to refocus at episode boundaries
+        // Game loop is paused (_waitingForPartnerFocus=true), so don't queue inputs
+        // that would accumulate and execute all at once when partner returns
+        if (this._waitingForPartnerFocus) {
+            // Discard inputs while waiting - we're at an episode boundary anyway
+            // and will resync state when partner returns
+            p2pLog.debug(`Discarding input from player ${playerId} (waiting for partner focus)`);
             return;
         }
 
@@ -5973,6 +6605,9 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
             clearTimeout(this.p2pEpisodeSync.retryTimeoutId);
             this.p2pEpisodeSync.retryTimeoutId = null;
         }
+        // Clear waiting for partner focus state (but keep partnerFocused as-is - it's tracked separately)
+        this.p2pEpisodeSync.waitingForPartnerFocus = false;
+        this._hideWaitingForPartnerOverlay();
     }
 
     _handleEpisodeReady(buffer) {
@@ -6071,11 +6706,19 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
         /**
          * Check if both peers have completed reset and are ready to start.
          * If both are ready, resolve the start promise to begin the episode.
+         *
+         * Note: Focus waiting is now handled by showEpisodeTransition() which runs
+         * BEFORE the reset. This function only handles post-reset state sync.
          */
         const sync = this.p2pEpisodeSync;
 
         if (!sync.localResetComplete || !sync.remoteResetComplete) {
-            return;  // Still waiting for both peers
+            return;  // Still waiting for both peers to reset
+        }
+
+        // If startResolve is null, the episode sync has already completed
+        if (!sync.startResolve) {
+            return;  // Episode already started, nothing to do
         }
 
         // Verify state hashes match
@@ -6108,8 +6751,8 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
 
     waitForP2PEpisodeStart(timeoutMs = 5000) {
         /**
-         * Wait for peer to be ready before starting the episode.
-         * Returns a promise that resolves when both peers are ready.
+         * Wait for peer to complete reset before starting the episode.
+         * Focus waiting is handled earlier by showEpisodeTransition().
          *
          * @param {number} timeoutMs - Maximum wait time before proceeding anyway
          * @returns {Promise<void>}
@@ -6117,14 +6760,14 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
         return new Promise((resolve) => {
             const sync = this.p2pEpisodeSync;
 
-            // If peer is already ready, resolve immediately
+            // Check if both resets are complete
             if (sync.localResetComplete && sync.remoteResetComplete) {
                 p2pLog.debug('Peer already ready - starting immediately');
                 resolve();
                 return;
             }
 
-            // Store resolve function for when peer becomes ready
+            // Store resolve function for when sync completes
             sync.startResolve = resolve;
 
             // Timeout to prevent infinite waiting if peer message is lost

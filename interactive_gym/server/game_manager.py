@@ -166,6 +166,7 @@ class GameManager:
                     turn_username=turn_username,
                     turn_credential=turn_credential,
                     force_turn_relay=force_turn_relay,
+                    scene_metadata=self.scene.scene_metadata,
                 )
                 logger.info(
                     f"Created multiplayer Pyodide game state for {game_id} "
