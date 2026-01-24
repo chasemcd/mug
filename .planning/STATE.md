@@ -2,24 +2,25 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-01-23)
+See: .planning/PROJECT.md (updated 2026-01-24)
 
 **Core value:** Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
-**Current focus:** v1.6 Input Latency Diagnosis & Fix
+**Current focus:** v1.7 Admin Console Improvement
 
 ## Current Position
 
-Phase: 28 of 31 (Pipeline Instrumentation)
-Plan: 01 of 01 (Complete)
-Status: Phase complete
-Last activity: 2026-01-23 — Completed 28-01-PLAN.md
+Phase: Not started (run /gsd:create-roadmap)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-01-24 — Milestone v1.7 started
 
-Progress: [===-------] 25% (v1.6 - 1/4 phases)
+Progress: [----------] 0% (v1.7 - Admin Console Improvement)
 
 ## Milestone History
 
 | Milestone | Phases | Status | Shipped |
 |-----------|--------|--------|---------|
+| v1.6 Input Latency Diagnosis | 28 | Partial | 2026-01-24 |
 | v1.5 Focus Loss Handling | 24-27 | Complete | 2026-01-23 |
 | v1.4 Partner Disconnection Handling | 23 | Complete | 2026-01-22 |
 | v1.3 P2P Connection Validation | 19-22 | Complete | 2026-01-22 |
@@ -145,26 +146,16 @@ See: .planning/PROJECT.md Key Decisions table
 - Episode start sync can timeout on slow connections (mitigated with retry + two-way ack)
 - Rollback visual corrections cause brief teleporting (smoothing not yet implemented)
 
-**[CRITICAL] v1.6 focus:**
-- Users report 1-2 second local input lag in Overcooked
-- Unknown if single-player, multiplayer, or both affected
-- Unknown if consistent or intermittent
+**Deferred from v1.6:**
+- Input latency root cause fix (tooling now exists via Phase 28 instrumentation)
+- Users can use `[LATENCY]` console logs to diagnose specific issues
 
 ## Session Continuity
 
-Last session: 2026-01-23
-Stopped at: Completed 28-01-PLAN.md (Pipeline Instrumentation)
+Last session: 2026-01-24
+Stopped at: Started v1.7 Admin Console Improvement milestone
 Resume file: None
 
 ### Next Steps
 
-Phase 29 (Diagnosis) can now analyze latency logs to identify the root cause of reported 1-2 second input lag.
-
-Expected workflow:
-1. Start game, open browser console
-2. Observe `[LATENCY]` logs with breakdown
-3. Identify which pipeline stage(s) contribute to lag:
-   - High queue time = input buffering issue
-   - High step time = Pyodide execution bottleneck
-   - High render time = Phaser rendering issue
-   - Total >> sum = frame timing/throttling issue
+Run `/gsd:define-requirements` to detail specific admin console requirements, or `/gsd:research-project` if exploration of admin dashboard patterns is needed first.
