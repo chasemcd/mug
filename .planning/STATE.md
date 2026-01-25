@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-24)
 ## Current Position
 
 Phase: 32 of 35 (Dashboard Summary Stats)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-01-25 — v1.7 roadmap created
+Plan: 01 of 01 complete
+Status: Phase complete
+Last activity: 2026-01-25 — Completed 32-01-PLAN.md
 
-Progress: [░░░░░░░░░░] 0% (v1.7 - Admin Console Improvement)
+Progress: [##........] 25% (v1.7 - Admin Console Improvement: 1/4 phases)
 
 ## Milestone History
 
@@ -91,6 +91,14 @@ Progress: [░░░░░░░░░░] 0% (v1.7 - Admin Console Improvement)
 **v1.6 Execution:**
 - `.planning/phases/28-pipeline-instrumentation/28-01-SUMMARY.md`
 
+**v1.7 Execution:**
+- `.planning/phases/32-dashboard-summary/32-01-SUMMARY.md`
+
+**Dashboard Summary Stats (v1.7 Phase 32 - added):**
+- `interactive_gym/server/admin/aggregator.py` - track_session_start(), record_session_completion(), summary stats in get_experiment_snapshot()
+- `interactive_gym/server/admin/templates/dashboard.html` - Completion Rate and Avg Duration stat cards
+- `interactive_gym/server/admin/static/admin.js` - updateSummaryStats(), formatDurationLong()
+
 **Pipeline Instrumentation (v1.6 Phase 28 - added):**
 - `interactive_gym/server/static/js/ui_utils.js` - Keypress timestamp capture (DIAG-01)
 - `interactive_gym/server/static/js/phaser_gym_graphics.js` - Input queue timestamps, render timestamps, timestamp propagation
@@ -129,6 +137,11 @@ See: .planning/PROJECT.md Key Decisions table
 - Pass timestamps via setInputTimestamps() method rather than step() parameter (backward compatible)
 - Skip logging during fast-forward or background states
 
+**v1.7 Phase 32 decisions:**
+- Completion rate uses processed_subjects list for completed count
+- Duration calculated from ParticipantSession.created_at to completion time
+- Stats format: "X of Y (Z%)" for completion, human-readable for duration
+
 **v1.4 decisions:**
 - In-page overlay instead of redirect for partner disconnection (preserves data, better UX)
 
@@ -152,10 +165,10 @@ See: .planning/PROJECT.md Key Decisions table
 
 ## Session Continuity
 
-Last session: 2026-01-25
-Stopped at: v1.7 roadmap created (4 phases: 32-35)
+Last session: 2026-01-25T18:39:26Z
+Stopped at: Completed 32-01-PLAN.md (Dashboard Summary Stats)
 Resume file: None
 
 ### Next Steps
 
-Run `/gsd:plan-phase 32` to create execution plan for Dashboard Summary Stats.
+Run `/gsd:plan-phase 33` to create execution plan for Session Timeline.
