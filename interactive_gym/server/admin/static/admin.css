@@ -397,10 +397,10 @@
     border: 1px solid oklch(var(--b3));
     border-radius: 0.5rem;
     padding: 0.75rem;
-    margin-bottom: 0.5rem;
 }
 
-.session-card:last-child {
+/* Grid container handles gaps, so margin not needed when in grid */
+.session-card-grid .session-card {
     margin-bottom: 0;
 }
 
@@ -596,6 +596,69 @@
     word-break: break-word;
     flex: 1;
     min-width: 0;
+}
+
+/* ============================================
+   Problems Indicator (Phase 35)
+   ============================================ */
+
+.problems-indicator {
+    cursor: pointer;
+}
+
+.problems-indicator:hover {
+    opacity: 0.8;
+}
+
+/* ============================================
+   Expanded Session List (Phase 35)
+   ============================================ */
+
+.session-list-expanded {
+    min-height: 400px;
+}
+
+.session-list-expanded .empty-state {
+    padding: 4rem 2rem;
+}
+
+/* Session card grid for wider panel */
+@media (min-width: 1024px) {
+    .session-card-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: 0.75rem;
+    }
+}
+
+/* ============================================
+   Compact Participants List (Phase 35)
+   ============================================ */
+
+.participant-list-compact {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.participant-item-compact {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid oklch(var(--bc) / 0.08);
+}
+
+.participant-item-compact:last-child {
+    border-bottom: none;
+}
+
+.participant-item-id {
+    font-family: ui-monospace, monospace;
+    font-size: 0.75rem;
+    max-width: 100px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 /* ============================================
