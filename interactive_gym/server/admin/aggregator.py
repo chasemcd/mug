@@ -351,11 +351,9 @@ class AdminEventAggregator:
             if room_state:
                 waiting_rooms.append(room_state)
 
-        # Get active multiplayer games
-        multiplayer_games = self._get_multiplayer_games_state()
-        active_games = len(multiplayer_games)
-        if active_games > 0:
-            logger.info(f"Admin snapshot includes {active_games} active multiplayer games")
+        # Get active games (both multiplayer and single-player)
+        active_games_list = self._get_active_games_state()
+        active_games = len(active_games_list)
 
         # Get recent activity (last 100 for display)
         recent_activity = [
@@ -424,7 +422,7 @@ class AdminEventAggregator:
         return {
             'participants': participants,
             'waiting_rooms': waiting_rooms,
-            'multiplayer_games': multiplayer_games,
+            'multiplayer_games': active_games_list,  # Now includes both single-player and multiplayer
             'activity_log': recent_activity,
             'console_logs': recent_console_logs,
             'summary': summary
@@ -563,51 +561,95 @@ class AdminEventAggregator:
             logger.debug(f"Error getting waiting room state for {scene_id}: {e}")
             return None
 
-    def _get_multiplayer_games_state(self) -> list[dict]:
+    def _get_active_games_state(self) -> list[dict]:
         """
-        Extract active multiplayer game states.
+        Extract active game states (both multiplayer and single-player).
 
         Returns:
-            List of dicts with game_id, players, host_id, p2p_health, session_health, etc.
+            List of dicts with game_id, players, p2p_health, session_health, etc.
         """
         games = []
-        if not self.pyodide_coordinator:
-            logger.debug("No pyodide_coordinator set, returning empty games list")
-            return games
+        tracked_game_ids = set()  # Avoid duplicates
 
-        # Debug: Log the current state of coordinator games
-        coordinator_games = self.pyodide_coordinator.games
-        logger.debug(f"Coordinator has {len(coordinator_games)} games: {list(coordinator_games.keys())}")
+        # 1. Get multiplayer games from coordinator
+        if self.pyodide_coordinator:
+            try:
+                for game_id, game_state in list(self.pyodide_coordinator.games.items()):
+                    tracked_game_ids.add(game_id)
 
+                    # Get P2P health data for this game (Phase 33)
+                    p2p_health = self._get_p2p_health_for_game(game_id)
+                    session_health = self._compute_session_health(p2p_health)
+
+                    # Get current episode from health reports (max across players)
+                    current_episode = None
+                    for health_data in p2p_health.values():
+                        ep = health_data.get('episode')
+                        if ep is not None:
+                            if current_episode is None or ep > current_episode:
+                                current_episode = ep
+
+                    games.append({
+                        'game_id': game_id,
+                        'players': list(game_state.players.keys()),
+                        'subject_ids': list(game_state.player_subjects.values()),
+                        'current_frame': game_state.frame_number,
+                        'is_server_authoritative': game_state.server_authoritative,
+                        'created_at': game_state.created_at,
+                        'game_type': 'multiplayer',
+                        # Phase 33: P2P health data
+                        'p2p_health': p2p_health,
+                        'session_health': session_health,
+                        'current_episode': current_episode,
+                        # Phase 34: Termination info if session ended
+                        'termination': self._session_terminations.get(game_id),
+                    })
+            except Exception as e:
+                logger.error(f"Error getting multiplayer games state: {e}", exc_info=True)
+
+        # 2. Get single-player Pyodide games from game managers
         try:
-            for game_id, game_state in list(self.pyodide_coordinator.games.items()):
-                # Get P2P health data for this game (Phase 33)
-                p2p_health = self._get_p2p_health_for_game(game_id)
-                session_health = self._compute_session_health(p2p_health)
+            for scene_id, game_manager in list(self.game_managers.items()):
+                # Check if this is a single-player Pyodide scene
+                scene = game_manager.scene
+                if not getattr(scene, 'run_through_pyodide', False):
+                    continue  # Not a Pyodide scene
+                if getattr(scene, 'pyodide_multiplayer', False):
+                    continue  # Multiplayer - already tracked via coordinator
 
-                # Get current episode from health reports (max across players)
-                current_episode = None
-                for health_data in p2p_health.values():
-                    ep = health_data.get('episode')
-                    if ep is not None:
-                        if current_episode is None or ep > current_episode:
-                            current_episode = ep
+                # Get active games from this manager
+                for game_id in list(game_manager.active_games):
+                    if game_id in tracked_game_ids:
+                        continue  # Already tracked
+                    tracked_game_ids.add(game_id)
 
-                games.append({
-                    'game_id': game_id,
-                    'players': list(game_state.players.keys()),
-                    'current_frame': game_state.frame_number,
-                    'is_server_authoritative': game_state.server_authoritative,
-                    'created_at': game_state.created_at,
-                    # Phase 33: P2P health data
-                    'p2p_health': p2p_health,
-                    'session_health': session_health,
-                    'current_episode': current_episode,
-                    # Phase 34: Termination info if session ended
-                    'termination': self._session_terminations.get(game_id),
-                })
+                    game = game_manager.games.get(game_id)
+                    if not game:
+                        continue
+
+                    # Get subject IDs for players in this game
+                    subject_ids = []
+                    for subject_id, gid in list(game_manager.subject_games.items()):
+                        if gid == game_id:
+                            subject_ids.append(subject_id)
+
+                    games.append({
+                        'game_id': game_id,
+                        'players': list(game.human_players.keys()) if hasattr(game, 'human_players') else [],
+                        'subject_ids': subject_ids,
+                        'current_frame': getattr(game, 'tick_num', None),
+                        'is_server_authoritative': False,
+                        'created_at': None,
+                        'game_type': 'single_player',
+                        'scene_id': scene_id,
+                        # No P2P for single-player
+                        'p2p_health': {},
+                        'session_health': 'healthy',
+                        'current_episode': getattr(game, 'episode_num', None),
+                        'termination': self._session_terminations.get(game_id),
+                    })
         except Exception as e:
-            logger.error(f"Error getting multiplayer games state: {e}", exc_info=True)
+            logger.error(f"Error getting single-player games state: {e}", exc_info=True)
 
         return games
 

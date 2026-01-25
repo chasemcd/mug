@@ -668,11 +668,11 @@
 .session-detail-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.5);
+    background: rgba(0, 0, 0, 0.75);
     z-index: 100;
     display: flex;
     justify-content: flex-end;
-    backdrop-filter: blur(2px);
+    backdrop-filter: blur(4px);
 }
 
 .session-detail-overlay.hidden {
@@ -683,11 +683,12 @@
     width: 100%;
     max-width: 480px;
     height: 100%;
-    background: oklch(var(--b1));
-    box-shadow: -4px 0 20px rgba(0, 0, 0, 0.15);
+    background: #1e293b;  /* Solid slate-800 - lighter than typical dark bg */
+    box-shadow: -8px 0 30px rgba(0, 0, 0, 0.5);
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    border-left: 2px solid #3b82f6;  /* Blue accent border */
 }
 
 .session-detail-header {
@@ -695,7 +696,8 @@
     justify-content: space-between;
     align-items: center;
     padding: 1rem 1.25rem;
-    border-bottom: 1px solid oklch(var(--b3));
+    background: #334155;  /* Slate-700 - slightly lighter header */
+    border-bottom: 1px solid #475569;
     flex-shrink: 0;
 }
 
@@ -703,6 +705,8 @@
     flex: 1;
     overflow-y: auto;
     padding: 1rem 1.25rem;
+    background: #1e293b;  /* Match panel background */
+    color: #e2e8f0;  /* Light text */
 }
 
 .session-detail-section {
@@ -721,10 +725,10 @@
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    color: oklch(var(--bc) / 0.6);
+    color: #94a3b8;  /* Slate-400 */
     margin-bottom: 0.75rem;
     padding-bottom: 0.5rem;
-    border-bottom: 1px solid oklch(var(--b3));
+    border-bottom: 1px solid #475569;
 }
 
 .session-detail-grid {
@@ -741,7 +745,7 @@
 
 .session-detail-label {
     font-size: 0.6875rem;
-    color: oklch(var(--bc) / 0.5);
+    color: #94a3b8;  /* Slate-400 */
     text-transform: uppercase;
 }
 
@@ -764,13 +768,10 @@
     align-items: center;
     justify-content: space-between;
     padding: 0.625rem 0.75rem;
-    background: oklch(var(--b2));
+    background: #334155;  /* Slate-700 */
     border-radius: 0.375rem;
     font-size: 0.8125rem;
-}
-
-.session-detail-player.host {
-    background: oklch(var(--p) / 0.1);
+    color: #e2e8f0;
 }
 
 .session-detail-player .player-id {
@@ -780,26 +781,27 @@
 
 .player-health {
     font-size: 0.75rem;
-    color: oklch(var(--bc) / 0.6);
+    color: #94a3b8;  /* Slate-400 */
 }
 
-.player-health-healthy { color: oklch(var(--su)); }
-.player-health-degraded { color: oklch(var(--wa)); }
-.player-health-reconnecting { color: oklch(var(--er)); }
-.player-health-unknown { color: oklch(var(--bc) / 0.4); }
+.player-health-healthy { color: #22c55e; }  /* Green-500 */
+.player-health-degraded { color: #eab308; }  /* Yellow-500 */
+.player-health-reconnecting { color: #ef4444; }  /* Red-500 */
+.player-health-unknown { color: #64748b; }  /* Slate-500 */
 
 /* Termination section */
 .session-termination {
-    background: oklch(var(--er) / 0.08);
+    background: rgba(239, 68, 68, 0.1);  /* Red with low opacity */
     border-radius: 0.5rem;
     padding: 0.875rem;
     margin-left: -0.5rem;
     margin-right: -0.5rem;
+    border: 1px solid rgba(239, 68, 68, 0.3);
 }
 
 .session-termination .session-detail-section-title {
-    color: oklch(var(--er));
-    border-bottom-color: oklch(var(--er) / 0.2);
+    color: #f87171;  /* Red-400 */
+    border-bottom-color: rgba(239, 68, 68, 0.3);
 }
 
 .termination-info {
@@ -810,32 +812,44 @@
 
 .termination-reason {
     font-weight: 600;
-    color: oklch(var(--er));
+    color: #f87171;  /* Red-400 */
 }
 
 .termination-message {
     font-size: 0.8125rem;
-    color: oklch(var(--bc) / 0.7);
+    color: #cbd5e1;  /* Slate-300 */
     padding: 0.5rem;
-    background: oklch(var(--b1));
+    background: #0f172a;  /* Slate-900 */
     border-radius: 0.25rem;
 }
 
 .termination-time {
     font-size: 0.75rem;
-    color: oklch(var(--bc) / 0.5);
+    color: #94a3b8;  /* Slate-400 */
 }
 
 /* Session detail logs */
 .session-detail-logs {
-    max-height: 250px;
+    max-height: 300px;
     overflow-y: auto;
-    background: oklch(var(--b2));
+    background: #0f172a;  /* Slate-900 - darker for contrast */
     border-radius: 0.375rem;
+    border: 1px solid #334155;
 }
 
 .session-detail-logs .log-entry {
     font-size: 0.6875rem;
+    padding: 0.375rem 0.5rem;
+    border-bottom: 1px solid #1e293b;
+    color: #cbd5e1;  /* Slate-300 */
+}
+
+.session-detail-logs .log-entry:last-child {
+    border-bottom: none;
+}
+
+.session-detail-logs .log-message {
+    word-break: break-word;
 }
 
 /* Make session cards clickable */

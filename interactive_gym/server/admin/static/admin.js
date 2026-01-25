@@ -109,7 +109,19 @@ function updateDashboard(state) {
         if (session) {
             const content = document.getElementById('session-detail-content');
             if (content) {
+                // Preserve scroll positions before re-rendering
+                const contentScrollTop = content.scrollTop;
+                const logsContainer = content.querySelector('.session-detail-logs');
+                const logsScrollTop = logsContainer ? logsContainer.scrollTop : 0;
+
                 content.innerHTML = renderSessionDetailContent(session);
+
+                // Restore scroll positions
+                content.scrollTop = contentScrollTop;
+                const newLogsContainer = content.querySelector('.session-detail-logs');
+                if (newLogsContainer) {
+                    newLogsContainer.scrollTop = logsScrollTop;
+                }
             }
         }
     }
@@ -326,18 +338,29 @@ function renderSessionCard(game) {
     const health = game.session_health || 'healthy';
     const hasProblem = health !== 'healthy';
     const p2pHealth = game.p2p_health || {};
+    const isMultiplayer = game.game_type === 'multiplayer';
+    const isSinglePlayer = game.game_type === 'single_player';
 
-    // Get connection type (use first player's data, both should match)
+    // Get connection type (use first player's data for multiplayer)
     const firstPlayerHealth = Object.values(p2pHealth)[0] || {};
-    const connectionType = firstPlayerHealth.connection_type || 'unknown';
-    const connectionTypeLabel = getConnectionTypeLabel(connectionType);
+    const connectionType = isMultiplayer ? (firstPlayerHealth.connection_type || 'unknown') : null;
+    const connectionTypeLabel = isMultiplayer ? getConnectionTypeLabel(connectionType) : 'Local';
 
-    // Get latency (average of both players if available)
+    // Get latency (average of both players if available, only for multiplayer)
     const latencies = Object.values(p2pHealth).map(h => h.latency_ms).filter(l => l != null);
     const avgLatency = latencies.length > 0 ? Math.round(latencies.reduce((a,b) => a+b, 0) / latencies.length) : null;
 
-    // Get episode
-    const episode = game.current_episode ?? '--';
+    // Get episode (1-indexed for display)
+    const episodeNum = game.current_episode;
+    const episode = episodeNum != null ? episodeNum + 1 : '--';
+
+    // Get participant IDs for display
+    const subjectIds = game.subject_ids || [];
+
+    // Badge for game type
+    const typeBadge = isSinglePlayer
+        ? '<span class="badge badge-xs badge-info">Solo</span>'
+        : `<span class="badge badge-xs ${game.is_server_authoritative ? 'badge-warning' : 'badge-success'}">${game.is_server_authoritative ? 'Server Auth' : 'P2P'}</span>`;
 
     return `
         <div class="session-card ${hasProblem ? 'session-problem' : ''}" onclick="showSessionDetail('${escapeHtml(game.game_id)}')" role="button" tabindex="0">
@@ -345,18 +368,17 @@ function renderSessionCard(game) {
                 <div class="session-card-title">
                     <span class="health-indicator health-${health}"></span>
                     <span class="session-id" title="${escapeHtml(game.game_id)}">
-                        Session ${truncateId(game.game_id)}
+                        ${isSinglePlayer ? 'Game' : 'Session'} ${truncateId(game.game_id)}
                     </span>
                 </div>
-                <span class="badge badge-xs ${game.is_server_authoritative ? 'badge-warning' : 'badge-success'}">
-                    ${game.is_server_authoritative ? 'Server Auth' : 'P2P'}
-                </span>
+                ${typeBadge}
             </div>
             <div class="session-card-metrics">
                 <div class="session-metric">
                     <span class="session-metric-label">Episode</span>
                     <span class="session-metric-value">${episode}</span>
                 </div>
+                ${isMultiplayer ? `
                 <div class="session-metric">
                     <span class="session-metric-label">Connection</span>
                     <span class="session-metric-value">${connectionTypeLabel}</span>
@@ -367,6 +389,12 @@ function renderSessionCard(game) {
                         ${avgLatency != null ? avgLatency + 'ms' : '--'}
                     </span>
                 </div>
+                ` : `
+                <div class="session-metric">
+                    <span class="session-metric-label">Scene</span>
+                    <span class="session-metric-value">${escapeHtml(truncateId(game.scene_id || 'unknown'))}</span>
+                </div>
+                `}
                 <div class="session-metric">
                     <span class="session-metric-label">Status</span>
                     <span class="session-metric-value session-status-${health}">
@@ -375,11 +403,18 @@ function renderSessionCard(game) {
                 </div>
             </div>
             <div class="session-card-players">
-                ${game.players.map(player => `
-                    <span class="session-player">
-                        ${escapeHtml(truncateId(String(player)))}
-                    </span>
-                `).join('')}
+                ${subjectIds.length > 0
+                    ? subjectIds.map(subject => `
+                        <span class="session-player">
+                            ${escapeHtml(truncateId(String(subject)))}
+                        </span>
+                    `).join('')
+                    : game.players.map(player => `
+                        <span class="session-player">
+                            ${escapeHtml(truncateId(String(player)))}
+                        </span>
+                    `).join('')
+                }
             </div>
         </div>
     `;
@@ -487,6 +522,10 @@ function renderConsoleLogs() {
     const countBadge = document.getElementById('logs-count');
     if (!container) return;
 
+    // Preserve scroll position
+    const scrollTop = container.scrollTop;
+    const wasScrolledToBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 50;
+
     // Apply filters
     let filtered = consoleLogs;
     if (logLevelFilter !== 'all') {
@@ -517,6 +556,13 @@ function renderConsoleLogs() {
             <span class="log-message">${escapeHtml(log.message)}</span>
         </div>
     `).join('');
+
+    // Restore scroll position (only auto-scroll if user was already at bottom)
+    if (wasScrolledToBottom) {
+        container.scrollTop = container.scrollHeight;
+    } else {
+        container.scrollTop = scrollTop;
+    }
 }
 
 // ============================================
@@ -641,27 +687,39 @@ function renderSessionDetailContent(session) {
     const health = session.session_health || 'healthy';
     const p2pHealth = session.p2p_health || {};
     const termination = session.termination;
+    const isMultiplayer = session.game_type === 'multiplayer';
+    const isSinglePlayer = session.game_type === 'single_player';
 
-    // Get connection info from first player
+    // Get connection info from first player (multiplayer only)
     const firstPlayerHealth = Object.values(p2pHealth)[0] || {};
-    const connectionType = getConnectionTypeLabel(firstPlayerHealth.connection_type || 'unknown');
+    const connectionType = isMultiplayer
+        ? getConnectionTypeLabel(firstPlayerHealth.connection_type || 'unknown')
+        : 'Local';
 
-    // Calculate latency
+    // Calculate latency (multiplayer only)
     const latencies = Object.values(p2pHealth).map(h => h.latency_ms).filter(l => l != null);
     const avgLatency = latencies.length > 0
         ? Math.round(latencies.reduce((a,b) => a+b, 0) / latencies.length)
         : null;
 
-    // Get console errors for this session's players
-    const playerIds = session.players || [];
-    const playerErrors = consoleLogs.filter(log =>
-        playerIds.includes(log.subject_id) &&
-        (log.level === 'error' || log.level === 'warn')
-    ).slice(0, 20);
+    // Get all console logs for this session's players (use subject_ids)
+    const subjectIds = session.subject_ids || [];
+    const playerLogs = consoleLogs.filter(log =>
+        subjectIds.includes(log.subject_id)
+    ).slice(-30);  // Show last 30 logs
+
+    // Episode display (1-indexed)
+    const episodeNum = session.current_episode;
+    const episodeDisplay = episodeNum != null ? episodeNum + 1 : '--';
+
+    // Mode display
+    const modeDisplay = isSinglePlayer
+        ? 'Single Player'
+        : (session.is_server_authoritative ? 'Server Auth' : 'P2P');
 
     return `
         <div class="session-detail-section">
-            <h4 class="session-detail-section-title">Session Info</h4>
+            <h4 class="session-detail-section-title">${isSinglePlayer ? 'Game' : 'Session'} Info</h4>
             <div class="session-detail-grid">
                 <div class="session-detail-item">
                     <span class="session-detail-label">Game ID</span>
@@ -674,6 +732,7 @@ function renderSessionDetailContent(session) {
                         ${health.charAt(0).toUpperCase() + health.slice(1)}
                     </span>
                 </div>
+                ${isMultiplayer ? `
                 <div class="session-detail-item">
                     <span class="session-detail-label">Connection</span>
                     <span class="session-detail-value">${connectionType}</span>
@@ -684,24 +743,30 @@ function renderSessionDetailContent(session) {
                         ${avgLatency != null ? avgLatency + 'ms' : '--'}
                     </span>
                 </div>
+                ` : `
+                <div class="session-detail-item">
+                    <span class="session-detail-label">Scene</span>
+                    <span class="session-detail-value">${escapeHtml(session.scene_id || 'unknown')}</span>
+                </div>
+                `}
                 <div class="session-detail-item">
                     <span class="session-detail-label">Episode</span>
-                    <span class="session-detail-value">${session.current_episode ?? '--'}</span>
+                    <span class="session-detail-value">${episodeDisplay}</span>
                 </div>
                 <div class="session-detail-item">
                     <span class="session-detail-label">Mode</span>
-                    <span class="session-detail-value">${session.is_server_authoritative ? 'Server Auth' : 'P2P'}</span>
+                    <span class="session-detail-value">${modeDisplay}</span>
                 </div>
             </div>
         </div>
 
         <div class="session-detail-section">
-            <h4 class="session-detail-section-title">Players</h4>
+            <h4 class="session-detail-section-title">${isSinglePlayer ? 'Participant' : 'Players'}</h4>
             <div class="session-detail-players">
-                ${playerIds.map(player => `
+                ${subjectIds.map((subject, idx) => `
                     <div class="session-detail-player">
-                        <span class="player-id">${escapeHtml(player)}</span>
-                        ${renderPlayerHealth(p2pHealth[player])}
+                        <span class="player-id">${escapeHtml(subject)}</span>
+                        ${isMultiplayer ? renderPlayerHealth(p2pHealth[session.players[idx]]) : ''}
                     </div>
                 `).join('')}
             </div>
@@ -727,23 +792,22 @@ function renderSessionDetailContent(session) {
 
         <div class="session-detail-section">
             <h4 class="session-detail-section-title">
-                Console Errors & Warnings
-                <span class="badge badge-ghost badge-xs">${playerErrors.length}</span>
+                Console Logs
+                <span class="badge badge-ghost badge-xs">${playerLogs.length}</span>
             </h4>
-            ${playerErrors.length > 0 ? `
+            ${playerLogs.length > 0 ? `
                 <div class="session-detail-logs">
-                    ${playerErrors.map(log => `
+                    ${playerLogs.map(log => `
                         <div class="log-entry log-${log.level}">
                             <span class="log-time">${formatTime(log.timestamp)}</span>
                             <span class="log-level log-level-${log.level}">${log.level.toUpperCase()}</span>
-                            <span class="log-subject">${escapeHtml(truncateId(log.subject_id))}</span>
                             <span class="log-message">${escapeHtml(log.message)}</span>
                         </div>
                     `).join('')}
                 </div>
             ` : `
                 <div class="empty-state-sm">
-                    <p class="text-base-content/50 text-sm">No errors or warnings</p>
+                    <p class="text-base-content/50 text-sm">No logs for this session</p>
                 </div>
             `}
         </div>
