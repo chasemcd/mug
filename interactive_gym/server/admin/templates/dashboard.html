@@ -201,6 +201,23 @@
             </div>
         </div>
     </div>
+
+    <!-- Session Detail Panel (Phase 34) -->
+    <div id="session-detail-overlay" class="session-detail-overlay hidden">
+        <div class="session-detail-panel">
+            <div class="session-detail-header">
+                <h3 class="text-lg font-semibold">Session Details</h3>
+                <button onclick="closeSessionDetail()" class="btn btn-ghost btn-sm btn-circle">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <div id="session-detail-content" class="session-detail-content">
+                <!-- Content populated by JS -->
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}
 

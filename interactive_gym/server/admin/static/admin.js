@@ -23,6 +23,9 @@ let logLevelFilter = 'all';
 let logParticipantFilter = 'all';
 let consoleLogs = [];
 
+// Session detail state (Phase 34)
+let selectedSessionId = null;
+
 // ============================================
 // Connection status handlers
 // ============================================
@@ -98,6 +101,17 @@ function updateDashboard(state) {
         renderConsoleLogs();
     }
     updateParticipantFilter(state.participants);
+
+    // Update session detail panel if open (Phase 34)
+    if (selectedSessionId) {
+        const session = state.multiplayer_games?.find(g => g.game_id === selectedSessionId);
+        if (session) {
+            const content = document.getElementById('session-detail-content');
+            if (content) {
+                content.innerHTML = renderSessionDetailContent(session);
+            }
+        }
+    }
 }
 
 // ============================================
@@ -317,7 +331,7 @@ function renderSessionCard(game) {
     const episode = game.current_episode ?? '--';
 
     return `
-        <div class="session-card ${hasProblem ? 'session-problem' : ''}">
+        <div class="session-card ${hasProblem ? 'session-problem' : ''}" onclick="showSessionDetail('${escapeHtml(game.game_id)}')" role="button" tabindex="0">
             <div class="session-card-header">
                 <div class="session-card-title">
                     <span class="health-indicator health-${health}"></span>
@@ -540,6 +554,181 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 });
+
+// ============================================
+// Session Detail Panel (Phase 34)
+// ============================================
+
+function showSessionDetail(gameId) {
+    selectedSessionId = gameId;
+    const overlay = document.getElementById('session-detail-overlay');
+    const content = document.getElementById('session-detail-content');
+
+    if (!overlay || !content) return;
+
+    // Find session in current state
+    const session = currentState.multiplayer_games?.find(g => g.game_id === gameId);
+
+    if (!session) {
+        content.innerHTML = '<div class="empty-state-sm"><p>Session not found</p></div>';
+        overlay.classList.remove('hidden');
+        return;
+    }
+
+    // Render session detail
+    content.innerHTML = renderSessionDetailContent(session);
+    overlay.classList.remove('hidden');
+}
+
+function closeSessionDetail() {
+    selectedSessionId = null;
+    const overlay = document.getElementById('session-detail-overlay');
+    if (overlay) {
+        overlay.classList.add('hidden');
+    }
+}
+
+function renderSessionDetailContent(session) {
+    const health = session.session_health || 'healthy';
+    const p2pHealth = session.p2p_health || {};
+    const termination = session.termination;
+
+    // Get connection info from first player
+    const firstPlayerHealth = Object.values(p2pHealth)[0] || {};
+    const connectionType = getConnectionTypeLabel(firstPlayerHealth.connection_type || 'unknown');
+
+    // Calculate latency
+    const latencies = Object.values(p2pHealth).map(h => h.latency_ms).filter(l => l != null);
+    const avgLatency = latencies.length > 0
+        ? Math.round(latencies.reduce((a,b) => a+b, 0) / latencies.length)
+        : null;
+
+    // Get console errors for this session's players
+    const playerIds = session.players || [];
+    const playerErrors = consoleLogs.filter(log =>
+        playerIds.includes(log.subject_id) &&
+        (log.level === 'error' || log.level === 'warn')
+    ).slice(0, 20);
+
+    return `
+        <div class="session-detail-section">
+            <h4 class="session-detail-section-title">Session Info</h4>
+            <div class="session-detail-grid">
+                <div class="session-detail-item">
+                    <span class="session-detail-label">Game ID</span>
+                    <span class="session-detail-value font-mono text-sm">${escapeHtml(session.game_id)}</span>
+                </div>
+                <div class="session-detail-item">
+                    <span class="session-detail-label">Status</span>
+                    <span class="session-detail-value session-status-${health}">
+                        <span class="health-indicator health-${health}"></span>
+                        ${health.charAt(0).toUpperCase() + health.slice(1)}
+                    </span>
+                </div>
+                <div class="session-detail-item">
+                    <span class="session-detail-label">Connection</span>
+                    <span class="session-detail-value">${connectionType}</span>
+                </div>
+                <div class="session-detail-item">
+                    <span class="session-detail-label">Latency</span>
+                    <span class="session-detail-value ${avgLatency && avgLatency > 150 ? 'text-warning' : ''}">
+                        ${avgLatency != null ? avgLatency + 'ms' : '--'}
+                    </span>
+                </div>
+                <div class="session-detail-item">
+                    <span class="session-detail-label">Episode</span>
+                    <span class="session-detail-value">${session.current_episode ?? '--'}</span>
+                </div>
+                <div class="session-detail-item">
+                    <span class="session-detail-label">Mode</span>
+                    <span class="session-detail-value">${session.is_server_authoritative ? 'Server Auth' : 'P2P'}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="session-detail-section">
+            <h4 class="session-detail-section-title">Players</h4>
+            <div class="session-detail-players">
+                ${playerIds.map(player => `
+                    <div class="session-detail-player ${player === session.host_id ? 'host' : ''}">
+                        <span class="player-id">${escapeHtml(player)}</span>
+                        ${player === session.host_id ? '<span class="host-badge">Host</span>' : ''}
+                        ${renderPlayerHealth(p2pHealth[player])}
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+
+        ${termination ? `
+        <div class="session-detail-section session-termination">
+            <h4 class="session-detail-section-title">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                </svg>
+                Termination
+            </h4>
+            <div class="termination-info">
+                <div class="termination-reason">${getTerminationReasonLabel(termination.reason)}</div>
+                ${termination.details?.message ? `
+                    <div class="termination-message">${escapeHtml(termination.details.message)}</div>
+                ` : ''}
+                <div class="termination-time">Ended: ${formatTime(termination.timestamp)}</div>
+            </div>
+        </div>
+        ` : ''}
+
+        <div class="session-detail-section">
+            <h4 class="session-detail-section-title">
+                Console Errors & Warnings
+                <span class="badge badge-ghost badge-xs">${playerErrors.length}</span>
+            </h4>
+            ${playerErrors.length > 0 ? `
+                <div class="session-detail-logs">
+                    ${playerErrors.map(log => `
+                        <div class="log-entry log-${log.level}">
+                            <span class="log-time">${formatTime(log.timestamp)}</span>
+                            <span class="log-level log-level-${log.level}">${log.level.toUpperCase()}</span>
+                            <span class="log-subject">${escapeHtml(truncateId(log.subject_id))}</span>
+                            <span class="log-message">${escapeHtml(log.message)}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            ` : `
+                <div class="empty-state-sm">
+                    <p class="text-base-content/50 text-sm">No errors or warnings</p>
+                </div>
+            `}
+        </div>
+    `;
+}
+
+function renderPlayerHealth(health) {
+    if (!health) return '<span class="player-health-unknown">No data</span>';
+
+    const status = health.status || 'unknown';
+    const latency = health.latency_ms;
+    const connType = health.connection_type;
+
+    return `
+        <span class="player-health player-health-${status}">
+            ${latency != null ? latency + 'ms' : '--'}
+            (${getConnectionTypeLabel(connType)})
+        </span>
+    `;
+}
+
+function getTerminationReasonLabel(reason) {
+    const labels = {
+        'partner_disconnected': 'Partner Disconnected',
+        'focus_loss_timeout': 'Focus Loss Timeout',
+        'sustained_ping': 'High Latency (Sustained)',
+        'tab_hidden': 'Tab Hidden Too Long',
+        'exclusion': 'Participant Excluded',
+        'custom_callback': 'Custom Exclusion Rule',
+        'normal': 'Normal Completion'
+    };
+    return labels[reason] || reason || 'Unknown';
+}
 
 // ============================================
 // Utility functions
