@@ -224,6 +224,10 @@ def user_index(subject_id):
             is_connected=False,
         )
 
+        # Track session start for admin dashboard stats
+        if ADMIN_AGGREGATOR:
+            ADMIN_AGGREGATOR.track_session_start(subject_id)
+
     return flask.render_template(
         "index.html",
         async_mode=socketio.async_mode,
@@ -545,8 +549,16 @@ def leave_game(data):
         game_manager.leave_game(subject_id=subject_id)
         PROCESSED_SUBJECT_NAMES.append(subject_id)
 
-        # Close console log file for completed subject
+        # Record session completion for admin dashboard stats
         if ADMIN_AGGREGATOR:
+            session = PARTICIPANT_SESSIONS.get(subject_id)
+            if session:
+                ADMIN_AGGREGATOR.record_session_completion(
+                    subject_id=subject_id,
+                    started_at=session.created_at,
+                    completed_at=time.time()
+                )
+            # Close console log file for completed subject
             ADMIN_AGGREGATOR.close_subject_console_log(subject_id)
 
 
