@@ -364,7 +364,7 @@ Plans:
 **Research flag:** Unlikely (performance.now() API well-documented)
 **Plans:** 1 plan
 Plans:
-- [ ] 28-01-PLAN.md — Pipeline instrumentation with per-stage timestamps
+- [x] 28-01-PLAN.md — Pipeline instrumentation with per-stage timestamps
 
 ### Phase 29: Root Cause Diagnosis
 **Goal:** Use instrumentation data to identify where the 1-2 second delay occurs
@@ -418,7 +418,7 @@ Plans:
 **Research flag:** Unlikely (standard dashboard patterns)
 **Plans:** 1 plan
 Plans:
-- [ ] 32-01-PLAN.md — Completion rate aggregation, avg duration computation, summary stat cards
+- [x] 32-01-PLAN.md — Completion rate aggregation, avg duration computation, summary stat cards
 
 ### Phase 33: Session List with P2P Health
 **Goal:** Session list shows what's happening and flags problems
@@ -431,9 +431,9 @@ Plans:
   4. Sessions display health indicator (healthy / degraded / reconnecting)
   5. Problem sessions are visually distinguished from healthy ones
 **Research flag:** Unlikely (extends existing session list)
-**Plans:** TBD
+**Plans:** 1 plan
 Plans:
-- [ ] 33-01-PLAN.md — Session list UI with P2P metrics and health indicators
+- [ ] 33-01-PLAN.md — P2P health reporting, aggregator storage, session list UI with health indicators
 
 ### Phase 34: Session Detail View
 **Goal:** Clicking a session reveals detailed diagnostic info
@@ -488,10 +488,10 @@ Phases execute in numeric order: 32 → 33 → 34 → 35
 | 28. Pipeline Instrumentation | v1.6 | 1/1 | Complete | 2026-01-24 |
 | 29-31. Deferred | v1.6 | — | Deferred | — |
 | 32. Dashboard Summary | v1.7 | 1/1 | Complete | 2026-01-25 |
-| 33. Session List | v1.7 | 0/1 | Not started | - |
+| 33. Session List | v1.7 | 0/1 | Planned | - |
 | 34. Session Detail | v1.7 | 0/1 | Not started | - |
 | 35. Layout & Polish | v1.7 | 0/1 | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-01-25 after Phase 32 complete*
+*Last updated: 2026-01-25 after Phase 33 planning*
