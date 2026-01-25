@@ -101,6 +101,7 @@ function updateDashboard(state) {
         renderConsoleLogs();
     }
     updateParticipantFilter(state.participants);
+    updateProblemsIndicator();
 
     // Update session detail panel if open (Phase 34)
     if (selectedSessionId) {
@@ -171,11 +172,8 @@ function updateParticipants(participants) {
 
     if (!participants || participants.length === 0) {
         container.innerHTML = `
-            <div class="empty-state">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-12 h-12 mx-auto mb-2 opacity-30">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
-                </svg>
-                <p class="text-base-content/50">No participants connected</p>
+            <div class="empty-state-sm">
+                <p class="text-base-content/50 text-sm">No participants connected</p>
             </div>
         `;
         return;
@@ -191,9 +189,15 @@ function updateParticipants(participants) {
         return (b.created_at || 0) - (a.created_at || 0);
     });
 
+    // Compact list view for sidebar
     container.innerHTML = `
-        <div class="participant-grid">
-            ${sorted.map(p => renderParticipantCard(p)).join('')}
+        <div class="participant-list-compact">
+            ${sorted.map(p => `
+                <div class="participant-item-compact">
+                    <span class="participant-item-id" title="${escapeHtml(p.subject_id)}">${escapeHtml(truncateId(p.subject_id))}</span>
+                    ${getStatusBadge(p.connection_status)}
+                </div>
+            `).join('')}
         </div>
     `;
 }
@@ -295,8 +299,12 @@ function updateSessionList(games) {
 
     if (!games || games.length === 0) {
         container.innerHTML = `
-            <div class="empty-state-sm">
-                <p class="text-base-content/50 text-sm">No active sessions</p>
+            <div class="empty-state">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-12 h-12 mx-auto mb-2 opacity-30">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z" />
+                </svg>
+                <p class="text-base-content/50">No active sessions</p>
+                <p class="text-base-content/30 text-sm mt-1">Sessions will appear here when participants start games</p>
             </div>
         `;
         return;
@@ -310,7 +318,8 @@ function updateSessionList(games) {
         return (priority[aStatus] || 2) - (priority[bStatus] || 2);
     });
 
-    container.innerHTML = sorted.map(game => renderSessionCard(game)).join('');
+    // Wrap in grid container for responsive layout
+    container.innerHTML = `<div class="session-card-grid">${sorted.map(game => renderSessionCard(game)).join('')}</div>`;
 }
 
 function renderSessionCard(game) {
@@ -471,6 +480,7 @@ function addConsoleLog(log) {
         consoleLogs = consoleLogs.slice(0, 500);
     }
     renderConsoleLogs();
+    updateProblemsIndicator();
 }
 
 function renderConsoleLogs() {
@@ -508,6 +518,46 @@ function renderConsoleLogs() {
             <span class="log-message">${escapeHtml(log.message)}</span>
         </div>
     `).join('');
+}
+
+// ============================================
+// Problems indicator (Phase 35)
+// ============================================
+
+function updateProblemsIndicator() {
+    const indicator = document.getElementById('problems-indicator');
+    if (!indicator) return;
+
+    // Count errors and warnings
+    const problemCount = consoleLogs.filter(l =>
+        l.level === 'error' || l.level === 'warn'
+    ).length;
+
+    const countEl = indicator.querySelector('.problems-count');
+    if (countEl) {
+        countEl.textContent = problemCount;
+    }
+
+    // Show/hide based on count
+    if (problemCount > 0) {
+        indicator.classList.remove('hidden');
+    } else {
+        indicator.classList.add('hidden');
+    }
+}
+
+function scrollToProblems() {
+    const logsSection = document.getElementById('console-logs-container');
+    if (logsSection) {
+        logsSection.scrollIntoView({ behavior: 'smooth' });
+    }
+    // Set filter to show only errors and warnings
+    const levelFilter = document.getElementById('log-level-filter');
+    if (levelFilter) {
+        levelFilter.value = 'error';
+        logLevelFilter = 'error';
+        renderConsoleLogs();
+    }
 }
 
 function updateParticipantFilter(participants) {
