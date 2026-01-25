@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-24)
 
 ## Current Position
 
-Phase: 32 of 35 (Dashboard Summary Stats) - VERIFIED
+Phase: 33 of 35 (Session List with P2P Health) - COMPLETE
 Plan: 01 of 01 complete
-Status: Phase 32 verified, ready to plan Phase 33
-Last activity: 2026-01-25 — Phase 32 verified
+Status: Phase 33 complete
+Last activity: 2026-01-25 - Completed 33-01-PLAN.md
 
-Progress: [##........] 25% (v1.7 - Admin Console Improvement: 1/4 phases)
+Progress: [####......] 50% (v1.7 - Admin Console Improvement: 2/4 phases)
 
 ## Milestone History
 
@@ -93,11 +93,20 @@ Progress: [##........] 25% (v1.7 - Admin Console Improvement: 1/4 phases)
 
 **v1.7 Execution:**
 - `.planning/phases/32-dashboard-summary/32-01-SUMMARY.md`
+- `.planning/phases/33-session-list/33-01-SUMMARY.md`
 
 **Dashboard Summary Stats (v1.7 Phase 32 - added):**
 - `interactive_gym/server/admin/aggregator.py` - track_session_start(), record_session_completion(), summary stats in get_experiment_snapshot()
 - `interactive_gym/server/admin/templates/dashboard.html` - Completion Rate and Avg Duration stat cards
 - `interactive_gym/server/admin/static/admin.js` - updateSummaryStats(), formatDurationLong()
+
+**Session List with P2P Health (v1.7 Phase 33 - added):**
+- `interactive_gym/server/static/js/pyodide_multiplayer_game.js` - _reportP2PHealth(), _startP2PHealthReporting(), _stopP2PHealthReporting()
+- `interactive_gym/server/app.py` - p2p_health_report SocketIO handler
+- `interactive_gym/server/admin/aggregator.py` - _p2p_health_cache, receive_p2p_health(), _get_p2p_health_for_game(), _compute_session_health()
+- `interactive_gym/server/admin/templates/dashboard.html` - Active Sessions section with health legend
+- `interactive_gym/server/admin/static/admin.js` - updateSessionList(), renderSessionCard(), getConnectionTypeLabel()
+- `interactive_gym/server/admin/static/admin.css` - Session card styles, health indicators
 
 **Pipeline Instrumentation (v1.6 Phase 28 - added):**
 - `interactive_gym/server/static/js/ui_utils.js` - Keypress timestamp capture (DIAG-01)
@@ -108,6 +117,17 @@ Progress: [##........] 25% (v1.7 - Admin Console Improvement: 1/4 phases)
 ### Decisions
 
 See: .planning/PROJECT.md Key Decisions table
+
+**v1.7 Phase 33 decisions:**
+- Health status thresholds: latency >150ms or ICE state checking/disconnected = degraded
+- Health report interval: 2 seconds to balance responsiveness vs overhead
+- Health cache expiry: 10 seconds to auto-clean stale entries
+- SocketIO fallback treated as degraded status (not error)
+
+**v1.7 Phase 32 decisions:**
+- Completion rate uses processed_subjects list for completed count
+- Duration calculated from ParticipantSession.created_at to completion time
+- Stats format: "X of Y (Z%)" for completion, human-readable for duration
 
 **v1.5 Phase 27 decisions:**
 - Focus loss timeout defaults to 30 seconds, set to 0 to disable
@@ -137,11 +157,6 @@ See: .planning/PROJECT.md Key Decisions table
 - Pass timestamps via setInputTimestamps() method rather than step() parameter (backward compatible)
 - Skip logging during fast-forward or background states
 
-**v1.7 Phase 32 decisions:**
-- Completion rate uses processed_subjects list for completed count
-- Duration calculated from ParticipantSession.created_at to completion time
-- Stats format: "X of Y (Z%)" for completion, human-readable for duration
-
 **v1.4 decisions:**
 - In-page overlay instead of redirect for partner disconnection (preserves data, better UX)
 
@@ -166,9 +181,9 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-01-25
-Stopped at: Phase 32 verified
+Stopped at: Completed 33-01-PLAN.md
 Resume file: None
 
 ### Next Steps
 
-Run `/gsd:plan-phase 33` to create execution plan for Session List with P2P Health.
+Run `/gsd:plan-phase 34` to create execution plan for Phase 34.
