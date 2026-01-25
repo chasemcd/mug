@@ -9,17 +9,18 @@ See: .planning/PROJECT.md (updated 2026-01-24)
 
 ## Current Position
 
-Phase: 34 of 35 (Session Detail View) - VERIFIED
+Phase: 35 of 35 (Layout Polish) - COMPLETE
 Plan: 01 of 01 complete
-Status: Phase 34 verified, ready to plan Phase 35
-Last activity: 2026-01-25 — Phase 34 verified
+Status: v1.7 Admin Console Improvement milestone complete
+Last activity: 2026-01-25 — Completed 35-01-PLAN.md
 
-Progress: [######....] 75% (v1.7 - Admin Console Improvement: 3/4 phases)
+Progress: [########..] 100% (v1.7 - Admin Console Improvement: 4/4 phases)
 
 ## Milestone History
 
 | Milestone | Phases | Status | Shipped |
 |-----------|--------|--------|---------|
+| v1.7 Admin Console Improvement | 32-35 | Complete | 2026-01-25 |
 | v1.6 Input Latency Diagnosis | 28 | Partial | 2026-01-24 |
 | v1.5 Focus Loss Handling | 24-27 | Complete | 2026-01-23 |
 | v1.4 Partner Disconnection Handling | 23 | Complete | 2026-01-22 |
@@ -95,6 +96,7 @@ Progress: [######....] 75% (v1.7 - Admin Console Improvement: 3/4 phases)
 - `.planning/phases/32-dashboard-summary/32-01-SUMMARY.md`
 - `.planning/phases/33-session-list/33-01-SUMMARY.md`
 - `.planning/phases/34-session-detail/34-01-SUMMARY.md`
+- `.planning/phases/35-layout-polish/35-01-SUMMARY.md`
 
 **Session Detail View (v1.7 Phase 34 - added):**
 - `interactive_gym/server/admin/aggregator.py` - _session_terminations, record_session_termination(), get_session_detail()
@@ -102,6 +104,11 @@ Progress: [######....] 75% (v1.7 - Admin Console Improvement: 3/4 phases)
 - `interactive_gym/server/admin/static/admin.css` - Session detail panel styles
 - `interactive_gym/server/admin/templates/dashboard.html` - Session detail overlay panel
 - `interactive_gym/server/app.py` - Termination recording in p2p_reconnection_timeout, mid_game_exclusion
+
+**Layout Polish (v1.7 Phase 35 - modified):**
+- `interactive_gym/server/admin/templates/dashboard.html` - Restructured layout (sessions 8-col, sidebar 4-col), problems indicator
+- `interactive_gym/server/admin/static/admin.css` - Problems indicator, expanded session list, compact participant list styles
+- `interactive_gym/server/admin/static/admin.js` - updateProblemsIndicator(), scrollToProblems(), compact participant rendering
 
 **Dashboard Summary Stats (v1.7 Phase 32 - added):**
 - `interactive_gym/server/admin/aggregator.py` - track_session_start(), record_session_completion(), summary stats in get_experiment_snapshot()
@@ -125,6 +132,12 @@ Progress: [######....] 75% (v1.7 - Admin Console Improvement: 3/4 phases)
 ### Decisions
 
 See: .planning/PROJECT.md Key Decisions table
+
+**v1.7 Phase 35 decisions:**
+- Active sessions promoted to 8-column primary area (was in sidebar)
+- Participants demoted to compact sidebar list (was 8-column cards)
+- Problems indicator scrolls to console logs and filters to errors
+- Session cards use responsive grid (auto-fill, minmax 320px)
 
 **v1.7 Phase 34 decisions:**
 - Detail panel slides in from right (standard UI pattern)
@@ -195,9 +208,16 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-01-25
-Stopped at: Completed 34-01-PLAN.md
+Stopped at: Completed 35-01-PLAN.md (v1.7 milestone complete)
 Resume file: None
 
 ### Next Steps
 
-Run `/gsd:plan-phase 35` to create execution plan for Phase 35.
+v1.7 Admin Console Improvement milestone complete. Dashboard now provides:
+- Summary stats (completion rate, avg duration)
+- Active sessions with P2P health (primary 8-col focus)
+- Session detail drill-down panel
+- Compact participant list in sidebar
+- Problems indicator for error/warning visibility
+
+Ready to plan next milestone or ship v1.7.
