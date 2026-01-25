@@ -15,11 +15,11 @@ Requirements for v1.7 Admin Console Improvement milestone. Each maps to roadmap 
 
 ### Session List
 
-- [ ] **LIST-01**: Session list shows current episode/round for each active game
-- [ ] **LIST-02**: Session list shows connection type per session (P2P direct / TURN relay / SocketIO fallback)
-- [ ] **LIST-03**: Session list shows current latency between peers
-- [ ] **LIST-04**: Session list shows connection status indicator (healthy / degraded / reconnecting)
-- [ ] **LIST-05**: Sessions with issues visually distinguished from healthy sessions
+- [x] **LIST-01**: Session list shows current episode/round for each active game
+- [x] **LIST-02**: Session list shows connection type per session (P2P direct / TURN relay / SocketIO fallback)
+- [x] **LIST-03**: Session list shows current latency between peers
+- [x] **LIST-04**: Session list shows connection status indicator (healthy / degraded / reconnecting)
+- [x] **LIST-05**: Sessions with issues visually distinguished from healthy sessions
 
 ### Session Details
 
@@ -69,11 +69,11 @@ Which phases cover which requirements. Updated by create-roadmap.
 | DASH-01 | Phase 32 | Complete |
 | DASH-02 | Phase 32 | Complete |
 | DASH-03 | Phase 32 | Complete |
-| LIST-01 | Phase 33 | Pending |
-| LIST-02 | Phase 33 | Pending |
-| LIST-03 | Phase 33 | Pending |
-| LIST-04 | Phase 33 | Pending |
-| LIST-05 | Phase 33 | Pending |
+| LIST-01 | Phase 33 | Complete |
+| LIST-02 | Phase 33 | Complete |
+| LIST-03 | Phase 33 | Complete |
+| LIST-04 | Phase 33 | Complete |
+| LIST-05 | Phase 33 | Complete |
 | DETAIL-01 | Phase 34 | Pending |
 | DETAIL-02 | Phase 34 | Pending |
 | DETAIL-03 | Phase 34 | Pending |
@@ -88,4 +88,4 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 ---
 *Requirements defined: 2026-01-24*
-*Last updated: 2026-01-25 after Phase 32 complete*
+*Last updated: 2026-01-25 after Phase 33 complete*
