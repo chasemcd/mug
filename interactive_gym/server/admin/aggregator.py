@@ -354,6 +354,8 @@ class AdminEventAggregator:
         # Get active multiplayer games
         multiplayer_games = self._get_multiplayer_games_state()
         active_games = len(multiplayer_games)
+        if active_games > 0:
+            logger.info(f"Admin snapshot includes {active_games} active multiplayer games")
 
         # Get recent activity (last 100 for display)
         recent_activity = [
@@ -570,7 +572,12 @@ class AdminEventAggregator:
         """
         games = []
         if not self.pyodide_coordinator:
+            logger.debug("No pyodide_coordinator set, returning empty games list")
             return games
+
+        # Debug: Log the current state of coordinator games
+        coordinator_games = self.pyodide_coordinator.games
+        logger.debug(f"Coordinator has {len(coordinator_games)} games: {list(coordinator_games.keys())}")
 
         try:
             for game_id, game_state in list(self.pyodide_coordinator.games.items()):
@@ -589,10 +596,9 @@ class AdminEventAggregator:
                 games.append({
                     'game_id': game_id,
                     'players': list(game_state.players.keys()),
-                    'host_id': game_state.host_id,
-                    'current_frame': getattr(game_state, 'current_frame', None),
+                    'current_frame': game_state.frame_number,
                     'is_server_authoritative': game_state.server_authoritative,
-                    'created_at': getattr(game_state, 'created_at', None),
+                    'created_at': game_state.created_at,
                     # Phase 33: P2P health data
                     'p2p_health': p2p_health,
                     'session_health': session_health,
@@ -601,7 +607,7 @@ class AdminEventAggregator:
                     'termination': self._session_terminations.get(game_id),
                 })
         except Exception as e:
-            logger.debug(f"Error getting multiplayer games state: {e}")
+            logger.error(f"Error getting multiplayer games state: {e}", exc_info=True)
 
         return games
 

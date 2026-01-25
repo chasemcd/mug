@@ -125,6 +125,7 @@ class GameManager:
             self.reset_events[game_id] = utils.ThreadSafeDict()
 
             # If this is a multiplayer Pyodide game, create coordinator state
+            logger.debug(f"Scene {self.scene.scene_id}: pyodide_multiplayer={self.scene.pyodide_multiplayer}, coordinator={self.pyodide_coordinator is not None}")
             if self.scene.pyodide_multiplayer and self.pyodide_coordinator:
                 num_players = len(self.scene.policy_mapping)  # Number of agents in the game
 

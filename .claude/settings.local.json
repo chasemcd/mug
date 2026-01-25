@@ -12,7 +12,9 @@
       "Bash(npx -y esprima-next:*)",
       "Bash(python -m py_compile:*)",
       "Bash(git checkout:*)",
-      "Bash(npx eslint:*)"
+      "Bash(npx eslint:*)",
+      "Bash(echo:*)",
+      "Bash(git revert:*)"
     ],
     "deny": [],
     "ask": []

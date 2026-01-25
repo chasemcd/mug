@@ -376,9 +376,8 @@ function renderSessionCard(game) {
             </div>
             <div class="session-card-players">
                 ${game.players.map(player => `
-                    <span class="session-player ${player === game.host_id ? 'host' : ''}">
+                    <span class="session-player">
                         ${escapeHtml(truncateId(String(player)))}
-                        ${player === game.host_id ? '<span class="host-badge">Host</span>' : ''}
                     </span>
                 `).join('')}
             </div>
@@ -700,9 +699,8 @@ function renderSessionDetailContent(session) {
             <h4 class="session-detail-section-title">Players</h4>
             <div class="session-detail-players">
                 ${playerIds.map(player => `
-                    <div class="session-detail-player ${player === session.host_id ? 'host' : ''}">
+                    <div class="session-detail-player">
                         <span class="player-id">${escapeHtml(player)}</span>
-                        ${player === session.host_id ? '<span class="host-badge">Host</span>' : ''}
                         ${renderPlayerHealth(p2pHealth[player])}
                     </div>
                 `).join('')}
