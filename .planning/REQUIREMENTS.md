@@ -66,26 +66,26 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DASH-01 | — | Pending |
-| DASH-02 | — | Pending |
-| DASH-03 | — | Pending |
-| LIST-01 | — | Pending |
-| LIST-02 | — | Pending |
-| LIST-03 | — | Pending |
-| LIST-04 | — | Pending |
-| LIST-05 | — | Pending |
-| DETAIL-01 | — | Pending |
-| DETAIL-02 | — | Pending |
-| DETAIL-03 | — | Pending |
-| DETAIL-04 | — | Pending |
-| LAYOUT-01 | — | Pending |
-| LAYOUT-02 | — | Pending |
+| DASH-01 | Phase 32 | Pending |
+| DASH-02 | Phase 32 | Pending |
+| DASH-03 | Phase 32 | Pending |
+| LIST-01 | Phase 33 | Pending |
+| LIST-02 | Phase 33 | Pending |
+| LIST-03 | Phase 33 | Pending |
+| LIST-04 | Phase 33 | Pending |
+| LIST-05 | Phase 33 | Pending |
+| DETAIL-01 | Phase 34 | Pending |
+| DETAIL-02 | Phase 34 | Pending |
+| DETAIL-03 | Phase 34 | Pending |
+| DETAIL-04 | Phase 34 | Pending |
+| LAYOUT-01 | Phase 35 | Pending |
+| LAYOUT-02 | Phase 35 | Pending |
 
 **Coverage:**
 - v1.7 requirements: 14 total
-- Mapped to phases: 0 (run /gsd:create-roadmap)
-- Unmapped: 14
+- Mapped to phases: 14 ✓
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-01-24*
-*Last updated: 2026-01-24 after initial definition*
+*Last updated: 2026-01-25 after roadmap creation*

@@ -2,13 +2,14 @@
 
 ## Milestones
 
-- **v1.0 P2P Multiplayer** - Phases 1-10 (shipped 2026-01-19)
-- **v1.1 Sync Validation** - Phases 11-14 (complete)
-- **v1.2 Participant Exclusion** - Phases 15-18 (shipped 2026-01-22)
-- **v1.3 P2P Connection Validation** - Phases 19-22 (shipped 2026-01-22)
-- **v1.4 Partner Disconnection Handling** - Phase 23 (shipped 2026-01-22)
-- **v1.5 Focus Loss Handling** - Phases 24-27 (shipped 2026-01-23)
-- 🚧 **v1.6 Input Latency Diagnosis & Fix** - Phases 28-31 (in progress)
+- ✅ **v1.0 P2P Multiplayer** - Phases 1-10 (shipped 2026-01-19)
+- ✅ **v1.1 Sync Validation** - Phases 11-14 (shipped 2026-01-21)
+- ✅ **v1.2 Participant Exclusion** - Phases 15-18 (shipped 2026-01-22)
+- ✅ **v1.3 P2P Connection Validation** - Phases 19-22 (shipped 2026-01-22)
+- ✅ **v1.4 Partner Disconnection Handling** - Phase 23 (shipped 2026-01-22)
+- ✅ **v1.5 Focus Loss Handling** - Phases 24-27 (shipped 2026-01-23)
+- ✅ **v1.6 Input Latency Diagnosis** - Phases 28-31 (partial: 2026-01-24)
+- 🚧 **v1.7 Admin Console Improvement** - Phases 32-35 (in progress)
 
 ## Phases
 
@@ -87,14 +88,28 @@ Key deliverables:
 
 </details>
 
-### 🚧 v1.6 Input Latency Diagnosis & Fix (In Progress)
+<details>
+<summary>✅ v1.6 Input Latency Diagnosis (Phases 28-31) - PARTIAL 2026-01-24</summary>
 
-**Milestone Goal:** Diagnose and fix reported 1-2 second local input lag, with tooling to measure input→execute→render latency at each pipeline stage.
+**Milestone Goal:** Diagnose reported 1-2 second local input lag with tooling to measure input→execute→render latency at each pipeline stage.
 
-- [ ] **Phase 28: Pipeline Instrumentation** - Timestamp capture at each pipeline stage
-- [ ] **Phase 29: Root Cause Diagnosis** - Use instrumentation to identify lag source
-- [ ] **Phase 30: Latency Fix** - Implement fix for <100ms local input response
-- [ ] **Phase 31: Telemetry Export** - Export latency metrics for research analysis
+**Delivered:** Pipeline instrumentation. Root cause fix deferred to future milestone.
+
+- [x] **Phase 28: Pipeline Instrumentation** - Timestamp capture at each pipeline stage
+- [ ] **Phase 29: Root Cause Diagnosis** - Deferred
+- [ ] **Phase 30: Latency Fix** - Deferred
+- [ ] **Phase 31: Telemetry Export** - Deferred
+
+</details>
+
+### 🚧 v1.7 Admin Console Improvement (In Progress)
+
+**Milestone Goal:** A clean, usable admin console that gives researchers effective experiment monitoring — see what's happening, catch problems, track progress.
+
+- [ ] **Phase 32: Dashboard Summary Stats** - Key experiment metrics at a glance
+- [ ] **Phase 33: Session List with P2P Health** - Session status and problem flagging
+- [ ] **Phase 34: Session Detail View** - Detailed diagnostic info on click
+- [ ] **Phase 35: Layout & Polish** - Clean visual hierarchy and prioritization
 
 ## Phase Details
 
@@ -392,10 +407,64 @@ Plans:
 Plans:
 - [ ] 31-01-PLAN.md — Latency stats computation and export integration
 
+### Phase 32: Dashboard Summary Stats
+**Goal:** Researchers see key experiment metrics at a glance
+**Depends on:** v1.6 complete (existing admin infrastructure)
+**Requirements:** DASH-01, DASH-02, DASH-03
+**Success Criteria** (what must be TRUE):
+  1. Dashboard displays "X of Y participants completed successfully" (completion rate)
+  2. Dashboard displays average session duration
+  3. Summary stats appear prominently at top of admin page
+**Research flag:** Unlikely (standard dashboard patterns)
+**Plans:** TBD
+Plans:
+- [ ] 32-01-PLAN.md — Server-side aggregation, summary UI component
+
+### Phase 33: Session List with P2P Health
+**Goal:** Session list shows what's happening and flags problems
+**Depends on:** Phase 32
+**Requirements:** LIST-01, LIST-02, LIST-03, LIST-04, LIST-05
+**Success Criteria** (what must be TRUE):
+  1. Each active session shows current episode/round number
+  2. Each session shows connection type (P2P direct / TURN relay / SocketIO fallback)
+  3. Each session shows current peer latency
+  4. Sessions display health indicator (healthy / degraded / reconnecting)
+  5. Problem sessions are visually distinguished from healthy ones
+**Research flag:** Unlikely (extends existing session list)
+**Plans:** TBD
+Plans:
+- [ ] 33-01-PLAN.md — Session list UI with P2P metrics and health indicators
+
+### Phase 34: Session Detail View
+**Goal:** Clicking a session reveals detailed diagnostic info
+**Depends on:** Phase 33
+**Requirements:** DETAIL-01, DETAIL-02, DETAIL-03, DETAIL-04
+**Success Criteria** (what must be TRUE):
+  1. Clicking a session opens detailed view
+  2. Detail view shows exclusion reason (if participant was excluded)
+  3. Detail view shows disconnection reason (if session ended abnormally)
+  4. Detail view surfaces console errors from that session
+**Research flag:** Unlikely (builds on existing session data)
+**Plans:** TBD
+Plans:
+- [ ] 34-01-PLAN.md — Session detail component with error/exclusion/disconnect info
+
+### Phase 35: Layout & Polish
+**Goal:** Clean, prioritized information hierarchy
+**Depends on:** Phase 34
+**Requirements:** LAYOUT-01, LAYOUT-02
+**Success Criteria** (what must be TRUE):
+  1. Clear visual hierarchy: summary at top → session list in middle → details on click
+  2. Information prioritized by importance (stats > active sessions > history)
+**Research flag:** Unlikely (UI polish)
+**Plans:** TBD
+Plans:
+- [ ] 35-01-PLAN.md — Visual hierarchy refinement and UX polish
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 28 -> 29 -> 30 -> 31
+Phases execute in numeric order: 32 → 33 → 34 → 35
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -416,11 +485,13 @@ Phases execute in numeric order: 28 -> 29 -> 30 -> 31
 | 25. Focus Detection | v1.5 | 1/1 | Complete | 2026-01-23 |
 | 26. Resync & Partner UX | v1.5 | 1/1 | Complete | 2026-01-23 |
 | 27. Timeout & Telemetry | v1.5 | 1/1 | Complete | 2026-01-23 |
-| 28. Pipeline Instrumentation | v1.6 | 0/1 | Planned | - |
-| 29. Root Cause Diagnosis | v1.6 | 0/1 | Not started | - |
-| 30. Latency Fix | v1.6 | 0/1 | Not started | - |
-| 31. Telemetry Export | v1.6 | 0/1 | Not started | - |
+| 28. Pipeline Instrumentation | v1.6 | 1/1 | Complete | 2026-01-24 |
+| 29-31. Deferred | v1.6 | — | Deferred | — |
+| 32. Dashboard Summary | v1.7 | 0/1 | Not started | - |
+| 33. Session List | v1.7 | 0/1 | Not started | - |
+| 34. Session Detail | v1.7 | 0/1 | Not started | - |
+| 35. Layout & Polish | v1.7 | 0/1 | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-01-23 after Phase 28 planning*
+*Last updated: 2026-01-25 after v1.7 roadmap creation*
