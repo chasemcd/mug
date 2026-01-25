@@ -9,7 +9,7 @@
 - **v1.4 Partner Disconnection Handling** - Phase 23 (shipped 2026-01-22)
 - **v1.5 Focus Loss Handling** - Phases 24-27 (shipped 2026-01-23)
 - **v1.6 Input Latency Diagnosis** - Phases 28-31 (partial: 2026-01-24)
-- **v1.7 Admin Console Improvement** - Phases 32-35 (in progress)
+- **v1.7 Admin Console Improvement** - Phases 32-35 (shipped 2026-01-25)
 
 ## Phases
 
@@ -102,14 +102,14 @@ Key deliverables:
 
 </details>
 
-### v1.7 Admin Console Improvement (In Progress)
+### v1.7 Admin Console Improvement (Complete)
 
 **Milestone Goal:** A clean, usable admin console that gives researchers effective experiment monitoring — see what's happening, catch problems, track progress.
 
 - [x] **Phase 32: Dashboard Summary Stats** - Key experiment metrics at a glance
 - [x] **Phase 33: Session List with P2P Health** - Session status and problem flagging
 - [x] **Phase 34: Session Detail View** - Detailed diagnostic info on click
-- [ ] **Phase 35: Layout & Polish** - Clean visual hierarchy and prioritization
+- [x] **Phase 35: Layout & Polish** - Clean visual hierarchy and prioritization
 
 ## Phase Details
 
@@ -459,7 +459,7 @@ Plans:
 **Research flag:** Unlikely (UI polish)
 **Plans:** 1 plan
 Plans:
-- [ ] 35-01-PLAN.md — Layout restructure with active sessions primary, problems indicator
+- [x] 35-01-PLAN.md — Layout restructure with active sessions primary, problems indicator
 
 ## Progress
 
@@ -490,8 +490,8 @@ Phases execute in numeric order: 32 → 33 → 34 → 35
 | 32. Dashboard Summary | v1.7 | 1/1 | Complete | 2026-01-25 |
 | 33. Session List | v1.7 | 1/1 | Complete | 2026-01-25 |
 | 34. Session Detail | v1.7 | 1/1 | Complete | 2026-01-25 |
-| 35. Layout & Polish | v1.7 | 0/1 | Planned | - |
+| 35. Layout & Polish | v1.7 | 1/1 | Complete | 2026-01-25 |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-01-25 after Phase 35 planning*
+*Last updated: 2026-01-25 after Phase 35 complete*

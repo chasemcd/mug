@@ -30,8 +30,8 @@ Requirements for v1.7 Admin Console Improvement milestone. Each maps to roadmap 
 
 ### Layout & Hierarchy
 
-- [ ] **LAYOUT-01**: Clear visual hierarchy: summary at top → session list in middle → details on click
-- [ ] **LAYOUT-02**: Information prioritized by importance (stats > active sessions > history)
+- [x] **LAYOUT-01**: Clear visual hierarchy: summary at top → session list in middle → details on click
+- [x] **LAYOUT-02**: Information prioritized by importance (stats > active sessions > history)
 
 ## v2 Requirements
 
@@ -78,8 +78,8 @@ Which phases cover which requirements. Updated by create-roadmap.
 | DETAIL-02 | Phase 34 | Complete |
 | DETAIL-03 | Phase 34 | Complete |
 | DETAIL-04 | Phase 34 | Complete |
-| LAYOUT-01 | Phase 35 | Pending |
-| LAYOUT-02 | Phase 35 | Pending |
+| LAYOUT-01 | Phase 35 | Complete |
+| LAYOUT-02 | Phase 35 | Complete |
 
 **Coverage:**
 - v1.7 requirements: 14 total
@@ -88,4 +88,4 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 ---
 *Requirements defined: 2026-01-24*
-*Last updated: 2026-01-25 after Phase 34 complete*
+*Last updated: 2026-01-25 after Phase 35 complete*
