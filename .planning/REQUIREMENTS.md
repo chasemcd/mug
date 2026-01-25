@@ -9,9 +9,9 @@ Requirements for v1.7 Admin Console Improvement milestone. Each maps to roadmap 
 
 ### Dashboard Overview
 
-- [ ] **DASH-01**: Dashboard shows completion rate (X of Y participants completed successfully)
-- [ ] **DASH-02**: Dashboard shows average session duration
-- [ ] **DASH-03**: Summary stats visually prominent at top of page
+- [x] **DASH-01**: Dashboard shows completion rate (X of Y participants completed successfully)
+- [x] **DASH-02**: Dashboard shows average session duration
+- [x] **DASH-03**: Summary stats visually prominent at top of page
 
 ### Session List
 
@@ -66,9 +66,9 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DASH-01 | Phase 32 | Pending |
-| DASH-02 | Phase 32 | Pending |
-| DASH-03 | Phase 32 | Pending |
+| DASH-01 | Phase 32 | Complete |
+| DASH-02 | Phase 32 | Complete |
+| DASH-03 | Phase 32 | Complete |
 | LIST-01 | Phase 33 | Pending |
 | LIST-02 | Phase 33 | Pending |
 | LIST-03 | Phase 33 | Pending |
@@ -88,4 +88,4 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 ---
 *Requirements defined: 2026-01-24*
-*Last updated: 2026-01-25 after roadmap creation*
+*Last updated: 2026-01-25 after Phase 32 complete*

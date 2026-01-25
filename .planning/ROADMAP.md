@@ -106,7 +106,7 @@ Key deliverables:
 
 **Milestone Goal:** A clean, usable admin console that gives researchers effective experiment monitoring — see what's happening, catch problems, track progress.
 
-- [ ] **Phase 32: Dashboard Summary Stats** - Key experiment metrics at a glance
+- [x] **Phase 32: Dashboard Summary Stats** - Key experiment metrics at a glance
 - [ ] **Phase 33: Session List with P2P Health** - Session status and problem flagging
 - [ ] **Phase 34: Session Detail View** - Detailed diagnostic info on click
 - [ ] **Phase 35: Layout & Polish** - Clean visual hierarchy and prioritization
@@ -487,11 +487,11 @@ Phases execute in numeric order: 32 → 33 → 34 → 35
 | 27. Timeout & Telemetry | v1.5 | 1/1 | Complete | 2026-01-23 |
 | 28. Pipeline Instrumentation | v1.6 | 1/1 | Complete | 2026-01-24 |
 | 29-31. Deferred | v1.6 | — | Deferred | — |
-| 32. Dashboard Summary | v1.7 | 0/1 | Planned | - |
+| 32. Dashboard Summary | v1.7 | 1/1 | Complete | 2026-01-25 |
 | 33. Session List | v1.7 | 0/1 | Not started | - |
 | 34. Session Detail | v1.7 | 0/1 | Not started | - |
 | 35. Layout & Polish | v1.7 | 0/1 | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-01-25 after Phase 32 planning*
+*Last updated: 2026-01-25 after Phase 32 complete*
