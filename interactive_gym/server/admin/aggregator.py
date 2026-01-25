@@ -96,12 +96,54 @@ class AdminEventAggregator:
             os.makedirs(self.CONSOLE_LOGS_DIR, exist_ok=True)
             logger.info(f"Console logs will be saved to {self.CONSOLE_LOGS_DIR}/")
 
+        # Session completion tracking for duration calculation
+        # Maps subject_id -> {started_at: float, completed_at: float}
+        self._completed_sessions: dict[str, dict] = {}
+
+        # Track all subjects who have ever started (for total_started calculation)
+        self._all_started_subjects: set[str] = set()
+
         # Broadcast loop state
         self._broadcast_running = False
         self._last_state_hash: str | None = None
         self._last_broadcast_time: float = 0
 
         logger.info("AdminEventAggregator initialized")
+
+    def record_session_completion(
+        self,
+        subject_id: str,
+        started_at: float,
+        completed_at: float
+    ) -> None:
+        """
+        Record session completion data for duration calculation.
+
+        Called when a participant finishes their experiment (enters PROCESSED_SUBJECT_NAMES).
+
+        Args:
+            subject_id: The participant's subject ID
+            started_at: Unix timestamp when session started (ParticipantSession.created_at)
+            completed_at: Unix timestamp when session completed
+        """
+        self._completed_sessions[subject_id] = {
+            'started_at': started_at,
+            'completed_at': completed_at
+        }
+        # Ensure subject is in started set
+        self._all_started_subjects.add(subject_id)
+        logger.debug(f"Recorded session completion for {subject_id}: duration={completed_at - started_at:.1f}s")
+
+    def track_session_start(self, subject_id: str) -> None:
+        """
+        Track that a subject has started a session.
+
+        Called when a participant connects for the first time.
+
+        Args:
+            subject_id: The participant's subject ID
+        """
+        self._all_started_subjects.add(subject_id)
 
     def get_experiment_snapshot(self) -> dict:
         """
@@ -159,6 +201,24 @@ class AdminEventAggregator:
         # Total waiting across all rooms
         waiting_count = sum(r.get('waiting_count', 0) for r in waiting_rooms)
 
+        # Calculate total started (current sessions + completed not in current)
+        current_subject_ids = set(self.participant_sessions.keys())
+        all_started = self._all_started_subjects | current_subject_ids
+        total_started = len(all_started)
+
+        # Calculate completion rate
+        completed_count_actual = len(self.processed_subjects)
+        completion_rate = (completed_count_actual / total_started * 100) if total_started > 0 else 0
+
+        # Calculate average session duration from completed sessions
+        avg_session_duration_ms = None
+        if self._completed_sessions:
+            durations = [
+                (s['completed_at'] - s['started_at']) * 1000  # Convert to ms
+                for s in self._completed_sessions.values()
+            ]
+            avg_session_duration_ms = int(sum(durations) / len(durations))
+
         summary = {
             'total_participants': len(participants),
             'connected_count': connected_count,
@@ -167,7 +227,11 @@ class AdminEventAggregator:
             'completed_count': completed_count,
             'active_games': active_games,
             'waiting_count': waiting_count,
-            'timestamp': time.time()
+            'timestamp': time.time(),
+            # New summary stats
+            'total_started': total_started,
+            'completion_rate': round(completion_rate, 1),
+            'avg_session_duration_ms': avg_session_duration_ms
         }
 
         # Get recent console logs (last 100 for display)
