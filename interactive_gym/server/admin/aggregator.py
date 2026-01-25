@@ -109,6 +109,10 @@ class AdminEventAggregator:
         self._p2p_health_cache: dict[str, dict[str, dict]] = {}
         self._p2p_health_expiry_seconds = 10  # Auto-expire entries older than this
 
+        # Session termination tracking (Phase 34)
+        # Maps game_id -> {reason: str, timestamp: float, players: list[str], details: dict}
+        self._session_terminations: dict[str, dict] = {}
+
         # Broadcast loop state
         self._broadcast_running = False
         self._last_state_hash: str | None = None
@@ -150,6 +154,85 @@ class AdminEventAggregator:
             subject_id: The participant's subject ID
         """
         self._all_started_subjects.add(subject_id)
+
+    def record_session_termination(
+        self,
+        game_id: str,
+        reason: str,
+        players: list[str],
+        details: dict | None = None
+    ) -> None:
+        """
+        Record session termination with reason for detail view.
+
+        Args:
+            game_id: The game ID
+            reason: Termination reason (partner_disconnected, focus_loss_timeout,
+                    sustained_ping, tab_hidden, exclusion, normal)
+            players: List of player subject IDs
+            details: Optional additional details (exclusion message, etc.)
+        """
+        self._session_terminations[game_id] = {
+            'reason': reason,
+            'timestamp': time.time(),
+            'players': players,
+            'details': details or {}
+        }
+        logger.debug(f"Session termination recorded for {game_id}: {reason}")
+
+    def get_session_detail(self, game_id: str) -> dict | None:
+        """
+        Get detailed information for a specific session.
+
+        Args:
+            game_id: The game ID
+
+        Returns:
+            Dict with session info, termination reason, and player console logs
+        """
+        # Get active game state if still running
+        game_state = None
+        if self.pyodide_coordinator and game_id in self.pyodide_coordinator.games:
+            game = self.pyodide_coordinator.games[game_id]
+            p2p_health = self._get_p2p_health_for_game(game_id)
+            game_state = {
+                'game_id': game_id,
+                'players': list(game.players.keys()),
+                'host_id': game.host_id,
+                'is_server_authoritative': game.server_authoritative,
+                'created_at': getattr(game, 'created_at', None),
+                'p2p_health': p2p_health,
+                'session_health': self._compute_session_health(p2p_health)
+            }
+
+        # Get termination info if session ended
+        termination = self._session_terminations.get(game_id)
+
+        # Get player list from game_state or termination
+        players = []
+        if game_state:
+            players = game_state['players']
+        elif termination:
+            players = termination.get('players', [])
+
+        # Filter console logs for these players (last 50 per player, errors prioritized)
+        player_logs = []
+        for log in list(self._console_logs):
+            if log.get('subject_id') in players:
+                player_logs.append(log)
+
+        # Sort by timestamp descending, prioritize errors
+        player_logs.sort(key=lambda x: (
+            0 if x.get('level') == 'error' else 1,
+            -x.get('timestamp', 0)
+        ))
+        player_logs = player_logs[:100]  # Limit to 100 logs
+
+        return {
+            'game_state': game_state,
+            'termination': termination,
+            'player_logs': player_logs
+        }
 
     def receive_p2p_health(
         self,
@@ -514,6 +597,8 @@ class AdminEventAggregator:
                     'p2p_health': p2p_health,
                     'session_health': session_health,
                     'current_episode': current_episode,
+                    # Phase 34: Termination info if session ended
+                    'termination': self._session_terminations.get(game_id),
                 })
         except Exception as e:
             logger.debug(f"Error getting multiplayer games state: {e}")
