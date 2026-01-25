@@ -433,7 +433,7 @@ Plans:
 **Research flag:** Unlikely (extends existing session list)
 **Plans:** 1 plan
 Plans:
-- [ ] 33-01-PLAN.md — P2P health reporting, aggregator storage, session list UI with health indicators
+- [x] 33-01-PLAN.md — P2P health reporting, aggregator storage, session list UI with health indicators
 
 ### Phase 34: Session Detail View
 **Goal:** Clicking a session reveals detailed diagnostic info
@@ -445,9 +445,9 @@ Plans:
   3. Detail view shows disconnection reason (if session ended abnormally)
   4. Detail view surfaces console errors from that session
 **Research flag:** Unlikely (builds on existing session data)
-**Plans:** TBD
+**Plans:** 1 plan
 Plans:
-- [ ] 34-01-PLAN.md — Session detail component with error/exclusion/disconnect info
+- [ ] 34-01-PLAN.md — Session detail panel with termination reason and console error filtering
 
 ### Phase 35: Layout & Polish
 **Goal:** Clean, prioritized information hierarchy
@@ -489,9 +489,9 @@ Phases execute in numeric order: 32 → 33 → 34 → 35
 | 29-31. Deferred | v1.6 | — | Deferred | — |
 | 32. Dashboard Summary | v1.7 | 1/1 | Complete | 2026-01-25 |
 | 33. Session List | v1.7 | 1/1 | Complete | 2026-01-25 |
-| 34. Session Detail | v1.7 | 0/1 | Not started | - |
+| 34. Session Detail | v1.7 | 0/1 | Planned | - |
 | 35. Layout & Polish | v1.7 | 0/1 | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-01-25 after Phase 33 execution*
+*Last updated: 2026-01-25 after Phase 34 planning*
