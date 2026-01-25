@@ -1525,6 +1525,26 @@ def handle_p2p_validation_status(data):
     )
 
 
+@socketio.on("p2p_health_report")
+def on_p2p_health_report(data):
+    """Receive P2P health report from client (Phase 33).
+
+    Updates admin dashboard with connection health metrics for each active game.
+    """
+    if ADMIN_AGGREGATOR:
+        ADMIN_AGGREGATOR.receive_p2p_health(
+            game_id=data.get('game_id'),
+            player_id=data.get('player_id'),
+            health_data={
+                'connection_type': data.get('connection_type'),
+                'latency_ms': data.get('latency_ms'),
+                'status': data.get('status'),
+                'episode': data.get('episode'),
+                'timestamp': time.time()
+            }
+        )
+
+
 @socketio.on("p2p_validation_success")
 def handle_p2p_validation_success(data):
     """Handle successful P2P validation from a client (Phase 19)."""

@@ -103,6 +103,12 @@ class AdminEventAggregator:
         # Track all subjects who have ever started (for total_started calculation)
         self._all_started_subjects: set[str] = set()
 
+        # P2P health cache (Phase 33)
+        # Maps game_id -> {player_id -> health_data}
+        # health_data: {connection_type, latency_ms, status, episode, timestamp}
+        self._p2p_health_cache: dict[str, dict[str, dict]] = {}
+        self._p2p_health_expiry_seconds = 10  # Auto-expire entries older than this
+
         # Broadcast loop state
         self._broadcast_running = False
         self._last_state_hash: str | None = None
@@ -144,6 +150,99 @@ class AdminEventAggregator:
             subject_id: The participant's subject ID
         """
         self._all_started_subjects.add(subject_id)
+
+    def receive_p2p_health(
+        self,
+        game_id: str,
+        player_id: str,
+        health_data: dict
+    ) -> None:
+        """
+        Receive P2P health report from a client (Phase 33).
+
+        Stores health data in cache for inclusion in admin state updates.
+        Entries auto-expire after _p2p_health_expiry_seconds.
+
+        Args:
+            game_id: The game ID
+            player_id: The player ID reporting health
+            health_data: Dict with connection_type, latency_ms, status, episode, timestamp
+        """
+        if not game_id or not player_id:
+            return
+
+        if game_id not in self._p2p_health_cache:
+            self._p2p_health_cache[game_id] = {}
+
+        self._p2p_health_cache[game_id][player_id] = health_data
+        logger.debug(f"P2P health update for game {game_id}, player {player_id}: {health_data.get('status')}")
+
+    def _get_p2p_health_for_game(self, game_id: str) -> dict:
+        """
+        Get P2P health data for a game, filtering out expired entries.
+
+        Args:
+            game_id: The game ID
+
+        Returns:
+            Dict of player_id -> health_data for non-expired entries
+        """
+        if game_id not in self._p2p_health_cache:
+            return {}
+
+        now = time.time()
+        valid_entries = {}
+        expired_players = []
+
+        for player_id, health_data in self._p2p_health_cache[game_id].items():
+            timestamp = health_data.get('timestamp', 0)
+            if now - timestamp < self._p2p_health_expiry_seconds:
+                valid_entries[player_id] = health_data
+            else:
+                expired_players.append(player_id)
+
+        # Clean up expired entries
+        for player_id in expired_players:
+            del self._p2p_health_cache[game_id][player_id]
+
+        # Clean up empty game entries
+        if not self._p2p_health_cache[game_id]:
+            del self._p2p_health_cache[game_id]
+
+        return valid_entries
+
+    def _compute_session_health(self, p2p_health: dict) -> str:
+        """
+        Compute overall session health from individual player health reports.
+
+        Args:
+            p2p_health: Dict of player_id -> health_data
+
+        Returns:
+            'healthy' if all players healthy
+            'degraded' if any degraded or using SocketIO fallback
+            'reconnecting' if any reconnecting
+        """
+        if not p2p_health:
+            return 'healthy'  # No data means assume healthy
+
+        has_reconnecting = False
+        has_degraded = False
+
+        for health_data in p2p_health.values():
+            status = health_data.get('status', 'healthy')
+            conn_type = health_data.get('connection_type', '')
+
+            if status == 'reconnecting':
+                has_reconnecting = True
+            elif status == 'degraded' or conn_type == 'socketio_fallback':
+                has_degraded = True
+
+        if has_reconnecting:
+            return 'reconnecting'
+        if has_degraded:
+            return 'degraded'
+        return 'healthy'
 
     def get_experiment_snapshot(self) -> dict:
         """
@@ -384,7 +483,7 @@ class AdminEventAggregator:
         Extract active multiplayer game states.
 
         Returns:
-            List of dicts with game_id, players, host_id, etc.
+            List of dicts with game_id, players, host_id, p2p_health, session_health, etc.
         """
         games = []
         if not self.pyodide_coordinator:
@@ -392,6 +491,18 @@ class AdminEventAggregator:
 
         try:
             for game_id, game_state in list(self.pyodide_coordinator.games.items()):
+                # Get P2P health data for this game (Phase 33)
+                p2p_health = self._get_p2p_health_for_game(game_id)
+                session_health = self._compute_session_health(p2p_health)
+
+                # Get current episode from health reports (max across players)
+                current_episode = None
+                for health_data in p2p_health.values():
+                    ep = health_data.get('episode')
+                    if ep is not None:
+                        if current_episode is None or ep > current_episode:
+                            current_episode = ep
+
                 games.append({
                     'game_id': game_id,
                     'players': list(game_state.players.keys()),
@@ -399,6 +510,10 @@ class AdminEventAggregator:
                     'current_frame': getattr(game_state, 'current_frame', None),
                     'is_server_authoritative': game_state.server_authoritative,
                     'created_at': getattr(game_state, 'created_at', None),
+                    # Phase 33: P2P health data
+                    'p2p_health': p2p_health,
+                    'session_health': session_health,
+                    'current_episode': current_episode,
                 })
         except Exception as e:
             logger.debug(f"Error getting multiplayer games state: {e}")

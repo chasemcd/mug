@@ -1186,6 +1186,9 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         // Phase 27: Waiting for partner to refocus (game paused)
         this._waitingForPartnerFocus = false;
 
+        // Phase 33: P2P health reporting interval ID (for cleanup)
+        this._p2pHealthReportIntervalId = null;
+
         // Hook into FocusManager's foregrounded event to trigger fast-forward and broadcast state
         const originalOnForegrounded = this.focusManager._onForegrounded.bind(this.focusManager);
         this.focusManager._onForegrounded = () => {
@@ -5216,6 +5219,89 @@ _cumulative_rewards
         });
     }
 
+    // ========== P2P Health Reporting (Phase 33) ==========
+
+    /**
+     * Report P2P health metrics to server for admin dashboard.
+     * Called periodically (every 2 seconds) while game is active.
+     * Reports: connection type, latency, health status, current episode.
+     */
+    _reportP2PHealth() {
+        if (!socket || !this.gameId) return;
+
+        let connectionType = 'socketio_fallback';  // Default if no P2P
+        let latencyMs = null;
+        let status = 'healthy';  // SocketIO fallback still works
+
+        if (this.webrtcManager && this.webrtcManager.isReady()) {
+            // Get actual P2P data
+            const connInfo = this.webrtcManager.connectionType;
+            connectionType = connInfo?.connectionType || 'unknown';
+
+            // Get latency from telemetry
+            if (this.latencyTelemetry) {
+                const stats = this.latencyTelemetry.getStats();
+                latencyMs = stats?.medianMs ?? stats?.meanMs ?? null;
+            }
+
+            // Determine status
+            const iceState = this.webrtcManager.peerConnection?.iceConnectionState;
+            if (this.webrtcManager.iceRestartAttempts > 0 || this.reconnectionState.state === 'reconnecting') {
+                status = 'reconnecting';
+            } else if (latencyMs && latencyMs > 150) {
+                status = 'degraded';
+            } else if (iceState === 'connected' || iceState === 'completed') {
+                status = 'healthy';
+            } else if (iceState === 'checking' || iceState === 'disconnected') {
+                status = 'degraded';
+            }
+        }
+
+        // Get current episode number
+        const currentEpisode = this.cumulativeValidation.episodes.length;
+
+        socket.emit('p2p_health_report', {
+            game_id: this.gameId,
+            player_id: this.myPlayerId,
+            connection_type: connectionType,
+            latency_ms: latencyMs,
+            status: status,
+            episode: currentEpisode
+        });
+    }
+
+    /**
+     * Start periodic P2P health reporting.
+     * Called when game starts (after P2P connection established).
+     */
+    _startP2PHealthReporting() {
+        if (this._p2pHealthReportIntervalId) {
+            return;  // Already running
+        }
+
+        // Report immediately on start
+        this._reportP2PHealth();
+
+        // Then report every 2 seconds
+        this._p2pHealthReportIntervalId = setInterval(() => {
+            this._reportP2PHealth();
+        }, 2000);
+
+        p2pLog.debug('P2P health reporting started');
+    }
+
+    /**
+     * Stop periodic P2P health reporting.
+     * Called on game cleanup.
+     */
+    _stopP2PHealthReporting() {
+        if (this._p2pHealthReportIntervalId) {
+            clearInterval(this._p2pHealthReportIntervalId);
+            this._p2pHealthReportIntervalId = null;
+            p2pLog.debug('P2P health reporting stopped');
+        }
+    }
+
     /**
      * Resolve the P2P ready gate, allowing the game to start.
      * Called when P2P connection is established or timeout occurs.
@@ -5238,6 +5324,9 @@ _cumulative_rewards
 
         // Initialize Web Worker timer now that P2P gate is resolved
         this._initTimerWorker();
+
+        // Start P2P health reporting for admin dashboard (Phase 33)
+        this._startP2PHealthReporting();
     }
 
     // ========== Web Worker Timer (Phase 24) ==========
@@ -5384,6 +5473,8 @@ _cumulative_rewards
         if (this.focusManager) {
             this.focusManager.destroy();
         }
+        // Phase 33: Stop P2P health reporting
+        this._stopP2PHealthReporting();
     }
 
     /**
