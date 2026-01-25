@@ -18,6 +18,13 @@
             <span class="status-dot"></span>
             <span class="status-text">Connecting...</span>
         </div>
+        <div class="badge badge-lg gap-2 badge-error hidden cursor-pointer" id="problems-indicator" onclick="scrollToProblems()">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+            </svg>
+            <span class="problems-count">0</span>
+            <span>Problems</span>
+        </div>
         <a href="{{ url_for('admin.logout') }}" class="btn btn-ghost btn-sm">Logout</a>
     </div>
 </div>
@@ -102,44 +109,9 @@
 
         <!-- Main Content Grid -->
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <!-- Participants Panel -->
+            <!-- Active Sessions Panel (Primary Focus) -->
             <div class="lg:col-span-8">
-                <div class="card bg-base-100 shadow-sm">
-                    <div class="card-body p-0">
-                        <div class="flex items-center justify-between p-4 border-b border-base-200">
-                            <h2 class="text-lg font-semibold">Participants</h2>
-                            <span class="badge badge-ghost" id="participant-count">0 total</span>
-                        </div>
-                        <div class="p-4" id="participants-container">
-                            <div class="empty-state">
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-12 h-12 mx-auto mb-2 opacity-30">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
-                                </svg>
-                                <p class="text-base-content/50">No participants connected</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Sidebar -->
-            <div class="lg:col-span-4 space-y-6">
-                <!-- Waiting Rooms -->
-                <div class="card bg-base-100 shadow-sm">
-                    <div class="card-body p-0">
-                        <div class="flex items-center justify-between p-4 border-b border-base-200">
-                            <h2 class="text-lg font-semibold">Waiting Rooms</h2>
-                        </div>
-                        <div class="p-4" id="waiting-rooms-container">
-                            <div class="empty-state-sm">
-                                <p class="text-base-content/50 text-sm">No active waiting rooms</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Active Sessions (P2P Health) -->
-                <div class="card bg-base-100 shadow-sm">
+                <div class="card bg-base-100 shadow-sm" id="session-list-panel">
                     <div class="card-body p-0">
                         <div class="flex items-center justify-between p-4 border-b border-base-200">
                             <h2 class="text-lg font-semibold">Active Sessions</h2>
@@ -150,9 +122,45 @@
                                 <span class="badge badge-ghost badge-sm" id="games-count">0 active</span>
                             </div>
                         </div>
-                        <div class="p-4" id="multiplayer-games-container">
+                        <div class="p-4 session-list-expanded" id="multiplayer-games-container">
+                            <div class="empty-state">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-12 h-12 mx-auto mb-2 opacity-30">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z" />
+                                </svg>
+                                <p class="text-base-content/50">No active sessions</p>
+                                <p class="text-base-content/30 text-sm mt-1">Sessions will appear here when participants start games</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sidebar (Secondary Info) -->
+            <div class="lg:col-span-4 space-y-6">
+                <!-- Participants (Compact View) -->
+                <div class="card bg-base-100 shadow-sm">
+                    <div class="card-body p-0">
+                        <div class="flex items-center justify-between p-4 border-b border-base-200">
+                            <h2 class="text-lg font-semibold">Participants</h2>
+                            <span class="badge badge-ghost badge-sm" id="participant-count">0 total</span>
+                        </div>
+                        <div class="p-2" id="participants-container">
                             <div class="empty-state-sm">
-                                <p class="text-base-content/50 text-sm">No active sessions</p>
+                                <p class="text-base-content/50 text-sm">No participants connected</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Waiting Rooms -->
+                <div class="card bg-base-100 shadow-sm">
+                    <div class="card-body p-0">
+                        <div class="flex items-center justify-between p-4 border-b border-base-200">
+                            <h2 class="text-lg font-semibold">Waiting Rooms</h2>
+                        </div>
+                        <div class="p-4" id="waiting-rooms-container">
+                            <div class="empty-state-sm">
+                                <p class="text-base-content/50 text-sm">No active waiting rooms</p>
                             </div>
                         </div>
                     </div>
