@@ -389,6 +389,145 @@
 }
 
 /* ============================================
+   Session Cards with P2P Health (Phase 33)
+   ============================================ */
+
+.session-card {
+    background: oklch(var(--b1));
+    border: 1px solid oklch(var(--b3));
+    border-radius: 0.5rem;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+}
+
+.session-card:last-child {
+    margin-bottom: 0;
+}
+
+.session-card.session-problem {
+    border-color: oklch(var(--wa));
+    background: oklch(var(--wa) / 0.05);
+}
+
+.session-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.session-card-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 500;
+}
+
+.session-id {
+    font-family: ui-monospace, monospace;
+    font-size: 0.8125rem;
+}
+
+.health-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+}
+
+.health-indicator.health-healthy,
+.health-dot.health-healthy {
+    background-color: oklch(var(--su));
+}
+
+.health-indicator.health-degraded,
+.health-dot.health-degraded {
+    background-color: oklch(var(--wa));
+}
+
+.health-indicator.health-reconnecting,
+.health-dot.health-reconnecting {
+    background-color: oklch(var(--er));
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+.session-card-metrics {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    font-size: 0.75rem;
+}
+
+.session-metric {
+    display: flex;
+    flex-direction: column;
+}
+
+.session-metric-label {
+    color: oklch(var(--bc) / 0.5);
+    font-size: 0.65rem;
+    text-transform: uppercase;
+}
+
+.session-metric-value {
+    font-weight: 500;
+}
+
+.session-status-healthy { color: oklch(var(--su)); }
+.session-status-degraded { color: oklch(var(--wa)); }
+.session-status-reconnecting { color: oklch(var(--er)); }
+
+.session-card-players {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    font-size: 0.7rem;
+}
+
+.session-player {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-family: ui-monospace, monospace;
+    background: oklch(var(--b2));
+    padding: 0.125rem 0.375rem;
+    border-radius: 0.25rem;
+    color: oklch(var(--bc) / 0.7);
+}
+
+.session-player.host {
+    background: oklch(var(--p) / 0.1);
+}
+
+/* Health legend in section header */
+.health-legend {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.65rem;
+    color: oklch(var(--bc) / 0.6);
+}
+
+.health-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+/* Text warning color for high latency */
+.text-warning {
+    color: oklch(var(--wa));
+}
+
+/* ============================================
    Console Logs
    ============================================ */
 

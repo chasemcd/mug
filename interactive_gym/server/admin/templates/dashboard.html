@@ -138,16 +138,21 @@
                     </div>
                 </div>
 
-                <!-- Multiplayer Games -->
+                <!-- Active Sessions (P2P Health) -->
                 <div class="card bg-base-100 shadow-sm">
                     <div class="card-body p-0">
                         <div class="flex items-center justify-between p-4 border-b border-base-200">
-                            <h2 class="text-lg font-semibold">Multiplayer Games</h2>
-                            <span class="badge badge-ghost badge-sm" id="games-count">0 active</span>
+                            <h2 class="text-lg font-semibold">Active Sessions</h2>
+                            <div class="flex items-center gap-3">
+                                <span class="health-legend"><span class="health-dot health-healthy"></span>Healthy</span>
+                                <span class="health-legend"><span class="health-dot health-degraded"></span>Degraded</span>
+                                <span class="health-legend"><span class="health-dot health-reconnecting"></span>Reconnecting</span>
+                                <span class="badge badge-ghost badge-sm" id="games-count">0 active</span>
+                            </div>
                         </div>
                         <div class="p-4" id="multiplayer-games-container">
                             <div class="empty-state-sm">
-                                <p class="text-base-content/50 text-sm">No active games</p>
+                                <p class="text-base-content/50 text-sm">No active sessions</p>
                             </div>
                         </div>
                     </div>

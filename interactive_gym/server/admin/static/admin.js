@@ -90,7 +90,7 @@ function updateDashboard(state) {
     updateSummaryStats(state.summary);
     updateParticipants(state.participants);
     updateWaitingRooms(state.waiting_rooms);
-    updateMultiplayerGames(state.multiplayer_games);
+    updateSessionList(state.multiplayer_games);
     updateActivityTimeline(state.activity_log);
     // Initialize console logs from state on first load
     if (state.console_logs && consoleLogs.length === 0) {
@@ -267,10 +267,10 @@ function updateWaitingRooms(waitingRooms) {
 }
 
 // ============================================
-// Multiplayer games
+// Session list with P2P health (Phase 33)
 // ============================================
 
-function updateMultiplayerGames(games) {
+function updateSessionList(games) {
     const container = document.getElementById('multiplayer-games-container');
     const countBadge = document.getElementById('games-count');
     if (!container) return;
@@ -282,30 +282,93 @@ function updateMultiplayerGames(games) {
     if (!games || games.length === 0) {
         container.innerHTML = `
             <div class="empty-state-sm">
-                <p class="text-base-content/50 text-sm">No active games</p>
+                <p class="text-base-content/50 text-sm">No active sessions</p>
             </div>
         `;
         return;
     }
 
-    container.innerHTML = games.map(game => `
-        <div class="multiplayer-game-card">
-            <div class="multiplayer-game-header">
-                <span class="multiplayer-game-id" title="${escapeHtml(game.game_id)}">Game ${truncateId(game.game_id)}</span>
-                ${game.is_server_authoritative ?
-                    '<span class="badge badge-warning badge-xs">Server Auth</span>' :
-                    '<span class="badge badge-success badge-xs">P2P</span>'}
+    // Sort: problem sessions first (reconnecting > degraded > healthy)
+    const sorted = [...games].sort((a, b) => {
+        const priority = { 'reconnecting': 0, 'degraded': 1, 'healthy': 2 };
+        const aStatus = a.session_health || 'healthy';
+        const bStatus = b.session_health || 'healthy';
+        return (priority[aStatus] || 2) - (priority[bStatus] || 2);
+    });
+
+    container.innerHTML = sorted.map(game => renderSessionCard(game)).join('');
+}
+
+function renderSessionCard(game) {
+    const health = game.session_health || 'healthy';
+    const hasProblem = health !== 'healthy';
+    const p2pHealth = game.p2p_health || {};
+
+    // Get connection type (use first player's data, both should match)
+    const firstPlayerHealth = Object.values(p2pHealth)[0] || {};
+    const connectionType = firstPlayerHealth.connection_type || 'unknown';
+    const connectionTypeLabel = getConnectionTypeLabel(connectionType);
+
+    // Get latency (average of both players if available)
+    const latencies = Object.values(p2pHealth).map(h => h.latency_ms).filter(l => l != null);
+    const avgLatency = latencies.length > 0 ? Math.round(latencies.reduce((a,b) => a+b, 0) / latencies.length) : null;
+
+    // Get episode
+    const episode = game.current_episode ?? '--';
+
+    return `
+        <div class="session-card ${hasProblem ? 'session-problem' : ''}">
+            <div class="session-card-header">
+                <div class="session-card-title">
+                    <span class="health-indicator health-${health}"></span>
+                    <span class="session-id" title="${escapeHtml(game.game_id)}">
+                        Session ${truncateId(game.game_id)}
+                    </span>
+                </div>
+                <span class="badge badge-xs ${game.is_server_authoritative ? 'badge-warning' : 'badge-success'}">
+                    ${game.is_server_authoritative ? 'Server Auth' : 'P2P'}
+                </span>
             </div>
-            <div class="multiplayer-game-players">
+            <div class="session-card-metrics">
+                <div class="session-metric">
+                    <span class="session-metric-label">Episode</span>
+                    <span class="session-metric-value">${episode}</span>
+                </div>
+                <div class="session-metric">
+                    <span class="session-metric-label">Connection</span>
+                    <span class="session-metric-value">${connectionTypeLabel}</span>
+                </div>
+                <div class="session-metric">
+                    <span class="session-metric-label">Latency</span>
+                    <span class="session-metric-value ${avgLatency && avgLatency > 150 ? 'text-warning' : ''}">
+                        ${avgLatency != null ? avgLatency + 'ms' : '--'}
+                    </span>
+                </div>
+                <div class="session-metric">
+                    <span class="session-metric-label">Status</span>
+                    <span class="session-metric-value session-status-${health}">
+                        ${health.charAt(0).toUpperCase() + health.slice(1)}
+                    </span>
+                </div>
+            </div>
+            <div class="session-card-players">
                 ${game.players.map(player => `
-                    <span class="multiplayer-player ${player === game.host_id ? 'host' : ''}">
+                    <span class="session-player ${player === game.host_id ? 'host' : ''}">
                         ${escapeHtml(truncateId(String(player)))}
                         ${player === game.host_id ? '<span class="host-badge">Host</span>' : ''}
                     </span>
                 `).join('')}
             </div>
         </div>
-    `).join('');
+    `;
+}
+
+function getConnectionTypeLabel(type) {
+    if (!type || type === 'unknown') return 'Unknown';
+    if (type === 'relay') return 'TURN Relay';
+    if (type === 'direct') return 'P2P Direct';
+    if (type === 'socketio_fallback') return 'SocketIO';
+    return type;
 }
 
 // ============================================
