@@ -457,9 +457,9 @@ Plans:
   1. Clear visual hierarchy: summary at top → session list in middle → details on click
   2. Information prioritized by importance (stats > active sessions > history)
 **Research flag:** Unlikely (UI polish)
-**Plans:** TBD
+**Plans:** 1 plan
 Plans:
-- [ ] 35-01-PLAN.md — Visual hierarchy refinement and UX polish
+- [ ] 35-01-PLAN.md — Layout restructure with active sessions primary, problems indicator
 
 ## Progress
 
@@ -490,8 +490,8 @@ Phases execute in numeric order: 32 → 33 → 34 → 35
 | 32. Dashboard Summary | v1.7 | 1/1 | Complete | 2026-01-25 |
 | 33. Session List | v1.7 | 1/1 | Complete | 2026-01-25 |
 | 34. Session Detail | v1.7 | 1/1 | Complete | 2026-01-25 |
-| 35. Layout & Polish | v1.7 | 0/1 | Not started | - |
+| 35. Layout & Polish | v1.7 | 0/1 | Planned | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-01-25 after Phase 34 execution*
+*Last updated: 2026-01-25 after Phase 35 planning*
