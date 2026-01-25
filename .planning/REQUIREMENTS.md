@@ -23,10 +23,10 @@ Requirements for v1.7 Admin Console Improvement milestone. Each maps to roadmap 
 
 ### Session Details
 
-- [ ] **DETAIL-01**: Clicking a session opens detailed view
-- [ ] **DETAIL-02**: Session detail shows exclusion reason if participant was excluded
-- [ ] **DETAIL-03**: Session detail shows disconnection reason if session ended abnormally
-- [ ] **DETAIL-04**: Session detail surfaces console errors from that participant
+- [x] **DETAIL-01**: Clicking a session opens detailed view
+- [x] **DETAIL-02**: Session detail shows exclusion reason if participant was excluded
+- [x] **DETAIL-03**: Session detail shows disconnection reason if session ended abnormally
+- [x] **DETAIL-04**: Session detail surfaces console errors from that participant
 
 ### Layout & Hierarchy
 
@@ -74,10 +74,10 @@ Which phases cover which requirements. Updated by create-roadmap.
 | LIST-03 | Phase 33 | Complete |
 | LIST-04 | Phase 33 | Complete |
 | LIST-05 | Phase 33 | Complete |
-| DETAIL-01 | Phase 34 | Pending |
-| DETAIL-02 | Phase 34 | Pending |
-| DETAIL-03 | Phase 34 | Pending |
-| DETAIL-04 | Phase 34 | Pending |
+| DETAIL-01 | Phase 34 | Complete |
+| DETAIL-02 | Phase 34 | Complete |
+| DETAIL-03 | Phase 34 | Complete |
+| DETAIL-04 | Phase 34 | Complete |
 | LAYOUT-01 | Phase 35 | Pending |
 | LAYOUT-02 | Phase 35 | Pending |
 
@@ -88,4 +88,4 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 ---
 *Requirements defined: 2026-01-24*
-*Last updated: 2026-01-25 after Phase 33 complete*
+*Last updated: 2026-01-25 after Phase 34 complete*

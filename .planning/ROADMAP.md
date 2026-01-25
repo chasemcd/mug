@@ -108,7 +108,7 @@ Key deliverables:
 
 - [x] **Phase 32: Dashboard Summary Stats** - Key experiment metrics at a glance
 - [x] **Phase 33: Session List with P2P Health** - Session status and problem flagging
-- [ ] **Phase 34: Session Detail View** - Detailed diagnostic info on click
+- [x] **Phase 34: Session Detail View** - Detailed diagnostic info on click
 - [ ] **Phase 35: Layout & Polish** - Clean visual hierarchy and prioritization
 
 ## Phase Details
@@ -447,7 +447,7 @@ Plans:
 **Research flag:** Unlikely (builds on existing session data)
 **Plans:** 1 plan
 Plans:
-- [ ] 34-01-PLAN.md — Session detail panel with termination reason and console error filtering
+- [x] 34-01-PLAN.md — Session detail panel with termination reason and console error filtering
 
 ### Phase 35: Layout & Polish
 **Goal:** Clean, prioritized information hierarchy
@@ -489,9 +489,9 @@ Phases execute in numeric order: 32 → 33 → 34 → 35
 | 29-31. Deferred | v1.6 | — | Deferred | — |
 | 32. Dashboard Summary | v1.7 | 1/1 | Complete | 2026-01-25 |
 | 33. Session List | v1.7 | 1/1 | Complete | 2026-01-25 |
-| 34. Session Detail | v1.7 | 0/1 | Planned | - |
+| 34. Session Detail | v1.7 | 1/1 | Complete | 2026-01-25 |
 | 35. Layout & Polish | v1.7 | 0/1 | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-01-25 after Phase 34 planning*
+*Last updated: 2026-01-25 after Phase 34 execution*
