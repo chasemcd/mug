@@ -1500,6 +1500,19 @@ def on_mid_game_exclusion(data):
         f"(reason: {reason}, frame: {frame_number})"
     )
 
+    # Get players before handling exclusion for termination recording
+    game = PYODIDE_COORDINATOR.games.get(game_id)
+    players = list(game.players.keys()) if game else []
+
+    # Record termination for admin dashboard (Phase 34)
+    if ADMIN_AGGREGATOR:
+        ADMIN_AGGREGATOR.record_session_termination(
+            game_id=game_id,
+            reason=reason,  # sustained_ping, tab_hidden, etc.
+            players=players,
+            details={'excluded_player_id': excluded_player_id, 'frame_number': frame_number}
+        )
+
     PYODIDE_COORDINATOR.handle_player_exclusion(
         game_id=game_id,
         excluded_player_id=excluded_player_id,
@@ -1693,8 +1706,21 @@ def handle_p2p_reconnection_timeout(data):
     # Get the disconnected player ID from the coordinator (Phase 23 - DATA-04)
     disconnected_player_id = PYODIDE_COORDINATOR.get_disconnected_player_id(game_id)
 
+    # Get players before cleanup for termination recording
+    game = PYODIDE_COORDINATOR.games.get(game_id)
+    players = list(game.players.keys()) if game else []
+
     # Get reconnection data for logging
     reconnection_data = PYODIDE_COORDINATOR.handle_reconnection_timeout(game_id)
+
+    # Record termination for admin dashboard (Phase 34)
+    if ADMIN_AGGREGATOR:
+        ADMIN_AGGREGATOR.record_session_termination(
+            game_id=game_id,
+            reason='partner_disconnected',
+            players=players,
+            details={'disconnected_player_id': disconnected_player_id}
+        )
 
     # Emit game ended to all players
     socketio.emit(
