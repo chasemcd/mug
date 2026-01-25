@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-24)
 
 ## Current Position
 
-Phase: 33 of 35 (Session List with P2P Health) - VERIFIED
+Phase: 34 of 35 (Session Detail View) - COMPLETE
 Plan: 01 of 01 complete
-Status: Phase 33 verified, ready to plan Phase 34
-Last activity: 2026-01-25 — Phase 33 verified
+Status: Phase 34 complete, ready to plan Phase 35
+Last activity: 2026-01-25 - Completed 34-01-PLAN.md
 
-Progress: [####......] 50% (v1.7 - Admin Console Improvement: 2/4 phases)
+Progress: [######....] 75% (v1.7 - Admin Console Improvement: 3/4 phases)
 
 ## Milestone History
 
@@ -94,6 +94,14 @@ Progress: [####......] 50% (v1.7 - Admin Console Improvement: 2/4 phases)
 **v1.7 Execution:**
 - `.planning/phases/32-dashboard-summary/32-01-SUMMARY.md`
 - `.planning/phases/33-session-list/33-01-SUMMARY.md`
+- `.planning/phases/34-session-detail/34-01-SUMMARY.md`
+
+**Session Detail View (v1.7 Phase 34 - added):**
+- `interactive_gym/server/admin/aggregator.py` - _session_terminations, record_session_termination(), get_session_detail()
+- `interactive_gym/server/admin/static/admin.js` - showSessionDetail(), closeSessionDetail(), renderSessionDetailContent(), renderPlayerHealth()
+- `interactive_gym/server/admin/static/admin.css` - Session detail panel styles
+- `interactive_gym/server/admin/templates/dashboard.html` - Session detail overlay panel
+- `interactive_gym/server/app.py` - Termination recording in p2p_reconnection_timeout, mid_game_exclusion
 
 **Dashboard Summary Stats (v1.7 Phase 32 - added):**
 - `interactive_gym/server/admin/aggregator.py` - track_session_start(), record_session_completion(), summary stats in get_experiment_snapshot()
@@ -117,6 +125,12 @@ Progress: [####......] 50% (v1.7 - Admin Console Improvement: 2/4 phases)
 ### Decisions
 
 See: .planning/PROJECT.md Key Decisions table
+
+**v1.7 Phase 34 decisions:**
+- Detail panel slides in from right (standard UI pattern)
+- Termination reasons use semantic codes (partner_disconnected, sustained_ping, tab_hidden, exclusion, focus_loss_timeout, normal)
+- Console logs filtered to session participants, limited to 20 errors/warnings
+- Real-time panel updates when session state changes
 
 **v1.7 Phase 33 decisions:**
 - Health status thresholds: latency >150ms or ICE state checking/disconnected = degraded
@@ -181,9 +195,9 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-01-25
-Stopped at: Completed 33-01-PLAN.md
+Stopped at: Completed 34-01-PLAN.md
 Resume file: None
 
 ### Next Steps
 
-Run `/gsd:plan-phase 34` to create execution plan for Phase 34.
+Run `/gsd:plan-phase 35` to create execution plan for Phase 35.
