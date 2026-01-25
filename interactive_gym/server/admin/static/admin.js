@@ -109,6 +109,8 @@ function updateSummaryStats(summary) {
     const elWaiting = document.getElementById('stat-waiting');
     const elGames = document.getElementById('stat-games');
     const elCompleted = document.getElementById('stat-completed');
+    const elCompletion = document.getElementById('stat-completion');
+    const elAvgDuration = document.getElementById('stat-avg-duration');
     const elParticipantCount = document.getElementById('participant-count');
     const elActivityCount = document.getElementById('activity-count');
 
@@ -123,6 +125,19 @@ function updateSummaryStats(summary) {
     }
     if (elCompleted) {
         elCompleted.textContent = summary.completed_count || 0;
+    }
+    if (elCompletion) {
+        const completed = summary.completed_count || 0;
+        const total = summary.total_started || 0;
+        const rate = summary.completion_rate || 0;
+        elCompletion.textContent = `${completed} of ${total} (${rate}%)`;
+    }
+    if (elAvgDuration) {
+        if (summary.avg_session_duration_ms != null) {
+            elAvgDuration.textContent = formatDurationLong(summary.avg_session_duration_ms);
+        } else {
+            elAvgDuration.textContent = '--';
+        }
     }
     if (elParticipantCount) {
         elParticipantCount.textContent = `${summary.total_participants || 0} total`;
@@ -499,6 +514,25 @@ function formatDuration(ms) {
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
     return `${minutes}m ${remainingSeconds}s`;
+}
+
+function formatDurationLong(ms) {
+    if (ms == null || ms < 0) return '--';
+    const totalSeconds = Math.floor(ms / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    if (hours > 0) {
+        // Format: "1h 15m"
+        return `${hours}h ${minutes}m`;
+    } else if (minutes > 0) {
+        // Format: "5m 30s"
+        return `${minutes}m ${seconds}s`;
+    } else {
+        // Format: "45s"
+        return `${seconds}s`;
+    }
 }
 
 // Request fresh state periodically (fallback if push fails)

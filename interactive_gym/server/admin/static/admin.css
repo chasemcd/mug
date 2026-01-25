@@ -46,6 +46,13 @@
     letter-spacing: 0.025em;
 }
 
+/* Responsive stat card value for narrower cards in 6-column grid */
+@media (min-width: 1024px) {
+    .stat-card-value {
+        font-size: 1.25rem;
+    }
+}
+
 /* ============================================
    Participant Cards - Grid display
    ============================================ */
