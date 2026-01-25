@@ -2,14 +2,14 @@
 
 ## Milestones
 
-- ✅ **v1.0 P2P Multiplayer** - Phases 1-10 (shipped 2026-01-19)
-- ✅ **v1.1 Sync Validation** - Phases 11-14 (shipped 2026-01-21)
-- ✅ **v1.2 Participant Exclusion** - Phases 15-18 (shipped 2026-01-22)
-- ✅ **v1.3 P2P Connection Validation** - Phases 19-22 (shipped 2026-01-22)
-- ✅ **v1.4 Partner Disconnection Handling** - Phase 23 (shipped 2026-01-22)
-- ✅ **v1.5 Focus Loss Handling** - Phases 24-27 (shipped 2026-01-23)
-- ✅ **v1.6 Input Latency Diagnosis** - Phases 28-31 (partial: 2026-01-24)
-- 🚧 **v1.7 Admin Console Improvement** - Phases 32-35 (in progress)
+- **v1.0 P2P Multiplayer** - Phases 1-10 (shipped 2026-01-19)
+- **v1.1 Sync Validation** - Phases 11-14 (shipped 2026-01-21)
+- **v1.2 Participant Exclusion** - Phases 15-18 (shipped 2026-01-22)
+- **v1.3 P2P Connection Validation** - Phases 19-22 (shipped 2026-01-22)
+- **v1.4 Partner Disconnection Handling** - Phase 23 (shipped 2026-01-22)
+- **v1.5 Focus Loss Handling** - Phases 24-27 (shipped 2026-01-23)
+- **v1.6 Input Latency Diagnosis** - Phases 28-31 (partial: 2026-01-24)
+- **v1.7 Admin Console Improvement** - Phases 32-35 (in progress)
 
 ## Phases
 
@@ -89,7 +89,7 @@ Key deliverables:
 </details>
 
 <details>
-<summary>✅ v1.6 Input Latency Diagnosis (Phases 28-31) - PARTIAL 2026-01-24</summary>
+<summary>v1.6 Input Latency Diagnosis (Phases 28-31) - PARTIAL 2026-01-24</summary>
 
 **Milestone Goal:** Diagnose reported 1-2 second local input lag with tooling to measure input→execute→render latency at each pipeline stage.
 
@@ -102,7 +102,7 @@ Key deliverables:
 
 </details>
 
-### 🚧 v1.7 Admin Console Improvement (In Progress)
+### v1.7 Admin Console Improvement (In Progress)
 
 **Milestone Goal:** A clean, usable admin console that gives researchers effective experiment monitoring — see what's happening, catch problems, track progress.
 
@@ -416,9 +416,9 @@ Plans:
   2. Dashboard displays average session duration
   3. Summary stats appear prominently at top of admin page
 **Research flag:** Unlikely (standard dashboard patterns)
-**Plans:** TBD
+**Plans:** 1 plan
 Plans:
-- [ ] 32-01-PLAN.md — Server-side aggregation, summary UI component
+- [ ] 32-01-PLAN.md — Completion rate aggregation, avg duration computation, summary stat cards
 
 ### Phase 33: Session List with P2P Health
 **Goal:** Session list shows what's happening and flags problems
@@ -487,11 +487,11 @@ Phases execute in numeric order: 32 → 33 → 34 → 35
 | 27. Timeout & Telemetry | v1.5 | 1/1 | Complete | 2026-01-23 |
 | 28. Pipeline Instrumentation | v1.6 | 1/1 | Complete | 2026-01-24 |
 | 29-31. Deferred | v1.6 | — | Deferred | — |
-| 32. Dashboard Summary | v1.7 | 0/1 | Not started | - |
+| 32. Dashboard Summary | v1.7 | 0/1 | Planned | - |
 | 33. Session List | v1.7 | 0/1 | Not started | - |
 | 34. Session Detail | v1.7 | 0/1 | Not started | - |
 | 35. Layout & Polish | v1.7 | 0/1 | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-01-25 after v1.7 roadmap creation*
+*Last updated: 2026-01-25 after Phase 32 planning*
