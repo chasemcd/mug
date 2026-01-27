@@ -224,6 +224,33 @@ async function runEntryScreening(sceneMetadata) {
         }
     }
 
+    // Check max_ping at entry (wait for enough measurements)
+    if (sceneMetadata.max_ping) {
+        const minMeasurements = sceneMetadata.min_ping_measurements || 5;
+        const maxPing = sceneMetadata.max_ping;
+
+        // Wait for enough ping measurements (up to 10 seconds)
+        const startTime = Date.now();
+        const timeout = 10000; // 10 seconds max wait
+
+        while (latencyMeasurements.length < minMeasurements && (Date.now() - startTime) < timeout) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+        }
+
+        if (latencyMeasurements.length >= minMeasurements) {
+            const medianPing = calculateMedian(latencyMeasurements);
+            console.debug(`[EntryScreening] Ping check: ${medianPing}ms (max: ${maxPing}ms, measurements: ${latencyMeasurements.length})`);
+
+            if (medianPing > maxPing) {
+                const message = sceneMetadata.exclusion_messages?.ping ||
+                    "Your connection is too slow for this study.";
+                return { passed: false, failedRule: "ping", message: message };
+            }
+        } else {
+            console.warn(`[EntryScreening] Not enough ping measurements (${latencyMeasurements.length}/${minMeasurements}), skipping ping check`);
+        }
+    }
+
     // Phase 18: If built-in checks pass and entry callback is configured, call server
     if (sceneMetadata.has_entry_callback) {
         console.debug("[EntryScreening] Executing server-side entry callback...");
@@ -307,7 +334,7 @@ function showExclusionMessage(message) {
     // Set headers - use existing header if present, otherwise use default
     const currentHeader = $("#sceneHeader").text().trim();
     if (!currentHeader) {
-        $("#sceneHeader").text("Browser Not Supported");
+        $("#sceneHeader").text("Error!");
     }
     $("#sceneHeader").show();
     $("#sceneSubHeader").text("Unable to Continue");
@@ -379,10 +406,17 @@ socket.on('experiment_config', async function(data) {
 
         if (hasScreeningRules) {
             console.log("[ExperimentConfig] Running experiment-level entry screening...");
+
+            // Show loading indicator during screening
+            $("#screeningLoader").show();
+
             const result = await runEntryScreening(experimentScreeningConfig);
             experimentScreeningPassed = result.passed;
             experimentScreeningMessage = result.message;
             experimentScreeningComplete = true;
+
+            // Hide loading indicator
+            $("#screeningLoader").hide();
 
             if (!result.passed) {
                 console.log("[ExperimentConfig] Screening failed:", result.failedRule, result.message);
@@ -587,7 +621,6 @@ socket.on("waiting_room", function(data) {
         // Stop the timer if it reaches zero
         if (timer <= 0) {
             clearInterval(waitroomInterval);
-            $("#waitroomText").text("Sorry, could not find enough players. You will be redirected shortly...");
             console.log("Leaving game due to waitroom ending...")
             socket.emit("leave_game", {session_id: window.sessionId})
             socket.emit('end_game_request_redirect', {waitroom_timeout: true})
@@ -661,7 +694,6 @@ socket.on("waiting_room_player_left", function(data) {
     socket.emit("leave_game", {session_id: window.sessionId})
     socket.emit('end_game_request_redirect', {waitroom_timeout: true})
 })
-
 
 // P2P Validation Status (Phase 19) - log only, no UI updates
 socket.on('p2p_validation_status', function(data) {
@@ -1128,6 +1160,17 @@ function terminateGymScene(data) {
     ui_utils.disableKeyListener();
     graphics_end();
 
+    // Clear any pending checkPyodideDone interval to prevent stale checks
+    if (checkPyodideDone) {
+        clearInterval(checkPyodideDone);
+        checkPyodideDone = null;
+    }
+    // Also clear refreshStartButton if still running
+    if (refreshStartButton) {
+        clearInterval(refreshStartButton);
+        refreshStartButton = null;
+    }
+
     // Sync globals to server before emitting game data
     socket.emit("sync_globals", {interactiveGymGlobals: window.interactiveGymGlobals});
 
@@ -1202,6 +1245,11 @@ async function initializePyodideRemoteGame(data) {
 
 var checkPyodideDone;
 function enableCheckPyodideDone() {
+    // Clear any existing interval to prevent orphaned checks from previous scenes
+    if (checkPyodideDone) {
+        clearInterval(checkPyodideDone);
+        checkPyodideDone = null;
+    }
     checkPyodideDone = setInterval(() => {
         if (pyodideRemoteGame !== undefined && pyodideRemoteGame.isDone()) {
             clearInterval(checkPyodideDone);

@@ -111,6 +111,7 @@ class GymScene(scene.Scene):
         self.scene_header: str = None
         self.scene_body: str = None
         self.waitroom_timeout_redirect_url: str = None
+        self.waitroom_timeout_scene_id: str = None  # Scene to jump to on waitroom timeout
         self.waitroom_timeout: int = 120000
         self.game_page_html_fn: Callable = None
         self.reset_timeout: int = 3000
@@ -442,6 +443,7 @@ class GymScene(scene.Scene):
         in_game_scene_body_filepath: str = NotProvided,
         waitroom_timeout: int = NotProvided,
         waitroom_timeout_redirect_url: str = NotProvided,
+        waitroom_timeout_scene_id: str = NotProvided,
         game_page_html_fn: Callable = NotProvided,
     ):
         """Configure the user experience for the GymScene.
@@ -460,6 +462,8 @@ class GymScene(scene.Scene):
         :type waitroom_timeout: int, optional
         :param waitroom_timeout_redirect_url: URL to redirect to if waitroom times out, defaults to NotProvided
         :type waitroom_timeout_redirect_url: str, optional
+        :param waitroom_timeout_scene_id: Scene ID to jump to if waitroom times out (alternative to redirect), defaults to NotProvided
+        :type waitroom_timeout_scene_id: str, optional
         :param game_page_html_fn: Function to generate custom game page HTML, defaults to NotProvided
         :type game_page_html_fn: Callable, optional
         :return: The GymScene instance
@@ -470,6 +474,9 @@ class GymScene(scene.Scene):
 
         if waitroom_timeout_redirect_url is not NotProvided:
             self.waitroom_timeout_redirect_url = waitroom_timeout_redirect_url
+
+        if waitroom_timeout_scene_id is not NotProvided:
+            self.waitroom_timeout_scene_id = waitroom_timeout_scene_id
 
         if waitroom_timeout is not NotProvided:
             self.waitroom_timeout = waitroom_timeout
