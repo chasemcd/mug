@@ -37,6 +37,23 @@ const p2pLog = {
     debug: (...args) => { if (getLogLevel() >= LOG_LEVELS.debug) console.log('[P2P]', ...args); },
 };
 
+// ========== Completion Code Generation ==========
+/**
+ * Generate a UUID v4 for completion codes.
+ * Uses crypto.randomUUID if available, otherwise falls back to manual generation.
+ */
+function generateCompletionCode() {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+        return crypto.randomUUID();
+    }
+    // Fallback for older browsers
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+}
+
 // ========== Web Worker Timer (Phase 24) ==========
 // Browsers throttle main-thread timers when tabs are backgrounded.
 // Web Workers are exempt from throttling, providing reliable timing.
@@ -5872,11 +5889,26 @@ _cumulative_rewards
      * Show partner disconnected message (Phase 23 - UI-01 through UI-04).
      * Hides ALL page content and replaces with disconnect message.
      * Page stays displayed indefinitely (no redirect, no Continue button).
+     * Now includes completion code for participant compensation.
      * @param {string} message - Message to display
      */
     _showPartnerDisconnectedOverlay(message) {
         // Remove reconnecting overlay if present
         this._hideReconnectingOverlay();
+
+        // Generate completion code for participant
+        const completionCode = generateCompletionCode();
+        p2pLog.warn('Partner disconnected mid-game - completion code:', completionCode);
+
+        // Emit completion code to server for logging/validation
+        if (this.socket) {
+            this.socket.emit('waitroom_timeout_completion', {
+                completion_code: completionCode,
+                reason: 'partner_disconnected_mid_game',
+                frame_number: this.frameNumber,
+                episode_number: this.num_episodes
+            });
+        }
 
         // Hide ALL direct children of body (Phase 23 - UI-02)
         Array.from(document.body.children).forEach(child => {
@@ -5905,7 +5937,7 @@ _cumulative_rewards
             document.body.appendChild(container);
         }
 
-        // Simple centered message (not an overlay - this IS the page content now)
+        // Simple centered message with completion code
         container.innerHTML = `
             <div style="
                 padding: 40px;
@@ -5913,7 +5945,12 @@ _cumulative_rewards
                 text-align: center;
             ">
                 <h2 style="color: #333; margin-bottom: 20px;">Session Ended</h2>
-                <p style="font-size: 16px; color: #333;">${message}</p>
+                <p style="font-size: 16px; color: #333; margin-bottom: 20px;">${message}</p>
+                <p style="font-size: 14px; color: #333;"><strong>Your completion code is:</strong></p>
+                <p style="font-size: 24px; font-family: monospace; background: #f0f0f0; padding: 10px; border-radius: 5px; user-select: all;">
+                    ${completionCode}
+                </p>
+                <p style="font-size: 14px; color: #666; margin-top: 15px;">Please copy this code and submit it to complete the study.</p>
             </div>
         `;
         container.style.display = 'flex';
@@ -5980,11 +6017,26 @@ _cumulative_rewards
     /**
      * Show focus loss timeout message (Phase 27 - TIMEOUT-03).
      * Reuses partner disconnected overlay pattern.
+     * Now includes completion code for participant compensation.
      * @param {string} message - Message to display
      */
     _showFocusLossTimeoutOverlay(message) {
         // Remove any existing overlays
         this._hideReconnectingOverlay();
+
+        // Generate completion code for participant
+        const completionCode = generateCompletionCode();
+        p2pLog.warn('Focus loss timeout - completion code:', completionCode);
+
+        // Emit completion code to server for logging/validation
+        if (this.socket) {
+            this.socket.emit('waitroom_timeout_completion', {
+                completion_code: completionCode,
+                reason: 'focus_loss_timeout',
+                frame_number: this.frameNumber,
+                episode_number: this.num_episodes
+            });
+        }
 
         // Hide ALL direct children of body
         Array.from(document.body.children).forEach(child => {
@@ -6020,7 +6072,12 @@ _cumulative_rewards
                 text-align: center;
             ">
                 <h2 style="color: #333; margin-bottom: 20px;">Session Ended</h2>
-                <p style="font-size: 16px; color: #333;">${message}</p>
+                <p style="font-size: 16px; color: #333; margin-bottom: 20px;">${message}</p>
+                <p style="font-size: 14px; color: #333;"><strong>Your completion code is:</strong></p>
+                <p style="font-size: 24px; font-family: monospace; background: #f0f0f0; padding: 10px; border-radius: 5px; user-select: all;">
+                    ${completionCode}
+                </p>
+                <p style="font-size: 14px; color: #666; margin-top: 15px;">Please copy this code and submit it to complete the study.</p>
             </div>
         `;
         container.style.display = 'flex';

@@ -157,6 +157,26 @@ function calculateMedian(arr) {
 }
 
 // ============================================
+// UUID Generator for Completion Codes
+// ============================================
+
+/**
+ * Generate a UUID v4 for completion codes.
+ * Uses crypto.randomUUID if available, otherwise falls back to manual generation.
+ */
+function generateCompletionCode() {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+        return crypto.randomUUID();
+    }
+    // Fallback for older browsers
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+}
+
+// ============================================
 // Entry Screening (Phase 15 + Phase 18 Callbacks)
 // ============================================
 
@@ -623,7 +643,26 @@ socket.on("waiting_room", function(data) {
             clearInterval(waitroomInterval);
             console.log("Leaving game due to waitroom ending...")
             socket.emit("leave_game", {session_id: window.sessionId})
-            socket.emit('end_game_request_redirect', {waitroom_timeout: true})
+
+            // Generate completion code and display it
+            const completionCode = generateCompletionCode();
+            console.log("Waitroom timeout - completion code:", completionCode);
+
+            // Emit completion code to server for logging/validation
+            socket.emit('waitroom_timeout_completion', {
+                completion_code: completionCode,
+                reason: 'waitroom_timeout'
+            });
+
+            // Display completion code to participant
+            $("#waitroomText").html(
+                "<p>Sorry, we could not find enough players for this study.</p>" +
+                "<p><strong>Your completion code is:</strong></p>" +
+                "<p style='font-size: 24px; font-family: monospace; background: #f0f0f0; padding: 10px; border-radius: 5px; user-select: all;'>" +
+                completionCode +
+                "</p>" +
+                "<p>Please copy this code and submit it to complete the study.</p>"
+            );
         }
     }, 1000);
     $("#waitroomText").show();
@@ -673,12 +712,28 @@ socket.on("single_player_waiting_room", function(data) {
 
 
 socket.on("single_player_waiting_room_failure", function(data) {
-
-    $("#waitroomText").text("Sorry, you were matched with a player but they disconnected before the game could start. You will be redirected shortly...");
     console.log("Leaving game due to waiting room failure (other player left)...")
     socket.emit("leave_game", {session_id: window.sessionId})
-    socket.emit('end_game_request_redirect', {waitroom_timeout: true})
 
+    // Generate completion code and display it
+    const completionCode = generateCompletionCode();
+    console.log("Partner disconnected before game start - completion code:", completionCode);
+
+    // Emit completion code to server for logging/validation
+    socket.emit('waitroom_timeout_completion', {
+        completion_code: completionCode,
+        reason: 'partner_disconnected_before_start'
+    });
+
+    // Display completion code to participant
+    $("#waitroomText").html(
+        "<p>Sorry, you were matched with a player but they disconnected before the game could start.</p>" +
+        "<p><strong>Your completion code is:</strong></p>" +
+        "<p style='font-size: 24px; font-family: monospace; background: #f0f0f0; padding: 10px; border-radius: 5px; user-select: all;'>" +
+        completionCode +
+        "</p>" +
+        "<p>Please copy this code and submit it to complete the study.</p>"
+    );
 })
 
 
@@ -688,11 +743,29 @@ socket.on("waiting_room_player_left", function(data) {
         clearInterval(waitroomInterval);
     }
 
-    var message = data.message || "Another player left the waiting room. You will be redirected shortly...";
-    $("#waitroomText").text(message);
     console.log("Leaving game due to player leaving waiting room...")
     socket.emit("leave_game", {session_id: window.sessionId})
-    socket.emit('end_game_request_redirect', {waitroom_timeout: true})
+
+    // Generate completion code and display it
+    const completionCode = generateCompletionCode();
+    console.log("Partner left waiting room - completion code:", completionCode);
+
+    // Emit completion code to server for logging/validation
+    socket.emit('waitroom_timeout_completion', {
+        completion_code: completionCode,
+        reason: 'partner_left_waitroom'
+    });
+
+    // Display completion code to participant
+    var message = data.message || "Another player left the waiting room.";
+    $("#waitroomText").html(
+        "<p>" + message + "</p>" +
+        "<p><strong>Your completion code is:</strong></p>" +
+        "<p style='font-size: 24px; font-family: monospace; background: #f0f0f0; padding: 10px; border-radius: 5px; user-select: all;'>" +
+        completionCode +
+        "</p>" +
+        "<p>Please copy this code and submit it to complete the study.</p>"
+    );
 })
 
 // P2P Validation Status (Phase 19) - log only, no UI updates
