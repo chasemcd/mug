@@ -58,8 +58,8 @@ hh_start_scene = (
 stager = stager.Stager(
     scenes=[
         hh_start_scene,
-        oc_scenes.tutorial_gym_scene,
-        oc_scenes.cramped_room_human_human.gameplay(num_episodes=20).focus_loss_config(pause_on_partner_background=False),
+        # oc_scenes.tutorial_gym_scene,
+        oc_scenes.cramped_room_human_human.gameplay(num_episodes=20, max_steps=300).focus_loss_config(pause_on_partner_background=False),
         oc_scenes.multiplayer_feedback_scene,
         oc_scenes.end_scene,
     ]

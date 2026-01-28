@@ -2101,7 +2101,11 @@ hashlib.md5(json.dumps(_state, sort_keys=True).encode()).hexdigest()[:8]
             this.otherPlayerActionQueues[playerId] = [];
         }
         this.lastExecutedActions = {};
-        p2pLog.debug('Cleared action queues after episode transition');
+
+        // Also clear global pressed keys to prevent stale inputs from previous episode
+        clearHumanInputBuffers();
+
+        p2pLog.debug('Cleared action queues and human input buffers after episode transition');
     }
 
     /**
@@ -2120,6 +2124,7 @@ hashlib.md5(json.dumps(_state, sort_keys=True).encode()).hexdigest()[:8]
         }
 
         // For P2P multiplayer, wait for partner to be focused before showing countdown
+        // Only do this if WebRTC is ready and we have a focus manager
         if (!this.serverAuthoritative && this.webrtcManager?.isReady() && this.focusManager) {
             const localFocused = !this.focusManager.isBackgrounded;
             const partnerFocused = this.p2pEpisodeSync.partnerFocused;
@@ -2131,13 +2136,23 @@ hashlib.md5(json.dumps(_state, sort_keys=True).encode()).hexdigest()[:8]
                 this._showWaitingForPartnerOverlay(!partnerFocused);
                 p2pLog.info(`Waiting for ${waitingFor} to focus before episode countdown`);
 
-                // Wait for focus to be restored
+                // Wait for focus to be restored (with timeout to prevent infinite wait)
+                const focusWaitTimeout = 10000;  // 10 second timeout
+                const startWaitTime = performance.now();
+
                 await new Promise((resolve) => {
                     const checkFocus = () => {
                         const nowLocalFocused = !this.focusManager.isBackgrounded;
                         const nowPartnerFocused = this.p2pEpisodeSync.partnerFocused;
+                        const elapsed = performance.now() - startWaitTime;
 
                         if (nowLocalFocused && nowPartnerFocused) {
+                            this._waitingForPartnerFocus = false;
+                            this._hideWaitingForPartnerOverlay();
+                            resolve();
+                        } else if (elapsed > focusWaitTimeout) {
+                            // Timeout - proceed anyway to prevent stuck state
+                            p2pLog.warn(`Focus wait timeout (${(elapsed/1000).toFixed(1)}s) - proceeding with countdown`);
                             this._waitingForPartnerFocus = false;
                             this._hideWaitingForPartnerOverlay();
                             resolve();
@@ -4952,6 +4967,9 @@ _cumulative_rewards
         if (this.focusManager) {
             this.focusManager.reset();
         }
+
+        // Clear global pressed keys to prevent stale inputs from previous episode
+        clearHumanInputBuffers();
 
         p2pLog.debug('GGPO state cleared for new episode');
     }
