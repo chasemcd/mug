@@ -599,6 +599,8 @@ socket.on('start_game', function(data) {
 
 
 var waitroomInterval;
+var waitroomTimeoutMessage = null;  // Store custom timeout message from server
+
 socket.on("waiting_room", function(data) {
     if (waitroomInterval) {
         clearInterval(waitroomInterval);
@@ -606,6 +608,8 @@ socket.on("waiting_room", function(data) {
 
     $("#instructions").hide();
 
+    // Store custom timeout message if provided
+    waitroomTimeoutMessage = data.waitroom_timeout_message || null;
 
     var timer = Math.floor(data.ms_remaining / 1000); // Convert milliseconds to seconds
 
@@ -624,12 +628,12 @@ socket.on("waiting_room", function(data) {
             console.log("Leaving game due to waitroom ending...")
             socket.emit("leave_game", {session_id: window.sessionId})
 
-            // Display message to participant (no completion code - they'll be paid via Compensation HIT)
-            $("#waitroomText").html(
-                "<p>Sorry, we could not find enough players for this study.</p>" +
-                "<p>Please return the HIT now. You will be paid through a Compensation HIT.</p>" +
-                "<p>Thank you for your interest in our study!</p>"
-            );
+            // Display custom message if configured, otherwise use default
+            var message = waitroomTimeoutMessage ||
+                "Sorry, we could not find enough players for this study. " +
+                "Please return the HIT now. You will be paid through a Compensation HIT. " +
+                "Thank you for your interest in our study!";
+            $("#waitroomText").html("<p>" + message + "</p>");
         }
     }, 1000);
     $("#waitroomText").show();
@@ -682,16 +686,16 @@ socket.on("single_player_waiting_room_failure", function(data) {
     console.log("Leaving game due to waiting room failure (other player left)...")
     socket.emit("leave_game", {session_id: window.sessionId})
 
-    // Display message to participant (no completion code - they'll be paid via Compensation HIT)
-    $("#waitroomText").html(
-        "<p>Sorry, you were matched with a player but they disconnected before the game could start.</p>" +
-        "<p>Please return the HIT now. You will be paid through a Compensation HIT.</p>" +
-        "<p>Thank you for your interest in our study!</p>"
-    );
+    // Display custom message if configured, otherwise use default
+    var message = waitroomTimeoutMessage ||
+        "Sorry, you were matched with a player but they disconnected before the game could start. " +
+        "Please return the HIT now. You will be paid through a Compensation HIT. " +
+        "Thank you for your interest in our study!";
+    $("#waitroomText").html("<p>" + message + "</p>");
 })
 
 
-socket.on("waiting_room_player_left", function(data) {
+socket.on("waiting_room_player_left", function() {
     // Clear the waitroom countdown interval
     if (waitroomInterval) {
         clearInterval(waitroomInterval);
@@ -700,13 +704,12 @@ socket.on("waiting_room_player_left", function(data) {
     console.log("Leaving game due to player leaving waiting room...")
     socket.emit("leave_game", {session_id: window.sessionId})
 
-    // Display message to participant (no completion code - they'll be paid via Compensation HIT)
-    var message = data.message || "Another player left the waiting room.";
-    $("#waitroomText").html(
-        "<p>" + message + "</p>" +
-        "<p>Please return the HIT now. You will be paid through a Compensation HIT.</p>" +
-        "<p>Thank you for your interest in our study!</p>"
-    );
+    // Display custom message if configured, otherwise use default
+    var message = waitroomTimeoutMessage ||
+        "Another player left the waiting room. " +
+        "Please return the HIT now. You will be paid through a Compensation HIT. " +
+        "Thank you for your interest in our study!";
+    $("#waitroomText").html("<p>" + message + "</p>");
 })
 
 // P2P Validation Status (Phase 19) - log only, no UI updates

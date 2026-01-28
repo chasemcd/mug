@@ -5889,25 +5889,33 @@ _cumulative_rewards
      * Show partner disconnected message (Phase 23 - UI-01 through UI-04).
      * Hides ALL page content and replaces with disconnect message.
      * Page stays displayed indefinitely (no redirect, no Continue button).
-     * Now includes completion code for participant compensation.
+     * Optionally includes completion code for participant compensation (configurable).
      * @param {string} message - Message to display
      */
     _showPartnerDisconnectedOverlay(message) {
         // Remove reconnecting overlay if present
         this._hideReconnectingOverlay();
 
-        // Generate completion code for participant
-        const completionCode = generateCompletionCode();
-        p2pLog.warn('Partner disconnected mid-game - completion code:', completionCode);
+        // Check if completion code should be shown (defaults to true)
+        const showCompletionCode = this.config?.partner_disconnect_show_completion_code !== false;
 
-        // Emit completion code to server for logging/validation
-        if (this.socket) {
-            this.socket.emit('waitroom_timeout_completion', {
-                completion_code: completionCode,
-                reason: 'partner_disconnected_mid_game',
-                frame_number: this.frameNumber,
-                episode_number: this.num_episodes
-            });
+        let completionCode = null;
+        if (showCompletionCode) {
+            // Generate completion code for participant
+            completionCode = generateCompletionCode();
+            p2pLog.warn('Partner disconnected mid-game - completion code:', completionCode);
+
+            // Emit completion code to server for logging/validation
+            if (this.socket) {
+                this.socket.emit('waitroom_timeout_completion', {
+                    completion_code: completionCode,
+                    reason: 'partner_disconnected_mid_game',
+                    frame_number: this.frameNumber,
+                    episode_number: this.num_episodes
+                });
+            }
+        } else {
+            p2pLog.warn('Partner disconnected mid-game - no completion code (disabled in config)');
         }
 
         // Hide ALL direct children of body (Phase 23 - UI-02)
@@ -5937,8 +5945,8 @@ _cumulative_rewards
             document.body.appendChild(container);
         }
 
-        // Simple centered message with completion code
-        container.innerHTML = `
+        // Build content based on whether completion code is shown
+        let contentHtml = `
             <div style="
                 padding: 40px;
                 max-width: 500px;
@@ -5946,13 +5954,21 @@ _cumulative_rewards
             ">
                 <h2 style="color: #333; margin-bottom: 20px;">Session Ended</h2>
                 <p style="font-size: 16px; color: #333; margin-bottom: 20px;">${message}</p>
+        `;
+
+        if (showCompletionCode && completionCode) {
+            contentHtml += `
                 <p style="font-size: 14px; color: #333;"><strong>Your completion code is:</strong></p>
                 <p style="font-size: 24px; font-family: monospace; background: #f0f0f0; padding: 10px; border-radius: 5px; user-select: all;">
                     ${completionCode}
                 </p>
                 <p style="font-size: 14px; color: #666; margin-top: 15px;">Please copy this code and submit it to complete the study.</p>
-            </div>
-        `;
+            `;
+        }
+
+        contentHtml += `</div>`;
+
+        container.innerHTML = contentHtml;
         container.style.display = 'flex';
     }
 
