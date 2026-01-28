@@ -324,6 +324,7 @@ function showExclusionMessage(message) {
     $("#instructions").hide();
     $("#startButton").hide();
     $("#startButton").attr("disabled", true);
+    $("#startButtonLoader").removeClass("visible");
     $("#advanceButton").hide();
     $("#redirectButton").hide();
     $("#sceneBody").hide();
@@ -379,6 +380,7 @@ $(function() {
     $('#startButton').click( () => {
         $("#startButton").hide();
         $("#startButton").attr("disabled", true);
+        $("#startButtonLoader").removeClass("visible");
         console.debug("Joining game in session", window.sessionId)
         socket.emit("join_game", {session_id: window.sessionId});
 
@@ -497,6 +499,7 @@ socket.on('session_restored', function(data) {
     // Hide all buttons - the scene activation will show the appropriate ones
     $("#startButton").hide();
     $("#startButton").attr("disabled", true);
+    $("#startButtonLoader").removeClass("visible");
     $("#advanceButton").hide();
     $("#advanceButton").attr("disabled", true);
     $("#redirectButton").hide();
@@ -514,6 +517,7 @@ socket.on('duplicate_session', function(data) {
 
     // Hide all interactive elements
     $("#startButton").hide();
+    $("#startButtonLoader").removeClass("visible");
     $("#advanceButton").hide();
     $("#redirectButton").hide();
     $("#gameContainer").hide();
@@ -1037,6 +1041,7 @@ function startStaticScene(data) {
     // Hide other buttons that shouldn't be visible
     $("#startButton").hide();
     $("#startButton").attr("disabled", true);
+    $("#startButtonLoader").removeClass("visible");
     $("#redirectButton").hide();
 
     $("#sceneHeader").show();
@@ -1062,6 +1067,7 @@ function startEndScene(data) {
     // Hide buttons that shouldn't be visible in EndScene
     $("#startButton").hide();
     $("#startButton").attr("disabled", true);
+    $("#startButtonLoader").removeClass("visible");
     $("#advanceButton").hide();
     $("#advanceButton").attr("disabled", true);
     $("#redirectButton").hide();
@@ -1139,6 +1145,8 @@ async function startGymScene(data) {
     $("#sceneSubHeader").show();
     $("#sceneBody").show();
     $("#startButton").show();
+    // Show loader immediately while Pyodide loads (button starts disabled)
+    $("#startButtonLoader").addClass("visible");
 
 };
 
@@ -1209,8 +1217,9 @@ function terminateGymScene(data) {
     
     $("#sceneBody").show();
     $("#sceneBody").html("");
-    
+
     $("#startButton").hide();
+    $("#startButtonLoader").removeClass("visible");
     $("#gameContainer").hide();
 
     $('#hudText').hide()
@@ -1322,6 +1331,7 @@ function enableStartRefreshInterval() {
         // Don't process if screening failed
         if (experimentScreeningPassed === false) {
             clearInterval(refreshStartButton);
+            $("#startButtonLoader").removeClass("visible");
             return;
         }
 
@@ -1331,21 +1341,32 @@ function enableStartRefreshInterval() {
         if (currentSceneMetadata.scene_type !== "GymScene") {
             $("#startButton").hide();
             $("#startButton").attr("disabled", true);
+            $("#startButtonLoader").removeClass("visible");
         } else if (maxLatency != null && latencyMeasurements.length > minPingMeasurements && curLatency > maxLatency) {
             // Use configured ping exclusion message if available, otherwise use default
             const pingMessage = currentSceneMetadata.exclusion_messages?.ping ||
                 "Sorry, your connection is too slow for this application. Please make sure you have a strong internet connection to ensure a good experience for all players in the game.";
             showExclusionMessage(pingMessage);
             clearInterval(refreshStartButton);
+            $("#startButtonLoader").removeClass("visible");
         } else if (maxLatency != null && latencyMeasurements.length <= minPingMeasurements) {
             $("#startButton").show();
             $("#startButton").attr("disabled", true);
+            // Show loader while measuring ping
+            $("#startButtonLoader").addClass("visible");
         }
         else if (pyodideReadyIfUsing()){
             $('#errorText').hide()
             $("#startButton").show();
             $("#startButton").attr("disabled", false);
+            // Hide loader when ready
+            $("#startButtonLoader").removeClass("visible");
             clearInterval(refreshStartButton);
+        } else {
+            // Pyodide not ready yet, show button as disabled with loader
+            $("#startButton").show();
+            $("#startButton").attr("disabled", true);
+            $("#startButtonLoader").addClass("visible");
         }
     }, 500);
 }

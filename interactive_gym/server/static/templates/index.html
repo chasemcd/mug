@@ -84,6 +84,35 @@
             cursor: not-allowed;
         }
 
+        /* Start button loading spinner */
+        .start-button-wrapper {
+            display: inline-flex;
+            align-items: center;
+            position: relative;
+            margin: 15px 10px;
+        }
+
+        .start-button-wrapper #startButton {
+            margin: 0;
+        }
+
+        #startButtonLoader {
+            display: none;
+            width: 24px;
+            height: 24px;
+            border: 3px solid #ecf0f1;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            position: absolute;
+            left: 100%;
+            margin-left: 10px;
+        }
+
+        #startButtonLoader.visible {
+            display: inline-block;
+        }
+
         #resetGame, #waitroomText, #hudText, #errorText {
             background-color: #ecf0f1;
             border: 2px solid #34495e;
@@ -271,7 +300,10 @@
 
         <!-- Centered container for the start button -->
         <div class="centered-container">
-            <button id="startButton" disabled>Start</button>
+            <div class="start-button-wrapper">
+                <button id="startButton" disabled>Start</button>
+                <div id="startButtonLoader"></div>
+            </div>
             <button id="advanceButton">Continue</button>
             <button id="redirectButton">Finish</button>
         </div>
