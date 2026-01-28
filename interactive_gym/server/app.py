@@ -224,6 +224,10 @@ def user_index(subject_id):
             is_connected=False,
         )
 
+        # Track session start for admin dashboard stats
+        if ADMIN_AGGREGATOR:
+            ADMIN_AGGREGATOR.track_session_start(subject_id)
+
     return flask.render_template(
         "index.html",
         async_mode=socketio.async_mode,
@@ -545,8 +549,16 @@ def leave_game(data):
         game_manager.leave_game(subject_id=subject_id)
         PROCESSED_SUBJECT_NAMES.append(subject_id)
 
-        # Close console log file for completed subject
+        # Record session completion for admin dashboard stats
         if ADMIN_AGGREGATOR:
+            session = PARTICIPANT_SESSIONS.get(subject_id)
+            if session:
+                ADMIN_AGGREGATOR.record_session_completion(
+                    subject_id=subject_id,
+                    started_at=session.created_at,
+                    completed_at=time.time()
+                )
+            # Close console log file for completed subject
             ADMIN_AGGREGATOR.close_subject_console_log(subject_id)
 
 
@@ -1520,6 +1532,19 @@ def on_mid_game_exclusion(data):
         f"(reason: {reason}, frame: {frame_number})"
     )
 
+    # Get players before handling exclusion for termination recording
+    game = PYODIDE_COORDINATOR.games.get(game_id)
+    players = list(game.players.keys()) if game else []
+
+    # Record termination for admin dashboard (Phase 34)
+    if ADMIN_AGGREGATOR:
+        ADMIN_AGGREGATOR.record_session_termination(
+            game_id=game_id,
+            reason=reason,  # sustained_ping, tab_hidden, etc.
+            players=players,
+            details={'excluded_player_id': excluded_player_id, 'frame_number': frame_number}
+        )
+
     PYODIDE_COORDINATOR.handle_player_exclusion(
         game_id=game_id,
         excluded_player_id=excluded_player_id,
@@ -1543,6 +1568,26 @@ def handle_p2p_validation_status(data):
         {"status": status},
         room=game_id,
     )
+
+
+@socketio.on("p2p_health_report")
+def on_p2p_health_report(data):
+    """Receive P2P health report from client (Phase 33).
+
+    Updates admin dashboard with connection health metrics for each active game.
+    """
+    if ADMIN_AGGREGATOR:
+        ADMIN_AGGREGATOR.receive_p2p_health(
+            game_id=data.get('game_id'),
+            player_id=data.get('player_id'),
+            health_data={
+                'connection_type': data.get('connection_type'),
+                'latency_ms': data.get('latency_ms'),
+                'status': data.get('status'),
+                'episode': data.get('episode'),
+                'timestamp': time.time()
+            }
+        )
 
 
 @socketio.on("p2p_validation_success")
@@ -1693,8 +1738,21 @@ def handle_p2p_reconnection_timeout(data):
     # Get the disconnected player ID from the coordinator (Phase 23 - DATA-04)
     disconnected_player_id = PYODIDE_COORDINATOR.get_disconnected_player_id(game_id)
 
+    # Get players before cleanup for termination recording
+    game = PYODIDE_COORDINATOR.games.get(game_id)
+    players = list(game.players.keys()) if game else []
+
     # Get reconnection data for logging
     reconnection_data = PYODIDE_COORDINATOR.handle_reconnection_timeout(game_id)
+
+    # Record termination for admin dashboard (Phase 34)
+    if ADMIN_AGGREGATOR:
+        ADMIN_AGGREGATOR.record_session_termination(
+            game_id=game_id,
+            reason='partner_disconnected',
+            players=players,
+            details={'disconnected_player_id': disconnected_player_id}
+        )
 
     # Emit game ended to all players
     socketio.emit(

@@ -96,12 +96,236 @@ class AdminEventAggregator:
             os.makedirs(self.CONSOLE_LOGS_DIR, exist_ok=True)
             logger.info(f"Console logs will be saved to {self.CONSOLE_LOGS_DIR}/")
 
+        # Session completion tracking for duration calculation
+        # Maps subject_id -> {started_at: float, completed_at: float}
+        self._completed_sessions: dict[str, dict] = {}
+
+        # Track all subjects who have ever started (for total_started calculation)
+        self._all_started_subjects: set[str] = set()
+
+        # P2P health cache (Phase 33)
+        # Maps game_id -> {player_id -> health_data}
+        # health_data: {connection_type, latency_ms, status, episode, timestamp}
+        self._p2p_health_cache: dict[str, dict[str, dict]] = {}
+        self._p2p_health_expiry_seconds = 10  # Auto-expire entries older than this
+
+        # Session termination tracking (Phase 34)
+        # Maps game_id -> {reason: str, timestamp: float, players: list[str], details: dict}
+        self._session_terminations: dict[str, dict] = {}
+
         # Broadcast loop state
         self._broadcast_running = False
         self._last_state_hash: str | None = None
         self._last_broadcast_time: float = 0
 
         logger.info("AdminEventAggregator initialized")
+
+    def record_session_completion(
+        self,
+        subject_id: str,
+        started_at: float,
+        completed_at: float
+    ) -> None:
+        """
+        Record session completion data for duration calculation.
+
+        Called when a participant finishes their experiment (enters PROCESSED_SUBJECT_NAMES).
+
+        Args:
+            subject_id: The participant's subject ID
+            started_at: Unix timestamp when session started (ParticipantSession.created_at)
+            completed_at: Unix timestamp when session completed
+        """
+        self._completed_sessions[subject_id] = {
+            'started_at': started_at,
+            'completed_at': completed_at
+        }
+        # Ensure subject is in started set
+        self._all_started_subjects.add(subject_id)
+        logger.debug(f"Recorded session completion for {subject_id}: duration={completed_at - started_at:.1f}s")
+
+    def track_session_start(self, subject_id: str) -> None:
+        """
+        Track that a subject has started a session.
+
+        Called when a participant connects for the first time.
+
+        Args:
+            subject_id: The participant's subject ID
+        """
+        self._all_started_subjects.add(subject_id)
+
+    def record_session_termination(
+        self,
+        game_id: str,
+        reason: str,
+        players: list[str],
+        details: dict | None = None
+    ) -> None:
+        """
+        Record session termination with reason for detail view.
+
+        Args:
+            game_id: The game ID
+            reason: Termination reason (partner_disconnected, focus_loss_timeout,
+                    sustained_ping, tab_hidden, exclusion, normal)
+            players: List of player subject IDs
+            details: Optional additional details (exclusion message, etc.)
+        """
+        self._session_terminations[game_id] = {
+            'reason': reason,
+            'timestamp': time.time(),
+            'players': players,
+            'details': details or {}
+        }
+        logger.debug(f"Session termination recorded for {game_id}: {reason}")
+
+    def get_session_detail(self, game_id: str) -> dict | None:
+        """
+        Get detailed information for a specific session.
+
+        Args:
+            game_id: The game ID
+
+        Returns:
+            Dict with session info, termination reason, and player console logs
+        """
+        # Get active game state if still running
+        game_state = None
+        if self.pyodide_coordinator and game_id in self.pyodide_coordinator.games:
+            game = self.pyodide_coordinator.games[game_id]
+            p2p_health = self._get_p2p_health_for_game(game_id)
+            game_state = {
+                'game_id': game_id,
+                'players': list(game.players.keys()),
+                'host_id': game.host_id,
+                'is_server_authoritative': game.server_authoritative,
+                'created_at': getattr(game, 'created_at', None),
+                'p2p_health': p2p_health,
+                'session_health': self._compute_session_health(p2p_health)
+            }
+
+        # Get termination info if session ended
+        termination = self._session_terminations.get(game_id)
+
+        # Get player list from game_state or termination
+        players = []
+        if game_state:
+            players = game_state['players']
+        elif termination:
+            players = termination.get('players', [])
+
+        # Filter console logs for these players (last 50 per player, errors prioritized)
+        player_logs = []
+        for log in list(self._console_logs):
+            if log.get('subject_id') in players:
+                player_logs.append(log)
+
+        # Sort by timestamp descending, prioritize errors
+        player_logs.sort(key=lambda x: (
+            0 if x.get('level') == 'error' else 1,
+            -x.get('timestamp', 0)
+        ))
+        player_logs = player_logs[:100]  # Limit to 100 logs
+
+        return {
+            'game_state': game_state,
+            'termination': termination,
+            'player_logs': player_logs
+        }
+
+    def receive_p2p_health(
+        self,
+        game_id: str,
+        player_id: str,
+        health_data: dict
+    ) -> None:
+        """
+        Receive P2P health report from a client (Phase 33).
+
+        Stores health data in cache for inclusion in admin state updates.
+        Entries auto-expire after _p2p_health_expiry_seconds.
+
+        Args:
+            game_id: The game ID
+            player_id: The player ID reporting health
+            health_data: Dict with connection_type, latency_ms, status, episode, timestamp
+        """
+        if not game_id or not player_id:
+            return
+
+        if game_id not in self._p2p_health_cache:
+            self._p2p_health_cache[game_id] = {}
+
+        self._p2p_health_cache[game_id][player_id] = health_data
+        logger.debug(f"P2P health update for game {game_id}, player {player_id}: {health_data.get('status')}")
+
+    def _get_p2p_health_for_game(self, game_id: str) -> dict:
+        """
+        Get P2P health data for a game, filtering out expired entries.
+
+        Args:
+            game_id: The game ID
+
+        Returns:
+            Dict of player_id -> health_data for non-expired entries
+        """
+        if game_id not in self._p2p_health_cache:
+            return {}
+
+        now = time.time()
+        valid_entries = {}
+        expired_players = []
+
+        for player_id, health_data in self._p2p_health_cache[game_id].items():
+            timestamp = health_data.get('timestamp', 0)
+            if now - timestamp < self._p2p_health_expiry_seconds:
+                valid_entries[player_id] = health_data
+            else:
+                expired_players.append(player_id)
+
+        # Clean up expired entries
+        for player_id in expired_players:
+            del self._p2p_health_cache[game_id][player_id]
+
+        # Clean up empty game entries
+        if not self._p2p_health_cache[game_id]:
+            del self._p2p_health_cache[game_id]
+
+        return valid_entries
+
+    def _compute_session_health(self, p2p_health: dict) -> str:
+        """
+        Compute overall session health from individual player health reports.
+
+        Args:
+            p2p_health: Dict of player_id -> health_data
+
+        Returns:
+            'healthy' if all players healthy
+            'degraded' if any degraded or using SocketIO fallback
+            'reconnecting' if any reconnecting
+        """
+        if not p2p_health:
+            return 'healthy'  # No data means assume healthy
+
+        has_reconnecting = False
+        has_degraded = False
+
+        for health_data in p2p_health.values():
+            status = health_data.get('status', 'healthy')
+            conn_type = health_data.get('connection_type', '')
+
+            if status == 'reconnecting':
+                has_reconnecting = True
+            elif status == 'degraded' or conn_type == 'socketio_fallback':
+                has_degraded = True
+
+        if has_reconnecting:
+            return 'reconnecting'
+        if has_degraded:
+            return 'degraded'
+        return 'healthy'
 
     def get_experiment_snapshot(self) -> dict:
         """
@@ -127,9 +351,9 @@ class AdminEventAggregator:
             if room_state:
                 waiting_rooms.append(room_state)
 
-        # Get active multiplayer games
-        multiplayer_games = self._get_multiplayer_games_state()
-        active_games = len(multiplayer_games)
+        # Get active games (both multiplayer and single-player)
+        active_games_list = self._get_active_games_state()
+        active_games = len(active_games_list)
 
         # Get recent activity (last 100 for display)
         recent_activity = [
@@ -159,6 +383,24 @@ class AdminEventAggregator:
         # Total waiting across all rooms
         waiting_count = sum(r.get('waiting_count', 0) for r in waiting_rooms)
 
+        # Calculate total started (current sessions + completed not in current)
+        current_subject_ids = set(self.participant_sessions.keys())
+        all_started = self._all_started_subjects | current_subject_ids
+        total_started = len(all_started)
+
+        # Calculate completion rate
+        completed_count_actual = len(self.processed_subjects)
+        completion_rate = (completed_count_actual / total_started * 100) if total_started > 0 else 0
+
+        # Calculate average session duration from completed sessions
+        avg_session_duration_ms = None
+        if self._completed_sessions:
+            durations = [
+                (s['completed_at'] - s['started_at']) * 1000  # Convert to ms
+                for s in self._completed_sessions.values()
+            ]
+            avg_session_duration_ms = int(sum(durations) / len(durations))
+
         summary = {
             'total_participants': len(participants),
             'connected_count': connected_count,
@@ -167,7 +409,11 @@ class AdminEventAggregator:
             'completed_count': completed_count,
             'active_games': active_games,
             'waiting_count': waiting_count,
-            'timestamp': time.time()
+            'timestamp': time.time(),
+            # New summary stats
+            'total_started': total_started,
+            'completion_rate': round(completion_rate, 1),
+            'avg_session_duration_ms': avg_session_duration_ms
         }
 
         # Get recent console logs (last 100 for display)
@@ -176,7 +422,7 @@ class AdminEventAggregator:
         return {
             'participants': participants,
             'waiting_rooms': waiting_rooms,
-            'multiplayer_games': multiplayer_games,
+            'multiplayer_games': active_games_list,  # Now includes both single-player and multiplayer
             'activity_log': recent_activity,
             'console_logs': recent_console_logs,
             'summary': summary
@@ -315,29 +561,95 @@ class AdminEventAggregator:
             logger.debug(f"Error getting waiting room state for {scene_id}: {e}")
             return None
 
-    def _get_multiplayer_games_state(self) -> list[dict]:
+    def _get_active_games_state(self) -> list[dict]:
         """
-        Extract active multiplayer game states.
+        Extract active game states (both multiplayer and single-player).
 
         Returns:
-            List of dicts with game_id, players, host_id, etc.
+            List of dicts with game_id, players, p2p_health, session_health, etc.
         """
         games = []
-        if not self.pyodide_coordinator:
-            return games
+        tracked_game_ids = set()  # Avoid duplicates
 
+        # 1. Get multiplayer games from coordinator
+        if self.pyodide_coordinator:
+            try:
+                for game_id, game_state in list(self.pyodide_coordinator.games.items()):
+                    tracked_game_ids.add(game_id)
+
+                    # Get P2P health data for this game (Phase 33)
+                    p2p_health = self._get_p2p_health_for_game(game_id)
+                    session_health = self._compute_session_health(p2p_health)
+
+                    # Get current episode from health reports (max across players)
+                    current_episode = None
+                    for health_data in p2p_health.values():
+                        ep = health_data.get('episode')
+                        if ep is not None:
+                            if current_episode is None or ep > current_episode:
+                                current_episode = ep
+
+                    games.append({
+                        'game_id': game_id,
+                        'players': list(game_state.players.keys()),
+                        'subject_ids': list(game_state.player_subjects.values()),
+                        'current_frame': game_state.frame_number,
+                        'is_server_authoritative': game_state.server_authoritative,
+                        'created_at': game_state.created_at,
+                        'game_type': 'multiplayer',
+                        # Phase 33: P2P health data
+                        'p2p_health': p2p_health,
+                        'session_health': session_health,
+                        'current_episode': current_episode,
+                        # Phase 34: Termination info if session ended
+                        'termination': self._session_terminations.get(game_id),
+                    })
+            except Exception as e:
+                logger.error(f"Error getting multiplayer games state: {e}", exc_info=True)
+
+        # 2. Get single-player Pyodide games from game managers
         try:
-            for game_id, game_state in list(self.pyodide_coordinator.games.items()):
-                games.append({
-                    'game_id': game_id,
-                    'players': list(game_state.players.keys()),
-                    'host_id': game_state.host_id,
-                    'current_frame': getattr(game_state, 'current_frame', None),
-                    'is_server_authoritative': game_state.server_authoritative,
-                    'created_at': getattr(game_state, 'created_at', None),
-                })
+            for scene_id, game_manager in list(self.game_managers.items()):
+                # Check if this is a single-player Pyodide scene
+                scene = game_manager.scene
+                if not getattr(scene, 'run_through_pyodide', False):
+                    continue  # Not a Pyodide scene
+                if getattr(scene, 'pyodide_multiplayer', False):
+                    continue  # Multiplayer - already tracked via coordinator
+
+                # Get active games from this manager
+                for game_id in list(game_manager.active_games):
+                    if game_id in tracked_game_ids:
+                        continue  # Already tracked
+                    tracked_game_ids.add(game_id)
+
+                    game = game_manager.games.get(game_id)
+                    if not game:
+                        continue
+
+                    # Get subject IDs for players in this game
+                    subject_ids = []
+                    for subject_id, gid in list(game_manager.subject_games.items()):
+                        if gid == game_id:
+                            subject_ids.append(subject_id)
+
+                    games.append({
+                        'game_id': game_id,
+                        'players': list(game.human_players.keys()) if hasattr(game, 'human_players') else [],
+                        'subject_ids': subject_ids,
+                        'current_frame': getattr(game, 'tick_num', None),
+                        'is_server_authoritative': False,
+                        'created_at': None,
+                        'game_type': 'single_player',
+                        'scene_id': scene_id,
+                        # No P2P for single-player
+                        'p2p_health': {},
+                        'session_health': 'healthy',
+                        'current_episode': getattr(game, 'episode_num', None),
+                        'termination': self._session_terminations.get(game_id),
+                    })
         except Exception as e:
-            logger.debug(f"Error getting multiplayer games state: {e}")
+            logger.error(f"Error getting single-player games state: {e}", exc_info=True)
 
         return games
 

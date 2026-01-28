@@ -1,40 +1,53 @@
-# Requirements: Interactive Gym v1.6 Input Latency Diagnosis & Fix
+# Requirements: Interactive Gym v1.7 Admin Console Improvement
 
-**Defined:** 2026-01-23
-**Core Value:** Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
+**Defined:** 2026-01-24
+**Core Value:** A clean, usable admin console that gives researchers effective experiment monitoring — see what's happening, catch problems, track progress.
 
-## v1.6 Requirements
+## v1.7 Requirements
 
-Requirements for v1.6 Input Latency Diagnosis & Fix milestone. Each maps to roadmap phases.
+Requirements for v1.7 Admin Console Improvement milestone. Each maps to roadmap phases.
 
-### Diagnosis Infrastructure
+### Dashboard Overview
 
-- [x] **DIAG-01**: Timestamp captured at keypress event (performance.now())
-- [x] **DIAG-02**: Timestamp captured when action enters input queue
-- [x] **DIAG-03**: Timestamp captured when Pyodide env.step() called
-- [x] **DIAG-04**: Timestamp captured when env.step() returns
-- [x] **DIAG-05**: Timestamp captured when render update begins
-- [x] **DIAG-06**: Timestamp captured when render update completes
-- [x] **DIAG-07**: Per-input latency breakdown computed (queue time, step time, render time)
+- [x] **DASH-01**: Dashboard shows completion rate (X of Y participants completed successfully)
+- [x] **DASH-02**: Dashboard shows average session duration
+- [x] **DASH-03**: Summary stats visually prominent at top of page
 
-### Root Cause Fix
+### Session List
 
-- [ ] **FIX-01**: Local input latency consistently under 100ms (keypress to render)
-- [ ] **FIX-02**: Fix validated in both single-player and multiplayer modes
-- [ ] **FIX-03**: Fix validated specifically in Overcooked environment
+- [x] **LIST-01**: Session list shows current episode/round for each active game
+- [x] **LIST-02**: Session list shows connection type per session (P2P direct / TURN relay / SocketIO fallback)
+- [x] **LIST-03**: Session list shows current latency between peers
+- [x] **LIST-04**: Session list shows connection status indicator (healthy / degraded / reconnecting)
+- [x] **LIST-05**: Sessions with issues visually distinguished from healthy sessions
 
-### Validation & Telemetry
+### Session Details
 
-- [ ] **TELEM-01**: Input latency metrics included in session data export
-- [ ] **TELEM-02**: Min/max/mean/median latency stats computed per session
-- [ ] **TELEM-03**: Latency outliers (>100ms) flagged and counted
-- [ ] **TELEM-04**: Latency breakdown by pipeline stage available for research analysis
+- [x] **DETAIL-01**: Clicking a session opens detailed view
+- [x] **DETAIL-02**: Session detail shows exclusion reason if participant was excluded
+- [x] **DETAIL-03**: Session detail shows disconnection reason if session ended abnormally
+- [x] **DETAIL-04**: Session detail surfaces console errors from that participant
+
+### Layout & Hierarchy
+
+- [x] **LAYOUT-01**: Clear visual hierarchy: summary at top → session list in middle → details on click
+- [x] **LAYOUT-02**: Information prioritized by importance (stats > active sessions > history)
 
 ## v2 Requirements
 
 Deferred to future release. Tracked but not in current roadmap.
 
-(None for v1.6)
+### Alerts & Notifications
+
+- **ALERT-01**: Real-time alerts when sessions have issues
+- **ALERT-02**: Configurable alert thresholds (e.g., latency > 200ms)
+- **ALERT-03**: Sound/visual notification for critical issues
+
+### Historical Analysis
+
+- **HIST-01**: View past sessions with same detail level as live
+- **HIST-02**: Filter/search sessions by date, status, errors
+- **HIST-03**: Export session summaries to CSV
 
 ## Out of Scope
 
@@ -42,10 +55,10 @@ Explicitly excluded. Documented to prevent scope creep.
 
 | Feature | Reason |
 |---------|--------|
-| Network latency optimization | This milestone is about local lag, not P2P latency |
-| Visual rollback smoothing | Separate issue, deferred to future milestone |
-| Real-time latency HUD | Telemetry is for export, not live display |
-| Adaptive input delay | Deferred to future milestone |
+| Participant management (ban, message) | Admin console is monitoring-focused, not intervention |
+| Experiment configuration via admin UI | Experiments configured in Python code, not live |
+| Real-time intervention (pause/resume games) | Would require significant game state management |
+| Multi-admin access control | Single researcher use case, keep auth simple |
 
 ## Traceability
 
@@ -53,26 +66,26 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DIAG-01 | Phase 28 | Complete |
-| DIAG-02 | Phase 28 | Complete |
-| DIAG-03 | Phase 28 | Complete |
-| DIAG-04 | Phase 28 | Complete |
-| DIAG-05 | Phase 28 | Complete |
-| DIAG-06 | Phase 28 | Complete |
-| DIAG-07 | Phase 28 | Complete |
-| FIX-01 | Phase 30 | Pending |
-| FIX-02 | Phase 30 | Pending |
-| FIX-03 | Phase 30 | Pending |
-| TELEM-01 | Phase 31 | Pending |
-| TELEM-02 | Phase 31 | Pending |
-| TELEM-03 | Phase 31 | Pending |
-| TELEM-04 | Phase 31 | Pending |
+| DASH-01 | Phase 32 | Complete |
+| DASH-02 | Phase 32 | Complete |
+| DASH-03 | Phase 32 | Complete |
+| LIST-01 | Phase 33 | Complete |
+| LIST-02 | Phase 33 | Complete |
+| LIST-03 | Phase 33 | Complete |
+| LIST-04 | Phase 33 | Complete |
+| LIST-05 | Phase 33 | Complete |
+| DETAIL-01 | Phase 34 | Complete |
+| DETAIL-02 | Phase 34 | Complete |
+| DETAIL-03 | Phase 34 | Complete |
+| DETAIL-04 | Phase 34 | Complete |
+| LAYOUT-01 | Phase 35 | Complete |
+| LAYOUT-02 | Phase 35 | Complete |
 
 **Coverage:**
-- v1.6 requirements: 14 total
-- Mapped to phases: 14
-- Unmapped: 0 ✓
+- v1.7 requirements: 14 total
+- Mapped to phases: 14 ✓
+- Unmapped: 0
 
 ---
-*Requirements defined: 2026-01-23*
-*Last updated: 2026-01-23 after Phase 28 completion*
+*Requirements defined: 2026-01-24*
+*Last updated: 2026-01-25 after Phase 35 complete*

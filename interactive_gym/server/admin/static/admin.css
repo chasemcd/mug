@@ -46,6 +46,13 @@
     letter-spacing: 0.025em;
 }
 
+/* Responsive stat card value for narrower cards in 6-column grid */
+@media (min-width: 1024px) {
+    .stat-card-value {
+        font-size: 1.25rem;
+    }
+}
+
 /* ============================================
    Participant Cards - Grid display
    ============================================ */
@@ -382,6 +389,145 @@
 }
 
 /* ============================================
+   Session Cards with P2P Health (Phase 33)
+   ============================================ */
+
+.session-card {
+    background: oklch(var(--b1));
+    border: 1px solid oklch(var(--b3));
+    border-radius: 0.5rem;
+    padding: 0.75rem;
+}
+
+/* Grid container handles gaps, so margin not needed when in grid */
+.session-card-grid .session-card {
+    margin-bottom: 0;
+}
+
+.session-card.session-problem {
+    border-color: oklch(var(--wa));
+    background: oklch(var(--wa) / 0.05);
+}
+
+.session-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.session-card-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 500;
+}
+
+.session-id {
+    font-family: ui-monospace, monospace;
+    font-size: 0.8125rem;
+}
+
+.health-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+}
+
+.health-indicator.health-healthy,
+.health-dot.health-healthy {
+    background-color: oklch(var(--su));
+}
+
+.health-indicator.health-degraded,
+.health-dot.health-degraded {
+    background-color: oklch(var(--wa));
+}
+
+.health-indicator.health-reconnecting,
+.health-dot.health-reconnecting {
+    background-color: oklch(var(--er));
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+.session-card-metrics {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    font-size: 0.75rem;
+}
+
+.session-metric {
+    display: flex;
+    flex-direction: column;
+}
+
+.session-metric-label {
+    color: oklch(var(--bc) / 0.5);
+    font-size: 0.65rem;
+    text-transform: uppercase;
+}
+
+.session-metric-value {
+    font-weight: 500;
+}
+
+.session-status-healthy { color: oklch(var(--su)); }
+.session-status-degraded { color: oklch(var(--wa)); }
+.session-status-reconnecting { color: oklch(var(--er)); }
+
+.session-card-players {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    font-size: 0.7rem;
+}
+
+.session-player {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-family: ui-monospace, monospace;
+    background: oklch(var(--b2));
+    padding: 0.125rem 0.375rem;
+    border-radius: 0.25rem;
+    color: oklch(var(--bc) / 0.7);
+}
+
+.session-player.host {
+    background: oklch(var(--p) / 0.1);
+}
+
+/* Health legend in section header */
+.health-legend {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.65rem;
+    color: oklch(var(--bc) / 0.6);
+}
+
+.health-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+/* Text warning color for high latency */
+.text-warning {
+    color: oklch(var(--wa));
+}
+
+/* ============================================
    Console Logs
    ============================================ */
 
@@ -453,6 +599,276 @@
 }
 
 /* ============================================
+   Problems Indicator (Phase 35)
+   ============================================ */
+
+.problems-indicator {
+    cursor: pointer;
+}
+
+.problems-indicator:hover {
+    opacity: 0.8;
+}
+
+/* ============================================
+   Expanded Session List (Phase 35)
+   ============================================ */
+
+.session-list-expanded {
+    min-height: 400px;
+}
+
+.session-list-expanded .empty-state {
+    padding: 4rem 2rem;
+}
+
+/* Session card grid for wider panel */
+@media (min-width: 1024px) {
+    .session-card-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: 0.75rem;
+    }
+}
+
+/* ============================================
+   Compact Participants List (Phase 35)
+   ============================================ */
+
+.participant-list-compact {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.participant-item-compact {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid oklch(var(--bc) / 0.08);
+}
+
+.participant-item-compact:last-child {
+    border-bottom: none;
+}
+
+.participant-item-id {
+    font-family: ui-monospace, monospace;
+    font-size: 0.75rem;
+    max-width: 100px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ============================================
+   Session Detail Panel (Phase 34)
+   ============================================ */
+
+.session-detail-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.75);
+    z-index: 100;
+    display: flex;
+    justify-content: flex-end;
+    backdrop-filter: blur(4px);
+}
+
+.session-detail-overlay.hidden {
+    display: none;
+}
+
+.session-detail-panel {
+    width: 100%;
+    max-width: 480px;
+    height: 100%;
+    background: #1e293b;  /* Solid slate-800 - lighter than typical dark bg */
+    box-shadow: -8px 0 30px rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border-left: 2px solid #3b82f6;  /* Blue accent border */
+}
+
+.session-detail-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.25rem;
+    background: #334155;  /* Slate-700 - slightly lighter header */
+    border-bottom: 1px solid #475569;
+    flex-shrink: 0;
+}
+
+.session-detail-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1rem 1.25rem;
+    background: #1e293b;  /* Match panel background */
+    color: #e2e8f0;  /* Light text */
+}
+
+.session-detail-section {
+    margin-bottom: 1.5rem;
+}
+
+.session-detail-section:last-child {
+    margin-bottom: 0;
+}
+
+.session-detail-section-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #94a3b8;  /* Slate-400 */
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #475569;
+}
+
+.session-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+}
+
+.session-detail-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.session-detail-label {
+    font-size: 0.6875rem;
+    color: #94a3b8;  /* Slate-400 */
+    text-transform: uppercase;
+}
+
+.session-detail-value {
+    font-size: 0.875rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+}
+
+.session-detail-players {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.session-detail-player {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.625rem 0.75rem;
+    background: #334155;  /* Slate-700 */
+    border-radius: 0.375rem;
+    font-size: 0.8125rem;
+    color: #e2e8f0;
+}
+
+.session-detail-player .player-id {
+    font-family: ui-monospace, monospace;
+    font-weight: 500;
+}
+
+.player-health {
+    font-size: 0.75rem;
+    color: #94a3b8;  /* Slate-400 */
+}
+
+.player-health-healthy { color: #22c55e; }  /* Green-500 */
+.player-health-degraded { color: #eab308; }  /* Yellow-500 */
+.player-health-reconnecting { color: #ef4444; }  /* Red-500 */
+.player-health-unknown { color: #64748b; }  /* Slate-500 */
+
+/* Termination section */
+.session-termination {
+    background: rgba(239, 68, 68, 0.1);  /* Red with low opacity */
+    border-radius: 0.5rem;
+    padding: 0.875rem;
+    margin-left: -0.5rem;
+    margin-right: -0.5rem;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.session-termination .session-detail-section-title {
+    color: #f87171;  /* Red-400 */
+    border-bottom-color: rgba(239, 68, 68, 0.3);
+}
+
+.termination-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+}
+
+.termination-reason {
+    font-weight: 600;
+    color: #f87171;  /* Red-400 */
+}
+
+.termination-message {
+    font-size: 0.8125rem;
+    color: #cbd5e1;  /* Slate-300 */
+    padding: 0.5rem;
+    background: #0f172a;  /* Slate-900 */
+    border-radius: 0.25rem;
+}
+
+.termination-time {
+    font-size: 0.75rem;
+    color: #94a3b8;  /* Slate-400 */
+}
+
+/* Session detail logs */
+.session-detail-logs {
+    max-height: 300px;
+    overflow-y: auto;
+    background: #0f172a;  /* Slate-900 - darker for contrast */
+    border-radius: 0.375rem;
+    border: 1px solid #334155;
+}
+
+.session-detail-logs .log-entry {
+    font-size: 0.6875rem;
+    padding: 0.375rem 0.5rem;
+    border-bottom: 1px solid #1e293b;
+    color: #cbd5e1;  /* Slate-300 */
+}
+
+.session-detail-logs .log-entry:last-child {
+    border-bottom: none;
+}
+
+.session-detail-logs .log-message {
+    word-break: break-word;
+}
+
+/* Make session cards clickable */
+.session-card {
+    cursor: pointer;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.session-card:hover {
+    border-color: oklch(var(--p) / 0.5);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.session-card:focus {
+    outline: 2px solid oklch(var(--p));
+    outline-offset: 2px;
+}
+
+/* ============================================
    Responsive
    ============================================ */
 
@@ -467,5 +883,10 @@
 
     .participant-grid {
         grid-template-columns: 1fr;
+    }
+
+    /* Responsive: full-screen panel on mobile (Phase 34) */
+    .session-detail-panel {
+        max-width: 100%;
     }
 }

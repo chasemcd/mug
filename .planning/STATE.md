@@ -2,24 +2,26 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-01-23)
+See: .planning/PROJECT.md (updated 2026-01-24)
 
 **Core value:** Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
-**Current focus:** v1.6 Input Latency Diagnosis & Fix
+**Current focus:** v1.7 Admin Console Improvement
 
 ## Current Position
 
-Phase: 28 of 31 (Pipeline Instrumentation)
-Plan: 01 of 01 (Complete)
-Status: Phase complete
-Last activity: 2026-01-23 — Completed 28-01-PLAN.md
+Phase: 35 of 35 (Layout & Polish) - VERIFIED
+Plan: 01 of 01 complete
+Status: v1.7 Admin Console Improvement milestone complete, verified
+Last activity: 2026-01-25 — Phase 35 verified, v1.7 ready for audit
 
-Progress: [===-------] 25% (v1.6 - 1/4 phases)
+Progress: [########..] 100% (v1.7 - Admin Console Improvement: 4/4 phases)
 
 ## Milestone History
 
 | Milestone | Phases | Status | Shipped |
 |-----------|--------|--------|---------|
+| v1.7 Admin Console Improvement | 32-35 | Complete | 2026-01-25 |
+| v1.6 Input Latency Diagnosis | 28 | Partial | 2026-01-24 |
 | v1.5 Focus Loss Handling | 24-27 | Complete | 2026-01-23 |
 | v1.4 Partner Disconnection Handling | 23 | Complete | 2026-01-22 |
 | v1.3 P2P Connection Validation | 19-22 | Complete | 2026-01-22 |
@@ -90,6 +92,37 @@ Progress: [===-------] 25% (v1.6 - 1/4 phases)
 **v1.6 Execution:**
 - `.planning/phases/28-pipeline-instrumentation/28-01-SUMMARY.md`
 
+**v1.7 Execution:**
+- `.planning/phases/32-dashboard-summary/32-01-SUMMARY.md`
+- `.planning/phases/33-session-list/33-01-SUMMARY.md`
+- `.planning/phases/34-session-detail/34-01-SUMMARY.md`
+- `.planning/phases/35-layout-polish/35-01-SUMMARY.md`
+
+**Session Detail View (v1.7 Phase 34 - added):**
+- `interactive_gym/server/admin/aggregator.py` - _session_terminations, record_session_termination(), get_session_detail()
+- `interactive_gym/server/admin/static/admin.js` - showSessionDetail(), closeSessionDetail(), renderSessionDetailContent(), renderPlayerHealth()
+- `interactive_gym/server/admin/static/admin.css` - Session detail panel styles
+- `interactive_gym/server/admin/templates/dashboard.html` - Session detail overlay panel
+- `interactive_gym/server/app.py` - Termination recording in p2p_reconnection_timeout, mid_game_exclusion
+
+**Layout Polish (v1.7 Phase 35 - modified):**
+- `interactive_gym/server/admin/templates/dashboard.html` - Restructured layout (sessions 8-col, sidebar 4-col), problems indicator
+- `interactive_gym/server/admin/static/admin.css` - Problems indicator, expanded session list, compact participant list styles
+- `interactive_gym/server/admin/static/admin.js` - updateProblemsIndicator(), scrollToProblems(), compact participant rendering
+
+**Dashboard Summary Stats (v1.7 Phase 32 - added):**
+- `interactive_gym/server/admin/aggregator.py` - track_session_start(), record_session_completion(), summary stats in get_experiment_snapshot()
+- `interactive_gym/server/admin/templates/dashboard.html` - Completion Rate and Avg Duration stat cards
+- `interactive_gym/server/admin/static/admin.js` - updateSummaryStats(), formatDurationLong()
+
+**Session List with P2P Health (v1.7 Phase 33 - added):**
+- `interactive_gym/server/static/js/pyodide_multiplayer_game.js` - _reportP2PHealth(), _startP2PHealthReporting(), _stopP2PHealthReporting()
+- `interactive_gym/server/app.py` - p2p_health_report SocketIO handler
+- `interactive_gym/server/admin/aggregator.py` - _p2p_health_cache, receive_p2p_health(), _get_p2p_health_for_game(), _compute_session_health()
+- `interactive_gym/server/admin/templates/dashboard.html` - Active Sessions section with health legend
+- `interactive_gym/server/admin/static/admin.js` - updateSessionList(), renderSessionCard(), getConnectionTypeLabel()
+- `interactive_gym/server/admin/static/admin.css` - Session card styles, health indicators
+
 **Pipeline Instrumentation (v1.6 Phase 28 - added):**
 - `interactive_gym/server/static/js/ui_utils.js` - Keypress timestamp capture (DIAG-01)
 - `interactive_gym/server/static/js/phaser_gym_graphics.js` - Input queue timestamps, render timestamps, timestamp propagation
@@ -99,6 +132,29 @@ Progress: [===-------] 25% (v1.6 - 1/4 phases)
 ### Decisions
 
 See: .planning/PROJECT.md Key Decisions table
+
+**v1.7 Phase 35 decisions:**
+- Active sessions promoted to 8-column primary area (was in sidebar)
+- Participants demoted to compact sidebar list (was 8-column cards)
+- Problems indicator scrolls to console logs and filters to errors
+- Session cards use responsive grid (auto-fill, minmax 320px)
+
+**v1.7 Phase 34 decisions:**
+- Detail panel slides in from right (standard UI pattern)
+- Termination reasons use semantic codes (partner_disconnected, sustained_ping, tab_hidden, exclusion, focus_loss_timeout, normal)
+- Console logs filtered to session participants, limited to 20 errors/warnings
+- Real-time panel updates when session state changes
+
+**v1.7 Phase 33 decisions:**
+- Health status thresholds: latency >150ms or ICE state checking/disconnected = degraded
+- Health report interval: 2 seconds to balance responsiveness vs overhead
+- Health cache expiry: 10 seconds to auto-clean stale entries
+- SocketIO fallback treated as degraded status (not error)
+
+**v1.7 Phase 32 decisions:**
+- Completion rate uses processed_subjects list for completed count
+- Duration calculated from ParticipantSession.created_at to completion time
+- Stats format: "X of Y (Z%)" for completion, human-readable for duration
 
 **v1.5 Phase 27 decisions:**
 - Focus loss timeout defaults to 30 seconds, set to 0 to disable
@@ -145,26 +201,18 @@ See: .planning/PROJECT.md Key Decisions table
 - Episode start sync can timeout on slow connections (mitigated with retry + two-way ack)
 - Rollback visual corrections cause brief teleporting (smoothing not yet implemented)
 
-**[CRITICAL] v1.6 focus:**
-- Users report 1-2 second local input lag in Overcooked
-- Unknown if single-player, multiplayer, or both affected
-- Unknown if consistent or intermittent
+**Deferred from v1.6:**
+- Input latency root cause fix (tooling now exists via Phase 28 instrumentation)
+- Users can use `[LATENCY]` console logs to diagnose specific issues
 
 ## Session Continuity
 
-Last session: 2026-01-23
-Stopped at: Completed 28-01-PLAN.md (Pipeline Instrumentation)
+Last session: 2026-01-25
+Stopped at: Completed 35-01-PLAN.md (v1.7 milestone complete)
 Resume file: None
 
 ### Next Steps
 
-Phase 29 (Diagnosis) can now analyze latency logs to identify the root cause of reported 1-2 second input lag.
+v1.7 Admin Console Improvement milestone complete and verified.
 
-Expected workflow:
-1. Start game, open browser console
-2. Observe `[LATENCY]` logs with breakdown
-3. Identify which pipeline stage(s) contribute to lag:
-   - High queue time = input buffering issue
-   - High step time = Pyodide execution bottleneck
-   - High render time = Phaser rendering issue
-   - Total >> sum = frame timing/throttling issue
+Run `/gsd:audit-milestone` to verify cross-phase integration and prepare for archive.

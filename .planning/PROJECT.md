@@ -8,17 +8,29 @@ A framework for running browser-based reinforcement learning experiments with hu
 
 Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
 
-## Current Milestone: v1.6 Input Latency Diagnosis & Fix
+## Current Milestone: v1.7 Admin Console Improvement
 
-**Goal:** Diagnose and fix reported 1-2 second local input lag, with tooling to measure input→execute→render latency at each pipeline stage.
+**Goal:** A clean, usable admin console that gives researchers effective experiment monitoring — see what's happening, catch problems, track progress.
 
 **Target features:**
+- Dashboard overview with key experiment stats (completion rate, active sessions, issues)
+- Session list showing state, P2P/connection health, and problems
+- Live session state visibility (what's happening in active sessions)
+- P2P/connection metrics surfaced (latency, connection type, health indicators)
+- Error and exclusion details visible (why sessions failed or participants excluded)
+- Clean layout that prioritizes actionable information
+
+## Previous Milestone: v1.6 Input Latency Diagnosis (Partial: 2026-01-24)
+
+**Delivered:** Pipeline instrumentation for latency diagnosis. Root cause fix deferred.
+
+**Key accomplishments:**
 - Diagnostic instrumentation for input→execute→render pipeline timing
-- Latency measurement at each stage (keypress capture, action queuing, Pyodide execution, render update)
-- Root cause identification for 1-2 second delay
-- Fix for identified latency source(s)
-- Validation metrics confirming acceptable input responsiveness
-- Exportable latency telemetry for research analysis
+- Latency measurement at each stage (queue time, step time, render time)
+- Console logging format for latency breakdown per frame
+- Instrumentation in both multiplayer and single-player code paths
+
+**Deferred to future:** Root cause identification and fix for reported 1-2s delay (tooling now exists for diagnosis).
 
 ## Previous Milestone: v1.5 Focus Loss Handling (Shipped: 2026-01-23)
 
@@ -137,12 +149,17 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 
 ### Active
 
-- [ ] Diagnostic instrumentation for input→execute→render pipeline
-- [ ] Latency measurement at each pipeline stage
-- [ ] Root cause identification for reported 1-2s delay
-- [ ] Fix for identified latency source(s)
-- [ ] Validation metrics confirming acceptable responsiveness
-- [ ] Exportable latency telemetry for research
+- [ ] Dashboard overview with key experiment stats
+- [ ] Session list with state and P2P health indicators
+- [ ] Live session state visibility
+- [ ] P2P/connection metrics surfaced in UI
+- [ ] Error and exclusion details visible
+- [ ] Clean, prioritized layout
+
+*Shipped in v1.6 (partial):*
+- ✓ Diagnostic instrumentation for input→execute→render pipeline — v1.6
+- ✓ Latency measurement at each pipeline stage — v1.6
+- ✓ Console logging for latency breakdown — v1.6
 
 *Shipped in v1.5:*
 - ✓ Web Worker-based timing for background tab resilience — v1.5
@@ -158,6 +175,7 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 - [ ] Rollback visual smoothing (tween objects after corrections)
 - [ ] N-player support with hybrid topology (mesh for small N, relay for large N)
 - [ ] Adaptive input delay based on RTT
+- [ ] Input latency root cause fix (v1.6 tooling exists for diagnosis)
 
 ### Out of Scope
 
@@ -200,4 +218,4 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 | Open Relay Project for TURN | Free 20GB/month tier sufficient for research | ✓ Good |
 
 ---
-*Last updated: 2026-01-23 after v1.6 milestone start*
+*Last updated: 2026-01-24 after v1.7 milestone start*
