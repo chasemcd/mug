@@ -111,7 +111,9 @@ class GymScene(scene.Scene):
         self.scene_header: str = None
         self.scene_body: str = None
         self.waitroom_timeout_redirect_url: str = None
+        self.waitroom_timeout_scene_id: str = None  # Scene to jump to on waitroom timeout
         self.waitroom_timeout: int = 120000
+        self.waitroom_timeout_message: str | None = None  # Custom message when waitroom times out
         self.game_page_html_fn: Callable = None
         self.reset_timeout: int = 3000
         self.reset_freeze_s: int = 0
@@ -186,6 +188,7 @@ class GymScene(scene.Scene):
 
         # Partner disconnection message (Phase 23)
         self.partner_disconnect_message: str | None = None  # Custom message, None uses default
+        self.partner_disconnect_show_completion_code: bool = True  # Show completion code on partner disconnect
 
         # Focus loss handling (Phase 27)
         self.focus_loss_timeout_ms: int = 30000  # Default 30 seconds
@@ -442,6 +445,8 @@ class GymScene(scene.Scene):
         in_game_scene_body_filepath: str = NotProvided,
         waitroom_timeout: int = NotProvided,
         waitroom_timeout_redirect_url: str = NotProvided,
+        waitroom_timeout_scene_id: str = NotProvided,
+        waitroom_timeout_message: str = NotProvided,
         game_page_html_fn: Callable = NotProvided,
     ):
         """Configure the user experience for the GymScene.
@@ -460,6 +465,10 @@ class GymScene(scene.Scene):
         :type waitroom_timeout: int, optional
         :param waitroom_timeout_redirect_url: URL to redirect to if waitroom times out, defaults to NotProvided
         :type waitroom_timeout_redirect_url: str, optional
+        :param waitroom_timeout_scene_id: Scene ID to jump to if waitroom times out (alternative to redirect), defaults to NotProvided
+        :type waitroom_timeout_scene_id: str, optional
+        :param waitroom_timeout_message: Custom message to display when waitroom times out, defaults to NotProvided
+        :type waitroom_timeout_message: str, optional
         :param game_page_html_fn: Function to generate custom game page HTML, defaults to NotProvided
         :type game_page_html_fn: Callable, optional
         :return: The GymScene instance
@@ -471,8 +480,14 @@ class GymScene(scene.Scene):
         if waitroom_timeout_redirect_url is not NotProvided:
             self.waitroom_timeout_redirect_url = waitroom_timeout_redirect_url
 
+        if waitroom_timeout_scene_id is not NotProvided:
+            self.waitroom_timeout_scene_id = waitroom_timeout_scene_id
+
         if waitroom_timeout is not NotProvided:
             self.waitroom_timeout = waitroom_timeout
+
+        if waitroom_timeout_message is not NotProvided:
+            self.waitroom_timeout_message = waitroom_timeout_message
 
         if game_page_html_fn is not NotProvided:
             self.game_page_html_fn = game_page_html_fn
@@ -790,6 +805,7 @@ class GymScene(scene.Scene):
     def partner_disconnect_message_config(
         self,
         message: str = NotProvided,
+        show_completion_code: bool = NotProvided,
     ):
         """Configure the message shown when partner disconnects mid-game.
 
@@ -798,16 +814,23 @@ class GymScene(scene.Scene):
 
         :param message: Custom message to display when partner disconnects
         :type message: str
+        :param show_completion_code: Whether to show a completion code to the active participant
+            when their partner disconnects. Defaults to True.
+        :type show_completion_code: bool
         :return: This scene object
         :rtype: GymScene
 
         Example:
             scene.partner_disconnect_message_config(
-                message="Your partner left the experiment. Thank you for participating."
+                message="Your partner left the experiment. Thank you for participating.",
+                show_completion_code=True
             )
         """
         if message is not NotProvided:
             self.partner_disconnect_message = message
+
+        if show_completion_code is not NotProvided:
+            self.partner_disconnect_show_completion_code = show_completion_code
 
         return self
 

@@ -79,7 +79,7 @@ if __name__ == "__main__":
         experiment_config.ExperimentConfig()
         .experiment(stager=stager, experiment_id="overcooked_multiplayer_hh")
         .hosting(port=args.port, host="0.0.0.0")
-        .entry_screening(browser_requirements=["Chrome", "Safari"], browser_blocklist=["Firefox"])
+        .entry_screening(browser_requirements=["Chrome", "Safari"], browser_blocklist=["Firefox"], max_ping=200)
         # For TURN server fallback, use:
         # $ export TURN_USERNAME=<open-relay-username>
         # $ export TURN_CREDENTIAL=<open-relay-password>

@@ -769,6 +769,38 @@ def on_client_callback(data):
     current_scene.on_client_callback(data, sio=socketio, room=flask.request.sid)
 
 
+@socketio.on("waitroom_timeout_completion")
+def on_waitroom_timeout_completion(data):
+    """Log completion code when a participant times out in the waitroom."""
+    subject_id = get_subject_id_from_session_id(flask.request.sid)
+    completion_code = data.get("completion_code")
+    reason = data.get("reason", "waitroom_timeout")
+
+    logger.info(
+        f"Waitroom timeout completion - subject: {subject_id}, "
+        f"code: {completion_code}, reason: {reason}"
+    )
+
+    # Save completion code to file if data saving is enabled
+    if CONFIG.save_experiment_data:
+        completion_data = {
+            "subject_id": subject_id,
+            "completion_code": completion_code,
+            "reason": reason,
+            "timestamp": time.time(),
+        }
+
+        # Save to data/completion_codes/{subject_id}.json
+        completion_dir = os.path.join("data", "completion_codes")
+        os.makedirs(completion_dir, exist_ok=True)
+        filepath = os.path.join(completion_dir, f"{subject_id}.json")
+
+        with open(filepath, "w") as f:
+            json.dump(completion_data, f, indent=2)
+
+        logger.info(f"Saved completion code to {filepath}")
+
+
 def on_exit():
     # Force-terminate all games on server termination
     for game_manager in GAME_MANAGERS.values():

@@ -465,6 +465,7 @@ cramped_room_human_human = (
         <br><br>
         """,
         waitroom_timeout=300000,  # 5 minutes
+        waitroom_timeout_message="Sorry, we could not find enough players for this study. Please return the HIT now. You will be paid through a Compensation HIT.",
     )
     .pyodide(
         run_through_pyodide=True,
@@ -476,7 +477,7 @@ cramped_room_human_human = (
         server_authoritative=False,  # Server-authoritative mode
         input_delay=3,
     )
-    .partner_disconnect_message_config(message="Your partner disconnected. The task will end here and you will be compensated for your performance so far.")
+    .partner_disconnect_message_config(message="Your partner disconnected. The task will end here and you will be compensated for your performance so far. Please submit the completion code below.", show_completion_code=True)
 )
 
 counter_circuit_human_human = (

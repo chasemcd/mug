@@ -457,6 +457,7 @@ class GameManager:
                 "cur_num_players": game.cur_num_human_players(),
                 "players_needed": len(game.get_available_human_agent_ids()),
                 "ms_remaining": remaining_wait_time,
+                "waitroom_timeout_message": self.scene.waitroom_timeout_message,
             },
             room=subject_id,
         )
@@ -483,6 +484,7 @@ class GameManager:
                 "cur_num_players": game.cur_num_human_players(),
                 "players_needed": len(game.get_available_human_agent_ids()),
                 "ms_remaining": remaining_wait_time,
+                "waitroom_timeout_message": self.scene.waitroom_timeout_message,
             },
             room=game_id,
         )
