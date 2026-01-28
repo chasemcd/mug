@@ -157,26 +157,6 @@ function calculateMedian(arr) {
 }
 
 // ============================================
-// UUID Generator for Completion Codes
-// ============================================
-
-/**
- * Generate a UUID v4 for completion codes.
- * Uses crypto.randomUUID if available, otherwise falls back to manual generation.
- */
-function generateCompletionCode() {
-    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-        return crypto.randomUUID();
-    }
-    // Fallback for older browsers
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-        const r = Math.random() * 16 | 0;
-        const v = c === 'x' ? r : (r & 0x3 | 0x8);
-        return v.toString(16);
-    });
-}
-
-// ============================================
 // Entry Screening (Phase 15 + Phase 18 Callbacks)
 // ============================================
 
@@ -644,24 +624,11 @@ socket.on("waiting_room", function(data) {
             console.log("Leaving game due to waitroom ending...")
             socket.emit("leave_game", {session_id: window.sessionId})
 
-            // Generate completion code and display it
-            const completionCode = generateCompletionCode();
-            console.log("Waitroom timeout - completion code:", completionCode);
-
-            // Emit completion code to server for logging/validation
-            socket.emit('waitroom_timeout_completion', {
-                completion_code: completionCode,
-                reason: 'waitroom_timeout'
-            });
-
-            // Display completion code to participant
+            // Display message to participant (no completion code - they'll be paid via Compensation HIT)
             $("#waitroomText").html(
                 "<p>Sorry, we could not find enough players for this study.</p>" +
-                "<p><strong>Your completion code is:</strong></p>" +
-                "<p style='font-size: 24px; font-family: monospace; background: #f0f0f0; padding: 10px; border-radius: 5px; user-select: all;'>" +
-                completionCode +
-                "</p>" +
-                "<p>Please copy this code and submit it to complete the study.</p>"
+                "<p>Please return the HIT now. You will be paid through a Compensation HIT.</p>" +
+                "<p>Thank you for your interest in our study!</p>"
             );
         }
     }, 1000);
@@ -715,24 +682,11 @@ socket.on("single_player_waiting_room_failure", function(data) {
     console.log("Leaving game due to waiting room failure (other player left)...")
     socket.emit("leave_game", {session_id: window.sessionId})
 
-    // Generate completion code and display it
-    const completionCode = generateCompletionCode();
-    console.log("Partner disconnected before game start - completion code:", completionCode);
-
-    // Emit completion code to server for logging/validation
-    socket.emit('waitroom_timeout_completion', {
-        completion_code: completionCode,
-        reason: 'partner_disconnected_before_start'
-    });
-
-    // Display completion code to participant
+    // Display message to participant (no completion code - they'll be paid via Compensation HIT)
     $("#waitroomText").html(
         "<p>Sorry, you were matched with a player but they disconnected before the game could start.</p>" +
-        "<p><strong>Your completion code is:</strong></p>" +
-        "<p style='font-size: 24px; font-family: monospace; background: #f0f0f0; padding: 10px; border-radius: 5px; user-select: all;'>" +
-        completionCode +
-        "</p>" +
-        "<p>Please copy this code and submit it to complete the study.</p>"
+        "<p>Please return the HIT now. You will be paid through a Compensation HIT.</p>" +
+        "<p>Thank you for your interest in our study!</p>"
     );
 })
 
@@ -746,25 +700,12 @@ socket.on("waiting_room_player_left", function(data) {
     console.log("Leaving game due to player leaving waiting room...")
     socket.emit("leave_game", {session_id: window.sessionId})
 
-    // Generate completion code and display it
-    const completionCode = generateCompletionCode();
-    console.log("Partner left waiting room - completion code:", completionCode);
-
-    // Emit completion code to server for logging/validation
-    socket.emit('waitroom_timeout_completion', {
-        completion_code: completionCode,
-        reason: 'partner_left_waitroom'
-    });
-
-    // Display completion code to participant
+    // Display message to participant (no completion code - they'll be paid via Compensation HIT)
     var message = data.message || "Another player left the waiting room.";
     $("#waitroomText").html(
         "<p>" + message + "</p>" +
-        "<p><strong>Your completion code is:</strong></p>" +
-        "<p style='font-size: 24px; font-family: monospace; background: #f0f0f0; padding: 10px; border-radius: 5px; user-select: all;'>" +
-        completionCode +
-        "</p>" +
-        "<p>Please copy this code and submit it to complete the study.</p>"
+        "<p>Please return the HIT now. You will be paid through a Compensation HIT.</p>" +
+        "<p>Thank you for your interest in our study!</p>"
     );
 })
 
