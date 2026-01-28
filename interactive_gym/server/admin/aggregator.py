@@ -388,9 +388,8 @@ class AdminEventAggregator:
         all_started = self._all_started_subjects | current_subject_ids
         total_started = len(all_started)
 
-        # Calculate completion rate
-        completed_count_actual = len(self.processed_subjects)
-        completion_rate = (completed_count_actual / total_started * 100) if total_started > 0 else 0
+        # Calculate completion rate using the same completed_count (includes participants on final scene)
+        completion_rate = (completed_count / total_started * 100) if total_started > 0 else 0
 
         # Calculate average session duration from completed sessions
         avg_session_duration_ms = None
@@ -457,14 +456,14 @@ class AdminEventAggregator:
 
         return {
             'subject_id': subject_id,
-            'connection_status': self._compute_connection_status(session, subject_id),
+            'connection_status': self._compute_connection_status(session, subject_id, stager),
             'current_scene_id': session.current_scene_id,
             'scene_progress': scene_progress,
             'created_at': session.created_at,
             'last_updated_at': session.last_updated_at
         }
 
-    def _compute_connection_status(self, session: Any, subject_id: str) -> str:
+    def _compute_connection_status(self, session: Any, subject_id: str, stager: Any = None) -> str:
         """
         Compute connection status for display.
 
@@ -477,6 +476,24 @@ class AdminEventAggregator:
         # Check if completed (need access to PROCESSED_SUBJECT_NAMES)
         if subject_id in self.processed_subjects:
             return 'completed'
+
+        # Check if participant is on the final scene (considered completed)
+        if stager is not None:
+            try:
+                current_index = stager.current_scene_index
+                total_scenes = len(stager.scenes)
+                # If on the last scene, consider completed
+                if current_index >= total_scenes - 1:
+                    # Record completion for duration tracking (if not already recorded)
+                    if subject_id not in self._completed_sessions:
+                        self.record_session_completion(
+                            subject_id=subject_id,
+                            started_at=session.created_at,
+                            completed_at=time.time()
+                        )
+                    return 'completed'
+            except Exception:
+                pass  # If we can't determine scene progress, fall through to other checks
 
         if session.is_connected:
             return 'connected'

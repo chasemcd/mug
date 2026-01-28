@@ -190,6 +190,10 @@ def index(*args):
 def user_index(subject_id):
     global STAGERS, SESSION_ID_TO_SUBJECT_ID, SUBJECTS, PARTICIPANT_SESSIONS
 
+    # Ignore browser resource requests that get captured by this route
+    if subject_id in ("favicon.ico", "robots.txt", "apple-touch-icon.png"):
+        return "", 404
+
     if subject_id in PROCESSED_SUBJECT_NAMES:
         return (
             "Error: You have already completed the experiment with this ID!",
@@ -421,6 +425,18 @@ def advance_scene(data):
     # Log activity for admin dashboard
     if ADMIN_AGGREGATOR:
         ADMIN_AGGREGATOR.log_activity("scene_advance", subject_id, {"scene_id": current_scene.scene_id})
+
+        # Record session completion if participant just reached the final scene
+        current_index = participant_stager.current_scene_index
+        total_scenes = len(participant_stager.scenes)
+        if current_index >= total_scenes - 1:
+            session = PARTICIPANT_SESSIONS.get(subject_id)
+            if session and subject_id not in ADMIN_AGGREGATOR._completed_sessions:
+                ADMIN_AGGREGATOR.record_session_completion(
+                    subject_id=subject_id,
+                    started_at=session.created_at,
+                    completed_at=time.time()
+                )
 
     # Update session state with new scene position for session restoration
     session = PARTICIPANT_SESSIONS.get(subject_id)
