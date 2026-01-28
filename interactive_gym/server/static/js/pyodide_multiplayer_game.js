@@ -6017,26 +6017,14 @@ _cumulative_rewards
     /**
      * Show focus loss timeout message (Phase 27 - TIMEOUT-03).
      * Reuses partner disconnected overlay pattern.
-     * Now includes completion code for participant compensation.
+     * NOTE: No completion code shown here - this is displayed to the participant
+     * who was inactive/away. The active partner receives a completion code via
+     * _showPartnerDisconnectedOverlay instead.
      * @param {string} message - Message to display
      */
     _showFocusLossTimeoutOverlay(message) {
         // Remove any existing overlays
         this._hideReconnectingOverlay();
-
-        // Generate completion code for participant
-        const completionCode = generateCompletionCode();
-        p2pLog.warn('Focus loss timeout - completion code:', completionCode);
-
-        // Emit completion code to server for logging/validation
-        if (this.socket) {
-            this.socket.emit('waitroom_timeout_completion', {
-                completion_code: completionCode,
-                reason: 'focus_loss_timeout',
-                frame_number: this.frameNumber,
-                episode_number: this.num_episodes
-            });
-        }
 
         // Hide ALL direct children of body
         Array.from(document.body.children).forEach(child => {
@@ -6072,12 +6060,7 @@ _cumulative_rewards
                 text-align: center;
             ">
                 <h2 style="color: #333; margin-bottom: 20px;">Session Ended</h2>
-                <p style="font-size: 16px; color: #333; margin-bottom: 20px;">${message}</p>
-                <p style="font-size: 14px; color: #333;"><strong>Your completion code is:</strong></p>
-                <p style="font-size: 24px; font-family: monospace; background: #f0f0f0; padding: 10px; border-radius: 5px; user-select: all;">
-                    ${completionCode}
-                </p>
-                <p style="font-size: 14px; color: #666; margin-top: 15px;">Please copy this code and submit it to complete the study.</p>
+                <p style="font-size: 16px; color: #333;">${message}</p>
             </div>
         `;
         container.style.display = 'flex';
