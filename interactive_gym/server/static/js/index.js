@@ -391,6 +391,16 @@ socket.on('server_session_id', function(data) {
     window.sessionId = data.session_id;
 });
 
+// Handle join_game errors - show start button again so user can retry
+socket.on('join_game_error', function(data) {
+    console.error("join_game_error:", data.message);
+    $("#startButton").show();
+    $("#startButton").attr("disabled", false);
+    $("#startButtonLoader").removeClass("visible");
+    $("#errorText").text(data.message);
+    $("#errorText").show();
+});
+
 // Experiment-level configuration (including entry screening)
 socket.on('experiment_config', async function(data) {
     console.log("[ExperimentConfig] Received experiment configuration");

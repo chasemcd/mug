@@ -76,6 +76,7 @@ class GameManager:
 
         # Queue of games IDs that are waiting for additional players to join.
         self.waiting_games = []
+        self.waiting_games_lock = eventlet.semaphore.Semaphore()  # Protect waiting_games access
         self.waitroom_timeouts = utils.ThreadSafeDict()
 
         # holds reset events so we only continue in game loop when triggered
@@ -185,8 +186,9 @@ class GameManager:
 
     def _remove_game(self, game_id: GameID) -> None:
         """Remove a game from the server."""
-        if game_id in self.waiting_games:
-            self.waiting_games.remove(game_id)
+        with self.waiting_games_lock:
+            if game_id in self.waiting_games:
+                self.waiting_games.remove(game_id)
 
         if game_id in self.games:
             del self.games[game_id]
@@ -196,8 +198,6 @@ class GameManager:
             del self.waitroom_timeouts[game_id]
         if game_id in self.active_games:
             self.active_games.remove(game_id)
-        if game_id in self.waiting_games:
-            self.waiting_games.remove(game_id)
 
         self.sio.close_room(game_id)
 
@@ -205,7 +205,8 @@ class GameManager:
         assert game_id not in self.reset_events
         assert game_id not in self.waitroom_timeouts
         assert game_id not in self.active_games
-        assert game_id not in self.waiting_games
+        with self.waiting_games_lock:
+            assert game_id not in self.waiting_games
 
         logger.info(
             f"Successfully removed game {game_id} and closed the associated room."
@@ -319,18 +320,19 @@ class GameManager:
         subject_ids: list[SubjectID]
     ) -> remote_game.RemoteGameV2:
         """Create a game for a specific group of players."""
-        # Create a new game
-        self._create_game()
-        game: remote_game.RemoteGameV2 = self.games[self.waiting_games[-1]]
+        with self.waiting_games_lock:
+            # Create a new game
+            self._create_game()
+            game: remote_game.RemoteGameV2 = self.games[self.waiting_games[-1]]
 
-        # Add each partner to the game
-        for subject_id in subject_ids:
-            self._add_subject_to_specific_game(subject_id, game)
+            # Add each partner to the game
+            for subject_id in subject_ids:
+                self._add_subject_to_specific_game(subject_id, game)
 
-        # The game should now be ready
-        if game.is_ready_to_start():
-            self.waiting_games.remove(game.game_id)
-            self.start_game(game)
+            # The game should now be ready
+            if game.is_ready_to_start():
+                self.waiting_games.remove(game.game_id)
+                self.start_game(game)
 
         return game
 
@@ -380,65 +382,67 @@ class GameManager:
         self, subject_id: SubjectID
     ) -> remote_game.RemoteGameV2:
         """Add a subject to the standard FIFO matching queue."""
-        if not self.waiting_games:
-            logger.info("No games waiting for players. Creating a new game.")
-            self._create_game()
-            logger.info(f"Created game. waiting_games now: {self.waiting_games}")
+        # Use lock to prevent race conditions when multiple participants join simultaneously
+        with self.waiting_games_lock:
+            if not self.waiting_games:
+                logger.info("No games waiting for players. Creating a new game.")
+                self._create_game()
+                logger.info(f"Created game. waiting_games now: {self.waiting_games}")
 
-        game: remote_game.RemoteGameV2 = self.games[self.waiting_games[0]]
-        logger.info(f"Adding subject {subject_id} to game {game.game_id}. Game has {len(game.human_players)} players, needs {len(self.scene.policy_mapping)}")
-        with game.lock:
-            self.subject_games[subject_id] = game.game_id
-            self.subject_rooms[subject_id] = game.game_id
-            self.reset_events[game.game_id][subject_id] = eventlet.event.Event()
-            flask_socketio.join_room(game.game_id)
+            game: remote_game.RemoteGameV2 = self.games[self.waiting_games[0]]
+            logger.info(f"Adding subject {subject_id} to game {game.game_id}. Game has {len(game.human_players)} players, needs {len(self.scene.policy_mapping)}")
+            with game.lock:
+                self.subject_games[subject_id] = game.game_id
+                self.subject_rooms[subject_id] = game.game_id
+                self.reset_events[game.game_id][subject_id] = eventlet.event.Event()
+                flask_socketio.join_room(game.game_id)
 
-            available_human_agent_ids = game.get_available_human_agent_ids()
-            player_id = None
-            if not available_human_agent_ids:
-                logger.warning(
-                    f"No available human agent IDs for game {game.game_id}. Adding as a spectator."
-                )
-            else:
-                player_id = random.choice(available_human_agent_ids)
-                game.add_player(player_id, subject_id)
+                available_human_agent_ids = game.get_available_human_agent_ids()
+                player_id = None
+                if not available_human_agent_ids:
+                    logger.warning(
+                        f"No available human agent IDs for game {game.game_id}. Adding as a spectator."
+                    )
+                else:
+                    player_id = random.choice(available_human_agent_ids)
+                    game.add_player(player_id, subject_id)
 
-            # If multiplayer Pyodide, add player to coordinator
-            if self.scene.pyodide_multiplayer and self.pyodide_coordinator and player_id is not None:
-                self.pyodide_coordinator.add_player(
-                    game_id=game.game_id,
-                    player_id=player_id,
-                    socket_id=flask.request.sid,
-                    subject_id=subject_id  # Pass subject_id for data logging
-                )
-                logger.info(
-                    f"Added player {player_id} (subject: {subject_id}) to Pyodide coordinator for game {game.game_id}"
-                )
+                # If multiplayer Pyodide, add player to coordinator
+                if self.scene.pyodide_multiplayer and self.pyodide_coordinator and player_id is not None:
+                    self.pyodide_coordinator.add_player(
+                        game_id=game.game_id,
+                        player_id=player_id,
+                        socket_id=flask.request.sid,
+                        subject_id=subject_id  # Pass subject_id for data logging
+                    )
+                    logger.info(
+                        f"Added player {player_id} (subject: {subject_id}) to Pyodide coordinator for game {game.game_id}"
+                    )
 
-            if self.scene.game_page_html_fn is not None:
-                self.sio.emit(
-                    "update_game_page_text",
-                    {
-                        "game_page_text": self.scene.game_page_html_fn(
-                            game, subject_id
-                        )
-                    },
-                    room=subject_id,
-                )
+                if self.scene.game_page_html_fn is not None:
+                    self.sio.emit(
+                        "update_game_page_text",
+                        {
+                            "game_page_text": self.scene.game_page_html_fn(
+                                game, subject_id
+                            )
+                        },
+                        room=subject_id,
+                    )
 
-            # If the game is ready to start, we'll remove it from WAITING_GAMES.
-            is_ready = game.is_ready_to_start()
-            logger.info(f"Game {game.game_id} ready to start: {is_ready}. Available slots: {game.get_available_human_agent_ids()}")
-            if is_ready:
-                logger.info(f"Removing game {game.game_id} from waiting_games")
-                self.waiting_games.remove(game.game_id)
-                assert game.game_id not in self.waiting_games
+                # If the game is ready to start, we'll remove it from WAITING_GAMES.
+                is_ready = game.is_ready_to_start()
+                logger.info(f"Game {game.game_id} ready to start: {is_ready}. Available slots: {game.get_available_human_agent_ids()}")
+                if is_ready:
+                    logger.info(f"Removing game {game.game_id} from waiting_games")
+                    self.waiting_games.remove(game.game_id)
+                    assert game.game_id not in self.waiting_games
 
-            if is_ready:
-                self.start_game(game)
-            else:
-                # Broadcast to all players in the room so everyone sees updated count
-                self.broadcast_waiting_room_status(game.game_id)
+                if is_ready:
+                    self.start_game(game)
+                else:
+                    # Broadcast to all players in the room so everyone sees updated count
+                    self.broadcast_waiting_room_status(game.game_id)
 
         return game
 

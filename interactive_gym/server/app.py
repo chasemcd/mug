@@ -482,6 +482,18 @@ def join_game(data):
     subject_id = get_subject_id_from_session_id(flask.request.sid)
     client_session_id = data.get("session_id")  # Client sends "session_id"
 
+    # Validate subject_id exists
+    if subject_id is None:
+        logger.error(
+            f"join_game called but no subject_id found for session {flask.request.sid}"
+        )
+        socketio.emit(
+            "join_game_error",
+            {"message": "Session not found. Please refresh the page."},
+            room=flask.request.sid,
+        )
+        return
+
     # Validate session
     # if not is_valid_session(client_session_id, subject_id, "join_game"):
     #     return
@@ -494,6 +506,11 @@ def join_game(data):
             logger.error(
                 f"Subject {subject_id} tried to join a game but they don't have a stager."
             )
+            socketio.emit(
+                "join_game_error",
+                {"message": "Session state not found. Please refresh the page."},
+                room=flask.request.sid,
+            )
             return
 
         # Get the current scene and game manager to determine where to send the participant
@@ -504,19 +521,43 @@ def join_game(data):
             logger.error(
                 f"Subject {subject_id} tried to join a game but no game manager was found for scene {current_scene.scene_id}."
             )
-            return
-
-        # Check if the participant is already in a game in this scene, they should not be.
-        if game_manager.subject_in_game(subject_id):
-            logger.error(
-                f"Subject {subject_id} in a game in scene {current_scene.scene_id} but attempted to join another."
+            socketio.emit(
+                "join_game_error",
+                {"message": "Game not available. Please refresh the page."},
+                room=flask.request.sid,
             )
             return
 
-        game = game_manager.add_subject_to_game(subject_id)
-        logger.info(
-            f"Successfully added subject {subject_id} to game {game.game_id}."
-        )
+        # Check if the participant is already in a game in this scene.
+        # This can happen if a previous session didn't clean up properly (browser crash, network issue, etc.)
+        if game_manager.subject_in_game(subject_id):
+            logger.warning(
+                f"Subject {subject_id} already has a game entry in scene {current_scene.scene_id}. "
+                f"Cleaning up stale entry before rejoining."
+            )
+            # Clean up the stale entry so they can rejoin
+            game_manager.remove_subject_quietly(subject_id)
+
+        try:
+            game = game_manager.add_subject_to_game(subject_id)
+            if game is not None:
+                logger.info(
+                    f"Successfully added subject {subject_id} to game {game.game_id}."
+                )
+            else:
+                # game is None when waiting for group members - this is expected
+                logger.info(
+                    f"Subject {subject_id} is waiting for group members."
+                )
+        except Exception as e:
+            logger.exception(
+                f"Error adding subject {subject_id} to game: {e}"
+            )
+            socketio.emit(
+                "join_game_error",
+                {"message": "Failed to join game. Please try again."},
+                room=flask.request.sid,
+            )
 
 
 def is_valid_session(
