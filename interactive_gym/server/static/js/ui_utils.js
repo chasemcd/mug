@@ -74,13 +74,38 @@ export function disableKeyListener() {
 // Episode Transition Overlay
 
 /**
+ * Ensure the episode transition overlay exists in the DOM.
+ * Creates it dynamically if it was removed (e.g., by Phaser initialization).
+ */
+function ensureOverlayExists() {
+    let overlay = $('#episodeTransitionOverlay');
+    if (overlay.length === 0) {
+        // Overlay doesn't exist - create it dynamically
+        const gameContainer = $('#gameContainer');
+        if (gameContainer.length > 0) {
+            const overlayHtml = `
+                <div id="episodeTransitionOverlay">
+                    <div id="episodeTransitionText">Next round will begin shortly...</div>
+                    <div id="episodeCountdown"></div>
+                </div>
+            `;
+            gameContainer.prepend(overlayHtml);
+            overlay = $('#episodeTransitionOverlay');
+            console.log('[UI] Created episode transition overlay dynamically');
+        }
+    }
+    return overlay;
+}
+
+/**
  * Show the episode transition overlay with "waiting" message.
  * Call this when waiting for the server to send the next episode state.
  */
 export function showEpisodeWaiting(message = "Next round will begin shortly...") {
+    const overlay = ensureOverlayExists();
     $('#episodeTransitionText').text(message);
     $('#episodeCountdown').text('');
-    $('#episodeTransitionOverlay').addClass('visible');
+    overlay.addClass('visible');
 }
 
 /**
@@ -94,7 +119,7 @@ export function showEpisodeWaiting(message = "Next round will begin shortly...")
 export function showEpisodeCountdown(seconds = 3, message = "Get ready!") {
     return new Promise((resolve) => {
         console.log(`[UI] showEpisodeCountdown: ${seconds}s, message="${message}"`);
-        const overlay = $('#episodeTransitionOverlay');
+        const overlay = ensureOverlayExists();
         console.log(`[UI] Overlay element found: ${overlay.length > 0}, current classes: "${overlay.attr('class')}"`);
 
         $('#episodeTransitionText').text(message);
@@ -134,5 +159,8 @@ export function showEpisodeCountdown(seconds = 3, message = "Get ready!") {
  */
 export function hideEpisodeOverlay() {
     console.log('[UI] hideEpisodeOverlay called');
-    $('#episodeTransitionOverlay').removeClass('visible');
+    const overlay = $('#episodeTransitionOverlay');
+    if (overlay.length > 0) {
+        overlay.removeClass('visible');
+    }
 }
