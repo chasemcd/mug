@@ -2116,9 +2116,11 @@ hashlib.md5(json.dumps(_state, sort_keys=True).encode()).hexdigest()[:8]
     async showEpisodeTransition(waitingMessage = null) {
         // Check if this is a subsequent episode (not the first one)
         const isSubsequentEpisode = this.num_episodes > 0;
+        p2pLog.info(`showEpisodeTransition called: num_episodes=${this.num_episodes}, isSubsequentEpisode=${isSubsequentEpisode}`);
 
         if (!isSubsequentEpisode) {
             // First episode - just ensure overlay is hidden
+            p2pLog.info('First episode - skipping countdown');
             ui_utils.hideEpisodeOverlay();
             return;
         }
@@ -2173,7 +2175,9 @@ hashlib.md5(json.dumps(_state, sort_keys=True).encode()).hexdigest()[:8]
 
         // Show countdown before starting
         const episodeNum = this.num_episodes + 1;
+        p2pLog.info(`Showing episode countdown for round ${episodeNum}`);
         await ui_utils.showEpisodeCountdown(3, `Round ${episodeNum} starting!`);
+        p2pLog.info('Episode countdown completed');
     }
 
     async step(allActionsDict) {

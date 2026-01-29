@@ -93,8 +93,20 @@ export function showEpisodeWaiting(message = "Next round will begin shortly...")
  */
 export function showEpisodeCountdown(seconds = 3, message = "Get ready!") {
     return new Promise((resolve) => {
+        console.log(`[UI] showEpisodeCountdown: ${seconds}s, message="${message}"`);
+        const overlay = $('#episodeTransitionOverlay');
+        console.log(`[UI] Overlay element found: ${overlay.length > 0}, current classes: "${overlay.attr('class')}"`);
+
         $('#episodeTransitionText').text(message);
-        $('#episodeTransitionOverlay').addClass('visible');
+        overlay.addClass('visible');
+        console.log(`[UI] Added visible class, now: "${overlay.attr('class')}"`);
+
+        // Check computed style to verify visibility
+        const overlayEl = overlay[0];
+        if (overlayEl) {
+            const computed = window.getComputedStyle(overlayEl);
+            console.log(`[UI] Computed display: "${computed.display}", visibility: "${computed.visibility}", opacity: "${computed.opacity}", z-index: "${computed.zIndex}"`);
+        }
 
         let remaining = seconds;
         $('#episodeCountdown').text(remaining);
@@ -121,5 +133,6 @@ export function showEpisodeCountdown(seconds = 3, message = "Get ready!") {
  * Hide the episode transition overlay.
  */
 export function hideEpisodeOverlay() {
+    console.log('[UI] hideEpisodeOverlay called');
     $('#episodeTransitionOverlay').removeClass('visible');
 }
