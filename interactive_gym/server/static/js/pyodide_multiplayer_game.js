@@ -2439,6 +2439,7 @@ hashlib.md5(json.dumps(_st, sort_keys=True).encode()).hexdigest()[:8]
                 rewards: Object.fromEntries(rewards),
                 terminateds: Object.fromEntries(terminateds),
                 truncateds: Object.fromEntries(truncateds),
+                infos: infos instanceof Map ? Object.fromEntries(infos) : infos,
                 isFocused: this.focusManager ? !this.focusManager.isBackgrounded : true
             });
         }
@@ -3545,6 +3546,7 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
             rewards: data.rewards,
             terminateds: data.terminateds,
             truncateds: data.truncateds,
+            infos: data.infos,
             isFocused: data.isFocused,
             timestamp: Date.now()
         });
@@ -3574,6 +3576,7 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
             rewards: {},
             terminateds: {},
             truncateds: {},
+            infos: {},
             isFocused: {},
             episode_num: [],
             t: [],
@@ -3604,10 +3607,34 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
                 }
             };
 
+            // Add per-agent infos with flattening (infos.agentId.key instead of infos.agentId = {...})
+            const addFlattenedInfos = (infosData) => {
+                if (!infosData) return;
+                for (const [agentId, infoDict] of Object.entries(infosData)) {
+                    if (!infoDict || typeof infoDict !== 'object') {
+                        // If infoDict is not an object, store it directly
+                        if (!data.infos[agentId]) {
+                            data.infos[agentId] = [];
+                        }
+                        data.infos[agentId].push(infoDict);
+                        continue;
+                    }
+                    // Flatten the info dict: infos.agentId.key = value
+                    for (const [key, value] of Object.entries(infoDict)) {
+                        const flatKey = `${agentId}.${key}`;
+                        if (!data.infos[flatKey]) {
+                            data.infos[flatKey] = [];
+                        }
+                        data.infos[flatKey].push(value);
+                    }
+                }
+            };
+
             addAgentData('actions', frameData.actions);
             addAgentData('rewards', frameData.rewards);
             addAgentData('terminateds', frameData.terminateds);
             addAgentData('truncateds', frameData.truncateds);
+            addFlattenedInfos(frameData.infos);
             addAgentData('isFocused', frameData.isFocused);
         }
 
@@ -4626,10 +4653,11 @@ for _rf in _replay_frames:
 
     _actions = {int(k) if str(k).isdigit() else k: v for k, v in _rf['actions'].items()}
     _obs, _rewards, _term, _trunc, _info = env.step(_actions)
-    # Convert rewards/term/trunc to dicts with string keys for JSON
+    # Convert rewards/term/trunc/info to dicts with string keys for JSON
     _rewards_dict = {str(k): v for k, v in _rewards.items()} if isinstance(_rewards, dict) else {'human': _rewards}
     _term_dict = {str(k): v for k, v in _term.items()} if isinstance(_term, dict) else {'human': _term}
     _trunc_dict = {str(k): v for k, v in _trunc.items()} if isinstance(_trunc, dict) else {'human': _trunc}
+    _info_dict = {str(k): v for k, v in _info.items()} if isinstance(_info, dict) else {'human': _info}
     # Accumulate rewards from replay (critical for HUD sync)
     if isinstance(_rewards, dict):
         for _k, _v in _rewards.items():
@@ -4645,6 +4673,7 @@ for _rf in _replay_frames:
         'rewards': _rewards_dict,
         'terminateds': _term_dict,
         'truncateds': _trunc_dict,
+        'infos': _info_dict,
         'pre_hash': _pre_hash,
         'post_hash': _post_hash
     })
@@ -4700,6 +4729,7 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
                         rewards: entry.rewards,
                         terminateds: entry.terminateds,
                         truncateds: entry.truncateds,
+                        infos: entry.infos,
                         isFocused: this.focusManager ? !this.focusManager.isBackgrounded : true
                     });
                 }
@@ -4876,13 +4906,15 @@ for _ff in _ff_frames:
     _rewards_dict = {str(k): v for k, v in _rewards.items()} if isinstance(_rewards, dict) else {'human': _rewards}
     _term_dict = {str(k): v for k, v in _terms.items()} if isinstance(_terms, dict) else {'human': _terms}
     _trunc_dict = {str(k): v for k, v in _truncs.items()} if isinstance(_truncs, dict) else {'human': _truncs}
+    _info_dict = {str(k): v for k, v in _infos.items()} if isinstance(_infos, dict) else {'human': _infos}
     # Store per-frame data
     _per_frame_data.append({
         'frame': _frame,
         'actions': _ff['actions'],
         'rewards': _rewards_dict,
         'terminateds': _term_dict,
-        'truncateds': _trunc_dict
+        'truncateds': _trunc_dict,
+        'infos': _info_dict
     })
     # Accumulate rewards
     for _agent_id, _reward in _rewards.items():
@@ -4914,6 +4946,7 @@ json.dumps({'cumulative_rewards': {str(k): v for k, v in _cumulative_rewards.ite
                     rewards: frameData.rewards,
                     terminateds: frameData.terminateds,
                     truncateds: frameData.truncateds,
+                    infos: frameData.infos,
                     isFocused: focusStateForFF
                 });
             }
