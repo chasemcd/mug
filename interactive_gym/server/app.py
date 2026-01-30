@@ -551,20 +551,27 @@ def join_game(data):
             # Clean up the stale entry so they can rejoin
             game_manager.remove_subject_quietly(subject_id)
 
+        logger.info(
+            f"[JoinGame] Subject {subject_id} clicked start button for scene {current_scene.scene_id}. "
+            f"Attempting to add to game..."
+        )
+
         try:
             game = game_manager.add_subject_to_game(subject_id)
             if game is not None:
                 logger.info(
-                    f"Successfully added subject {subject_id} to game {game.game_id}."
+                    f"[JoinGame] Subject {subject_id} successfully added to game {game.game_id}. "
+                    f"Game starting."
                 )
             else:
-                # game is None when waiting for group members - this is expected
+                # game is None when waiting for group members or in waiting room
                 logger.info(
-                    f"Subject {subject_id} is waiting for group members."
+                    f"[JoinGame] Subject {subject_id} added to waiting room for scene {current_scene.scene_id}. "
+                    f"Waiting for more players."
                 )
         except Exception as e:
             logger.exception(
-                f"Error adding subject {subject_id} to game: {e}"
+                f"[JoinGame] Error adding subject {subject_id} to game: {e}"
             )
             socketio.emit(
                 "join_game_error",
@@ -594,7 +601,7 @@ def is_valid_session(
 @socketio.on("leave_game")
 def leave_game(data):
     subject_id = get_subject_id_from_session_id(flask.request.sid)
-    logger.info(f"Participant {subject_id} leaving game.")
+    logger.info(f"[LeaveGame] Subject {subject_id} leaving game (likely waitroom timeout or disconnect).")
 
     # Validate session
     client_reported_session_id = data.get("session_id")
@@ -840,8 +847,8 @@ def on_waitroom_timeout_completion(data):
     reason = data.get("reason", "waitroom_timeout")
 
     logger.info(
-        f"Waitroom timeout completion - subject: {subject_id}, "
-        f"code: {completion_code}, reason: {reason}"
+        f"[WaitroomTimeout] Subject {subject_id} waitroom timed out. "
+        f"Completion code: {completion_code}, Reason: {reason}"
     )
 
     # Save completion code to file if data saving is enabled

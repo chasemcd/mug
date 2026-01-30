@@ -378,10 +378,10 @@ function pyodideReadyIfUsing() {
 
 $(function() {
     $('#startButton').click( () => {
+        console.log("[StartButton] Clicked - attempting to join game. Session:", window.sessionId, "Subject:", window.subjectName || interactiveGymGlobals?.subjectName);
         $("#startButton").hide();
         $("#startButton").attr("disabled", true);
         $("#startButtonLoader").removeClass("visible");
-        console.debug("Joining game in session", window.sessionId)
         socket.emit("join_game", {session_id: window.sessionId});
 
     })
@@ -616,6 +616,10 @@ var waitroomInterval;
 var waitroomTimeoutMessage = null;  // Store custom timeout message from server
 
 socket.on("waiting_room", function(data) {
+    console.log("[WaitingRoom] Added to waiting room. Subject:", window.subjectName || interactiveGymGlobals?.subjectName,
+        "Players:", data.cur_num_players, "/", (data.cur_num_players + data.players_needed),
+        "Timeout:", Math.floor(data.ms_remaining / 1000), "seconds");
+
     if (waitroomInterval) {
         clearInterval(waitroomInterval);
     }
@@ -639,7 +643,7 @@ socket.on("waiting_room", function(data) {
         // Stop the timer if it reaches zero
         if (timer <= 0) {
             clearInterval(waitroomInterval);
-            console.log("Leaving game due to waitroom ending...")
+            console.log("[WaitroomTimeout] Waiting room timed out. Subject:", window.subjectName || interactiveGymGlobals?.subjectName, "Session:", window.sessionId);
             socket.emit("leave_game", {session_id: window.sessionId})
 
             // Display custom message if configured, otherwise use default
