@@ -492,19 +492,11 @@ class GymScene extends Phaser.Scene {
                 }
 
                 // Check if this is a multiplayer game with rollback support
+                // For multiplayer, frame data is stored inside step() to ensure correct frame number
+                // Only use remoteGameLogger for single-player mode
                 const isMultiplayerWithRollback = this.pyodide_remote_game.storeFrameData !== undefined;
 
-                if (isMultiplayerWithRollback) {
-                    // Use rollback-safe frame buffer for multiplayer
-                    // Data is stored by frame number and corrected on rollback
-                    this.pyodide_remote_game.storeFrameData(this.pyodide_remote_game.frameNumber, {
-                        actions: syncedActions instanceof Map ? Object.fromEntries(syncedActions) : syncedActions,
-                        rewards: rewards instanceof Map ? Object.fromEntries(rewards) : rewards,
-                        terminateds: terminateds instanceof Map ? Object.fromEntries(terminateds) : terminateds,
-                        truncateds: truncateds instanceof Map ? Object.fromEntries(truncateds) : truncateds,
-                        isFocused: this.pyodide_remote_game.getFocusStatePerPlayer?.() || {}
-                    });
-                } else {
+                if (!isMultiplayerWithRollback) {
                     // Single-player mode: use standard logger (no rollback concerns)
                     remoteGameLogger.logData(
                         {
@@ -520,6 +512,7 @@ class GymScene extends Phaser.Scene {
                             isFocused: this.pyodide_remote_game.getFocusStatePerPlayer?.() || {}
                         });
                 }
+                // Note: For multiplayer, data is stored in step() before frameNumber++ to ensure correct frame
             }
             addStateToBuffer(render_state);
         }

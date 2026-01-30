@@ -2428,10 +2428,25 @@ hashlib.md5(json.dumps(_st, sort_keys=True).encode()).hexdigest()[:8]
         // State sync (hash comparison) is a separate verification layer that's not needed
         // when rollback is working correctly.
 
+        // Store frame data in the rollback-safe buffer BEFORE incrementing frameNumber
+        // This ensures we use the correct frame number for data storage
+        // Data will be cleared and re-stored on rollback via clearFrameDataFromRollback + replay
+        // IMPORTANT: Don't store data if we've already detected episode end locally
+        // (we may still be executing frames while waiting for peer sync)
+        if (!this.p2pEpisodeSync.localEpisodeEndDetected) {
+            this.storeFrameData(this.frameNumber, {
+                actions: finalActions,
+                rewards: Object.fromEntries(rewards),
+                terminateds: Object.fromEntries(terminateds),
+                truncateds: Object.fromEntries(truncateds),
+                isFocused: this.focusManager ? !this.focusManager.isBackgrounded : true
+            });
+        }
+
         // Check P2P health for fallback awareness
         this._checkP2PHealth();
 
-        // 4. Increment frame (AFTER recording hash)
+        // 4. Increment frame (AFTER recording data and hash)
         this.frameNumber++;
 
         // Prune old input buffer entries to prevent unbounded growth

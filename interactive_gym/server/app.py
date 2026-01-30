@@ -744,8 +744,8 @@ def pong(data):
     if ping_ms is not None:
         session_id = flask.request.sid
         subject_id = get_subject_id_from_session_id(session_id)
-        if subject_id and subject_id in SESSIONS:
-            SESSIONS[subject_id].current_rtt = ping_ms
+        if subject_id and subject_id in PARTICIPANT_SESSIONS:
+            PARTICIPANT_SESSIONS[subject_id].current_rtt = ping_ms
 
 
 @socketio.on("unityEpisodeEnd")
