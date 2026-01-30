@@ -245,13 +245,32 @@ export function logFastForwardFrame(frameData) {
 }
 
 export function graphics_start(graphics_config) {
+    // Clean up any existing game instance before creating a new one
+    // This prevents duplicate Phaser canvases from appearing
+    if (game_graphics && game_graphics.game) {
+        console.log("[graphics_start] Destroying existing game instance before creating new one");
+        try {
+            $("#gameContainer").empty();
+            game_graphics.game.destroy(true);
+        } catch (e) {
+            console.warn("[graphics_start] Error destroying existing game:", e);
+        }
+        stateBuffer = [];
+    }
     game_graphics = new GraphicsManager(game_config, graphics_config);
 }
 
 
 export function graphics_end() {
     $("#gameContainer").empty();
-    game_graphics.game.destroy(true);
+    if (game_graphics && game_graphics.game) {
+        try {
+            game_graphics.game.destroy(true);
+        } catch (e) {
+            console.warn("[graphics_end] Error destroying game:", e);
+        }
+    }
+    game_graphics = null;
     stateBuffer = [];
 }
 
