@@ -15,7 +15,7 @@ import * as seeded_random from './seeded_random.js';
 import * as ui_utils from './ui_utils.js';
 import { WebRTCManager, LatencyTelemetry } from './webrtc_manager.js';
 import { ContinuousMonitor } from './continuous_monitor.js';
-import { clearHumanInputBuffers, logFastForwardFrame, emitEpisodeData } from './phaser_gym_graphics.js';
+import { clearHumanInputBuffers } from './phaser_gym_graphics.js';
 
 // ========== Logging Configuration ==========
 // Control verbosity via browser console: window.p2pLogLevel = 'info' or 'debug'
@@ -1018,6 +1018,11 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         this.actionSequence = [];  // [{frame: N, actions: {player: action}}]
         this.actionCounts = {};    // {playerId: {action: count}}
 
+        // Frame-indexed data buffer for rollback-safe data logging
+        // Maps frame -> {actions, rewards, terminateds, truncateds, isFocused}
+        // This buffer is cleared/updated on rollback to ensure only correct data is exported
+        this.frameDataBuffer = new Map();
+
         // Cumulative validation data - persists across episodes for full session export
         // This data is NOT cleared on episode reset, only when scene ends
         this.cumulativeValidation = {
@@ -1821,6 +1826,9 @@ print(f"[Python] Seeded RNG with {${seed}}")
         // Clear action tracking for sync verification
         this.actionSequence = [];
         this.actionCounts = {};
+
+        // Clear frame data buffer for new episode
+        this.frameDataBuffer.clear();
 
         // Reset per-episode diagnostics
         this.diagnostics.syncCount = 0;
@@ -3511,6 +3519,86 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
          */
     }
 
+    /**
+     * Store frame data in the rollback-safe buffer.
+     * Called after each step to record the frame's data.
+     * On rollback, frames >= target are deleted and re-recorded with correct data.
+     */
+    storeFrameData(frameNumber, data) {
+        this.frameDataBuffer.set(frameNumber, {
+            actions: data.actions,
+            rewards: data.rewards,
+            terminateds: data.terminateds,
+            truncateds: data.truncateds,
+            isFocused: data.isFocused,
+            timestamp: Date.now()
+        });
+    }
+
+    /**
+     * Clear frame data buffer entries from rollback target onwards.
+     * Called at the start of rollback to remove predicted/incorrect data.
+     */
+    clearFrameDataFromRollback(targetFrame) {
+        for (const frame of this.frameDataBuffer.keys()) {
+            if (frame >= targetFrame) {
+                this.frameDataBuffer.delete(frame);
+            }
+        }
+        p2pLog.debug(`Cleared frame data buffer from frame ${targetFrame} onwards`);
+    }
+
+    /**
+     * Export episode data from frameDataBuffer in the format expected by remoteGameLogger.
+     * Called at episode end to build the correct, rollback-corrected data.
+     * @returns {Object} Episode data in remoteGameLogger format
+     */
+    exportEpisodeDataFromBuffer() {
+        const data = {
+            actions: {},
+            rewards: {},
+            terminateds: {},
+            truncateds: {},
+            isFocused: {},
+            episode_num: [],
+            t: [],
+            timestamp: [],
+            player_subjects: this.playerSubjects
+        };
+
+        // Get sorted frame numbers
+        const sortedFrames = Array.from(this.frameDataBuffer.keys()).sort((a, b) => a - b);
+
+        for (const frame of sortedFrames) {
+            const frameData = this.frameDataBuffer.get(frame);
+            if (!frameData) continue;
+
+            // Add step number
+            data.t.push(frame);
+            data.episode_num.push(this.num_episodes);
+            data.timestamp.push(frameData.timestamp);
+
+            // Add per-agent data
+            const addAgentData = (field, agentData) => {
+                if (!agentData) return;
+                for (const [agentId, value] of Object.entries(agentData)) {
+                    if (!data[field][agentId]) {
+                        data[field][agentId] = [];
+                    }
+                    data[field][agentId].push(value);
+                }
+            };
+
+            addAgentData('actions', frameData.actions);
+            addAgentData('rewards', frameData.rewards);
+            addAgentData('terminateds', frameData.terminateds);
+            addAgentData('truncateds', frameData.truncateds);
+            addAgentData('isFocused', frameData.isFocused);
+        }
+
+        return data;
+    }
+
     signalEpisodeComplete() {
         /**
          * Mark the game as done when episode completes.
@@ -3522,10 +3610,10 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
          * That in turn calls terminateGymScene() which saves data via emit_remote_game_data.
          */
 
-        // Emit episode data incrementally to avoid large payloads at scene end
-        // This sends the current episode's data and resets the logger
+        // Export episode data from the rollback-safe buffer
+        // This ensures only correct, validated data is emitted
         if (this.sceneId) {
-            emitEpisodeData(this.sceneId, this.num_episodes);
+            this._emitEpisodeDataFromBuffer();
         }
 
         this.num_episodes += 1;
@@ -3538,6 +3626,41 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
             this.shouldReset = true;
             p2pLog.debug(`Episode ${this.num_episodes}/${this.max_episodes} complete, will reset`);
         }
+    }
+
+    /**
+     * Emit episode data from the rollback-safe frame buffer.
+     * Uses msgpack encoding for efficient transmission.
+     */
+    _emitEpisodeDataFromBuffer() {
+        if (!window.socket) {
+            console.error('[_emitEpisodeDataFromBuffer] Socket not available');
+            return;
+        }
+
+        const episodeData = this.exportEpisodeDataFromBuffer();
+
+        // Skip if no data to send
+        if (!episodeData || episodeData.t.length === 0) {
+            console.log(`[_emitEpisodeDataFromBuffer] No data to emit for episode ${this.num_episodes}`);
+            return;
+        }
+
+        // Encode to msgpack for efficient transmission
+        const binaryData = msgpack.encode(episodeData);
+
+        console.log(`[_emitEpisodeDataFromBuffer] Emitting episode ${this.num_episodes} data: ${episodeData.t.length} frames, ${binaryData.byteLength} bytes`);
+
+        window.socket.emit("emit_episode_data", {
+            data: binaryData,
+            scene_id: this.sceneId,
+            episode_num: this.num_episodes,
+            session_id: window.sessionId,
+            interactiveGymGlobals: window.interactiveGymGlobals
+        });
+
+        // Clear the buffer after emitting
+        this.frameDataBuffer.clear();
     }
 
     /**
@@ -4292,6 +4415,10 @@ json.dumps({
         // Clear outbound queue - these hashes are for states being overwritten
         this.pendingHashExchange = this.pendingHashExchange.filter(h => h.frame < targetFrame);
 
+        // Clear frame data buffer from rollback point onwards
+        // This ensures predicted/incorrect data is replaced with correct data during replay
+        this.clearFrameDataFromRollback(targetFrame);
+
         // Also reset confirmedFrame to before rollback point
         // (it will be recalculated after replay completes via _updateConfirmedFrame)
         this.confirmedFrame = Math.min(this.confirmedFrame, targetFrame - 1);
@@ -4484,6 +4611,10 @@ for _rf in _replay_frames:
 
     _actions = {int(k) if str(k).isdigit() else k: v for k, v in _rf['actions'].items()}
     _obs, _rewards, _term, _trunc, _info = env.step(_actions)
+    # Convert rewards/term/trunc to dicts with string keys for JSON
+    _rewards_dict = {str(k): v for k, v in _rewards.items()} if isinstance(_rewards, dict) else {'human': _rewards}
+    _term_dict = {str(k): v for k, v in _term.items()} if isinstance(_term, dict) else {'human': _term}
+    _trunc_dict = {str(k): v for k, v in _trunc.items()} if isinstance(_trunc, dict) else {'human': _trunc}
     # Accumulate rewards from replay (critical for HUD sync)
     if isinstance(_rewards, dict):
         for _k, _v in _rewards.items():
@@ -4492,7 +4623,16 @@ for _rf in _replay_frames:
         _cumulative_rewards['human'] = _cumulative_rewards.get('human', 0) + _rewards
     _post_state = env.get_state()
     _post_hash = hashlib.md5(json.dumps(_post_state, sort_keys=True).encode()).hexdigest()[:8]
-    _replay_log.append({'frame': _frame, 'actions': _rf['actions'], 'pre_hash': _pre_hash, 'post_hash': _post_hash})
+    # Include per-frame data for rollback-safe logging
+    _replay_log.append({
+        'frame': _frame,
+        'actions': _rf['actions'],
+        'rewards': _rewards_dict,
+        'terminateds': _term_dict,
+        'truncateds': _trunc_dict,
+        'pre_hash': _pre_hash,
+        'post_hash': _post_hash
+    })
 _t_after_replay = env.t if hasattr(env, 't') else 'N/A'
 _state_after = env.get_state()
 _state_hash = hashlib.md5(json.dumps(_state_after, sort_keys=True).encode()).hexdigest()[:8]
@@ -4536,6 +4676,19 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
 
                 // Update step_num to account for replayed frames
                 this.step_num += replayInfo.num_steps;
+
+                // Store corrected frame data in the rollback-safe buffer
+                // This replaces any previously predicted data with correct data
+                for (const entry of replayInfo.replay_log) {
+                    this.storeFrameData(entry.frame, {
+                        actions: entry.actions,
+                        rewards: entry.rewards,
+                        terminateds: entry.terminateds,
+                        truncateds: entry.truncateds,
+                        isFocused: this.focusManager ? !this.focusManager.isBackgrounded : true
+                    });
+                }
+                p2pLog.debug(`Stored ${replayInfo.replay_log.length} corrected frames in data buffer`);
             }
 
             // Update JS frame counter to match Python state
@@ -4682,29 +4835,16 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
                 return;
             }
 
-            // 5b. Log each fast-forward frame to CSV with isFocused=false for local player
-            // These frames occurred while we were backgrounded, so mark our focus as false
+            // 5b. Build focus state for fast-forward frames
+            // Local player was backgrounded; partner was focused (they sent us inputs)
             const focusStateForFF = {};
             for (const playerId of humanPlayerIds) {
-                // Local player was backgrounded; partner was focused (they sent us inputs)
                 focusStateForFF[playerId] = String(playerId) !== String(this.myPlayerId);
-            }
-
-            const startingStepNum = this.step_num;
-            for (let i = 0; i < fastForwardFrames.length; i++) {
-                const ff = fastForwardFrames[i];
-                logFastForwardFrame({
-                    actions: ff.actions,
-                    isFocused: focusStateForFF,
-                    episode_num: this.num_episodes,
-                    t: startingStepNum + i,
-                    player_subjects: this.playerSubjects
-                });
             }
 
             // 6. Execute ALL fast-forward steps in a single Python call (no rendering)
             // This is much faster than calling stepWithActions for each frame
-            // Track cumulative rewards across all frames for HUD update
+            // Track per-frame data for rollback-safe logging
             p2pLog.info(`FAST-FORWARD: batch stepping ${fastForwardFrames.length} frames`);
 
             const result = await this.pyodide.runPythonAsync(`
@@ -4712,21 +4852,37 @@ import json
 import numpy as np
 _ff_frames = ${JSON.stringify(fastForwardFrames)}
 _cumulative_rewards = {}
+_per_frame_data = []
 for _ff in _ff_frames:
+    _frame = _ff['frame']
     _actions = {int(k) if str(k).isdigit() else k: v for k, v in _ff['actions'].items()}
     _obs, _rewards, _terms, _truncs, _infos = env.step(_actions)
+    # Convert to dicts with string keys for JSON
+    _rewards_dict = {str(k): v for k, v in _rewards.items()} if isinstance(_rewards, dict) else {'human': _rewards}
+    _term_dict = {str(k): v for k, v in _terms.items()} if isinstance(_terms, dict) else {'human': _terms}
+    _trunc_dict = {str(k): v for k, v in _truncs.items()} if isinstance(_truncs, dict) else {'human': _truncs}
+    # Store per-frame data
+    _per_frame_data.append({
+        'frame': _frame,
+        'actions': _ff['actions'],
+        'rewards': _rewards_dict,
+        'terminateds': _term_dict,
+        'truncateds': _trunc_dict
+    })
     # Accumulate rewards
     for _agent_id, _reward in _rewards.items():
         if _agent_id not in _cumulative_rewards:
             _cumulative_rewards[_agent_id] = 0
         _cumulative_rewards[_agent_id] += _reward
-_cumulative_rewards
+json.dumps({'cumulative_rewards': {str(k): v for k, v in _cumulative_rewards.items()}, 'per_frame_data': _per_frame_data})
             `);
 
+            // Parse result and update state
+            const ffResult = JSON.parse(result);
+
             // Update cumulative rewards from fast-forward
-            const ffRewards = await this.pyodide.toPy(result).toJs();
-            if (ffRewards instanceof Map) {
-                for (let [key, value] of ffRewards.entries()) {
+            if (ffResult.cumulative_rewards) {
+                for (const [key, value] of Object.entries(ffResult.cumulative_rewards)) {
                     if (this.cumulative_rewards[key] !== undefined) {
                         this.cumulative_rewards[key] += value;
                     } else {
@@ -4734,6 +4890,19 @@ _cumulative_rewards
                     }
                 }
             }
+
+            // Store per-frame data in the rollback-safe buffer
+            // Note: isFocused=false for local player during fast-forward
+            for (const frameData of ffResult.per_frame_data) {
+                this.storeFrameData(frameData.frame, {
+                    actions: frameData.actions,
+                    rewards: frameData.rewards,
+                    terminateds: frameData.terminateds,
+                    truncateds: frameData.truncateds,
+                    isFocused: focusStateForFF
+                });
+            }
+            p2pLog.debug(`Stored ${ffResult.per_frame_data.length} fast-forward frames in data buffer`);
 
             framesProcessed = fastForwardFrames.length;
 

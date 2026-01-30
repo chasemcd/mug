@@ -491,19 +491,35 @@ class GymScene extends Phaser.Scene {
                     syncedActions = actions;  // Fallback to local actions for single-player
                 }
 
-                remoteGameLogger.logData(
-                    {
-                        observations: currentObservations,
-                        actions: syncedActions,  // Use synchronized actions for accurate logging
-                        rewards: rewards,
-                        terminateds: terminateds,
-                        truncateds: truncateds,
-                        infos: infos,
-                        episode_num: this.pyodide_remote_game.num_episodes,
-                        t: this.pyodide_remote_game.step_num,
-                        player_subjects: this.pyodide_remote_game.playerSubjects,
+                // Check if this is a multiplayer game with rollback support
+                const isMultiplayerWithRollback = this.pyodide_remote_game.storeFrameData !== undefined;
+
+                if (isMultiplayerWithRollback) {
+                    // Use rollback-safe frame buffer for multiplayer
+                    // Data is stored by frame number and corrected on rollback
+                    this.pyodide_remote_game.storeFrameData(this.pyodide_remote_game.frameNumber, {
+                        actions: syncedActions instanceof Map ? Object.fromEntries(syncedActions) : syncedActions,
+                        rewards: rewards instanceof Map ? Object.fromEntries(rewards) : rewards,
+                        terminateds: terminateds instanceof Map ? Object.fromEntries(terminateds) : terminateds,
+                        truncateds: truncateds instanceof Map ? Object.fromEntries(truncateds) : truncateds,
                         isFocused: this.pyodide_remote_game.getFocusStatePerPlayer?.() || {}
                     });
+                } else {
+                    // Single-player mode: use standard logger (no rollback concerns)
+                    remoteGameLogger.logData(
+                        {
+                            observations: currentObservations,
+                            actions: syncedActions,
+                            rewards: rewards,
+                            terminateds: terminateds,
+                            truncateds: truncateds,
+                            infos: infos,
+                            episode_num: this.pyodide_remote_game.num_episodes,
+                            t: this.pyodide_remote_game.step_num,
+                            player_subjects: this.pyodide_remote_game.playerSubjects,
+                            isFocused: this.pyodide_remote_game.getFocusStatePerPlayer?.() || {}
+                        });
+                }
             }
             addStateToBuffer(render_state);
         }
