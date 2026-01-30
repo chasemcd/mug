@@ -452,6 +452,11 @@
     animation: pulse 1s infinite;
 }
 
+.health-indicator.health-completed,
+.health-dot.health-completed {
+    background-color: oklch(var(--bc) / 0.4);
+}
+
 @keyframes pulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.5; }
@@ -483,6 +488,17 @@
 .session-status-healthy { color: oklch(var(--su)); }
 .session-status-degraded { color: oklch(var(--wa)); }
 .session-status-reconnecting { color: oklch(var(--er)); }
+.session-status-completed { color: oklch(var(--bc) / 0.6); }
+
+/* Historical session card styling */
+.session-card.session-historical {
+    border-color: oklch(var(--bc) / 0.15);
+    background: oklch(var(--bc) / 0.02);
+}
+
+.session-card.session-historical:hover {
+    border-color: oklch(var(--bc) / 0.3);
+}
 
 .session-card-players {
     display: flex;

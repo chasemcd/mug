@@ -113,6 +113,12 @@ class AdminEventAggregator:
         # Maps game_id -> {reason: str, timestamp: float, players: list[str], details: dict}
         self._session_terminations: dict[str, dict] = {}
 
+        # Completed/historical sessions (Phase 35)
+        # Stores finished sessions for historical viewing in admin console
+        # Maps game_id -> full session state dict at time of completion
+        self._completed_games: dict[str, dict] = {}
+        self.MAX_COMPLETED_GAMES = 100  # Limit historical sessions
+
         # Broadcast loop state
         self._broadcast_running = False
         self._last_state_hash: str | None = None
@@ -160,7 +166,8 @@ class AdminEventAggregator:
         game_id: str,
         reason: str,
         players: list[str],
-        details: dict | None = None
+        details: dict | None = None,
+        session_snapshot: dict | None = None
     ) -> None:
         """
         Record session termination with reason for detail view.
@@ -171,14 +178,92 @@ class AdminEventAggregator:
                     sustained_ping, tab_hidden, exclusion, normal)
             players: List of player subject IDs
             details: Optional additional details (exclusion message, etc.)
+            session_snapshot: Optional full session state at time of termination
         """
-        self._session_terminations[game_id] = {
+        termination_info = {
             'reason': reason,
             'timestamp': time.time(),
             'players': players,
             'details': details or {}
         }
+        self._session_terminations[game_id] = termination_info
+
+        # Store completed session for history
+        if session_snapshot:
+            self._add_completed_game(game_id, session_snapshot, termination_info)
+
         logger.debug(f"Session termination recorded for {game_id}: {reason}")
+
+    def _add_completed_game(
+        self,
+        game_id: str,
+        session_snapshot: dict,
+        termination_info: dict
+    ) -> None:
+        """
+        Add a completed game to history.
+
+        Args:
+            game_id: The game ID
+            session_snapshot: Full session state at completion
+            termination_info: Termination reason and details
+        """
+        # Add termination info to snapshot
+        completed_session = {
+            **session_snapshot,
+            'termination': termination_info,
+            'completed_at': time.time()
+        }
+        self._completed_games[game_id] = completed_session
+
+        # Trim old entries if over limit (keep most recent)
+        if len(self._completed_games) > self.MAX_COMPLETED_GAMES:
+            # Sort by completed_at and remove oldest
+            sorted_ids = sorted(
+                self._completed_games.keys(),
+                key=lambda gid: self._completed_games[gid].get('completed_at', 0)
+            )
+            # Remove oldest entries
+            for old_id in sorted_ids[:len(self._completed_games) - self.MAX_COMPLETED_GAMES]:
+                del self._completed_games[old_id]
+
+        logger.debug(f"Added completed game to history: {game_id}")
+
+    def archive_active_session(self, game_id: str, reason: str = 'normal') -> None:
+        """
+        Archive an active session to history when it ends.
+
+        Call this when a game ends (normally or abnormally) to preserve
+        it in session history for admin viewing.
+
+        Args:
+            game_id: The game ID to archive
+            reason: Termination reason
+        """
+        # Get current state of this session
+        active_games = self._get_active_games_state()
+        session = next((g for g in active_games if g['game_id'] == game_id), None)
+
+        if session:
+            # Get player console logs for this session
+            subject_ids = session.get('subject_ids', [])
+            player_logs = [
+                log for log in list(self._console_logs)
+                if log.get('subject_id') in subject_ids
+            ][-50:]  # Last 50 logs
+
+            session['archived_logs'] = player_logs
+            self._add_completed_game(
+                game_id,
+                session,
+                self._session_terminations.get(game_id, {
+                    'reason': reason,
+                    'timestamp': time.time(),
+                    'players': subject_ids,
+                    'details': {}
+                })
+            )
+            logger.info(f"Archived session {game_id} to history")
 
     def get_session_detail(self, game_id: str) -> dict | None:
         """
@@ -418,10 +503,14 @@ class AdminEventAggregator:
         # Get recent console logs (last 100 for display)
         recent_console_logs = list(self._console_logs)[-100:]
 
+        # Get completed/historical sessions (last 50 for display)
+        completed_games = self._get_completed_games_state()
+
         return {
             'participants': participants,
             'waiting_rooms': waiting_rooms,
             'multiplayer_games': active_games_list,  # Now includes both single-player and multiplayer
+            'completed_games': completed_games,  # Historical sessions
             'activity_log': recent_activity,
             'console_logs': recent_console_logs,
             'summary': summary
@@ -669,6 +758,34 @@ class AdminEventAggregator:
             logger.error(f"Error getting single-player games state: {e}", exc_info=True)
 
         return games
+
+    def _get_completed_games_state(self) -> list[dict]:
+        """
+        Get completed/historical game sessions for admin viewing.
+
+        Returns:
+            List of completed session dicts, sorted by completion time (most recent first)
+        """
+        # Sort by completed_at descending (most recent first)
+        completed = sorted(
+            self._completed_games.values(),
+            key=lambda g: g.get('completed_at', 0),
+            reverse=True
+        )
+        # Return last 50 for display
+        return completed[:50]
+
+    def get_session_history_detail(self, game_id: str) -> dict | None:
+        """
+        Get detailed information for a historical/completed session.
+
+        Args:
+            game_id: The game ID
+
+        Returns:
+            Full session details including archived logs, or None if not found
+        """
+        return self._completed_games.get(game_id)
 
     def receive_console_log(
         self,

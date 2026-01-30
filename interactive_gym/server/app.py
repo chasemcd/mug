@@ -1606,13 +1606,27 @@ def on_mid_game_exclusion(data):
     game = PYODIDE_COORDINATOR.games.get(game_id)
     players = list(game.players.keys()) if game else []
 
-    # Record termination for admin dashboard (Phase 34)
+    # Record termination for admin dashboard (Phase 34) and archive for history
     if ADMIN_AGGREGATOR:
+        # Build session snapshot for historical viewing
+        session_snapshot = None
+        if game:
+            session_snapshot = {
+                'game_id': game_id,
+                'players': players,
+                'subject_ids': list(game.player_subjects.values()),
+                'current_frame': game.frame_number,
+                'is_server_authoritative': game.server_authoritative,
+                'created_at': game.created_at,
+                'game_type': 'multiplayer',
+                'current_episode': getattr(game, 'episode_number', None),
+            }
         ADMIN_AGGREGATOR.record_session_termination(
             game_id=game_id,
             reason=reason,  # sustained_ping, tab_hidden, etc.
             players=players,
-            details={'excluded_player_id': excluded_player_id, 'frame_number': frame_number}
+            details={'excluded_player_id': excluded_player_id, 'frame_number': frame_number},
+            session_snapshot=session_snapshot
         )
 
     PYODIDE_COORDINATOR.handle_player_exclusion(
@@ -1815,13 +1829,27 @@ def handle_p2p_reconnection_timeout(data):
     # Get reconnection data for logging
     reconnection_data = PYODIDE_COORDINATOR.handle_reconnection_timeout(game_id)
 
-    # Record termination for admin dashboard (Phase 34)
+    # Record termination for admin dashboard (Phase 34) and archive for history
     if ADMIN_AGGREGATOR:
+        # Build session snapshot for historical viewing
+        session_snapshot = None
+        if game:
+            session_snapshot = {
+                'game_id': game_id,
+                'players': players,
+                'subject_ids': list(game.player_subjects.values()),
+                'current_frame': game.frame_number,
+                'is_server_authoritative': game.server_authoritative,
+                'created_at': game.created_at,
+                'game_type': 'multiplayer',
+                'current_episode': getattr(game, 'episode_number', None),
+            }
         ADMIN_AGGREGATOR.record_session_termination(
             game_id=game_id,
             reason='partner_disconnected',
             players=players,
-            details={'disconnected_player_id': disconnected_player_id}
+            details={'disconnected_player_id': disconnected_player_id},
+            session_snapshot=session_snapshot
         )
 
     # Emit game ended to all players

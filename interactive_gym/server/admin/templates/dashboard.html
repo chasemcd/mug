@@ -109,12 +109,15 @@
 
         <!-- Main Content Grid -->
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <!-- Active Sessions Panel (Primary Focus) -->
+            <!-- Sessions Panel (Primary Focus) - Tabbed Active/History -->
             <div class="lg:col-span-8">
                 <div class="card bg-base-100 shadow-sm" id="session-list-panel">
                     <div class="card-body p-0">
                         <div class="flex items-center justify-between p-4 border-b border-base-200">
-                            <h2 class="text-lg font-semibold">Active Sessions</h2>
+                            <div class="tabs tabs-boxed tabs-sm">
+                                <a class="tab tab-active" id="tab-active-sessions" onclick="switchSessionTab('active')">Active Sessions</a>
+                                <a class="tab" id="tab-session-history" onclick="switchSessionTab('history')">Session History</a>
+                            </div>
                             <div class="flex items-center gap-3">
                                 <span class="health-legend"><span class="health-dot health-healthy"></span>Healthy</span>
                                 <span class="health-legend"><span class="health-dot health-degraded"></span>Degraded</span>
@@ -122,6 +125,7 @@
                                 <span class="badge badge-ghost badge-sm" id="games-count">0 active</span>
                             </div>
                         </div>
+                        <!-- Active Sessions Container -->
                         <div class="p-4 session-list-expanded" id="multiplayer-games-container">
                             <div class="empty-state">
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-12 h-12 mx-auto mb-2 opacity-30">
@@ -129,6 +133,16 @@
                                 </svg>
                                 <p class="text-base-content/50">No active sessions</p>
                                 <p class="text-base-content/30 text-sm mt-1">Sessions will appear here when participants start games</p>
+                            </div>
+                        </div>
+                        <!-- Session History Container (hidden by default) -->
+                        <div class="p-4 session-list-expanded hidden" id="session-history-container">
+                            <div class="empty-state">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-12 h-12 mx-auto mb-2 opacity-30">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <p class="text-base-content/50">No session history</p>
+                                <p class="text-base-content/30 text-sm mt-1">Completed sessions will appear here</p>
                             </div>
                         </div>
                     </div>

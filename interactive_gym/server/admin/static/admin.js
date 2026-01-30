@@ -13,10 +13,14 @@ let currentState = {
     participants: [],
     waiting_rooms: [],
     multiplayer_games: [],
+    completed_games: [],  // Session history
     activity_log: [],
     console_logs: [],
     summary: {}
 };
+
+// Session tab state
+let activeSessionTab = 'active';  // 'active' or 'history'
 
 // Console log filtering state
 let logLevelFilter = 'all';
@@ -94,6 +98,7 @@ function updateDashboard(state) {
     updateParticipants(state.participants);
     updateWaitingRooms(state.waiting_rooms);
     updateSessionList(state.multiplayer_games);
+    updateSessionHistory(state.completed_games);
     updateActivityTimeline(state.activity_log);
     // Initialize console logs from state on first load
     if (state.console_logs && consoleLogs.length === 0) {
@@ -429,6 +434,140 @@ function getConnectionTypeLabel(type) {
 }
 
 // ============================================
+// Session History (Phase 35)
+// ============================================
+
+function switchSessionTab(tab) {
+    activeSessionTab = tab;
+    const activeContainer = document.getElementById('multiplayer-games-container');
+    const historyContainer = document.getElementById('session-history-container');
+    const activeTab = document.getElementById('tab-active-sessions');
+    const historyTab = document.getElementById('tab-session-history');
+    const countBadge = document.getElementById('games-count');
+
+    if (tab === 'active') {
+        activeContainer?.classList.remove('hidden');
+        historyContainer?.classList.add('hidden');
+        activeTab?.classList.add('tab-active');
+        historyTab?.classList.remove('tab-active');
+        if (countBadge) {
+            countBadge.textContent = `${currentState.multiplayer_games?.length || 0} active`;
+        }
+    } else {
+        activeContainer?.classList.add('hidden');
+        historyContainer?.classList.remove('hidden');
+        activeTab?.classList.remove('tab-active');
+        historyTab?.classList.add('tab-active');
+        if (countBadge) {
+            countBadge.textContent = `${currentState.completed_games?.length || 0} completed`;
+        }
+    }
+}
+
+function updateSessionHistory(completedGames) {
+    const container = document.getElementById('session-history-container');
+    if (!container) return;
+
+    // Store in state
+    currentState.completed_games = completedGames || [];
+
+    // Update count badge if on history tab
+    if (activeSessionTab === 'history') {
+        const countBadge = document.getElementById('games-count');
+        if (countBadge) {
+            countBadge.textContent = `${completedGames?.length || 0} completed`;
+        }
+    }
+
+    if (!completedGames || completedGames.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-12 h-12 mx-auto mb-2 opacity-30">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <p class="text-base-content/50">No session history</p>
+                <p class="text-base-content/30 text-sm mt-1">Completed sessions will appear here</p>
+            </div>
+        `;
+        return;
+    }
+
+    // Render completed sessions (most recent first - already sorted by server)
+    container.innerHTML = `<div class="session-card-grid">${completedGames.map(game => renderHistoricalSessionCard(game)).join('')}</div>`;
+}
+
+function renderHistoricalSessionCard(game) {
+    const termination = game.termination || {};
+    const reason = termination.reason || 'unknown';
+    const isMultiplayer = game.game_type === 'multiplayer';
+    const isSinglePlayer = game.game_type === 'single_player';
+
+    // Get subject IDs for display
+    const subjectIds = game.subject_ids || [];
+
+    // Episode display (1-indexed)
+    const episodeNum = game.current_episode;
+    const episode = episodeNum != null ? episodeNum + 1 : '--';
+
+    // Time completed
+    const completedAt = game.completed_at ? formatTime(game.completed_at) : '--';
+
+    // Duration (if we have created_at and completed_at)
+    let duration = '--';
+    if (game.created_at && game.completed_at) {
+        const durationMs = (game.completed_at - game.created_at) * 1000;
+        duration = formatDuration(durationMs);
+    }
+
+    // Termination badge color based on reason
+    const reasonBadgeClass = reason === 'normal' ? 'badge-success' :
+                             reason === 'partner_disconnected' ? 'badge-error' :
+                             'badge-warning';
+
+    return `
+        <div class="session-card session-historical" onclick="showSessionDetail('${escapeHtml(game.game_id)}', true)" role="button" tabindex="0">
+            <div class="session-card-header">
+                <div class="session-card-title">
+                    <span class="health-indicator health-completed"></span>
+                    <span class="session-id" title="${escapeHtml(game.game_id)}">
+                        ${isSinglePlayer ? 'Game' : 'Session'} ${truncateId(game.game_id)}
+                    </span>
+                </div>
+                <span class="badge badge-xs ${reasonBadgeClass}">${getTerminationReasonLabel(reason)}</span>
+            </div>
+            <div class="session-card-metrics">
+                <div class="session-metric">
+                    <span class="session-metric-label">Episode</span>
+                    <span class="session-metric-value">${episode}</span>
+                </div>
+                <div class="session-metric">
+                    <span class="session-metric-label">Duration</span>
+                    <span class="session-metric-value">${duration}</span>
+                </div>
+                <div class="session-metric">
+                    <span class="session-metric-label">Ended</span>
+                    <span class="session-metric-value">${completedAt}</span>
+                </div>
+            </div>
+            <div class="session-card-players">
+                ${subjectIds.length > 0
+                    ? subjectIds.map(subject => `
+                        <span class="session-player">
+                            ${escapeHtml(truncateId(String(subject)))}
+                        </span>
+                    `).join('')
+                    : game.players?.map(player => `
+                        <span class="session-player">
+                            ${escapeHtml(truncateId(String(player)))}
+                        </span>
+                    `).join('') || ''
+                }
+            </div>
+        </div>
+    `;
+}
+
+// ============================================
 // Activity timeline
 // ============================================
 
@@ -654,15 +793,22 @@ document.addEventListener('DOMContentLoaded', () => {
 // Session Detail Panel (Phase 34)
 // ============================================
 
-function showSessionDetail(gameId) {
+function showSessionDetail(gameId, isHistorical = false) {
     selectedSessionId = gameId;
     const overlay = document.getElementById('session-detail-overlay');
     const content = document.getElementById('session-detail-content');
 
     if (!overlay || !content) return;
 
-    // Find session in current state
-    const session = currentState.multiplayer_games?.find(g => g.game_id === gameId);
+    // Find session in current state (check both active and completed)
+    let session = currentState.multiplayer_games?.find(g => g.game_id === gameId);
+    let sessionIsHistorical = false;
+
+    if (!session) {
+        // Check completed games
+        session = currentState.completed_games?.find(g => g.game_id === gameId);
+        sessionIsHistorical = true;
+    }
 
     if (!session) {
         content.innerHTML = '<div class="empty-state-sm"><p>Session not found</p></div>';
@@ -670,8 +816,8 @@ function showSessionDetail(gameId) {
         return;
     }
 
-    // Render session detail
-    content.innerHTML = renderSessionDetailContent(session);
+    // Render session detail (with historical flag)
+    content.innerHTML = renderSessionDetailContent(session, sessionIsHistorical);
     overlay.classList.remove('hidden');
 }
 
@@ -683,8 +829,8 @@ function closeSessionDetail() {
     }
 }
 
-function renderSessionDetailContent(session) {
-    const health = session.session_health || 'healthy';
+function renderSessionDetailContent(session, isHistorical = false) {
+    const health = isHistorical ? 'completed' : (session.session_health || 'healthy');
     const p2pHealth = session.p2p_health || {};
     const termination = session.termination;
     const isMultiplayer = session.game_type === 'multiplayer';
@@ -702,11 +848,18 @@ function renderSessionDetailContent(session) {
         ? Math.round(latencies.reduce((a,b) => a+b, 0) / latencies.length)
         : null;
 
-    // Get all console logs for this session's players (use subject_ids)
+    // Get console logs for this session
+    // For historical sessions, use archived_logs if available
+    // For active sessions, filter from current logs
     const subjectIds = session.subject_ids || [];
-    const playerLogs = consoleLogs.filter(log =>
-        subjectIds.includes(log.subject_id)
-    ).slice(-30);  // Show last 30 logs
+    let playerLogs;
+    if (isHistorical && session.archived_logs) {
+        playerLogs = session.archived_logs;
+    } else {
+        playerLogs = consoleLogs.filter(log =>
+            subjectIds.includes(log.subject_id)
+        ).slice(-30);  // Show last 30 logs
+    }
 
     // Episode display (1-indexed)
     const episodeNum = session.current_episode;
@@ -716,6 +869,13 @@ function renderSessionDetailContent(session) {
     const modeDisplay = isSinglePlayer
         ? 'Single Player'
         : (session.is_server_authoritative ? 'Server Auth' : 'P2P');
+
+    // Duration for historical sessions
+    let durationDisplay = '--';
+    if (isHistorical && session.created_at && session.completed_at) {
+        const durationMs = (session.completed_at - session.created_at) * 1000;
+        durationDisplay = formatDurationLong(durationMs);
+    }
 
     return `
         <div class="session-detail-section">
@@ -757,6 +917,16 @@ function renderSessionDetailContent(session) {
                     <span class="session-detail-label">Mode</span>
                     <span class="session-detail-value">${modeDisplay}</span>
                 </div>
+                ${isHistorical ? `
+                <div class="session-detail-item">
+                    <span class="session-detail-label">Duration</span>
+                    <span class="session-detail-value">${durationDisplay}</span>
+                </div>
+                <div class="session-detail-item">
+                    <span class="session-detail-label">Ended</span>
+                    <span class="session-detail-value">${session.completed_at ? formatTime(session.completed_at) : '--'}</span>
+                </div>
+                ` : ''}
             </div>
         </div>
 
