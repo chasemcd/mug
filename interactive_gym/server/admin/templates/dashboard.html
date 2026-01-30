@@ -109,9 +109,34 @@
 
         <!-- Main Content Grid -->
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <!-- Sessions Panel (Primary Focus) - Tabbed Active/History -->
+            <!-- Participants Panel (Primary Focus) -->
             <div class="lg:col-span-8">
-                <div class="card bg-base-100 shadow-sm" id="session-list-panel">
+                <div class="card bg-base-100 shadow-sm">
+                    <div class="card-body p-0">
+                        <div class="flex items-center justify-between p-4 border-b border-base-200">
+                            <h2 class="text-lg font-semibold">Participants</h2>
+                            <div class="flex items-center gap-3">
+                                <span class="health-legend"><span class="health-dot health-healthy"></span>Connected</span>
+                                <span class="health-legend"><span class="health-dot health-reconnecting"></span>Reconnecting</span>
+                                <span class="health-legend"><span class="health-dot health-disconnected"></span>Disconnected</span>
+                                <span class="health-legend"><span class="health-dot health-completed"></span>Completed</span>
+                                <span class="badge badge-ghost badge-sm" id="participant-count">0 total</span>
+                            </div>
+                        </div>
+                        <div class="p-4 participant-list-expanded" id="participants-container">
+                            <div class="empty-state">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-12 h-12 mx-auto mb-2 opacity-30">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+                                </svg>
+                                <p class="text-base-content/50">No participants</p>
+                                <p class="text-base-content/30 text-sm mt-1">Participants will appear here when they join</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Multiplayer Sessions Panel -->
+                <div class="card bg-base-100 shadow-sm mt-6">
                     <div class="card-body p-0">
                         <div class="flex items-center justify-between p-4 border-b border-base-200">
                             <div class="tabs tabs-boxed tabs-sm">
@@ -121,28 +146,19 @@
                             <div class="flex items-center gap-3">
                                 <span class="health-legend"><span class="health-dot health-healthy"></span>Healthy</span>
                                 <span class="health-legend"><span class="health-dot health-degraded"></span>Degraded</span>
-                                <span class="health-legend"><span class="health-dot health-reconnecting"></span>Reconnecting</span>
                                 <span class="badge badge-ghost badge-sm" id="games-count">0 active</span>
                             </div>
                         </div>
                         <!-- Active Sessions Container -->
-                        <div class="p-4 session-list-expanded" id="multiplayer-games-container">
-                            <div class="empty-state">
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-12 h-12 mx-auto mb-2 opacity-30">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z" />
-                                </svg>
-                                <p class="text-base-content/50">No active sessions</p>
-                                <p class="text-base-content/30 text-sm mt-1">Sessions will appear here when participants start games</p>
+                        <div class="p-4 session-list-compact" id="multiplayer-games-container">
+                            <div class="empty-state-sm">
+                                <p class="text-base-content/50 text-sm">No active multiplayer sessions</p>
                             </div>
                         </div>
                         <!-- Session History Container (hidden by default) -->
-                        <div class="p-4 session-list-expanded hidden" id="session-history-container">
-                            <div class="empty-state">
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-12 h-12 mx-auto mb-2 opacity-30">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                <p class="text-base-content/50">No session history</p>
-                                <p class="text-base-content/30 text-sm mt-1">Completed sessions will appear here</p>
+                        <div class="p-4 session-list-compact hidden" id="session-history-container">
+                            <div class="empty-state-sm">
+                                <p class="text-base-content/50 text-sm">No session history</p>
                             </div>
                         </div>
                     </div>
@@ -151,21 +167,6 @@
 
             <!-- Sidebar (Secondary Info) -->
             <div class="lg:col-span-4 space-y-6">
-                <!-- Participants (Compact View) -->
-                <div class="card bg-base-100 shadow-sm">
-                    <div class="card-body p-0">
-                        <div class="flex items-center justify-between p-4 border-b border-base-200">
-                            <h2 class="text-lg font-semibold">Participants</h2>
-                            <span class="badge badge-ghost badge-sm" id="participant-count">0 total</span>
-                        </div>
-                        <div class="p-2" id="participants-container">
-                            <div class="empty-state-sm">
-                                <p class="text-base-content/50 text-sm">No participants connected</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
                 <!-- Waiting Rooms -->
                 <div class="card bg-base-100 shadow-sm">
                     <div class="card-body p-0">
@@ -224,7 +225,24 @@
         </div>
     </div>
 
-    <!-- Session Detail Panel (Phase 34) -->
+    <!-- Participant Detail Panel -->
+    <div id="participant-detail-overlay" class="session-detail-overlay hidden">
+        <div class="session-detail-panel">
+            <div class="session-detail-header">
+                <h3 class="text-lg font-semibold">Participant Details</h3>
+                <button onclick="closeParticipantDetail()" class="btn btn-ghost btn-sm btn-circle">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <div id="participant-detail-content" class="session-detail-content">
+                <!-- Content populated by JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Session Detail Panel -->
     <div id="session-detail-overlay" class="session-detail-overlay hidden">
         <div class="session-detail-panel">
             <div class="session-detail-header">

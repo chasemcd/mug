@@ -103,6 +103,11 @@ class AdminEventAggregator:
         # Track all subjects who have ever started (for total_started calculation)
         self._all_started_subjects: set[str] = set()
 
+        # Participant lifecycle tracking (Phase 35 rework)
+        # Maps subject_id -> list of game participations
+        # Each entry: {game_id, started_at, ended_at, role, termination_reason}
+        self._participant_games: dict[str, list[dict]] = {}
+
         # P2P health cache (Phase 33)
         # Maps game_id -> {player_id -> health_data}
         # health_data: {connection_type, latency_ms, status, episode, timestamp}
@@ -160,6 +165,60 @@ class AdminEventAggregator:
             subject_id: The participant's subject ID
         """
         self._all_started_subjects.add(subject_id)
+        # Initialize participant games list
+        if subject_id not in self._participant_games:
+            self._participant_games[subject_id] = []
+
+    def track_participant_game_start(
+        self,
+        subject_id: str,
+        game_id: str,
+        role: str = 'player'
+    ) -> None:
+        """
+        Track when a participant joins a game.
+
+        Args:
+            subject_id: The participant's subject ID
+            game_id: The game ID they joined
+            role: Their role (e.g., 'host', 'player')
+        """
+        if subject_id not in self._participant_games:
+            self._participant_games[subject_id] = []
+
+        self._participant_games[subject_id].append({
+            'game_id': game_id,
+            'started_at': time.time(),
+            'ended_at': None,
+            'role': role,
+            'termination_reason': None
+        })
+        logger.debug(f"Tracked game start for {subject_id} in {game_id}")
+
+    def track_participant_game_end(
+        self,
+        subject_id: str,
+        game_id: str,
+        termination_reason: str = 'normal'
+    ) -> None:
+        """
+        Track when a participant's game ends.
+
+        Args:
+            subject_id: The participant's subject ID
+            game_id: The game ID that ended
+            termination_reason: Why the game ended
+        """
+        if subject_id not in self._participant_games:
+            return
+
+        # Find and update the matching game entry
+        for game_entry in reversed(self._participant_games[subject_id]):
+            if game_entry['game_id'] == game_id and game_entry['ended_at'] is None:
+                game_entry['ended_at'] = time.time()
+                game_entry['termination_reason'] = termination_reason
+                logger.debug(f"Tracked game end for {subject_id} in {game_id}: {termination_reason}")
+                break
 
     def record_session_termination(
         self,
@@ -543,13 +602,71 @@ class AdminEventAggregator:
             except Exception as e:
                 logger.debug(f"Error getting scene progress for {subject_id}: {e}")
 
+        # Get current game ID if in a game
+        current_game_id = None
+        if self.pyodide_coordinator:
+            for game_id, game in self.pyodide_coordinator.games.items():
+                if subject_id in game.player_subjects.values():
+                    current_game_id = game_id
+                    break
+
+        # Get game history for this participant
+        game_history = self._participant_games.get(subject_id, [])
+
+        # Count logs for this participant (for badge display)
+        log_count = sum(1 for log in self._console_logs if log.get('subject_id') == subject_id)
+        error_count = sum(1 for log in self._console_logs
+                        if log.get('subject_id') == subject_id and log.get('level') == 'error')
+
         return {
             'subject_id': subject_id,
             'connection_status': self._compute_connection_status(session, subject_id, stager),
             'current_scene_id': session.current_scene_id,
             'scene_progress': scene_progress,
             'created_at': session.created_at,
-            'last_updated_at': session.last_updated_at
+            'last_updated_at': session.last_updated_at,
+            'current_game_id': current_game_id,
+            'game_history': game_history,
+            'log_count': log_count,
+            'error_count': error_count
+        }
+
+    def get_participant_detail(self, subject_id: str) -> dict | None:
+        """
+        Get detailed information for a specific participant.
+
+        Args:
+            subject_id: The participant's subject ID
+
+        Returns:
+            Full participant details including all logs and game history
+        """
+        # Get base state
+        state = self._get_participant_state(subject_id)
+        if not state:
+            return None
+
+        # Get all console logs for this participant
+        participant_logs = [
+            log for log in list(self._console_logs)
+            if log.get('subject_id') == subject_id
+        ]
+
+        # Get activity events for this participant
+        participant_activity = [
+            {
+                'timestamp': event.timestamp,
+                'event_type': event.event_type,
+                'details': event.details
+            }
+            for event in self._activity_log
+            if event.subject_id == subject_id
+        ]
+
+        return {
+            **state,
+            'logs': participant_logs,
+            'activity': participant_activity
         }
 
     def _compute_connection_status(self, session: Any, subject_id: str, stager: Any = None) -> str:

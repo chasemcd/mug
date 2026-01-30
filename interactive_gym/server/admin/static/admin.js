@@ -206,24 +206,27 @@ function updateParticipants(participants) {
         return (b.created_at || 0) - (a.created_at || 0);
     });
 
-    // Compact list view for sidebar
+    // Grid view of participant cards (clickable)
     container.innerHTML = `
-        <div class="participant-list-compact">
-            ${sorted.map(p => `
-                <div class="participant-item-compact">
-                    <span class="participant-item-id" title="${escapeHtml(p.subject_id)}">${escapeHtml(truncateId(p.subject_id))}</span>
-                    ${getStatusBadge(p.connection_status)}
-                </div>
-            `).join('')}
+        <div class="participant-card-grid">
+            ${sorted.map(p => renderParticipantCard(p)).join('')}
         </div>
     `;
 }
 
 function renderParticipantCard(p) {
+    const hasErrors = p.error_count > 0;
+    const statusIndicator = getConnectionStatusIndicator(p.connection_status);
+
     return `
-        <div class="participant-card">
+        <div class="participant-card ${hasErrors ? 'participant-has-errors' : ''}"
+             onclick="showParticipantDetail('${escapeHtml(p.subject_id)}')"
+             role="button" tabindex="0">
             <div class="participant-card-header">
-                <span class="participant-card-id" title="${escapeHtml(p.subject_id)}">${escapeHtml(p.subject_id)}</span>
+                <div class="participant-card-title">
+                    <span class="health-indicator ${statusIndicator}"></span>
+                    <span class="participant-card-id" title="${escapeHtml(p.subject_id)}">${escapeHtml(truncateId(p.subject_id))}</span>
+                </div>
                 ${getStatusBadge(p.connection_status)}
             </div>
             <div class="participant-card-body">
@@ -235,13 +238,32 @@ function renderParticipantCard(p) {
                     <span class="participant-card-label">Progress</span>
                     <span class="participant-card-value">${getProgressDisplay(p.scene_progress)}</span>
                 </div>
+                ${p.current_game_id ? `
                 <div class="participant-card-row">
-                    <span class="participant-card-label">Updated</span>
-                    <span class="participant-card-value">${formatTimestamp(p.last_updated_at)}</span>
+                    <span class="participant-card-label">Game</span>
+                    <span class="participant-card-value font-mono text-xs">${escapeHtml(truncateId(p.current_game_id))}</span>
+                </div>
+                ` : ''}
+                <div class="participant-card-row">
+                    <span class="participant-card-label">Logs</span>
+                    <span class="participant-card-value">
+                        ${p.log_count || 0}
+                        ${hasErrors ? `<span class="badge badge-error badge-xs ml-1">${p.error_count} errors</span>` : ''}
+                    </span>
                 </div>
             </div>
         </div>
     `;
+}
+
+function getConnectionStatusIndicator(status) {
+    const indicators = {
+        'connected': 'health-healthy',
+        'reconnecting': 'health-reconnecting',
+        'disconnected': 'health-disconnected',
+        'completed': 'health-completed'
+    };
+    return indicators[status] || 'health-completed';
 }
 
 function getStatusBadge(status) {
@@ -316,12 +338,8 @@ function updateSessionList(games) {
 
     if (!games || games.length === 0) {
         container.innerHTML = `
-            <div class="empty-state">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-12 h-12 mx-auto mb-2 opacity-30">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z" />
-                </svg>
-                <p class="text-base-content/50">No active sessions</p>
-                <p class="text-base-content/30 text-sm mt-1">Sessions will appear here when participants start games</p>
+            <div class="empty-state-sm">
+                <p class="text-base-content/50 text-sm">No active multiplayer sessions</p>
             </div>
         `;
         return;
@@ -431,6 +449,137 @@ function getConnectionTypeLabel(type) {
     if (type === 'direct') return 'P2P Direct';
     if (type === 'socketio_fallback') return 'SocketIO';
     return type;
+}
+
+// ============================================
+// Participant Detail Panel (Phase 35 rework)
+// ============================================
+
+let selectedParticipantId = null;
+
+function showParticipantDetail(subjectId) {
+    selectedParticipantId = subjectId;
+    const overlay = document.getElementById('participant-detail-overlay');
+    const content = document.getElementById('participant-detail-content');
+
+    if (!overlay || !content) return;
+
+    // Find participant in current state
+    const participant = currentState.participants?.find(p => p.subject_id === subjectId);
+
+    if (!participant) {
+        content.innerHTML = '<div class="empty-state-sm"><p>Participant not found</p></div>';
+        overlay.classList.remove('hidden');
+        return;
+    }
+
+    // Render participant detail
+    content.innerHTML = renderParticipantDetailContent(participant);
+    overlay.classList.remove('hidden');
+}
+
+function closeParticipantDetail() {
+    selectedParticipantId = null;
+    const overlay = document.getElementById('participant-detail-overlay');
+    if (overlay) {
+        overlay.classList.add('hidden');
+    }
+}
+
+function renderParticipantDetailContent(participant) {
+    const statusIndicator = getConnectionStatusIndicator(participant.connection_status);
+    const gameHistory = participant.game_history || [];
+
+    // Get all logs for this participant from current state
+    const participantLogs = consoleLogs.filter(log =>
+        log.subject_id === participant.subject_id
+    );
+
+    // Calculate session duration
+    let sessionDuration = '--';
+    if (participant.created_at) {
+        const durationMs = (Date.now() / 1000 - participant.created_at) * 1000;
+        sessionDuration = formatDurationLong(durationMs);
+    }
+
+    return `
+        <div class="session-detail-section">
+            <h4 class="session-detail-section-title">Participant Info</h4>
+            <div class="session-detail-grid">
+                <div class="session-detail-item">
+                    <span class="session-detail-label">Subject ID</span>
+                    <span class="session-detail-value font-mono text-sm">${escapeHtml(participant.subject_id)}</span>
+                </div>
+                <div class="session-detail-item">
+                    <span class="session-detail-label">Status</span>
+                    <span class="session-detail-value">
+                        <span class="health-indicator ${statusIndicator}"></span>
+                        ${participant.connection_status.charAt(0).toUpperCase() + participant.connection_status.slice(1)}
+                    </span>
+                </div>
+                <div class="session-detail-item">
+                    <span class="session-detail-label">Current Scene</span>
+                    <span class="session-detail-value">${escapeHtml(participant.current_scene_id || '—')}</span>
+                </div>
+                <div class="session-detail-item">
+                    <span class="session-detail-label">Progress</span>
+                    <span class="session-detail-value">${getProgressDisplay(participant.scene_progress)}</span>
+                </div>
+                <div class="session-detail-item">
+                    <span class="session-detail-label">Session Duration</span>
+                    <span class="session-detail-value">${sessionDuration}</span>
+                </div>
+                <div class="session-detail-item">
+                    <span class="session-detail-label">Last Updated</span>
+                    <span class="session-detail-value">${formatTime(participant.last_updated_at)}</span>
+                </div>
+                ${participant.current_game_id ? `
+                <div class="session-detail-item">
+                    <span class="session-detail-label">Current Game</span>
+                    <span class="session-detail-value font-mono text-sm cursor-pointer text-primary"
+                          onclick="showSessionDetail('${escapeHtml(participant.current_game_id)}'); closeParticipantDetail();">
+                        ${escapeHtml(truncateId(participant.current_game_id))}
+                    </span>
+                </div>
+                ` : ''}
+            </div>
+        </div>
+
+        ${gameHistory.length > 0 ? `
+        <div class="session-detail-section">
+            <h4 class="session-detail-section-title">Game History (${gameHistory.length})</h4>
+            <div class="game-history-list">
+                ${gameHistory.map(game => `
+                    <div class="game-history-item">
+                        <div class="game-history-header">
+                            <span class="font-mono text-xs">${escapeHtml(truncateId(game.game_id))}</span>
+                            <span class="badge badge-xs ${game.ended_at ? (game.termination_reason === 'normal' ? 'badge-success' : 'badge-warning') : 'badge-primary'}">
+                                ${game.ended_at ? (game.termination_reason || 'ended') : 'active'}
+                            </span>
+                        </div>
+                        <div class="game-history-details">
+                            <span>Role: ${game.role || 'player'}</span>
+                            ${game.ended_at ? `<span>Duration: ${formatDuration((game.ended_at - game.started_at) * 1000)}</span>` : ''}
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+        ` : ''}
+
+        <div class="session-detail-section">
+            <h4 class="session-detail-section-title">Console Logs (${participantLogs.length})</h4>
+            <div class="session-detail-logs">
+                ${participantLogs.length > 0 ? participantLogs.slice(-50).map(log => `
+                    <div class="log-entry log-${log.level || 'log'}">
+                        <span class="log-time">${formatTime(log.timestamp)}</span>
+                        <span class="log-level log-level-${log.level || 'log'}">${(log.level || 'LOG').toUpperCase()}</span>
+                        <span class="log-message">${escapeHtml(log.message || '')}</span>
+                    </div>
+                `).join('') : '<div class="empty-state-sm"><p class="text-base-content/50">No logs captured</p></div>'}
+            </div>
+        </div>
+    `;
 }
 
 // ============================================
