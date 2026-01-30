@@ -562,6 +562,10 @@ socket.on('start_game', function(data) {
         return;
     }
 
+    console.log("[StartGame] Game starting. Subject:", window.subjectName || interactiveGymGlobals?.subjectName,
+        "GameID:", data.game_id || 'N/A',
+        "Scene:", data.scene_metadata?.scene_id || 'unknown');
+
     // Clear the waitroomInterval to stop the waiting room timer
     if (waitroomInterval) {
         clearInterval(waitroomInterval);
@@ -643,6 +647,10 @@ socket.on("waiting_room", function(data) {
         // Stop the timer if it reaches zero
         if (timer <= 0) {
             clearInterval(waitroomInterval);
+            // Prevent start button from being re-enabled after timeout
+            if (refreshStartButton) {
+                clearInterval(refreshStartButton);
+            }
             console.log("[WaitroomTimeout] Waiting room timed out. Subject:", window.subjectName || interactiveGymGlobals?.subjectName, "Session:", window.sessionId);
             socket.emit("leave_game", {session_id: window.sessionId})
 
@@ -652,6 +660,10 @@ socket.on("waiting_room", function(data) {
                 "Please return the HIT now. You will be paid through a Compensation HIT. " +
                 "Thank you for your interest in our study!";
             $("#waitroomText").html("<p>" + message + "</p>");
+
+            // Disable start button to prevent rejoining after timeout
+            $("#startButton").hide();
+            $("#startButton").attr("disabled", true);
         }
     }, 1000);
     $("#waitroomText").show();
@@ -702,6 +714,10 @@ socket.on("single_player_waiting_room", function(data) {
 
 socket.on("single_player_waiting_room_failure", function(data) {
     console.log("Leaving game due to waiting room failure (other player left)...")
+    // Prevent start button from being re-enabled after failure
+    if (refreshStartButton) {
+        clearInterval(refreshStartButton);
+    }
     socket.emit("leave_game", {session_id: window.sessionId})
 
     // Display custom message if configured, otherwise use default
@@ -710,6 +726,10 @@ socket.on("single_player_waiting_room_failure", function(data) {
         "Please return the HIT now. You will be paid through a Compensation HIT. " +
         "Thank you for your interest in our study!";
     $("#waitroomText").html("<p>" + message + "</p>");
+
+    // Disable start button to prevent rejoining after failure
+    $("#startButton").hide();
+    $("#startButton").attr("disabled", true);
 })
 
 
@@ -717,6 +737,10 @@ socket.on("waiting_room_player_left", function() {
     // Clear the waitroom countdown interval
     if (waitroomInterval) {
         clearInterval(waitroomInterval);
+    }
+    // Prevent start button from being re-enabled after player left
+    if (refreshStartButton) {
+        clearInterval(refreshStartButton);
     }
 
     console.log("Leaving game due to player leaving waiting room...")
@@ -728,6 +752,10 @@ socket.on("waiting_room_player_left", function() {
         "Please return the HIT now. You will be paid through a Compensation HIT. " +
         "Thank you for your interest in our study!";
     $("#waitroomText").html("<p>" + message + "</p>");
+
+    // Disable start button to prevent rejoining after player left
+    $("#startButton").hide();
+    $("#startButton").attr("disabled", true);
 })
 
 // P2P Validation Status (Phase 19) - log only, no UI updates
@@ -1257,7 +1285,7 @@ $(function() {
     $('#advanceButton').click( () => {
         $("#advanceButton").hide();
         $("#advanceButton").attr("disabled", true);
-        console.log("Emitting advance_scene")
+        console.log("[AdvanceScene] Continue button clicked. Subject:", window.subjectName || interactiveGymGlobals?.subjectName);
         socket.emit("advance_scene", {session_id: window.sessionId});
     })
 })

@@ -1252,7 +1252,11 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
 
         // Game ready to start
         socket.on('pyodide_game_ready', (data) => {
-            console.log('[DEBUG] pyodide_game_ready event received:', data);
+            // Always log for admin console visibility
+            console.log('[P2P] Game ready - multiplayer session starting. Subject:',
+                window.subjectName || window.interactiveGymGlobals?.subjectName,
+                'GameID:', data.game_id, 'Players:', data.players.length,
+                'ServerAuth:', data.server_authoritative || false);
             p2pLog.debug(`Game ready: ${data.players.length} players, server_auth=${data.server_authoritative || false}`);
 
             // Build player ID <-> index mapping for binary protocol
@@ -3663,8 +3667,16 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
         if (this.num_episodes >= this.max_episodes) {
             this.state = "done";
             this._destroyTimerWorker();  // Clean up Web Worker timer (Phase 24)
+            // Always log for admin console visibility
+            console.log('[P2P] Game complete - all episodes finished. Subject:',
+                window.subjectName || window.interactiveGymGlobals?.subjectName,
+                'GameID:', this.gameId, 'Episodes:', this.num_episodes, '/', this.max_episodes);
             p2pLog.warn(`Game complete (${this.num_episodes}/${this.max_episodes} episodes)`);
         } else {
+            // Always log for admin console visibility
+            console.log('[P2P] Episode complete. Subject:',
+                window.subjectName || window.interactiveGymGlobals?.subjectName,
+                'GameID:', this.gameId, 'Episode:', this.num_episodes, '/', this.max_episodes);
             this.shouldReset = true;
             p2pLog.debug(`Episode ${this.num_episodes}/${this.max_episodes} complete, will reset`);
         }
@@ -6093,6 +6105,10 @@ json.dumps({'cumulative_rewards': {str(k): v for k, v in _cumulative_rewards.ite
             return;
         }
 
+        // Always log for admin console visibility
+        console.log('[P2P] Partner disconnected - game paused for reconnection. Subject:',
+            window.subjectName || window.interactiveGymGlobals?.subjectName,
+            'GameID:', this.gameId, 'PauseFrame:', data.pause_frame);
         p2pLog.info('Server requested pause for reconnection', data);
 
         if (!this.reconnectionState.isPaused) {
@@ -6128,6 +6144,10 @@ json.dumps({'cumulative_rewards': {str(k): v for k, v in _cumulative_rewards.ite
      * Game ends cleanly for both players.
      */
     _onReconnectionTimeout() {
+        // Always log for admin console visibility
+        console.log('[P2P] Reconnection timeout reached - ending game. Subject:',
+            window.subjectName || window.interactiveGymGlobals?.subjectName,
+            'GameID:', this.gameId, 'TimeoutMs:', this.reconnectionState.timeoutMs);
         p2pLog.warn('Reconnection timeout reached');
 
         // Calculate pause duration for logging (LOG-02)
@@ -6169,6 +6189,11 @@ json.dumps({'cumulative_rewards': {str(k): v for k, v in _cumulative_rewards.ite
             return;
         }
 
+        // Always log for admin console visibility
+        console.log('[P2P] Game ended - partner disconnected. Subject:',
+            window.subjectName || window.interactiveGymGlobals?.subjectName,
+            'GameID:', this.gameId, 'Reason:', data.reason,
+            'DisconnectedPlayer:', data.disconnected_player_id);
         p2pLog.warn('Game ended due to partner disconnection', data);
 
         this._clearReconnectionTimeout();
@@ -6309,6 +6334,10 @@ json.dumps({'cumulative_rewards': {str(k): v for k, v in _cumulative_rewards.ite
     _handleFocusLossTimeout() {
         const timeoutMs = this.focusManager.timeoutMs;
         const actualMs = this.focusManager.getCurrentBackgroundDuration();
+        // Always log for admin console visibility
+        console.log('[P2P] Focus loss timeout - participant away too long. Subject:',
+            window.subjectName || window.interactiveGymGlobals?.subjectName,
+            'GameID:', this.gameId, 'AwayMs:', actualMs.toFixed(0), 'TimeoutMs:', timeoutMs);
         p2pLog.warn(`Focus loss timeout exceeded: ${actualMs.toFixed(0)}ms > ${timeoutMs}ms`);
 
         // Stop game state - similar to _handleReconnectionGameEnd
@@ -6648,6 +6677,10 @@ json.dumps({'cumulative_rewards': {str(k): v for k, v in _cumulative_rewards.ite
             return;
         }
 
+        // Always log for admin console visibility
+        console.log('[P2P] Partner reconnected - game resuming. Subject:',
+            window.subjectName || window.interactiveGymGlobals?.subjectName,
+            'GameID:', this.gameId);
         p2pLog.info('Server requested resume - restoring gameplay');
 
         // Clear timeout first (prevent race condition - Pitfall 4 from research)
