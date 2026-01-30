@@ -467,6 +467,7 @@ cramped_room_human_human = (
         waitroom_timeout=300000,  # 5 minutes
         waitroom_timeout_message="Sorry, we could not find enough players for this study. Please return the HIT now. You will be paid through a Compensation HIT.",
     )
+    .matchmaking(hide_lobby_count=True, max_rtt=100)
     .pyodide(
         run_through_pyodide=True,
         multiplayer=True,  # Enable multiplayer Pyodide coordination

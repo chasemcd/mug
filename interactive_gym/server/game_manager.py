@@ -49,6 +49,7 @@ class GameManager:
         sio: flask_socketio.SocketIO,
         pyodide_coordinator: pyodide_game_coordinator.PyodideGameCoordinator | None = None,
         pairing_manager: player_pairing_manager.PlayerPairingManager | None = None,
+        get_subject_rtt: callable | None = None,
     ):
         assert isinstance(scene, gym_scene.GymScene)
         self.scene = scene
@@ -56,6 +57,7 @@ class GameManager:
         self.sio = sio
         self.pyodide_coordinator = pyodide_coordinator
         self.pairing_manager = pairing_manager
+        self.get_subject_rtt = get_subject_rtt  # Callback to get RTT for a subject
 
         # Data structure to save subjects by their socket id
         self.subject = utils.ThreadSafeDict()
@@ -378,18 +380,72 @@ class GameManager:
                     room=subject_id,
                 )
 
+    def _is_rtt_compatible(self, subject_id: SubjectID, game: remote_game.RemoteGameV2) -> bool:
+        """Check if a subject's RTT is compatible with players already in a game.
+
+        Returns True if:
+        - No matchmaking_max_rtt is configured
+        - No get_subject_rtt callback is available
+        - The subject's RTT is within max_rtt of all existing players
+        """
+        max_rtt_diff = self.scene.matchmaking_max_rtt
+        if max_rtt_diff is None or self.get_subject_rtt is None:
+            return True
+
+        subject_rtt = self.get_subject_rtt(subject_id)
+        if subject_rtt is None:
+            # No RTT measurement yet, allow pairing
+            logger.debug(f"No RTT measurement for {subject_id}, allowing pairing")
+            return True
+
+        # Check against all players already in the game
+        for player_id, existing_subject_id in game.human_players.items():
+            if existing_subject_id == utils.Available:
+                continue
+
+            existing_rtt = self.get_subject_rtt(existing_subject_id)
+            if existing_rtt is None:
+                # Existing player has no RTT measurement, allow pairing
+                continue
+
+            rtt_diff = abs(subject_rtt - existing_rtt)
+            if rtt_diff > max_rtt_diff:
+                logger.info(
+                    f"RTT incompatible: {subject_id} (RTT={subject_rtt}ms) vs "
+                    f"{existing_subject_id} (RTT={existing_rtt}ms), diff={rtt_diff}ms > max={max_rtt_diff}ms"
+                )
+                return False
+
+        logger.debug(f"RTT compatible: {subject_id} (RTT={subject_rtt}ms)")
+        return True
+
     def _add_to_fifo_queue(
         self, subject_id: SubjectID
     ) -> remote_game.RemoteGameV2:
-        """Add a subject to the standard FIFO matching queue."""
+        """Add a subject to the standard FIFO matching queue.
+
+        If matchmaking_max_rtt is configured, will only pair with games where
+        all existing players have RTT within the allowed difference.
+        """
         # Use lock to prevent race conditions when multiple participants join simultaneously
         with self.waiting_games_lock:
-            if not self.waiting_games:
-                logger.info("No games waiting for players. Creating a new game.")
+            # Find a compatible game based on RTT
+            compatible_game = None
+            for game_id in self.waiting_games:
+                candidate_game = self.games.get(game_id)
+                if candidate_game and self._is_rtt_compatible(subject_id, candidate_game):
+                    compatible_game = candidate_game
+                    break
+
+            if compatible_game is None:
+                # No compatible game found, create a new one
+                logger.info(f"No RTT-compatible game found for {subject_id}. Creating a new game.")
                 self._create_game()
                 logger.info(f"Created game. waiting_games now: {self.waiting_games}")
+                # The newly created game will be at the end of waiting_games
+                compatible_game = self.games[self.waiting_games[-1]]
 
-            game: remote_game.RemoteGameV2 = self.games[self.waiting_games[0]]
+            game = compatible_game
             logger.info(f"Adding subject {subject_id} to game {game.game_id}. Game has {len(game.human_players)} players, needs {len(self.scene.policy_mapping)}")
             with game.lock:
                 self.subject_games[subject_id] = game.game_id
@@ -462,6 +518,7 @@ class GameManager:
                 "players_needed": len(game.get_available_human_agent_ids()),
                 "ms_remaining": remaining_wait_time,
                 "waitroom_timeout_message": self.scene.waitroom_timeout_message,
+                "hide_lobby_count": self.scene.hide_lobby_count,
             },
             room=subject_id,
         )
@@ -489,6 +546,7 @@ class GameManager:
                 "players_needed": len(game.get_available_human_agent_ids()),
                 "ms_remaining": remaining_wait_time,
                 "waitroom_timeout_message": self.scene.waitroom_timeout_message,
+                "hide_lobby_count": self.scene.hide_lobby_count,
             },
             room=game_id,
         )

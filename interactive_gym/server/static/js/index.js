@@ -765,7 +765,14 @@ function updateWaitroomText(data, timer) {
 
     minutes = minutes < 10 ? "0" + minutes : minutes;
     seconds = seconds < 10 ? "0" + seconds : seconds;
-    $("#waitroomText").text(`There are ${data.cur_num_players} / ${data.cur_num_players + data.players_needed} players in the lobby. Waiting ${minutes}:${seconds} for more to join...`);
+
+    if (data.hide_lobby_count) {
+        // Hide participant count, only show timer
+        $("#waitroomText").text(`Waiting ${minutes}:${seconds} for more players to join...`);
+    } else {
+        // Show participant count and timer
+        $("#waitroomText").text(`There are ${data.cur_num_players} / ${data.cur_num_players + data.players_needed} players in the lobby. Waiting ${minutes}:${seconds} for more to join...`);
+    }
 }
 
 socket.on("game_reset", function(data) {

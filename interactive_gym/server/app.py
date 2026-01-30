@@ -52,6 +52,7 @@ class ParticipantSession:
     is_connected: bool  # Whether currently connected
     created_at: float = dataclasses.field(default_factory=time.time)
     last_updated_at: float = dataclasses.field(default_factory=time.time)
+    current_rtt: int | None = None  # Current RTT measurement in ms (for matchmaking)
 
 
 def setup_logger(name, log_file, level=logging.INFO):
@@ -403,6 +404,17 @@ def sync_globals(data):
 #     # )
 
 
+def _get_subject_rtt(subject_id: str) -> int | None:
+    """Get the current RTT measurement for a subject.
+
+    Used by GameManager for RTT-based matchmaking.
+    """
+    session = PARTICIPANT_SESSIONS.get(subject_id)
+    if session is not None:
+        return session.current_rtt
+    return None
+
+
 @socketio.on("advance_scene")
 def advance_scene(data):
     global GAME_MANAGERS, PARTICIPANT_SESSIONS
@@ -465,6 +477,7 @@ def advance_scene(data):
                 sio=socketio,
                 pyodide_coordinator=PYODIDE_COORDINATOR,
                 pairing_manager=GROUP_MANAGER,
+                get_subject_rtt=_get_subject_rtt,
             )
             GAME_MANAGERS[current_scene.scene_id] = game_manager
         else:
@@ -726,20 +739,13 @@ def pong(data):
         room=flask.request.sid,
     )
 
-    # TODO(chase): when data tracking is reimplemented, we'll want to track the ping/focus status here.
-    # also track if the user isn't focused on their window.
-    # game = _get_existing_game(sid)
-    # if game is None:
-    #     return
-
-    # document_in_focus = data["document_in_focus"]
-    # ping_ms = data["ping_ms"]
-    # player_name = SUBJECT_ID_MAP[sid]
-    # game.update_ping(
-    #     player_identifier=player_name,
-    #     hidden_status=document_in_focus,
-    #     ping=ping_ms,
-    # )
+    # Store RTT for matchmaking purposes
+    ping_ms = data.get("ping_ms")
+    if ping_ms is not None:
+        session_id = flask.request.sid
+        subject_id = get_subject_id_from_session_id(session_id)
+        if subject_id and subject_id in SESSIONS:
+            SESSIONS[subject_id].current_rtt = ping_ms
 
 
 @socketio.on("unityEpisodeEnd")

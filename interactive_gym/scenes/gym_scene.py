@@ -153,6 +153,12 @@ class GymScene(scene.Scene):
         # Set to 0 for no input delay (not recommended for multiplayer)
         self.input_delay: int = 0  # frames of input delay
 
+        # Lobby/waitroom display settings
+        self.hide_lobby_count: bool = False  # If True, hide participant count in waitroom
+
+        # Matchmaking settings
+        self.matchmaking_max_rtt: int | None = None  # Max RTT difference (ms) between paired participants
+
         # Player group settings (for multiplayer games)
         # Groups are always tracked automatically after each game completes.
         # wait_for_known_group controls whether to require the same group members in this scene.
@@ -519,6 +525,41 @@ class GymScene(scene.Scene):
                 in_game_scene_body_filepath is NotProvided
             ), "Cannot set both filepath and html_body."
             self.in_game_scene_body = in_game_scene_body
+
+        return self
+
+    def matchmaking(
+        self,
+        hide_lobby_count: bool = NotProvided,
+        max_rtt: int = NotProvided,
+    ):
+        """Configure matchmaking and lobby settings for the GymScene.
+
+        :param hide_lobby_count: If True, hides the participant count display in the waitroom.
+            Participants will only see the countdown timer, not how many are waiting.
+            Defaults to NotProvided (False).
+        :type hide_lobby_count: bool, optional
+        :param max_rtt: Maximum RTT difference (in milliseconds) allowed between participants
+            when pairing. If a participant's RTT differs from another by more than this value,
+            they will not be paired together. Set to None to disable RTT-based pairing.
+            Defaults to NotProvided (None).
+        :type max_rtt: int, optional
+        :return: The GymScene instance
+        :rtype: GymScene
+
+        Example:
+            scene.matchmaking(
+                hide_lobby_count=True,  # Don't show "2/4 players in lobby"
+                max_rtt=50,  # Only pair participants within 50ms RTT of each other
+            )
+        """
+        if hide_lobby_count is not NotProvided:
+            self.hide_lobby_count = hide_lobby_count
+
+        if max_rtt is not NotProvided:
+            if max_rtt is not None and max_rtt <= 0:
+                raise ValueError("max_rtt must be a positive integer or None")
+            self.matchmaking_max_rtt = max_rtt
 
         return self
 
