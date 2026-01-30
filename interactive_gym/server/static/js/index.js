@@ -439,6 +439,12 @@ socket.on('experiment_config', async function(data) {
                 if (pendingSceneData) {
                     console.log("[ExperimentConfig] Processing pending scene");
                     processPendingScene();
+                } else {
+                    // No pending scene - request current scene from server
+                    // This handles the race condition where activate_scene arrived before
+                    // the socket.on handler was ready, or was lost due to timing issues
+                    console.log("[ExperimentConfig] No pending scene, requesting current scene from server");
+                    socket.emit("request_current_scene", {});
                 }
             }
         } else {

@@ -360,6 +360,28 @@ def register_subject(data):
     participant_stager.current_scene.export_metadata(subject_id)
 
 
+@socketio.on("request_current_scene")
+def request_current_scene(data):
+    """
+    Re-send the current scene activation to the client.
+
+    This is called when the client completed entry screening but didn't receive
+    the activate_scene event (race condition during initial connection).
+    """
+    subject_id = get_subject_id_from_session_id(flask.request.sid)
+    if subject_id is None:
+        logger.warning("request_current_scene called but no subject_id found")
+        return
+
+    participant_stager = STAGERS.get(subject_id)
+    if participant_stager is None:
+        logger.error(f"No stager found for subject {subject_id} during request_current_scene")
+        return
+
+    logger.info(f"[RequestCurrentScene] Re-sending activate_scene for subject {subject_id}")
+    participant_stager.current_scene.activate(socketio, room=flask.request.sid)
+
+
 @socketio.on("sync_globals")
 def sync_globals(data):
     """
