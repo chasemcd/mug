@@ -526,7 +526,7 @@ Plans:
 
 </details>
 
-### 🚧 v1.9 Data Parity Testing (In Progress)
+### v1.9 Data Parity Testing (In Progress)
 
 **Milestone Goal:** Validate v1.8 data export parity under controlled network conditions using Playwright automation against `overcooked_human_human_multiplayer`.
 
@@ -540,10 +540,11 @@ Plans:
   3. Flask server starts/stops cleanly as part of test lifecycle
   4. Test can capture game completion state
 **Research flag:** Likely (Playwright MCP integration, multiplayer automation patterns)
-**Plans:** TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] 40-01-PLAN.md — Playwright dual-context setup, Flask lifecycle, game automation
+- [ ] 40-01-PLAN.md — Test infrastructure setup (pytest, fixtures, server lifecycle)
+- [ ] 40-02-PLAN.md — Game automation helpers and multiplayer test
 
 ### Phase 41: Latency Injection Tests
 **Goal:** Test data parity under various latency conditions
@@ -608,7 +609,7 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 36 → 37 → 38 → 39
+Phases execute in numeric order: 40 → 41 → 42 → 43 → 44
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -639,7 +640,7 @@ Phases execute in numeric order: 36 → 37 → 38 → 39
 | 37. Fast-Forward Fix | v1.8 | 1/1 | Complete | 2026-01-30 |
 | 38. Episode Boundary | v1.8 | 1/1 | Complete | 2026-01-30 |
 | 39. Verification & Metadata | v1.8 | 1/1 | Complete | 2026-01-30 |
-| 40. Test Infrastructure | v1.9 | 0/1 | Not started | - |
+| 40. Test Infrastructure | v1.9 | 0/2 | Not started | - |
 | 41. Latency Injection | v1.9 | 0/1 | Not started | - |
 | 42. Network Disruption | v1.9 | 0/1 | Not started | - |
 | 43. Data Comparison | v1.9 | 0/1 | Not started | - |
@@ -647,4 +648,4 @@ Phases execute in numeric order: 36 → 37 → 38 → 39
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-01-30 after v1.9 roadmap creation*
+*Last updated: 2026-01-30 after Phase 40 planning*
