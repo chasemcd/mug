@@ -9,8 +9,8 @@ Requirements for v1.9 Data Parity Testing milestone. Each maps to roadmap phases
 
 ### Test Infrastructure
 
-- [ ] **INFRA-01**: Playwright test suite can launch two browser contexts for multiplayer game
-- [ ] **INFRA-02**: Test lifecycle manages Flask server startup and teardown
+- [x] **INFRA-01**: Playwright test suite can launch two browser contexts for multiplayer game
+- [x] **INFRA-02**: Test lifecycle manages Flask server startup and teardown
 
 ### Network Condition Tests
 
@@ -67,8 +67,8 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| INFRA-01 | Phase 40 | Pending |
-| INFRA-02 | Phase 40 | Pending |
+| INFRA-01 | Phase 40 | Complete |
+| INFRA-02 | Phase 40 | Complete |
 | NET-01 | Phase 41 | Pending |
 | NET-04 | Phase 41 | Pending |
 | NET-05 | Phase 41 | Pending |

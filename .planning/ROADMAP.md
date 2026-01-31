@@ -543,8 +543,8 @@ Plans:
 **Plans:** 2 plans
 
 Plans:
-- [ ] 40-01-PLAN.md — Test infrastructure setup (pytest, fixtures, server lifecycle)
-- [ ] 40-02-PLAN.md — Game automation helpers and multiplayer test
+- [x] 40-01-PLAN.md — Test infrastructure setup (pytest, fixtures, server lifecycle)
+- [x] 40-02-PLAN.md — Game automation helpers and multiplayer test
 
 ### Phase 41: Latency Injection Tests
 **Goal:** Test data parity under various latency conditions
@@ -640,7 +640,7 @@ Phases execute in numeric order: 40 → 41 → 42 → 43 → 44
 | 37. Fast-Forward Fix | v1.8 | 1/1 | Complete | 2026-01-30 |
 | 38. Episode Boundary | v1.8 | 1/1 | Complete | 2026-01-30 |
 | 39. Verification & Metadata | v1.8 | 1/1 | Complete | 2026-01-30 |
-| 40. Test Infrastructure | v1.9 | 0/2 | Not started | - |
+| 40. Test Infrastructure | v1.9 | 2/2 | Complete | 2026-01-31 |
 | 41. Latency Injection | v1.9 | 0/1 | Not started | - |
 | 42. Network Disruption | v1.9 | 0/1 | Not started | - |
 | 43. Data Comparison | v1.9 | 0/1 | Not started | - |
