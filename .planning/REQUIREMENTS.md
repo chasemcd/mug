@@ -67,23 +67,23 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| INFRA-01 | — | Pending |
-| INFRA-02 | — | Pending |
-| NET-01 | — | Pending |
-| NET-02 | — | Pending |
-| NET-03 | — | Pending |
-| NET-04 | — | Pending |
-| NET-05 | — | Pending |
-| CMP-01 | — | Pending |
-| CMP-02 | — | Pending |
-| CMP-03 | — | Pending |
-| DOC-01 | — | Pending |
+| INFRA-01 | Phase 40 | Pending |
+| INFRA-02 | Phase 40 | Pending |
+| NET-01 | Phase 41 | Pending |
+| NET-04 | Phase 41 | Pending |
+| NET-05 | Phase 41 | Pending |
+| NET-02 | Phase 42 | Pending |
+| NET-03 | Phase 42 | Pending |
+| CMP-01 | Phase 43 | Pending |
+| CMP-02 | Phase 43 | Pending |
+| CMP-03 | Phase 43 | Pending |
+| DOC-01 | Phase 44 | Pending |
 
 **Coverage:**
 - v1.9 requirements: 11 total
-- Mapped to phases: 0 ⚠️
-- Unmapped: 11
+- Mapped to phases: 11 ✓
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-01-31*
-*Last updated: 2026-01-31 after initial definition*
+*Last updated: 2026-01-30 after roadmap creation*
