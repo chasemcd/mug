@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-01-30)
 
 **Core value:** Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
-**Current focus:** v1.8 Data Export Parity (COMPLETE)
+**Current focus:** v1.9 Data Parity Testing
 
 ## Current Position
 
-Phase: 39 of 39 (Verification & Metadata)
-Plan: 01 of 01 (COMPLETE)
-Status: Milestone complete
-Last activity: 2026-01-31 - Completed 39-01-PLAN.md
+Phase: Not started (run /gsd:create-roadmap or /gsd:define-requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-01-31 - Milestone v1.9 started
 
-Progress: [██████████] 100% (v1.8 - Data Export Parity: 4/4 phases)
+Progress: [░░░░░░░░░░] 0% (v1.9 - Data Parity Testing: 0/? phases)
 
 ## Milestone History
 
@@ -254,16 +254,10 @@ Resume file: None
 
 ### Next Steps
 
-v1.8 Data Export Parity milestone is complete. All phases (36-39) are finished:
-- Phase 36: Dual-buffer architecture for speculative vs confirmed data
-- Phase 37: Fast-forward data recording fix
-- Phase 38: Episode boundary promotion
-- Phase 39: Verification metadata and compare tooling
+v1.9 Data Parity Testing milestone started. Goals:
+- Playwright-based automated test suite for multiplayer data parity
+- Test conditions: artificial latency, packet loss, tab focus scenarios
+- Both in-browser and Python script comparison
+- Manual test protocol documentation
 
-The data export pipeline now:
-1. Records frames to speculative buffer first
-2. Promotes to canonical buffer only after confirmation
-3. Clears both buffers on rollback
-4. Force-promotes at episode boundary
-5. Exports wasSpeculative flag and rollbackEvents metadata
-6. Provides --compare mode for offline validation
+Next: Run `/gsd:define-requirements` or `/gsd:create-roadmap`

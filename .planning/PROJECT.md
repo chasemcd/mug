@@ -8,18 +8,30 @@ A framework for running browser-based reinforcement learning experiments with hu
 
 Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
 
-## Current Milestone: v1.8 Data Export Parity
+## Current Milestone: v1.9 Data Parity Testing
 
-**Goal:** Both players export identical game state data (actions, observations, rewards, infos) regardless of rollbacks, fast-forwards, latency, or other edge cases — ensuring research data validity.
+**Goal:** Validate v1.8 data export parity under controlled network conditions using Playwright automation against `overcooked_human_human_multiplayer`.
 
 **Target features:**
-- Identical frame counts between both players' exports
-- Identical actions recorded per frame across both players
-- Identical rewards and infos per frame
-- Correct data collection during/after rollbacks (only validated state recorded)
-- Correct data collection during/after fast-forward (tab refocus scenarios)
-- Correct data collection under high latency conditions
-- Edge case handling for any scenario that could cause data divergence
+- Playwright-based automated test suite for multiplayer data parity
+- Artificial latency injection tests (100ms, 200ms, 500ms via Chrome DevTools Protocol)
+- Packet loss simulation tests to trigger rollback scenarios
+- Tab focus scenarios (tab away/back during gameplay) to test fast-forward
+- In-browser export comparison during test runs
+- Python script comparison via `validate_action_sequences.py --compare`
+- Documented manual test protocol for researchers
+
+## Previous Milestone: v1.8 Data Export Parity (Shipped: 2026-01-31)
+
+**Delivered:** Both players export identical game state data regardless of rollbacks, fast-forwards, or latency.
+
+**Key accomplishments:**
+- Dual-buffer architecture (speculative → canonical frame data)
+- Fast-forward frames properly promoted to canonical buffer
+- Episode boundary confirmation ensures complete data export
+- `wasSpeculative` per-frame metadata for research analysis
+- `rollbackEvents` array in export for rollback history
+- Offline `--compare` mode in validation script
 
 ## Previous Milestone: v1.7 Admin Console Improvement (Shipped: 2026-01-25)
 
@@ -161,13 +173,24 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 
 ### Active
 
-- [ ] Identical frame counts between both players' exports
-- [ ] Identical actions recorded per frame across both players
-- [ ] Identical rewards and infos per frame
-- [ ] Correct data collection during/after rollbacks
-- [ ] Correct data collection during/after fast-forward
-- [ ] Correct data collection under high latency
-- [ ] Edge case handling for data divergence scenarios
+- [ ] Playwright test infrastructure for multiplayer game automation
+- [ ] Latency injection tests (100ms, 200ms, 500ms)
+- [ ] Packet loss simulation tests
+- [ ] Tab focus/unfocus tests
+- [ ] In-browser export comparison
+- [ ] Python script comparison integration
+- [ ] Manual test protocol documentation
+
+*Shipped in v1.8:*
+- ✓ Identical frame counts between both players' exports — v1.8
+- ✓ Identical actions recorded per frame across both players — v1.8
+- ✓ Identical rewards and infos per frame — v1.8
+- ✓ Correct data collection during/after rollbacks — v1.8
+- ✓ Correct data collection during/after fast-forward — v1.8
+- ✓ Correct data collection under high latency — v1.8
+- ✓ `wasSpeculative` per-frame metadata — v1.8
+- ✓ `rollbackEvents` in export — v1.8
+- ✓ Offline `--compare` validation mode — v1.8
 
 *Shipped in v1.7:*
 - ✓ Dashboard overview with key experiment stats — v1.7
@@ -217,7 +240,7 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 - Episode start sync can timeout on slow connections (mitigated with retry mechanism)
 - Rollback visual corrections cause brief teleporting (smoothing not yet implemented)
 - **[CRITICAL]** Users report 1-2 second local input lag in Overcooked (investigating in v1.6)
-- **[CRITICAL]** Data export parity issues — players' exported data diverges after rollbacks/fast-forward (addressing in v1.8)
+- ~~**[RESOLVED]** Data export parity issues — fixed in v1.8 with dual-buffer architecture~~
 
 ## Constraints
 
@@ -239,5 +262,8 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 | GGPO-style input queuing | Prevents race conditions during rollback replay | ✓ Good |
 | Open Relay Project for TURN | Free 20GB/month tier sufficient for research | ✓ Good |
 
+| Dual-buffer data recording | Separates speculative from confirmed frame data for export parity | ✓ Good |
+| Playwright MCP for testing | Browser automation with network condition control | — Pending |
+
 ---
-*Last updated: 2026-01-30 after v1.8 milestone start*
+*Last updated: 2026-01-31 after v1.9 milestone start*
