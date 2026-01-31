@@ -1,6 +1,7 @@
 data/
 .DS_Store
 .claude/ 
+.claude/*
 build/
 
 # Byte-compiled / optimized / DLL files
