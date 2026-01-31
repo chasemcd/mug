@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-30)
 ## Current Position
 
 Phase: 38 of 39 (Episode Boundary Confirmation)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-01-30 — Phase 37 verified and complete
+Plan: 01 of 01 complete
+Status: Phase complete
+Last activity: 2026-01-30 - Completed 38-01-PLAN.md
 
-Progress: [█████░░░░░] 50% (v1.8 - Data Export Parity: 2/4 phases)
+Progress: [██████░░░░] 75% (v1.8 - Data Export Parity: 3/4 phases)
 
 ## Milestone History
 
@@ -101,6 +101,10 @@ Progress: [█████░░░░░] 50% (v1.8 - Data Export Parity: 2/4 p
 **v1.8 Execution:**
 - `.planning/phases/36-buffer-split/36-01-SUMMARY.md`
 - `.planning/phases/37-fast-forward-fix/37-01-SUMMARY.md`
+- `.planning/phases/38-episode-boundary/38-01-SUMMARY.md`
+
+**Episode Boundary Promotion (v1.8 Phase 38 - added):**
+- `interactive_gym/server/static/js/pyodide_multiplayer_game.js` - _promoteRemainingAtBoundary() method added, called in signalEpisodeComplete()
 
 **Fast-Forward Data Recording (v1.8 Phase 37 - fixed):**
 - `interactive_gym/server/static/js/pyodide_multiplayer_game.js` - _promoteConfirmedFrames() call added to _performFastForward()
@@ -142,6 +146,11 @@ Progress: [█████░░░░░] 50% (v1.8 - Data Export Parity: 2/4 p
 ### Decisions
 
 See: .planning/PROJECT.md Key Decisions table
+
+**v1.8 Phase 38 decisions:**
+- Use console.warn for boundary promotion (unusual condition worth attention)
+- Promote ALL remaining frames at episode boundary (no confirmedFrame check)
+- Call promotion outside if-block to run regardless of sceneId
 
 **v1.7 Phase 35 decisions:**
 - Active sessions promoted to 8-column primary area (was in sidebar)
@@ -226,15 +235,15 @@ See: .planning/PROJECT.md Key Decisions table
 - Users can use `[LATENCY]` console logs to diagnose specific issues
 
 **v1.8 Focus:**
-- Data export parity issues — players' exported data diverges after rollbacks/fast-forward
-- Need to ensure only validated (post-rollback, post-fast-forward) state is recorded
+- Data export parity issues - players' exported data diverges after rollbacks/fast-forward
+- Phase 38 complete: Episode boundary promotion ensures all frames exported
 
 ## Session Continuity
 
 Last session: 2026-01-30
-Stopped at: Phase 37 execution complete
+Stopped at: Phase 38 execution complete
 Resume file: None
 
 ### Next Steps
 
-Run `/gsd:plan-phase 38` to create detailed plan for Episode Boundary Confirmation.
+Run `/gsd:plan-phase 39` to create detailed plan for Validation Comparison (final phase of v1.8).
