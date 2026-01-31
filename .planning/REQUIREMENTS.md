@@ -9,9 +9,9 @@ Requirements for v1.8 Data Export Parity milestone. Each maps to roadmap phases.
 
 ### Data Recording
 
-- [ ] **REC-01**: Data is stored in a speculative buffer during frame execution
-- [ ] **REC-02**: Data is promoted to confirmed buffer only when all players' inputs for that frame are received
-- [ ] **REC-03**: Export reads only from confirmed buffer, never from speculative buffer
+- [x] **REC-01**: Data is stored in a speculative buffer during frame execution
+- [x] **REC-02**: Data is promoted to confirmed buffer only when all players' inputs for that frame are received
+- [x] **REC-03**: Export reads only from confirmed buffer, never from speculative buffer
 - [ ] **REC-04**: Each frame includes `wasSpeculative` metadata indicating if it was ever predicted
 
 ### Edge Case Handling
@@ -55,9 +55,9 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| REC-01 | Phase 36 | Pending |
-| REC-02 | Phase 36 | Pending |
-| REC-03 | Phase 36 | Pending |
+| REC-01 | Phase 36 | Complete |
+| REC-02 | Phase 36 | Complete |
+| REC-03 | Phase 36 | Complete |
 | REC-04 | Phase 39 | Pending |
 | EDGE-01 | Phase 37 | Pending |
 | EDGE-02 | Phase 38 | Pending |
