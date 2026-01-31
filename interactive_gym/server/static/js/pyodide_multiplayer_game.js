@@ -2982,6 +2982,31 @@ obs, rewards, terminateds, truncateds, infos, render_state
     }
 
     /**
+     * Force-promote any remaining speculative frames at episode boundary.
+     * Called before export to ensure all frame data is captured.
+     *
+     * At episode end, both players have executed identical steps with real inputs.
+     * The data is correct - it just hasn't been "confirmed" because input
+     * confirmation packets are still in flight.
+     *
+     * Phase 38: EDGE-02
+     */
+    _promoteRemainingAtBoundary() {
+        const remaining = this.speculativeFrameData.size;
+        if (remaining === 0) return;
+
+        // Log warning - this indicates confirmedFrame was behind at episode end
+        console.warn(`[Episode Boundary] Promoting ${remaining} unconfirmed frames ` +
+            `at episode end (confirmedFrame=${this.confirmedFrame}, frameNumber=${this.frameNumber})`);
+
+        // Promote all remaining frames - don't check confirmedFrame
+        for (const [frame, data] of this.speculativeFrameData.entries()) {
+            this.frameDataBuffer.set(frame, data);
+        }
+        this.speculativeFrameData.clear();
+    }
+
+    /**
      * Compute and store hash for a confirmed frame.
      * Only called when frame is fully confirmed (all inputs received, no rollback pending).
      * IMPORTANT: Uses the snapshot for that frame, not current state, to ensure
