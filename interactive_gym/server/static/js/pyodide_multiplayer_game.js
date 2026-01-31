@@ -2952,6 +2952,32 @@ obs, rewards, terminateds, truncateds, infos, render_state
                 break;
             }
         }
+
+        // Promote confirmed frames to canonical buffer (Phase 36)
+        this._promoteConfirmedFrames();
+    }
+
+    /**
+     * Promote confirmed frame data from speculative to canonical buffer.
+     * Only frames where frame <= confirmedFrame are promoted.
+     * This ensures only data with confirmed inputs is exported.
+     */
+    _promoteConfirmedFrames() {
+        const promoted = [];
+        for (const [frame, data] of this.speculativeFrameData.entries()) {
+            if (frame <= this.confirmedFrame) {
+                // Promote to canonical buffer
+                this.frameDataBuffer.set(frame, data);
+                promoted.push(frame);
+            }
+        }
+        // Remove promoted entries from speculative buffer
+        for (const frame of promoted) {
+            this.speculativeFrameData.delete(frame);
+        }
+        if (promoted.length > 0) {
+            p2pLog.debug(`Promoted ${promoted.length} frames to canonical buffer (up to frame ${this.confirmedFrame})`);
+        }
     }
 
     /**
