@@ -203,13 +203,27 @@ class RemoteGameV2:
         except queue.Full:
             pass
 
-    def add_player(self, player_id: str | int, identifier: str | int) -> None:
+    def add_player(self, player_id: str | int, identifier: str | int) -> bool:
+        """Add a player to the game.
+
+        Returns True if the player was successfully added, False if the slot
+        was not available (e.g., due to a race condition).
+        """
         available_ids = self.get_available_human_agent_ids()
-        assert (
-            player_id in available_ids
-        ), f"Player ID is not available! Available IDs are: {available_ids}"
+        if player_id not in available_ids:
+            logger.error(
+                f"Player slot {player_id} is not available! "
+                f"Available IDs are: {available_ids}. "
+                f"Attempted to add identifier: {identifier}"
+            )
+            return False
 
         self.human_players[player_id] = identifier
+        logger.info(
+            f"Successfully added player {identifier} to slot {player_id}. "
+            f"Remaining slots: {self.get_available_human_agent_ids()}"
+        )
+        return True
 
     def update_document_focus_status_and_ping(
         self, player_identifier: str | int, hidden_status: bool, ping: int

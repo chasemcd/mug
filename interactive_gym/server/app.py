@@ -646,6 +646,45 @@ def leave_game(data):
         game_manager = GAME_MANAGERS.get(current_scene.scene_id, None)
 
         game_manager.leave_game(subject_id=subject_id)
+
+        # Also clean up from pyodide coordinator if applicable
+        if PYODIDE_COORDINATOR:
+            # Find and remove this player from any pyodide games
+            for game_id, game in list(PYODIDE_COORDINATOR.games.items()):
+                if subject_id in game.player_subjects.values():
+                    # Find the player_id for this subject
+                    player_id = None
+                    for pid, sid in game.player_subjects.items():
+                        if sid == subject_id:
+                            player_id = pid
+                            break
+                    if player_id is not None:
+                        logger.info(f"[LeaveGame] Removing subject {subject_id} (player {player_id}) from pyodide game {game_id}")
+                        # Archive the session before removing if it was a waiting game
+                        if ADMIN_AGGREGATOR and not game.is_active:
+                            session = PARTICIPANT_SESSIONS.get(subject_id)
+                            scene_id = session.current_scene_id if session else None
+                            session_snapshot = {
+                                'game_id': game_id,
+                                'players': list(game.players.keys()),
+                                'subject_ids': list(game.player_subjects.values()),
+                                'current_frame': game.frame_number,
+                                'is_server_authoritative': game.server_authoritative,
+                                'created_at': game.created_at,
+                                'game_type': 'multiplayer',
+                                'current_episode': None,
+                                'scene_id': scene_id,
+                            }
+                            ADMIN_AGGREGATOR.record_session_termination(
+                                game_id=game_id,
+                                reason='waitroom_timeout',
+                                players=list(game.player_subjects.values()),
+                                details={'leaving_player': subject_id},
+                                session_snapshot=session_snapshot
+                            )
+                        PYODIDE_COORDINATOR.remove_player(game_id, player_id, notify_others=True)
+                    break
+
         PROCESSED_SUBJECT_NAMES.append(subject_id)
 
         # Record session completion for admin dashboard stats
@@ -872,6 +911,13 @@ def on_waitroom_timeout_completion(data):
         f"[WaitroomTimeout] Subject {subject_id} waitroom timed out. "
         f"Completion code: {completion_code}, Reason: {reason}"
     )
+
+    # Track waitroom timeout in admin aggregator
+    if ADMIN_AGGREGATOR:
+        # Get current scene_id from participant session
+        session = PARTICIPANT_SESSIONS.get(subject_id)
+        scene_id = session.current_scene_id if session else None
+        ADMIN_AGGREGATOR.track_waitroom_timeout(subject_id, scene_id)
 
     # Save completion code to file if data saving is enabled
     if CONFIG.save_experiment_data:
@@ -1633,15 +1679,23 @@ def on_mid_game_exclusion(data):
         # Build session snapshot for historical viewing
         session_snapshot = None
         if game:
+            # Get scene_id from first player's session
+            scene_id = None
+            subject_ids = list(game.player_subjects.values())
+            if subject_ids:
+                first_session = PARTICIPANT_SESSIONS.get(subject_ids[0])
+                scene_id = first_session.current_scene_id if first_session else None
+
             session_snapshot = {
                 'game_id': game_id,
                 'players': players,
-                'subject_ids': list(game.player_subjects.values()),
+                'subject_ids': subject_ids,
                 'current_frame': game.frame_number,
                 'is_server_authoritative': game.server_authoritative,
                 'created_at': game.created_at,
                 'game_type': 'multiplayer',
                 'current_episode': getattr(game, 'episode_number', None),
+                'scene_id': scene_id,
             }
         ADMIN_AGGREGATOR.record_session_termination(
             game_id=game_id,
@@ -1694,6 +1748,117 @@ def on_p2p_health_report(data):
                 'timestamp': time.time()
             }
         )
+
+
+@socketio.on("multiplayer_game_complete")
+def handle_multiplayer_game_complete(data):
+    """Handle notification that a multiplayer game completed all episodes.
+
+    Called by clients when all episodes finish successfully.
+    Archives the session for admin console viewing.
+    """
+    game_id = data.get("game_id")
+    episode_num = data.get("episode_num")
+    max_episodes = data.get("max_episodes")
+
+    if not game_id:
+        return
+
+    logger.info(f"[GameComplete] Multiplayer game {game_id} completed: {episode_num}/{max_episodes} episodes")
+
+    if ADMIN_AGGREGATOR and PYODIDE_COORDINATOR:
+        game = PYODIDE_COORDINATOR.games.get(game_id)
+        if game:
+            # Get subject IDs from pyodide coordinator
+            subject_ids = list(game.player_subjects.values())
+            players = list(game.players.keys())
+
+            # Get scene_id from first participant
+            scene_id = None
+            for sid in subject_ids:
+                session = PARTICIPANT_SESSIONS.get(sid)
+                if session:
+                    scene_id = session.current_scene_id
+                    break
+
+            # Get P2P health data before archiving
+            p2p_health = ADMIN_AGGREGATOR._get_p2p_health_for_game(game_id)
+
+            # Build session snapshot with connection stats
+            session_snapshot = {
+                'game_id': game_id,
+                'players': players,
+                'subject_ids': subject_ids,
+                'current_frame': game.frame_number,
+                'is_server_authoritative': game.server_authoritative,
+                'created_at': game.created_at,
+                'game_type': 'multiplayer',
+                'current_episode': episode_num,
+                'max_episodes': max_episodes,
+                'scene_id': scene_id,
+                'p2p_health': p2p_health,
+                'session_health': ADMIN_AGGREGATOR._compute_session_health(p2p_health),
+            }
+
+            ADMIN_AGGREGATOR.record_session_termination(
+                game_id=game_id,
+                reason='normal',
+                players=subject_ids,
+                details={
+                    'episode_num': episode_num,
+                    'max_episodes': max_episodes,
+                },
+                session_snapshot=session_snapshot
+            )
+            logger.info(f"[GameComplete] Archived session {game_id} with {len(subject_ids)} players")
+
+
+@socketio.on("participant_terminal_state")
+def handle_participant_terminal_state(data):
+    """Handle participant entering a terminal state (partner disconnected, etc.).
+
+    Updates admin console to show correct participant status by adding to
+    PROCESSED_SUBJECT_NAMES, which the aggregator checks for 'completed' status.
+
+    Args:
+        data: {
+            'game_id': str,
+            'scene_id': str,
+            'reason': str ('partner_disconnected', 'focus_loss_timeout'),
+            'frame_number': int,
+            'episode_number': int
+        }
+    """
+    global PROCESSED_SUBJECT_NAMES
+
+    subject_id = get_subject_id_from_session_id(flask.request.sid)
+    if subject_id is None:
+        return
+
+    game_id = data.get("game_id")
+    scene_id = data.get("scene_id")
+    reason = data.get("reason")
+
+    logger.info(
+        f"[TerminalState] Subject {subject_id} entered terminal state: {reason} "
+        f"(game: {game_id}, scene: {scene_id})"
+    )
+
+    # Add to processed subjects so aggregator shows them as 'completed'
+    if subject_id not in PROCESSED_SUBJECT_NAMES:
+        PROCESSED_SUBJECT_NAMES.append(subject_id)
+
+    # Record session completion for duration tracking
+    if ADMIN_AGGREGATOR:
+        session = PARTICIPANT_SESSIONS.get(subject_id)
+        if session:
+            ADMIN_AGGREGATOR.record_session_completion(
+                subject_id=subject_id,
+                started_at=session.created_at,
+                completed_at=time.time()
+            )
+        # Close console log file for this subject
+        ADMIN_AGGREGATOR.close_subject_console_log(subject_id)
 
 
 @socketio.on("p2p_validation_success")
@@ -1856,15 +2021,23 @@ def handle_p2p_reconnection_timeout(data):
         # Build session snapshot for historical viewing
         session_snapshot = None
         if game:
+            # Get scene_id from first player's session
+            scene_id = None
+            subject_ids = list(game.player_subjects.values())
+            if subject_ids:
+                first_session = PARTICIPANT_SESSIONS.get(subject_ids[0])
+                scene_id = first_session.current_scene_id if first_session else None
+
             session_snapshot = {
                 'game_id': game_id,
                 'players': players,
-                'subject_ids': list(game.player_subjects.values()),
+                'subject_ids': subject_ids,
                 'current_frame': game.frame_number,
                 'is_server_authoritative': game.server_authoritative,
                 'created_at': game.created_at,
                 'game_type': 'multiplayer',
                 'current_episode': getattr(game, 'episode_number', None),
+                'scene_id': scene_id,
             }
         ADMIN_AGGREGATOR.record_session_termination(
             game_id=game_id,
@@ -2326,15 +2499,45 @@ def on_disconnect():
         for game_id, game_state in list(PYODIDE_COORDINATOR.games.items()):
             for player_id, socket_id in game_state.players.items():
                 if socket_id == flask.request.sid:
+                    # For Pyodide games, check if the game is active
+                    is_in_active_pyodide_game = game_state.is_active
+
                     logger.info(
                         f"Player {player_id} (subject {subject_id}) disconnected "
-                        f"from Pyodide game {game_id}"
+                        f"from Pyodide game {game_id} (active={is_in_active_pyodide_game})"
                     )
-                    # Only notify others if player was in an active game scene
+
+                    # Record session termination for admin dashboard
+                    if ADMIN_AGGREGATOR and is_in_active_pyodide_game:
+                        # Build session snapshot with P2P health data
+                        all_subject_ids = list(game_state.player_subjects.values())
+                        p2p_health = ADMIN_AGGREGATOR._get_p2p_health_for_game(game_id)
+
+                        session_snapshot = {
+                            'game_id': game_id,
+                            'subject_ids': all_subject_ids,
+                            'p2p_health': p2p_health,
+                            'frame_number': game_state.frame_number,
+                            'created_at': game_state.created_at,
+                        }
+
+                        ADMIN_AGGREGATOR.record_session_termination(
+                            game_id=game_id,
+                            reason='partner_disconnected',
+                            players=all_subject_ids,
+                            details={
+                                'disconnected_player': subject_id,
+                                'disconnected_player_id': player_id,
+                                'frame_at_disconnect': game_state.frame_number,
+                            },
+                            session_snapshot=session_snapshot
+                        )
+
+                    # Only notify others if player was in an active game
                     PYODIDE_COORDINATOR.remove_player(
                         game_id=game_id,
                         player_id=player_id,
-                        notify_others=is_in_active_gym_scene
+                        notify_others=is_in_active_pyodide_game
                     )
                     # Clean up group manager
                     if GROUP_MANAGER:

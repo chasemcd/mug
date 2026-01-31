@@ -320,21 +320,62 @@ class GameManager:
     def _create_game_for_group(
         self,
         subject_ids: list[SubjectID]
-    ) -> remote_game.RemoteGameV2:
-        """Create a game for a specific group of players."""
+    ) -> remote_game.RemoteGameV2 | None:
+        """Create a game for a specific group of players.
+
+        Returns the game if successfully created and started, None if there was an error.
+        """
+        # Safety validation: check group size matches expected player count
+        expected_human_players = len([
+            p for p in self.scene.policy_mapping.values()
+            if p == configuration_constants.PolicyTypes.Human
+        ])
+
+        if len(subject_ids) != expected_human_players:
+            logger.error(
+                f"Group size mismatch! Expected {expected_human_players} players, "
+                f"got {len(subject_ids)}: {subject_ids}. Aborting group game creation."
+            )
+            return None
+
+        # Check for duplicates in the group
+        if len(subject_ids) != len(set(subject_ids)):
+            logger.error(
+                f"Duplicate subjects in group! Subject IDs: {subject_ids}. "
+                f"Aborting group game creation."
+            )
+            return None
+
         with self.waiting_games_lock:
             # Create a new game
             self._create_game()
             game: remote_game.RemoteGameV2 = self.games[self.waiting_games[-1]]
 
-            # Add each partner to the game
+            # Add each partner to the game, tracking success
+            added_subjects = []
             for subject_id in subject_ids:
-                self._add_subject_to_specific_game(subject_id, game)
+                if self._add_subject_to_specific_game(subject_id, game):
+                    added_subjects.append(subject_id)
+                else:
+                    logger.error(
+                        f"Failed to add subject {subject_id} to group game {game.game_id}. "
+                        f"Successfully added: {added_subjects}. Cleaning up."
+                    )
+                    # Clean up the game since we can't complete the group
+                    self._remove_game(game.game_id)
+                    return None
 
-            # The game should now be ready
-            if game.is_ready_to_start():
-                self.waiting_games.remove(game.game_id)
-                self.start_game(game)
+            # Final validation: ensure game is ready with correct player count
+            if not game.is_ready_to_start():
+                logger.error(
+                    f"Group game {game.game_id} is not ready after adding all players! "
+                    f"Added: {added_subjects}, Available slots: {game.get_available_human_agent_ids()}"
+                )
+                self._remove_game(game.game_id)
+                return None
+
+            self.waiting_games.remove(game.game_id)
+            self.start_game(game)
 
         return game
 
@@ -342,27 +383,43 @@ class GameManager:
         self,
         subject_id: SubjectID,
         game: remote_game.RemoteGameV2
-    ):
-        """Add a subject to a specific game (used for group matching)."""
+    ) -> bool:
+        """Add a subject to a specific game (used for group matching).
+
+        Returns True if the player was successfully added, False otherwise.
+        """
         with game.lock:
+            # Safety check: verify game has available slots
+            available_human_agent_ids = game.get_available_human_agent_ids()
+            if not available_human_agent_ids:
+                logger.error(
+                    f"No available slots in game {game.game_id} for subject {subject_id}. "
+                    f"Current players: {game.cur_num_human_players()}, "
+                    f"Human players: {list(game.human_players.values())}"
+                )
+                return False
+
             self.subject_games[subject_id] = game.game_id
             self.subject_rooms[subject_id] = game.game_id
             self.reset_events[game.game_id][subject_id] = eventlet.event.Event()
             # Note: join_room needs the request context, so we emit to the subject
             # and they'll join the room on their end via start_game
 
-            available_human_agent_ids = game.get_available_human_agent_ids()
-            player_id = None
-            if not available_human_agent_ids:
-                logger.warning(
-                    f"No available human agent IDs for game {game.game_id}. Adding as a spectator."
+            player_id = random.choice(available_human_agent_ids)
+            player_added = game.add_player(player_id, subject_id)
+            if not player_added:
+                logger.error(
+                    f"Failed to add subject {subject_id} to slot {player_id} in game {game.game_id}. "
+                    f"Cleaning up partial state."
                 )
-            else:
-                player_id = random.choice(available_human_agent_ids)
-                game.add_player(player_id, subject_id)
+                # Clean up the partial state we added
+                del self.subject_games[subject_id]
+                del self.subject_rooms[subject_id]
+                del self.reset_events[game.game_id][subject_id]
+                return False
 
             # If multiplayer Pyodide, add player to coordinator
-            if self.scene.pyodide_multiplayer and self.pyodide_coordinator and player_id is not None:
+            if self.scene.pyodide_multiplayer and self.pyodide_coordinator:
                 # Get the socket_id for this subject from the pairing manager
                 # For now, we'll need to handle this separately
                 logger.info(
@@ -379,6 +436,8 @@ class GameManager:
                     },
                     room=subject_id,
                 )
+
+            return True
 
     def _is_rtt_compatible(self, subject_id: SubjectID, game: remote_game.RemoteGameV2) -> bool:
         """Check if a subject's RTT is compatible with players already in a game.
@@ -446,7 +505,46 @@ class GameManager:
                 compatible_game = self.games[self.waiting_games[-1]]
 
             game = compatible_game
-            logger.info(f"Adding subject {subject_id} to game {game.game_id}. Game has {len(game.human_players)} players, needs {len(self.scene.policy_mapping)}")
+            current_players = game.cur_num_human_players()
+            expected_players = len([
+                p for p in self.scene.policy_mapping.values()
+                if p == configuration_constants.PolicyTypes.Human
+            ])
+            logger.info(
+                f"Adding subject {subject_id} to game {game.game_id}. "
+                f"Current players: {current_players}/{expected_players}"
+            )
+
+            # Safety check: verify game isn't already at capacity before proceeding
+            if game.is_at_player_capacity():
+                logger.error(
+                    f"Race condition detected: Game {game.game_id} is already at capacity "
+                    f"({current_players}/{expected_players} players). "
+                    f"Subject {subject_id} will be added to a new game instead."
+                )
+                # Create a new game for this subject
+                self._create_game()
+                game = self.games[self.waiting_games[-1]]
+                logger.info(f"Created new game {game.game_id} for subject {subject_id}")
+
+            with game.lock:
+                # Double-check availability inside the lock
+                available_human_agent_ids = game.get_available_human_agent_ids()
+                if not available_human_agent_ids:
+                    logger.error(
+                        f"No available slots in game {game.game_id} after acquiring lock. "
+                        f"This indicates a race condition. Creating new game for {subject_id}."
+                    )
+                    # Release lock and create new game
+                    # Note: We need to exit this lock context first
+                    game = None
+
+            # Handle the case where we need to create a new game due to race condition
+            if game is None:
+                self._create_game()
+                game = self.games[self.waiting_games[-1]]
+                logger.info(f"Created new game {game.game_id} for subject {subject_id} after race condition")
+
             with game.lock:
                 self.subject_games[subject_id] = game.game_id
                 self.subject_rooms[subject_id] = game.game_id
@@ -455,13 +553,19 @@ class GameManager:
 
                 available_human_agent_ids = game.get_available_human_agent_ids()
                 player_id = None
+                player_added = False
                 if not available_human_agent_ids:
                     logger.warning(
                         f"No available human agent IDs for game {game.game_id}. Adding as a spectator."
                     )
                 else:
                     player_id = random.choice(available_human_agent_ids)
-                    game.add_player(player_id, subject_id)
+                    player_added = game.add_player(player_id, subject_id)
+                    if not player_added:
+                        logger.error(
+                            f"Failed to add player {subject_id} to slot {player_id} in game {game.game_id}. "
+                            f"This should not happen if locks are working correctly."
+                        )
 
                 # If multiplayer Pyodide, add player to coordinator
                 if self.scene.pyodide_multiplayer and self.pyodide_coordinator and player_id is not None:
@@ -678,8 +782,36 @@ class GameManager:
 
     def start_game(self, game: remote_game.RemoteGameV2):
         """Start a game."""
+        # Safety validation: ensure correct number of players before starting
+        expected_human_players = len([
+            p for p in self.scene.policy_mapping.values()
+            if p == configuration_constants.PolicyTypes.Human
+        ])
+        actual_human_players = game.cur_num_human_players()
+        available_slots = len(game.get_available_human_agent_ids())
+
+        if actual_human_players != expected_human_players:
+            logger.error(
+                f"CRITICAL: Attempted to start game {game.game_id} with wrong player count! "
+                f"Expected {expected_human_players} human players, got {actual_human_players}. "
+                f"Available slots: {available_slots}. "
+                f"Players: {list(game.human_players.items())}. "
+                f"Aborting game start."
+            )
+            # Don't start the game - return the players to the waiting room or error state
+            return
+
+        if available_slots != 0:
+            logger.error(
+                f"CRITICAL: Attempted to start game {game.game_id} with {available_slots} "
+                f"unfilled slots! Players: {list(game.human_players.items())}. "
+                f"Aborting game start."
+            )
+            return
+
         logger.info(
-            f"Starting game {game.game_id} with subjects {[sid for sid in game.human_players.values()]}"
+            f"Starting game {game.game_id} with {actual_human_players} subjects: "
+            f"{[sid for sid in game.human_players.values()]}"
         )
         self.active_games.add(game.game_id)
 
