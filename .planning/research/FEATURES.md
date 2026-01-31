@@ -1,350 +1,359 @@
-# Features Research: Participant Exclusion
+# Feature Research: Rollback Netcode Data Consistency
 
-**Domain:** Browser-based research experiment platforms with participant screening
-**Researched:** 2026-01-21
-**Confidence:** MEDIUM-HIGH (verified with official documentation and platform guides)
+**Domain:** Rollback netcode authoritative history and data recording for P2P multiplayer
+**Researched:** 2026-01-30
+**Confidence:** HIGH (codebase analysis + established rollback netcode patterns)
 
 ## Executive Summary
 
-Research platforms implement participant screening at three levels: **pre-registration screening** (demographics/qualifications before study access), **entry-time technical checks** (device/browser validation at experiment start), and **continuous monitoring** (attention/behavior during experiment). The sophistication varies dramatically:
+This research addresses data divergence in P2P rollback netcode systems where both players must export IDENTICAL game data (actions, rewards, infos) for research purposes. The core challenge: rollbacks and fast-forwards cause each peer to execute frames multiple times with potentially different inputs, creating divergent local histories.
 
-- **Recruitment platforms** (Prolific, MTurk, CloudResearch) excel at pre-registration demographic screening with massive filter catalogs
-- **Experiment builders** (jsPsych, Gorilla, oTree) focus on entry-time technical validation with runtime behavior detection
-- **Interactive Gym's use case** requires both entry checks AND continuous real-time monitoring during gameplay, plus multiplayer-specific dropout handling
+**Key insight:** In GGPO-style rollback netcode, there is no single "authoritative" peer in true P2P. Instead, **authoritative history emerges from input confirmation** - a frame becomes "confirmed" when ALL players' inputs for that frame have been received by ALL peers. Only confirmed frames should be recorded for export.
 
-**Key insight:** No existing platform handles the "multiplayer game with continuous exclusion + partner impact" case well. oTree has dropout handling for turn-based economics experiments, but real-time game scenarios need tighter monitoring. This is a differentiator opportunity.
+## Frame State Lifecycle
 
-## Table Stakes Features
+### States
 
-Features users expect. Missing = platform unusable for serious research.
+| State | Definition | When Reached |
+|-------|------------|--------------|
+| **FUTURE** | Frame not yet simulated | Default state for frames > currentFrame |
+| **SPECULATIVE** | Frame executed but using at least one predicted input | When `getInputsForFrame()` returns any prediction |
+| **CONFIRMED** | All players' inputs received for this frame by this peer | When `inputBuffer.get(frame)` contains entries for ALL human players |
+| **VERIFIED** | Confirmed AND peer hash matches (optional) | When local and remote hashes for frame agree (Phase 11-14 infrastructure) |
+| **RECORDED** | Frame data exported to final dataset | When frame transitions to CONFIRMED and data is moved from speculative buffer to export buffer |
 
-| Feature | Why Expected | Complexity | Notes |
-|---------|--------------|------------|-------|
-| **Device type detection** (mobile/desktop) | Mobile inputs differ fundamentally; many experiments require keyboard | Low | jsPsych, Gorilla have built-in. Modern devices can spoof (iPads as computers) |
-| **Browser type/version check** | WebRTC/WebGL/WebAudio support varies by browser | Low | jsPsych browser-check plugin does this well |
-| **Screen size minimum** | Experiments need consistent viewport; small screens break layouts | Low | jsPsych supports minimum_width/height with resize prompt |
-| **Configurable rejection messages** | Researchers need to explain why participant can't continue | Low | Every platform supports custom exclusion text |
-| **Consent flow integration** | IRB requires informed consent before any data collection | Medium | Must gate all screening after consent or use consent as implicit screening |
-| **Pre-screening demographic filters** | Core recruitment platform functionality | Medium | Prolific has 400+ prescreeners; MTurk has qualifications; SONA has prescreen questionnaires |
-| **Repeat participation prevention** | Within-subject designs need tracking; between-subjects need blocking | Medium | Session tracking, participant IDs, or browser fingerprinting |
+### State Transitions
 
-**Implementation priority:** Device detection, browser check, and screen size are immediate needs for Interactive Gym. Consent flow already exists (StartScene). Pre-screening is handled by upstream recruitment platforms (Prolific/MTurk).
+```
+                              +------------------+
+                              |      FUTURE      |
+                              +--------+---------+
+                                       |
+                     (frame simulated) | step() executes
+                                       v
+                    +------------------+-----------------+
+                    |                                    |
+        (missing inputs)                      (all inputs present)
+                    v                                    v
+           +--------+--------+                +---------+---------+
+           |   SPECULATIVE   |                |     CONFIRMED     |
+           +--------+--------+                +---------+---------+
+                    |                                    |
+                    |  (late input arrives)              |  (peer hash received)
+                    |  storeRemoteInput()                |  _compareFrameHashes()
+                    |                                    v
+                    |                         +---------+---------+
+                    |                         |     VERIFIED      |
+                    |                         +---------+---------+
+                    |                                    |
+                    +---------->-----------<-------------+
+                                       |
+                    (ready for export) | _updateConfirmedFrame()
+                                       v
+                              +--------+---------+
+                              |     RECORDED     |
+                              +------------------+
 
-## Advanced Features (Differentiators)
-
-Features that set product apart. Not expected, but valued.
-
-| Feature | Value Proposition | Complexity | Notes |
-|---------|-------------------|------------|-------|
-| **Connection quality monitoring** (ping, jitter, packet loss) | Ensures valid data for latency-sensitive experiments | Medium | No existing experiment platform does this well; Interactive Gym already has WebRTC metrics |
-| **Continuous real-time exclusion** | Exclude participant mid-experiment if criteria violated | High | oTree has timeout-based; jsPsych doesn't support mid-experiment exclusion |
-| **Multiplayer dropout coordination** | End experiment cleanly for partner when one participant excluded | High | oTree's dropout_handling reduces timeouts; no platform handles "end for both" well |
-| **Inactivity detection during gameplay** | Detect AFK participants in real-time games | Medium | oTree checks between pages; need continuous detection during game loop |
-| **Fullscreen enforcement with recovery** | Prevent tab-switching during attention-critical tasks | Medium | jsPsych tracks fullscreen exit events; can prompt re-entry |
-| **Tab visibility monitoring** | Detect when participant switches to other tabs | Low | Browser visibilitychange API; jsPsych records interaction data |
-| **Comprehension check gating** | Block experiment continuation until instructions understood | Medium | GuidedTrack pattern: repeat instructions until quiz passed |
-| **Attention check with auto-rejection** | Prolific allows rejection on 2 failed attention checks | Medium | Controversial: recent research questions validity |
-| **Connection type discrimination** | Distinguish direct P2P vs TURN relay vs WebSocket fallback | Low | Interactive Gym already tracks this; can exclude TURN-only participants |
-| **Custom callback exclusion rules** | Let researchers define arbitrary exclusion logic | Medium | jsPsych inclusion_function pattern is good model |
-
-**Implementation priority:** Connection quality monitoring and multiplayer dropout coordination are the key differentiators for Interactive Gym's real-time game use case.
-
-## Anti-Features
-
-Features to explicitly NOT build. Common mistakes in this domain.
-
-| Anti-Feature | Why Avoid | What to Do Instead |
-|--------------|-----------|-------------------|
-| **Duplicate all Prolific/MTurk prescreeners** | Recruitment platforms already do this; duplicating creates maintenance burden and sync issues | Accept that pre-screening is upstream; focus on technical criteria they can't check |
-| **Auto-rejection on first attention check failure** | Research shows 61% of failures may be deliberate non-compliance, not inattention; false positives harm data quality | Use attention checks for flagging, not auto-exclusion; require 2+ failures |
-| **Silent exclusion without explanation** | Participants deserve to know why they can't continue; platforms like Prolific require explanation | Always show configurable message explaining exclusion reason |
-| **Server-side browser fingerprinting for repeat detection** | Privacy concerns, GDPR issues, fingerprints change with browser updates | Use recruitment platform's built-in repeat detection (Prolific tracks this) |
-| **Complex rule engine with AND/OR/NOT operators** | Over-engineering; researchers want simple "check A, check B" not SQL-style predicates | Simple list of rules, all must pass; complex logic can use custom callbacks |
-| **Blocking based on ISP/geolocation** | False positives (VPN users, travelers); CloudResearch found this unreliable alone | Combine with other signals if needed; don't use as sole criterion |
-| **Mandatory fullscreen for all experiments** | Some experiments don't need it; Safari has keyboard issues in fullscreen; creates friction | Make fullscreen optional, configurable per experiment |
-| **Webcam/microphone permission blocking** | Many experiments don't need A/V; prompting for unused permissions is bad UX | Only check when experiment actually uses these features |
-
-## Platform Comparison
-
-### Prolific
-
-**Type:** Recruitment platform (participants pre-registered)
-**Screening approach:** Pre-registration demographic filters
-
-**Features:**
-- 400+ prescreening criteria (demographics, health, personality, etc.)
-- In-study custom screening (August 2025) with auto screen-out payment
-- Quota studies with demographic balancing (up to 120 strata)
-- "Exceptionally fast" submission detection for quality flagging
-- Attention check policy: can reject on 2 failed valid checks
-
-**Strengths:** Massive prescreener library, participant quality vetting, handles payment for screen-outs
-**Weaknesses:** Technical checks (device, browser, connection) must be done in your experiment
-
-**Sources:** [Prolific Prescreening](https://researcher-help.prolific.com/en/article/58ef2f), [In-Study Screening](https://researcher-help.prolific.com/en/articles/445165-can-i-screen-participants-within-my-study)
-
-### MTurk / CloudResearch
-
-**Type:** Recruitment platform with qualification system
-**Screening approach:** Qualifications (system + custom) and vetted participant lists
-
-**Features:**
-- System qualifications: HIT approval rate, # HITs approved, Masters status
-- Custom qualifications with qualification tests
-- CloudResearch Approved Participants (vetted for attention/engagement)
-- Sentry: Pre-survey behavioral + technological vetting
-- Suspicious geolocation blocking
-- 50+ panel criteria for demographic targeting
-
-**Strengths:** Experience-based qualifications (10K+ approved HITs), CloudResearch's patented vetting
-**Weaknesses:** Custom qualifications require API (not in UI), qualification request system is broken
-
-**Sources:** [MTurk Qualifications](https://docs.aws.amazon.com/AWSMechTurk/latest/AWSMechanicalTurkRequester/SelectingEligibleWorkers.html), [CloudResearch Data Quality](https://www.cloudresearch.com/resources/blog/new-tools-improve-research-data-quality-mturk/)
-
-### jsPsych
-
-**Type:** Experiment framework (JavaScript)
-**Screening approach:** Browser-check plugin at experiment start
-
-**Features:**
-- Browser type and version detection
-- Mobile device detection
-- Screen size requirements with resize prompts
-- WebAudio API support check
-- Fullscreen API support check
-- Display refresh rate measurement
-- Webcam/microphone availability detection
-- Custom inclusion_function for arbitrary logic
-- Custom exclusion_message based on which criterion failed
-- Interaction data recording (fullscreen exit, tab blur events)
-
-**Strengths:** Well-designed plugin API, comprehensive browser feature detection
-**Weaknesses:** Mid-experiment exclusion not supported (only at trial boundaries), mobile exclusion has known bugs on tablets
-
-**Code pattern:**
-```javascript
-var trial = {
-  type: jsPsychBrowserCheck,
-  inclusion_function: (data) => {
-    return data.browser == 'chrome' && data.mobile === false
-  },
-  exclusion_message: (data) => {
-    if(data.mobile){
-      return '<p>You must use a desktop/laptop computer.</p>';
-    } else if(data.browser !== 'chrome'){
-      return '<p>You must use Chrome.</p>'
-    }
-  }
-};
+    ROLLBACK EVENT:
+    If late input differs from prediction:
+    SPECULATIVE -> (rollback) -> clear frames >= targetFrame -> replay with confirmed inputs
 ```
 
-**Sources:** [jsPsych Browser Check Plugin](https://www.jspsych.org/v7/plugins/browser-check/), [Browser Device Support](https://www.jspsych.org/v8/overview/browser-device-support/)
+### Rollback Impact on State
 
-### oTree
+When rollback occurs:
+1. Frames from `targetFrame` to `currentFrame` transition back to FUTURE
+2. `frameDataBuffer` entries for those frames are CLEARED (`clearFrameDataFromRollback()`)
+3. Frames are re-executed with correct inputs
+4. Re-executed frames may be SPECULATIVE (if still missing other player's inputs) or CONFIRMED
 
-**Type:** Experiment framework (Python, focused on economics/game theory)
-**Screening approach:** Timeout-based dropout detection, consent-based filtering
+**Critical:** A frame may be rolled back and re-executed multiple times before becoming CONFIRMED. Only the final confirmed execution should be recorded.
 
-**Features:**
-- Activity detection: participants asked "are you still there?" after inactivity
-- Tab-switching detection: excludes participants who switch tabs on wait pages
-- Timeout-based dropout marking (timeout_happened flag)
-- Consent app filtering with group_by_arrival_time
-- Participant labels for duplicate participation prevention
-- PARTICIPANT_FIELDS for storing screening data across apps
+## Confirmation Protocol
 
-**Multiplayer dropout handling (third-party):**
-- Dynamically reduces timeouts to 1 second when dropout detected
-- Time-limited group matching (create single-player group if match timeout)
-- Reduces wait time from 90+ seconds to ~32 seconds
+### Input Confirmation in P2P (Two Players)
 
-**Strengths:** Built for multiplayer economics experiments, good dropout handling patterns
-**Weaknesses:** Page-based checking (not continuous), no real-time game support
+In true P2P with GGPO-style rollback, input confirmation happens independently on each peer:
 
-**Sources:** [oTree Wait Pages](https://otree.readthedocs.io/en/latest/multiplayer/waitpages.html), [oTree Dropout Handling](https://github.com/chkgk/dropout_handling)
+**Peer A's view:**
+- Frame N is CONFIRMED when:
+  - Peer A has stored their own input for frame N (`storeLocalInput`)
+  - Peer A has received Peer B's input for frame N (`storeRemoteInput`)
 
-### Gorilla Experiment Builder
+**Peer B's view:**
+- Frame N is CONFIRMED when:
+  - Peer B has stored their own input for frame N (`storeLocalInput`)
+  - Peer B has received Peer A's input for frame N (`storeRemoteInput`)
 
-**Type:** No-code experiment builder (web-based)
-**Screening approach:** Recruitment requirements + experiment tree reject nodes
+**Key insight:** Both peers will eventually reach the same CONFIRMED state for frame N because:
+1. Each peer's local input is sent to the other via P2P DataChannel
+2. Each peer stores both their local input and received remote inputs in `inputBuffer`
+3. When both inputs exist in `inputBuffer.get(N)`, frame N is CONFIRMED
 
-**Features:**
-- Device type restrictions (mobile/tablet/desktop)
-- Browser type restrictions
-- Location restrictions
-- Connection speed restrictions
-- Reject nodes in experiment tree for early screening
-- Rejection statuses: Rejected, RejectedManual, RejectedTimeLimit, RejectedQuality, RejectedOverQuota
-- Custom eligibility questions with branching
+### Current Implementation Analysis
 
-**Strengths:** Visual experiment builder, granular rejection status tracking
-**Weaknesses:** Device spoofing (iPads identifying as computers) requires additional verification
+The existing codebase (`pyodide_multiplayer_game.js`) has the infrastructure:
 
-**Sources:** [Gorilla Recruitment Requirements](https://support.gorilla.sc/support/launching-your-study/recruitment-requirements)
+```javascript
+// Lines 2901-2911: Check if all players have inputs for a frame
+_hasAllInputsForFrame(frameNumber, playerIds) {
+    const frameInputs = this.inputBuffer.get(frameNumber);
+    if (!frameInputs) return false;
 
-### Pavlovia
+    for (const playerId of playerIds) {
+        if (!frameInputs.has(String(playerId))) {
+            return false;
+        }
+    }
+    return true;
+}
 
-**Type:** Experiment hosting platform (PsychoPy/jsPsych/lab.js)
-**Screening approach:** Inherits from experiment framework used
+// Lines 2918-2951: Update confirmedFrame tracking
+async _updateConfirmedFrame() {
+    const humanPlayerIds = this._getHumanPlayerIds();
+    // Find highest consecutive confirmed frame
+    for (let frame = startFrame; frame < this.frameNumber; frame++) {
+        if (this._hasAllInputsForFrame(frame, humanPlayerIds)) {
+            this.confirmedFrame = frame;
+            // ... compute and store hash
+        } else {
+            break;  // Gap in confirmation
+        }
+    }
+}
+```
 
-**Features:**
-- Automatically saves frame rate and OS
-- Touch screen support via Mouse component
-- Integrates with Prolific screening
-- URL parameters for condition assignment
-- Git-based project management
+**Current gap:** Frame data is stored in `frameDataBuffer` immediately on step completion (line 2441-2449), regardless of confirmation status. Export (`exportEpisodeDataFromBuffer`) doesn't filter by confirmation state.
 
-**Strengths:** Supports multiple experiment frameworks, good PsychoPy integration
-**Weaknesses:** No built-in screening; relies on underlying framework (jsPsych, etc.)
+## Data Recording Rules
 
-**Sources:** [Pavlovia Integration](https://researcher-help.prolific.com/en/articles/445190-pavlovia-integration-guide)
+### Table Stakes (Must Have)
 
-### SONA Systems
+| Rule | Why Required | Implementation Notes |
+|------|--------------|---------------------|
+| **Record only CONFIRMED frames** | Speculative frames may use wrong inputs; will be corrected on rollback | Check `confirmedFrame >= frameNumber` before writing to export buffer |
+| **Clear speculative data on rollback** | Rollback invalidates all data from targetFrame onward | Existing: `clearFrameDataFromRollback(targetFrame)` - already implemented |
+| **Re-record during replay** | Replay produces correct data after rollback | Existing: `storeFrameData()` called during replay (lines 4747-4756) |
+| **Buffer until confirmation** | Can't export speculative data as final | New: separate `speculativeDataBuffer` from `confirmedDataBuffer` |
+| **Export from confirmed buffer only** | Ensures both peers export identical data | Modify `exportEpisodeDataFromBuffer()` to read from confirmed buffer |
+| **Include confirmation metadata** | Research needs to know which frames were speculative | Add `wasSpeculative: bool` and `rollbackCount: number` per frame |
 
-**Type:** University participant pool management
-**Screening approach:** Prescreen questionnaire with eligibility restrictions
+### Differentiator Rules (Research Value-Add)
 
-**Features:**
-- Custom prescreen questionnaires
-- Restrictions based on single items or computed scores
-- Multiple criteria with logical AND
-- Real-time participant count for restrictions
-- Per-study restriction settings
-- Opt-out options for sensitive questions
+| Rule | Why Valuable | Implementation Notes |
+|------|--------------|---------------------|
+| **Track rollback events per frame** | Understand prediction accuracy | Existing: `sessionMetrics.rollbacks.events` |
+| **Include input delay metrics** | Correlate delay with rollback frequency | Add `inputDelayAtRecord` field |
+| **Mark focus state per frame** | Filter out backgrounded frames if needed | Existing: `isFocused` field per frame |
+| **Hash verification status** | Know which frames were cryptographically verified | Add `peerHashMatch: bool` from Phase 11-14 |
 
-**Strengths:** Designed for university subject pools, handles course credit
-**Weaknesses:** Limited to demographics/questionnaire data, no technical checks
+## Edge Cases
 
-**Sources:** [SONA Prescreen Restrictions](https://www.sona-systems.com/researcher/prescreen-participation-restrictions/)
+### Scenario: Rollback
+
+| Step | Correct Behavior | Common Mistake |
+|------|------------------|----------------|
+| 1. Late input arrives | Trigger `pendingRollbackFrame` | Recording data before checking for rollback |
+| 2. Clear speculative data | `clearFrameDataFromRollback(targetFrame)` | Only clearing some data structures |
+| 3. Load snapshot | `loadStateSnapshot(snapshotFrame)` | Forgetting to restore RNG state |
+| 4. Replay frames | Execute with confirmed inputs, re-store frame data | Not re-storing data during replay |
+| 5. Resume normal execution | Continue from `currentFrame` | Leaving `rollbackInProgress` flag set |
+
+### Scenario: Fast-Forward (Tab Refocus)
+
+| Step | Correct Behavior | Common Mistake |
+|------|------------------|----------------|
+| 1. Detect refocus | `FocusManager._onForegrounded()` | Not detecting visibility change |
+| 2. Request missing inputs | `_requestMissingInputs()` if gaps exist | Processing immediately without inputs |
+| 3. Fast-forward execution | Execute batched frames without rendering | Rendering each frame (slow, causes freeze) |
+| 4. Mark focus state | `isFocused: false` for backgrounded frames | Recording all frames as focused |
+| 5. Data recording | Same as rollback - store with correct inputs | Using predicted inputs without verification |
+
+### Scenario: Packet Loss (Missing Inputs)
+
+| Step | Correct Behavior | Common Mistake |
+|------|------------------|----------------|
+| 1. Input not received | Use prediction (`getPredictedAction`) | Blocking/waiting for input |
+| 2. Mark as speculative | Add frame to `predictedFrames` set | Treating predicted frame as confirmed |
+| 3. Continue simulation | Execute with prediction, don't record as final | Recording speculative data as final |
+| 4. Input arrives late | Trigger rollback if prediction was wrong | Ignoring late input |
+| 5. After correction | Frame becomes CONFIRMED, record correct data | Keeping wrong data in export buffer |
+
+### Scenario: Episode End During Speculation
+
+| Step | Correct Behavior | Common Mistake |
+|------|------------------|----------------|
+| 1. Terminal state detected | Set `episodeComplete = true` | Immediately exporting data |
+| 2. Wait for peer sync | Exchange `p2p_episode_ready` messages | Exporting before peer reaches same state |
+| 3. Confirm final frames | Wait for all inputs up to terminal frame | Exporting with predicted final frames |
+| 4. Export confirmed data | Only export frames where `frame <= confirmedFrame` | Exporting all frames including speculative |
 
 ## Feature Dependencies
 
-```
-Pre-experiment (before game starts):
-  Consent → Browser Check → Connection Quality Check → Entry Allowed
+For data parity to work correctly, these must be true:
 
-Entry checks:
-  ├── Device type (mobile/desktop)
-  ├── Browser type/version
-  ├── Screen size
-  ├── WebRTC support
-  └── Connection quality (ping test)
+1. **Deterministic simulation**: Given same inputs, both peers produce identical state
+   - Verified via state hash comparison (Phase 11-14)
+   - Requires seeded RNG, deterministic environment
 
-Continuous monitoring (during game):
-  ├── Inactivity detection → Exclusion trigger
-  ├── Connection quality degradation → Exclusion trigger
-  ├── Tab visibility → Warning/Exclusion trigger
-  └── Fullscreen exit → Warning/Recovery prompt
+2. **Reliable input delivery**: All inputs eventually reach both peers
+   - P2P DataChannel with redundant sending (3 inputs per packet)
+   - SocketIO fallback path
+   - Input request mechanism for missing inputs
 
-Multiplayer coordination:
-  Player A excluded → Notify Player B → End game for both → Collect partial data
-```
+3. **Synchronized episode boundaries**: Both peers agree when episode ends
+   - `p2pEpisodeSync` mechanism
+   - Wait for peer before exporting
 
-## Recommendations for Interactive Gym
+4. **Consistent frame numbering**: Both peers use same frame counter
+   - Shared `syncEpoch` prevents stale frame matching
+   - Frame counter resets together on episode start
 
-### Phase 1: Entry Screening (Table Stakes)
+5. **Rollback capability**: Environment supports `get_state()` / `set_state()`
+   - Required for snapshot/restore
+   - `stateSyncSupported` flag gates rollback features
 
-**Priority: HIGH** — Without these, researchers won't trust data quality
+## Recommended Data Structure
 
-1. **Device type detection** — Exclude mobile unless explicitly allowed
-2. **Browser check** — Require WebRTC-capable browsers (Chrome, Firefox, Edge)
-3. **Screen size minimum** — Configurable per experiment
-4. **Configurable rejection messages** — Each rule has its own message
+### Dual-Buffer Approach
 
-### Phase 2: Connection Quality (Differentiator)
+```javascript
+// Speculative buffer - data from current execution (may be wrong)
+this.speculativeDataBuffer = new Map();  // frameNumber -> frameData
 
-**Priority: HIGH** — This is where Interactive Gym can excel
+// Confirmed buffer - data promoted after confirmation (correct)
+this.confirmedDataBuffer = new Map();    // frameNumber -> frameData
 
-1. **Ping threshold check at entry** — "Your connection is too slow for this experiment"
-2. **Connection type detection** — Already exists; expose as exclusion criterion
-3. **Continuous latency monitoring** — Exclude if ping degrades past threshold
-4. **Packet loss detection** — WebRTC stats API provides this
+// On step completion:
+storeFrameData(frameNumber, data) {
+    this.speculativeDataBuffer.set(frameNumber, data);
+    this._promoteConfirmedFrames();
+}
 
-### Phase 3: Behavior Monitoring (Differentiator)
+// On rollback:
+clearFrameDataFromRollback(targetFrame) {
+    for (const frame of this.speculativeDataBuffer.keys()) {
+        if (frame >= targetFrame) {
+            this.speculativeDataBuffer.delete(frame);
+        }
+    }
+    // Note: DO NOT clear confirmedDataBuffer - those frames are already confirmed
+    // But in rare cases (server correction), we may need to invalidate confirmed data too
+}
 
-**Priority: MEDIUM** — Important for data quality, complex to implement
+// Promote confirmed frames:
+_promoteConfirmedFrames() {
+    const humanPlayerIds = this._getHumanPlayerIds();
+    for (const [frame, data] of this.speculativeDataBuffer) {
+        if (frame <= this.confirmedFrame && this._hasAllInputsForFrame(frame, humanPlayerIds)) {
+            // Frame is confirmed - move to confirmed buffer
+            this.confirmedDataBuffer.set(frame, {
+                ...data,
+                wasSpeculative: this.predictedFrames.has(frame),
+                confirmedAt: Date.now()
+            });
+            this.speculativeDataBuffer.delete(frame);
+        }
+    }
+}
 
-1. **Inactivity detection** — No inputs for N seconds triggers warning, then exclusion
-2. **Tab visibility monitoring** — Record or warn on tab switches
-3. **Disconnect pattern detection** — Multiple reconnects may indicate unstable environment
-
-### Phase 4: Multiplayer Coordination (Critical Differentiator)
-
-**Priority: HIGH** — No other platform does this well
-
-1. **Partner notification on exclusion** — "Your partner has been disconnected"
-2. **Clean game termination** — Save partial data, record exclusion reason
-3. **Exclusion propagation** — Both players see appropriate message
-4. **Partial data handling** — Don't discard valid data before exclusion
-
-### Architecture Recommendation
-
-```
-ExclusionRule interface:
-  - name: string
-  - checkAtEntry: boolean
-  - checkContinuously: boolean
-  - check(context): { passed: boolean, reason?: string }
-  - getMessage(): string
-
-Built-in rules:
-  - PingThresholdRule(maxPing: number)
-  - BrowserRequirementRule(allowed: string[])
-  - ScreenSizeRule(minWidth: number, minHeight: number)
-  - InactivityRule(timeoutSeconds: number)
-  - DeviceTypeRule(allowMobile: boolean)
-
-Custom rules:
-  - CustomCallbackRule(fn: (context) => { passed, reason })
-
-Exclusion flow:
-  1. Entry: Run all checkAtEntry rules
-  2. Game loop: Run all checkContinuously rules each tick (or interval)
-  3. Exclusion: Stop game, notify all players, collect partial data
+// Export only confirmed data:
+exportEpisodeDataFromBuffer() {
+    // Only read from confirmedDataBuffer
+    const sortedFrames = Array.from(this.confirmedDataBuffer.keys()).sort((a, b) => a - b);
+    // ... build export format from confirmed frames only
+}
 ```
 
-## Confidence Assessment
+### Frame Data Schema (Extended)
 
-| Area | Confidence | Reason |
-|------|------------|--------|
-| Platform capabilities | HIGH | Verified with official documentation for jsPsych, oTree, Gorilla, Prolific |
-| Attention check research | MEDIUM | Academic literature reviewed, but recommendations still evolving |
-| Multiplayer dropout patterns | MEDIUM | oTree patterns verified; real-time game scenarios less documented |
-| Connection quality thresholds | LOW | Gaming industry has standards (50-100ms acceptable), but research experiments may differ |
+```javascript
+{
+    // Core data (existing)
+    actions: { playerId: action },
+    rewards: { playerId: reward },
+    terminateds: { playerId: bool },
+    truncateds: { playerId: bool },
+    infos: { playerId: info },
+    isFocused: bool,
+    timestamp: number,
 
-## Open Questions
+    // Confirmation metadata (new)
+    wasSpeculative: bool,           // Was this frame ever predicted?
+    confirmedAt: number,            // Timestamp when frame became confirmed
+    rollbacksBeforeConfirm: number, // How many times was this frame rolled back?
+    inputDelayFrames: number,       // INPUT_DELAY setting when recorded
 
-1. **What ping threshold makes data invalid?** Gaming suggests >100ms is problematic, but research experiments may have different tolerances
-2. **Should inactivity warning precede exclusion?** Prolific policy requires warning before rejection in some cases
-3. **How to handle "border" cases?** Participant with 95ms ping when threshold is 100ms — binary or gradual?
-4. **Partial data retention policy?** If participant excluded at minute 3 of 5, is that data usable?
+    // Verification metadata (from Phase 11-14)
+    localHash: string,              // State hash after this frame
+    peerHashMatch: bool,            // Did peer's hash match?
+    hashVerifiedAt: number          // Timestamp of hash verification
+}
+```
+
+## Anti-Features (Do NOT Build)
+
+| Anti-Feature | Why Avoid | What to Do Instead |
+|--------------|-----------|-------------------|
+| **Server-authoritative data source** | P2P architecture has no server running the game; adds complexity | Each peer exports from own confirmed buffer; verify with hash comparison |
+| **Waiting for confirmation before stepping** | Transforms rollback into lockstep; kills responsiveness | Predict and continue; rollback on mismatch |
+| **Real-time data streaming to server** | Network overhead; doesn't solve divergence | Batch export at episode end |
+| **Discarding all rollback data** | Loses research value of understanding rollback patterns | Record rollback metadata, discard wrong values |
+| **Single global "authoritative" export** | No single authority in P2P | Both peers export; verify equivalence offline |
+
+## Implementation Priority
+
+### Phase 1: Core Confirmation Tracking (Required)
+
+1. Add `confirmedFrame` tracking (already exists)
+2. Add `_hasAllInputsForFrame()` check (already exists)
+3. Split data buffers: speculative vs confirmed
+4. Modify export to read from confirmed buffer only
+
+### Phase 2: Rollback-Safe Data Recording (Required)
+
+1. Clear speculative buffer on rollback (partially exists)
+2. Re-store data during replay (exists)
+3. Promote to confirmed buffer after replay completes
+4. Ensure episode-end waits for final frame confirmation
+
+### Phase 3: Research Metadata (Recommended)
+
+1. Track `wasSpeculative` per frame
+2. Record rollback events with frame ranges
+3. Add hash verification status (leverages Phase 11-14)
+4. Export confirmation timing metrics
+
+### Phase 4: Verification (Optional)
+
+1. Cross-peer hash comparison at export time
+2. Offline validation tool to compare two exports
+3. Alert on divergence detection
 
 ## Sources
 
-### Recruitment Platforms
-- [Prolific Prescreening](https://researcher-help.prolific.com/en/article/58ef2f)
-- [Prolific In-Study Screening](https://researcher-help.prolific.com/en/articles/445165-can-i-screen-participants-within-my-study)
-- [Prolific Attention Check Policy](https://researcher-help.prolific.com/en/articles/445153-prolific-s-attention-and-comprehension-check-policy)
-- [MTurk Qualification Requirements](https://docs.aws.amazon.com/AWSMechTurk/latest/AWSMturkAPI/ApiReference_QualificationRequirementDataStructureArticle.html)
-- [CloudResearch Data Quality](https://www.cloudresearch.com/resources/blog/new-tools-improve-research-data-quality-mturk/)
-- [SONA Prescreen Restrictions](https://www.sona-systems.com/researcher/prescreen-participation-restrictions/)
+### Primary (HIGH Confidence - Codebase Analysis)
+- `/Users/chasemcd/Repositories/interactive-gym/interactive_gym/server/static/js/pyodide_multiplayer_game.js` - Current GGPO implementation (7000+ lines)
+- `/Users/chasemcd/Repositories/interactive-gym/.planning/phases/03-ggpo-p2p-integration/03-RESEARCH.md` - Phase 3 research on GGPO integration
 
-### Experiment Frameworks
-- [jsPsych Browser Check Plugin](https://www.jspsych.org/v7/plugins/browser-check/)
-- [jsPsych Browser Device Support](https://www.jspsych.org/v8/overview/browser-device-support/)
-- [jsPsych Fullscreen Plugin](https://www.jspsych.org/v7/plugins/fullscreen/)
-- [oTree Wait Pages](https://otree.readthedocs.io/en/latest/multiplayer/waitpages.html)
-- [oTree Dropout Handling (third-party)](https://github.com/chkgk/dropout_handling)
-- [Gorilla Recruitment Requirements](https://support.gorilla.sc/support/launching-your-study/recruitment-requirements)
-- [Pavlovia Integration Guide](https://researcher-help.prolific.com/en/articles/445190-pavlovia-integration-guide)
+### Secondary (HIGH Confidence - Established Patterns)
+- [GGPO Developer Guide](https://github.com/pond3r/ggpo/blob/master/doc/DeveloperGuide.md) - Rollback netcode reference
+- [Rollback Networking in INVERSUS](https://www.gamedeveloper.com/design/rollback-networking-in-inversus) - Symmetric P2P patterns, deterministic replay
+- [SnapNet: Netcode Architectures Part 2: Rollback](https://www.snapnet.dev/blog/netcode-architectures-part-2-rollback/) - Confirmed vs speculative frames
 
-### Research Literature
-- [Attention Checks Review and Recommendations](https://www.researchgate.net/publication/376340288_Attention_checks_and_how_to_use_them_Review_and_practical_recommendations)
-- [Statistical Analysis of Studies with Attention Checks (2025)](https://journals.sagepub.com/doi/full/10.1177/25152459251338041)
-- [Reducing Dropouts in Online Experiments](https://www.playstudies.com/reducing-dropouts-in-online-experiments/)
-- [Dropout Analysis R Package](https://link.springer.com/article/10.3758/s13428-025-02730-2)
+### Tertiary (MEDIUM Confidence - Community Patterns)
+- [Gaffer on Games: Deterministic Lockstep](https://gafferongames.com/post/deterministic_lockstep/) - Input acknowledgment protocol
+- [2XKO Netcode Article](https://2xko.riotgames.com/en-us/news/dev/how-2xko-handles-online-play/) - Spectator data from confirmed frames
+- [BestoNet](https://github.com/BestoGames/BestoNet) - Confirmed frame input buffer for spectators
 
-### Technical References
-- [Ping and Latency in Gaming](https://www.bandwidthplace.com/article/ping-latency-in-gaming)
-- [Chrome Idle Detection API](https://developer.chrome.com/docs/capabilities/web-apis/idle-detection)
-- [Browser Fingerprinting Survey](https://www.researchgate.net/publication/332873650_Browser_Fingerprinting_A_survey)
+## Confidence Assessment
+
+| Area | Confidence | Rationale |
+|------|------------|-----------|
+| Frame state definitions | HIGH | Based on established GGPO patterns + existing codebase |
+| Confirmation protocol | HIGH | Directly analyzed from `pyodide_multiplayer_game.js` |
+| Dual-buffer approach | HIGH | Standard pattern from INVERSUS and other rollback implementations |
+| Rollback edge cases | HIGH | Already implemented in codebase, just needs data recording fix |
+| Fast-forward edge cases | HIGH | Implementation exists in codebase (Phase 26) |
+| Verification/hash comparison | MEDIUM | Phase 11-14 infrastructure exists but export integration untested |
+| Research metadata schema | MEDIUM | Custom requirements; standard patterns provide guidance |

@@ -1,652 +1,403 @@
-# Architecture Research: Participant Exclusion System
+# Architecture Research: Rollback Netcode Data Collection
 
-**Domain:** Participant screening and exclusion for web-based experiments
-**Researched:** 2026-01-21
-**Confidence:** HIGH (based on existing codebase analysis + established patterns)
+**Domain:** P2P rollback netcode data collection for research export
+**Researched:** 2026-01-30
+**Confidence:** HIGH (based on codebase analysis + GGPO principles)
 
 ## Executive Summary
 
-The exclusion system should be a **hybrid client-server architecture** with:
+The current implementation has a well-structured `frameDataBuffer` mechanism that correctly handles rollback data correction. However, analysis reveals the **fast-forward path bypasses the confirmation check**, and data is recorded based on **frame execution** rather than **frame confirmation**. This creates the divergence problem: both peers record the same frames but potentially with different speculative values before correction propagates.
 
-1. **Server-side rule registry** - Python classes defining exclusion rules, configured in experiment setup
-2. **Client-side checks** - JavaScript implementations for real-time monitoring (latency, browser, focus)
-3. **Server-side enforcement** - All exclusion decisions validated and enforced server-side
-4. **Pluggable rule engine** - Strategy pattern with chain-of-responsibility for rule evaluation
+The key architectural insight: **Data should only be exported for confirmed frames** - frames where ALL players' inputs have been received and the state is deterministically identical on both peers.
 
-**Key architectural decision:** Client-side checks for UX (instant feedback) but server-side enforcement for security. Never trust client-only exclusion - malicious participants can bypass JavaScript.
+## Data Collection Architecture
 
-The system integrates naturally with the existing `GymScene` configuration pattern and extends the current `GameCallback` hook system.
-
-## Client vs Server Responsibilities
-
-### Client-Side Responsibilities (JavaScript)
-
-| Responsibility | Rationale | Implementation |
-|---------------|-----------|----------------|
-| **Latency measurement** | Already exists via ping/pong | Extend `index.js` latency tracking |
-| **Browser detection** | Only client knows UA string | Feature detection preferred over UA sniffing |
-| **Focus monitoring** | Only client knows visibility | Already exists: `visibilitychange` listener |
-| **UI feedback** | Instant user feedback | Show exclusion messages immediately |
-| **Data collection** | Gather metrics for server | Report via SocketIO events |
-
-**Current client-side code already handles:**
-- Ping measurement (lines 45-78 in `index.js`)
-- Focus detection (`visibilitychange`, `focus`, `blur` events)
-- Max latency checking (lines 848-855 in `index.js`)
-
-### Server-Side Responsibilities (Python)
-
-| Responsibility | Rationale | Implementation |
-|---------------|-----------|----------------|
-| **Rule definition** | Single source of truth | Python classes in configuration |
-| **Rule evaluation** | Security - can't be bypassed | Evaluate in `app.py` or `GameManager` |
-| **Exclusion enforcement** | Prevent game start/continue | Emit exclusion events to client |
-| **Multiplayer handling** | Coordinate exclusion across players | Notify all players in game room |
-| **Logging/audit** | Research data integrity | Log all exclusion events |
-
-### Why This Split?
-
-1. **Security**: Client-side JavaScript can be bypassed. Server must be authoritative.
-2. **User Experience**: Waiting for server round-trip for every check is poor UX.
-3. **Performance**: Real-time checks (ping, focus) need client-side loop.
-4. **Research Integrity**: Server logs ensure exclusion data is trustworthy.
-
-**Pattern**: Client detects, reports, and shows feedback. Server validates, decides, and enforces.
-
-## Rule Engine Patterns
-
-### Recommended: Strategy Pattern + Chain of Responsibility
-
-The exclusion system should use a **Strategy Pattern** where each rule is a self-contained strategy, combined with **Chain of Responsibility** for sequential evaluation.
+### Current Flow (Problematic)
 
 ```
-                          +------------------+
-                          | ExclusionManager |
-                          +------------------+
-                                   |
-                    +--------------+--------------+
-                    |              |              |
-               +--------+    +--------+    +----------+
-               | Rule 1 |    | Rule 2 |    | Rule N   |
-               | (Ping) |    |(Browser)|   |(Custom)  |
-               +--------+    +--------+    +----------+
+                         PEER A                                    PEER B
+                           |                                          |
+  Frame N tick  ------>  step()                                    step()  <------ Frame N tick
+                           |                                          |
+                     [speculative]                               [speculative]
+                      local input                                 local input
+                      predicted partner                           predicted partner
+                           |                                          |
+                     storeFrameData(N)  <--- PROBLEM --->   storeFrameData(N)
+                     (may use prediction)                   (may use prediction)
+                           |                                          |
+                       frameNumber++                              frameNumber++
+                           |                                          |
+               [late input arrives]                       [late input arrives]
+                           |                                          |
+                     performRollback()                          performRollback()
+                           |                                          |
+                     clearFrameData(N)                          clearFrameData(N)
+                     replay + re-store                          replay + re-store
+                           |                                          |
+                    Episode ends -----> EXPORT <--------- Episode ends
+                                        (both export corrected data)
+
+  PROBLEM: Fast-forward path does NOT use confirmation check
+           Background player exports frames with isFocused=false
+           but data may still diverge due to timing
 ```
 
-### Rule Interface (Python)
+### The Core Issue
 
-```python
-from abc import ABC, abstractmethod
-from dataclasses import dataclass
-from typing import Callable, Any
+1. **Speculative Storage**: `storeFrameData()` is called in `step()` BEFORE confirmation is verified
+2. **Rollback Corrects It**: `performRollback()` properly clears and re-stores data
+3. **Fast-Forward Gap**: `_performFastForward()` stores data without rollback-style correction
+4. **Export Timing**: Episode ends export from `frameDataBuffer` - but timing determines what's "final"
 
-@dataclass
-class ExclusionResult:
-    """Result of evaluating an exclusion rule."""
-    should_exclude: bool
-    rule_name: str
-    message: str  # User-facing message
-    data: dict | None = None  # Additional context for logging
-
-class ExclusionRule(ABC):
-    """Base class for all exclusion rules."""
-
-    @property
-    @abstractmethod
-    def name(self) -> str:
-        """Unique identifier for this rule."""
-        pass
-
-    @property
-    @abstractmethod
-    def check_timing(self) -> str:
-        """When to check: 'pre_game', 'continuous', or 'both'."""
-        pass
-
-    @abstractmethod
-    def evaluate(self, context: dict) -> ExclusionResult:
-        """
-        Evaluate the rule against the provided context.
-
-        Args:
-            context: Dict containing participant state, metrics, etc.
-
-        Returns:
-            ExclusionResult indicating whether to exclude.
-        """
-        pass
-```
-
-### Built-in Rule Examples
-
-```python
-class PingThreshold(ExclusionRule):
-    """Exclude participants with latency above threshold."""
-
-    def __init__(self, max_ms: int = 200, message: str | None = None):
-        self.max_ms = max_ms
-        self._message = message or f"Your connection latency ({'{ping}'} ms) exceeds the maximum allowed ({max_ms} ms)."
-
-    @property
-    def name(self) -> str:
-        return "ping_threshold"
-
-    @property
-    def check_timing(self) -> str:
-        return "both"  # Check before game and continuously
-
-    def evaluate(self, context: dict) -> ExclusionResult:
-        ping = context.get("ping_ms", 0)
-        should_exclude = ping > self.max_ms
-        return ExclusionResult(
-            should_exclude=should_exclude,
-            rule_name=self.name,
-            message=self._message.format(ping=ping) if should_exclude else "",
-            data={"ping_ms": ping, "threshold": self.max_ms}
-        )
-
-
-class BrowserExclusion(ExclusionRule):
-    """Exclude specific browsers."""
-
-    def __init__(
-        self,
-        blocked: list[str] | None = None,
-        allowed: list[str] | None = None,
-        message: str | None = None
-    ):
-        self.blocked = [b.lower() for b in (blocked or [])]
-        self.allowed = [a.lower() for a in (allowed or [])]
-        self._message = message or "Your browser is not supported for this experiment."
-
-    @property
-    def name(self) -> str:
-        return "browser_exclusion"
-
-    @property
-    def check_timing(self) -> str:
-        return "pre_game"  # Only check once at start
-
-    def evaluate(self, context: dict) -> ExclusionResult:
-        browser = context.get("browser", "unknown").lower()
-
-        if self.blocked and browser in self.blocked:
-            return ExclusionResult(True, self.name, self._message, {"browser": browser})
-
-        if self.allowed and browser not in self.allowed:
-            return ExclusionResult(True, self.name, self._message, {"browser": browser})
-
-        return ExclusionResult(False, self.name, "")
-
-
-class FocusRequirement(ExclusionRule):
-    """Exclude participants who tab away too often or too long."""
-
-    def __init__(
-        self,
-        max_blur_duration_ms: int = 5000,
-        max_blur_count: int = 3,
-        message: str | None = None
-    ):
-        self.max_blur_duration_ms = max_blur_duration_ms
-        self.max_blur_count = max_blur_count
-        self._message = message or "Please keep the experiment window focused."
-
-    @property
-    def name(self) -> str:
-        return "focus_requirement"
-
-    @property
-    def check_timing(self) -> str:
-        return "continuous"
-
-    def evaluate(self, context: dict) -> ExclusionResult:
-        blur_count = context.get("blur_count", 0)
-        blur_duration = context.get("blur_duration_ms", 0)
-
-        should_exclude = (
-            blur_count > self.max_blur_count or
-            blur_duration > self.max_blur_duration_ms
-        )
-
-        return ExclusionResult(
-            should_exclude=should_exclude,
-            rule_name=self.name,
-            message=self._message if should_exclude else "",
-            data={"blur_count": blur_count, "blur_duration_ms": blur_duration}
-        )
-
-
-class CustomCallback(ExclusionRule):
-    """Wrap a user-provided callback function as a rule."""
-
-    def __init__(
-        self,
-        callback: Callable[[dict], bool],
-        name: str = "custom",
-        timing: str = "both",
-        message: str = "You have been excluded from this experiment."
-    ):
-        self._callback = callback
-        self._name = name
-        self._timing = timing
-        self._message = message
-
-    @property
-    def name(self) -> str:
-        return self._name
-
-    @property
-    def check_timing(self) -> str:
-        return self._timing
-
-    def evaluate(self, context: dict) -> ExclusionResult:
-        should_exclude = self._callback(context)
-        return ExclusionResult(
-            should_exclude=should_exclude,
-            rule_name=self.name,
-            message=self._message if should_exclude else ""
-        )
-```
-
-### Exclusion Manager (Chain of Responsibility)
-
-```python
-class ExclusionManager:
-    """Manages and evaluates exclusion rules."""
-
-    def __init__(self, rules: list[ExclusionRule]):
-        self.rules = rules
-
-    def evaluate_pre_game(self, context: dict) -> ExclusionResult | None:
-        """Evaluate rules before game starts. Returns first exclusion or None."""
-        for rule in self.rules:
-            if rule.check_timing in ("pre_game", "both"):
-                result = rule.evaluate(context)
-                if result.should_exclude:
-                    return result
-        return None
-
-    def evaluate_continuous(self, context: dict) -> ExclusionResult | None:
-        """Evaluate rules during gameplay. Returns first exclusion or None."""
-        for rule in self.rules:
-            if rule.check_timing in ("continuous", "both"):
-                result = rule.evaluate(context)
-                if result.should_exclude:
-                    return result
-        return None
-
-    def evaluate_all(self, context: dict, timing: str = "both") -> list[ExclusionResult]:
-        """Evaluate all applicable rules, returning all violations."""
-        results = []
-        for rule in self.rules:
-            if timing == "both" or rule.check_timing in (timing, "both"):
-                result = rule.evaluate(context)
-                if result.should_exclude:
-                    results.append(result)
-        return results
-```
-
-### Configuration API (Integration with GymScene)
-
-```python
-# In experiment configuration
-game_scene = (
-    GymScene()
-    .scene(scene_id="main_game")
-    .exclusion(
-        rules=[
-            PingThreshold(max_ms=200, message="Your connection is too slow."),
-            BrowserExclusion(blocked=["Firefox"], message="Please use Chrome or Edge."),
-            FocusRequirement(max_blur_count=5),
-            CustomCallback(
-                callback=lambda ctx: ctx.get("age", 99) < 18,
-                name="age_check",
-                timing="pre_game",
-                message="You must be 18+ to participate."
-            ),
-        ],
-        # Behavior options
-        pre_game_check=True,  # Block game start on exclusion
-        continuous_check=True,  # Monitor during gameplay
-        on_exclude_multiplayer="end_for_all",  # or "end_for_excluded"
-        grace_period_ms=2000,  # Warn before excluding
-    )
-    # ... other configuration
-)
-```
-
-## Data Flow
-
-### Pre-Game Exclusion Check
+### Recommended Flow
 
 ```
-Participant clicks "Start"
-         |
-         v
-+-------------------+
-| Client: Collect   |     1. Gather browser info, current ping,
-| screening data    |        focus state, etc.
-+-------------------+
-         |
-         v (SocketIO: "pre_game_screening")
-+-------------------+
-| Server: Receive   |     2. Receive screening data
-| screening data    |
-+-------------------+
-         |
-         v
-+-------------------+
-| Server: Evaluate  |     3. Run ExclusionManager.evaluate_pre_game()
-| pre_game rules    |
-+-------------------+
-         |
-    +----+----+
-    |         |
-  PASS      FAIL
-    |         |
-    v         v
-+--------+ +------------------+
-| Proceed| | Emit "excluded"  |    4a. If pass: normal game flow
-| to     | | with message     |    4b. If fail: send exclusion event
-| game   | +------------------+
-+--------+        |
-                  v
-           +------------------+
-           | Client: Show     |    5. Display exclusion message
-           | exclusion UI     |        and redirect
-           +------------------+
+                         PEER A                                    PEER B
+                           |                                          |
+  Frame N tick  ------>  step()                                    step()  <------ Frame N tick
+                           |                                          |
+                     [speculative step]                         [speculative step]
+                           |                                          |
+                     speculativeBuffer[N]                       speculativeBuffer[N]
+                     (temporary storage)                        (temporary storage)
+                           |                                          |
+               [inputs exchange + confirm]               [inputs exchange + confirm]
+                           |                                          |
+                     _updateConfirmedFrame()                    _updateConfirmedFrame()
+                           |                                          |
+              confirmedFrame >= N?  ----------------------> confirmedFrame >= N?
+                     YES                                           YES
+                           |                                          |
+                     promoteToCanonical(N)                     promoteToCanonical(N)
+                     frameDataBuffer[N] =                      frameDataBuffer[N] =
+                       speculativeBuffer[N]                      speculativeBuffer[N]
+                           |                                          |
+                    Episode ends -----> EXPORT <--------- Episode ends
+                         (only confirmed data)              (only confirmed data)
+                         GUARANTEED PARITY                  GUARANTEED PARITY
 ```
 
-### Continuous Monitoring During Gameplay
+### Key Insight
+
+**The architectural change needed:** Separate "speculative recording" from "canonical history."
+
+Current code conflates these - `frameDataBuffer` holds both speculative and confirmed data, relying on rollback to correct errors. This works for rollback scenarios but fails for:
+
+1. Fast-forward (bulk processing without rollback correction)
+2. Episode boundaries (export happens at arbitrary confirmation points)
+3. Focus divergence (one peer backgrounds, their data differs until sync)
+
+## Component Responsibilities
+
+| Component | Current Responsibility | Recommended Change |
+|-----------|------------------------|-------------------|
+| `frameDataBuffer` | Stores all frame data, corrected on rollback | Store ONLY confirmed frames |
+| `storeFrameData()` | Called after every step | Call only when frame confirmed |
+| `clearFrameDataFromRollback()` | Clears frames >= target | Keep as safety valve |
+| `_updateConfirmedFrame()` | Tracks confirmation, triggers hash | ALSO trigger data promotion |
+| `exportEpisodeDataFromBuffer()` | Exports frameDataBuffer contents | No change (buffer now clean) |
+| NEW: `speculativeData` | N/A | Temporary storage for unconfirmed frames |
+
+### Component Ownership
 
 ```
-+-------------------+
-| Client: Monitor   |     1. Track ping, focus, custom metrics
-| metrics loop      |        at configured interval (e.g., 1s)
-+-------------------+
-         |
-         v (SocketIO: "exclusion_metrics")
-+-------------------+
-| Server: Receive   |     2. Update participant context
-| metrics update    |
-+-------------------+
-         |
-         v
-+-------------------+
-| Server: Evaluate  |     3. Run ExclusionManager.evaluate_continuous()
-| continuous rules  |
-+-------------------+
-         |
-    +----+----+
-    |         |
-  PASS      FAIL
-    |         |
-    v         v
-+--------+ +------------------+
-| Continue| | Grace period?   |    4a. If pass: continue
-| game   | | (warn first)    |    4b. If fail: check grace period
-+--------+ +------------------+
-                  |
-        +---------+---------+
-        |                   |
-    WARNED              EXCLUDED
-        |                   |
-        v                   v
-+------------------+ +------------------+
-| Emit "exclusion_ | | Emit "excluded"  |
-| warning"         | | end game for     |
-+------------------+ | player(s)        |
-                     +------------------+
+                    +------------------+
+                    |  Game Loop       |
+                    |  (step())        |
+                    +--------+---------+
+                             |
+             +---------------+---------------+
+             |                               |
+    +--------v---------+          +----------v----------+
+    | Speculative      |          | Confirmation        |
+    | Layer            |          | Layer               |
+    +------------------+          +---------------------+
+    | - speculativeData|          | - confirmedFrame    |
+    | - predictions    |          | - inputBuffer       |
+    | - temp rewards   |          | - hashHistory       |
+    +--------+---------+          +----------+----------+
+             |                               |
+             |    Frame confirmed?           |
+             +----------+--------------------+
+                        |
+               +--------v--------+
+               | Canonical       |
+               | History         |
+               +-----------------+
+               | - frameDataBuffer|  <-- Only confirmed
+               | - actionSequence|
+               | - cumulativeValid|
+               +-----------------+
+                        |
+               +--------v--------+
+               | Export Layer    |
+               +-----------------+
+               | - emitEpisodeData|
+               | - validation data|
+               +-----------------+
 ```
 
-### Multiplayer Exclusion Handling
+## Recording Points
 
-```
-Player A excluded
-         |
-         v
-+-------------------+
-| Server: Check     |     1. Determine multiplayer behavior
-| on_exclude config |        from scene configuration
-+-------------------+
-         |
-    +----+----+
-    |         |
-"end_for_   "end_for_
- excluded"   all"
-    |         |
-    v         v
-+--------+ +------------------+
-| Emit   | | Emit "end_game"  |    2a. Only excluded player ends
-| to A   | | to game room     |    2b. All players in game end
-+--------+ +------------------+
-    |              |
-    v              v
-+------------------+
-| Clean up game    |     3. Remove from active games,
-| state            |        persist data, clean up
-+------------------+
-```
+### When to Record
 
-## Integration Points
+| Event | Record to Speculative? | Promote to Canonical? | Rationale |
+|-------|------------------------|----------------------|-----------|
+| Speculative step | YES | NO | Need data for potential rollback replay |
+| Post-rollback step | YES (replaces) | NO | Corrected data, but may rollback again |
+| Frame confirmed | N/A | YES | All inputs received, state is final |
+| Fast-forward step | YES | NO | Bulk processing, needs confirmation check |
+| Episode end | N/A | Promote remaining | Force-confirm at boundary |
 
-### Where Exclusion Hooks Into Existing Architecture
+### Frame Confirmation Logic
 
-| Hook Point | File | Description |
-|------------|------|-------------|
-| **Scene Configuration** | `gym_scene.py` | New `.exclusion()` method on GymScene |
-| **Pre-game Check** | `game_manager.py` | Check in `add_subject_to_game()` before adding |
-| **Continuous Check** | `game_manager.py` | New background task or integrate with game loop |
-| **Client Metrics** | `index.js` | Extend existing ping/focus code to report metrics |
-| **Exclusion Events** | `app.py` | New SocketIO events: `pre_game_screening`, `exclusion_metrics`, `excluded`, `exclusion_warning` |
-| **Callback Integration** | `callback.py` | New hooks: `on_pre_exclusion_check`, `on_exclusion` |
+A frame N is "confirmed" when:
+1. ALL human players have inputs in `inputBuffer.get(N)`
+2. Frame N <= `confirmedFrame` (monotonically increasing)
+3. No rollback is in progress (`!rollbackInProgress`)
 
-### New SocketIO Events
+Current code in `_hasAllInputsForFrame()` and `_updateConfirmedFrame()` correctly implements this.
 
-| Event | Direction | Payload | Purpose |
-|-------|-----------|---------|---------|
-| `pre_game_screening` | Client -> Server | `{browser, ping_ms, ...}` | Send screening data before game |
-| `exclusion_metrics` | Client -> Server | `{ping_ms, focus_state, blur_count, ...}` | Continuous monitoring data |
-| `excluded` | Server -> Client | `{rule, message, redirect_url}` | Notify of exclusion |
-| `exclusion_warning` | Server -> Client | `{rule, message, grace_remaining_ms}` | Grace period warning |
-| `screening_passed` | Server -> Client | `{}` | Confirm screening passed, proceed |
+### Canonical History Buffer Structure
 
-### Extending GameCallback
+```javascript
+// NEW: Speculative buffer (temporary, may be overwritten)
+this.speculativeFrameData = new Map();  // frameNumber -> {actions, rewards, ...}
 
-```python
-class GameCallback:
-    # ... existing methods ...
+// EXISTING: Canonical buffer (only confirmed, exported)
+this.frameDataBuffer = new Map();  // frameNumber -> {actions, rewards, ...}
 
-    def on_pre_exclusion_check(self, subject_id: str, context: dict) -> dict:
-        """
-        Hook called before exclusion rules are evaluated.
-        Can modify context to add custom data for rules.
+// Promotion happens in _updateConfirmedFrame():
+async _updateConfirmedFrame() {
+    // ... existing confirmation logic ...
 
-        Returns:
-            Modified context dict
-        """
-        return context
+    for (let frame = startFrame; frame < this.frameNumber; frame++) {
+        if (this._hasAllInputsForFrame(frame, humanPlayerIds)) {
+            this.confirmedFrame = frame;
 
-    def on_exclusion(
-        self,
-        subject_id: str,
-        result: ExclusionResult,
-        remote_game: RemoteGame | None
-    ):
-        """
-        Hook called when a participant is excluded.
-        Can perform custom logging, data export, etc.
-        """
-        pass
+            // NEW: Promote speculative data to canonical
+            if (this.speculativeFrameData.has(frame)) {
+                this.frameDataBuffer.set(frame, this.speculativeFrameData.get(frame));
+                this.speculativeFrameData.delete(frame);
+            }
 
-    def on_exclusion_warning(
-        self,
-        subject_id: str,
-        result: ExclusionResult,
-        grace_remaining_ms: int
-    ):
-        """
-        Hook called when a grace period warning is issued.
-        """
-        pass
-```
-
-## Suggested Build Order
-
-Based on dependencies and incremental value delivery:
-
-### Phase 1: Core Rule Infrastructure (Server-Side)
-
-**Files to create/modify:**
-- `interactive_gym/configurations/exclusion_rules.py` (new)
-- `interactive_gym/scenes/gym_scene.py` (add `.exclusion()` method)
-
-**What to build:**
-1. `ExclusionRule` base class
-2. `ExclusionResult` dataclass
-3. `ExclusionManager` class
-4. Built-in rules: `PingThreshold`
-5. `GymScene.exclusion()` configuration method
-
-**Why first:** Foundation for everything else. No external dependencies.
-
-### Phase 2: Pre-Game Exclusion (Client + Server)
-
-**Files to modify:**
-- `interactive_gym/server/app.py` (new SocketIO events)
-- `interactive_gym/server/game_manager.py` (pre-game check)
-- `interactive_gym/server/static/js/index.js` (screening data collection)
-
-**What to build:**
-1. `pre_game_screening` event handler
-2. Pre-game check in `add_subject_to_game()`
-3. Client-side screening data collection
-4. `excluded` event emission and handling
-5. Basic exclusion UI on client
-
-**Why second:** High value, blocks bad participants before they start.
-
-### Phase 3: Built-in Rule Set
-
-**Files to modify:**
-- `interactive_gym/configurations/exclusion_rules.py`
-
-**What to build:**
-1. `BrowserExclusion` rule
-2. `FocusRequirement` rule
-3. `MobileExclusion` rule (detect mobile devices)
-4. `CustomCallback` wrapper
-
-**Why third:** Adds immediate utility with common exclusion scenarios.
-
-### Phase 4: Continuous Monitoring
-
-**Files to modify:**
-- `interactive_gym/server/app.py`
-- `interactive_gym/server/game_manager.py`
-- `interactive_gym/server/static/js/index.js`
-
-**What to build:**
-1. `exclusion_metrics` periodic reporting from client
-2. Continuous rule evaluation on server
-3. Grace period warning system
-4. Mid-game exclusion handling
-
-**Why fourth:** More complex, builds on pre-game foundation.
-
-### Phase 5: Multiplayer Handling
-
-**Files to modify:**
-- `interactive_gym/server/game_manager.py`
-- `interactive_gym/server/pyodide_game_coordinator.py`
-
-**What to build:**
-1. `on_exclude_multiplayer` behavior options
-2. Room-level exclusion notifications
-3. Clean game termination for all players
-4. WebRTC disconnect handling on exclusion
-
-**Why fifth:** Requires understanding of multiplayer state management.
-
-### Phase 6: Callback Integration & Logging
-
-**Files to modify:**
-- `interactive_gym/server/callback.py`
-- Data logging infrastructure
-
-**What to build:**
-1. `on_pre_exclusion_check` hook
-2. `on_exclusion` hook
-3. `on_exclusion_warning` hook
-4. Exclusion event logging to data files
-
-**Why sixth:** Polish phase, adds extensibility for researchers.
-
-## Patterns to Consider
-
-### Strategy Pattern
-Each exclusion rule is a strategy with a common interface. Allows:
-- Easy addition of new rules
-- Rules can be tested in isolation
-- Configuration via composition
-
-### Chain of Responsibility
-Rules are evaluated in sequence, stopping at first exclusion (or collecting all). Allows:
-- Short-circuit on first failure (performance)
-- Configurable rule ordering
-- Collect all violations for comprehensive feedback
-
-### Observer Pattern (for callbacks)
-Existing `GameCallback` already uses this. Extend for exclusion events:
-- Researchers can add custom logging
-- UI components can react to exclusion events
-- Decouples core logic from extensions
-
-### Middleware Pattern (alternative consideration)
-Similar to Django/Express middleware. Each rule can:
-- Pass to next rule
-- Reject with response
-- Modify context for subsequent rules
-
-This is more powerful but more complex. **Recommendation: Start with simpler Chain of Responsibility, consider middleware if more flexibility needed later.**
-
-### Factory Pattern (for rule instantiation)
-If rules are loaded from configuration files (JSON/YAML):
-
-```python
-class ExclusionRuleFactory:
-    _rules = {
-        "ping_threshold": PingThreshold,
-        "browser_exclusion": BrowserExclusion,
-        # ...
+            // Existing: hash computation
+            await this._computeAndStoreConfirmedHash(frame);
+        } else {
+            break;
+        }
     }
-
-    @classmethod
-    def create(cls, rule_type: str, **kwargs) -> ExclusionRule:
-        return cls._rules[rule_type](**kwargs)
+}
 ```
 
-**Recommendation: Not needed initially if rules are defined in Python config. Add if JSON config is desired later.**
+## Data Flow Patterns
 
-## Security Considerations
+### Pattern 1: Speculative-Then-Confirm
 
-1. **Never trust client-only exclusion**: All decisions must be validated server-side.
+**What:** Store data speculatively on step, promote to canonical on confirmation.
 
-2. **Rate limit metrics reporting**: Prevent DoS via excessive `exclusion_metrics` events.
+**When to use:** Normal gameplay flow where inputs arrive within a few frames.
 
-3. **Validate metric values**: Client could send fake ping values. Consider server-measured RTT as ground truth.
+**Trade-offs:**
+- (+) Simple mental model
+- (+) Works with existing rollback flow
+- (-) Requires two buffers
+- (-) Must handle promotion timing carefully
 
-4. **Log exclusion attempts**: For audit trail and detecting manipulation attempts.
+```javascript
+// In step():
+this.speculativeFrameData.set(this.frameNumber, {
+    actions: finalActions,
+    rewards: Object.fromEntries(rewards),
+    // ...
+});
 
-5. **Secure redirect URLs**: Validate redirect URLs to prevent open redirect vulnerabilities.
+// In _updateConfirmedFrame():
+if (this._hasAllInputsForFrame(frame, humanPlayerIds)) {
+    // Promote to canonical
+    this.frameDataBuffer.set(frame, this.speculativeFrameData.get(frame));
+}
+```
+
+### Pattern 2: Delayed Recording
+
+**What:** Don't record at step time. Record only when confirmed.
+
+**When to use:** When memory is tight and most frames confirm quickly.
+
+**Trade-offs:**
+- (+) Single buffer, simpler
+- (-) Must re-extract data from actionSequence/rewards on confirmation
+- (-) Loses per-frame timing information
+
+```javascript
+// In step(): Don't store to frameDataBuffer
+
+// In _updateConfirmedFrame():
+if (this._hasAllInputsForFrame(frame, humanPlayerIds)) {
+    // Reconstruct data from actionSequence
+    const record = this.actionSequence.find(r => r.frame === frame);
+    this.frameDataBuffer.set(frame, {
+        actions: record.actions,
+        // Must track rewards separately...
+    });
+}
+```
+
+### Pattern 3: Force-Confirm at Boundaries
+
+**What:** At episode end, force all remaining speculative frames to confirmed.
+
+**When to use:** Episode boundaries where determinism is guaranteed by sync.
+
+**Trade-offs:**
+- (+) Ensures complete data export
+- (+) Handles edge cases at boundaries
+- (-) May include frames with prediction (though rare at boundary)
+
+```javascript
+// In signalEpisodeComplete():
+// Force-promote any remaining speculative data
+for (const [frame, data] of this.speculativeFrameData) {
+    if (!this.frameDataBuffer.has(frame)) {
+        this.frameDataBuffer.set(frame, data);
+    }
+}
+this.speculativeFrameData.clear();
+
+// Then export
+this._emitEpisodeDataFromBuffer();
+```
+
+### Recommended Pattern: Hybrid
+
+Use Pattern 1 (Speculative-Then-Confirm) for normal flow, with Pattern 3 (Force-Confirm at Boundaries) for episode endings:
+
+```
+Normal tick: step() -> speculativeFrameData -> _updateConfirmedFrame() -> frameDataBuffer
+Episode end: force promote remaining -> export -> clear
+```
+
+## Anti-Patterns
+
+### Anti-Pattern 1: Recording Before Inputs Are Known
+
+**What it does:** Stores data immediately after `step()` without checking confirmation.
+
+**Why it causes divergence:**
+- Peer A may have all inputs (confirmed)
+- Peer B may be using prediction (speculative)
+- Both store to `frameDataBuffer`
+- If no rollback occurs before export, data differs
+
+**Current code doing this:**
+```javascript
+// In step(), line ~2441:
+this.storeFrameData(this.frameNumber, {
+    actions: finalActions,  // May include predictions!
+    rewards: Object.fromEntries(rewards),
+    // ...
+});
+```
+
+### Anti-Pattern 2: Fast-Forward Without Confirmation Check
+
+**What it does:** Bulk-processes frames and stores data without verifying confirmation.
+
+**Why it causes divergence:**
+- Fast-forward happens when one peer backgrounds
+- That peer bulk-processes frames using buffered inputs
+- No rollback correction happens (it's not a rollback, it's catch-up)
+- Data may include prediction if inputs were lost
+
+**Current code doing this:**
+```javascript
+// In _performFastForward(), line ~4965:
+for (const frameData of ffResult.per_frame_data) {
+    this.storeFrameData(frameData.frame, {
+        actions: frameData.actions,
+        // No confirmation check!
+    });
+}
+```
+
+### Anti-Pattern 3: Exporting at Episode End Without Confirmation Sync
+
+**What it does:** Exports `frameDataBuffer` at episode end without ensuring both peers are at same confirmation point.
+
+**Why it causes divergence:**
+- Episode end is detected locally
+- P2P sync ensures both peers agree on END frame
+- But confirmation may lag behind current frame
+- Peer A: confirmed=N-5, Peer B: confirmed=N-2
+- Both export, but with different "final" data
+
+**Mitigation in current code:** Episode sync waits for peer agreement. But this doesn't wait for confirmation to catch up.
+
+### Anti-Pattern 4: Clearing Buffer Before Export
+
+**What it does:** Clears `frameDataBuffer` immediately after emit, before confirmation of receipt.
+
+**Why it causes issues:**
+- If emit fails, data is lost
+- No retry mechanism
+- Current code does this (line ~3726)
+
+**Better:** Mark as "pending export" and clear only after server ACK.
+
+## Implementation Recommendations
+
+### Phase 1: Add Speculative Buffer (Low Risk)
+
+1. Add `speculativeFrameData` Map
+2. Change `storeFrameData()` to write to speculative buffer
+3. Add `promoteToCanonical()` call in `_updateConfirmedFrame()`
+4. No changes to export logic (it reads from frameDataBuffer which now only has confirmed)
+
+### Phase 2: Fix Fast-Forward Path (Medium Risk)
+
+1. After fast-forward batch processing, call `_updateConfirmedFrame()`
+2. Only promote frames that are actually confirmed
+3. Handle remaining speculative frames appropriately
+
+### Phase 3: Add Force-Confirm at Boundaries (Low Risk)
+
+1. Before `_emitEpisodeDataFromBuffer()`, promote remaining speculative
+2. Log warning if promoting unconfirmed frames (indicates sync issue)
+
+### Phase 4: Add Export Confirmation (Optional)
+
+1. Don't clear buffer immediately on emit
+2. Wait for server ACK before clearing
+3. Retry on failure
+
+## Verification
+
+To verify the fix works:
+
+1. **Action Parity Test:**
+   - Run two peers through episode with artificial rollbacks
+   - Export data from both
+   - Run `validate_action_sequences.py`
+   - Should show 0 mismatches
+
+2. **Fast-Forward Test:**
+   - One peer backgrounds for 5+ seconds
+   - Refocuses and fast-forwards
+   - Compare exported data
+   - Should show identical actions/rewards for all frames
+
+3. **Boundary Test:**
+   - Episode ends while frames still unconfirmed
+   - Both peers should export identical data
+   - Verify no prediction-based differences
 
 ## Sources
 
-- [Rules Engine Design Pattern - Nected](https://www.nected.ai/us/blog-us/rules-engine-design-pattern)
-- [Chain of Responsibility Pattern - Refactoring Guru](https://refactoring.guru/design-patterns/chain-of-responsibility)
-- [Input Validation Cheat Sheet - OWASP](https://cheatsheetseries.owasp.org/cheatsheets/Input_Validation_Cheat_Sheet.html)
-- [Client-Side vs Server-Side Validation - PacketLabs](https://www.packetlabs.net/posts/input-validation/)
-- [Browser Detection Using User Agent - MDN](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Browser_detection_using_the_user_agent)
-- [Feature Detection - MDN](https://developer.mozilla.org/en-US/docs/Learn_web_development/Extensions/Testing/Feature_detection)
-- [WebRTC Latency Monitoring - VideoSDK](https://www.videosdk.live/developer-hub/webrtc/webrtc-latency)
-- [Chain of Responsibility in Python - Medium](https://medium.com/@amirm.lavasani/design-patterns-in-python-chain-of-responsibility-cc22bb241b41)
+- [GGPO Official Documentation](https://www.ggpo.net/) - Rollback networking fundamentals
+- [SnapNet: Netcode Architectures Part 2 - Rollback](https://www.snapnet.dev/blog/netcode-architectures-part-2-rollback/) - Confirmed vs speculative frames
+- [Gaffer On Games: Deterministic Lockstep](https://gafferongames.com/post/deterministic_lockstep/) - Frame confirmation concepts
+- [GitHub: WillKirkmanM/rollback-netcode](https://github.com/WillKirkmanM/rollback-netcode) - Confirmed frame cleanup patterns
+- [GitHub: Corrade/netcode-lockstep](https://github.com/Corrade/netcode-lockstep) - P2P lockstep reference implementation
+- Codebase analysis: `/Users/chasemcd/Repositories/interactive-gym/interactive_gym/server/static/js/pyodide_multiplayer_game.js`
