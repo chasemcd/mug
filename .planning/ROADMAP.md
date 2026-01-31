@@ -117,7 +117,7 @@ Key deliverables:
 **Milestone Goal:** Both players export identical game state data (actions, observations, rewards, infos) regardless of rollbacks, fast-forwards, or latency — ensuring research data validity.
 
 - [x] **Phase 36: Speculative/Canonical Buffer Split** - Core data recording architecture fix
-- [ ] **Phase 37: Fast-Forward Data Recording Fix** - Tab refocus confirmation-gated recording
+- [x] **Phase 37: Fast-Forward Data Recording Fix** - Tab refocus confirmation-gated recording
 - [ ] **Phase 38: Episode Boundary Confirmation** - Ensure all frames confirmed before export
 - [ ] **Phase 39: Verification & Metadata** - Per-frame metadata and validation tooling
 
@@ -495,7 +495,7 @@ Plans:
 **Research flag:** Complete (root cause identified in research phase)
 **Plans:** 1 plan
 Plans:
-- [ ] 37-01-PLAN.md — Add _promoteConfirmedFrames() call in _performFastForward()
+- [x] 37-01-PLAN.md — Add _promoteConfirmedFrames() call in _performFastForward()
 
 ### Phase 38: Episode Boundary Confirmation
 **Goal:** All frames confirmed before export triggered
@@ -554,7 +554,7 @@ Phases execute in numeric order: 36 → 37 → 38 → 39
 | 34. Session Detail | v1.7 | 1/1 | Complete | 2026-01-25 |
 | 35. Layout & Polish | v1.7 | 1/1 | Complete | 2026-01-25 |
 | 36. Buffer Split | v1.8 | 1/1 | Complete | 2026-01-30 |
-| 37. Fast-Forward Fix | v1.8 | 0/1 | Planned | - |
+| 37. Fast-Forward Fix | v1.8 | 1/1 | Complete | 2026-01-30 |
 | 38. Episode Boundary | v1.8 | 0/TBD | Not started | - |
 | 39. Verification & Metadata | v1.8 | 0/TBD | Not started | - |
 
