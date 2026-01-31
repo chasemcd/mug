@@ -19,5 +19,11 @@ setuptools.setup(
             "pandas",
             "flatten_dict",
         ],
+        "test": [
+            "pytest>=8.0",
+            "playwright>=1.49",
+            "pytest-playwright>=0.6",
+            "pytest-timeout>=2.3",
+        ],
     },
 )
