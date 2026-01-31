@@ -22,9 +22,9 @@ Requirements for v1.9 Data Parity Testing milestone. Each maps to roadmap phases
 
 ### Data Comparison
 
-- [ ] **CMP-01**: Test collects export files from both players after episode ends
-- [ ] **CMP-02**: Test invokes `validate_action_sequences.py --compare` on collected exports
-- [ ] **CMP-03**: Test reports pass/fail based on comparison result (exit code)
+- [x] **CMP-01**: Test collects export files from both players after episode ends
+- [x] **CMP-02**: Test invokes `validate_action_sequences.py --compare` on collected exports
+- [x] **CMP-03**: Test reports pass/fail based on comparison result (exit code)
 
 ### Documentation
 
@@ -74,9 +74,9 @@ Which phases cover which requirements. Updated by create-roadmap.
 | NET-05 | Phase 41 | Complete |
 | NET-02 | Phase 42 | Complete |
 | NET-03 | Phase 42 | Complete |
-| CMP-01 | Phase 43 | Pending |
-| CMP-02 | Phase 43 | Pending |
-| CMP-03 | Phase 43 | Pending |
+| CMP-01 | Phase 43 | Complete |
+| CMP-02 | Phase 43 | Complete |
+| CMP-03 | Phase 43 | Complete |
 | DOC-01 | Phase 44 | Pending |
 
 **Coverage:**
@@ -86,4 +86,4 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 ---
 *Requirements defined: 2026-01-31*
-*Last updated: 2026-01-31 after Phase 42 execution*
+*Last updated: 2026-01-31 after Phase 43 execution*
