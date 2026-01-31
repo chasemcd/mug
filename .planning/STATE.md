@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-30)
 ## Current Position
 
 Phase: 40 of 44 (Test Infrastructure Foundation)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-01-30 — v1.9 roadmap created
+Plan: 01 complete
+Status: Phase complete
+Last activity: 2026-01-31 — Completed 40-01-PLAN.md
 
-Progress: [░░░░░░░░░░] 0% (v1.9 - Data Parity Testing: 0/5 phases)
+Progress: [██░░░░░░░░] 20% (v1.9 - Data Parity Testing: 1/5 phases)
 
 ## Milestone History
 
@@ -105,6 +105,13 @@ Progress: [░░░░░░░░░░] 0% (v1.9 - Data Parity Testing: 0/5 p
 - `.planning/phases/37-fast-forward-fix/37-01-SUMMARY.md`
 - `.planning/phases/38-episode-boundary/38-01-SUMMARY.md`
 - `.planning/phases/39-verification-metadata/39-01-SUMMARY.md`
+
+**v1.9 Execution:**
+- `.planning/phases/40-test-infrastructure/40-01-SUMMARY.md`
+
+**Test Infrastructure (v1.9 Phase 40 - added):**
+- `tests/conftest.py` - flask_server (module-scoped), player_contexts (function-scoped) fixtures
+- `tests/e2e/test_infrastructure.py` - smoke test validating infrastructure
 
 **Verification Metadata (v1.8 Phase 39 - added):**
 - `interactive_gym/server/static/js/pyodide_multiplayer_game.js` - wasSpeculative flag in _promoteConfirmedFrames() and _promoteRemainingAtBoundary(), wasSpeculative and rollbackEvents in exportEpisodeDataFromBuffer()
@@ -229,6 +236,11 @@ See: .planning/PROJECT.md Key Decisions table
 **v1.4 decisions:**
 - In-page overlay instead of redirect for partner disconnection (preserves data, better UX)
 
+**v1.9 Phase 40 decisions:**
+- Test deps in setup.py extras_require (not pyproject.toml - package uses legacy setup.py)
+- flask_server fixture uses HTTP polling (not requests) to avoid extra dependencies
+- Server fixture scope=module (expensive), player_contexts scope=function (isolation)
+
 **v1.3 post-milestone fix:**
 - Reduced disconnect grace period from 3s to 500ms for faster connection loss detection
 - Added aggressive SocketIO ping settings (2s interval, 2s timeout)
@@ -249,17 +261,16 @@ See: .planning/PROJECT.md Key Decisions table
 
 ## Session Continuity
 
-Last session: 2026-01-30
-Stopped at: v1.9 roadmap created
+Last session: 2026-01-31
+Stopped at: Completed 40-01-PLAN.md
 Resume file: None
 
 ### Next Steps
 
-v1.9 roadmap complete. 5 phases defined (40-44):
-- Phase 40: Test Infrastructure Foundation (Playwright + Flask lifecycle)
+Phase 40 complete. Test infrastructure ready.
 - Phase 41: Latency Injection Tests (100ms, 200ms, 500ms, asymmetric, jitter)
 - Phase 42: Network Disruption Tests (packet loss, tab focus)
 - Phase 43: Data Comparison Pipeline (collect, validate, report)
 - Phase 44: Manual Test Protocol (documentation)
 
-Next: Run `/gsd:plan-phase 40`
+Next: Run `/gsd:plan-phase 41`
