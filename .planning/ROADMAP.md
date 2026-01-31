@@ -519,7 +519,7 @@ Plans:
   2. Export includes rollback event metadata (frame ranges, count per frame)
   3. Offline validation script compares two player exports and reports divergences
 **Research flag:** Unlikely (additive metadata, no core logic changes)
-**Plans:** TBD
+**Plans:** 1 plan
 Plans:
 - [ ] 39-01-PLAN.md — wasSpeculative field, rollback metadata, export comparison script
 
@@ -556,8 +556,8 @@ Phases execute in numeric order: 36 → 37 → 38 → 39
 | 36. Buffer Split | v1.8 | 1/1 | Complete | 2026-01-30 |
 | 37. Fast-Forward Fix | v1.8 | 1/1 | Complete | 2026-01-30 |
 | 38. Episode Boundary | v1.8 | 1/1 | Complete | 2026-01-30 |
-| 39. Verification & Metadata | v1.8 | 0/TBD | Not started | - |
+| 39. Verification & Metadata | v1.8 | 0/1 | Planned | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-01-30 after Phase 38 execution*
+*Last updated: 2026-01-30 after Phase 39 planning*
