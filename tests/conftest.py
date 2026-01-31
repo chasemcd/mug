@@ -87,10 +87,22 @@ def player_contexts(browser):
 
     Scope: function (fresh contexts for each test)
     Yields: tuple of (page1, page2)
+
+    Note: Uses a Chrome user agent to pass browser entry screening.
+    Headless Chromium reports as "Chrome Headless" which may fail
+    browser allowlist checks that only permit "Chrome".
     """
-    # Create two isolated browser contexts
-    context1 = browser.new_context()
-    context2 = browser.new_context()
+    # Use a standard Chrome user agent to pass browser entry screening
+    # Headless Chrome reports as "Chrome Headless" which may fail allowlists
+    chrome_ua = (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/120.0.0.0 Safari/537.36"
+    )
+
+    # Create two isolated browser contexts with Chrome user agent
+    context1 = browser.new_context(user_agent=chrome_ua)
+    context2 = browser.new_context(user_agent=chrome_ua)
 
     # Create a page in each context
     page1 = context1.new_page()
