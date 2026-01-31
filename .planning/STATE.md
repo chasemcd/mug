@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-30)
 ## Current Position
 
 Phase: 37 of 39 (Fast-Forward Data Recording Fix)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-01-30 — Phase 36 verified and complete
+Plan: 01 of 01 complete
+Status: Phase complete
+Last activity: 2026-01-31 — Completed 37-01-PLAN.md
 
-Progress: [██░░░░░░░░] 25% (v1.8 - Data Export Parity: 1/4 phases)
+Progress: [█████░░░░░] 50% (v1.8 - Data Export Parity: 2/4 phases)
 
 ## Milestone History
 
@@ -100,6 +100,10 @@ Progress: [██░░░░░░░░] 25% (v1.8 - Data Export Parity: 1/4 p
 
 **v1.8 Execution:**
 - `.planning/phases/36-buffer-split/36-01-SUMMARY.md`
+- `.planning/phases/37-fast-forward-fix/37-01-SUMMARY.md`
+
+**Fast-Forward Data Recording (v1.8 Phase 37 - fixed):**
+- `interactive_gym/server/static/js/pyodide_multiplayer_game.js` - _promoteConfirmedFrames() call added to _performFastForward()
 
 **Dual-Buffer Data Recording (v1.8 Phase 36 - added):**
 - `interactive_gym/server/static/js/pyodide_multiplayer_game.js` - speculativeFrameData Map, _promoteConfirmedFrames(), extended clearFrameDataFromRollback()
@@ -190,6 +194,11 @@ See: .planning/PROJECT.md Key Decisions table
 - Pass timestamps via setInputTimestamps() method rather than step() parameter (backward compatible)
 - Skip logging during fast-forward or background states
 
+**v1.8 Phase 37 decisions:**
+- _promoteConfirmedFrames() called directly (not via _updateConfirmedFrame())
+- Promotion happens after confirmedFrame update in fast-forward
+- Fast-forward now follows same confirmation-gated recording path as normal execution
+
 **v1.8 Phase 36 decisions:**
 - Dual-buffer architecture: speculativeFrameData for unconfirmed, frameDataBuffer for confirmed
 - Promotion at end of _updateConfirmedFrame() after confirmedFrame advances
@@ -222,10 +231,10 @@ See: .planning/PROJECT.md Key Decisions table
 
 ## Session Continuity
 
-Last session: 2026-01-30
-Stopped at: Phase 36 execution complete
+Last session: 2026-01-31
+Stopped at: Completed 37-01-PLAN.md
 Resume file: None
 
 ### Next Steps
 
-Run `/gsd:plan-phase 37` to create detailed plan for Fast-Forward Data Recording Fix.
+Run `/gsd:plan-phase 38` to create detailed plan for Episode Boundary Handling.
