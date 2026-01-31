@@ -17,7 +17,7 @@ Requirements for v1.8 Data Export Parity milestone. Each maps to roadmap phases.
 ### Edge Case Handling
 
 - [x] **EDGE-01**: Fast-forward (tab refocus) uses the same confirmation-gated recording path as normal execution
-- [ ] **EDGE-02**: Episode end waits for all frames to be confirmed before triggering export
+- [x] **EDGE-02**: Episode end waits for all frames to be confirmed before triggering export
 - [ ] **EDGE-03**: Export includes rollback event metadata (frame ranges, count per frame)
 
 ### Verification
@@ -60,7 +60,7 @@ Which phases cover which requirements. Updated by create-roadmap.
 | REC-03 | Phase 36 | Complete |
 | REC-04 | Phase 39 | Pending |
 | EDGE-01 | Phase 37 | Complete |
-| EDGE-02 | Phase 38 | Pending |
+| EDGE-02 | Phase 38 | Complete |
 | EDGE-03 | Phase 39 | Pending |
 | VERIFY-01 | Phase 39 | Pending |
 
@@ -71,4 +71,4 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 ---
 *Requirements defined: 2026-01-30*
-*Last updated: 2026-01-30 after roadmap creation*
+*Last updated: 2026-01-30 after Phase 38 execution*

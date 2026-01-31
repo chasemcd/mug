@@ -118,7 +118,7 @@ Key deliverables:
 
 - [x] **Phase 36: Speculative/Canonical Buffer Split** - Core data recording architecture fix
 - [x] **Phase 37: Fast-Forward Data Recording Fix** - Tab refocus confirmation-gated recording
-- [ ] **Phase 38: Episode Boundary Confirmation** - Ensure all frames confirmed before export
+- [x] **Phase 38: Episode Boundary Confirmation** - Ensure all frames confirmed before export
 - [ ] **Phase 39: Verification & Metadata** - Per-frame metadata and validation tooling
 
 ## Phase Details
@@ -508,7 +508,7 @@ Plans:
 **Research flag:** Unlikely (focused change at episode boundary)
 **Plans:** 1 plan
 Plans:
-- [ ] 38-01-PLAN.md — Force-promote at episode end, warning logging
+- [x] 38-01-PLAN.md — Force-promote at episode end, warning logging
 
 ### Phase 39: Verification & Metadata
 **Goal:** Per-frame metadata and offline validation tooling
@@ -555,9 +555,9 @@ Phases execute in numeric order: 36 → 37 → 38 → 39
 | 35. Layout & Polish | v1.7 | 1/1 | Complete | 2026-01-25 |
 | 36. Buffer Split | v1.8 | 1/1 | Complete | 2026-01-30 |
 | 37. Fast-Forward Fix | v1.8 | 1/1 | Complete | 2026-01-30 |
-| 38. Episode Boundary | v1.8 | 0/1 | Ready | - |
+| 38. Episode Boundary | v1.8 | 1/1 | Complete | 2026-01-30 |
 | 39. Verification & Metadata | v1.8 | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-01-30 after Phase 38 planning*
+*Last updated: 2026-01-30 after Phase 38 execution*
