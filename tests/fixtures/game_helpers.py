@@ -195,3 +195,35 @@ def get_page_debug_info(page: Page) -> dict:
         }
         return result;
     }""")
+
+
+def get_scene_id(page: Page) -> str:
+    """
+    Get the current scene ID from the game object.
+
+    The scene ID is used in export file paths and identifies the game layout
+    (e.g., "cramped_room", "asymmetric_advantages").
+
+    Args:
+        page: Playwright Page object
+
+    Returns:
+        str: The scene ID, or None if game not initialized
+    """
+    return page.evaluate("() => window.game?.sceneId || null")
+
+
+def get_subject_id(page: Page) -> str:
+    """
+    Get the subject ID for this player.
+
+    Subject IDs are unique identifiers assigned by the server to each
+    participant and used in export filenames.
+
+    Args:
+        page: Playwright Page object
+
+    Returns:
+        str: The subject ID, or None if not available
+    """
+    return page.evaluate("() => window.subjectId || window.game?.subjectId || null")
