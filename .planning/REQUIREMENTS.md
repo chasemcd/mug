@@ -1,42 +1,54 @@
-# Requirements: Interactive Gym v1.8 Data Export Parity
+# Requirements: Interactive Gym v1.9 Data Parity Testing
 
-**Defined:** 2026-01-30
-**Core Value:** Both players in a multiplayer game export identical game state data (actions, observations, rewards, infos) regardless of rollbacks, fast-forwards, or latency — ensuring research data validity.
+**Defined:** 2026-01-31
+**Core Value:** Validate that both players export identical game state data under controlled network conditions, ensuring v1.8 data export parity works in practice.
 
-## v1.8 Requirements
+## v1.9 Requirements
 
-Requirements for v1.8 Data Export Parity milestone. Each maps to roadmap phases.
+Requirements for v1.9 Data Parity Testing milestone. Each maps to roadmap phases.
 
-### Data Recording
+### Test Infrastructure
 
-- [x] **REC-01**: Data is stored in a speculative buffer during frame execution
-- [x] **REC-02**: Data is promoted to confirmed buffer only when all players' inputs for that frame are received
-- [x] **REC-03**: Export reads only from confirmed buffer, never from speculative buffer
-- [x] **REC-04**: Each frame includes `wasSpeculative` metadata indicating if it was ever predicted
+- [ ] **INFRA-01**: Playwright test suite can launch two browser contexts for multiplayer game
+- [ ] **INFRA-02**: Test lifecycle manages Flask server startup and teardown
 
-### Edge Case Handling
+### Network Condition Tests
 
-- [x] **EDGE-01**: Fast-forward (tab refocus) uses the same confirmation-gated recording path as normal execution
-- [x] **EDGE-02**: Episode end waits for all frames to be confirmed before triggering export
-- [x] **EDGE-03**: Export includes rollback event metadata (frame ranges, count per frame)
+- [ ] **NET-01**: Test applies fixed latency (100ms, 200ms, 500ms) via Chrome DevTools Protocol
+- [ ] **NET-02**: Test simulates packet loss to trigger rollback scenarios
+- [ ] **NET-03**: Test triggers tab unfocus/refocus to exercise fast-forward path
+- [ ] **NET-04**: Test applies asymmetric latency (different delays for each player)
+- [ ] **NET-05**: Test applies jitter (variable latency) during gameplay
 
-### Verification
+### Data Comparison
 
-- [x] **VERIFY-01**: Offline validation script can compare two player export files and report divergences
+- [ ] **CMP-01**: Test collects export files from both players after episode ends
+- [ ] **CMP-02**: Test invokes `validate_action_sequences.py --compare` on collected exports
+- [ ] **CMP-03**: Test reports pass/fail based on comparison result (exit code)
+
+### Documentation
+
+- [ ] **DOC-01**: Manual test protocol documents step-by-step researcher verification process
 
 ## v2 Requirements
 
 Deferred to future release. Tracked but not in current roadmap.
 
-### Data Recording
+### Test Infrastructure
 
-- **REC-05**: Include input delay metrics per frame
-- **REC-06**: Include confirmation timing metrics per frame
+- **INFRA-03**: Headless mode for CI/CD integration
+- **INFRA-04**: Screenshot capture on test failure
 
-### Verification
+### Data Comparison
 
-- **VERIFY-02**: Per-frame hash verification status from Phase 11-14 infrastructure
-- **VERIFY-03**: Real-time divergence detection alert
+- **CMP-04**: In-browser comparison before server export
+- **CMP-05**: Detailed divergence reports (columns, frames)
+
+### Documentation
+
+- **DOC-02**: Setup instructions for running test suite
+- **DOC-03**: CI integration guide (GitHub Actions)
+- **DOC-04**: Test case documentation with expected outcomes
 
 ## Out of Scope
 
@@ -44,10 +56,10 @@ Explicitly excluded. Documented to prevent scope creep.
 
 | Feature | Reason |
 |---------|--------|
-| Server-authoritative data source | P2P architecture has no server running the game |
-| Real-time data streaming to server | Network overhead; batch export at episode end sufficient |
-| Waiting for confirmation before stepping | Would transform rollback into lockstep, killing responsiveness |
-| Single global "authoritative" export | No single authority in P2P; both peers export, verify equivalence offline |
+| Automated CI pipeline | Manual test runs sufficient for v1.9 |
+| Performance benchmarking | Focus is parity validation, not latency measurement |
+| Mobile browser testing | Desktop Chrome/Firefox only |
+| Cross-browser matrix | Playwright on Chromium sufficient for validation |
 
 ## Traceability
 
@@ -55,20 +67,23 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| REC-01 | Phase 36 | Complete |
-| REC-02 | Phase 36 | Complete |
-| REC-03 | Phase 36 | Complete |
-| REC-04 | Phase 39 | Complete |
-| EDGE-01 | Phase 37 | Complete |
-| EDGE-02 | Phase 38 | Complete |
-| EDGE-03 | Phase 39 | Complete |
-| VERIFY-01 | Phase 39 | Complete |
+| INFRA-01 | — | Pending |
+| INFRA-02 | — | Pending |
+| NET-01 | — | Pending |
+| NET-02 | — | Pending |
+| NET-03 | — | Pending |
+| NET-04 | — | Pending |
+| NET-05 | — | Pending |
+| CMP-01 | — | Pending |
+| CMP-02 | — | Pending |
+| CMP-03 | — | Pending |
+| DOC-01 | — | Pending |
 
 **Coverage:**
-- v1.8 requirements: 8 total
-- Mapped to phases: 8 ✓
-- Unmapped: 0
+- v1.9 requirements: 11 total
+- Mapped to phases: 0 ⚠️
+- Unmapped: 11
 
 ---
-*Requirements defined: 2026-01-30*
-*Last updated: 2026-01-30 after Phase 39 execution*
+*Requirements defined: 2026-01-31*
+*Last updated: 2026-01-31 after initial definition*
