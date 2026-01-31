@@ -1835,8 +1835,9 @@ print(f"[Python] Seeded RNG with {${seed}}")
         this.actionSequence = [];
         this.actionCounts = {};
 
-        // Clear frame data buffer for new episode
+        // Clear frame data buffers for new episode
         this.frameDataBuffer.clear();
+        this.speculativeFrameData.clear();
 
         // Reset per-episode diagnostics
         this.diagnostics.syncCount = 0;
@@ -3588,15 +3589,23 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
 
     /**
      * Clear frame data buffer entries from rollback target onwards.
-     * Called at the start of rollback to remove predicted/incorrect data.
+     * Clears both speculative and canonical buffers to ensure
+     * replayed frames are stored with correct data.
      */
     clearFrameDataFromRollback(targetFrame) {
+        // Clear canonical buffer (safety valve - shouldn't have unconfirmed frames)
         for (const frame of this.frameDataBuffer.keys()) {
             if (frame >= targetFrame) {
                 this.frameDataBuffer.delete(frame);
             }
         }
-        p2pLog.debug(`Cleared frame data buffer from frame ${targetFrame} onwards`);
+        // Clear speculative buffer (primary target - unconfirmed frames)
+        for (const frame of this.speculativeFrameData.keys()) {
+            if (frame >= targetFrame) {
+                this.speculativeFrameData.delete(frame);
+            }
+        }
+        p2pLog.debug(`Cleared frame data buffers from frame ${targetFrame} onwards`);
     }
 
     /**
@@ -3752,8 +3761,9 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
             interactiveGymGlobals: window.interactiveGymGlobals
         });
 
-        // Clear the buffer after emitting
+        // Clear the buffers after emitting
         this.frameDataBuffer.clear();
+        this.speculativeFrameData.clear();
     }
 
     /**
