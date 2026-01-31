@@ -506,9 +506,9 @@ Plans:
   2. Warning logged if promoting unconfirmed frames at episode boundary
   3. Both players export identical frame counts
 **Research flag:** Unlikely (focused change at episode boundary)
-**Plans:** TBD
+**Plans:** 1 plan
 Plans:
-- [ ] 38-01-PLAN.md — Force-confirm at episode end, export timing verification
+- [ ] 38-01-PLAN.md — Force-promote at episode end, warning logging
 
 ### Phase 39: Verification & Metadata
 **Goal:** Per-frame metadata and offline validation tooling
@@ -555,9 +555,9 @@ Phases execute in numeric order: 36 → 37 → 38 → 39
 | 35. Layout & Polish | v1.7 | 1/1 | Complete | 2026-01-25 |
 | 36. Buffer Split | v1.8 | 1/1 | Complete | 2026-01-30 |
 | 37. Fast-Forward Fix | v1.8 | 1/1 | Complete | 2026-01-30 |
-| 38. Episode Boundary | v1.8 | 0/TBD | Not started | - |
+| 38. Episode Boundary | v1.8 | 0/1 | Ready | - |
 | 39. Verification & Metadata | v1.8 | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-01-30 after Phase 37 planning*
+*Last updated: 2026-01-30 after Phase 38 planning*
