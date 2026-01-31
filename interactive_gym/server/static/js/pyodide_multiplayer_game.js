@@ -5024,6 +5024,10 @@ json.dumps({'cumulative_rewards': {str(k): v for k, v in _cumulative_rewards.ite
             // This prevents GGPO from thinking we have many unconfirmed frames
             this.confirmedFrame = this.frameNumber - 1;
 
+            // Promote fast-forward frames to canonical buffer (Phase 37: EDGE-01)
+            // Without this, data stays in speculativeFrameData and is missing from export
+            this._promoteConfirmedFrames();
+
             // Update HUD to reflect fast-forwarded state
             ui_utils.updateHUDText(this.getHUDText());
 
