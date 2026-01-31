@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-30)
 ## Current Position
 
 Phase: 41 of 44 (Latency Injection Tests)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-01-31 — Phase 40 verified and complete
+Plan: 01 complete
+Status: Phase complete
+Last activity: 2026-01-31 — Completed 41-01-PLAN.md
 
-Progress: [██░░░░░░░░] 20% (v1.9 - Data Parity Testing: 1/5 phases)
+Progress: [████░░░░░░] 40% (v1.9 - Data Parity Testing: 2/5 phases)
 
 ## Milestone History
 
@@ -109,6 +109,11 @@ Progress: [██░░░░░░░░] 20% (v1.9 - Data Parity Testing: 1/5 
 **v1.9 Execution:**
 - `.planning/phases/40-test-infrastructure/40-01-SUMMARY.md`
 - `.planning/phases/40-test-infrastructure/40-02-SUMMARY.md`
+- `.planning/phases/41-latency-injection/41-01-SUMMARY.md`
+
+**Latency Injection Tests (v1.9 Phase 41 - added):**
+- `tests/fixtures/network_helpers.py` - CDP latency injection utilities (apply_latency, JitterEmulator)
+- `tests/e2e/test_latency_injection.py` - Latency injection test suite (4 tests)
 
 **Test Infrastructure (v1.9 Phase 40 - added):**
 - `tests/conftest.py` - flask_server (module-scoped), player_contexts (function-scoped) fixtures, Chrome UA
@@ -240,6 +245,12 @@ See: .planning/PROJECT.md Key Decisions table
 **v1.4 decisions:**
 - In-page overlay instead of redirect for partner disconnection (preserves data, better UX)
 
+**v1.9 Phase 41 decisions:**
+- 500ms symmetric latency causes WebRTC signaling timeouts (documented as known limitation)
+- Asymmetric test uses 50ms vs 200ms (reliable, represents realistic mismatch)
+- Jitter uses 200ms +/- 150ms (50-350ms range)
+- CDP session created per-player for isolated network conditions
+
 **v1.9 Phase 40 decisions:**
 - Test deps in setup.py extras_require (not pyproject.toml - package uses legacy setup.py)
 - flask_server fixture uses HTTP polling (not requests) to avoid extra dependencies
@@ -269,15 +280,14 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-01-31
-Stopped at: Completed 40-02-PLAN.md
+Stopped at: Completed 41-01-PLAN.md
 Resume file: None
 
 ### Next Steps
 
-Phase 40 complete. Test infrastructure ready with game automation helpers.
-- Phase 41: Latency Injection Tests (100ms, 200ms, 500ms, asymmetric, jitter)
+Phase 41 complete. Latency injection tests validate game behavior under network stress.
 - Phase 42: Network Disruption Tests (packet loss, tab focus)
 - Phase 43: Data Comparison Pipeline (collect, validate, report)
 - Phase 44: Manual Test Protocol (documentation)
 
-Next: Run `/gsd:plan-phase 41`
+Next: Run `/gsd:plan-phase 42`
