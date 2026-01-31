@@ -10,7 +10,7 @@
 - **v1.5 Focus Loss Handling** - Phases 24-27 (shipped 2026-01-23)
 - **v1.6 Input Latency Diagnosis** - Phases 28-31 (partial: 2026-01-24)
 - **v1.7 Admin Console Improvement** - Phases 32-35 (shipped 2026-01-25)
-- 🚧 **v1.8 Data Export Parity** - Phases 36-39 (in progress)
+- **v1.8 Data Export Parity** - Phases 36-39 (shipped 2026-01-30)
 
 ## Phases
 
@@ -112,14 +112,14 @@ Key deliverables:
 - [x] **Phase 34: Session Detail View** - Detailed diagnostic info on click
 - [x] **Phase 35: Layout & Polish** - Clean visual hierarchy and prioritization
 
-### 🚧 v1.8 Data Export Parity (In Progress)
+### v1.8 Data Export Parity (Complete)
 
 **Milestone Goal:** Both players export identical game state data (actions, observations, rewards, infos) regardless of rollbacks, fast-forwards, or latency — ensuring research data validity.
 
 - [x] **Phase 36: Speculative/Canonical Buffer Split** - Core data recording architecture fix
 - [x] **Phase 37: Fast-Forward Data Recording Fix** - Tab refocus confirmation-gated recording
 - [x] **Phase 38: Episode Boundary Confirmation** - Ensure all frames confirmed before export
-- [ ] **Phase 39: Verification & Metadata** - Per-frame metadata and validation tooling
+- [x] **Phase 39: Verification & Metadata** - Per-frame metadata and validation tooling
 
 ## Phase Details
 
@@ -556,7 +556,7 @@ Phases execute in numeric order: 36 → 37 → 38 → 39
 | 36. Buffer Split | v1.8 | 1/1 | Complete | 2026-01-30 |
 | 37. Fast-Forward Fix | v1.8 | 1/1 | Complete | 2026-01-30 |
 | 38. Episode Boundary | v1.8 | 1/1 | Complete | 2026-01-30 |
-| 39. Verification & Metadata | v1.8 | 0/1 | Planned | - |
+| 39. Verification & Metadata | v1.8 | 1/1 | Complete | 2026-01-30 |
 
 ---
 *Roadmap created: 2026-01-20*

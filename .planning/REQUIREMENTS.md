@@ -12,17 +12,17 @@ Requirements for v1.8 Data Export Parity milestone. Each maps to roadmap phases.
 - [x] **REC-01**: Data is stored in a speculative buffer during frame execution
 - [x] **REC-02**: Data is promoted to confirmed buffer only when all players' inputs for that frame are received
 - [x] **REC-03**: Export reads only from confirmed buffer, never from speculative buffer
-- [ ] **REC-04**: Each frame includes `wasSpeculative` metadata indicating if it was ever predicted
+- [x] **REC-04**: Each frame includes `wasSpeculative` metadata indicating if it was ever predicted
 
 ### Edge Case Handling
 
 - [x] **EDGE-01**: Fast-forward (tab refocus) uses the same confirmation-gated recording path as normal execution
 - [x] **EDGE-02**: Episode end waits for all frames to be confirmed before triggering export
-- [ ] **EDGE-03**: Export includes rollback event metadata (frame ranges, count per frame)
+- [x] **EDGE-03**: Export includes rollback event metadata (frame ranges, count per frame)
 
 ### Verification
 
-- [ ] **VERIFY-01**: Offline validation script can compare two player export files and report divergences
+- [x] **VERIFY-01**: Offline validation script can compare two player export files and report divergences
 
 ## v2 Requirements
 
@@ -58,11 +58,11 @@ Which phases cover which requirements. Updated by create-roadmap.
 | REC-01 | Phase 36 | Complete |
 | REC-02 | Phase 36 | Complete |
 | REC-03 | Phase 36 | Complete |
-| REC-04 | Phase 39 | Pending |
+| REC-04 | Phase 39 | Complete |
 | EDGE-01 | Phase 37 | Complete |
 | EDGE-02 | Phase 38 | Complete |
-| EDGE-03 | Phase 39 | Pending |
-| VERIFY-01 | Phase 39 | Pending |
+| EDGE-03 | Phase 39 | Complete |
+| VERIFY-01 | Phase 39 | Complete |
 
 **Coverage:**
 - v1.8 requirements: 8 total
@@ -71,4 +71,4 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 ---
 *Requirements defined: 2026-01-30*
-*Last updated: 2026-01-30 after Phase 38 execution*
+*Last updated: 2026-01-30 after Phase 39 execution*
