@@ -5,21 +5,22 @@
 See: .planning/PROJECT.md (updated 2026-01-30)
 
 **Core value:** Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
-**Current focus:** v1.8 Data Export Parity
+**Current focus:** v1.8 Data Export Parity (COMPLETE)
 
 ## Current Position
 
 Phase: 39 of 39 (Verification & Metadata)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-01-30 — Phase 38 verified and complete
+Plan: 01 of 01 (COMPLETE)
+Status: Milestone complete
+Last activity: 2026-01-31 - Completed 39-01-PLAN.md
 
-Progress: [██████░░░░] 75% (v1.8 - Data Export Parity: 3/4 phases)
+Progress: [██████████] 100% (v1.8 - Data Export Parity: 4/4 phases)
 
 ## Milestone History
 
 | Milestone | Phases | Status | Shipped |
 |-----------|--------|--------|---------|
+| v1.8 Data Export Parity | 36-39 | Complete | 2026-01-31 |
 | v1.7 Admin Console Improvement | 32-35 | Complete | 2026-01-25 |
 | v1.6 Input Latency Diagnosis | 28 | Partial | 2026-01-24 |
 | v1.5 Focus Loss Handling | 24-27 | Complete | 2026-01-23 |
@@ -102,6 +103,11 @@ Progress: [██████░░░░] 75% (v1.8 - Data Export Parity: 3/4 p
 - `.planning/phases/36-buffer-split/36-01-SUMMARY.md`
 - `.planning/phases/37-fast-forward-fix/37-01-SUMMARY.md`
 - `.planning/phases/38-episode-boundary/38-01-SUMMARY.md`
+- `.planning/phases/39-verification-metadata/39-01-SUMMARY.md`
+
+**Verification Metadata (v1.8 Phase 39 - added):**
+- `interactive_gym/server/static/js/pyodide_multiplayer_game.js` - wasSpeculative flag in _promoteConfirmedFrames() and _promoteRemainingAtBoundary(), wasSpeculative and rollbackEvents in exportEpisodeDataFromBuffer()
+- `scripts/validate_action_sequences.py` - compare_files() function, --compare CLI argument
 
 **Episode Boundary Promotion (v1.8 Phase 38 - added):**
 - `interactive_gym/server/static/js/pyodide_multiplayer_game.js` - _promoteRemainingAtBoundary() method added, called in signalEpisodeComplete()
@@ -146,6 +152,12 @@ Progress: [██████░░░░] 75% (v1.8 - Data Export Parity: 3/4 p
 ### Decisions
 
 See: .planning/PROJECT.md Key Decisions table
+
+**v1.8 Phase 39 decisions:**
+- wasSpeculative applied at promotion time (only speculative frames get flag)
+- wasSpeculative stored per-agent to match existing column format
+- rollbackEvents exported as array (researchers can compute derived metrics)
+- Compare mode extends existing script (not new script)
 
 **v1.8 Phase 38 decisions:**
 - Use console.warn for boundary promotion (unusual condition worth attention)
@@ -234,16 +246,24 @@ See: .planning/PROJECT.md Key Decisions table
 - Input latency root cause fix (tooling now exists via Phase 28 instrumentation)
 - Users can use `[LATENCY]` console logs to diagnose specific issues
 
-**v1.8 Focus:**
-- Data export parity issues - players' exported data diverges after rollbacks/fast-forward
-- Phase 38 complete: Episode boundary promotion ensures all frames exported
-
 ## Session Continuity
 
-Last session: 2026-01-30
-Stopped at: Phase 38 execution complete
+Last session: 2026-01-31
+Stopped at: Phase 39 execution complete - v1.8 milestone shipped
 Resume file: None
 
 ### Next Steps
 
-Run `/gsd:plan-phase 39` to create detailed plan for Validation Comparison (final phase of v1.8).
+v1.8 Data Export Parity milestone is complete. All phases (36-39) are finished:
+- Phase 36: Dual-buffer architecture for speculative vs confirmed data
+- Phase 37: Fast-forward data recording fix
+- Phase 38: Episode boundary promotion
+- Phase 39: Verification metadata and compare tooling
+
+The data export pipeline now:
+1. Records frames to speculative buffer first
+2. Promotes to canonical buffer only after confirmation
+3. Clears both buffers on rollback
+4. Force-promotes at episode boundary
+5. Exports wasSpeculative flag and rollbackEvents metadata
+6. Provides --compare mode for offline validation
