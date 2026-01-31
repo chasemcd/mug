@@ -2967,8 +2967,9 @@ obs, rewards, terminateds, truncateds, infos, render_state
         const promoted = [];
         for (const [frame, data] of this.speculativeFrameData.entries()) {
             if (frame <= this.confirmedFrame) {
-                // Promote to canonical buffer
-                this.frameDataBuffer.set(frame, data);
+                // Promote to canonical buffer with wasSpeculative flag (Phase 39: REC-04)
+                // Frames promoted from speculative buffer were predicted before confirmation
+                this.frameDataBuffer.set(frame, { ...data, wasSpeculative: true });
                 promoted.push(frame);
             }
         }
@@ -2999,9 +3000,10 @@ obs, rewards, terminateds, truncateds, infos, render_state
         console.warn(`[Episode Boundary] Promoting ${remaining} unconfirmed frames ` +
             `at episode end (confirmedFrame=${this.confirmedFrame}, frameNumber=${this.frameNumber})`);
 
-        // Promote all remaining frames - don't check confirmedFrame
+        // Promote all remaining frames with wasSpeculative flag (Phase 39: REC-04)
+        // These frames were predicted before confirmation, same as _promoteConfirmedFrames()
         for (const [frame, data] of this.speculativeFrameData.entries()) {
-            this.frameDataBuffer.set(frame, data);
+            this.frameDataBuffer.set(frame, { ...data, wasSpeculative: true });
         }
         this.speculativeFrameData.clear();
     }
