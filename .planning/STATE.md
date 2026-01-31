@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-30)
 
 ## Current Position
 
-Phase: Not started (run /gsd:create-roadmap)
-Plan: —
-Status: Defining requirements for v1.8
-Last activity: 2026-01-30 — Milestone v1.8 started
+Phase: 36 of 39 (Speculative/Canonical Buffer Split)
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-01-30 — Roadmap created with 4 phases
 
-Progress: [..........] 0% (v1.8 - Data Export Parity: 0/? phases)
+Progress: [░░░░░░░░░░] 0% (v1.8 - Data Export Parity: 0/4 phases)
 
 ## Milestone History
 
@@ -212,9 +212,9 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-01-30
-Stopped at: Milestone v1.8 initialized
+Stopped at: Roadmap created for v1.8
 Resume file: None
 
 ### Next Steps
 
-Run `/gsd:create-roadmap` to plan phases for v1.8 Data Export Parity milestone.
+Run `/gsd:plan-phase 36` to create detailed plan for Speculative/Canonical Buffer Split.

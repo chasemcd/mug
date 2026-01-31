@@ -10,6 +10,7 @@
 - **v1.5 Focus Loss Handling** - Phases 24-27 (shipped 2026-01-23)
 - **v1.6 Input Latency Diagnosis** - Phases 28-31 (partial: 2026-01-24)
 - **v1.7 Admin Console Improvement** - Phases 32-35 (shipped 2026-01-25)
+- 🚧 **v1.8 Data Export Parity** - Phases 36-39 (in progress)
 
 ## Phases
 
@@ -110,6 +111,15 @@ Key deliverables:
 - [x] **Phase 33: Session List with P2P Health** - Session status and problem flagging
 - [x] **Phase 34: Session Detail View** - Detailed diagnostic info on click
 - [x] **Phase 35: Layout & Polish** - Clean visual hierarchy and prioritization
+
+### 🚧 v1.8 Data Export Parity (In Progress)
+
+**Milestone Goal:** Both players export identical game state data (actions, observations, rewards, infos) regardless of rollbacks, fast-forwards, or latency — ensuring research data validity.
+
+- [ ] **Phase 36: Speculative/Canonical Buffer Split** - Core data recording architecture fix
+- [ ] **Phase 37: Fast-Forward Data Recording Fix** - Tab refocus confirmation-gated recording
+- [ ] **Phase 38: Episode Boundary Confirmation** - Ensure all frames confirmed before export
+- [ ] **Phase 39: Verification & Metadata** - Per-frame metadata and validation tooling
 
 ## Phase Details
 
@@ -461,10 +471,62 @@ Plans:
 Plans:
 - [x] 35-01-PLAN.md — Layout restructure with active sessions primary, problems indicator
 
+### Phase 36: Speculative/Canonical Buffer Split
+**Goal:** Separate speculative frame data from confirmed frame data
+**Depends on:** v1.7 complete (existing data collection infrastructure)
+**Requirements:** REC-01, REC-02, REC-03
+**Success Criteria** (what must be TRUE):
+  1. Frame data written to speculativeFrameData buffer during step()
+  2. Data promoted to confirmed buffer only when all inputs for that frame are received
+  3. Export methods read from confirmed buffer, never speculative
+**Research flag:** Unlikely (well-documented pattern from GGPO/NetplayJS)
+**Plans:** TBD
+Plans:
+- [ ] 36-01-PLAN.md — speculativeFrameData buffer, storeFrameData() modification, _promoteConfirmedFrames()
+
+### Phase 37: Fast-Forward Data Recording Fix
+**Goal:** Fast-forward uses same confirmation-gated recording path as normal execution
+**Depends on:** Phase 36
+**Requirements:** EDGE-01
+**Success Criteria** (what must be TRUE):
+  1. Fast-forward (tab refocus) writes to speculative buffer like normal execution
+  2. _updateConfirmedFrame() called after fast-forward completes
+  3. No frame gaps in export after tab refocus scenario
+**Research flag:** Likely (fast-forward code path is complex, needs careful audit)
+**Plans:** TBD
+Plans:
+- [ ] 37-01-PLAN.md — Audit _performFastForward(), confirmation-gated storage integration
+
+### Phase 38: Episode Boundary Confirmation
+**Goal:** All frames confirmed before export triggered
+**Depends on:** Phase 37
+**Requirements:** EDGE-02
+**Success Criteria** (what must be TRUE):
+  1. Episode end waits for all frames to be confirmed before triggering export
+  2. Warning logged if promoting unconfirmed frames at episode boundary
+  3. Both players export identical frame counts
+**Research flag:** Unlikely (focused change at episode boundary)
+**Plans:** TBD
+Plans:
+- [ ] 38-01-PLAN.md — Force-confirm at episode end, export timing verification
+
+### Phase 39: Verification & Metadata
+**Goal:** Per-frame metadata and offline validation tooling
+**Depends on:** Phase 38
+**Requirements:** REC-04, EDGE-03, VERIFY-01
+**Success Criteria** (what must be TRUE):
+  1. Each frame includes `wasSpeculative` metadata indicating if it was ever predicted
+  2. Export includes rollback event metadata (frame ranges, count per frame)
+  3. Offline validation script compares two player exports and reports divergences
+**Research flag:** Unlikely (additive metadata, no core logic changes)
+**Plans:** TBD
+Plans:
+- [ ] 39-01-PLAN.md — wasSpeculative field, rollback metadata, export comparison script
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 32 → 33 → 34 → 35
+Phases execute in numeric order: 36 → 37 → 38 → 39
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -491,7 +553,11 @@ Phases execute in numeric order: 32 → 33 → 34 → 35
 | 33. Session List | v1.7 | 1/1 | Complete | 2026-01-25 |
 | 34. Session Detail | v1.7 | 1/1 | Complete | 2026-01-25 |
 | 35. Layout & Polish | v1.7 | 1/1 | Complete | 2026-01-25 |
+| 36. Buffer Split | v1.8 | 0/TBD | Not started | - |
+| 37. Fast-Forward Fix | v1.8 | 0/TBD | Not started | - |
+| 38. Episode Boundary | v1.8 | 0/TBD | Not started | - |
+| 39. Verification & Metadata | v1.8 | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-01-25 after Phase 35 complete*
+*Last updated: 2026-01-30 after v1.8 phases added*
