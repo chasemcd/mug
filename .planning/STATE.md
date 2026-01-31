@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-01-30)
 ## Current Position
 
 Phase: 40 of 44 (Test Infrastructure Foundation)
-Plan: 01 complete
+Plan: 02 complete
 Status: Phase complete
-Last activity: 2026-01-31 — Completed 40-01-PLAN.md
+Last activity: 2026-01-31 — Completed 40-02-PLAN.md
 
 Progress: [██░░░░░░░░] 20% (v1.9 - Data Parity Testing: 1/5 phases)
 
@@ -108,10 +108,14 @@ Progress: [██░░░░░░░░] 20% (v1.9 - Data Parity Testing: 1/5 
 
 **v1.9 Execution:**
 - `.planning/phases/40-test-infrastructure/40-01-SUMMARY.md`
+- `.planning/phases/40-test-infrastructure/40-02-SUMMARY.md`
 
 **Test Infrastructure (v1.9 Phase 40 - added):**
-- `tests/conftest.py` - flask_server (module-scoped), player_contexts (function-scoped) fixtures
+- `tests/conftest.py` - flask_server (module-scoped), player_contexts (function-scoped) fixtures, Chrome UA
 - `tests/e2e/test_infrastructure.py` - smoke test validating infrastructure
+- `tests/fixtures/game_helpers.py` - game automation helpers (wait, click, state access)
+- `tests/e2e/test_multiplayer_basic.py` - multiplayer E2E tests (matchmaking, episode completion)
+- `pytest.ini` - test discovery configuration
 
 **Verification Metadata (v1.8 Phase 39 - added):**
 - `interactive_gym/server/static/js/pyodide_multiplayer_game.js` - wasSpeculative flag in _promoteConfirmedFrames() and _promoteRemainingAtBoundary(), wasSpeculative and rollbackEvents in exportEpisodeDataFromBuffer()
@@ -240,6 +244,9 @@ See: .planning/PROJECT.md Key Decisions table
 - Test deps in setup.py extras_require (not pyproject.toml - package uses legacy setup.py)
 - flask_server fixture uses HTTP polling (not requests) to avoid extra dependencies
 - Server fixture scope=module (expensive), player_contexts scope=function (isolation)
+- Use window.game for game state access (not window.pyodideMultiplayerGame)
+- Detect tutorial completion by scene header change to 'Multiplayer'
+- Set Chrome user agent to pass browser entry screening in headless mode
 
 **v1.3 post-milestone fix:**
 - Reduced disconnect grace period from 3s to 500ms for faster connection loss detection
@@ -262,12 +269,12 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-01-31
-Stopped at: Completed 40-01-PLAN.md
+Stopped at: Completed 40-02-PLAN.md
 Resume file: None
 
 ### Next Steps
 
-Phase 40 complete. Test infrastructure ready.
+Phase 40 complete. Test infrastructure ready with game automation helpers.
 - Phase 41: Latency Injection Tests (100ms, 200ms, 500ms, asymmetric, jitter)
 - Phase 42: Network Disruption Tests (packet loss, tab focus)
 - Phase 43: Data Comparison Pipeline (collect, validate, report)
