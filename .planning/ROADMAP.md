@@ -574,7 +574,7 @@ Plans:
 **Plans:** 1 plan
 
 Plans:
-- [ ] 42-01-PLAN.md — Packet loss simulation, tab focus automation
+- [x] 42-01-PLAN.md — Packet loss simulation, tab focus automation
 
 ### Phase 43: Data Comparison Pipeline
 **Goal:** Automated validation of export parity between players
@@ -642,10 +642,10 @@ Phases execute in numeric order: 40 → 41 → 42 → 43 → 44
 | 39. Verification & Metadata | v1.8 | 1/1 | Complete | 2026-01-30 |
 | 40. Test Infrastructure | v1.9 | 2/2 | Complete | 2026-01-31 |
 | 41. Latency Injection | v1.9 | 1/1 | Complete | 2026-01-31 |
-| 42. Network Disruption | v1.9 | 0/1 | Planned | - |
+| 42. Network Disruption | v1.9 | 1/1 | Complete | 2026-01-31 |
 | 43. Data Comparison | v1.9 | 0/1 | Not started | - |
 | 44. Manual Protocol | v1.9 | 0/1 | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-01-31 after Phase 42 planning*
+*Last updated: 2026-01-31 after Phase 42 execution*
