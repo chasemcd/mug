@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-30)
 ## Current Position
 
 Phase: 36 of 39 (Speculative/Canonical Buffer Split)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-01-30 — Roadmap created with 4 phases
+Plan: 01 complete
+Status: Phase complete
+Last activity: 2026-01-30 - Completed 36-01-PLAN.md
 
-Progress: [░░░░░░░░░░] 0% (v1.8 - Data Export Parity: 0/4 phases)
+Progress: [██░░░░░░░░] 25% (v1.8 - Data Export Parity: 1/4 phases)
 
 ## Milestone History
 
@@ -97,6 +97,12 @@ Progress: [░░░░░░░░░░] 0% (v1.8 - Data Export Parity: 0/4 ph
 - `.planning/phases/33-session-list/33-01-SUMMARY.md`
 - `.planning/phases/34-session-detail/34-01-SUMMARY.md`
 - `.planning/phases/35-layout-polish/35-01-SUMMARY.md`
+
+**v1.8 Execution:**
+- `.planning/phases/36-buffer-split/36-01-SUMMARY.md`
+
+**Dual-Buffer Data Recording (v1.8 Phase 36 - added):**
+- `interactive_gym/server/static/js/pyodide_multiplayer_game.js` - speculativeFrameData Map, _promoteConfirmedFrames(), extended clearFrameDataFromRollback()
 
 **Session Detail View (v1.7 Phase 34 - added):**
 - `interactive_gym/server/admin/aggregator.py` - _session_terminations, record_session_termination(), get_session_detail()
@@ -184,6 +190,11 @@ See: .planning/PROJECT.md Key Decisions table
 - Pass timestamps via setInputTimestamps() method rather than step() parameter (backward compatible)
 - Skip logging during fast-forward or background states
 
+**v1.8 Phase 36 decisions:**
+- Dual-buffer architecture: speculativeFrameData for unconfirmed, frameDataBuffer for confirmed
+- Promotion at end of _updateConfirmedFrame() after confirmedFrame advances
+- Both buffers cleared on rollback and episode reset
+
 **v1.4 decisions:**
 - In-page overlay instead of redirect for partner disconnection (preserves data, better UX)
 
@@ -212,9 +223,9 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-01-30
-Stopped at: Roadmap created for v1.8
+Stopped at: Completed 36-01-PLAN.md
 Resume file: None
 
 ### Next Steps
 
-Run `/gsd:plan-phase 36` to create detailed plan for Speculative/Canonical Buffer Split.
+Run `/gsd:plan-phase 37` to create detailed plan for Fast-Forward Logging.
