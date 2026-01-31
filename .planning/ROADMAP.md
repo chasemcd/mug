@@ -559,7 +559,7 @@ Plans:
 **Plans:** 1 plan
 
 Plans:
-- [ ] 41-01-PLAN.md — CDP latency injection, asymmetric/jitter scenarios
+- [x] 41-01-PLAN.md — CDP latency injection, asymmetric/jitter scenarios
 
 ### Phase 42: Network Disruption Tests
 **Goal:** Test data parity under packet loss and tab focus scenarios
@@ -641,11 +641,11 @@ Phases execute in numeric order: 40 → 41 → 42 → 43 → 44
 | 38. Episode Boundary | v1.8 | 1/1 | Complete | 2026-01-30 |
 | 39. Verification & Metadata | v1.8 | 1/1 | Complete | 2026-01-30 |
 | 40. Test Infrastructure | v1.9 | 2/2 | Complete | 2026-01-31 |
-| 41. Latency Injection | v1.9 | 0/1 | Not started | - |
+| 41. Latency Injection | v1.9 | 1/1 | Complete | 2026-01-31 |
 | 42. Network Disruption | v1.9 | 0/1 | Not started | - |
 | 43. Data Comparison | v1.9 | 0/1 | Not started | - |
 | 44. Manual Protocol | v1.9 | 0/1 | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-01-31 after Phase 41 planning*
+*Last updated: 2026-01-31 after Phase 41 execution*

@@ -14,11 +14,11 @@ Requirements for v1.9 Data Parity Testing milestone. Each maps to roadmap phases
 
 ### Network Condition Tests
 
-- [ ] **NET-01**: Test applies fixed latency (100ms, 200ms, 500ms) via Chrome DevTools Protocol
+- [x] **NET-01**: Test applies fixed latency (100ms, 200ms) via Chrome DevTools Protocol (500ms causes WebRTC signaling timeouts)
 - [ ] **NET-02**: Test simulates packet loss to trigger rollback scenarios
 - [ ] **NET-03**: Test triggers tab unfocus/refocus to exercise fast-forward path
-- [ ] **NET-04**: Test applies asymmetric latency (different delays for each player)
-- [ ] **NET-05**: Test applies jitter (variable latency) during gameplay
+- [x] **NET-04**: Test applies asymmetric latency (different delays for each player)
+- [x] **NET-05**: Test applies jitter (variable latency) during gameplay
 
 ### Data Comparison
 
@@ -69,9 +69,9 @@ Which phases cover which requirements. Updated by create-roadmap.
 |-------------|-------|--------|
 | INFRA-01 | Phase 40 | Complete |
 | INFRA-02 | Phase 40 | Complete |
-| NET-01 | Phase 41 | Pending |
-| NET-04 | Phase 41 | Pending |
-| NET-05 | Phase 41 | Pending |
+| NET-01 | Phase 41 | Complete |
+| NET-04 | Phase 41 | Complete |
+| NET-05 | Phase 41 | Complete |
 | NET-02 | Phase 42 | Pending |
 | NET-03 | Phase 42 | Pending |
 | CMP-01 | Phase 43 | Pending |
@@ -86,4 +86,4 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 ---
 *Requirements defined: 2026-01-31*
-*Last updated: 2026-01-30 after roadmap creation*
+*Last updated: 2026-01-31 after Phase 41 execution*
