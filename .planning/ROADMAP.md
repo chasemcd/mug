@@ -556,7 +556,7 @@ Plans:
   3. Test can apply jitter (variable latency) during gameplay
   4. Tests run to episode completion under each latency condition
 **Research flag:** Likely (Chrome DevTools Protocol latency injection)
-**Plans:** TBD
+**Plans:** 1 plan
 
 Plans:
 - [ ] 41-01-PLAN.md — CDP latency injection, asymmetric/jitter scenarios
@@ -648,4 +648,4 @@ Phases execute in numeric order: 40 → 41 → 42 → 43 → 44
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-01-30 after Phase 40 planning*
+*Last updated: 2026-01-31 after Phase 41 planning*
