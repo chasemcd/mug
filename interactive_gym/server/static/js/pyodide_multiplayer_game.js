@@ -1023,6 +1023,10 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         // This buffer is cleared/updated on rollback to ensure only correct data is exported
         this.frameDataBuffer = new Map();
 
+        // Speculative frame data buffer - holds unconfirmed frame data
+        // Data is promoted to frameDataBuffer when confirmedFrame advances
+        this.speculativeFrameData = new Map();
+
         // Cumulative validation data - persists across episodes for full session export
         // This data is NOT cleared on episode reset, only when scene ends
         this.cumulativeValidation = {
@@ -3540,12 +3544,12 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
     }
 
     /**
-     * Store frame data in the rollback-safe buffer.
-     * Called after each step to record the frame's data.
-     * On rollback, frames >= target are deleted and re-recorded with correct data.
+     * Store frame data in the speculative buffer.
+     * Data will be promoted to canonical buffer (frameDataBuffer) when confirmedFrame advances.
+     * On rollback, speculative data is cleared and re-stored during replay.
      */
     storeFrameData(frameNumber, data) {
-        this.frameDataBuffer.set(frameNumber, {
+        this.speculativeFrameData.set(frameNumber, {
             actions: data.actions,
             rewards: data.rewards,
             terminateds: data.terminateds,
