@@ -432,10 +432,13 @@ class PyodideGameCoordinator:
                     f"about disconnection in game {game_id}"
                 )
                 for socket_id in remaining_player_sockets:
+                    # Emit p2p_game_ended so client handles with proper overlay and completion code
                     self.sio.emit(
-                        'end_game',
+                        'p2p_game_ended',
                         {
-                            'message': 'You were matched with a partner but your game ended because the other player disconnected.'
+                            'game_id': game_id,
+                            'reason': 'partner_disconnected',
+                            'disconnected_player_id': player_id
                         },
                         room=socket_id
                     )

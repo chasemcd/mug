@@ -1,6 +1,6 @@
 /**
- * Admin Dashboard JavaScript
- * Handles SocketIO connection and real-time state updates
+ * Admin Dashboard JavaScript - v3
+ * Participant-centric dashboard with multiplayer session grouping
  */
 
 // Connect to admin SocketIO namespace
@@ -13,21 +13,24 @@ let currentState = {
     participants: [],
     waiting_rooms: [],
     multiplayer_games: [],
-    completed_games: [],  // Session history
+    completed_games: [],
     activity_log: [],
     console_logs: [],
-    summary: {}
+    problems: [],
+    summary: {},
+    aggregates: {}
 };
-
-// Session tab state
-let activeSessionTab = 'active';  // 'active' or 'history'
 
 // Console log filtering state
 let logLevelFilter = 'all';
 let logParticipantFilter = 'all';
 let consoleLogs = [];
 
-// Session detail state (Phase 34)
+// Participant filter state
+let showInactiveParticipants = false;
+
+// Detail panel state
+let selectedParticipantId = null;
 let selectedSessionId = null;
 
 // ============================================
@@ -37,7 +40,6 @@ let selectedSessionId = null;
 adminSocket.on('connect', () => {
     console.log('Admin connected to /admin namespace');
     updateConnectionBadge('connected');
-    // Request initial state
     adminSocket.emit('request_state');
 });
 
@@ -79,14 +81,8 @@ function updateConnectionBadge(status) {
 // ============================================
 
 adminSocket.on('state_update', (data) => {
-    console.log('State update received:', data);
     currentState = data;
     updateDashboard(data);
-});
-
-adminSocket.on('activity_event', (event) => {
-    console.log('Activity event:', event);
-    addActivityEvent(event);
 });
 
 adminSocket.on('console_log', (log) => {
@@ -95,726 +91,564 @@ adminSocket.on('console_log', (log) => {
 
 function updateDashboard(state) {
     updateSummaryStats(state.summary);
-    updateParticipants(state.participants);
-    updateWaitingRooms(state.waiting_rooms);
-    updateSessionList(state.multiplayer_games);
-    updateSessionHistory(state.completed_games);
-    updateActivityTimeline(state.activity_log);
+    updateActiveParticipantsTable(state.participants, state.multiplayer_games);
+    updateMultiplayerSessions(state.multiplayer_games);
+    updateProblems(state.problems || []);
+    updateSessionOutcomes(state.aggregates);
+    updateArchivedSessions(state.completed_games || []);
+    updateCompletedParticipants(state.participants);
+
     // Initialize console logs from state on first load
     if (state.console_logs && consoleLogs.length === 0) {
         consoleLogs = [...state.console_logs];
         renderConsoleLogs();
     }
     updateParticipantFilter(state.participants);
-    updateProblemsIndicator();
+    updateProblemsCount();
+}
 
-    // Update session detail panel if open (Phase 34)
-    if (selectedSessionId) {
-        const session = state.multiplayer_games?.find(g => g.game_id === selectedSessionId);
-        if (session) {
-            const content = document.getElementById('session-detail-content');
-            if (content) {
-                // Preserve scroll positions before re-rendering
-                const contentScrollTop = content.scrollTop;
-                const logsContainer = content.querySelector('.session-detail-logs');
-                const logsScrollTop = logsContainer ? logsContainer.scrollTop : 0;
+// ============================================
+// Summary stats
+// ============================================
 
-                content.innerHTML = renderSessionDetailContent(session);
+function updateSummaryStats(summary) {
+    setElementText('stat-active', summary.connected_count || 0);
+    setElementText('stat-waiting', summary.waiting_count || 0);
+    setElementText('stat-completed', summary.completed_count || 0);
 
-                // Restore scroll positions
-                content.scrollTop = contentScrollTop;
-                const newLogsContainer = content.querySelector('.session-detail-logs');
-                if (newLogsContainer) {
-                    newLogsContainer.scrollTop = logsScrollTop;
+    const total = summary.total_started || 0;
+    const completed = summary.completed_count || 0;
+    const rate = total > 0 ? Math.round((completed / total) * 100) : 0;
+    setElementText('stat-completion', `${rate}%`);
+
+    if (summary.avg_session_duration_ms != null) {
+        setElementText('stat-duration', formatDuration(summary.avg_session_duration_ms));
+    } else {
+        setElementText('stat-duration', '--');
+    }
+}
+
+function setElementText(id, text) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = text;
+}
+
+// ============================================
+// Active Participants Table
+// ============================================
+
+function updateActiveParticipantsTable(participants, games) {
+    const container = document.getElementById('active-participants-table');
+    const countEl = document.getElementById('active-participants-count');
+    if (!container) return;
+
+    // Filter to only non-completed participants
+    let active = participants.filter(p => p.connection_status !== 'completed');
+
+    // Count all non-completed for the badge (before filtering inactive)
+    const totalNonCompleted = active.length;
+
+    // Further filter to hide disconnected/reconnecting unless toggle is on
+    if (!showInactiveParticipants) {
+        active = active.filter(p =>
+            p.connection_status !== 'disconnected' &&
+            p.connection_status !== 'reconnecting'
+        );
+    }
+
+    // Update count badge - show filtered/total if different
+    if (countEl) {
+        if (active.length !== totalNonCompleted) {
+            countEl.textContent = `${active.length}/${totalNonCompleted}`;
+        } else {
+            countEl.textContent = active.length;
+        }
+    }
+
+    if (active.length === 0) {
+        const hiddenCount = totalNonCompleted - active.length;
+        container.innerHTML = `
+            <div class="empty-state">
+                <p class="text-base-content/50">No active participants${hiddenCount > 0 ? ` (${hiddenCount} inactive hidden)` : ''}</p>
+            </div>
+        `;
+        return;
+    }
+
+    // Build a map of game_id -> game for quick lookup
+    const gameMap = {};
+    (games || []).forEach(g => {
+        gameMap[g.game_id] = g;
+    });
+
+    // Sort: in-game first, then waiting, then connected, then inactive at end
+    const sorted = [...active].sort((a, b) => {
+        const getPriority = (p) => {
+            if (p.waitroom_info) return 0;  // Waiting first
+            if (p.current_game_id && !p.waitroom_info) return 1;  // In game
+            if (p.connection_status === 'connected') return 2;  // Connected but not in game/waitroom
+            if (p.connection_status === 'reconnecting') return 3;  // Reconnecting
+            return 4;  // Disconnected last
+        };
+        return getPriority(a) - getPriority(b);
+    });
+
+    container.innerHTML = `
+        <table class="participant-table">
+            <thead>
+                <tr>
+                    <th>Status</th>
+                    <th>Subject ID</th>
+                    <th>Scene</th>
+                    <th>Type</th>
+                    <th>Activity</th>
+                    <th>Ping</th>
+                    <th>Duration</th>
+                    <th>Errors</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${sorted.map(p => renderParticipantRow(p, gameMap)).join('')}
+            </tbody>
+        </table>
+    `;
+}
+
+function renderParticipantRow(p, gameMap) {
+    // Status indicator - IMPORTANT: Check waitroom_info BEFORE current_game_id
+    // because participants in waitroom also have a game_id assigned
+    let statusColor = '#22c55e'; // connected
+    let statusLabel = 'Connected';
+
+    if (p.waitroom_info) {
+        // Waitroom takes priority - participant is waiting even if they have a game_id
+        statusColor = '#eab308'; // yellow for waiting
+        statusLabel = 'Waiting';
+    } else if (p.current_game_id) {
+        statusColor = '#3b82f6'; // blue for in game
+        statusLabel = 'In Game';
+    } else if (p.connection_status === 'reconnecting') {
+        statusColor = '#f97316'; // orange
+        statusLabel = 'Reconnecting';
+    } else if (p.connection_status === 'disconnected') {
+        statusColor = '#ef4444'; // red
+        statusLabel = 'Disconnected';
+    }
+
+    // Scene display - always show actual scene name
+    const sceneDisplay = p.current_scene_id || '--';
+
+    // Determine game type (single-player vs multiplayer)
+    let gameType = '--';
+    let gameTypeClass = '';
+    if (p.waitroom_info) {
+        // In waitroom - check target size to determine game type
+        const targetSize = p.waitroom_info.target_size || 1;
+        if (targetSize > 1) {
+            gameType = 'Multiplayer';
+            gameTypeClass = 'type-multiplayer';
+        } else {
+            gameType = 'Single';
+            gameTypeClass = 'type-single';
+        }
+    } else if (p.current_game_id) {
+        const game = gameMap[p.current_game_id];
+        if (game) {
+            const playerCount = game.subject_ids?.length || 1;
+            if (playerCount > 1 || game.game_type === 'multiplayer') {
+                gameType = 'Multiplayer';
+                gameTypeClass = 'type-multiplayer';
+            } else {
+                gameType = 'Single';
+                gameTypeClass = 'type-single';
+            }
+        }
+    }
+
+    // Activity display
+    let activityDisplay = '--';
+    if (p.waitroom_info) {
+        // In waitroom - show wait progress and time
+        const w = p.waitroom_info;
+        const waitSecs = Math.floor(w.wait_duration_ms / 1000);
+        const waitDisplay = waitSecs < 60 ? `${waitSecs}s` : `${Math.floor(waitSecs / 60)}m ${waitSecs % 60}s`;
+        activityDisplay = `${w.waiting_count}/${w.target_size} (${waitDisplay})`;
+    } else if (p.current_game_id) {
+        const game = gameMap[p.current_game_id];
+        const episode = p.current_episode != null ? p.current_episode + 1 : (game?.current_episode != null ? game.current_episode + 1 : '?');
+        activityDisplay = `Round ${episode}`;
+    }
+
+    // Ping - get from game if available (only when actually in game, not waitroom)
+    let pingDisplay = '--';
+    if (p.current_game_id && !p.waitroom_info) {
+        const game = gameMap[p.current_game_id];
+        if (game?.p2p_health) {
+            // Find this participant's latency
+            for (const [playerId, health] of Object.entries(game.p2p_health)) {
+                if (health.latency_ms != null) {
+                    pingDisplay = `${health.latency_ms}ms`;
+                    break;
                 }
             }
         }
     }
-}
 
-// ============================================
-// Summary stats (new element IDs)
-// ============================================
-
-function updateSummaryStats(summary) {
-    const elConnected = document.getElementById('stat-connected');
-    const elWaiting = document.getElementById('stat-waiting');
-    const elGames = document.getElementById('stat-games');
-    const elCompleted = document.getElementById('stat-completed');
-    const elCompletion = document.getElementById('stat-completion');
-    const elAvgDuration = document.getElementById('stat-avg-duration');
-    const elParticipantCount = document.getElementById('participant-count');
-    const elActivityCount = document.getElementById('activity-count');
-
-    if (elConnected) {
-        elConnected.textContent = summary.connected_count || 0;
-    }
-    if (elWaiting) {
-        elWaiting.textContent = summary.waiting_count || 0;
-    }
-    if (elGames) {
-        elGames.textContent = summary.active_games || 0;
-    }
-    if (elCompleted) {
-        elCompleted.textContent = summary.completed_count || 0;
-    }
-    if (elCompletion) {
-        const completed = summary.completed_count || 0;
-        const total = summary.total_started || 0;
-        const rate = summary.completion_rate || 0;
-        elCompletion.textContent = `${completed} of ${total} (${rate}%)`;
-    }
-    if (elAvgDuration) {
-        if (summary.avg_session_duration_ms != null) {
-            elAvgDuration.textContent = formatDurationLong(summary.avg_session_duration_ms);
-        } else {
-            elAvgDuration.textContent = '--';
-        }
-    }
-    if (elParticipantCount) {
-        elParticipantCount.textContent = `${summary.total_participants || 0} total`;
-    }
-    if (elActivityCount && currentState.activity_log) {
-        elActivityCount.textContent = `${currentState.activity_log.length} events`;
-    }
-}
-
-// ============================================
-// Participants (card-based display)
-// ============================================
-
-function updateParticipants(participants) {
-    const container = document.getElementById('participants-container');
-    if (!container) return;
-
-    if (!participants || participants.length === 0) {
-        container.innerHTML = `
-            <div class="empty-state-sm">
-                <p class="text-base-content/50 text-sm">No participants connected</p>
-            </div>
-        `;
-        return;
+    // Duration - use last_updated_at for disconnected/reconnecting, Date.now() for active
+    let duration = '--';
+    if (p.created_at) {
+        const isInactive = p.connection_status === 'disconnected' ||
+                          p.connection_status === 'reconnecting' ||
+                          p.connection_status === 'completed';
+        const endTime = isInactive && p.last_updated_at ? p.last_updated_at : Date.now() / 1000;
+        duration = formatDuration((endTime - p.created_at) * 1000);
     }
 
-    // Sort: connected first, then by created_at (newest first)
-    const sorted = [...participants].sort((a, b) => {
-        // Priority: connected > reconnecting > disconnected > completed
-        const statusPriority = { 'connected': 0, 'reconnecting': 1, 'disconnected': 2, 'completed': 3 };
-        const priorityA = statusPriority[a.connection_status] ?? 4;
-        const priorityB = statusPriority[b.connection_status] ?? 4;
-        if (priorityA !== priorityB) return priorityA - priorityB;
-        return (b.created_at || 0) - (a.created_at || 0);
-    });
-
-    // Grid view of participant cards (clickable)
-    container.innerHTML = `
-        <div class="participant-card-grid">
-            ${sorted.map(p => renderParticipantCard(p)).join('')}
-        </div>
-    `;
-}
-
-function renderParticipantCard(p) {
-    const hasErrors = p.error_count > 0;
-    const statusIndicator = getConnectionStatusIndicator(p.connection_status);
+    // Errors
+    const errorBadge = p.error_count > 0
+        ? `<span class="error-badge">${p.error_count}</span>`
+        : '--';
 
     return `
-        <div class="participant-card ${hasErrors ? 'participant-has-errors' : ''}"
-             onclick="showParticipantDetail('${escapeHtml(p.subject_id)}')"
-             role="button" tabindex="0">
-            <div class="participant-card-header">
-                <div class="participant-card-title">
-                    <span class="health-indicator ${statusIndicator}"></span>
-                    <span class="participant-card-id" title="${escapeHtml(p.subject_id)}">${escapeHtml(truncateId(p.subject_id))}</span>
+        <tr class="participant-row" onclick="showParticipantDetail('${escapeHtml(p.subject_id)}')">
+            <td>
+                <div class="status-indicator">
+                    <span class="status-dot" style="background-color: ${statusColor};"></span>
+                    <span class="status-label">${statusLabel}</span>
                 </div>
-                ${getStatusBadge(p.connection_status)}
-            </div>
-            <div class="participant-card-body">
-                <div class="participant-card-row">
-                    <span class="participant-card-label">Scene</span>
-                    <span class="participant-card-value">${escapeHtml(p.current_scene_id || '—')}</span>
-                </div>
-                <div class="participant-card-row">
-                    <span class="participant-card-label">Progress</span>
-                    <span class="participant-card-value">${getProgressDisplay(p.scene_progress)}</span>
-                </div>
-                ${p.current_game_id ? `
-                <div class="participant-card-row">
-                    <span class="participant-card-label">Game</span>
-                    <span class="participant-card-value font-mono text-xs">${escapeHtml(truncateId(p.current_game_id))}</span>
-                </div>
-                ` : ''}
-                <div class="participant-card-row">
-                    <span class="participant-card-label">Logs</span>
-                    <span class="participant-card-value">
-                        ${p.log_count || 0}
-                        ${hasErrors ? `<span class="badge badge-error badge-xs ml-1">${p.error_count} errors</span>` : ''}
-                    </span>
-                </div>
-            </div>
-        </div>
+            </td>
+            <td class="font-mono">${escapeHtml(truncateId(p.subject_id, 16))}</td>
+            <td>${escapeHtml(sceneDisplay)}</td>
+            <td><span class="game-type-badge ${gameTypeClass}">${gameType}</span></td>
+            <td>${escapeHtml(activityDisplay)}</td>
+            <td>${pingDisplay}</td>
+            <td>${duration}</td>
+            <td>${errorBadge}</td>
+        </tr>
     `;
 }
 
-function getConnectionStatusIndicator(status) {
-    const indicators = {
-        'connected': 'health-healthy',
-        'reconnecting': 'health-reconnecting',
-        'disconnected': 'health-disconnected',
-        'completed': 'health-completed'
-    };
-    return indicators[status] || 'health-completed';
-}
-
-function getStatusBadge(status) {
-    const badges = {
-        'connected': '<span class="badge badge-success badge-xs">Connected</span>',
-        'reconnecting': '<span class="badge badge-warning badge-xs">Reconnecting</span>',
-        'disconnected': '<span class="badge badge-error badge-xs">Disconnected</span>',
-        'completed': '<span class="badge badge-ghost badge-xs">Completed</span>'
-    };
-    return badges[status] || '<span class="badge badge-ghost badge-xs">Unknown</span>';
-}
-
-function getProgressDisplay(progress) {
-    if (!progress || !progress.total_scenes) return '—';
-    return `${progress.current_index}/${progress.total_scenes}`;
-}
-
 // ============================================
-// Waiting rooms
+// Multiplayer Sessions
 // ============================================
 
-function updateWaitingRooms(waitingRooms) {
-    const container = document.getElementById('waiting-rooms-container');
+function updateMultiplayerSessions(games) {
+    const container = document.getElementById('multiplayer-sessions-list');
+    const countEl = document.getElementById('sessions-count');
     if (!container) return;
 
-    if (!waitingRooms || waitingRooms.length === 0) {
-        container.innerHTML = `
-            <div class="empty-state-sm">
-                <p class="text-base-content/50 text-sm">No active waiting rooms</p>
-            </div>
-        `;
-        return;
-    }
-
-    container.innerHTML = waitingRooms.map(room => `
-        <div class="waiting-room-card">
-            <div class="waiting-room-header">
-                <span class="waiting-room-scene">${escapeHtml(room.scene_id)}</span>
-                <span class="waiting-room-count">${room.waiting_count}/${room.target_size}</span>
-            </div>
-            ${room.groups && room.groups.length > 0 ? `
-                <div class="waiting-room-groups">
-                    ${room.groups.map(g => `
-                        <div class="waiting-room-group">
-                            <span>Group ${truncateId(g.group_id)}</span>
-                            <span>${g.waiting_count} waiting, ${formatDuration(g.wait_duration_ms)}</span>
-                        </div>
-                    `).join('')}
-                </div>
-            ` : ''}
-            ${room.avg_wait_duration_ms > 0 ? `
-                <div class="text-xs text-base-content/50 mt-1">
-                    Avg wait: ${formatDuration(room.avg_wait_duration_ms)}
-                </div>
-            ` : ''}
-        </div>
-    `).join('');
-}
-
-// ============================================
-// Session list with P2P health (Phase 33)
-// ============================================
-
-function updateSessionList(games) {
-    const container = document.getElementById('multiplayer-games-container');
-    const countBadge = document.getElementById('games-count');
-    if (!container) return;
-
-    if (countBadge) {
-        countBadge.textContent = `${games?.length || 0} active`;
-    }
-
-    if (!games || games.length === 0) {
-        container.innerHTML = `
-            <div class="empty-state-sm">
-                <p class="text-base-content/50 text-sm">No active multiplayer sessions</p>
-            </div>
-        `;
-        return;
-    }
-
-    // Sort: problem sessions first (reconnecting > degraded > healthy)
-    const sorted = [...games].sort((a, b) => {
-        const priority = { 'reconnecting': 0, 'degraded': 1, 'healthy': 2 };
-        const aStatus = a.session_health || 'healthy';
-        const bStatus = b.session_health || 'healthy';
-        return (priority[aStatus] || 2) - (priority[bStatus] || 2);
-    });
-
-    // Wrap in grid container for responsive layout
-    container.innerHTML = `<div class="session-card-grid">${sorted.map(game => renderSessionCard(game)).join('')}</div>`;
-}
-
-function renderSessionCard(game) {
-    const health = game.session_health || 'healthy';
-    const hasProblem = health !== 'healthy';
-    const p2pHealth = game.p2p_health || {};
-    const isMultiplayer = game.game_type === 'multiplayer';
-    const isSinglePlayer = game.game_type === 'single_player';
-
-    // Get connection type (use first player's data for multiplayer)
-    const firstPlayerHealth = Object.values(p2pHealth)[0] || {};
-    const connectionType = isMultiplayer ? (firstPlayerHealth.connection_type || 'unknown') : null;
-    const connectionTypeLabel = isMultiplayer ? getConnectionTypeLabel(connectionType) : 'Local';
-
-    // Get latency (average of both players if available, only for multiplayer)
-    const latencies = Object.values(p2pHealth).map(h => h.latency_ms).filter(l => l != null);
-    const avgLatency = latencies.length > 0 ? Math.round(latencies.reduce((a,b) => a+b, 0) / latencies.length) : null;
-
-    // Get episode (1-indexed for display)
-    const episodeNum = game.current_episode;
-    const episode = episodeNum != null ? episodeNum + 1 : '--';
-
-    // Get participant IDs for display
-    const subjectIds = game.subject_ids || [];
-
-    // Badge for game type
-    const typeBadge = isSinglePlayer
-        ? '<span class="badge badge-xs badge-info">Solo</span>'
-        : `<span class="badge badge-xs ${game.is_server_authoritative ? 'badge-warning' : 'badge-success'}">${game.is_server_authoritative ? 'Server Auth' : 'P2P'}</span>`;
-
-    return `
-        <div class="session-card ${hasProblem ? 'session-problem' : ''}" onclick="showSessionDetail('${escapeHtml(game.game_id)}')" role="button" tabindex="0">
-            <div class="session-card-header">
-                <div class="session-card-title">
-                    <span class="health-indicator health-${health}"></span>
-                    <span class="session-id" title="${escapeHtml(game.game_id)}">
-                        ${isSinglePlayer ? 'Game' : 'Session'} ${truncateId(game.game_id)}
-                    </span>
-                </div>
-                ${typeBadge}
-            </div>
-            <div class="session-card-metrics">
-                <div class="session-metric">
-                    <span class="session-metric-label">Episode</span>
-                    <span class="session-metric-value">${episode}</span>
-                </div>
-                ${isMultiplayer ? `
-                <div class="session-metric">
-                    <span class="session-metric-label">Connection</span>
-                    <span class="session-metric-value">${connectionTypeLabel}</span>
-                </div>
-                <div class="session-metric">
-                    <span class="session-metric-label">Latency</span>
-                    <span class="session-metric-value ${avgLatency && avgLatency > 150 ? 'text-warning' : ''}">
-                        ${avgLatency != null ? avgLatency + 'ms' : '--'}
-                    </span>
-                </div>
-                ` : `
-                <div class="session-metric">
-                    <span class="session-metric-label">Scene</span>
-                    <span class="session-metric-value">${escapeHtml(truncateId(game.scene_id || 'unknown'))}</span>
-                </div>
-                `}
-                <div class="session-metric">
-                    <span class="session-metric-label">Status</span>
-                    <span class="session-metric-value session-status-${health}">
-                        ${health.charAt(0).toUpperCase() + health.slice(1)}
-                    </span>
-                </div>
-            </div>
-            <div class="session-card-players">
-                ${subjectIds.length > 0
-                    ? subjectIds.map(subject => `
-                        <span class="session-player">
-                            ${escapeHtml(truncateId(String(subject)))}
-                        </span>
-                    `).join('')
-                    : game.players.map(player => `
-                        <span class="session-player">
-                            ${escapeHtml(truncateId(String(player)))}
-                        </span>
-                    `).join('')
-                }
-            </div>
-        </div>
-    `;
-}
-
-function getConnectionTypeLabel(type) {
-    if (!type || type === 'unknown') return 'Unknown';
-    if (type === 'relay') return 'TURN Relay';
-    if (type === 'direct') return 'P2P Direct';
-    if (type === 'socketio_fallback') return 'SocketIO';
-    return type;
-}
-
-// ============================================
-// Participant Detail Panel (Phase 35 rework)
-// ============================================
-
-let selectedParticipantId = null;
-
-function showParticipantDetail(subjectId) {
-    selectedParticipantId = subjectId;
-    const overlay = document.getElementById('participant-detail-overlay');
-    const content = document.getElementById('participant-detail-content');
-
-    if (!overlay || !content) return;
-
-    // Find participant in current state
-    const participant = currentState.participants?.find(p => p.subject_id === subjectId);
-
-    if (!participant) {
-        content.innerHTML = '<div class="empty-state-sm"><p>Participant not found</p></div>';
-        overlay.classList.remove('hidden');
-        return;
-    }
-
-    // Render participant detail
-    content.innerHTML = renderParticipantDetailContent(participant);
-    overlay.classList.remove('hidden');
-}
-
-function closeParticipantDetail() {
-    selectedParticipantId = null;
-    const overlay = document.getElementById('participant-detail-overlay');
-    if (overlay) {
-        overlay.classList.add('hidden');
-    }
-}
-
-function renderParticipantDetailContent(participant) {
-    const statusIndicator = getConnectionStatusIndicator(participant.connection_status);
-    const gameHistory = participant.game_history || [];
-
-    // Get all logs for this participant from current state
-    const participantLogs = consoleLogs.filter(log =>
-        log.subject_id === participant.subject_id
+    // Only show multiplayer games (more than 1 player)
+    const multiplayer = (games || []).filter(g =>
+        g.game_type === 'multiplayer' || (g.subject_ids && g.subject_ids.length > 1)
     );
 
-    // Calculate session duration
-    let sessionDuration = '--';
-    if (participant.created_at) {
-        const durationMs = (Date.now() / 1000 - participant.created_at) * 1000;
-        sessionDuration = formatDurationLong(durationMs);
-    }
+    if (countEl) countEl.textContent = multiplayer.length;
 
-    return `
-        <div class="session-detail-section">
-            <h4 class="session-detail-section-title">Participant Info</h4>
-            <div class="session-detail-grid">
-                <div class="session-detail-item">
-                    <span class="session-detail-label">Subject ID</span>
-                    <span class="session-detail-value font-mono text-sm">${escapeHtml(participant.subject_id)}</span>
-                </div>
-                <div class="session-detail-item">
-                    <span class="session-detail-label">Status</span>
-                    <span class="session-detail-value">
-                        <span class="health-indicator ${statusIndicator}"></span>
-                        ${participant.connection_status.charAt(0).toUpperCase() + participant.connection_status.slice(1)}
-                    </span>
-                </div>
-                <div class="session-detail-item">
-                    <span class="session-detail-label">Current Scene</span>
-                    <span class="session-detail-value">${escapeHtml(participant.current_scene_id || '—')}</span>
-                </div>
-                <div class="session-detail-item">
-                    <span class="session-detail-label">Progress</span>
-                    <span class="session-detail-value">${getProgressDisplay(participant.scene_progress)}</span>
-                </div>
-                <div class="session-detail-item">
-                    <span class="session-detail-label">Session Duration</span>
-                    <span class="session-detail-value">${sessionDuration}</span>
-                </div>
-                <div class="session-detail-item">
-                    <span class="session-detail-label">Last Updated</span>
-                    <span class="session-detail-value">${formatTime(participant.last_updated_at)}</span>
-                </div>
-                ${participant.current_game_id ? `
-                <div class="session-detail-item">
-                    <span class="session-detail-label">Current Game</span>
-                    <span class="session-detail-value font-mono text-sm cursor-pointer text-primary"
-                          onclick="showSessionDetail('${escapeHtml(participant.current_game_id)}'); closeParticipantDetail();">
-                        ${escapeHtml(truncateId(participant.current_game_id))}
-                    </span>
-                </div>
-                ` : ''}
-            </div>
-        </div>
-
-        ${gameHistory.length > 0 ? `
-        <div class="session-detail-section">
-            <h4 class="session-detail-section-title">Game History (${gameHistory.length})</h4>
-            <div class="game-history-list">
-                ${gameHistory.map(game => `
-                    <div class="game-history-item">
-                        <div class="game-history-header">
-                            <span class="font-mono text-xs">${escapeHtml(truncateId(game.game_id))}</span>
-                            <span class="badge badge-xs ${game.ended_at ? (game.termination_reason === 'normal' ? 'badge-success' : 'badge-warning') : 'badge-primary'}">
-                                ${game.ended_at ? (game.termination_reason || 'ended') : 'active'}
-                            </span>
-                        </div>
-                        <div class="game-history-details">
-                            <span>Role: ${game.role || 'player'}</span>
-                            ${game.ended_at ? `<span>Duration: ${formatDuration((game.ended_at - game.started_at) * 1000)}</span>` : ''}
-                        </div>
-                    </div>
-                `).join('')}
-            </div>
-        </div>
-        ` : ''}
-
-        <div class="session-detail-section">
-            <h4 class="session-detail-section-title">Console Logs (${participantLogs.length})</h4>
-            <div class="session-detail-logs">
-                ${participantLogs.length > 0 ? participantLogs.slice(-50).map(log => `
-                    <div class="log-entry log-${log.level || 'log'}">
-                        <span class="log-time">${formatTime(log.timestamp)}</span>
-                        <span class="log-level log-level-${log.level || 'log'}">${(log.level || 'LOG').toUpperCase()}</span>
-                        <span class="log-message">${escapeHtml(log.message || '')}</span>
-                    </div>
-                `).join('') : '<div class="empty-state-sm"><p class="text-base-content/50">No logs captured</p></div>'}
-            </div>
-        </div>
-    `;
-}
-
-// ============================================
-// Session History (Phase 35)
-// ============================================
-
-function switchSessionTab(tab) {
-    activeSessionTab = tab;
-    const activeContainer = document.getElementById('multiplayer-games-container');
-    const historyContainer = document.getElementById('session-history-container');
-    const activeTab = document.getElementById('tab-active-sessions');
-    const historyTab = document.getElementById('tab-session-history');
-    const countBadge = document.getElementById('games-count');
-
-    if (tab === 'active') {
-        activeContainer?.classList.remove('hidden');
-        historyContainer?.classList.add('hidden');
-        activeTab?.classList.add('tab-active');
-        historyTab?.classList.remove('tab-active');
-        if (countBadge) {
-            countBadge.textContent = `${currentState.multiplayer_games?.length || 0} active`;
-        }
-    } else {
-        activeContainer?.classList.add('hidden');
-        historyContainer?.classList.remove('hidden');
-        activeTab?.classList.remove('tab-active');
-        historyTab?.classList.add('tab-active');
-        if (countBadge) {
-            countBadge.textContent = `${currentState.completed_games?.length || 0} completed`;
-        }
-    }
-}
-
-function updateSessionHistory(completedGames) {
-    const container = document.getElementById('session-history-container');
-    if (!container) return;
-
-    // Store in state
-    currentState.completed_games = completedGames || [];
-
-    // Update count badge if on history tab
-    if (activeSessionTab === 'history') {
-        const countBadge = document.getElementById('games-count');
-        if (countBadge) {
-            countBadge.textContent = `${completedGames?.length || 0} completed`;
-        }
-    }
-
-    if (!completedGames || completedGames.length === 0) {
+    if (multiplayer.length === 0) {
         container.innerHTML = `
             <div class="empty-state">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-12 h-12 mx-auto mb-2 opacity-30">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <p class="text-base-content/50">No session history</p>
-                <p class="text-base-content/30 text-sm mt-1">Completed sessions will appear here</p>
+                <p class="text-base-content/50">No active multiplayer sessions</p>
             </div>
         `;
         return;
     }
 
-    // Render completed sessions (most recent first - already sorted by server)
-    container.innerHTML = `<div class="session-card-grid">${completedGames.map(game => renderHistoricalSessionCard(game)).join('')}</div>`;
+    // Sort by health status (problems first)
+    const sorted = [...multiplayer].sort((a, b) => {
+        const priority = { 'reconnecting': 0, 'degraded': 1, 'healthy': 2 };
+        return (priority[a.session_health] ?? 2) - (priority[b.session_health] ?? 2);
+    });
+
+    container.innerHTML = sorted.map(g => renderMultiplayerSession(g)).join('');
 }
 
-function renderHistoricalSessionCard(game) {
-    const termination = game.termination || {};
-    const reason = termination.reason || 'unknown';
-    const isMultiplayer = game.game_type === 'multiplayer';
-    const isSinglePlayer = game.game_type === 'single_player';
+function renderMultiplayerSession(game) {
+    const health = game.session_health || 'healthy';
+    let healthColor = '#22c55e';
+    if (health === 'degraded') healthColor = '#eab308';
+    if (health === 'reconnecting') healthColor = '#ef4444';
 
-    // Get subject IDs for display
-    const subjectIds = game.subject_ids || [];
+    // Get P2P RTT between players
+    const p2pHealth = game.p2p_health || {};
+    const latencies = Object.values(p2pHealth).map(h => h.latency_ms).filter(l => l != null);
+    const avgLatency = latencies.length > 0
+        ? Math.round(latencies.reduce((a, b) => a + b, 0) / latencies.length)
+        : null;
 
-    // Episode display (1-indexed)
-    const episodeNum = game.current_episode;
-    const episode = episodeNum != null ? episodeNum + 1 : '--';
+    // Connection type
+    const firstPlayer = Object.values(p2pHealth)[0] || {};
+    const connType = firstPlayer.connection_type || 'unknown';
+    const connLabel = getConnectionLabel(connType);
 
-    // Time completed
-    const completedAt = game.completed_at ? formatTime(game.completed_at) : '--';
+    // Episode
+    const episode = game.current_episode != null ? game.current_episode + 1 : '--';
 
-    // Duration (if we have created_at and completed_at)
-    let duration = '--';
-    if (game.created_at && game.completed_at) {
-        const durationMs = (game.completed_at - game.created_at) * 1000;
-        duration = formatDuration(durationMs);
-    }
-
-    // Termination badge color based on reason
-    const reasonBadgeClass = reason === 'normal' ? 'badge-success' :
-                             reason === 'partner_disconnected' ? 'badge-error' :
-                             'badge-warning';
+    // Players
+    const players = game.subject_ids || [];
 
     return `
-        <div class="session-card session-historical" onclick="showSessionDetail('${escapeHtml(game.game_id)}', true)" role="button" tabindex="0">
-            <div class="session-card-header">
-                <div class="session-card-title">
-                    <span class="health-indicator health-completed"></span>
-                    <span class="session-id" title="${escapeHtml(game.game_id)}">
-                        ${isSinglePlayer ? 'Game' : 'Session'} ${truncateId(game.game_id)}
-                    </span>
+        <div class="multiplayer-session-card" onclick="showSessionDetail('${escapeHtml(game.game_id)}')">
+            <div class="session-header-row">
+                <div class="session-health">
+                    <span class="health-dot" style="background-color: ${healthColor};"></span>
+                    <span class="session-id font-mono">${truncateId(game.game_id, 12)}</span>
                 </div>
-                <span class="badge badge-xs ${reasonBadgeClass}">${getTerminationReasonLabel(reason)}</span>
-            </div>
-            <div class="session-card-metrics">
-                <div class="session-metric">
-                    <span class="session-metric-label">Episode</span>
-                    <span class="session-metric-value">${episode}</span>
-                </div>
-                <div class="session-metric">
-                    <span class="session-metric-label">Duration</span>
-                    <span class="session-metric-value">${duration}</span>
-                </div>
-                <div class="session-metric">
-                    <span class="session-metric-label">Ended</span>
-                    <span class="session-metric-value">${completedAt}</span>
+                <div class="session-metrics-row">
+                    <span class="metric-pill">RTT: ${avgLatency != null ? avgLatency + 'ms' : '--'}</span>
+                    <span class="metric-pill">${connLabel}</span>
+                    <span class="metric-pill">Round ${episode}</span>
                 </div>
             </div>
-            <div class="session-card-players">
-                ${subjectIds.length > 0
-                    ? subjectIds.map(subject => `
-                        <span class="session-player">
-                            ${escapeHtml(truncateId(String(subject)))}
-                        </span>
-                    `).join('')
-                    : game.players?.map(player => `
-                        <span class="session-player">
-                            ${escapeHtml(truncateId(String(player)))}
-                        </span>
-                    `).join('') || ''
-                }
+            <div class="session-players-row">
+                ${players.map(sid => {
+                    const participant = currentState.participants?.find(p => p.subject_id === sid);
+                    const errorCount = participant?.error_count || 0;
+                    return `
+                        <div class="session-player">
+                            <span class="player-name font-mono">${escapeHtml(truncateId(sid, 14))}</span>
+                            ${errorCount > 0 ? `<span class="error-badge-small">${errorCount}</span>` : ''}
+                        </div>
+                    `;
+                }).join('')}
             </div>
         </div>
     `;
 }
 
+function getConnectionLabel(type) {
+    return {
+        'direct': 'P2P Direct',
+        'relay': 'TURN Relay',
+        'socketio_fallback': 'Fallback',
+        'unknown': '--'
+    }[type] || type;
+}
+
 // ============================================
-// Activity timeline
+// Archived Sessions
 // ============================================
 
-function updateActivityTimeline(events) {
-    const container = document.getElementById('activity-timeline');
-    const countBadge = document.getElementById('activity-count');
+function updateArchivedSessions(completedGames) {
+    const container = document.getElementById('archived-sessions-list');
+    const countEl = document.getElementById('archived-sessions-count');
     if (!container) return;
 
-    if (countBadge) {
-        countBadge.textContent = `${events?.length || 0} events`;
+    if (countEl) countEl.textContent = completedGames.length;
+
+    if (!completedGames || completedGames.length === 0) {
+        container.innerHTML = '<p class="text-base-content/50 p-4">No archived sessions</p>';
+        return;
     }
 
-    if (!events || events.length === 0) {
+    container.innerHTML = `
+        <table class="archived-sessions-table">
+            <thead>
+                <tr>
+                    <th>Session ID</th>
+                    <th>Players</th>
+                    <th>Outcome</th>
+                    <th>Duration</th>
+                    <th>Ended</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${completedGames.slice(0, 50).map(g => {
+                    const termination = g.termination || {};
+                    const players = g.subject_ids || termination.players || [];
+                    const reason = getTerminationLabel(termination.reason);
+                    const endTime = termination.timestamp ? formatTime(termination.timestamp) : '--';
+
+                    // Calculate duration if we have start time
+                    let duration = '--';
+                    if (g.created_at && g.completed_at) {
+                        duration = formatDuration((g.completed_at - g.created_at) * 1000);
+                    }
+
+                    return `
+                        <tr class="archived-session-row" onclick="showSessionDetail('${escapeHtml(g.game_id)}')">
+                            <td class="font-mono">${escapeHtml(truncateId(g.game_id, 12))}</td>
+                            <td>${players.map(p => truncateId(p, 10)).join(', ')}</td>
+                            <td><span class="outcome-badge outcome-${termination.reason || 'unknown'}">${reason}</span></td>
+                            <td>${duration}</td>
+                            <td>${endTime}</td>
+                        </tr>
+                    `;
+                }).join('')}
+            </tbody>
+        </table>
+    `;
+}
+
+// ============================================
+// Problems Panel
+// ============================================
+
+function updateProblems(problems) {
+    const container = document.getElementById('problems-list');
+    if (!container) return;
+
+    if (!problems || problems.length === 0) {
         container.innerHTML = `
-            <div class="empty-state-sm">
-                <p class="text-base-content/50 text-sm">No activity yet</p>
+            <div class="empty-state">
+                <p class="text-base-content/50">No problems detected</p>
             </div>
         `;
         return;
     }
 
-    // Show most recent first (reverse chronological)
-    const sorted = [...events].sort((a, b) => b.timestamp - a.timestamp);
+    // Show most recent first, limit to 20
+    const recent = [...problems].reverse().slice(0, 20);
 
-    container.innerHTML = sorted.slice(0, 50).map(event => `
-        <div class="activity-item">
-            <span class="activity-time">${formatTime(event.timestamp)}</span>
-            <span class="activity-icon">${getEventIcon(event.event_type)}</span>
-            <span class="activity-content">
-                <span class="subject-id">${escapeHtml(truncateId(event.subject_id))}</span>
-                ${getEventDescription(event)}
-            </span>
+    container.innerHTML = recent.map(p => `
+        <div class="problem-item problem-${p.severity}">
+            <span class="problem-icon">${getProblemIcon(p.severity)}</span>
+            <span class="problem-time">${formatTime(p.timestamp)}</span>
+            <span class="problem-msg">${escapeHtml(p.message)}</span>
+            ${p.subject_id ? `<span class="problem-subject">${escapeHtml(truncateId(p.subject_id, 10))}</span>` : ''}
         </div>
     `).join('');
 }
 
-function addActivityEvent(event) {
-    // Add to current state (for persistence across reconnects)
-    if (!currentState.activity_log) {
-        currentState.activity_log = [];
-    }
-    currentState.activity_log.unshift(event);
-
-    // Keep only last 100
-    if (currentState.activity_log.length > 100) {
-        currentState.activity_log = currentState.activity_log.slice(0, 100);
-    }
-
-    // Re-render timeline
-    updateActivityTimeline(currentState.activity_log);
+function getProblemIcon(severity) {
+    return {
+        'error': '!',
+        'warning': '!',
+        'info': 'i'
+    }[severity] || '!';
 }
 
-function getEventIcon(eventType) {
-    const icons = {
-        'join': '<span class="event-join">+</span>',
-        'disconnect': '<span class="event-disconnect">−</span>',
-        'scene_advance': '<span class="event-advance">→</span>',
-        'game_start': '<span class="event-game">▶</span>',
-        'game_end': '<span class="event-game">■</span>'
-    };
-    return icons[eventType] || '•';
-}
+function updateProblemsCount() {
+    const indicator = document.getElementById('problems-count-badge');
+    if (!indicator) return;
 
-function getEventDescription(event) {
-    const descriptions = {
-        'join': 'joined',
-        'disconnect': 'disconnected',
-        'scene_advance': `→ ${escapeHtml(event.details?.scene_id || '?')}`,
-        'game_start': 'started game',
-        'game_end': 'ended game'
-    };
-    return descriptions[event.event_type] || event.event_type;
+    const errorCount = consoleLogs.filter(l => l.level === 'error').length;
+    const problemCount = (currentState.problems || []).filter(p => p.severity === 'error').length;
+    const total = Math.max(errorCount, problemCount);
+
+    indicator.textContent = total;
+    indicator.style.display = total > 0 ? 'inline-flex' : 'none';
 }
 
 // ============================================
-// Console logs
+// Session Outcomes (Aggregates)
+// ============================================
+
+function updateSessionOutcomes(aggregates) {
+    if (!aggregates) return;
+
+    const total = aggregates.total_sessions_ended || 0;
+    const summaryStats = aggregates.summary_stats || {};
+
+    // Update summary percentage stats with detailed breakdown
+    if (total > 0) {
+        const completedPct = Math.round((summaryStats.completed || 0) / total * 100);
+        const waitroomTimeoutPct = Math.round((summaryStats.waitroom_timeout || 0) / total * 100);
+        const partnerAwayPct = Math.round((summaryStats.partner_away || 0) / total * 100);
+        const partnerLeftPct = Math.round((summaryStats.partner_left || 0) / total * 100);
+        const otherPct = Math.round((summaryStats.other || 0) / total * 100);
+
+        setElementText('stat-pct-completed', `${completedPct}%`);
+        setElementText('stat-pct-waitroom-timeout', `${waitroomTimeoutPct}%`);
+        setElementText('stat-pct-partner-away', `${partnerAwayPct}%`);
+        setElementText('stat-pct-partner-left', `${partnerLeftPct}%`);
+        setElementText('stat-pct-other', `${otherPct}%`);
+    } else {
+        setElementText('stat-pct-completed', '--%');
+        setElementText('stat-pct-waitroom-timeout', '--%');
+        setElementText('stat-pct-partner-away', '--%');
+        setElementText('stat-pct-partner-left', '--%');
+        setElementText('stat-pct-other', '--%');
+    }
+
+    // Render scene histogram
+    const sceneEndings = aggregates.scene_endings || {};
+    renderSceneHistogram(sceneEndings);
+
+    // Wait time stats
+    const waitTime = aggregates.wait_time || {};
+    setElementText('wait-avg', waitTime.avg_ms != null ? formatDuration(waitTime.avg_ms) : '--');
+    setElementText('wait-max', waitTime.max_ms != null ? formatDuration(waitTime.max_ms) : '--');
+
+    // Latency sparkline
+    const latency = aggregates.latency || {};
+    const sparklineContainer = document.getElementById('latency-sparkline');
+    if (sparklineContainer && latency.samples && latency.samples.length > 1) {
+        sparklineContainer.innerHTML = renderSparkline(latency.samples);
+    }
+    setElementText('latency-current', latency.current_avg_ms != null ? `${latency.current_avg_ms}ms` : '--');
+}
+
+function renderSceneHistogram(sceneEndings) {
+    const container = document.getElementById('scene-histogram');
+    if (!container) return;
+
+    const scenes = Object.entries(sceneEndings);
+    if (scenes.length === 0) {
+        container.innerHTML = '<p class="text-base-content/50 text-sm">No data yet</p>';
+        return;
+    }
+
+    // Sort scenes by name (numeric-aware sorting)
+    scenes.sort((a, b) => a[0].localeCompare(b[0], undefined, { numeric: true }));
+
+    // Calculate total for percentages
+    const totalEndings = scenes.reduce((sum, [_, count]) => sum + count, 0);
+    const maxCount = Math.max(...scenes.map(s => s[1]));
+    const maxHeight = 50;
+
+    container.innerHTML = scenes.map(([sceneId, count]) => {
+        const height = totalEndings > 0 ? Math.max(4, (count / maxCount) * maxHeight) : 4;
+        const percentage = totalEndings > 0 ? Math.round((count / totalEndings) * 100) : 0;
+        const displayId = sceneId.length > 10 ? sceneId.substring(0, 9) + '...' : sceneId;
+        return `
+            <div class="scene-bar-wrapper" title="${escapeHtml(sceneId)}: ${count} (${percentage}%)">
+                <span class="scene-bar-pct">${percentage}%</span>
+                <div class="scene-bar" style="height: ${height}px"></div>
+                <span class="scene-bar-label">${escapeHtml(displayId)}</span>
+            </div>
+        `;
+    }).join('');
+}
+
+function renderSparkline(samples, width = 120, height = 30) {
+    if (!samples || samples.length < 2) return '';
+
+    const max = Math.max(...samples, 150);
+    const min = Math.min(...samples, 0);
+    const range = max - min || 1;
+    const step = width / (samples.length - 1);
+
+    const points = samples.map((v, i) =>
+        `${i * step},${height - ((v - min) / range) * (height - 4) - 2}`
+    ).join(' ');
+
+    const lastValue = samples[samples.length - 1];
+    const color = lastValue > 150 ? '#ef4444' : lastValue > 100 ? '#eab308' : '#22c55e';
+
+    return `
+        <svg width="${width}" height="${height}" class="sparkline">
+            <polyline points="${points}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+    `;
+}
+
+// ============================================
+// Console Logs
 // ============================================
 
 function addConsoleLog(log) {
     consoleLogs.unshift(log);
-    // Keep only last 500
     if (consoleLogs.length > 500) {
         consoleLogs = consoleLogs.slice(0, 500);
     }
     renderConsoleLogs();
-    updateProblemsIndicator();
+    updateProblemsCount();
 }
 
 function renderConsoleLogs() {
-    const container = document.getElementById('console-logs-container');
-    const countBadge = document.getElementById('logs-count');
+    const container = document.getElementById('console-logs-list');
     if (!container) return;
 
-    // Preserve scroll position
-    const scrollTop = container.scrollTop;
-    const wasScrolledToBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 50;
-
-    // Apply filters
     let filtered = consoleLogs;
     if (logLevelFilter !== 'all') {
         filtered = filtered.filter(l => l.level === logLevelFilter);
@@ -823,14 +657,12 @@ function renderConsoleLogs() {
         filtered = filtered.filter(l => l.subject_id === logParticipantFilter);
     }
 
-    if (countBadge) {
-        countBadge.textContent = `${filtered.length}`;
-    }
+    setElementText('logs-count', filtered.length);
 
-    if (!filtered || filtered.length === 0) {
+    if (filtered.length === 0) {
         container.innerHTML = `
-            <div class="empty-state-sm">
-                <p class="text-base-content/50 text-sm">No logs captured</p>
+            <div class="empty-state">
+                <p class="text-base-content/50">No logs</p>
             </div>
         `;
         return;
@@ -839,326 +671,432 @@ function renderConsoleLogs() {
     container.innerHTML = filtered.slice(0, 100).map(log => `
         <div class="log-entry log-${log.level}">
             <span class="log-time">${formatTime(log.timestamp)}</span>
-            <span class="log-level log-level-${log.level}">${log.level.toUpperCase()}</span>
-            <span class="log-subject">${escapeHtml(truncateId(log.subject_id))}</span>
-            <span class="log-message">${escapeHtml(log.message)}</span>
+            <span class="log-level">${(log.level || 'log').toUpperCase()}</span>
+            <span class="log-subject">${escapeHtml(truncateId(log.subject_id, 10))}</span>
+            <span class="log-msg">${escapeHtml(log.message)}</span>
         </div>
     `).join('');
-
-    // Restore scroll position (only auto-scroll if user was already at bottom)
-    if (wasScrolledToBottom) {
-        container.scrollTop = container.scrollHeight;
-    } else {
-        container.scrollTop = scrollTop;
-    }
-}
-
-// ============================================
-// Problems indicator (Phase 35)
-// ============================================
-
-function updateProblemsIndicator() {
-    const indicator = document.getElementById('problems-indicator');
-    if (!indicator) return;
-
-    // Count errors and warnings
-    const problemCount = consoleLogs.filter(l =>
-        l.level === 'error' || l.level === 'warn'
-    ).length;
-
-    const countEl = indicator.querySelector('.problems-count');
-    if (countEl) {
-        countEl.textContent = problemCount;
-    }
-
-    // Show/hide based on count
-    if (problemCount > 0) {
-        indicator.classList.remove('hidden');
-    } else {
-        indicator.classList.add('hidden');
-    }
-}
-
-function scrollToProblems() {
-    const logsSection = document.getElementById('console-logs-container');
-    if (logsSection) {
-        logsSection.scrollIntoView({ behavior: 'smooth' });
-    }
-    // Set filter to show only errors and warnings
-    const levelFilter = document.getElementById('log-level-filter');
-    if (levelFilter) {
-        levelFilter.value = 'error';
-        logLevelFilter = 'error';
-        renderConsoleLogs();
-    }
 }
 
 function updateParticipantFilter(participants) {
     const select = document.getElementById('log-participant-filter');
     if (!select) return;
 
-    // Get current selection
     const currentValue = select.value;
-
-    // Build unique participant list
     const participantIds = [...new Set(consoleLogs.map(l => l.subject_id))];
 
-    // Rebuild options
     select.innerHTML = '<option value="all">All Participants</option>';
     participantIds.forEach(id => {
         const option = document.createElement('option');
         option.value = id;
-        option.textContent = truncateId(id);
+        option.textContent = truncateId(id, 12);
         select.appendChild(option);
     });
 
-    // Restore selection if still valid
     if (participantIds.includes(currentValue) || currentValue === 'all') {
         select.value = currentValue;
     }
 }
 
-// Set up filter event listeners
-document.addEventListener('DOMContentLoaded', () => {
-    const levelFilter = document.getElementById('log-level-filter');
-    const participantFilter = document.getElementById('log-participant-filter');
-
-    if (levelFilter) {
-        levelFilter.addEventListener('change', (e) => {
-            logLevelFilter = e.target.value;
-            renderConsoleLogs();
-        });
-    }
-
-    if (participantFilter) {
-        participantFilter.addEventListener('change', (e) => {
-            logParticipantFilter = e.target.value;
-            renderConsoleLogs();
-        });
-    }
-});
-
 // ============================================
-// Session Detail Panel (Phase 34)
+// Completed Participants (Collapsible)
 // ============================================
 
-function showSessionDetail(gameId, isHistorical = false) {
-    selectedSessionId = gameId;
-    const overlay = document.getElementById('session-detail-overlay');
-    const content = document.getElementById('session-detail-content');
+function updateCompletedParticipants(participants) {
+    const container = document.getElementById('completed-participants-list');
+    const countEl = document.getElementById('completed-count');
+    if (!container) return;
 
+    const completed = participants.filter(p => p.connection_status === 'completed');
+
+    if (countEl) countEl.textContent = completed.length;
+
+    if (completed.length === 0) {
+        container.innerHTML = '<p class="text-base-content/50 p-4">No completed participants</p>';
+        return;
+    }
+
+    container.innerHTML = `
+        <table class="completed-table">
+            <thead>
+                <tr>
+                    <th>Subject ID</th>
+                    <th>Duration</th>
+                    <th>Scenes</th>
+                    <th>Errors</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${completed.map(p => {
+                    const duration = p.created_at && p.last_updated_at
+                        ? formatDuration((p.last_updated_at - p.created_at) * 1000)
+                        : '--';
+                    const progress = p.scene_progress
+                        ? `${p.scene_progress.current_index + 1}/${p.scene_progress.total_scenes}`
+                        : '--';
+                    return `
+                        <tr onclick="showParticipantDetail('${escapeHtml(p.subject_id)}')">
+                            <td class="font-mono">${escapeHtml(truncateId(p.subject_id, 16))}</td>
+                            <td>${duration}</td>
+                            <td>${progress}</td>
+                            <td>${p.error_count > 0 ? `<span class="error-badge">${p.error_count}</span>` : '--'}</td>
+                        </tr>
+                    `;
+                }).join('')}
+            </tbody>
+        </table>
+    `;
+}
+
+// ============================================
+// Participant Detail Panel
+// ============================================
+
+function showParticipantDetail(subjectId) {
+    selectedParticipantId = subjectId;
+    const overlay = document.getElementById('participant-detail-overlay');
+    const content = document.getElementById('participant-detail-content');
     if (!overlay || !content) return;
 
-    // Find session in current state (check both active and completed)
-    let session = currentState.multiplayer_games?.find(g => g.game_id === gameId);
-    let sessionIsHistorical = false;
-
-    if (!session) {
-        // Check completed games
-        session = currentState.completed_games?.find(g => g.game_id === gameId);
-        sessionIsHistorical = true;
-    }
-
-    if (!session) {
-        content.innerHTML = '<div class="empty-state-sm"><p>Session not found</p></div>';
+    const participant = currentState.participants?.find(p => p.subject_id === subjectId);
+    if (!participant) {
+        content.innerHTML = '<p class="text-center p-4">Participant not found</p>';
         overlay.classList.remove('hidden');
         return;
     }
 
-    // Render session detail (with historical flag)
-    content.innerHTML = renderSessionDetailContent(session, sessionIsHistorical);
+    // Status color - IMPORTANT: Check waitroom_info BEFORE current_game_id
+    // because participants in waitroom also have a game_id assigned
+    let statusColor = '#22c55e';
+    let statusLabel = 'Connected';
+    if (participant.waitroom_info) {
+        statusColor = '#eab308';
+        statusLabel = 'Waiting';
+    } else if (participant.current_game_id) {
+        statusColor = '#3b82f6';
+        statusLabel = 'In Game';
+    } else if (participant.connection_status === 'reconnecting') {
+        statusColor = '#f97316';
+        statusLabel = 'Reconnecting';
+    } else if (participant.connection_status === 'disconnected') {
+        statusColor = '#ef4444';
+        statusLabel = 'Disconnected';
+    } else if (participant.connection_status === 'completed') {
+        statusColor = '#9ca3af';
+        statusLabel = 'Completed';
+    }
+
+    // Duration - use last_updated_at for disconnected/reconnecting/completed, Date.now() for active
+    let duration = '--';
+    if (participant.created_at) {
+        const isInactive = participant.connection_status === 'disconnected' ||
+                          participant.connection_status === 'reconnecting' ||
+                          participant.connection_status === 'completed';
+        const endTime = isInactive && participant.last_updated_at ? participant.last_updated_at : Date.now() / 1000;
+        duration = formatDuration((endTime - participant.created_at) * 1000);
+    }
+
+    const participantLogs = consoleLogs.filter(l => l.subject_id === subjectId).slice(0, 50);
+
+    // Scene display - always show actual scene name
+    const sceneDisplay = participant.current_scene_id || '--';
+
+    // Scene progress (separate from scene name)
+    let progressDisplay = '';
+    if (participant.scene_progress) {
+        progressDisplay = `${participant.scene_progress.current_index + 1}/${participant.scene_progress.total_scenes}`;
+    }
+
+    // Waitroom info
+    let waitroomHtml = '';
+    if (participant.waitroom_info) {
+        const w = participant.waitroom_info;
+        const waitSecs = Math.floor(w.wait_duration_ms / 1000);
+        const waitDisplay = waitSecs < 60 ? `${waitSecs}s` : `${Math.floor(waitSecs / 60)}m ${waitSecs % 60}s`;
+        waitroomHtml = `
+            <div class="detail-item">
+                <span class="detail-label">Waitroom</span>
+                <span class="detail-value" style="color: #eab308;">${w.waiting_count}/${w.target_size} players</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Wait Time</span>
+                <span class="detail-value">${waitDisplay}</span>
+            </div>
+        `;
+    }
+
+    // Episode info
+    let episodeHtml = '';
+    if (participant.current_game_id && participant.current_episode != null) {
+        episodeHtml = `
+            <div class="detail-item">
+                <span class="detail-label">Round</span>
+                <span class="detail-value">${participant.current_episode + 1}</span>
+            </div>
+        `;
+    }
+
+    content.innerHTML = `
+        <div class="detail-section">
+            <h4>Info</h4>
+            <div class="detail-grid">
+                <div class="detail-item">
+                    <span class="detail-label">Subject ID</span>
+                    <span class="detail-value font-mono">${escapeHtml(participant.subject_id)}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Status</span>
+                    <span class="detail-value" style="color: ${statusColor};">${statusLabel}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Scene</span>
+                    <span class="detail-value">${escapeHtml(sceneDisplay)}</span>
+                </div>
+                ${progressDisplay ? `
+                <div class="detail-item">
+                    <span class="detail-label">Progress</span>
+                    <span class="detail-value">${progressDisplay}</span>
+                </div>
+                ` : ''}
+                <div class="detail-item">
+                    <span class="detail-label">Duration</span>
+                    <span class="detail-value">${duration}</span>
+                </div>
+                ${participant.current_game_id && !participant.waitroom_info ? `
+                <div class="detail-item">
+                    <span class="detail-label">Session</span>
+                    <span class="detail-value font-mono" style="color: #3b82f6; cursor: pointer;"
+                          onclick="showSessionDetail('${escapeHtml(participant.current_game_id)}'); closeParticipantDetail();">
+                        ${escapeHtml(truncateId(participant.current_game_id, 12))}
+                    </span>
+                </div>
+                ` : ''}
+                ${episodeHtml}
+                ${waitroomHtml}
+            </div>
+        </div>
+        <div class="detail-section">
+            <h4>Logs (${participantLogs.length})</h4>
+            <div class="detail-logs">
+                ${participantLogs.length > 0
+                    ? participantLogs.map(log => `
+                        <div class="log-entry log-${log.level}">
+                            <span class="log-time">${formatTime(log.timestamp)}</span>
+                            <span class="log-level">${(log.level || 'log').toUpperCase()}</span>
+                            <span class="log-msg">${escapeHtml(log.message)}</span>
+                        </div>
+                    `).join('')
+                    : '<p class="text-base-content/50 p-2">No logs</p>'
+                }
+            </div>
+        </div>
+    `;
+    overlay.classList.remove('hidden');
+}
+
+function closeParticipantDetail() {
+    selectedParticipantId = null;
+    const overlay = document.getElementById('participant-detail-overlay');
+    if (overlay) overlay.classList.add('hidden');
+}
+
+// ============================================
+// Session Detail Panel
+// ============================================
+
+function showSessionDetail(gameId) {
+    selectedSessionId = gameId;
+    const overlay = document.getElementById('session-detail-overlay');
+    const content = document.getElementById('session-detail-content');
+    if (!overlay || !content) return;
+
+    // Find session in active or completed
+    let session = currentState.multiplayer_games?.find(g => g.game_id === gameId);
+    let isArchived = false;
+
+    if (!session) {
+        session = currentState.completed_games?.find(g => g.game_id === gameId);
+        isArchived = true;
+    }
+
+    if (!session) {
+        content.innerHTML = '<p class="text-center p-4">Session not found</p>';
+        overlay.classList.remove('hidden');
+        return;
+    }
+
+    // For archived sessions, use the stored session_health if available
+    const health = isArchived
+        ? (session.session_health || 'archived')
+        : (session.session_health || 'healthy');
+    let healthColor = '#22c55e';
+    if (health === 'degraded') healthColor = '#eab308';
+    if (health === 'reconnecting' || health === 'problem') healthColor = '#ef4444';
+    if (health === 'archived') healthColor = '#9ca3af';
+
+    const p2pHealth = session.p2p_health || {};
+    const subjectIds = session.subject_ids || [];
+    const termination = session.termination;
+
+    // Calculate connection stats summary for display
+    const latencies = Object.values(p2pHealth).map(h => h.latency_ms).filter(l => l != null);
+    const avgLatency = latencies.length > 0
+        ? Math.round(latencies.reduce((a, b) => a + b, 0) / latencies.length)
+        : null;
+    const firstPlayerHealth = Object.values(p2pHealth)[0] || {};
+    const connectionType = firstPlayerHealth.connection_type || 'unknown';
+
+    // Get all logs for players in this session
+    const sessionLogs = isArchived && session.archived_logs
+        ? session.archived_logs
+        : consoleLogs.filter(l => subjectIds.includes(l.subject_id)).slice(0, 50);
+
+    // Build player stats table
+    const playerStatsHtml = subjectIds.map(sid => {
+        const participant = currentState.participants?.find(p => p.subject_id === sid);
+        const playerHealth = Object.values(p2pHealth).find(h => true); // Get any health data
+        const latency = playerHealth?.latency_ms;
+        const connType = playerHealth?.connection_type;
+        const errorCount = participant?.error_count || 0;
+
+        return `
+            <tr onclick="showParticipantDetail('${escapeHtml(sid)}'); closeSessionDetail();">
+                <td class="font-mono">${escapeHtml(sid)}</td>
+                <td>${latency != null ? latency + 'ms' : '--'}</td>
+                <td>${getConnectionLabel(connType || 'unknown')}</td>
+                <td>${errorCount > 0 ? `<span class="error-badge">${errorCount}</span>` : '0'}</td>
+            </tr>
+        `;
+    }).join('');
+
+    // Calculate duration - use completed_at if archived, Date.now() if still active
+    let sessionDuration = '--';
+    if (session.created_at && session.completed_at) {
+        sessionDuration = formatDuration((session.completed_at - session.created_at) * 1000);
+    } else if (session.created_at && !isArchived) {
+        sessionDuration = formatDuration((Date.now() / 1000 - session.created_at) * 1000);
+    }
+
+    // Episode info
+    const episodeDisplay = session.max_episodes
+        ? `${session.current_episode || session.max_episodes}/${session.max_episodes}`
+        : (session.current_episode != null ? session.current_episode + 1 : '--');
+
+    content.innerHTML = `
+        <div class="detail-section">
+            <h4>Session Info</h4>
+            <div class="detail-grid">
+                <div class="detail-item">
+                    <span class="detail-label">Session ID</span>
+                    <span class="detail-value font-mono">${escapeHtml(session.game_id)}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Status</span>
+                    <span class="detail-value" style="color: ${healthColor};">${health}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Scene</span>
+                    <span class="detail-value">${escapeHtml(session.scene_id || '--')}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Episodes</span>
+                    <span class="detail-value">${episodeDisplay}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Duration</span>
+                    <span class="detail-value">${sessionDuration}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Players</span>
+                    <span class="detail-value">${subjectIds.length}</span>
+                </div>
+            </div>
+        </div>
+
+        ${Object.keys(p2pHealth).length > 0 ? `
+        <div class="detail-section">
+            <h4>Connection Stats</h4>
+            <div class="detail-grid">
+                <div class="detail-item">
+                    <span class="detail-label">Connection</span>
+                    <span class="detail-value">${getConnectionLabel(connectionType)}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Avg Latency</span>
+                    <span class="detail-value">${avgLatency != null ? avgLatency + 'ms' : '--'}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Health</span>
+                    <span class="detail-value" style="color: ${healthColor};">${health}</span>
+                </div>
+            </div>
+        </div>
+        ` : ''}
+
+        ${termination ? `
+        <div class="detail-section termination-section">
+            <h4>Outcome</h4>
+            <div class="termination-info">
+                <span class="termination-reason">${getTerminationLabel(termination.reason)}</span>
+                <span class="termination-time">${formatTime(termination.timestamp)}</span>
+            </div>
+        </div>
+        ` : ''}
+
+        <div class="detail-section">
+            <h4>Players</h4>
+            <table class="players-table">
+                <thead>
+                    <tr>
+                        <th>Subject ID</th>
+                        <th>Latency</th>
+                        <th>Connection</th>
+                        <th>Errors</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${playerStatsHtml}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="detail-section">
+            <h4>Session Logs (${sessionLogs.length})</h4>
+            <div class="detail-logs">
+                ${sessionLogs.length > 0
+                    ? sessionLogs.map(log => `
+                        <div class="log-entry log-${log.level}">
+                            <span class="log-time">${formatTime(log.timestamp)}</span>
+                            <span class="log-level">${(log.level || 'log').toUpperCase()}</span>
+                            <span class="log-subject">${escapeHtml(truncateId(log.subject_id, 8))}</span>
+                            <span class="log-msg">${escapeHtml(log.message)}</span>
+                        </div>
+                    `).join('')
+                    : '<p class="text-base-content/50 p-2">No logs</p>'
+                }
+            </div>
+        </div>
+    `;
     overlay.classList.remove('hidden');
 }
 
 function closeSessionDetail() {
     selectedSessionId = null;
     const overlay = document.getElementById('session-detail-overlay');
-    if (overlay) {
-        overlay.classList.add('hidden');
-    }
+    if (overlay) overlay.classList.add('hidden');
 }
 
-function renderSessionDetailContent(session, isHistorical = false) {
-    const health = isHistorical ? 'completed' : (session.session_health || 'healthy');
-    const p2pHealth = session.p2p_health || {};
-    const termination = session.termination;
-    const isMultiplayer = session.game_type === 'multiplayer';
-    const isSinglePlayer = session.game_type === 'single_player';
-
-    // Get connection info from first player (multiplayer only)
-    const firstPlayerHealth = Object.values(p2pHealth)[0] || {};
-    const connectionType = isMultiplayer
-        ? getConnectionTypeLabel(firstPlayerHealth.connection_type || 'unknown')
-        : 'Local';
-
-    // Calculate latency (multiplayer only)
-    const latencies = Object.values(p2pHealth).map(h => h.latency_ms).filter(l => l != null);
-    const avgLatency = latencies.length > 0
-        ? Math.round(latencies.reduce((a,b) => a+b, 0) / latencies.length)
-        : null;
-
-    // Get console logs for this session
-    // For historical sessions, use archived_logs if available
-    // For active sessions, filter from current logs
-    const subjectIds = session.subject_ids || [];
-    let playerLogs;
-    if (isHistorical && session.archived_logs) {
-        playerLogs = session.archived_logs;
-    } else {
-        playerLogs = consoleLogs.filter(log =>
-            subjectIds.includes(log.subject_id)
-        ).slice(-30);  // Show last 30 logs
-    }
-
-    // Episode display (1-indexed)
-    const episodeNum = session.current_episode;
-    const episodeDisplay = episodeNum != null ? episodeNum + 1 : '--';
-
-    // Mode display
-    const modeDisplay = isSinglePlayer
-        ? 'Single Player'
-        : (session.is_server_authoritative ? 'Server Auth' : 'P2P');
-
-    // Duration for historical sessions
-    let durationDisplay = '--';
-    if (isHistorical && session.created_at && session.completed_at) {
-        const durationMs = (session.completed_at - session.created_at) * 1000;
-        durationDisplay = formatDurationLong(durationMs);
-    }
-
-    return `
-        <div class="session-detail-section">
-            <h4 class="session-detail-section-title">${isSinglePlayer ? 'Game' : 'Session'} Info</h4>
-            <div class="session-detail-grid">
-                <div class="session-detail-item">
-                    <span class="session-detail-label">Game ID</span>
-                    <span class="session-detail-value font-mono text-sm">${escapeHtml(session.game_id)}</span>
-                </div>
-                <div class="session-detail-item">
-                    <span class="session-detail-label">Status</span>
-                    <span class="session-detail-value session-status-${health}">
-                        <span class="health-indicator health-${health}"></span>
-                        ${health.charAt(0).toUpperCase() + health.slice(1)}
-                    </span>
-                </div>
-                ${isMultiplayer ? `
-                <div class="session-detail-item">
-                    <span class="session-detail-label">Connection</span>
-                    <span class="session-detail-value">${connectionType}</span>
-                </div>
-                <div class="session-detail-item">
-                    <span class="session-detail-label">Latency</span>
-                    <span class="session-detail-value ${avgLatency && avgLatency > 150 ? 'text-warning' : ''}">
-                        ${avgLatency != null ? avgLatency + 'ms' : '--'}
-                    </span>
-                </div>
-                ` : `
-                <div class="session-detail-item">
-                    <span class="session-detail-label">Scene</span>
-                    <span class="session-detail-value">${escapeHtml(session.scene_id || 'unknown')}</span>
-                </div>
-                `}
-                <div class="session-detail-item">
-                    <span class="session-detail-label">Episode</span>
-                    <span class="session-detail-value">${episodeDisplay}</span>
-                </div>
-                <div class="session-detail-item">
-                    <span class="session-detail-label">Mode</span>
-                    <span class="session-detail-value">${modeDisplay}</span>
-                </div>
-                ${isHistorical ? `
-                <div class="session-detail-item">
-                    <span class="session-detail-label">Duration</span>
-                    <span class="session-detail-value">${durationDisplay}</span>
-                </div>
-                <div class="session-detail-item">
-                    <span class="session-detail-label">Ended</span>
-                    <span class="session-detail-value">${session.completed_at ? formatTime(session.completed_at) : '--'}</span>
-                </div>
-                ` : ''}
-            </div>
-        </div>
-
-        <div class="session-detail-section">
-            <h4 class="session-detail-section-title">${isSinglePlayer ? 'Participant' : 'Players'}</h4>
-            <div class="session-detail-players">
-                ${subjectIds.map((subject, idx) => `
-                    <div class="session-detail-player">
-                        <span class="player-id">${escapeHtml(subject)}</span>
-                        ${isMultiplayer ? renderPlayerHealth(p2pHealth[session.players[idx]]) : ''}
-                    </div>
-                `).join('')}
-            </div>
-        </div>
-
-        ${termination ? `
-        <div class="session-detail-section session-termination">
-            <h4 class="session-detail-section-title">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
-                </svg>
-                Termination
-            </h4>
-            <div class="termination-info">
-                <div class="termination-reason">${getTerminationReasonLabel(termination.reason)}</div>
-                ${termination.details?.message ? `
-                    <div class="termination-message">${escapeHtml(termination.details.message)}</div>
-                ` : ''}
-                <div class="termination-time">Ended: ${formatTime(termination.timestamp)}</div>
-            </div>
-        </div>
-        ` : ''}
-
-        <div class="session-detail-section">
-            <h4 class="session-detail-section-title">
-                Console Logs
-                <span class="badge badge-ghost badge-xs">${playerLogs.length}</span>
-            </h4>
-            ${playerLogs.length > 0 ? `
-                <div class="session-detail-logs">
-                    ${playerLogs.map(log => `
-                        <div class="log-entry log-${log.level}">
-                            <span class="log-time">${formatTime(log.timestamp)}</span>
-                            <span class="log-level log-level-${log.level}">${log.level.toUpperCase()}</span>
-                            <span class="log-message">${escapeHtml(log.message)}</span>
-                        </div>
-                    `).join('')}
-                </div>
-            ` : `
-                <div class="empty-state-sm">
-                    <p class="text-base-content/50 text-sm">No logs for this session</p>
-                </div>
-            `}
-        </div>
-    `;
-}
-
-function renderPlayerHealth(health) {
-    if (!health) return '<span class="player-health-unknown">No data</span>';
-
-    const status = health.status || 'unknown';
-    const latency = health.latency_ms;
-    const connType = health.connection_type;
-
-    return `
-        <span class="player-health player-health-${status}">
-            ${latency != null ? latency + 'ms' : '--'}
-            (${getConnectionTypeLabel(connType)})
-        </span>
-    `;
-}
-
-function getTerminationReasonLabel(reason) {
-    const labels = {
+function getTerminationLabel(reason) {
+    return {
         'partner_disconnected': 'Partner Disconnected',
         'focus_loss_timeout': 'Focus Loss Timeout',
-        'sustained_ping': 'High Latency (Sustained)',
-        'tab_hidden': 'Tab Hidden Too Long',
-        'exclusion': 'Participant Excluded',
-        'custom_callback': 'Custom Exclusion Rule',
-        'normal': 'Normal Completion'
-    };
-    return labels[reason] || reason || 'Unknown';
+        'sustained_ping': 'High Latency',
+        'tab_hidden': 'Tab Hidden',
+        'exclusion': 'Excluded',
+        'normal': 'Completed',
+        'reconnection_timeout': 'Reconnection Timeout',
+        'waitroom_timeout': 'Waitroom Timeout'
+    }[reason] || reason || 'Unknown';
 }
 
 // ============================================
@@ -1168,57 +1106,80 @@ function getTerminationReasonLabel(reason) {
 function escapeHtml(text) {
     if (!text) return '';
     const div = document.createElement('div');
-    div.textContent = text;
+    div.textContent = String(text);
     return div.innerHTML;
 }
 
-function truncateId(id) {
-    if (!id) return '—';
-    if (id.length <= 12) return id;
-    return id.substring(0, 8) + '…';
-}
-
-function formatTimestamp(ts) {
-    if (!ts) return '—';
-    const date = new Date(ts * 1000);
-    return date.toLocaleTimeString();
+function truncateId(id, maxLen = 10) {
+    if (!id) return '--';
+    const s = String(id);
+    if (s.length <= maxLen) return s;
+    return s.substring(0, maxLen - 3) + '...';
 }
 
 function formatTime(ts) {
-    if (!ts) return '—';
+    if (!ts) return '--';
     const date = new Date(ts * 1000);
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
 function formatDuration(ms) {
-    if (!ms || ms < 0) return '0s';
-    const seconds = Math.floor(ms / 1000);
-    if (seconds < 60) return `${seconds}s`;
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return `${minutes}m ${remainingSeconds}s`;
-}
-
-function formatDurationLong(ms) {
     if (ms == null || ms < 0) return '--';
     const totalSeconds = Math.floor(ms / 1000);
     const hours = Math.floor(totalSeconds / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
     const seconds = totalSeconds % 60;
 
-    if (hours > 0) {
-        // Format: "1h 15m"
-        return `${hours}h ${minutes}m`;
-    } else if (minutes > 0) {
-        // Format: "5m 30s"
-        return `${minutes}m ${seconds}s`;
-    } else {
-        // Format: "45s"
-        return `${seconds}s`;
-    }
+    if (hours > 0) return `${hours}h ${minutes}m`;
+    if (minutes > 0) return `${minutes}m ${seconds}s`;
+    return `${seconds}s`;
 }
 
-// Request fresh state periodically (fallback if push fails)
+// ============================================
+// Event listeners
+// ============================================
+
+document.addEventListener('DOMContentLoaded', () => {
+    // Show inactive participants toggle
+    const inactiveToggle = document.getElementById('show-inactive-toggle');
+    if (inactiveToggle) {
+        inactiveToggle.addEventListener('change', (e) => {
+            showInactiveParticipants = e.target.checked;
+            // Re-render with current state
+            if (currentState.participants) {
+                updateActiveParticipantsTable(currentState.participants, currentState.multiplayer_games);
+            }
+        });
+    }
+
+    // Log level filter
+    const levelFilter = document.getElementById('log-level-filter');
+    if (levelFilter) {
+        levelFilter.addEventListener('change', (e) => {
+            logLevelFilter = e.target.value;
+            renderConsoleLogs();
+        });
+    }
+
+    // Participant filter
+    const participantFilter = document.getElementById('log-participant-filter');
+    if (participantFilter) {
+        participantFilter.addEventListener('change', (e) => {
+            logParticipantFilter = e.target.value;
+            renderConsoleLogs();
+        });
+    }
+
+    // Close panels on overlay click
+    document.getElementById('participant-detail-overlay')?.addEventListener('click', (e) => {
+        if (e.target.id === 'participant-detail-overlay') closeParticipantDetail();
+    });
+    document.getElementById('session-detail-overlay')?.addEventListener('click', (e) => {
+        if (e.target.id === 'session-detail-overlay') closeSessionDetail();
+    });
+});
+
+// Periodic state refresh (fallback)
 setInterval(() => {
     if (adminSocket.connected) {
         adminSocket.emit('request_state');

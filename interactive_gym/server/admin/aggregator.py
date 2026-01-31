@@ -124,6 +124,36 @@ class AdminEventAggregator:
         self._completed_games: dict[str, dict] = {}
         self.MAX_COMPLETED_GAMES = 100  # Limit historical sessions
 
+        # === Aggregate Metrics (Admin Console v2) ===
+
+        # Session termination counts by reason
+        self._termination_counts: dict[str, int] = {
+            'normal': 0,
+            'partner_disconnected': 0,
+            'focus_loss_timeout': 0,
+            'sustained_ping': 0,
+            'tab_hidden': 0,
+            'exclusion': 0,
+            'reconnection_timeout': 0,
+            'waitroom_timeout': 0,
+            'other': 0
+        }
+
+        # Wait time samples (milliseconds) for waitroom duration analysis
+        self._wait_time_samples: deque[float] = deque(maxlen=500)
+
+        # Latency samples for trend visualization
+        # Each entry: {timestamp: float, latency_ms: int, game_id: str}
+        self._latency_samples: deque[dict] = deque(maxlen=1000)
+
+        # Problems list for real-time alerts
+        # Each entry: {timestamp, type, severity, message, subject_id, game_id}
+        self._problems: deque[dict] = deque(maxlen=200)
+
+        # Scene ending counts for histogram
+        # Maps scene_id -> count of sessions that ended at that scene
+        self._scene_ending_counts: dict[str, int] = {}
+
         # Broadcast loop state
         self._broadcast_running = False
         self._last_state_hash: str | None = None
@@ -247,6 +277,28 @@ class AdminEventAggregator:
         }
         self._session_terminations[game_id] = termination_info
 
+        # Increment termination count for aggregates
+        if reason in self._termination_counts:
+            self._termination_counts[reason] += 1
+        else:
+            self._termination_counts['other'] += 1
+
+        # Add problem entry for non-normal terminations
+        if reason != 'normal':
+            self._add_problem(
+                problem_type='session',
+                severity='warning' if reason in ('tab_hidden', 'focus_loss_timeout') else 'error',
+                message=f"Session ended: {reason}",
+                subject_id=players[0] if players else None,
+                game_id=game_id
+            )
+
+        # Track scene ending for histogram
+        if session_snapshot:
+            scene_id = session_snapshot.get('scene_id')
+            if scene_id:
+                self._scene_ending_counts[scene_id] = self._scene_ending_counts.get(scene_id, 0) + 1
+
         # Store completed session for history
         if session_snapshot:
             self._add_completed_game(game_id, session_snapshot, termination_info)
@@ -267,11 +319,19 @@ class AdminEventAggregator:
             session_snapshot: Full session state at completion
             termination_info: Termination reason and details
         """
-        # Add termination info to snapshot
+        # Get player console logs before archiving
+        subject_ids = session_snapshot.get('subject_ids', [])
+        archived_logs = [
+            log for log in list(self._console_logs)
+            if log.get('subject_id') in subject_ids
+        ][-100:]  # Keep last 100 logs for this session
+
+        # Add termination info and logs to snapshot
         completed_session = {
             **session_snapshot,
             'termination': termination_info,
-            'completed_at': time.time()
+            'completed_at': time.time(),
+            'archived_logs': archived_logs
         }
         self._completed_games[game_id] = completed_session
 
@@ -378,6 +438,70 @@ class AdminEventAggregator:
             'player_logs': player_logs
         }
 
+    def track_wait_complete(self, subject_id: str, wait_duration_ms: float) -> None:
+        """
+        Track when a participant finishes waiting in a waitroom.
+
+        Called when a participant is matched and leaves the waiting room.
+
+        Args:
+            subject_id: The participant's subject ID
+            wait_duration_ms: How long they waited in milliseconds
+        """
+        self._wait_time_samples.append(wait_duration_ms)
+        logger.debug(f"Wait time recorded for {subject_id}: {wait_duration_ms:.0f}ms")
+
+    def track_waitroom_timeout(self, subject_id: str, scene_id: str | None = None) -> None:
+        """
+        Track when a participant times out in the waitroom.
+
+        Args:
+            subject_id: The participant's subject ID
+            scene_id: Optional scene ID where timeout occurred
+        """
+        self._termination_counts['waitroom_timeout'] += 1
+
+        # Track scene ending
+        if scene_id:
+            self._scene_ending_counts[scene_id] = self._scene_ending_counts.get(scene_id, 0) + 1
+
+        # Add as a problem (info level - not really an error)
+        self._add_problem(
+            problem_type='session',
+            severity='info',
+            message='Waitroom timeout',
+            subject_id=subject_id
+        )
+
+        logger.debug(f"Waitroom timeout recorded for {subject_id} at scene {scene_id}")
+
+    def _add_problem(
+        self,
+        problem_type: str,
+        severity: str,
+        message: str,
+        subject_id: str | None = None,
+        game_id: str | None = None
+    ) -> None:
+        """
+        Add a problem entry for the problems panel.
+
+        Args:
+            problem_type: 'error', 'warning', or 'session'
+            severity: 'error', 'warning', or 'info'
+            message: Problem description
+            subject_id: Optional participant ID
+            game_id: Optional game ID
+        """
+        self._problems.append({
+            'timestamp': time.time(),
+            'type': problem_type,
+            'severity': severity,
+            'message': message,
+            'subject_id': subject_id,
+            'game_id': game_id
+        })
+
     def receive_p2p_health(
         self,
         game_id: str,
@@ -402,6 +526,42 @@ class AdminEventAggregator:
             self._p2p_health_cache[game_id] = {}
 
         self._p2p_health_cache[game_id][player_id] = health_data
+
+        # Store latency sample for trend visualization
+        latency_ms = health_data.get('latency_ms')
+        if latency_ms is not None:
+            self._latency_samples.append({
+                'timestamp': time.time(),
+                'latency_ms': latency_ms,
+                'game_id': game_id
+            })
+
+            # Add problem for high latency
+            if latency_ms > 200:
+                self._add_problem(
+                    problem_type='warning',
+                    severity='warning',
+                    message=f"High latency: {latency_ms}ms",
+                    game_id=game_id
+                )
+
+        # Add problem for degraded/reconnecting status
+        status = health_data.get('status')
+        if status == 'reconnecting':
+            self._add_problem(
+                problem_type='warning',
+                severity='error',
+                message="P2P reconnecting",
+                game_id=game_id
+            )
+        elif status == 'degraded':
+            self._add_problem(
+                problem_type='warning',
+                severity='warning',
+                message="P2P connection degraded",
+                game_id=game_id
+            )
+
         logger.debug(f"P2P health update for game {game_id}, player {player_id}: {health_data.get('status')}")
 
     def _get_p2p_health_for_game(self, game_id: str) -> dict:
@@ -565,6 +725,12 @@ class AdminEventAggregator:
         # Get completed/historical sessions (last 50 for display)
         completed_games = self._get_completed_games_state()
 
+        # Build aggregate metrics
+        aggregates = self._get_aggregates()
+
+        # Get recent problems (last 50)
+        recent_problems = list(self._problems)[-50:]
+
         return {
             'participants': participants,
             'waiting_rooms': waiting_rooms,
@@ -572,7 +738,9 @@ class AdminEventAggregator:
             'completed_games': completed_games,  # Historical sessions
             'activity_log': recent_activity,
             'console_logs': recent_console_logs,
-            'summary': summary
+            'summary': summary,
+            'aggregates': aggregates,
+            'problems': recent_problems
         }
 
     def _get_participant_state(self, subject_id: str) -> dict | None:
@@ -618,6 +786,22 @@ class AdminEventAggregator:
         error_count = sum(1 for log in self._console_logs
                         if log.get('subject_id') == subject_id and log.get('level') == 'error')
 
+        # Check if participant is in a waitroom
+        waitroom_info = self._get_participant_waitroom_info(subject_id)
+
+        # Get current episode/round from game if in one
+        current_episode = None
+        if current_game_id and self.pyodide_coordinator:
+            game = self.pyodide_coordinator.games.get(current_game_id)
+            if game:
+                # Try to get episode from P2P health data first
+                p2p_health = self._get_p2p_health_for_game(current_game_id)
+                for health_data in p2p_health.values():
+                    ep = health_data.get('episode')
+                    if ep is not None:
+                        current_episode = ep
+                        break
+
         return {
             'subject_id': subject_id,
             'connection_status': self._compute_connection_status(session, subject_id, stager),
@@ -628,7 +812,9 @@ class AdminEventAggregator:
             'current_game_id': current_game_id,
             'game_history': game_history,
             'log_count': log_count,
-            'error_count': error_count
+            'error_count': error_count,
+            'waitroom_info': waitroom_info,
+            'current_episode': current_episode
         }
 
     def get_participant_detail(self, subject_id: str) -> dict | None:
@@ -668,6 +854,102 @@ class AdminEventAggregator:
             'logs': participant_logs,
             'activity': participant_activity
         }
+
+    def _get_participant_waitroom_info(self, subject_id: str) -> dict | None:
+        """
+        Check if a participant is in a waitroom and return info.
+
+        Args:
+            subject_id: The participant's subject ID
+
+        Returns:
+            Dict with waitroom info (wait_duration_ms, group_id, waiting_count, target_size)
+            or None if not waiting
+        """
+        import time
+        now = time.time()
+
+        # First check pyodide coordinator games (is_active=False means waiting)
+        if self.pyodide_coordinator:
+            for game_id, game in self.pyodide_coordinator.games.items():
+                if subject_id in game.player_subjects.values():
+                    # Check if game hasn't started yet (waiting room)
+                    if not game.is_active:
+                        # Calculate wait duration from game creation
+                        wait_duration_ms = 0
+                        if hasattr(game, 'created_at'):
+                            wait_duration_ms = int((now - game.created_at) * 1000)
+
+                        # Get current and target player counts
+                        waiting_count = len(game.player_subjects)
+                        target_size = game.num_expected_players
+
+                        # Get scene_id from participant session if available
+                        scene_id = None
+                        session = self.participant_sessions.get(subject_id)
+                        if session:
+                            scene_id = session.current_scene_id
+
+                        return {
+                            'scene_id': scene_id,
+                            'group_id': game_id,
+                            'wait_duration_ms': max(0, wait_duration_ms),
+                            'waiting_count': waiting_count,
+                            'target_size': target_size
+                        }
+                    # Game is active, not in waitroom
+                    return None
+
+        for scene_id, game_manager in list(self.game_managers.items()):
+            # Check group waitrooms
+            if hasattr(game_manager, 'group_waitrooms'):
+                wait_times = getattr(game_manager, 'group_wait_start_times', {})
+                for group_id, waitroom in game_manager.group_waitrooms.items():
+                    if waitroom:
+                        waiting_subjects = list(waitroom) if isinstance(waitroom, list) else list(waitroom.keys())
+                        if subject_id in waiting_subjects:
+                            wait_start = wait_times.get(subject_id, now)
+                            wait_duration_ms = int((now - wait_start) * 1000)
+
+                            # Get target size
+                            target_size = 2
+                            if hasattr(game_manager, 'scene') and game_manager.scene:
+                                target_size = getattr(game_manager.scene, 'num_players', 2)
+
+                            return {
+                                'scene_id': scene_id,
+                                'group_id': group_id,
+                                'wait_duration_ms': wait_duration_ms,
+                                'waiting_count': len(waiting_subjects),
+                                'target_size': target_size
+                            }
+
+            # Check individual waiting games
+            if hasattr(game_manager, 'waiting_games') and game_manager.waiting_games:
+                for game_id in game_manager.waiting_games:
+                    game = game_manager.games.get(game_id)
+                    if game and hasattr(game, 'human_players'):
+                        if subject_id in [str(p) for p in game.human_players.keys()]:
+                            # Get wait duration from waitroom_timeouts if available
+                            wait_duration_ms = 0
+                            if hasattr(game_manager, 'waitroom_timeouts') and game_id in game_manager.waitroom_timeouts:
+                                # Calculate how long they've been waiting
+                                timeout_time = game_manager.waitroom_timeouts[game_id]
+                                if hasattr(game_manager.scene, 'waitroom_timeout'):
+                                    total_timeout = game_manager.scene.waitroom_timeout / 1000
+                                    wait_duration_ms = int((total_timeout - (timeout_time - now)) * 1000)
+
+                            target_size = getattr(game_manager.scene, 'num_players', 2) if hasattr(game_manager, 'scene') else 2
+
+                            return {
+                                'scene_id': scene_id,
+                                'group_id': None,
+                                'wait_duration_ms': max(0, wait_duration_ms),
+                                'waiting_count': len(game.human_players),
+                                'target_size': target_size
+                            }
+
+        return None
 
     def _compute_connection_status(self, session: Any, subject_id: str, stager: Any = None) -> str:
         """
@@ -794,11 +1076,25 @@ class AdminEventAggregator:
         games = []
         tracked_game_ids = set()  # Avoid duplicates
 
+        # Build set of connected participant IDs for filtering stale games
+        connected_subjects = set()
+        for subject_id in list(self.participant_sessions.keys()):
+            session = self.participant_sessions.get(subject_id)
+            if session and session.socket_id:
+                connected_subjects.add(subject_id)
+
         # 1. Get multiplayer games from coordinator
         if self.pyodide_coordinator:
             try:
                 for game_id, game_state in list(self.pyodide_coordinator.games.items()):
                     tracked_game_ids.add(game_id)
+
+                    # Get subject IDs for this game
+                    subject_ids = list(game_state.player_subjects.values())
+
+                    # Filter: Only show games with at least one connected participant
+                    if not any(sid in connected_subjects for sid in subject_ids):
+                        continue  # No connected participants - skip stale game
 
                     # Get P2P health data for this game (Phase 33)
                     p2p_health = self._get_p2p_health_for_game(game_id)
@@ -815,7 +1111,7 @@ class AdminEventAggregator:
                     games.append({
                         'game_id': game_id,
                         'players': list(game_state.players.keys()),
-                        'subject_ids': list(game_state.player_subjects.values()),
+                        'subject_ids': subject_ids,
                         'current_frame': game_state.frame_number,
                         'is_server_authoritative': game_state.server_authoritative,
                         'created_at': game_state.created_at,
@@ -856,6 +1152,10 @@ class AdminEventAggregator:
                         if gid == game_id:
                             subject_ids.append(subject_id)
 
+                    # Filter: Only show games with at least one connected participant
+                    if not any(sid in connected_subjects for sid in subject_ids):
+                        continue  # No connected participants - skip stale game
+
                     games.append({
                         'game_id': game_id,
                         'players': list(game.human_players.keys()) if hasattr(game, 'human_players') else [],
@@ -891,6 +1191,78 @@ class AdminEventAggregator:
         )
         # Return last 50 for display
         return completed[:50]
+
+    def _get_aggregates(self) -> dict:
+        """
+        Build aggregate metrics for admin dashboard.
+
+        Returns:
+            Dict with termination_counts, wait_time stats, latency samples
+        """
+        # Calculate total sessions ended
+        total_ended = sum(self._termination_counts.values())
+
+        # Calculate wait time stats
+        wait_samples = list(self._wait_time_samples)
+        wait_time = {
+            'avg_ms': int(sum(wait_samples) / len(wait_samples)) if wait_samples else None,
+            'max_ms': int(max(wait_samples)) if wait_samples else None,
+            'min_ms': int(min(wait_samples)) if wait_samples else None,
+            'count': len(wait_samples)
+        }
+
+        # Get latency samples for sparkline (last 100)
+        latency_samples = list(self._latency_samples)[-100:]
+        latency_values = [s['latency_ms'] for s in latency_samples if s.get('latency_ms') is not None]
+
+        latency = {
+            'current_avg_ms': int(sum(latency_values[-10:]) / len(latency_values[-10:])) if latency_values else None,
+            'samples': latency_values[-50:]  # Last 50 for sparkline
+        }
+
+        # Calculate termination proportions with detailed breakdown
+        # Completed = normal game completion
+        completed_count = self._termination_counts.get('normal', 0)
+
+        # Waitroom timeout = couldn't find a partner in time
+        waitroom_timeout_count = self._termination_counts.get('waitroom_timeout', 0)
+
+        # Partner away = partner stopped responding (focus loss, tab hidden)
+        partner_away_count = (
+            self._termination_counts.get('focus_loss_timeout', 0) +
+            self._termination_counts.get('tab_hidden', 0)
+        )
+
+        # Partner left = partner explicitly disconnected/closed window
+        partner_left_count = (
+            self._termination_counts.get('partner_disconnected', 0) +
+            self._termination_counts.get('reconnection_timeout', 0)
+        )
+
+        # Other = ping issues, exclusions, etc.
+        other_count = (
+            self._termination_counts.get('sustained_ping', 0) +
+            self._termination_counts.get('exclusion', 0) +
+            self._termination_counts.get('other', 0)
+        )
+
+        summary_stats = {
+            'completed': completed_count,
+            'waitroom_timeout': waitroom_timeout_count,
+            'partner_away': partner_away_count,
+            'partner_left': partner_left_count,
+            'other': other_count,
+            'total': total_ended
+        }
+
+        return {
+            'termination_counts': dict(self._termination_counts),
+            'total_sessions_ended': total_ended,
+            'wait_time': wait_time,
+            'latency': latency,
+            'summary_stats': summary_stats,
+            'scene_endings': dict(self._scene_ending_counts)
+        }
 
     def get_session_history_detail(self, game_id: str) -> dict | None:
         """
@@ -931,6 +1303,22 @@ class AdminEventAggregator:
 
         # Append to console log (deque auto-removes old entries when full)
         self._console_logs.append(log_entry)
+
+        # Track errors and warnings as problems
+        if level == 'error':
+            self._add_problem(
+                problem_type='error',
+                severity='error',
+                message=message[:100] if message else 'Unknown error',
+                subject_id=subject_id
+            )
+        elif level == 'warn':
+            self._add_problem(
+                problem_type='warning',
+                severity='warning',
+                message=message[:100] if message else 'Warning',
+                subject_id=subject_id
+            )
 
         # Persist to disk (non-blocking)
         if self._save_console_logs:

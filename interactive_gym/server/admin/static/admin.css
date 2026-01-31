@@ -1,11 +1,18 @@
 /**
- * Admin Dashboard Custom Styles
- * Extends DaisyUI with dashboard-specific styles
+ * Admin Dashboard CSS - v3
+ * Participant-centric dashboard with table layout
  */
 
 /* ============================================
-   Stat Cards - Modular top-level metrics
+   Summary Stats Bar
    ============================================ */
+
+.stats-bar {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+}
 
 .stat-card {
     display: flex;
@@ -27,6 +34,11 @@
     flex-shrink: 0;
 }
 
+.stat-card-icon svg {
+    width: 1.25rem;
+    height: 1.25rem;
+}
+
 .stat-card-content {
     display: flex;
     flex-direction: column;
@@ -46,122 +58,725 @@
     letter-spacing: 0.025em;
 }
 
-/* Responsive stat card value for narrower cards in 6-column grid */
-@media (min-width: 1024px) {
-    .stat-card-value {
-        font-size: 1.25rem;
+@media (max-width: 1200px) {
+    .stats-bar {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    .stats-bar {
+        grid-template-columns: repeat(2, 1fr);
     }
 }
 
 /* ============================================
-   Participant Cards - Grid display
+   Section Cards
    ============================================ */
 
-/* Participant card grid for main panel */
-.participant-card-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 0.75rem;
-}
-
-.participant-list-expanded {
-    min-height: 300px;
-}
-
-.participant-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 0.75rem;
-}
-
-.participant-card {
-    display: flex;
-    flex-direction: column;
-    padding: 0.875rem;
+.section-card {
     background: oklch(var(--b1));
-    border: 1px solid oklch(var(--bc) / 0.1);
-    border-radius: 0.5rem;
-    transition: box-shadow 0.15s ease, border-color 0.15s ease;
+    border-radius: 0.75rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    overflow: hidden;
+}
+
+.section-header {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid oklch(var(--bc) / 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.section-header h3 {
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin: 0;
+}
+
+.section-body {
+    padding: 1rem;
+}
+
+.section-body.p-0 {
+    padding: 0;
+}
+
+/* Filter Toggle */
+.filter-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.75rem;
+    color: oklch(var(--bc) / 0.6);
     cursor: pointer;
+    user-select: none;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    transition: background 0.15s ease;
 }
 
-.participant-card:hover {
-    border-color: oklch(var(--p) / 0.5);
-    box-shadow: 0 2px 8px 0 rgb(0 0 0 / 0.08);
+.filter-toggle:hover {
+    background: oklch(var(--bc) / 0.05);
 }
 
-.participant-card:focus {
-    outline: 2px solid oklch(var(--p));
-    outline-offset: 2px;
+.filter-toggle .checkbox {
+    margin: 0;
 }
 
-.participant-card.participant-has-errors {
-    border-color: oklch(var(--er) / 0.3);
-    background: oklch(var(--er) / 0.03);
+/* ============================================
+   Participant Table
+   ============================================ */
+
+.participant-table,
+.completed-table,
+.archived-sessions-table,
+.players-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
 }
 
-.participant-card-title {
+.participant-table th,
+.completed-table th,
+.archived-sessions-table th,
+.players-table th {
+    text-align: left;
+    padding: 0.75rem 1rem;
+    background: oklch(var(--b2));
+    font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    color: oklch(var(--bc) / 0.6);
+    border-bottom: 1px solid oklch(var(--bc) / 0.1);
+}
+
+.participant-table td,
+.completed-table td,
+.archived-sessions-table td,
+.players-table td {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid oklch(var(--bc) / 0.05);
+    vertical-align: middle;
+}
+
+.participant-table tbody tr,
+.completed-table tbody tr,
+.archived-sessions-table tbody tr,
+.players-table tbody tr {
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.participant-table tbody tr:hover,
+.completed-table tbody tr:hover,
+.archived-sessions-table tbody tr:hover,
+.players-table tbody tr:hover {
+    background: oklch(var(--bc) / 0.05);
+}
+
+.status-indicator {
     display: flex;
     align-items: center;
     gap: 0.5rem;
 }
 
-.participant-card-header {
-    display: flex;
+.status-indicator .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.status-indicator .status-label {
+    font-size: 0.8rem;
+}
+
+.error-badge {
+    display: inline-flex;
     align-items: center;
+    justify-content: center;
+    background: #ef4444;
+    color: white;
+    padding: 0.125rem 0.5rem;
+    border-radius: 9999px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    min-width: 1.25rem;
+}
+
+.error-badge-small {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #ef4444;
+    color: white;
+    padding: 0.1rem 0.35rem;
+    border-radius: 9999px;
+    font-size: 0.6rem;
+    font-weight: 600;
+    min-width: 1rem;
+}
+
+.font-mono {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+/* Game Type Badge */
+.game-type-badge {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.7rem;
+    font-weight: 500;
+    background: oklch(var(--bc) / 0.1);
+    color: oklch(var(--bc) / 0.6);
+}
+
+.game-type-badge.type-multiplayer {
+    background: rgba(147, 51, 234, 0.15);
+    color: #9333ea;
+}
+
+.game-type-badge.type-single {
+    background: rgba(59, 130, 246, 0.15);
+    color: #3b82f6;
+}
+
+/* ============================================
+   Multiplayer Session Cards
+   ============================================ */
+
+#multiplayer-sessions-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 0.75rem;
+}
+
+.multiplayer-session-card {
+    background: oklch(var(--b2));
+    border-radius: 0.5rem;
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    border: 1px solid transparent;
+}
+
+.multiplayer-session-card:hover {
+    background: oklch(var(--b3));
+    border-color: oklch(var(--bc) / 0.1);
+}
+
+.session-header-row {
+    display: flex;
     justify-content: space-between;
+    align-items: center;
     margin-bottom: 0.5rem;
 }
 
-.participant-card-id {
-    font-family: ui-monospace, monospace;
-    font-size: 0.8125rem;
+.session-health {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.session-health .health-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+.session-id {
+    font-size: 0.8rem;
     font-weight: 500;
-    color: oklch(var(--bc));
-    max-width: 140px;
+}
+
+.session-metrics-row {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.metric-pill {
+    background: oklch(var(--bc) / 0.1);
+    padding: 0.2rem 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.7rem;
+    color: oklch(var(--bc) / 0.7);
+}
+
+.session-players-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.session-player {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    background: oklch(var(--b1));
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+}
+
+.player-name {
+    font-size: 0.75rem;
+}
+
+/* ============================================
+   Outcome Badge
+   ============================================ */
+
+.outcome-badge {
+    display: inline-block;
+    padding: 0.15rem 0.4rem;
+    border-radius: 0.25rem;
+    font-size: 0.7rem;
+    font-weight: 500;
+}
+
+.outcome-badge.outcome-normal,
+.outcome-badge.outcome-completed {
+    background: rgba(34, 197, 94, 0.2);
+    color: #22c55e;
+}
+
+.outcome-badge.outcome-partner_disconnected,
+.outcome-badge.outcome-reconnection_timeout {
+    background: rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+}
+
+.outcome-badge.outcome-focus_loss_timeout,
+.outcome-badge.outcome-tab_hidden,
+.outcome-badge.outcome-waitroom_timeout {
+    background: rgba(234, 179, 8, 0.2);
+    color: #eab308;
+}
+
+.outcome-badge.outcome-sustained_ping,
+.outcome-badge.outcome-exclusion {
+    background: rgba(156, 163, 175, 0.2);
+    color: #6b7280;
+}
+
+/* ============================================
+   Problems Panel
+   ============================================ */
+
+#problems-list {
+    max-height: 250px;
+    overflow-y: auto;
+}
+
+.problem-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    border-radius: 0.375rem;
+    font-size: 0.8rem;
+    margin-bottom: 0.25rem;
+}
+
+.problem-item.problem-error {
+    background: rgba(239, 68, 68, 0.1);
+}
+
+.problem-item.problem-warning {
+    background: rgba(234, 179, 8, 0.1);
+}
+
+.problem-item.problem-info {
+    background: rgba(59, 130, 246, 0.1);
+}
+
+.problem-icon {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+.problem-error .problem-icon {
+    background: #ef4444;
+    color: white;
+}
+
+.problem-warning .problem-icon {
+    background: #eab308;
+    color: white;
+}
+
+.problem-info .problem-icon {
+    background: #3b82f6;
+    color: white;
+}
+
+.problem-time {
+    color: oklch(var(--bc) / 0.5);
+    font-size: 0.7rem;
+    flex-shrink: 0;
+}
+
+.problem-msg {
+    flex: 1;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.participant-card-body {
+.problem-subject {
+    font-family: ui-monospace, monospace;
+    font-size: 0.7rem;
+    color: oklch(var(--bc) / 0.6);
+}
+
+/* ============================================
+   Session Outcomes (Aggregates)
+   ============================================ */
+
+.outcome-summary {
+    display: flex;
+    gap: 2rem;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid oklch(var(--bc) / 0.1);
+}
+
+.outcome-stat {
     display: flex;
     flex-direction: column;
-    gap: 0.375rem;
-}
-
-.participant-card-row {
-    display: flex;
     align-items: center;
-    justify-content: space-between;
+    text-align: center;
+}
+
+.outcome-stat-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.outcome-stat-label {
+    font-size: 0.7rem;
+    color: oklch(var(--bc) / 0.6);
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+}
+
+/* Scene Histogram */
+.scene-histogram-container {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid oklch(var(--bc) / 0.1);
+}
+
+.scene-histogram-label {
     font-size: 0.75rem;
+    color: oklch(var(--bc) / 0.6);
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
 }
 
-.participant-card-label {
+.scene-histogram {
+    display: flex;
+    align-items: flex-end;
+    gap: 4px;
+    height: 60px;
+    min-height: 40px;
+}
+
+.scene-bar-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+    max-width: 60px;
+    min-width: 30px;
+}
+
+.scene-bar {
+    width: 100%;
+    background: oklch(var(--p));
+    border-radius: 2px 2px 0 0;
+    min-height: 4px;
+    transition: height 0.3s ease;
+}
+
+.scene-bar-label {
+    font-size: 0.65rem;
     color: oklch(var(--bc) / 0.5);
+    margin-top: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    text-align: center;
 }
 
-.participant-card-value {
+.scene-bar-count {
+    font-size: 0.6rem;
+    color: oklch(var(--bc) / 0.7);
+    font-weight: 500;
+}
+
+.scene-bar-pct {
+    font-size: 0.7rem;
     color: oklch(var(--bc) / 0.8);
+    font-weight: 600;
+    margin-bottom: 2px;
 }
 
-/* Progress bar in participant card */
-.participant-progress {
+/* Metrics Panel Row */
+.metrics-panel-row {
+    display: flex;
+    gap: 2rem;
+    flex-wrap: wrap;
+}
+
+.metrics-panel-row .metric-row {
     display: flex;
     align-items: center;
     gap: 0.5rem;
 }
 
-.participant-progress .progress {
-    height: 0.375rem;
-    flex: 1;
+.metrics-panel-row .metric-label {
+    font-size: 0.75rem;
+    color: oklch(var(--bc) / 0.6);
 }
 
-.participant-progress-text {
-    font-size: 0.6875rem;
+.metrics-panel-row .metric-value {
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.sparkline-container {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.sparkline {
+    display: block;
+}
+
+/* ============================================
+   Console Logs
+   ============================================ */
+
+.logs-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.logs-header select {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    min-height: auto;
+    height: auto;
+}
+
+#console-logs-list {
+    max-height: 300px;
+    overflow-y: auto;
+    font-family: ui-monospace, monospace;
+    font-size: 0.75rem;
+}
+
+.log-entry {
+    display: flex;
+    gap: 0.5rem;
+    padding: 0.25rem 0.75rem;
+    border-bottom: 1px solid oklch(var(--bc) / 0.05);
+}
+
+.log-entry.log-error {
+    background: rgba(239, 68, 68, 0.1);
+}
+
+.log-entry.log-warn {
+    background: rgba(234, 179, 8, 0.1);
+}
+
+.log-time {
+    color: oklch(var(--bc) / 0.5);
+    flex-shrink: 0;
+    width: 70px;
+}
+
+.log-level {
+    font-weight: 600;
+    flex-shrink: 0;
+    width: 50px;
+}
+
+.log-entry.log-error .log-level { color: #ef4444; }
+.log-entry.log-warn .log-level { color: #eab308; }
+.log-entry.log-info .log-level { color: #3b82f6; }
+
+.log-subject {
     color: oklch(var(--bc) / 0.6);
-    min-width: 2.5rem;
-    text-align: right;
+    flex-shrink: 0;
+    width: 80px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.log-msg {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ============================================
+   Detail Panels (Participant & Session)
+   ============================================ */
+
+#participant-detail-overlay,
+#session-detail-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 9999;
+    display: none;
+    justify-content: flex-end;
+    backdrop-filter: blur(4px);
+}
+
+#participant-detail-overlay:not(.hidden),
+#session-detail-overlay:not(.hidden) {
+    display: flex;
+}
+
+.detail-panel {
+    width: 450px;
+    max-width: 90%;
+    background-color: #ffffff;
+    color: #1f2937;
+    height: 100%;
+    overflow-y: auto;
+    box-shadow: -8px 0 30px rgba(0, 0, 0, 0.2);
+    border-left: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.detail-panel-wide {
+    width: 600px;
+}
+
+/* Dark theme support */
+[data-theme="dark"] .detail-panel {
+    background-color: #1d232a;
+    color: #a6adbb;
+    border-left-color: rgba(255, 255, 255, 0.1);
+}
+
+.detail-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    position: sticky;
+    top: 0;
+    background-color: inherit;
+    z-index: 10;
+}
+
+.detail-header h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0;
+}
+
+.detail-content {
+    padding: 1rem;
+}
+
+.detail-section {
+    margin-bottom: 1.5rem;
+}
+
+.detail-section h4 {
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: #6b7280;
+    margin-bottom: 0.75rem;
+}
+
+.detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+}
+
+.detail-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.detail-label {
+    font-size: 0.7rem;
+    color: #6b7280;
+    text-transform: uppercase;
+}
+
+.detail-value {
+    font-size: 0.9rem;
+}
+
+.detail-logs {
+    max-height: 300px;
+    overflow-y: auto;
+    background-color: rgba(0, 0, 0, 0.03);
+    border-radius: 0.375rem;
+    padding: 0.5rem;
+}
+
+[data-theme="dark"] .detail-logs {
+    background-color: rgba(255, 255, 255, 0.03);
+}
+
+.detail-logs .log-entry {
+    font-size: 0.7rem;
+    padding: 0.2rem 0.5rem;
+}
+
+.termination-section {
+    background-color: rgba(239, 68, 68, 0.1);
+    padding: 0.75rem;
+    border-radius: 0.5rem;
+}
+
+.termination-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.termination-reason {
+    font-weight: 600;
+    color: #ef4444;
+}
+
+.termination-time {
+    font-size: 0.8rem;
+    color: #6b7280;
 }
 
 /* ============================================
@@ -195,96 +810,9 @@
     animation: pulse-dot 1s infinite;
 }
 
-/* ============================================
-   Activity Timeline
-   ============================================ */
-
-.activity-timeline {
-    max-height: 350px;
-    overflow-y: auto;
-    padding: 0.75rem;
-}
-
-.activity-item {
-    display: flex;
-    align-items: flex-start;
-    gap: 0.5rem;
-    padding: 0.5rem 0;
-    border-bottom: 1px solid oklch(var(--bc) / 0.08);
-}
-
-.activity-item:last-child {
-    border-bottom: none;
-}
-
-.activity-time {
-    font-size: 0.6875rem;
-    color: oklch(var(--bc) / 0.4);
-    min-width: 55px;
-    font-family: ui-monospace, monospace;
-}
-
-.activity-icon {
-    width: 1rem;
-    text-align: center;
-    font-weight: 600;
-}
-
-.activity-content {
-    flex: 1;
-    font-size: 0.8125rem;
-    color: oklch(var(--bc) / 0.8);
-}
-
-.activity-content .subject-id {
-    font-family: ui-monospace, monospace;
-    font-size: 0.75rem;
-    background: oklch(var(--bc) / 0.05);
-    padding: 0.125rem 0.25rem;
-    border-radius: 0.25rem;
-}
-
-/* ============================================
-   Waiting Rooms
-   ============================================ */
-
-.waiting-room-card {
-    padding: 0.75rem;
-    background: oklch(var(--b2));
-    border-radius: 0.5rem;
-    margin-bottom: 0.5rem;
-}
-
-.waiting-room-card:last-child {
-    margin-bottom: 0;
-}
-
-.waiting-room-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 0.375rem;
-}
-
-.waiting-room-scene {
-    font-weight: 500;
-    font-size: 0.875rem;
-}
-
-.waiting-room-count {
-    font-size: 0.75rem;
-    color: oklch(var(--bc) / 0.6);
-}
-
-.waiting-room-groups {
-    font-size: 0.6875rem;
-    color: oklch(var(--bc) / 0.5);
-}
-
-.waiting-room-group {
-    display: flex;
-    justify-content: space-between;
-    padding: 0.25rem 0;
+@keyframes pulse-dot {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
 }
 
 /* ============================================
@@ -301,261 +829,10 @@
     text-align: center;
 }
 
-.empty-state svg {
-    opacity: 0.3;
-}
-
-.empty-state-sm {
-    padding: 1rem;
-    color: oklch(var(--bc) / 0.4);
-    text-align: center;
-    font-size: 0.875rem;
-}
-
 /* ============================================
-   Animations
+   Health Legend
    ============================================ */
 
-@keyframes pulse-dot {
-    0%, 100% {
-        opacity: 1;
-    }
-    50% {
-        opacity: 0.4;
-    }
-}
-
-/* ============================================
-   Status Colors
-   ============================================ */
-
-.status-connected {
-    --tw-bg-opacity: 1;
-    background-color: oklch(var(--su) / var(--tw-bg-opacity));
-}
-
-.status-reconnecting {
-    --tw-bg-opacity: 1;
-    background-color: oklch(var(--wa) / var(--tw-bg-opacity));
-}
-
-.status-disconnected {
-    --tw-bg-opacity: 1;
-    background-color: oklch(var(--er) / var(--tw-bg-opacity));
-}
-
-.status-completed {
-    --tw-bg-opacity: 0.5;
-    background-color: oklch(var(--bc) / var(--tw-bg-opacity));
-}
-
-/* Event type colors for timeline */
-.event-join { color: oklch(var(--su)); }
-.event-disconnect { color: oklch(var(--er)); }
-.event-advance { color: oklch(var(--in)); }
-.event-game { color: oklch(var(--p)); }
-
-/* ============================================
-   Multiplayer Games
-   ============================================ */
-
-.multiplayer-game-card {
-    padding: 0.75rem;
-    background: oklch(var(--b2));
-    border-radius: 0.5rem;
-    margin-bottom: 0.5rem;
-}
-
-.multiplayer-game-card:last-child {
-    margin-bottom: 0;
-}
-
-.multiplayer-game-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 0.5rem;
-}
-
-.multiplayer-game-id {
-    font-family: ui-monospace, monospace;
-    font-size: 0.8125rem;
-    font-weight: 500;
-}
-
-.multiplayer-game-players {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.375rem;
-}
-
-.multiplayer-player {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
-    font-size: 0.6875rem;
-    font-family: ui-monospace, monospace;
-    padding: 0.25rem 0.5rem;
-    background: oklch(var(--bc) / 0.08);
-    border-radius: 0.25rem;
-    color: oklch(var(--bc) / 0.7);
-}
-
-.multiplayer-player.host {
-    background: oklch(var(--su) / 0.15);
-    color: oklch(var(--su));
-}
-
-.host-badge {
-    font-size: 0.5625rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    background: oklch(var(--su) / 0.2);
-    padding: 0.125rem 0.25rem;
-    border-radius: 0.125rem;
-    letter-spacing: 0.02em;
-}
-
-/* ============================================
-   Session Cards with P2P Health (Phase 33)
-   ============================================ */
-
-.session-card {
-    background: oklch(var(--b1));
-    border: 1px solid oklch(var(--b3));
-    border-radius: 0.5rem;
-    padding: 0.75rem;
-}
-
-/* Grid container handles gaps, so margin not needed when in grid */
-.session-card-grid .session-card {
-    margin-bottom: 0;
-}
-
-.session-card.session-problem {
-    border-color: oklch(var(--wa));
-    background: oklch(var(--wa) / 0.05);
-}
-
-.session-card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 0.5rem;
-}
-
-.session-card-title {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-weight: 500;
-}
-
-.session-id {
-    font-family: ui-monospace, monospace;
-    font-size: 0.8125rem;
-}
-
-.health-indicator {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    display: inline-block;
-    flex-shrink: 0;
-}
-
-.health-indicator.health-healthy,
-.health-dot.health-healthy {
-    background-color: oklch(var(--su));
-}
-
-.health-indicator.health-degraded,
-.health-dot.health-degraded {
-    background-color: oklch(var(--wa));
-}
-
-.health-indicator.health-reconnecting,
-.health-dot.health-reconnecting {
-    background-color: oklch(var(--er));
-    animation: pulse 1s infinite;
-}
-
-.health-indicator.health-completed,
-.health-dot.health-completed {
-    background-color: oklch(var(--bc) / 0.4);
-}
-
-.health-indicator.health-disconnected,
-.health-dot.health-disconnected {
-    background-color: oklch(var(--er));
-}
-
-@keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
-}
-
-.session-card-metrics {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 0.5rem;
-    margin-bottom: 0.5rem;
-    font-size: 0.75rem;
-}
-
-.session-metric {
-    display: flex;
-    flex-direction: column;
-}
-
-.session-metric-label {
-    color: oklch(var(--bc) / 0.5);
-    font-size: 0.65rem;
-    text-transform: uppercase;
-}
-
-.session-metric-value {
-    font-weight: 500;
-}
-
-.session-status-healthy { color: oklch(var(--su)); }
-.session-status-degraded { color: oklch(var(--wa)); }
-.session-status-reconnecting { color: oklch(var(--er)); }
-.session-status-completed { color: oklch(var(--bc) / 0.6); }
-
-/* Historical session card styling */
-.session-card.session-historical {
-    border-color: oklch(var(--bc) / 0.15);
-    background: oklch(var(--bc) / 0.02);
-}
-
-.session-card.session-historical:hover {
-    border-color: oklch(var(--bc) / 0.3);
-}
-
-.session-card-players {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.25rem;
-    font-size: 0.7rem;
-}
-
-.session-player {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
-    font-family: ui-monospace, monospace;
-    background: oklch(var(--b2));
-    padding: 0.125rem 0.375rem;
-    border-radius: 0.25rem;
-    color: oklch(var(--bc) / 0.7);
-}
-
-.session-player.host {
-    background: oklch(var(--p) / 0.1);
-}
-
-/* Health legend in section header */
 .health-legend {
     display: flex;
     align-items: center;
@@ -571,405 +848,40 @@
     display: inline-block;
 }
 
-/* Text warning color for high latency */
-.text-warning {
-    color: oklch(var(--wa));
-}
-
-/* ============================================
-   Console Logs
-   ============================================ */
-
-.console-logs-container {
-    max-height: 350px;
-    overflow-y: auto;
-    font-family: ui-monospace, monospace;
-    font-size: 0.6875rem;
-}
-
-.log-entry {
-    display: flex;
-    align-items: flex-start;
-    gap: 0.5rem;
-    padding: 0.375rem 0.75rem;
-    border-bottom: 1px solid oklch(var(--bc) / 0.05);
-}
-
-.log-entry:last-child {
-    border-bottom: none;
-}
-
-.log-entry.log-error {
-    background: oklch(var(--er) / 0.08);
-}
-
-.log-entry.log-warn {
-    background: oklch(var(--wa) / 0.08);
-}
-
-.log-entry.log-info {
-    background: oklch(var(--in) / 0.05);
-}
-
-.log-time {
-    color: oklch(var(--bc) / 0.4);
-    min-width: 55px;
-    flex-shrink: 0;
-}
-
-.log-level {
-    font-weight: 600;
-    min-width: 40px;
-    flex-shrink: 0;
-}
-
-.log-level-error { color: oklch(var(--er)); }
-.log-level-warn { color: oklch(var(--wa)); }
-.log-level-info { color: oklch(var(--in)); }
-.log-level-log { color: oklch(var(--bc) / 0.5); }
-
-.log-subject {
-    color: oklch(var(--bc) / 0.5);
-    background: oklch(var(--bc) / 0.05);
-    padding: 0.0625rem 0.25rem;
-    border-radius: 0.125rem;
-    flex-shrink: 0;
-    max-width: 80px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.log-message {
-    color: oklch(var(--bc) / 0.8);
-    word-break: break-word;
-    flex: 1;
-    min-width: 0;
-}
-
-/* ============================================
-   Problems Indicator (Phase 35)
-   ============================================ */
-
-.problems-indicator {
-    cursor: pointer;
-}
-
-.problems-indicator:hover {
-    opacity: 0.8;
-}
-
-/* ============================================
-   Expanded Session List (Phase 35)
-   ============================================ */
-
-.session-list-expanded {
-    min-height: 400px;
-}
-
-.session-list-expanded .empty-state {
-    padding: 4rem 2rem;
-}
-
-/* Compact session list for secondary panel */
-.session-list-compact {
-    min-height: 150px;
-    max-height: 350px;
-    overflow-y: auto;
-}
-
-/* Session card grid for wider panel */
-@media (min-width: 1024px) {
-    .session-card-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-        gap: 0.75rem;
-    }
-}
-
-/* ============================================
-   Compact Participants List (Phase 35)
-   ============================================ */
-
-.participant-list-compact {
-    max-height: 300px;
-    overflow-y: auto;
-}
-
-.participant-item-compact {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.5rem 0.75rem;
-    border-bottom: 1px solid oklch(var(--bc) / 0.08);
-}
-
-.participant-item-compact:last-child {
-    border-bottom: none;
-}
-
-.participant-item-id {
-    font-family: ui-monospace, monospace;
-    font-size: 0.75rem;
-    max-width: 100px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-/* ============================================
-   Session Detail Panel (Phase 34)
-   ============================================ */
-
-.session-detail-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.75);
-    z-index: 100;
-    display: flex;
-    justify-content: flex-end;
-    backdrop-filter: blur(4px);
-}
-
-.session-detail-overlay.hidden {
-    display: none;
-}
-
-.session-detail-panel {
-    width: 100%;
-    max-width: 480px;
-    height: 100%;
-    background: #1e293b;  /* Solid slate-800 - lighter than typical dark bg */
-    box-shadow: -8px 0 30px rgba(0, 0, 0, 0.5);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    border-left: 2px solid #3b82f6;  /* Blue accent border */
-}
-
-.session-detail-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1rem 1.25rem;
-    background: #334155;  /* Slate-700 - slightly lighter header */
-    border-bottom: 1px solid #475569;
-    flex-shrink: 0;
-}
-
-.session-detail-content {
-    flex: 1;
-    overflow-y: auto;
-    padding: 1rem 1.25rem;
-    background: #1e293b;  /* Match panel background */
-    color: #e2e8f0;  /* Light text */
-}
-
-.session-detail-section {
-    margin-bottom: 1.5rem;
-}
-
-.session-detail-section:last-child {
-    margin-bottom: 0;
-}
-
-.session-detail-section-title {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: #94a3b8;  /* Slate-400 */
-    margin-bottom: 0.75rem;
-    padding-bottom: 0.5rem;
-    border-bottom: 1px solid #475569;
-}
-
-.session-detail-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 0.75rem;
-}
-
-.session-detail-item {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-}
-
-.session-detail-label {
-    font-size: 0.6875rem;
-    color: #94a3b8;  /* Slate-400 */
-    text-transform: uppercase;
-}
-
-.session-detail-value {
-    font-size: 0.875rem;
-    font-weight: 500;
-    display: flex;
-    align-items: center;
-    gap: 0.375rem;
-}
-
-.session-detail-players {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-}
-
-.session-detail-player {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.625rem 0.75rem;
-    background: #334155;  /* Slate-700 */
-    border-radius: 0.375rem;
-    font-size: 0.8125rem;
-    color: #e2e8f0;
-}
-
-.session-detail-player .player-id {
-    font-family: ui-monospace, monospace;
-    font-weight: 500;
-}
-
-.player-health {
-    font-size: 0.75rem;
-    color: #94a3b8;  /* Slate-400 */
-}
-
-.player-health-healthy { color: #22c55e; }  /* Green-500 */
-.player-health-degraded { color: #eab308; }  /* Yellow-500 */
-.player-health-reconnecting { color: #ef4444; }  /* Red-500 */
-.player-health-unknown { color: #64748b; }  /* Slate-500 */
-
-/* Termination section */
-.session-termination {
-    background: rgba(239, 68, 68, 0.1);  /* Red with low opacity */
-    border-radius: 0.5rem;
-    padding: 0.875rem;
-    margin-left: -0.5rem;
-    margin-right: -0.5rem;
-    border: 1px solid rgba(239, 68, 68, 0.3);
-}
-
-.session-termination .session-detail-section-title {
-    color: #f87171;  /* Red-400 */
-    border-bottom-color: rgba(239, 68, 68, 0.3);
-}
-
-.termination-info {
-    display: flex;
-    flex-direction: column;
-    gap: 0.375rem;
-}
-
-.termination-reason {
-    font-weight: 600;
-    color: #f87171;  /* Red-400 */
-}
-
-.termination-message {
-    font-size: 0.8125rem;
-    color: #cbd5e1;  /* Slate-300 */
-    padding: 0.5rem;
-    background: #0f172a;  /* Slate-900 */
-    border-radius: 0.25rem;
-}
-
-.termination-time {
-    font-size: 0.75rem;
-    color: #94a3b8;  /* Slate-400 */
-}
-
-/* Game history list in participant detail */
-.game-history-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-}
-
-.game-history-item {
-    background: #334155;
-    border-radius: 0.375rem;
-    padding: 0.5rem 0.75rem;
-}
-
-.game-history-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 0.25rem;
-}
-
-.game-history-details {
-    display: flex;
-    gap: 1rem;
-    font-size: 0.75rem;
-    color: #94a3b8;
-}
-
-/* Session detail logs */
-.session-detail-logs {
-    max-height: 300px;
-    overflow-y: auto;
-    background: #0f172a;  /* Slate-900 - darker for contrast */
-    border-radius: 0.375rem;
-    border: 1px solid #334155;
-}
-
-.session-detail-logs .log-entry {
-    font-size: 0.6875rem;
-    padding: 0.375rem 0.5rem;
-    border-bottom: 1px solid #1e293b;
-    color: #cbd5e1;  /* Slate-300 */
-}
-
-.session-detail-logs .log-entry:last-child {
-    border-bottom: none;
-}
-
-.session-detail-logs .log-message {
-    word-break: break-word;
-}
-
-/* Make session cards clickable */
-.session-card {
-    cursor: pointer;
-    transition: border-color 0.15s ease, box-shadow 0.15s ease;
-}
-
-.session-card:hover {
-    border-color: oklch(var(--p) / 0.5);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.session-card:focus {
-    outline: 2px solid oklch(var(--p));
-    outline-offset: 2px;
-}
-
 /* ============================================
    Responsive
    ============================================ */
 
-@media (max-width: 640px) {
-    .stat-card {
-        padding: 0.75rem;
+@media (max-width: 768px) {
+    .detail-panel {
+        width: 100%;
+        max-width: 100%;
     }
 
-    .stat-card-value {
-        font-size: 1.25rem;
+    .detail-panel-wide {
+        width: 100%;
     }
 
-    .participant-grid {
+    #multiplayer-sessions-list {
         grid-template-columns: 1fr;
     }
 
-    /* Responsive: full-screen panel on mobile (Phase 34) */
-    .session-detail-panel {
-        max-width: 100%;
+    .session-header-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
     }
+
+    .session-metrics-row {
+        flex-wrap: wrap;
+    }
+}
+
+/* ============================================
+   Custom Color Utilities
+   ============================================ */
+
+/* Orange color for "Partner Away" timeout category */
+.text-orange-500 {
+    color: #f97316;
 }

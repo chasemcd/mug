@@ -3672,6 +3672,15 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
                 window.subjectName || window.interactiveGymGlobals?.subjectName,
                 'GameID:', this.gameId, 'Episodes:', this.num_episodes, '/', this.max_episodes);
             p2pLog.warn(`Game complete (${this.num_episodes}/${this.max_episodes} episodes)`);
+
+            // Notify server for admin console archiving
+            if (window.socket) {
+                window.socket.emit('multiplayer_game_complete', {
+                    game_id: this.gameId,
+                    episode_num: this.num_episodes,
+                    max_episodes: this.max_episodes
+                });
+            }
         } else {
             // Always log for admin console visibility
             console.log('[P2P] Episode complete. Subject:',
@@ -6230,6 +6239,16 @@ json.dumps({'cumulative_rewards': {str(k): v for k, v in _cumulative_rewards.ite
         // Get custom message from config, or use default
         const customMessage = this.config?.partner_disconnect_message;
         const message = customMessage || "Your partner has disconnected.";
+
+        // Notify server that this participant has entered terminal state
+        // This updates admin console to show correct status
+        socket.emit('participant_terminal_state', {
+            game_id: this.gameId,
+            scene_id: this.sceneId,
+            reason: 'partner_disconnected',
+            frame_number: this.frameNumber,
+            episode_number: this.num_episodes
+        });
 
         // Show in-page overlay (Phase 23 - UI-01, UI-02, UI-03, UI-04)
         this._showPartnerDisconnectedOverlay(message);
