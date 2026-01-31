@@ -490,12 +490,12 @@ Plans:
 **Requirements:** EDGE-01
 **Success Criteria** (what must be TRUE):
   1. Fast-forward (tab refocus) writes to speculative buffer like normal execution
-  2. _updateConfirmedFrame() called after fast-forward completes
+  2. _promoteConfirmedFrames() called after fast-forward completes
   3. No frame gaps in export after tab refocus scenario
-**Research flag:** Likely (fast-forward code path is complex, needs careful audit)
-**Plans:** TBD
+**Research flag:** Complete (root cause identified in research phase)
+**Plans:** 1 plan
 Plans:
-- [ ] 37-01-PLAN.md — Audit _performFastForward(), confirmation-gated storage integration
+- [ ] 37-01-PLAN.md — Add _promoteConfirmedFrames() call in _performFastForward()
 
 ### Phase 38: Episode Boundary Confirmation
 **Goal:** All frames confirmed before export triggered
@@ -554,10 +554,10 @@ Phases execute in numeric order: 36 → 37 → 38 → 39
 | 34. Session Detail | v1.7 | 1/1 | Complete | 2026-01-25 |
 | 35. Layout & Polish | v1.7 | 1/1 | Complete | 2026-01-25 |
 | 36. Buffer Split | v1.8 | 1/1 | Complete | 2026-01-30 |
-| 37. Fast-Forward Fix | v1.8 | 0/TBD | Not started | - |
+| 37. Fast-Forward Fix | v1.8 | 0/1 | Planned | - |
 | 38. Episode Boundary | v1.8 | 0/TBD | Not started | - |
 | 39. Verification & Metadata | v1.8 | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-01-30 after Phase 36 execution*
+*Last updated: 2026-01-30 after Phase 37 planning*
