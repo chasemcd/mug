@@ -586,7 +586,7 @@ Plans:
   3. Test reports pass/fail based on validation script exit code
   4. Failed comparisons produce actionable diagnostic output
 **Research flag:** Unlikely (file collection and script invocation)
-**Plans:** TBD
+**Plans:** 1 plan
 
 Plans:
 - [ ] 43-01-PLAN.md — Export collection, validation invocation, result reporting
@@ -643,9 +643,9 @@ Phases execute in numeric order: 40 → 41 → 42 → 43 → 44
 | 40. Test Infrastructure | v1.9 | 2/2 | Complete | 2026-01-31 |
 | 41. Latency Injection | v1.9 | 1/1 | Complete | 2026-01-31 |
 | 42. Network Disruption | v1.9 | 1/1 | Complete | 2026-01-31 |
-| 43. Data Comparison | v1.9 | 0/1 | Not started | - |
+| 43. Data Comparison | v1.9 | 0/1 | Planned | - |
 | 44. Manual Protocol | v1.9 | 0/1 | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-01-31 after Phase 42 execution*
+*Last updated: 2026-01-31 after Phase 43 planning*
