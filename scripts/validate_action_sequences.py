@@ -12,6 +12,10 @@ Usage:
     python scripts/validate_action_sequences.py data/cramped_room_hh
     python scripts/validate_action_sequences.py data/cramped_room_hh --verbose
     python scripts/validate_action_sequences.py data/cramped_room_hh --no-plot
+
+Compare mode (Phase 39: VERIFY-01):
+    python scripts/validate_action_sequences.py --compare file1.csv file2.csv
+    python scripts/validate_action_sequences.py --compare file1.csv file2.csv --verbose
 """
 
 import argparse
@@ -43,6 +47,70 @@ def load_csv(filepath: Path) -> tuple[list[str], list[dict]]:
         headers = reader.fieldnames or []
         rows = list(reader)
     return headers, rows
+
+
+def compare_files(file1: Path, file2: Path, verbose: bool = False) -> int:
+    """Compare two export files and report divergences.
+
+    Phase 39: VERIFY-01 - Offline validation for post-experiment analysis.
+
+    Returns exit code: 0 if identical, 1 if different.
+    """
+    headers1, rows1 = load_csv(file1)
+    headers2, rows2 = load_csv(file2)
+
+    errors = []
+
+    # Check row counts
+    if len(rows1) != len(rows2):
+        errors.append(f"Row count mismatch: {file1.name} has {len(rows1)} rows, {file2.name} has {len(rows2)} rows")
+
+    # Check column sets
+    if set(headers1) != set(headers2):
+        only_in_1 = set(headers1) - set(headers2)
+        only_in_2 = set(headers2) - set(headers1)
+        if only_in_1:
+            errors.append(f"Columns only in {file1.name}: {only_in_1}")
+        if only_in_2:
+            errors.append(f"Columns only in {file2.name}: {only_in_2}")
+
+    # Compare common columns
+    common_cols = set(headers1) & set(headers2)
+    min_rows = min(len(rows1), len(rows2))
+
+    divergences = defaultdict(list)
+    for i in range(min_rows):
+        for col in common_cols:
+            val1 = rows1[i].get(col, "")
+            val2 = rows2[i].get(col, "")
+            if val1 != val2:
+                divergences[col].append((i, val1, val2))
+
+    # Report divergences
+    if divergences:
+        for col, diffs in sorted(divergences.items()):
+            errors.append(f"Column '{col}' has {len(diffs)} divergences")
+            if verbose:
+                for idx, val1, val2 in diffs[:5]:
+                    errors.append(f"  Row {idx}: {file1.name}={val1}, {file2.name}={val2}")
+                if len(diffs) > 5:
+                    errors.append(f"  ... and {len(diffs) - 5} more divergences")
+
+    # Print results
+    print(f"Comparing: {file1.name} vs {file2.name}")
+    print("=" * 70)
+    print(f"Rows: {len(rows1)} vs {len(rows2)}")
+    print(f"Columns: {len(headers1)} vs {len(headers2)}")
+    print()
+
+    if errors:
+        print("DIVERGENCES FOUND:")
+        for error in errors:
+            print(f"  {error}")
+        return 1
+    else:
+        print("FILES ARE IDENTICAL")
+        return 0
 
 
 def load_episode_data(data_dir: Path) -> dict:
@@ -404,11 +472,30 @@ def main():
     parser = argparse.ArgumentParser(
         description="Validate and analyze action sequences between paired players in P2P multiplayer games"
     )
-    parser.add_argument("data_dir", type=str, help="Path to the scene data directory")
+    parser.add_argument("data_dir", type=str, nargs="?", help="Path to the scene data directory")
     parser.add_argument("--verbose", "-v", action="store_true", help="Show detailed mismatch information")
     parser.add_argument("--no-plot", action="store_true", help="Skip generating plots")
     parser.add_argument("--save-plot", type=str, help="Save plot to specified path instead of displaying")
+    parser.add_argument(
+        "--compare", nargs=2, metavar=("FILE1", "FILE2"),
+        help="Compare two specific export files instead of scanning directory"
+    )
     args = parser.parse_args()
+
+    # Handle compare mode (Phase 39: VERIFY-01)
+    if args.compare:
+        file1, file2 = Path(args.compare[0]), Path(args.compare[1])
+        if not file1.exists():
+            print(f"Error: File not found: {file1}")
+            sys.exit(1)
+        if not file2.exists():
+            print(f"Error: File not found: {file2}")
+            sys.exit(1)
+        sys.exit(compare_files(file1, file2, args.verbose))
+
+    # Require data_dir for directory scan mode
+    if not args.data_dir:
+        parser.error("data_dir is required when not using --compare mode")
 
     data_dir = Path(args.data_dir)
 
