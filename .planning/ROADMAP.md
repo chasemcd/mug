@@ -480,7 +480,7 @@ Plans:
   2. Data promoted to confirmed buffer only when all inputs for that frame are received
   3. Export methods read from confirmed buffer, never speculative
 **Research flag:** Unlikely (well-documented pattern from GGPO/NetplayJS)
-**Plans:** TBD
+**Plans:** 1 plan
 Plans:
 - [ ] 36-01-PLAN.md — speculativeFrameData buffer, storeFrameData() modification, _promoteConfirmedFrames()
 
@@ -553,11 +553,11 @@ Phases execute in numeric order: 36 → 37 → 38 → 39
 | 33. Session List | v1.7 | 1/1 | Complete | 2026-01-25 |
 | 34. Session Detail | v1.7 | 1/1 | Complete | 2026-01-25 |
 | 35. Layout & Polish | v1.7 | 1/1 | Complete | 2026-01-25 |
-| 36. Buffer Split | v1.8 | 0/TBD | Not started | - |
+| 36. Buffer Split | v1.8 | 0/1 | Planned | - |
 | 37. Fast-Forward Fix | v1.8 | 0/TBD | Not started | - |
 | 38. Episode Boundary | v1.8 | 0/TBD | Not started | - |
 | 39. Verification & Metadata | v1.8 | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-01-30 after v1.8 phases added*
+*Last updated: 2026-01-30 after Phase 36 planning*
