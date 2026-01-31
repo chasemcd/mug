@@ -929,7 +929,7 @@ def on_waitroom_timeout_completion(data):
         }
 
         # Save to data/completion_codes/{subject_id}.json
-        completion_dir = os.path.join("data", "completion_codes")
+        completion_dir = os.path.join("data", CONFIG.experiment_id, "completion_codes")
         os.makedirs(completion_dir, exist_ok=True)
         filepath = os.path.join(completion_dir, f"{subject_id}.json")
 
@@ -973,11 +973,11 @@ def data_emission(data):
         return
 
     # Create a directory for the CSV files if it doesn't exist
-    os.makedirs(f"data/{scene_id}/", exist_ok=True)
+    os.makedirs(f"data/{CONFIG.experiment_id}/{scene_id}/", exist_ok=True)
 
     # Generate a unique filename
-    filename = f"data/{scene_id}/{subject_id}.csv"
-    globals_filename = f"data/{scene_id}/{subject_id}_globals.json"
+    filename = f"data/{CONFIG.experiment_id}/{scene_id}/{subject_id}.csv"
+    globals_filename = f"data/{CONFIG.experiment_id}/{scene_id}/{subject_id}_globals.json"
 
     # Save as CSV
     logger.info(f"Saving {filename}")
@@ -1042,11 +1042,11 @@ def receive_remote_game_data(data):
     df = pd.DataFrame(padded_data)
 
     # Create a directory for the CSV files if it doesn't exist
-    os.makedirs(f"data/{data['scene_id']}/", exist_ok=True)
+    os.makedirs(f"data/{CONFIG.experiment_id}/{data['scene_id']}/", exist_ok=True)
 
     # Generate a unique filename
-    filename = f"data/{data['scene_id']}/{subject_id}.csv"
-    globals_filename = f"data/{data['scene_id']}/{subject_id}_globals.json"
+    filename = f"data/{CONFIG.experiment_id}/{data['scene_id']}/{subject_id}.csv"
+    globals_filename = f"data/{CONFIG.experiment_id}/{data['scene_id']}/{subject_id}_globals.json"
 
     # Save as CSV
     logger.info(f"Saving {filename}")
@@ -1072,7 +1072,7 @@ def receive_remote_game_data(data):
     # current_scene_metadata = current_scene.get_complete_scene_metadata()
 
     # # save the metadata to a json file
-    # with open(f"data/{data['scene_id']}/{subject_id}_metadata.json", "w") as f:
+    # with open(f"data/{CONFIG.experiment_id}/{data['scene_id']}/{subject_id}_metadata.json", "w") as f:
     #     json.dump(current_scene_metadata, f)
 
 
@@ -1133,10 +1133,10 @@ def receive_episode_data(data):
     df = pd.DataFrame(padded_data)
 
     # Create a directory for the CSV files if it doesn't exist
-    os.makedirs(f"data/{data['scene_id']}/", exist_ok=True)
+    os.makedirs(f"data/{CONFIG.experiment_id}/{data['scene_id']}/", exist_ok=True)
 
     # Generate filename with episode number
-    filename = f"data/{data['scene_id']}/{subject_id}_ep{episode_num}.csv"
+    filename = f"data/{CONFIG.experiment_id}/{data['scene_id']}/{subject_id}_ep{episode_num}.csv"
 
     # Save as CSV
     logger.info(f"Saving episode {episode_num} data: {filename} ({len(df)} rows)")
@@ -1144,7 +1144,7 @@ def receive_episode_data(data):
     df.to_csv(filename, index=False)
 
     # Also save globals (overwrite each episode to keep latest)
-    globals_filename = f"data/{data['scene_id']}/{subject_id}_globals.json"
+    globals_filename = f"data/{CONFIG.experiment_id}/{data['scene_id']}/{subject_id}_globals.json"
     with open(globals_filename, "w") as f:
         json.dump(data.get("interactiveGymGlobals", {}), f)
 
@@ -1178,10 +1178,10 @@ def receive_multiplayer_metrics(data):
         return
 
     # Create directory if needed
-    os.makedirs(f"data/{scene_id}/", exist_ok=True)
+    os.makedirs(f"data/{CONFIG.experiment_id}/{scene_id}/", exist_ok=True)
 
     # Save individual player's metrics
-    filename = f"data/{scene_id}/{subject_id}_multiplayer_metrics.json"
+    filename = f"data/{CONFIG.experiment_id}/{scene_id}/{subject_id}_multiplayer_metrics.json"
     logger.info(f"Saving multiplayer metrics to {filename}")
     with open(filename, "w") as f:
         json.dump(metrics, f, indent=2)
@@ -1373,7 +1373,7 @@ def _create_aggregated_metrics(scene_id: str, game_id: str, player_metrics: dict
     }
 
     # Save aggregated file
-    filename = f"data/{scene_id}/{game_id}_aggregated_metrics.json"
+    filename = f"data/{CONFIG.experiment_id}/{scene_id}/{game_id}_aggregated_metrics.json"
     logger.info(f"Saving aggregated multiplayer metrics to {filename}")
     with open(filename, "w") as f:
         json.dump(aggregated, f, indent=2)
