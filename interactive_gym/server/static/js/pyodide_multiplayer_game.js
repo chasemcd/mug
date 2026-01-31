@@ -3720,6 +3720,10 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
          * That in turn calls terminateGymScene() which saves data via emit_remote_game_data.
          */
 
+        // Phase 38 (EDGE-02): Promote any remaining unconfirmed frames before export
+        // At episode end, all frames have real inputs - just not yet confirmed via packets
+        this._promoteRemainingAtBoundary();
+
         // Export episode data from the rollback-safe buffer
         // This ensures only correct, validated data is emitted
         if (this.sceneId) {
