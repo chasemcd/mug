@@ -8,17 +8,29 @@ A framework for running browser-based reinforcement learning experiments with hu
 
 Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
 
-## Current Milestone: v1.7 Admin Console Improvement
+## Current Milestone: v1.8 Data Export Parity
 
-**Goal:** A clean, usable admin console that gives researchers effective experiment monitoring — see what's happening, catch problems, track progress.
+**Goal:** Both players export identical game state data (actions, observations, rewards, infos) regardless of rollbacks, fast-forwards, latency, or other edge cases — ensuring research data validity.
 
 **Target features:**
-- Dashboard overview with key experiment stats (completion rate, active sessions, issues)
-- Session list showing state, P2P/connection health, and problems
-- Live session state visibility (what's happening in active sessions)
-- P2P/connection metrics surfaced (latency, connection type, health indicators)
-- Error and exclusion details visible (why sessions failed or participants excluded)
-- Clean layout that prioritizes actionable information
+- Identical frame counts between both players' exports
+- Identical actions recorded per frame across both players
+- Identical rewards and infos per frame
+- Correct data collection during/after rollbacks (only validated state recorded)
+- Correct data collection during/after fast-forward (tab refocus scenarios)
+- Correct data collection under high latency conditions
+- Edge case handling for any scenario that could cause data divergence
+
+## Previous Milestone: v1.7 Admin Console Improvement (Shipped: 2026-01-25)
+
+**Delivered:** A clean, usable admin console that gives researchers effective experiment monitoring — see what's happening, catch problems, track progress.
+
+**Key accomplishments:**
+- Dashboard overview with completion rate and average duration stats
+- Session list showing state, P2P health indicators, and connection type
+- Session detail panel with termination reasons and player health
+- Problems indicator for quick access to errors/warnings
+- Clean layout with sessions as the primary focus
 
 ## Previous Milestone: v1.6 Input Latency Diagnosis (Partial: 2026-01-24)
 
@@ -149,12 +161,21 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 
 ### Active
 
-- [ ] Dashboard overview with key experiment stats
-- [ ] Session list with state and P2P health indicators
-- [ ] Live session state visibility
-- [ ] P2P/connection metrics surfaced in UI
-- [ ] Error and exclusion details visible
-- [ ] Clean, prioritized layout
+- [ ] Identical frame counts between both players' exports
+- [ ] Identical actions recorded per frame across both players
+- [ ] Identical rewards and infos per frame
+- [ ] Correct data collection during/after rollbacks
+- [ ] Correct data collection during/after fast-forward
+- [ ] Correct data collection under high latency
+- [ ] Edge case handling for data divergence scenarios
+
+*Shipped in v1.7:*
+- ✓ Dashboard overview with key experiment stats — v1.7
+- ✓ Session list with state and P2P health indicators — v1.7
+- ✓ Live session state visibility — v1.7
+- ✓ P2P/connection metrics surfaced in UI — v1.7
+- ✓ Error and exclusion details visible — v1.7
+- ✓ Clean, prioritized layout — v1.7
 
 *Shipped in v1.6 (partial):*
 - ✓ Diagnostic instrumentation for input→execute→render pipeline — v1.6
@@ -196,6 +217,7 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 - Episode start sync can timeout on slow connections (mitigated with retry mechanism)
 - Rollback visual corrections cause brief teleporting (smoothing not yet implemented)
 - **[CRITICAL]** Users report 1-2 second local input lag in Overcooked (investigating in v1.6)
+- **[CRITICAL]** Data export parity issues — players' exported data diverges after rollbacks/fast-forward (addressing in v1.8)
 
 ## Constraints
 
@@ -218,4 +240,4 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 | Open Relay Project for TURN | Free 20GB/month tier sufficient for research | ✓ Good |
 
 ---
-*Last updated: 2026-01-24 after v1.7 milestone start*
+*Last updated: 2026-01-30 after v1.8 milestone start*

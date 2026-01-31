@@ -2,19 +2,19 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-01-24)
+See: .planning/PROJECT.md (updated 2026-01-30)
 
 **Core value:** Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
-**Current focus:** v1.7 Admin Console Improvement
+**Current focus:** v1.8 Data Export Parity
 
 ## Current Position
 
-Phase: 35 of 35 (Layout & Polish) - VERIFIED
-Plan: 01 of 01 complete
-Status: v1.7 Admin Console Improvement milestone complete, verified
-Last activity: 2026-01-25 — Phase 35 verified, v1.7 ready for audit
+Phase: Not started (run /gsd:create-roadmap)
+Plan: —
+Status: Defining requirements for v1.8
+Last activity: 2026-01-30 — Milestone v1.8 started
 
-Progress: [########..] 100% (v1.7 - Admin Console Improvement: 4/4 phases)
+Progress: [..........] 0% (v1.8 - Data Export Parity: 0/? phases)
 
 ## Milestone History
 
@@ -205,14 +205,16 @@ See: .planning/PROJECT.md Key Decisions table
 - Input latency root cause fix (tooling now exists via Phase 28 instrumentation)
 - Users can use `[LATENCY]` console logs to diagnose specific issues
 
+**v1.8 Focus:**
+- Data export parity issues — players' exported data diverges after rollbacks/fast-forward
+- Need to ensure only validated (post-rollback, post-fast-forward) state is recorded
+
 ## Session Continuity
 
-Last session: 2026-01-25
-Stopped at: Completed 35-01-PLAN.md (v1.7 milestone complete)
+Last session: 2026-01-30
+Stopped at: Milestone v1.8 initialized
 Resume file: None
 
 ### Next Steps
 
-v1.7 Admin Console Improvement milestone complete and verified.
-
-Run `/gsd:audit-milestone` to verify cross-phase integration and prepare for archive.
+Run `/gsd:create-roadmap` to plan phases for v1.8 Data Export Parity milestone.
