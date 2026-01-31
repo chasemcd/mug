@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-30)
 
 ## Current Position
 
-Phase: 42 of 44 (Network Disruption Tests)
+Phase: 43 of 44 (Data Comparison Pipeline)
 Plan: 01 complete
 Status: Phase complete
-Last activity: 2026-01-31 - Completed 42-01-PLAN.md
+Last activity: 2026-01-31 - Completed 43-01-PLAN.md
 
-Progress: [██████░░░░] 60% (v1.9 - Data Parity Testing: 3/5 phases)
+Progress: [████████░░] 80% (v1.9 - Data Parity Testing: 4/5 phases)
 
 ## Milestone History
 
@@ -111,6 +111,12 @@ Progress: [██████░░░░] 60% (v1.9 - Data Parity Testing: 3/5 
 - `.planning/phases/40-test-infrastructure/40-02-SUMMARY.md`
 - `.planning/phases/41-latency-injection/41-01-SUMMARY.md`
 - `.planning/phases/42-network-disruption/42-01-SUMMARY.md`
+- `.planning/phases/43-data-comparison/43-01-SUMMARY.md`
+
+**Data Comparison Pipeline (v1.9 Phase 43 - added):**
+- `tests/fixtures/export_helpers.py` - Export collection and comparison utilities (collect_export_files, wait_for_export_files, run_comparison)
+- `tests/e2e/test_data_comparison.py` - Data parity test suite (2 tests: basic, with latency)
+- `tests/fixtures/game_helpers.py` - Extended with get_scene_id(), get_subject_id()
 
 **Network Disruption Tests (v1.9 Phase 42 - added):**
 - `tests/fixtures/network_helpers.py` - Extended with apply_packet_loss(), set_tab_visibility(), get_rollback_stats(), get_fast_forward_state()
@@ -262,6 +268,12 @@ See: .planning/PROJECT.md Key Decisions table
 - 5 second hidden duration for fast-forward test (enough frames to observe jump > 30)
 - Frame jump threshold of 30 frames validates fast-forward occurred
 
+**v1.9 Phase 43 decisions:**
+- Separate export_helpers module rather than extending game_helpers (separation of concerns)
+- Subprocess-based script invocation for comparison (clean isolation)
+- Polling-based file wait with 0.5s interval (handles async server writes)
+- Two tests: basic and with-latency (validates dual-buffer under stress)
+
 **v1.9 Phase 40 decisions:**
 - Test deps in setup.py extras_require (not pyproject.toml - package uses legacy setup.py)
 - flask_server fixture uses HTTP polling (not requests) to avoid extra dependencies
@@ -297,15 +309,14 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-01-31
-Stopped at: Completed 42-01-PLAN.md
+Stopped at: Completed 43-01-PLAN.md
 Resume file: None
 
 ### Next Steps
 
-Phase 42 complete. Network disruption test helpers and tests created.
-- Phase 43: Data Comparison Pipeline (collect, validate, report)
+Phase 43 complete. Data comparison pipeline created with export helpers and parity tests.
 - Phase 44: Manual Test Protocol (documentation)
 
 Note: E2E test environment has episode completion timeout issue affecting all multiplayer tests. Tests are structurally correct and will pass once underlying issue is resolved.
 
-Next: Run `/gsd:plan-phase 43`
+Next: Run `/gsd:plan-phase 44`
