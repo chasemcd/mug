@@ -3648,6 +3648,7 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
             truncateds: {},
             infos: {},
             isFocused: {},
+            wasSpeculative: {},  // Phase 39: REC-04 - track which frames were speculative predictions
             episode_num: [],
             t: [],
             timestamp: [],
@@ -3706,7 +3707,23 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
             addAgentData('truncateds', frameData.truncateds);
             addFlattenedInfos(frameData.infos);
             addAgentData('isFocused', frameData.isFocused);
+
+            // Phase 39: REC-04 - add wasSpeculative per agent
+            // If frame was promoted from speculative buffer, wasSpeculative is true
+            // If undefined/false, frame was never speculative (direct execution)
+            if (frameData.actions) {
+                for (const agentId of Object.keys(frameData.actions)) {
+                    if (!data.wasSpeculative[agentId]) {
+                        data.wasSpeculative[agentId] = [];
+                    }
+                    data.wasSpeculative[agentId].push(frameData.wasSpeculative || false);
+                }
+            }
         }
+
+        // Phase 39: EDGE-03 - include rollback events metadata
+        // Provides full rollback history with frame ranges for offline analysis
+        data.rollbackEvents = this.sessionMetrics?.rollbacks?.events || [];
 
         return data;
     }
