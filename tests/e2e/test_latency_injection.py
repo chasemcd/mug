@@ -32,6 +32,19 @@ from tests.fixtures.game_helpers import (
     click_advance_button,
     click_start_button,
     complete_tutorial_and_advance,
+    get_scene_id,
+    run_full_episode_flow_until_gameplay,
+)
+from tests.fixtures.input_helpers import (
+    start_random_actions,
+    stop_random_actions,
+    verify_non_noop_actions,
+)
+from tests.fixtures.export_helpers import (
+    get_experiment_id,
+    get_subject_ids_from_pages,
+    wait_for_export_files,
+    run_comparison,
 )
 
 
@@ -257,6 +270,119 @@ def test_episode_completion_under_jitter(flask_server, player_contexts):
         # Cleanup CDP sessions
         try:
             cdp1.detach()
+            cdp2.detach()
+        except Exception:
+            pass
+
+
+# =============================================================================
+# Active Input + Latency Test (INPUT-04)
+# =============================================================================
+
+@pytest.mark.parametrize("latency_ms", [100, 200])
+@pytest.mark.timeout(300)  # 5 minutes max per test
+def test_active_input_with_latency(flask_server, player_contexts, latency_ms):
+    """
+    Test data parity when both players actively input actions under latency.
+
+    This is the critical test: real inputs + real latency = realistic gameplay.
+    Previous tests let players idle (Noop action), which could mask bugs in
+    action recording during rollbacks.
+
+    This test validates that:
+    1. Real inputs are correctly recorded under latency
+    2. Rollback correction handles real action values, not just Noop
+    3. Both players export identical data despite network delays
+
+    Configuration:
+    - Player 1: random actions every 150ms
+    - Player 2: random actions every 200ms + network latency
+    - Different intervals create input conflicts that stress rollback handling
+    """
+    page1, page2 = player_contexts
+    base_url = flask_server["url"]
+
+    # Apply latency to player 2 BEFORE navigation
+    cdp2 = apply_latency(page2, latency_ms=latency_ms)
+
+    try:
+        # Run through to gameplay
+        run_full_episode_flow_until_gameplay(page1, page2, base_url)
+
+        # Verify both players are in same game
+        state1 = get_game_state(page1)
+        state2 = get_game_state(page2)
+        assert state1["gameId"] == state2["gameId"], "Players should be in same game"
+        assert state1["playerId"] != state2["playerId"], "Players should have different IDs"
+
+        # Start random action injection on both players
+        interval1 = start_random_actions(page1, interval_ms=150)
+        interval2 = start_random_actions(page2, interval_ms=200)
+
+        print(f"\n[Active Input + {latency_ms}ms Latency] Started random actions")
+
+        try:
+            # Wait for episode completion
+            wait_for_episode_complete(page1, episode_num=1, timeout=180000)
+            wait_for_episode_complete(page2, episode_num=1, timeout=180000)
+        finally:
+            stop_random_actions(page1, interval1)
+            stop_random_actions(page2, interval2)
+
+        # Verify both players recorded non-trivial actions
+        passed1, stats1, count1 = verify_non_noop_actions(page1)
+        passed2, stats2, count2 = verify_non_noop_actions(page2)
+
+        print(f"  Player 1 non-Noop actions: {count1}")
+        print(f"  Player 2 non-Noop actions: {count2}")
+
+        assert passed1, f"Player 1 should have non-Noop actions: {stats1}"
+        assert passed2, f"Player 2 should have non-Noop actions: {stats2}"
+
+        # Get final states
+        final_state1 = get_game_state(page1)
+        final_state2 = get_game_state(page2)
+
+        # Verify completion
+        assert final_state1["numEpisodes"] >= 1, "Player 1 should complete 1+ episodes"
+        assert final_state2["numEpisodes"] >= 1, "Player 2 should complete 1+ episodes"
+
+        # Extract identifiers for export files
+        experiment_id = get_experiment_id()
+        scene_id = get_scene_id(page1)
+        assert scene_id, "Could not get scene ID from game"
+
+        subject_ids = get_subject_ids_from_pages(page1, page2)
+
+        # Wait for export files
+        try:
+            file1, file2 = wait_for_export_files(
+                experiment_id=experiment_id,
+                scene_id=scene_id,
+                subject_ids=subject_ids,
+                episode_num=1,
+                timeout_sec=30
+            )
+        except TimeoutError as e:
+            pytest.fail(f"Export files not found: {e}")
+
+        # Run comparison
+        exit_code, output = run_comparison(file1, file2, verbose=True)
+
+        print(f"\nComparison output:\n{output}")
+
+        # Assert parity
+        if exit_code != 0:
+            pytest.fail(
+                f"Data parity check failed with active inputs + {latency_ms}ms latency "
+                f"(exit code {exit_code}):\n{output}"
+            )
+
+        print(f"\n[{latency_ms}ms + Active Input] Data parity verified")
+        print(f"  Episodes completed: gameId={final_state1['gameId']}")
+
+    finally:
+        try:
             cdp2.detach()
         except Exception:
             pass

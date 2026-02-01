@@ -227,3 +227,50 @@ def get_subject_id(page: Page) -> str:
         str: The subject ID, or None if not available
     """
     return page.evaluate("() => window.subjectId || window.game?.subjectId || null")
+
+
+def run_full_episode_flow_until_gameplay(page1: Page, page2: Page, base_url: str) -> None:
+    """
+    Progress both players from navigation to active gameplay.
+
+    This helper runs both players through:
+    1. Navigate to base URL
+    2. Wait for socket connection
+    3. Click advance button (instructions)
+    4. Complete tutorial
+    5. Click start button (multiplayer matchmaking)
+    6. Wait for game canvas and game object
+
+    After this function returns, both players are in-game and ready
+    for action injection or waiting for episode completion.
+
+    Args:
+        page1: Playwright Page for player 1
+        page2: Playwright Page for player 2
+        base_url: Flask server URL
+    """
+    # Navigate to game
+    page1.goto(base_url)
+    page2.goto(base_url)
+
+    # Wait for socket connection
+    wait_for_socket_connected(page1, timeout=30000)
+    wait_for_socket_connected(page2, timeout=30000)
+
+    # Pass instructions
+    click_advance_button(page1, timeout=60000)
+    click_advance_button(page2, timeout=60000)
+
+    # Complete tutorials
+    complete_tutorial_and_advance(page1, timeout=120000)
+    complete_tutorial_and_advance(page2, timeout=120000)
+
+    # Start multiplayer
+    click_start_button(page1, timeout=60000)
+    click_start_button(page2, timeout=60000)
+
+    # Wait for game to start
+    wait_for_game_canvas(page1, timeout=120000)
+    wait_for_game_canvas(page2, timeout=120000)
+    wait_for_game_object(page1, timeout=60000)
+    wait_for_game_object(page2, timeout=60000)
