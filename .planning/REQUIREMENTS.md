@@ -28,7 +28,7 @@ Requirements for v1.9 Data Parity Testing milestone. Each maps to roadmap phases
 
 ### Documentation
 
-- [ ] **DOC-01**: Manual test protocol documents step-by-step researcher verification process
+- [x] **DOC-01**: Manual test protocol documents step-by-step researcher verification process
 
 ## v2 Requirements
 
@@ -77,7 +77,7 @@ Which phases cover which requirements. Updated by create-roadmap.
 | CMP-01 | Phase 43 | Complete |
 | CMP-02 | Phase 43 | Complete |
 | CMP-03 | Phase 43 | Complete |
-| DOC-01 | Phase 44 | Pending |
+| DOC-01 | Phase 44 | Complete |
 
 **Coverage:**
 - v1.9 requirements: 11 total
@@ -86,4 +86,4 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 ---
 *Requirements defined: 2026-01-31*
-*Last updated: 2026-01-31 after Phase 43 execution*
+*Last updated: 2026-02-01 after Phase 44 execution*
