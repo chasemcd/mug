@@ -5,22 +5,22 @@
 See: .planning/PROJECT.md (updated 2026-01-30)
 
 **Core value:** Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
-**Current focus:** v1.9 Data Parity Testing
+**Current focus:** v1.9 Data Parity Testing (COMPLETE)
 
 ## Current Position
 
-Phase: 43 of 44 (Data Comparison Pipeline)
+Phase: 44 of 44 (Manual Test Protocol)
 Plan: 01 complete
-Status: Phase complete
-Last activity: 2026-01-31 - Completed 43-01-PLAN.md
+Status: Milestone complete
+Last activity: 2026-02-01 - Completed 44-01-PLAN.md
 
-Progress: [████████░░] 80% (v1.9 - Data Parity Testing: 4/5 phases)
+Progress: [██████████] 100% (v1.9 - Data Parity Testing: 5/5 phases)
 
 ## Milestone History
 
 | Milestone | Phases | Status | Shipped |
 |-----------|--------|--------|---------|
-| v1.9 Data Parity Testing | 40-44 | In Progress | — |
+| v1.9 Data Parity Testing | 40-44 | Complete | 2026-02-01 |
 | v1.8 Data Export Parity | 36-39 | Complete | 2026-01-30 |
 | v1.7 Admin Console Improvement | 32-35 | Complete | 2026-01-25 |
 | v1.6 Input Latency Diagnosis | 28 | Partial | 2026-01-24 |
@@ -112,6 +112,10 @@ Progress: [████████░░] 80% (v1.9 - Data Parity Testing: 4/5 
 - `.planning/phases/41-latency-injection/41-01-SUMMARY.md`
 - `.planning/phases/42-network-disruption/42-01-SUMMARY.md`
 - `.planning/phases/43-data-comparison/43-01-SUMMARY.md`
+- `.planning/phases/44-manual-test-protocol/44-01-SUMMARY.md`
+
+**Manual Test Protocol (v1.9 Phase 44 - added):**
+- `docs/MANUAL_TEST_PROTOCOL.md` - Step-by-step protocol for 6 network condition scenarios (baseline, latency, asymmetric, jitter, packet loss, tab focus)
 
 **Data Comparison Pipeline (v1.9 Phase 43 - added):**
 - `tests/fixtures/export_helpers.py` - Export collection and comparison utilities (collect_export_files, wait_for_export_files, run_comparison)
@@ -180,6 +184,12 @@ Progress: [████████░░] 80% (v1.9 - Data Parity Testing: 4/5 
 ### Decisions
 
 See: .planning/PROJECT.md Key Decisions table
+
+**v1.9 Phase 44 decisions:**
+- Organized scenarios by network condition type (baseline, latency, asymmetric, jitter, packet loss, focus)
+- Included DevTools instructions for manual network throttling
+- Added detailed troubleshooting section for common divergence issues
+- Documented 500ms latency limitation from Phase 41 findings
 
 **v1.8 Phase 39 decisions:**
 - wasSpeculative applied at promotion time (only speculative frames get flag)
@@ -308,15 +318,23 @@ See: .planning/PROJECT.md Key Decisions table
 
 ## Session Continuity
 
-Last session: 2026-01-31
-Stopped at: Completed 43-01-PLAN.md
+Last session: 2026-02-01
+Stopped at: Completed 44-01-PLAN.md (v1.9 milestone complete)
 Resume file: None
 
 ### Next Steps
 
-Phase 43 complete. Data comparison pipeline created with export helpers and parity tests.
-- Phase 44: Manual Test Protocol (documentation)
+v1.9 Data Parity Testing milestone complete. All 5 phases finished:
+- Phase 40: Test Infrastructure
+- Phase 41: Latency Injection Tests
+- Phase 42: Network Disruption Tests
+- Phase 43: Data Comparison Pipeline
+- Phase 44: Manual Test Protocol
 
-Note: E2E test environment has episode completion timeout issue affecting all multiplayer tests. Tests are structurally correct and will pass once underlying issue is resolved.
+**Deliverables:**
+- E2E test suite with Playwright fixtures
+- CDP-based network condition simulation
+- Data parity tests comparing player exports
+- Manual test protocol documentation (docs/MANUAL_TEST_PROTOCOL.md)
 
-Next: Run `/gsd:plan-phase 44`
+**Note:** E2E test environment has episode completion timeout issue affecting all multiplayer tests. Tests are structurally correct and will pass once underlying issue is resolved. Manual testing can be performed using docs/MANUAL_TEST_PROTOCOL.md.
