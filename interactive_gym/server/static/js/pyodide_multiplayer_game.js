@@ -3003,16 +3003,32 @@ obs, rewards, terminateds, truncateds, infos, render_state
         const remaining = this.speculativeFrameData.size;
         if (remaining === 0) return;
 
+        // Phase 49 (BOUND-03): Only promote frames within episode boundary
+        const terminationFrame = this.p2pEpisodeSync?.syncedTerminationFrame;
+
         // Log warning - this indicates confirmedFrame was behind at episode end
         console.warn(`[Episode Boundary] Promoting ${remaining} unconfirmed frames ` +
             `at episode end (confirmedFrame=${this.confirmedFrame}, frameNumber=${this.frameNumber})`);
 
-        // Promote all remaining frames with wasSpeculative flag (Phase 39: REC-04)
+        // Promote remaining frames with wasSpeculative flag (Phase 39: REC-04)
         // These frames were predicted before confirmation, same as _promoteConfirmedFrames()
+        let promoted = 0;
+        let skipped = 0;
         for (const [frame, data] of this.speculativeFrameData.entries()) {
+            // Skip frames at or beyond episode boundary
+            if (terminationFrame !== null && terminationFrame !== undefined && frame >= terminationFrame) {
+                p2pLog.debug(`[Episode Boundary] Skipping post-boundary frame ${frame}`);
+                skipped++;
+                continue;
+            }
             this.frameDataBuffer.set(frame, { ...data, wasSpeculative: true });
+            promoted++;
         }
         this.speculativeFrameData.clear();
+
+        if (skipped > 0) {
+            p2pLog.info(`[Episode Boundary] Promoted ${promoted} frames, skipped ${skipped} post-boundary frames`);
+        }
     }
 
     /**
