@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-02)
 
 **Core value:** Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
-**Current focus:** Phase 48 — isFocused Column Consistency
+**Current focus:** Phase 49 — Episode Boundary Row Parity
 
 ## Current Position
 
-Phase: 48 of 50 (isFocused Column Consistency)
+Phase: 49 of 50 (Episode Boundary Row Parity)
 Plan: 01 complete
 Status: Phase complete
-Last activity: 2026-02-02 — Completed 48-01-PLAN.md
+Last activity: 2026-02-02 — Completed 49-01-PLAN.md
 
-Progress: [███       ] 33% (v1.11 - Data Export Edge Cases: 1/3 phases)
+Progress: [██████    ] 66% (v1.11 - Data Export Edge Cases: 2/3 phases)
 
 ## Milestone History
 
@@ -123,6 +123,11 @@ Progress: [███       ] 33% (v1.11 - Data Export Edge Cases: 1/3 phases)
 
 **v1.11 Execution:**
 - `.planning/phases/48-isfocused-column-consistency/48-01-SUMMARY.md`
+- `.planning/phases/49-episode-boundary-row-parity/49-01-SUMMARY.md`
+
+**Episode Boundary Row Parity (v1.11 Phase 49 - fixed):**
+- `interactive_gym/server/static/js/pyodide_multiplayer_game.js` - BOUND-02/03: fast-forward capped at syncedTerminationFrame, storeFrameData skips post-boundary frames, _promoteRemainingAtBoundary filters post-boundary frames
+- `tests/e2e/test_data_comparison.py` - test_focus_loss_episode_boundary_parity xfail removed (passes)
 
 **isFocused Column Consistency (v1.11 Phase 48 - fixed):**
 - `interactive_gym/server/static/js/pyodide_multiplayer_game.js` - All storeFrameData calls use getFocusStatePerPlayer()
@@ -362,22 +367,28 @@ See: .planning/PROJECT.md Key Decisions table
 - Column consistency (same columns) is the fix; value divergence is expected
 - Per-player focus state: Always use getFocusStatePerPlayer() for isFocused in storeFrameData
 
-**Focus Loss Data Export Known Limitations (v1.10 Phase 47 - PARTIALLY RESOLVED in v1.11 Phase 48):**
+**v1.11 Phase 49 decisions:**
+- Defense-in-depth: both maxFrame cap and storeFrameData guard for robustness
+- Use < comparison (not <=) to exclude termination frame itself
+- BOUND-02/03 patterns established for episode boundary guards in async paths
+
+**Focus Loss Data Export Known Limitations (v1.10 Phase 47 - RESOLVED in v1.11 Phases 48-49):**
 - isFocused.0 and isFocused.1 columns now always exported (Phase 48 fix)
-- Backgrounded player may record frames beyond max_steps at episode boundary (Phase 49 scope)
+- Both players export exactly max_steps rows at episode boundary (Phase 49 fix)
+- Both test_focus_loss_mid_episode_parity and test_focus_loss_episode_boundary_parity now pass
 
 ## Session Continuity
 
 Last session: 2026-02-02
-Stopped at: Completed 48-01-PLAN.md
+Stopped at: Completed 49-01-PLAN.md
 Resume file: None
 
 ### Next Steps
 
-**Phase 48 (isFocused Column Consistency) complete.**
+**Phase 49 (Episode Boundary Row Parity) complete.**
 
-Next action: Plan Phase 49 (Row Count at Episode Boundary)
+Next action: Plan Phase 50 (if planned)
 
 Options:
-- `/gsd:plan-phase 49` — Create execution plan for Row Count Boundary Fix
-- `/gsd:discuss-phase 49` — Gather additional context first
+- `/gsd:plan-phase 50` — Create execution plan for next phase
+- `/gsd:discuss-phase 50` — Gather additional context first
