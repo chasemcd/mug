@@ -640,7 +640,7 @@ Plans:
   4. `test_network_disruption.py` packet loss and focus tests pass
   5. `test_data_comparison.py` parity validation tests pass
 **Research flag:** Unlikely (running existing tests)
-**Plans:** TBD
+**Plans:** 1 plan
 
 Plans:
 - [ ] 46-01-PLAN.md — Run full test suite and fix any remaining issues
@@ -700,9 +700,9 @@ Phases execute in numeric order: 45 → 46 → 47
 | 43. Data Comparison | v1.9 | 1/1 | Complete | 2026-01-31 |
 | 44. Manual Protocol | v1.9 | 1/1 | Complete | 2026-02-01 |
 | 45. Episode Completion Fix | v1.10 | 1/1 | Complete | 2026-02-02 |
-| 46. Test Suite Verification | v1.10 | 0/1 | Not started | - |
+| 46. Test Suite Verification | v1.10 | 0/1 | Planned | - |
 | 47. Focus Loss Testing | v1.10 | 0/1 | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-02 after Phase 45 completion*
+*Last updated: 2026-02-02 after Phase 46 planning*
