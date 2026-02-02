@@ -710,7 +710,7 @@ Plans:
   6. All E2E tests pass with no xfail markers remaining
   7. Research exports are byte-identical (ignoring timestamps)
 **Research flag:** Unlikely (verification of prior fixes)
-**Plans:** TBD
+**Plans:** 1 plan
 
 Plans:
 - [ ] 50-01-PLAN.md — Remove xfail markers and verify all tests pass
@@ -759,8 +759,8 @@ Phases execute in numeric order: 48 → 49 → 50
 | 47. Focus Loss Testing | v1.10 | 1/1 | Complete | 2026-02-02 |
 | 48. isFocused Column | v1.11 | 1/1 | Complete | 2026-02-02 |
 | 49. Episode Boundary Row | v1.11 | 1/1 | Complete | 2026-02-02 |
-| 50. Stress Verification | v1.11 | 0/1 | Not started | - |
+| 50. Stress Verification | v1.11 | 0/1 | Ready | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-02 after Phase 49 complete*
+*Last updated: 2026-02-02 after Phase 50 planned*
