@@ -8,15 +8,26 @@ A framework for running browser-based reinforcement learning experiments with hu
 
 Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
 
-## Current Milestone: v1.10 E2E Test Fix
+## Current Milestone: v1.11 Data Export Edge Cases
 
-**Goal:** Fix E2E test environment so all automated tests pass in headed mode.
+**Goal:** Fix dual-buffer data recording edge cases so all xfail tests pass and research data exports are identical between both players.
 
 **Target features:**
-- Fix episode completion timeout (games initialize but frames don't advance)
-- Fix row count mismatch under latency (synchronized termination frame)
-- All existing E2E tests pass with `pytest tests/e2e/ --headed`
-- Tests validate data parity under network stress conditions
+- Fix isFocused column asymmetry (consistent columns in both player exports)
+- Fix episode boundary row count mismatch during focus loss
+- Fix dual-buffer promotion edge cases under stress (active inputs + latency/packet loss)
+- All 5 xfail tests pass without markers
+- Research experiments produce valid, identical data from both players
+
+## Previous Milestone: v1.10 E2E Test Fix (Shipped: 2026-02-02)
+
+**Delivered:** All E2E tests pass in headed mode with data parity validation under network stress.
+
+**Key accomplishments:**
+- Fixed Playwright visibility override (FocusManager was blocking frames when document.hidden=true)
+- 15 tests passing (12 passed + 3 xpassed)
+- Identified 5 edge cases in dual-buffer data recording (marked xfail for v1.11)
+- Focus loss data parity tests in place (reveal edge cases for fixing)
 
 ## Previous Milestone: v1.9 Data Parity Testing (Shipped: 2026-02-01)
 
@@ -181,9 +192,11 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 
 ### Active
 
-- [ ] Fix episode completion timeout in E2E tests
-- [ ] Fix row count mismatch under network latency (synchronized termination)
-- [ ] All E2E tests pass in headed mode
+- [ ] Fix isFocused column asymmetry in exports
+- [ ] Fix episode boundary row count mismatch during focus loss
+- [ ] Fix dual-buffer promotion edge cases under stress
+- [ ] All xfail tests pass without markers
+- [ ] Research data exports identical between both players
 
 *Shipped in v1.8:*
 - ✓ Identical frame counts between both players' exports — v1.8
@@ -270,4 +283,4 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 | Playwright MCP for testing | Browser automation with network condition control | — Pending |
 
 ---
-*Last updated: 2026-02-02 after v1.10 milestone start*
+*Last updated: 2026-02-02 after v1.11 milestone start*

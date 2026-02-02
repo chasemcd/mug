@@ -5,21 +5,22 @@
 See: .planning/PROJECT.md (updated 2026-02-02)
 
 **Core value:** Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
-**Current focus:** Phase 47 — Focus Loss Data Accuracy Testing
+**Current focus:** v1.11 — Data Export Edge Cases (defining requirements)
 
 ## Current Position
 
-Phase: 47 of 47 (Focus Loss Data Accuracy Testing)
-Plan: 01 of 01
-Status: Phase complete
-Last activity: 2026-02-02 — Completed 47-01-PLAN.md
+Phase: Not started (run /gsd:define-requirements or /gsd:research-project)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-02-02 — Milestone v1.11 started
 
-Progress: [██████████] 100% (v1.10 - E2E Test Fix: 3/3 phases)
+Progress: [          ] 0% (v1.11 - Data Export Edge Cases: 0/? phases)
 
 ## Milestone History
 
 | Milestone | Phases | Status | Shipped |
 |-----------|--------|--------|---------|
+| v1.11 Data Export Edge Cases | TBD | Defining | — |
 | v1.10 E2E Test Fix | 45-47 | Complete | 2026-02-02 |
 | v1.9 Data Parity Testing | 40-44 | Complete | 2026-02-01 |
 | v1.8 Data Export Parity | 36-39 | Complete | 2026-01-30 |
@@ -355,14 +356,15 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-02-02
-Stopped at: Completed 47-01-PLAN.md - v1.10 milestone complete
+Stopped at: Started v1.11 milestone
 Resume file: None
 
 ### Next Steps
 
-**v1.10 E2E Test Fix milestone complete.**
+**v1.11 Data Export Edge Cases started.**
 
-Recommended next actions for v1.11 (Data Export Fixes):
-- Fix isFocused column asymmetry (always export or add to exclude list)
-- Fix episode boundary row count mismatch during focus loss
-- Address dual-buffer edge cases identified by xfail tests
+Next action: Define requirements or research first
+
+Options:
+- `/gsd:define-requirements` — Define checkable requirements for v1.11
+- `/gsd:research-project` — Research dual-buffer patterns first (if unfamiliar)
