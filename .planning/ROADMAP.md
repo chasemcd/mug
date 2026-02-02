@@ -655,10 +655,10 @@ Plans:
   3. Test exists that triggers focus loss at episode boundary
   4. Test verifies data parity after boundary focus loss
 **Research flag:** Unlikely (builds on existing test patterns)
-**Plans:** TBD
+**Plans:** 1 plan
 
 Plans:
-- [ ] 47-01-PLAN.md — Focus loss data accuracy test scenarios
+- [ ] 47-01-PLAN.md — Focus loss data parity tests (mid-episode, boundary)
 
 ## Progress
 
@@ -701,8 +701,8 @@ Phases execute in numeric order: 45 → 46 → 47
 | 44. Manual Protocol | v1.9 | 1/1 | Complete | 2026-02-01 |
 | 45. Episode Completion Fix | v1.10 | 1/1 | Complete | 2026-02-02 |
 | 46. Test Suite Verification | v1.10 | 1/1 | Complete | 2026-02-02 |
-| 47. Focus Loss Testing | v1.10 | 0/1 | Not started | - |
+| 47. Focus Loss Testing | v1.10 | 0/1 | Planned | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-02 after Phase 46 execution*
+*Last updated: 2026-02-02 after Phase 47 planning*
