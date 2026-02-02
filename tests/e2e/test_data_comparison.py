@@ -503,7 +503,6 @@ def test_focus_loss_mid_episode_parity(flask_server, player_contexts, clean_data
 
 
 @pytest.mark.timeout(300)
-@pytest.mark.xfail(reason="Known issue: row count mismatch at episode boundary when player backgrounded - Phase 49 fix")
 def test_focus_loss_episode_boundary_parity(flask_server, player_contexts, clean_data_dir):
     """
     FOCUS-02: Test data parity maintained when one client loses focus at episode boundary.
@@ -520,14 +519,6 @@ def test_focus_loss_episode_boundary_parity(flask_server, player_contexts, clean
     - _promoteRemainingAtBoundary() when player is backgrounded
     - Episode completion detection while backgrounded
     - Data consistency at episode boundaries with pending fast-forward
-
-    NOTE: This test is marked xfail because there are known issues with episode
-    boundary handling when one player is backgrounded:
-    1. Row count mismatch: the backgrounded player may record frames beyond the
-       episode boundary due to fast-forward processing after episode ends
-    2. Column mismatch: isFocused columns only present for player who lost focus
-    These are edge cases in the dual-buffer data recording system that should
-    be addressed in a future phase.
     """
     page1, page2 = player_contexts
     base_url = flask_server["url"]
