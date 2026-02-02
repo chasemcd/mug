@@ -8,6 +8,7 @@ Note: The game object is exposed via window.game (defined in index.js).
 For multiplayer, this is an instance of MultiplayerPyodideGame.
 """
 from playwright.sync_api import Page
+from tests.fixtures.network_helpers import set_tab_visibility
 
 
 def wait_for_socket_connected(page: Page, timeout: int = 10000) -> None:
@@ -271,3 +272,8 @@ def run_full_episode_flow_until_gameplay(page1: Page, page2: Page, base_url: str
     wait_for_game_canvas(page2, timeout=120000)
     wait_for_game_object(page1, timeout=60000)
     wait_for_game_object(page2, timeout=60000)
+
+    # CRITICAL: Override document.hidden for Playwright
+    # Without this, FocusManager thinks tab is backgrounded and skips frame processing
+    set_tab_visibility(page1, visible=True)
+    set_tab_visibility(page2, visible=True)

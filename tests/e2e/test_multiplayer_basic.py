@@ -24,8 +24,8 @@ from tests.fixtures.game_helpers import (
     get_game_state,
     click_advance_button,
     click_start_button,
-    complete_tutorial_and_advance,
 )
+from tests.fixtures.network_helpers import set_tab_visibility
 
 
 @pytest.mark.timeout(300)  # 5 minutes max for full flow
@@ -54,12 +54,8 @@ def test_two_players_connect_and_complete_episode(flask_server, player_contexts)
     click_advance_button(page1)
     click_advance_button(page2)
 
-    # Step 4: Complete tutorial scene (GymScene with startButton)
-    # Tutorial is single-player, auto-completes after max_steps, then advances
-    complete_tutorial_and_advance(page1)
-    complete_tutorial_and_advance(page2)
-
-    # Now click startButton for the multiplayer scene
+    # Step 4: Click startButton for the multiplayer scene
+    # (Tutorial scene removed in commit 607b60a)
     click_start_button(page1)
     click_start_button(page2)
 
@@ -71,6 +67,11 @@ def test_two_players_connect_and_complete_episode(flask_server, player_contexts)
     # Step 6: Verify game objects initialized
     wait_for_game_object(page1)
     wait_for_game_object(page2)
+
+    # Override visibility for Playwright automation
+    # Without this, FocusManager thinks tab is backgrounded and skips frame processing
+    set_tab_visibility(page1, visible=True)
+    set_tab_visibility(page2, visible=True)
 
     # Get initial state
     state1 = get_game_state(page1)
@@ -120,11 +121,8 @@ def test_matchmaking_pairs_two_players(flask_server, player_contexts):
     click_advance_button(page1)
     click_advance_button(page2)
 
-    # Complete tutorial scene and advance to multiplayer
-    complete_tutorial_and_advance(page1)
-    complete_tutorial_and_advance(page2)
-
-    # Now click startButton for the multiplayer scene
+    # Click startButton for the multiplayer scene
+    # (Tutorial scene removed in commit 607b60a)
     click_start_button(page1)
     click_start_button(page2)
 
@@ -136,6 +134,11 @@ def test_matchmaking_pairs_two_players(flask_server, player_contexts):
     # Verify game objects exist and have same gameId
     wait_for_game_object(page1)
     wait_for_game_object(page2)
+
+    # Override visibility for Playwright automation
+    # Without this, FocusManager thinks tab is backgrounded and skips frame processing
+    set_tab_visibility(page1, visible=True)
+    set_tab_visibility(page2, visible=True)
 
     state1 = get_game_state(page1)
     state2 = get_game_state(page2)

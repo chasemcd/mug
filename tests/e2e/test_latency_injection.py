@@ -22,7 +22,7 @@ Known limitations:
   realistic scenario of mismatched network conditions.
 """
 import pytest
-from tests.fixtures.network_helpers import apply_latency, JitterEmulator
+from tests.fixtures.network_helpers import apply_latency, JitterEmulator, set_tab_visibility
 from tests.fixtures.game_helpers import (
     wait_for_socket_connected,
     wait_for_game_canvas,
@@ -31,7 +31,6 @@ from tests.fixtures.game_helpers import (
     get_game_state,
     click_advance_button,
     click_start_button,
-    complete_tutorial_and_advance,
     get_scene_id,
     run_full_episode_flow_until_gameplay,
 )
@@ -80,11 +79,8 @@ def run_full_episode_flow(
     click_advance_button(page1, timeout=setup_timeout)
     click_advance_button(page2, timeout=setup_timeout)
 
-    # Complete tutorial and advance to multiplayer
-    complete_tutorial_and_advance(page1, timeout=setup_timeout)
-    complete_tutorial_and_advance(page2, timeout=setup_timeout)
-
     # Click startButton for multiplayer scene
+    # (Tutorial scene removed in commit 607b60a)
     click_start_button(page1, timeout=setup_timeout)
     click_start_button(page2, timeout=setup_timeout)
 
@@ -96,6 +92,11 @@ def run_full_episode_flow(
     # Verify game objects initialized
     wait_for_game_object(page1, timeout=setup_timeout)
     wait_for_game_object(page2, timeout=setup_timeout)
+
+    # Override visibility for Playwright automation
+    # Without this, FocusManager thinks tab is backgrounded and skips frame processing
+    set_tab_visibility(page1, visible=True)
+    set_tab_visibility(page2, visible=True)
 
     # Verify both players are in same game
     state1 = get_game_state(page1)

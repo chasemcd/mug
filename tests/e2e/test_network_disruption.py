@@ -31,7 +31,6 @@ from tests.fixtures.game_helpers import (
     get_game_state,
     click_advance_button,
     click_start_button,
-    complete_tutorial_and_advance,
     get_scene_id,
     run_full_episode_flow_until_gameplay,
 )
@@ -148,11 +147,7 @@ def test_tab_visibility_triggers_fast_forward(flask_server, player_contexts):
     click_advance_button(page1, timeout=60000)
     click_advance_button(page2, timeout=60000)
 
-    # Complete tutorials
-    complete_tutorial_and_advance(page1, timeout=120000)
-    complete_tutorial_and_advance(page2, timeout=120000)
-
-    # Start multiplayer
+    # Start multiplayer (tutorial scene removed in commit 607b60a)
     click_start_button(page1, timeout=60000)
     click_start_button(page2, timeout=60000)
 
@@ -161,6 +156,10 @@ def test_tab_visibility_triggers_fast_forward(flask_server, player_contexts):
     wait_for_game_canvas(page2, timeout=120000)
     wait_for_game_object(page1, timeout=60000)
     wait_for_game_object(page2, timeout=60000)
+
+    # Override visibility for Playwright automation (essential for frames to advance)
+    set_tab_visibility(page1, visible=True)
+    set_tab_visibility(page2, visible=True)
 
     # Let game run for 3 seconds (build up some frames)
     time.sleep(3)
