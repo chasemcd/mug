@@ -678,10 +678,10 @@ Plans:
   1. Both players export isFocused.0 and isFocused.1 columns regardless of focus events
   2. isFocused values reflect actual focus state (true when focused, false when backgrounded)
 **Research flag:** Unlikely (straightforward data collection fix)
-**Plans:** TBD
+**Plans:** 1 plan
 
 Plans:
-- [ ] 48-01-PLAN.md — Fix isFocused column export consistency
+- [ ] 48-01-PLAN.md — Update storeFrameData calls to use getFocusStatePerPlayer()
 
 ### Phase 49: Episode Boundary Row Parity
 **Goal:** Both players export identical row counts at episode boundaries
@@ -718,7 +718,7 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 45 → 46 → 47
+Phases execute in numeric order: 48 → 49 → 50
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -757,10 +757,10 @@ Phases execute in numeric order: 45 → 46 → 47
 | 45. Episode Completion Fix | v1.10 | 1/1 | Complete | 2026-02-02 |
 | 46. Test Suite Verification | v1.10 | 1/1 | Complete | 2026-02-02 |
 | 47. Focus Loss Testing | v1.10 | 1/1 | Complete | 2026-02-02 |
-| 48. isFocused Column | v1.11 | 0/1 | Not started | - |
+| 48. isFocused Column | v1.11 | 0/1 | Planned | - |
 | 49. Episode Boundary | v1.11 | 0/1 | Not started | - |
 | 50. Stress Verification | v1.11 | 0/1 | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-02 after v1.11 roadmap creation*
+*Last updated: 2026-02-02 after Phase 48 planning*
