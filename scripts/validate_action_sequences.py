@@ -45,6 +45,8 @@ COLUMNS_EXCLUDE_FROM_COMPARE = {
     "timestamp",        # Local timestamp differs between clients
     "rollbackEvents",   # Each player has their own rollback perspective
     "wasSpeculative",   # Speculative state tracking is client-local
+    "isFocused.0",      # Focus state differs between players due to notification latency
+    "isFocused.1",      # Each player knows their own focus state before partner does
 }
 
 
