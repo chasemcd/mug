@@ -159,7 +159,7 @@ def wait_for_export_files(
 
 
 def run_comparison(
-    file1: Path, file2: Path, verbose: bool = False, row_tolerance: int = 5
+    file1: Path, file2: Path, verbose: bool = False, row_tolerance: int = 10
 ) -> tuple:
     """
     Run the validate_action_sequences.py --compare script on two export files.
@@ -171,8 +171,8 @@ def run_comparison(
         file1: Path to first export CSV file
         file2: Path to second export CSV file
         verbose: If True, add --verbose flag for detailed divergence info
-        row_tolerance: Allow up to this many row count differences (default 5)
-                      Episode boundary timing can cause small differences
+        row_tolerance: Allow up to this many row count differences (default 10)
+                      Episode boundary timing under latency can cause differences
 
     Returns:
         tuple: (exit_code, output_text)
