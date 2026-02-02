@@ -2362,7 +2362,7 @@ hashlib.md5(json.dumps(_state, sort_keys=True).encode()).hexdigest()[:8]
         this.actionSequence.push({
             frame: this.frameNumber,
             actions: {...finalActions},  // Clone to avoid mutation
-            isFocused: this.focusManager ? !this.focusManager.isBackgrounded : true
+            isFocused: this.getFocusStatePerPlayer()
         });
 
         // Update action counts
@@ -2456,7 +2456,7 @@ hashlib.md5(json.dumps(_st, sort_keys=True).encode()).hexdigest()[:8]
                 terminateds: Object.fromEntries(terminateds),
                 truncateds: Object.fromEntries(truncateds),
                 infos: infos instanceof Map ? Object.fromEntries(infos) : infos,
-                isFocused: this.focusManager ? !this.focusManager.isBackgrounded : true
+                isFocused: this.getFocusStatePerPlayer()
             });
         }
 
@@ -4716,7 +4716,7 @@ json.dumps({
                 this.actionSequence.push({
                     frame: frame,
                     actions: {...envActions},
-                    isFocused: this.focusManager ? !this.focusManager.isBackgrounded : true
+                    isFocused: this.getFocusStatePerPlayer()
                 });
 
                 // Update action counts with corrected actions
@@ -4855,7 +4855,7 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
                         terminateds: entry.terminateds,
                         truncateds: entry.truncateds,
                         infos: entry.infos,
-                        isFocused: this.focusManager ? !this.focusManager.isBackgrounded : true
+                        isFocused: this.getFocusStatePerPlayer()
                     });
                 }
                 p2pLog.debug(`Stored ${replayInfo.replay_log.length} corrected frames in data buffer`);
