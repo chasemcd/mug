@@ -39,6 +39,14 @@ REWARD_INFO_KEYS = [
     "soup_in_dish_reward",
 ]
 
+# Columns expected to differ between players (local metrics, not game state)
+# These should be excluded from parity checks as they measure client-local data
+COLUMNS_EXCLUDE_FROM_COMPARE = {
+    "timestamp",        # Local timestamp differs between clients
+    "rollbackEvents",   # Each player has their own rollback perspective
+    "wasSpeculative",   # Speculative state tracking is client-local
+}
+
 
 def load_csv(filepath: Path) -> tuple[list[str], list[dict]]:
     """Load a CSV file and return (headers, list of row dicts)."""
@@ -60,8 +68,10 @@ def compare_files(file1: Path, file2: Path, verbose: bool = False) -> int:
     headers2, rows2 = load_csv(file2)
 
     errors = []
+    warnings = []
 
-    # Check row counts
+    # Check row counts - must be exactly equal
+    # Both clients should terminate at the same frame (max_steps or terminal event)
     if len(rows1) != len(rows2):
         errors.append(f"Row count mismatch: {file1.name} has {len(rows1)} rows, {file2.name} has {len(rows2)} rows")
 
@@ -74,8 +84,8 @@ def compare_files(file1: Path, file2: Path, verbose: bool = False) -> int:
         if only_in_2:
             errors.append(f"Columns only in {file2.name}: {only_in_2}")
 
-    # Compare common columns
-    common_cols = set(headers1) & set(headers2)
+    # Compare common columns (excluding expected differences)
+    common_cols = (set(headers1) & set(headers2)) - COLUMNS_EXCLUDE_FROM_COMPARE
     min_rows = min(len(rows1), len(rows2))
 
     divergences = defaultdict(list)
@@ -102,6 +112,12 @@ def compare_files(file1: Path, file2: Path, verbose: bool = False) -> int:
     print(f"Rows: {len(rows1)} vs {len(rows2)}")
     print(f"Columns: {len(headers1)} vs {len(headers2)}")
     print()
+
+    if warnings:
+        print("WARNINGS:")
+        for warning in warnings:
+            print(f"  {warning}")
+        print()
 
     if errors:
         print("DIVERGENCES FOUND:")

@@ -29,10 +29,10 @@ def get_experiment_id() -> str:
     directory structure for export files.
 
     Returns:
-        str: The experiment ID (e.g., "overcooked_human_human_multiplayer")
+        str: The experiment ID (e.g., "overcooked_multiplayer_hh_test")
     """
-    # Default experiment ID from the example multiplayer server
-    return "overcooked_human_human_multiplayer"
+    # Experiment ID from the test server config (overcooked_human_human_multiplayer_test.py)
+    return "overcooked_multiplayer_hh_test"
 
 
 def get_subject_ids_from_pages(page1: Page, page2: Page) -> tuple:
@@ -52,12 +52,12 @@ def get_subject_ids_from_pages(page1: Page, page2: Page) -> tuple:
     Raises:
         ValueError: If subject IDs cannot be extracted from either page
     """
-    # Try window.subjectId first (set by index.js), fall back to game object
+    # Try various locations where subject ID/name may be stored
     subject1 = page1.evaluate(
-        "() => window.subjectId || window.game?.subjectId || null"
+        "() => window.subjectName || window.interactiveGymGlobals?.subjectName || window.subjectId || null"
     )
     subject2 = page2.evaluate(
-        "() => window.subjectId || window.game?.subjectId || null"
+        "() => window.subjectName || window.interactiveGymGlobals?.subjectName || window.subjectId || null"
     )
 
     if not subject1:

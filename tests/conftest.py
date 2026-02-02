@@ -3,7 +3,16 @@ Shared pytest fixtures for interactive-gym tests.
 
 Provides:
 - flask_server: Module-scoped fixture that starts/stops the Flask server
+- browser_type_launch_args: Override browser launch args for WebRTC compatibility
 - player_contexts: Function-scoped fixture providing two isolated browser contexts
+
+IMPORTANT: E2E tests using WebRTC require HEADED mode!
+WebRTC peer connections fail in headless Chromium due to ICE candidate
+gathering limitations. Run E2E tests with:
+
+    pytest tests/e2e/ --headed
+
+Or set PWHEADED=1 environment variable.
 """
 
 import subprocess
@@ -11,6 +20,34 @@ import time
 from http.client import HTTPConnection
 
 import pytest
+
+
+@pytest.fixture(scope="session")
+def browser_type_launch_args(browser_type_launch_args):
+    """
+    Override browser launch arguments for WebRTC to work between isolated contexts.
+
+    The key flags are:
+    - --disable-features=WebRtcHideLocalIpsWithMdns: Use actual local IPs instead of
+      mDNS .local addresses which don't resolve between isolated browser contexts
+    - --use-fake-ui-for-media-stream: Auto-approve media permissions
+    - --allow-insecure-localhost: Allow WebRTC on localhost
+
+    This properly extends pytest-playwright's browser_type_launch_args fixture.
+    See: https://playwright.dev/python/docs/test-runners
+    """
+    return {
+        **browser_type_launch_args,
+        "args": [
+            # Disable mDNS ICE candidates - use actual local IPs instead
+            # Without this, ICE candidates use unresolvable .local addresses
+            "--disable-features=WebRtcHideLocalIpsWithMdns",
+            # Auto-approve media permissions (avoids permission dialogs)
+            "--use-fake-ui-for-media-stream",
+            # Allow insecure localhost for WebRTC (useful for testing)
+            "--allow-insecure-localhost",
+        ],
+    }
 
 
 @pytest.fixture(scope="module")
@@ -25,11 +62,15 @@ def flask_server():
     base_url = f"http://localhost:{port}"
 
     # Start the Flask server as a subprocess
+    # Use test-specific config with relaxed constraints:
+    # - No max_rtt limit (allows latency injection)
+    # - No focus loss timeout (prevents disconnection)
+    # - Shorter episodes (~15s instead of ~45s)
     process = subprocess.Popen(
         [
             "python",
             "-m",
-            "interactive_gym.examples.cogrid.overcooked_human_human_multiplayer",
+            "interactive_gym.examples.cogrid.overcooked_human_human_multiplayer_test",
             "--port",
             str(port),
         ],

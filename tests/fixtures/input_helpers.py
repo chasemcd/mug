@@ -49,8 +49,9 @@ def start_random_actions(page, interval_ms: int = 200):
     """
     Start a background interval that presses random game keys.
 
-    Uses page.evaluate to set up a JS interval that dispatches
-    keyboard events. Returns interval ID for later cleanup.
+    Uses page.evaluate to set up a JS interval that triggers
+    jQuery keydown events (same method the game uses for input).
+    Returns interval ID for later cleanup.
 
     Args:
         page: Playwright page
@@ -64,7 +65,10 @@ def start_random_actions(page, interval_ms: int = 200):
         const keys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'w', 'q'];
         return setInterval(() => {{
             const key = keys[Math.floor(Math.random() * keys.length)];
-            document.dispatchEvent(new KeyboardEvent('keydown', {{ key }}));
+            // Use jQuery trigger to match how game listens for input (ui_utils.js)
+            const event = $.Event('keydown');
+            event.key = key;
+            $(document).trigger(event);
         }}, {interval_ms});
     }}"""
     )
@@ -85,7 +89,7 @@ def get_action_stats(page):
     """
     Get action statistics from game state.
 
-    Returns dict with counts of each action type seen in confirmed frame data.
+    Returns dict with counts of each action type seen in frame data buffer.
     Keys are action codes as strings, values are counts.
 
     Returns:
@@ -94,12 +98,13 @@ def get_action_stats(page):
     return page.evaluate(
         """() => {
         const game = window.game;
-        if (!game || !game.confirmedFrameData) return null;
+        if (!game || !game.frameDataBuffer) return null;
 
         const actionCounts = {};
-        for (const [frame, data] of Object.entries(game.confirmedFrameData)) {
-            const actions = data.actions || [];
-            for (const action of actions) {
+        for (const [frame, data] of game.frameDataBuffer.entries()) {
+            // actions is an object keyed by agentId: {0: action, 1: action}
+            const actions = data.actions || {};
+            for (const [agentId, action] of Object.entries(actions)) {
                 actionCounts[action] = (actionCounts[action] || 0) + 1;
             }
         }
@@ -121,14 +126,16 @@ def get_local_action_counts(page):
     return page.evaluate(
         """() => {
         const game = window.game;
-        if (!game || !game.confirmedFrameData) return null;
+        if (!game || !game.frameDataBuffer) return null;
 
-        const localPlayerId = game.localPlayerId;
+        // Player ID is a string key in the actions object
+        const localPlayerId = String(game.myPlayerId);
         const actionCounts = {};
 
-        for (const [frame, data] of Object.entries(game.confirmedFrameData)) {
-            // Actions are indexed by player order
-            const localAction = data.actions ? data.actions[localPlayerId] : null;
+        for (const [frame, data] of game.frameDataBuffer.entries()) {
+            // actions is {playerId: action, ...}
+            const actions = data.actions || {};
+            const localAction = actions[localPlayerId];
             if (localAction !== null && localAction !== undefined) {
                 actionCounts[localAction] = (actionCounts[localAction] || 0) + 1;
             }

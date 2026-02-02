@@ -237,9 +237,10 @@ def run_full_episode_flow_until_gameplay(page1: Page, page2: Page, base_url: str
     1. Navigate to base URL
     2. Wait for socket connection
     3. Click advance button (instructions)
-    4. Complete tutorial
-    5. Click start button (multiplayer matchmaking)
-    6. Wait for game canvas and game object
+    4. Click start button (multiplayer matchmaking)
+    5. Wait for game canvas and game object
+
+    Note: Tutorial scene is disabled in test config for faster execution.
 
     After this function returns, both players are in-game and ready
     for action injection or waiting for episode completion.
@@ -261,11 +262,7 @@ def run_full_episode_flow_until_gameplay(page1: Page, page2: Page, base_url: str
     click_advance_button(page1, timeout=60000)
     click_advance_button(page2, timeout=60000)
 
-    # Complete tutorials
-    complete_tutorial_and_advance(page1, timeout=120000)
-    complete_tutorial_and_advance(page2, timeout=120000)
-
-    # Start multiplayer
+    # Start multiplayer (tutorial scene is disabled in test config)
     click_start_button(page1, timeout=60000)
     click_start_button(page2, timeout=60000)
 
