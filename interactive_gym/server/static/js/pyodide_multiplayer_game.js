@@ -4910,6 +4910,15 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
             }
         }
 
+        // Phase 49 (BOUND-02): Cap fast-forward at episode boundary
+        const sync = this.p2pEpisodeSync;
+        if (sync && sync.syncedTerminationFrame !== null && sync.syncedTerminationFrame !== undefined) {
+            if (maxFrame > sync.syncedTerminationFrame) {
+                p2pLog.debug(`Fast-forward capped at episode boundary: ${maxFrame} -> ${sync.syncedTerminationFrame}`);
+                maxFrame = sync.syncedTerminationFrame;
+            }
+        }
+
         // 2. Determine how many frames to process
         const framesToProcess = maxFrame - this.frameNumber;
         p2pLog.info(`FAST-FORWARD: target frame ${maxFrame}, current ${this.frameNumber}, need ${framesToProcess} frames`);
@@ -5065,7 +5074,17 @@ json.dumps({'cumulative_rewards': {str(k): v for k, v in _cumulative_rewards.ite
 
             // Store per-frame data in the rollback-safe buffer
             // Note: isFocused=false for local player during fast-forward
+            // Phase 49 (BOUND-03): Skip frames at or beyond episode boundary
+            const terminationFrame = this.p2pEpisodeSync?.syncedTerminationFrame;
+            let storedCount = 0;
             for (const frameData of ffResult.per_frame_data) {
+                // Skip frames at or beyond episode boundary
+                if (terminationFrame !== null && terminationFrame !== undefined) {
+                    if (frameData.frame >= terminationFrame) {
+                        p2pLog.debug(`Fast-forward: skipping post-boundary frame ${frameData.frame}`);
+                        continue;
+                    }
+                }
                 this.storeFrameData(frameData.frame, {
                     actions: frameData.actions,
                     rewards: frameData.rewards,
@@ -5074,8 +5093,9 @@ json.dumps({'cumulative_rewards': {str(k): v for k, v in _cumulative_rewards.ite
                     infos: frameData.infos,
                     isFocused: focusStateForFF
                 });
+                storedCount++;
             }
-            p2pLog.debug(`Stored ${ffResult.per_frame_data.length} fast-forward frames in data buffer`);
+            p2pLog.debug(`Stored ${storedCount} fast-forward frames in data buffer (${ffResult.per_frame_data.length - storedCount} skipped)`);
 
             framesProcessed = fastForwardFrames.length;
 
