@@ -1099,6 +1099,7 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
             remoteEpisodeEndFrame: null,      // Frame where peer detected it
             pendingReset: false,              // Waiting for sync before reset
             syncTimeoutId: null,              // Timeout to prevent infinite waiting
+            syncedTerminationFrame: null,     // Agreed-upon termination frame (min of local/remote)
             // Episode START sync
             localResetComplete: false,        // We completed our reset
             remoteResetComplete: false,       // Peer completed their reset
@@ -2440,9 +2441,15 @@ hashlib.md5(json.dumps(_st, sort_keys=True).encode()).hexdigest()[:8]
         // Store frame data in the rollback-safe buffer BEFORE incrementing frameNumber
         // This ensures we use the correct frame number for data storage
         // Data will be cleared and re-stored on rollback via clearFrameDataFromRollback + replay
-        // IMPORTANT: Don't store data if we've already detected episode end locally
-        // (we may still be executing frames while waiting for peer sync)
-        if (!this.p2pEpisodeSync.localEpisodeEndDetected) {
+        // IMPORTANT: Don't store data if:
+        // 1. We've already detected episode end locally, OR
+        // 2. We've received peer's episode end and this frame exceeds the synced termination frame
+        // This ensures both clients export exactly the same number of frames
+        const sync = this.p2pEpisodeSync;
+        const shouldStoreFrame = !sync.localEpisodeEndDetected &&
+            (sync.syncedTerminationFrame === null || this.frameNumber < sync.syncedTerminationFrame);
+
+        if (shouldStoreFrame) {
             this.storeFrameData(this.frameNumber, {
                 actions: finalActions,
                 rewards: Object.fromEntries(rewards),
@@ -3655,8 +3662,17 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
             player_subjects: this.playerSubjects
         };
 
-        // Get sorted frame numbers
-        const sortedFrames = Array.from(this.frameDataBuffer.keys()).sort((a, b) => a - b);
+        // Get sorted frame numbers, limited to synced termination frame if set
+        // This ensures both clients export exactly the same number of frames
+        let sortedFrames = Array.from(this.frameDataBuffer.keys()).sort((a, b) => a - b);
+
+        const terminationFrame = this.p2pEpisodeSync?.syncedTerminationFrame;
+        if (terminationFrame !== null && terminationFrame !== undefined) {
+            // Only export frames up to (but not including) the termination frame
+            // Frame numbers are 0-indexed, so max_steps=450 means frames 0-449
+            sortedFrames = sortedFrames.filter(frame => frame < terminationFrame);
+            p2pLog.debug(`Export limited to ${sortedFrames.length} frames (terminationFrame=${terminationFrame})`);
+        }
 
         for (const frame of sortedFrames) {
             const frameData = this.frameDataBuffer.get(frame);
@@ -7153,6 +7169,10 @@ json.dumps({'cumulative_rewards': {str(k): v for k, v in _cumulative_rewards.ite
         this.p2pEpisodeSync.remoteEpisodeEndReceived = true;
         this.p2pEpisodeSync.remoteEpisodeEndFrame = packet.frameNumber;
 
+        // Calculate synced termination frame (minimum of local and remote)
+        // This ensures both clients export the same number of frames
+        this._updateSyncedTerminationFrame();
+
         // Check if we can now trigger the synchronized reset
         this._checkEpisodeSyncAndReset();
     }
@@ -7178,6 +7198,10 @@ json.dumps({'cumulative_rewards': {str(k): v for k, v in _cumulative_rewards.ite
         this.p2pEpisodeSync.localEpisodeEndDetected = true;
         this.p2pEpisodeSync.localEpisodeEndFrame = this.frameNumber;
         this.p2pEpisodeSync.pendingReset = true;
+
+        // Calculate synced termination frame (minimum of local and remote)
+        // This ensures both clients export the same number of frames
+        this._updateSyncedTerminationFrame();
 
         // Start timeout in case peer message is lost (2 seconds)
         // If we don't hear from peer, proceed with reset anyway
@@ -7241,6 +7265,7 @@ json.dumps({'cumulative_rewards': {str(k): v for k, v in _cumulative_rewards.ite
         this.p2pEpisodeSync.remoteEpisodeEndFrame = null;
         this.p2pEpisodeSync.pendingReset = false;
         this.p2pEpisodeSync.syncTimeoutId = null;
+        this.p2pEpisodeSync.syncedTerminationFrame = null;
         // Episode START sync state
         this.p2pEpisodeSync.localResetComplete = false;
         this.p2pEpisodeSync.remoteResetComplete = false;
@@ -7256,6 +7281,42 @@ json.dumps({'cumulative_rewards': {str(k): v for k, v in _cumulative_rewards.ite
         // Clear waiting for partner focus state (but keep partnerFocused as-is - it's tracked separately)
         this.p2pEpisodeSync.waitingForPartnerFocus = false;
         this._hideWaitingForPartnerOverlay();
+    }
+
+    _updateSyncedTerminationFrame() {
+        /**
+         * Calculate the synchronized termination frame from local and remote values.
+         *
+         * Uses the MINIMUM of the two frames where episode end was detected.
+         * This ensures both clients export exactly the same number of frames,
+         * preventing row count mismatches in data exports.
+         *
+         * Why minimum? Under network latency:
+         * - Client A (host) reaches max_steps at frame 450, broadcasts
+         * - Client B receives broadcast while at frame 455 (processed extra frames while packet was in-flight)
+         * - Both should export frames 0-449 (450 rows), not have B export extra frames
+         *
+         * For max_steps termination: Both clients should stop at the same step
+         * For event termination: The event is deterministic, both detect at same frame
+         */
+        const sync = this.p2pEpisodeSync;
+        const localFrame = sync.localEpisodeEndFrame;
+        const remoteFrame = sync.remoteEpisodeEndFrame;
+
+        if (localFrame !== null && remoteFrame !== null) {
+            // Both have detected - use minimum
+            sync.syncedTerminationFrame = Math.min(localFrame, remoteFrame);
+            p2pLog.debug(`Synced termination frame: ${sync.syncedTerminationFrame} (local=${localFrame}, remote=${remoteFrame})`);
+        } else if (localFrame !== null) {
+            // Only local detected - use local for now, will update when remote arrives
+            sync.syncedTerminationFrame = localFrame;
+        } else if (remoteFrame !== null) {
+            // Only remote detected - use remote for now
+            // This case means peer detected end before us, so we should stop at their frame
+            sync.syncedTerminationFrame = remoteFrame;
+            p2pLog.debug(`Using peer's termination frame: ${remoteFrame} (local not yet detected)`);
+        }
+        // If neither detected, syncedTerminationFrame stays null
     }
 
     _handleEpisodeReady(buffer) {

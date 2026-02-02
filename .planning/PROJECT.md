@@ -8,18 +8,26 @@ A framework for running browser-based reinforcement learning experiments with hu
 
 Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
 
-## Current Milestone: v1.9 Data Parity Testing
+## Current Milestone: v1.10 E2E Test Fix
 
-**Goal:** Validate v1.8 data export parity under controlled network conditions using Playwright automation against `overcooked_human_human_multiplayer`.
+**Goal:** Fix E2E test environment so all automated tests pass in headed mode.
 
 **Target features:**
-- Playwright-based automated test suite for multiplayer data parity
-- Artificial latency injection tests (100ms, 200ms, 500ms via Chrome DevTools Protocol)
-- Packet loss simulation tests to trigger rollback scenarios
-- Tab focus scenarios (tab away/back during gameplay) to test fast-forward
-- In-browser export comparison during test runs
-- Python script comparison via `validate_action_sequences.py --compare`
-- Documented manual test protocol for researchers
+- Fix episode completion timeout (games initialize but frames don't advance)
+- Fix row count mismatch under latency (synchronized termination frame)
+- All existing E2E tests pass with `pytest tests/e2e/ --headed`
+- Tests validate data parity under network stress conditions
+
+## Previous Milestone: v1.9 Data Parity Testing (Shipped: 2026-02-01)
+
+**Delivered:** Playwright E2E test infrastructure with network condition simulation and data comparison pipeline.
+
+**Key accomplishments:**
+- Playwright test fixtures (flask_server, player_contexts)
+- CDP-based latency injection tests (100ms, 200ms, jitter)
+- Packet loss and tab focus simulation tests
+- Export collection and comparison helpers
+- Manual test protocol documentation
 
 ## Previous Milestone: v1.8 Data Export Parity (Shipped: 2026-01-31)
 
@@ -173,13 +181,9 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 
 ### Active
 
-- [ ] Playwright test infrastructure for multiplayer game automation
-- [ ] Latency injection tests (100ms, 200ms, 500ms)
-- [ ] Packet loss simulation tests
-- [ ] Tab focus/unfocus tests
-- [ ] In-browser export comparison
-- [ ] Python script comparison integration
-- [ ] Manual test protocol documentation
+- [ ] Fix episode completion timeout in E2E tests
+- [ ] Fix row count mismatch under network latency (synchronized termination)
+- [ ] All E2E tests pass in headed mode
 
 *Shipped in v1.8:*
 - ✓ Identical frame counts between both players' exports — v1.8
@@ -266,4 +270,4 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 | Playwright MCP for testing | Browser automation with network condition control | — Pending |
 
 ---
-*Last updated: 2026-01-31 after v1.9 milestone start*
+*Last updated: 2026-02-02 after v1.10 milestone start*
