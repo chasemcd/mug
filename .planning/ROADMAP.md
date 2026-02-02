@@ -610,7 +610,7 @@ Plans:
 
 </details>
 
-### 🚧 v1.10 E2E Test Fix (In Progress)
+### v1.10 E2E Test Fix (In Progress)
 
 **Milestone Goal:** Fix E2E test environment so all automated tests pass in headed mode, validating data parity under network stress conditions.
 
@@ -623,11 +623,11 @@ Plans:
   2. Games progress through frames (frame counter increments)
   3. Episodes complete within 180s test timeout
   4. At least one test completes a full episode without manual intervention
-**Research flag:** Likely (must debug test automation behavior)
-**Plans:** TBD
+**Research flag:** Complete (root cause: document.hidden=true in Playwright, FocusManager skips frames)
+**Plans:** 1 plan
 
 Plans:
-- [ ] 45-01-PLAN.md — Diagnose and fix episode completion in E2E tests
+- [ ] 45-01-PLAN.md — Add visibility override to test helpers, remove obsolete tutorial flow calls
 
 ### Phase 46: Test Suite Verification
 **Goal:** All existing E2E tests pass in headed mode
@@ -699,10 +699,10 @@ Phases execute in numeric order: 45 → 46 → 47
 | 42. Network Disruption | v1.9 | 1/1 | Complete | 2026-01-31 |
 | 43. Data Comparison | v1.9 | 1/1 | Complete | 2026-01-31 |
 | 44. Manual Protocol | v1.9 | 1/1 | Complete | 2026-02-01 |
-| 45. Episode Completion Fix | v1.10 | 0/1 | Not started | - |
+| 45. Episode Completion Fix | v1.10 | 0/1 | Planned | - |
 | 46. Test Suite Verification | v1.10 | 0/1 | Not started | - |
 | 47. Focus Loss Testing | v1.10 | 0/1 | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-02 after v1.10 roadmap creation*
+*Last updated: 2026-02-02 after Phase 45 planning*
