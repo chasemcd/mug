@@ -14,9 +14,9 @@ Requirements for v1.11 Data Export Edge Cases milestone. Each maps to roadmap ph
 
 ### Episode Boundary Row Parity
 
-- [ ] **BOUND-01**: Both players export exactly the same number of rows (0 row tolerance)
-- [ ] **BOUND-02**: Fast-forward processing stops at episode boundary, not after
-- [ ] **BOUND-03**: `_promoteRemainingAtBoundary()` handles backgrounded player correctly
+- [x] **BOUND-01**: Both players export exactly the same number of rows (0 row tolerance)
+- [x] **BOUND-02**: Fast-forward processing stops at episode boundary, not after
+- [x] **BOUND-03**: `_promoteRemainingAtBoundary()` handles backgrounded player correctly
 
 ### Dual-Buffer Stress Handling
 
@@ -61,9 +61,9 @@ Deferred to future release.
 |-------------|-------|--------|
 | FOCUS-COL-01 | Phase 48 | Complete |
 | FOCUS-COL-02 | Phase 48 | Complete |
-| BOUND-01 | Phase 49 | Pending |
-| BOUND-02 | Phase 49 | Pending |
-| BOUND-03 | Phase 49 | Pending |
+| BOUND-01 | Phase 49 | Complete |
+| BOUND-02 | Phase 49 | Complete |
+| BOUND-03 | Phase 49 | Complete |
 | STRESS-01 | Phase 50 | Pending |
 | STRESS-02 | Phase 50 | Pending |
 | STRESS-03 | Phase 50 | Pending |
@@ -79,4 +79,4 @@ Deferred to future release.
 
 ---
 *Requirements defined: 2026-02-02*
-*Last updated: 2026-02-02 after Phase 48 complete*
+*Last updated: 2026-02-02 after Phase 49 complete*

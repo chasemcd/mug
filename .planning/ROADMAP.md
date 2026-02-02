@@ -695,7 +695,7 @@ Plans:
 **Plans:** 1 plan
 
 Plans:
-- [ ] 49-01-PLAN.md — Cap fast-forward at episode boundary, filter promotion
+- [x] 49-01-PLAN.md — Cap fast-forward at episode boundary, filter promotion
 
 ### Phase 50: Stress Test Verification
 **Goal:** All xfail tests pass without markers under network stress
@@ -758,9 +758,9 @@ Phases execute in numeric order: 48 → 49 → 50
 | 46. Test Suite Verification | v1.10 | 1/1 | Complete | 2026-02-02 |
 | 47. Focus Loss Testing | v1.10 | 1/1 | Complete | 2026-02-02 |
 | 48. isFocused Column | v1.11 | 1/1 | Complete | 2026-02-02 |
-| 49. Episode Boundary Row | v1.11 | 0/1 | Planned | - |
+| 49. Episode Boundary Row | v1.11 | 1/1 | Complete | 2026-02-02 |
 | 50. Stress Verification | v1.11 | 0/1 | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-02 after Phase 49 planned*
+*Last updated: 2026-02-02 after Phase 49 complete*
