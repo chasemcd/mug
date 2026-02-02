@@ -1,89 +1,81 @@
-# Requirements: Interactive Gym v1.9 Data Parity Testing
+# Requirements: Interactive Gym v1.10 E2E Test Fix
 
-**Defined:** 2026-01-31
-**Core Value:** Validate that both players export identical game state data under controlled network conditions, ensuring v1.8 data export parity works in practice.
+**Defined:** 2026-02-02
+**Core Value:** All E2E tests pass in headed mode, validating data parity under network stress conditions.
 
-## v1.9 Requirements
+## v1.10 Requirements
 
-Requirements for v1.9 Data Parity Testing milestone. Each maps to roadmap phases.
+Requirements for v1.10 E2E Test Fix milestone. Each maps to roadmap phases.
 
-### Test Infrastructure
+### Episode Completion Fix
 
-- [x] **INFRA-01**: Playwright test suite can launch two browser contexts for multiplayer game
-- [x] **INFRA-02**: Test lifecycle manages Flask server startup and teardown
+- [ ] **EPFIX-01**: Diagnose why game initializes but frames don't advance in E2E tests
+- [ ] **EPFIX-02**: Fix root cause so games progress through frames to episode completion
+- [ ] **EPFIX-03**: Episode completion detected within test timeout (180s)
 
-### Network Condition Tests
+### Row Count Synchronization
 
-- [x] **NET-01**: Test applies fixed latency (100ms, 200ms) via Chrome DevTools Protocol (500ms causes WebRTC signaling timeouts)
-- [x] **NET-02**: Test simulates packet loss to trigger rollback scenarios
-- [x] **NET-03**: Test triggers tab unfocus/refocus to exercise fast-forward path
-- [x] **NET-04**: Test applies asymmetric latency (different delays for each player)
-- [x] **NET-05**: Test applies jitter (variable latency) during gameplay
+- [ ] **SYNC-01**: Both players export identical frame counts regardless of network latency
+- [ ] **SYNC-02**: Synchronized termination frame calculated as minimum of local/remote detection
+- [ ] **SYNC-03**: Frame storage stops at synced termination frame
+- [ ] **SYNC-04**: Export filters frames to only include up to termination frame
 
-### Data Comparison
+### Test Validation
 
-- [x] **CMP-01**: Test collects export files from both players after episode ends
-- [x] **CMP-02**: Test invokes `validate_action_sequences.py --compare` on collected exports
-- [x] **CMP-03**: Test reports pass/fail based on comparison result (exit code)
-
-### Documentation
-
-- [x] **DOC-01**: Manual test protocol documents step-by-step researcher verification process
+- [ ] **TEST-01**: `test_infrastructure.py` smoke tests pass
+- [ ] **TEST-02**: `test_multiplayer_basic.py` matchmaking and episode tests pass
+- [ ] **TEST-03**: `test_latency_injection.py` all latency scenarios pass
+- [ ] **TEST-04**: `test_network_disruption.py` packet loss and focus tests pass
+- [ ] **TEST-05**: `test_data_comparison.py` parity validation tests pass
 
 ## v2 Requirements
 
-Deferred to future release. Tracked but not in current roadmap.
+Deferred to future release.
 
 ### Test Infrastructure
 
-- **INFRA-03**: Headless mode for CI/CD integration
-- **INFRA-04**: Screenshot capture on test failure
+- **CI-01**: Headless mode for CI/CD integration (requires WebRTC workaround)
+- **CI-02**: GitHub Actions workflow for automated test runs
+- **CI-03**: Screenshot/video capture on test failure
 
-### Data Comparison
+### Extended Coverage
 
-- **CMP-04**: In-browser comparison before server export
-- **CMP-05**: Detailed divergence reports (columns, frames)
-
-### Documentation
-
-- **DOC-02**: Setup instructions for running test suite
-- **DOC-03**: CI integration guide (GitHub Actions)
-- **DOC-04**: Test case documentation with expected outcomes
+- **COV-01**: Multi-episode test scenarios
+- **COV-02**: Stress testing with sustained high latency
+- **COV-03**: Connection recovery scenarios
 
 ## Out of Scope
 
-Explicitly excluded. Documented to prevent scope creep.
-
 | Feature | Reason |
 |---------|--------|
-| Automated CI pipeline | Manual test runs sufficient for v1.9 |
-| Performance benchmarking | Focus is parity validation, not latency measurement |
-| Mobile browser testing | Desktop Chrome/Firefox only |
-| Cross-browser matrix | Playwright on Chromium sufficient for validation |
+| Headless automation | WebRTC requires headed mode; defer to v2 |
+| Cross-browser testing | Chromium-only sufficient for validation |
+| Performance benchmarks | Focus is correctness, not speed |
+| New test scenarios | Fix existing tests first |
 
 ## Traceability
 
-Which phases cover which requirements. Updated by create-roadmap.
-
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| INFRA-01 | Phase 40 | Complete |
-| INFRA-02 | Phase 40 | Complete |
-| NET-01 | Phase 41 | Complete |
-| NET-04 | Phase 41 | Complete |
-| NET-05 | Phase 41 | Complete |
-| NET-02 | Phase 42 | Complete |
-| NET-03 | Phase 42 | Complete |
-| CMP-01 | Phase 43 | Complete |
-| CMP-02 | Phase 43 | Complete |
-| CMP-03 | Phase 43 | Complete |
-| DOC-01 | Phase 44 | Complete |
+| EPFIX-01 | TBD | Pending |
+| EPFIX-02 | TBD | Pending |
+| EPFIX-03 | TBD | Pending |
+| SYNC-01 | — | Implemented (pending verification) |
+| SYNC-02 | — | Implemented (pending verification) |
+| SYNC-03 | — | Implemented (pending verification) |
+| SYNC-04 | — | Implemented (pending verification) |
+| TEST-01 | TBD | Pending |
+| TEST-02 | TBD | Pending |
+| TEST-03 | TBD | Pending |
+| TEST-04 | TBD | Pending |
+| TEST-05 | TBD | Pending |
 
 **Coverage:**
-- v1.9 requirements: 11 total
-- Mapped to phases: 11 ✓
-- Unmapped: 0
+- v1.10 requirements: 12 total
+- Implemented (awaiting verification): 4 (SYNC-*)
+- Pending investigation/fix: 8
+- Unmapped to phases: 12 ⚠️
 
 ---
-*Requirements defined: 2026-01-31*
-*Last updated: 2026-02-01 after Phase 44 execution*
+*Requirements defined: 2026-02-02*
+*Last updated: 2026-02-02 after v1.10 milestone start*
