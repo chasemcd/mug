@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-02)
 ## Current Position
 
 Phase: 45 of 47 (Episode Completion Diagnosis & Fix)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-02-02 — Roadmap created for v1.10
+Plan: 01 complete
+Status: Phase 45 complete
+Last activity: 2026-02-02 — Completed 45-01-PLAN.md (Episode Completion Fix)
 
-Progress: [          ] 0% (v1.10 - E2E Test Fix: 0/3 phases)
+Progress: [███       ] 33% (v1.10 - E2E Test Fix: 1/3 phases)
 
 ## Milestone History
 
@@ -114,6 +114,9 @@ Progress: [          ] 0% (v1.10 - E2E Test Fix: 0/3 phases)
 - `.planning/phases/42-network-disruption/42-01-SUMMARY.md`
 - `.planning/phases/43-data-comparison/43-01-SUMMARY.md`
 - `.planning/phases/44-manual-test-protocol/44-01-SUMMARY.md`
+
+**v1.10 Execution:**
+- `.planning/phases/45-episode-completion-fix/45-01-SUMMARY.md`
 
 **Manual Test Protocol (v1.9 Phase 44 - added):**
 - `docs/MANUAL_TEST_PROTOCOL.md` - Step-by-step protocol for 6 network condition scenarios (baseline, latency, asymmetric, jitter, packet loss, tab focus)
@@ -311,23 +314,30 @@ See: .planning/PROJECT.md Key Decisions table
 - Input latency root cause fix (tooling now exists via Phase 28 instrumentation)
 - Users can use `[LATENCY]` console logs to diagnose specific issues
 
-**E2E Test Environment (v1.9 - known issue):**
-- Episode completion tests timeout on all multiplayer tests
-- Game initializes but frame numbers remain at 0
-- Matchmaking and WebRTC connection tests pass
-- Issue predates Phase 42; affects Phase 40-42 tests
+**E2E Test Environment (v1.9 - RESOLVED in v1.10 Phase 45):**
+- Root cause: Playwright sets document.hidden=true, FocusManager blocks frame processing
+- Fix: set_tab_visibility(page, True) override after wait_for_game_object()
+- test_two_players_connect_and_complete_episode now passes in ~32s
+
+**v1.10 Phase 45 decisions:**
+- Visibility override placed after wait_for_game_object (FocusManager must exist)
+- Removed complete_tutorial_and_advance calls (tutorial scene removed in 607b60a)
+- Override added to both shared helper and individual test flows for completeness
 
 ## Session Continuity
 
 Last session: 2026-02-02
-Stopped at: Roadmap created for v1.10
+Stopped at: Completed 45-01-PLAN.md
 Resume file: None
 
 ### Next Steps
 
-**Next action:** `/gsd:plan-phase 45`
+**Next action:** `/gsd:plan-phase 46` or `/gsd:execute-plan 46-01`
 
-Phase 45: Episode Completion Diagnosis & Fix
-- Diagnose why game initializes but frames don't advance in E2E tests
-- Fix root cause so games progress through frames
-- Episode completion within 180s test timeout
+Phase 46: Remaining Test Fixes
+- Fix any remaining E2E test failures
+- Validate all test flows work with visibility override
+
+Phase 47: Test Suite Validation
+- Run full test suite
+- Ensure all tests pass
