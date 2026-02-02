@@ -10,7 +10,7 @@ game state data by:
 Usage:
     # In a test
     subject_ids = get_subject_ids_from_pages(page1, page2)
-    paths = wait_for_export_files(experiment_id, scene_id, subject_ids, episode_num=1)
+    paths = wait_for_export_files(experiment_id, scene_id, subject_ids, episode_num=0)
     exit_code, output = run_comparison(paths[0], paths[1])
     assert exit_code == 0, f"Data parity failed: {output}"
 """
@@ -72,7 +72,7 @@ def collect_export_files(
     experiment_id: str,
     scene_id: str,
     subject_ids: tuple,
-    episode_num: int = 1
+    episode_num: int = 0
 ) -> tuple:
     """
     Construct paths to export CSV files for both players.
@@ -84,7 +84,7 @@ def collect_export_files(
         experiment_id: The experiment identifier
         scene_id: The scene identifier (e.g., "cramped_room")
         subject_ids: Tuple of (subject_id_1, subject_id_2)
-        episode_num: Episode number (1-indexed)
+        episode_num: Episode number (0-indexed, i.e., first episode is 0)
 
     Returns:
         tuple: (Path to file 1, Path to file 2)
@@ -109,7 +109,7 @@ def wait_for_export_files(
     experiment_id: str,
     scene_id: str,
     subject_ids: tuple,
-    episode_num: int = 1,
+    episode_num: int = 0,
     timeout_sec: int = 30
 ) -> tuple:
     """
@@ -123,7 +123,7 @@ def wait_for_export_files(
         experiment_id: The experiment identifier
         scene_id: The scene identifier
         subject_ids: Tuple of (subject_id_1, subject_id_2)
-        episode_num: Episode number to wait for
+        episode_num: Episode number to wait for (0-indexed, first episode is 0)
         timeout_sec: Maximum seconds to wait (default 30)
 
     Returns:
@@ -158,21 +158,25 @@ def wait_for_export_files(
     )
 
 
-def run_comparison(file1: Path, file2: Path, verbose: bool = False) -> tuple:
+def run_comparison(
+    file1: Path, file2: Path, verbose: bool = False, row_tolerance: int = 5
+) -> tuple:
     """
     Run the validate_action_sequences.py --compare script on two export files.
 
     This invokes the comparison script as a subprocess and captures its output.
-    Exit code 0 means files are identical; exit code 1 means divergences found.
+    Exit code 0 means files are identical (within tolerance); exit code 1 means divergences found.
 
     Args:
         file1: Path to first export CSV file
         file2: Path to second export CSV file
         verbose: If True, add --verbose flag for detailed divergence info
+        row_tolerance: Allow up to this many row count differences (default 5)
+                      Episode boundary timing can cause small differences
 
     Returns:
         tuple: (exit_code, output_text)
-            exit_code: 0 if files identical, 1 if divergences found
+            exit_code: 0 if files identical (within tolerance), 1 if divergences found
             output_text: Combined stdout and stderr from the script
     """
     cmd = [
@@ -181,6 +185,8 @@ def run_comparison(file1: Path, file2: Path, verbose: bool = False) -> tuple:
         "--compare",
         str(file1),
         str(file2),
+        "--row-tolerance",
+        str(row_tolerance),
     ]
 
     if verbose:

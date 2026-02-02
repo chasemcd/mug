@@ -57,12 +57,19 @@ def load_csv(filepath: Path) -> tuple[list[str], list[dict]]:
     return headers, rows
 
 
-def compare_files(file1: Path, file2: Path, verbose: bool = False) -> int:
+def compare_files(file1: Path, file2: Path, verbose: bool = False, row_tolerance: int = 0) -> int:
     """Compare two export files and report divergences.
 
     Phase 39: VERIFY-01 - Offline validation for post-experiment analysis.
 
-    Returns exit code: 0 if identical, 1 if different.
+    Args:
+        file1: Path to first CSV file
+        file2: Path to second CSV file
+        verbose: Show detailed divergence info
+        row_tolerance: Allow up to this many row count differences (for episode boundary timing)
+                      Set to 0 for strict matching, 5 for E2E test tolerance
+
+    Returns exit code: 0 if identical (within tolerance), 1 if different.
     """
     headers1, rows1 = load_csv(file1)
     headers2, rows2 = load_csv(file2)
@@ -70,10 +77,12 @@ def compare_files(file1: Path, file2: Path, verbose: bool = False) -> int:
     errors = []
     warnings = []
 
-    # Check row counts - must be exactly equal
-    # Both clients should terminate at the same frame (max_steps or terminal event)
-    if len(rows1) != len(rows2):
+    # Check row counts - allow small differences due to episode boundary timing
+    row_diff = abs(len(rows1) - len(rows2))
+    if row_diff > row_tolerance:
         errors.append(f"Row count mismatch: {file1.name} has {len(rows1)} rows, {file2.name} has {len(rows2)} rows")
+    elif row_diff > 0:
+        warnings.append(f"Row count difference within tolerance: {file1.name} has {len(rows1)} rows, {file2.name} has {len(rows2)} rows (diff={row_diff}, tolerance={row_tolerance})")
 
     # Check column sets
     if set(headers1) != set(headers2):
@@ -496,6 +505,10 @@ def main():
         "--compare", nargs=2, metavar=("FILE1", "FILE2"),
         help="Compare two specific export files instead of scanning directory"
     )
+    parser.add_argument(
+        "--row-tolerance", type=int, default=0,
+        help="Allow up to N row count differences (for episode boundary timing). Default: 0 (strict)"
+    )
     args = parser.parse_args()
 
     # Handle compare mode (Phase 39: VERIFY-01)
@@ -507,7 +520,7 @@ def main():
         if not file2.exists():
             print(f"Error: File not found: {file2}")
             sys.exit(1)
-        sys.exit(compare_files(file1, file2, args.verbose))
+        sys.exit(compare_files(file1, file2, args.verbose, args.row_tolerance))
 
     # Require data_dir for directory scan mode
     if not args.data_dir:

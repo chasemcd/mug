@@ -248,18 +248,21 @@ def get_rollback_stats(page: Page) -> dict:
     Get rollback statistics from the game.
 
     Returns dict with:
-        - rollbackCount: Total rollbacks this episode
+        - rollbackCount: Total rollbacks this session (persists across episodes)
         - maxRollbackFrames: Deepest rollback (frames replayed)
         - rollbackEvents: Array of rollback event details
         - rollbackInProgress: Whether rollback is currently executing
+
+    Note: Uses sessionMetrics.rollbacks which persists across episode resets,
+    unlike game.rollbackCount which resets on episode boundaries.
     """
     return page.evaluate("""() => {
         const game = window.game;
         if (!game) return null;
 
         return {
-            rollbackCount: game.rollbackCount || 0,
-            maxRollbackFrames: game.maxRollbackFrames || 0,
+            rollbackCount: game.sessionMetrics?.rollbacks?.count || 0,
+            maxRollbackFrames: game.sessionMetrics?.rollbacks?.maxFrames || 0,
             rollbackEvents: game.sessionMetrics?.rollbacks?.events || [],
             rollbackInProgress: game.rollbackInProgress || false,
         };
