@@ -13,6 +13,7 @@
 - ✅ **v1.8 Data Export Parity** - Phases 36-39 (shipped 2026-01-30)
 - ✅ **v1.9 Data Parity Testing** - Phases 40-44 (shipped 2026-02-01)
 - ✅ **v1.10 E2E Test Fix** - Phases 45-47 (shipped 2026-02-02)
+- 🚧 **v1.11 Data Export Edge Cases** - Phases 48-50 (in progress)
 
 ## Phases
 
@@ -610,7 +611,10 @@ Plans:
 
 </details>
 
-### v1.10 E2E Test Fix (In Progress)
+<details>
+<summary>v1.10 E2E Test Fix (Phases 45-47) - SHIPPED 2026-02-02</summary>
+
+### v1.10 E2E Test Fix
 
 **Milestone Goal:** Fix E2E test environment so all automated tests pass in headed mode, validating data parity under network stress conditions.
 
@@ -660,6 +664,57 @@ Plans:
 Plans:
 - [x] 47-01-PLAN.md — Focus loss data parity tests (mid-episode, boundary)
 
+</details>
+
+### 🚧 v1.11 Data Export Edge Cases (In Progress)
+
+**Milestone Goal:** Fix dual-buffer data recording edge cases so all xfail tests pass and research data exports are identical between both players.
+
+### Phase 48: isFocused Column Consistency
+**Goal:** Both players export consistent focus state columns
+**Depends on:** v1.10 complete (existing test infrastructure)
+**Requirements:** FOCUS-COL-01, FOCUS-COL-02
+**Success Criteria** (what must be TRUE):
+  1. Both players export isFocused.0 and isFocused.1 columns regardless of focus events
+  2. isFocused values reflect actual focus state (true when focused, false when backgrounded)
+**Research flag:** Unlikely (straightforward data collection fix)
+**Plans:** TBD
+
+Plans:
+- [ ] 48-01-PLAN.md — Fix isFocused column export consistency
+
+### Phase 49: Episode Boundary Row Parity
+**Goal:** Both players export identical row counts at episode boundaries
+**Depends on:** Phase 48
+**Requirements:** BOUND-01, BOUND-02, BOUND-03
+**Success Criteria** (what must be TRUE):
+  1. Both players export exactly the same number of rows (0 tolerance)
+  2. Fast-forward processing stops precisely at episode boundary
+  3. `_promoteRemainingAtBoundary()` handles backgrounded player correctly
+**Research flag:** Likely (complex fast-forward boundary interactions)
+**Plans:** TBD
+
+Plans:
+- [ ] 49-01-PLAN.md — Fix episode boundary row count mismatch
+
+### Phase 50: Stress Test Verification
+**Goal:** All xfail tests pass without markers under network stress
+**Depends on:** Phase 49
+**Requirements:** STRESS-01, STRESS-02, STRESS-03, STRESS-04, STRESS-05, VERIFY-01, VERIFY-02
+**Success Criteria** (what must be TRUE):
+  1. test_active_input_with_latency[100] passes
+  2. test_active_input_with_latency[200] passes
+  3. test_active_input_with_packet_loss passes
+  4. test_focus_loss_mid_episode_parity passes
+  5. test_focus_loss_episode_boundary_parity passes
+  6. All E2E tests pass with no xfail markers remaining
+  7. Research exports are byte-identical (ignoring timestamps)
+**Research flag:** Unlikely (verification of prior fixes)
+**Plans:** TBD
+
+Plans:
+- [ ] 50-01-PLAN.md — Remove xfail markers and verify all tests pass
+
 ## Progress
 
 **Execution Order:**
@@ -702,7 +757,10 @@ Phases execute in numeric order: 45 → 46 → 47
 | 45. Episode Completion Fix | v1.10 | 1/1 | Complete | 2026-02-02 |
 | 46. Test Suite Verification | v1.10 | 1/1 | Complete | 2026-02-02 |
 | 47. Focus Loss Testing | v1.10 | 1/1 | Complete | 2026-02-02 |
+| 48. isFocused Column | v1.11 | 0/1 | Not started | - |
+| 49. Episode Boundary | v1.11 | 0/1 | Not started | - |
+| 50. Stress Verification | v1.11 | 0/1 | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-02 after Phase 47 execution*
+*Last updated: 2026-02-02 after v1.11 roadmap creation*

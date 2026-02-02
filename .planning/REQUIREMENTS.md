@@ -59,24 +59,24 @@ Deferred to future release.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FOCUS-COL-01 | TBD | Pending |
-| FOCUS-COL-02 | TBD | Pending |
-| BOUND-01 | TBD | Pending |
-| BOUND-02 | TBD | Pending |
-| BOUND-03 | TBD | Pending |
-| STRESS-01 | TBD | Pending |
-| STRESS-02 | TBD | Pending |
-| STRESS-03 | TBD | Pending |
-| STRESS-04 | TBD | Pending |
-| STRESS-05 | TBD | Pending |
-| VERIFY-01 | TBD | Pending |
-| VERIFY-02 | TBD | Pending |
+| FOCUS-COL-01 | Phase 48 | Pending |
+| FOCUS-COL-02 | Phase 48 | Pending |
+| BOUND-01 | Phase 49 | Pending |
+| BOUND-02 | Phase 49 | Pending |
+| BOUND-03 | Phase 49 | Pending |
+| STRESS-01 | Phase 50 | Pending |
+| STRESS-02 | Phase 50 | Pending |
+| STRESS-03 | Phase 50 | Pending |
+| STRESS-04 | Phase 50 | Pending |
+| STRESS-05 | Phase 50 | Pending |
+| VERIFY-01 | Phase 50 | Pending |
+| VERIFY-02 | Phase 50 | Pending |
 
 **Coverage:**
 - v1.11 requirements: 12 total
-- Mapped to phases: 0 (run /gsd:create-roadmap)
-- Unmapped: 12
+- Mapped to phases: 12 ✓
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-02*
-*Last updated: 2026-02-02 after v1.11 milestone start*
+*Last updated: 2026-02-02 after roadmap mapping*
