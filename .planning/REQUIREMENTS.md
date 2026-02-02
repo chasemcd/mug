@@ -62,27 +62,26 @@ Deferred to future release.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| EPFIX-01 | TBD | Pending |
-| EPFIX-02 | TBD | Pending |
-| EPFIX-03 | TBD | Pending |
-| SYNC-01 | — | Implemented (pending verification) |
-| SYNC-02 | — | Implemented (pending verification) |
-| SYNC-03 | — | Implemented (pending verification) |
-| SYNC-04 | — | Implemented (pending verification) |
-| TEST-01 | TBD | Pending |
-| TEST-02 | TBD | Pending |
-| TEST-03 | TBD | Pending |
-| TEST-04 | TBD | Pending |
-| TEST-05 | TBD | Pending |
-| FOCUS-01 | TBD | Pending |
-| FOCUS-02 | TBD | Pending |
+| EPFIX-01 | Phase 45 | Pending |
+| EPFIX-02 | Phase 45 | Pending |
+| EPFIX-03 | Phase 45 | Pending |
+| SYNC-01 | Phase 46 | Implemented (pending verification) |
+| SYNC-02 | Phase 46 | Implemented (pending verification) |
+| SYNC-03 | Phase 46 | Implemented (pending verification) |
+| SYNC-04 | Phase 46 | Implemented (pending verification) |
+| TEST-01 | Phase 46 | Pending |
+| TEST-02 | Phase 46 | Pending |
+| TEST-03 | Phase 46 | Pending |
+| TEST-04 | Phase 46 | Pending |
+| TEST-05 | Phase 46 | Pending |
+| FOCUS-01 | Phase 47 | Pending |
+| FOCUS-02 | Phase 47 | Pending |
 
 **Coverage:**
 - v1.10 requirements: 14 total
-- Implemented (awaiting verification): 4 (SYNC-*)
-- Pending investigation/fix: 10
-- Unmapped to phases: 14 ⚠️
+- Mapped to phases: 14 ✓
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-02*
-*Last updated: 2026-02-02 after v1.10 milestone start*
+*Last updated: 2026-02-02 after roadmap creation*

@@ -12,6 +12,7 @@
 - ✅ **v1.7 Admin Console Improvement** - Phases 32-35 (shipped 2026-01-25)
 - ✅ **v1.8 Data Export Parity** - Phases 36-39 (shipped 2026-01-30)
 - ✅ **v1.9 Data Parity Testing** - Phases 40-44 (shipped 2026-02-01)
+- 🚧 **v1.10 E2E Test Fix** - Phases 45-47 (in progress)
 
 ## Phases
 
@@ -526,7 +527,8 @@ Plans:
 
 </details>
 
-### v1.9 Data Parity Testing (In Progress)
+<details>
+<summary>v1.9 Data Parity Testing (Phases 40-44) - SHIPPED 2026-02-01</summary>
 
 **Milestone Goal:** Validate v1.8 data export parity under controlled network conditions using Playwright automation against `overcooked_human_human_multiplayer`.
 
@@ -606,10 +608,62 @@ Plans:
 Plans:
 - [x] 44-01-PLAN.md — Manual test protocol documentation
 
+</details>
+
+### 🚧 v1.10 E2E Test Fix (In Progress)
+
+**Milestone Goal:** Fix E2E test environment so all automated tests pass in headed mode, validating data parity under network stress conditions.
+
+### Phase 45: Episode Completion Diagnosis & Fix
+**Goal:** Games progress through frames to episode completion in E2E tests
+**Depends on:** v1.9 complete (existing test infrastructure)
+**Requirements:** EPFIX-01, EPFIX-02, EPFIX-03
+**Success Criteria** (what must be TRUE):
+  1. Root cause of frame advancement failure identified and documented
+  2. Games progress through frames (frame counter increments)
+  3. Episodes complete within 180s test timeout
+  4. At least one test completes a full episode without manual intervention
+**Research flag:** Likely (must debug test automation behavior)
+**Plans:** TBD
+
+Plans:
+- [ ] 45-01-PLAN.md — Diagnose and fix episode completion in E2E tests
+
+### Phase 46: Test Suite Verification
+**Goal:** All existing E2E tests pass in headed mode
+**Depends on:** Phase 45
+**Requirements:** TEST-01, TEST-02, TEST-03, TEST-04, TEST-05, SYNC-01, SYNC-02, SYNC-03, SYNC-04
+**Success Criteria** (what must be TRUE):
+  1. `test_infrastructure.py` smoke tests pass
+  2. `test_multiplayer_basic.py` matchmaking and episode tests pass
+  3. `test_latency_injection.py` all latency scenarios (100ms, 200ms, jitter) pass
+  4. `test_network_disruption.py` packet loss and focus tests pass
+  5. `test_data_comparison.py` parity validation tests pass
+**Research flag:** Unlikely (running existing tests)
+**Plans:** TBD
+
+Plans:
+- [ ] 46-01-PLAN.md — Run full test suite and fix any remaining issues
+
+### Phase 47: Focus Loss Data Accuracy Testing
+**Goal:** Data parity maintained under focus loss scenarios
+**Depends on:** Phase 46
+**Requirements:** FOCUS-01, FOCUS-02
+**Success Criteria** (what must be TRUE):
+  1. Test exists that triggers mid-episode focus loss (new tab during gameplay)
+  2. Test verifies data parity after mid-episode focus loss
+  3. Test exists that triggers focus loss at episode boundary
+  4. Test verifies data parity after boundary focus loss
+**Research flag:** Unlikely (builds on existing test patterns)
+**Plans:** TBD
+
+Plans:
+- [ ] 47-01-PLAN.md — Focus loss data accuracy test scenarios
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 40 → 41 → 42 → 43 → 44
+Phases execute in numeric order: 45 → 46 → 47
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -645,7 +699,10 @@ Phases execute in numeric order: 40 → 41 → 42 → 43 → 44
 | 42. Network Disruption | v1.9 | 1/1 | Complete | 2026-01-31 |
 | 43. Data Comparison | v1.9 | 1/1 | Complete | 2026-01-31 |
 | 44. Manual Protocol | v1.9 | 1/1 | Complete | 2026-02-01 |
+| 45. Episode Completion Fix | v1.10 | 0/1 | Not started | - |
+| 46. Test Suite Verification | v1.10 | 0/1 | Not started | - |
+| 47. Focus Loss Testing | v1.10 | 0/1 | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-01 after Phase 44 execution (v1.9 complete)*
+*Last updated: 2026-02-02 after v1.10 roadmap creation*
