@@ -30,8 +30,8 @@ Requirements for v1.10 E2E Test Fix milestone. Each maps to roadmap phases.
 
 ### Focus Loss Data Accuracy
 
-- [ ] **FOCUS-01**: Data parity maintained when one client loses focus mid-episode (opens new tab during gameplay)
-- [ ] **FOCUS-02**: Data parity maintained when one client loses focus at episode boundary (opens new tab as episode ends)
+- [x] **FOCUS-01**: Data parity maintained when one client loses focus mid-episode (opens new tab during gameplay)
+- [x] **FOCUS-02**: Data parity maintained when one client loses focus at episode boundary (opens new tab as episode ends)
 
 ## v2 Requirements
 
@@ -74,8 +74,8 @@ Deferred to future release.
 | TEST-03 | Phase 46 | Complete |
 | TEST-04 | Phase 46 | Complete |
 | TEST-05 | Phase 46 | Complete |
-| FOCUS-01 | Phase 47 | Pending |
-| FOCUS-02 | Phase 47 | Pending |
+| FOCUS-01 | Phase 47 | Complete |
+| FOCUS-02 | Phase 47 | Complete |
 
 **Coverage:**
 - v1.10 requirements: 14 total
@@ -84,4 +84,4 @@ Deferred to future release.
 
 ---
 *Requirements defined: 2026-02-02*
-*Last updated: 2026-02-02 after Phase 46 completion*
+*Last updated: 2026-02-02 after Phase 47 completion*
