@@ -378,7 +378,6 @@ def test_active_input_parity(flask_server, player_contexts, clean_data_dir):
 
 
 @pytest.mark.timeout(300)
-@pytest.mark.xfail(reason="Known issue: isFocused columns only present when focus loss occurs, causing column mismatch")
 def test_focus_loss_mid_episode_parity(flask_server, player_contexts, clean_data_dir):
     """
     FOCUS-01: Test data parity maintained when one client loses focus mid-episode.
@@ -504,7 +503,7 @@ def test_focus_loss_mid_episode_parity(flask_server, player_contexts, clean_data
 
 
 @pytest.mark.timeout(300)
-@pytest.mark.xfail(reason="Known issue: dual-buffer edge cases at episode boundary during focus loss cause row count and column mismatches")
+@pytest.mark.xfail(reason="Known issue: row count mismatch at episode boundary when player backgrounded - Phase 49 fix")
 def test_focus_loss_episode_boundary_parity(flask_server, player_contexts, clean_data_dir):
     """
     FOCUS-02: Test data parity maintained when one client loses focus at episode boundary.
