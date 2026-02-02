@@ -9,8 +9,8 @@ Requirements for v1.11 Data Export Edge Cases milestone. Each maps to roadmap ph
 
 ### isFocused Column Consistency
 
-- [ ] **FOCUS-COL-01**: Both players export isFocused.0 and isFocused.1 columns regardless of whether focus loss occurred
-- [ ] **FOCUS-COL-02**: isFocused columns contain accurate values (true when focused, false when backgrounded)
+- [x] **FOCUS-COL-01**: Both players export isFocused.0 and isFocused.1 columns regardless of whether focus loss occurred
+- [x] **FOCUS-COL-02**: isFocused columns contain accurate values (true when focused, false when backgrounded)
 
 ### Episode Boundary Row Parity
 
@@ -59,8 +59,8 @@ Deferred to future release.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FOCUS-COL-01 | Phase 48 | Pending |
-| FOCUS-COL-02 | Phase 48 | Pending |
+| FOCUS-COL-01 | Phase 48 | Complete |
+| FOCUS-COL-02 | Phase 48 | Complete |
 | BOUND-01 | Phase 49 | Pending |
 | BOUND-02 | Phase 49 | Pending |
 | BOUND-03 | Phase 49 | Pending |
@@ -79,4 +79,4 @@ Deferred to future release.
 
 ---
 *Requirements defined: 2026-02-02*
-*Last updated: 2026-02-02 after roadmap mapping*
+*Last updated: 2026-02-02 after Phase 48 complete*
