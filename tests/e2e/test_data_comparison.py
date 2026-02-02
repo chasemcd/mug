@@ -397,11 +397,10 @@ def test_focus_loss_mid_episode_parity(flask_server, player_contexts, clean_data
     - Fast-forward processing buffered partner inputs
     - Data promotion after fast-forward completes
 
-    NOTE: This test is marked xfail because the isFocused telemetry columns are
-    only added to exports when a focus loss event occurs. The player who loses
-    focus has isFocused.0 and isFocused.1 columns, while the always-focused
-    player does not. This is a known limitation of the focus loss telemetry
-    export format that should be addressed in a future phase.
+    Validates dual-buffer fixes from Phases 48-49:
+    - Phase 48: isFocused column consistency (getFocusStatePerPlayer ensures both
+      players always export isFocused.0 and isFocused.1 columns)
+    - Phase 49: Episode boundary row parity (BOUND-02/03 guards)
     """
     page1, page2 = player_contexts
     base_url = flask_server["url"]

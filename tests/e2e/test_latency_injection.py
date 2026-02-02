@@ -291,7 +291,6 @@ def test_episode_completion_under_jitter(flask_server, player_contexts):
 
 @pytest.mark.parametrize("latency_ms", [100, 200])
 @pytest.mark.timeout(300)  # 5 minutes max per test
-@pytest.mark.xfail(reason="Known issue: data parity under latency + active inputs may fail due to dual-buffer edge cases")
 def test_active_input_with_latency(flask_server, player_contexts, latency_ms):
     """
     Test data parity when both players actively input actions under latency.
@@ -300,9 +299,9 @@ def test_active_input_with_latency(flask_server, player_contexts, latency_ms):
     Previous tests let players idle (Noop action), which could mask bugs in
     action recording during rollbacks.
 
-    NOTE: This test is marked xfail because data parity under stress conditions
-    (high latency + active inputs causing frequent rollbacks) can fail due to
-    edge cases in the dual-buffer data recording system at episode boundaries.
+    Validates dual-buffer fixes from Phases 48-49:
+    - Phase 48: isFocused column consistency (getFocusStatePerPlayer)
+    - Phase 49: Episode boundary row parity (BOUND-02/03 guards)
 
     This test validates that:
     1. Real inputs are correctly recorded under latency
