@@ -627,7 +627,7 @@ Plans:
 **Plans:** 1 plan
 
 Plans:
-- [ ] 45-01-PLAN.md — Add visibility override to test helpers, remove obsolete tutorial flow calls
+- [x] 45-01-PLAN.md — Add visibility override to test helpers, remove obsolete tutorial flow calls
 
 ### Phase 46: Test Suite Verification
 **Goal:** All existing E2E tests pass in headed mode
@@ -699,10 +699,10 @@ Phases execute in numeric order: 45 → 46 → 47
 | 42. Network Disruption | v1.9 | 1/1 | Complete | 2026-01-31 |
 | 43. Data Comparison | v1.9 | 1/1 | Complete | 2026-01-31 |
 | 44. Manual Protocol | v1.9 | 1/1 | Complete | 2026-02-01 |
-| 45. Episode Completion Fix | v1.10 | 0/1 | Planned | - |
+| 45. Episode Completion Fix | v1.10 | 1/1 | Complete | 2026-02-02 |
 | 46. Test Suite Verification | v1.10 | 0/1 | Not started | - |
 | 47. Focus Loss Testing | v1.10 | 0/1 | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-02 after Phase 45 planning*
+*Last updated: 2026-02-02 after Phase 45 completion*

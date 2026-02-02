@@ -9,9 +9,9 @@ Requirements for v1.10 E2E Test Fix milestone. Each maps to roadmap phases.
 
 ### Episode Completion Fix
 
-- [ ] **EPFIX-01**: Diagnose why game initializes but frames don't advance in E2E tests
-- [ ] **EPFIX-02**: Fix root cause so games progress through frames to episode completion
-- [ ] **EPFIX-03**: Episode completion detected within test timeout (180s)
+- [x] **EPFIX-01**: Diagnose why game initializes but frames don't advance in E2E tests
+- [x] **EPFIX-02**: Fix root cause so games progress through frames to episode completion
+- [x] **EPFIX-03**: Episode completion detected within test timeout (180s)
 
 ### Row Count Synchronization
 
@@ -62,9 +62,9 @@ Deferred to future release.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| EPFIX-01 | Phase 45 | Pending |
-| EPFIX-02 | Phase 45 | Pending |
-| EPFIX-03 | Phase 45 | Pending |
+| EPFIX-01 | Phase 45 | Complete |
+| EPFIX-02 | Phase 45 | Complete |
+| EPFIX-03 | Phase 45 | Complete |
 | SYNC-01 | Phase 46 | Implemented (pending verification) |
 | SYNC-02 | Phase 46 | Implemented (pending verification) |
 | SYNC-03 | Phase 46 | Implemented (pending verification) |
@@ -84,4 +84,4 @@ Deferred to future release.
 
 ---
 *Requirements defined: 2026-02-02*
-*Last updated: 2026-02-02 after roadmap creation*
+*Last updated: 2026-02-02 after Phase 45 completion*
