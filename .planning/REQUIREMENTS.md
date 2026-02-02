@@ -28,6 +28,11 @@ Requirements for v1.10 E2E Test Fix milestone. Each maps to roadmap phases.
 - [ ] **TEST-04**: `test_network_disruption.py` packet loss and focus tests pass
 - [ ] **TEST-05**: `test_data_comparison.py` parity validation tests pass
 
+### Focus Loss Data Accuracy
+
+- [ ] **FOCUS-01**: Data parity maintained when one client loses focus mid-episode (opens new tab during gameplay)
+- [ ] **FOCUS-02**: Data parity maintained when one client loses focus at episode boundary (opens new tab as episode ends)
+
 ## v2 Requirements
 
 Deferred to future release.
@@ -69,12 +74,14 @@ Deferred to future release.
 | TEST-03 | TBD | Pending |
 | TEST-04 | TBD | Pending |
 | TEST-05 | TBD | Pending |
+| FOCUS-01 | TBD | Pending |
+| FOCUS-02 | TBD | Pending |
 
 **Coverage:**
-- v1.10 requirements: 12 total
+- v1.10 requirements: 14 total
 - Implemented (awaiting verification): 4 (SYNC-*)
-- Pending investigation/fix: 8
-- Unmapped to phases: 12 ⚠️
+- Pending investigation/fix: 10
+- Unmapped to phases: 14 ⚠️
 
 ---
 *Requirements defined: 2026-02-02*
