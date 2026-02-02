@@ -1,37 +1,35 @@
-# Requirements: Interactive Gym v1.10 E2E Test Fix
+# Requirements: Interactive Gym v1.11 Data Export Edge Cases
 
 **Defined:** 2026-02-02
-**Core Value:** All E2E tests pass in headed mode, validating data parity under network stress conditions.
+**Core Value:** Both players export identical research data regardless of network conditions, focus loss, or stress scenarios.
 
-## v1.10 Requirements
+## v1.11 Requirements
 
-Requirements for v1.10 E2E Test Fix milestone. Each maps to roadmap phases.
+Requirements for v1.11 Data Export Edge Cases milestone. Each maps to roadmap phases.
 
-### Episode Completion Fix
+### isFocused Column Consistency
 
-- [x] **EPFIX-01**: Diagnose why game initializes but frames don't advance in E2E tests
-- [x] **EPFIX-02**: Fix root cause so games progress through frames to episode completion
-- [x] **EPFIX-03**: Episode completion detected within test timeout (180s)
+- [ ] **FOCUS-COL-01**: Both players export isFocused.0 and isFocused.1 columns regardless of whether focus loss occurred
+- [ ] **FOCUS-COL-02**: isFocused columns contain accurate values (true when focused, false when backgrounded)
 
-### Row Count Synchronization
+### Episode Boundary Row Parity
 
-- [x] **SYNC-01**: Both players export identical frame counts regardless of network latency (10 row tolerance for timing)
-- [x] **SYNC-02**: Synchronized termination frame calculated as minimum of local/remote detection
-- [x] **SYNC-03**: Frame storage stops at synced termination frame
-- [x] **SYNC-04**: Export filters frames to only include up to termination frame
+- [ ] **BOUND-01**: Both players export exactly the same number of rows (0 row tolerance)
+- [ ] **BOUND-02**: Fast-forward processing stops at episode boundary, not after
+- [ ] **BOUND-03**: `_promoteRemainingAtBoundary()` handles backgrounded player correctly
 
-### Test Validation
+### Dual-Buffer Stress Handling
 
-- [x] **TEST-01**: `test_infrastructure.py` smoke tests pass
-- [x] **TEST-02**: `test_multiplayer_basic.py` matchmaking and episode tests pass
-- [x] **TEST-03**: `test_latency_injection.py` all latency scenarios pass (stress tests xfail)
-- [x] **TEST-04**: `test_network_disruption.py` packet loss and focus tests pass (stress tests xfail)
-- [x] **TEST-05**: `test_data_comparison.py` parity validation tests pass
+- [ ] **STRESS-01**: `test_active_input_with_latency[100]` passes without xfail marker
+- [ ] **STRESS-02**: `test_active_input_with_latency[200]` passes without xfail marker
+- [ ] **STRESS-03**: `test_active_input_with_packet_loss` passes without xfail marker
+- [ ] **STRESS-04**: `test_focus_loss_mid_episode_parity` passes without xfail marker
+- [ ] **STRESS-05**: `test_focus_loss_episode_boundary_parity` passes without xfail marker
 
-### Focus Loss Data Accuracy
+### Verification
 
-- [x] **FOCUS-01**: Data parity maintained when one client loses focus mid-episode (opens new tab during gameplay)
-- [x] **FOCUS-02**: Data parity maintained when one client loses focus at episode boundary (opens new tab as episode ends)
+- [ ] **VERIFY-01**: All E2E tests pass with no xfail markers remaining
+- [ ] **VERIFY-02**: Research data exports from both players are byte-identical (ignoring timestamps)
 
 ## v2 Requirements
 
@@ -55,33 +53,30 @@ Deferred to future release.
 |---------|--------|
 | Headless automation | WebRTC requires headed mode; defer to v2 |
 | Cross-browser testing | Chromium-only sufficient for validation |
-| Performance benchmarks | Focus is correctness, not speed |
-| New test scenarios | Fix existing tests first |
+| Row tolerance relaxation | v1.11 targets exact parity (0 tolerance) |
 
 ## Traceability
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| EPFIX-01 | Phase 45 | Complete |
-| EPFIX-02 | Phase 45 | Complete |
-| EPFIX-03 | Phase 45 | Complete |
-| SYNC-01 | Phase 46 | Complete |
-| SYNC-02 | Phase 46 | Complete |
-| SYNC-03 | Phase 46 | Complete |
-| SYNC-04 | Phase 46 | Complete |
-| TEST-01 | Phase 46 | Complete |
-| TEST-02 | Phase 46 | Complete |
-| TEST-03 | Phase 46 | Complete |
-| TEST-04 | Phase 46 | Complete |
-| TEST-05 | Phase 46 | Complete |
-| FOCUS-01 | Phase 47 | Complete |
-| FOCUS-02 | Phase 47 | Complete |
+| FOCUS-COL-01 | TBD | Pending |
+| FOCUS-COL-02 | TBD | Pending |
+| BOUND-01 | TBD | Pending |
+| BOUND-02 | TBD | Pending |
+| BOUND-03 | TBD | Pending |
+| STRESS-01 | TBD | Pending |
+| STRESS-02 | TBD | Pending |
+| STRESS-03 | TBD | Pending |
+| STRESS-04 | TBD | Pending |
+| STRESS-05 | TBD | Pending |
+| VERIFY-01 | TBD | Pending |
+| VERIFY-02 | TBD | Pending |
 
 **Coverage:**
-- v1.10 requirements: 14 total
-- Mapped to phases: 14 ✓
-- Unmapped: 0
+- v1.11 requirements: 12 total
+- Mapped to phases: 0 (run /gsd:create-roadmap)
+- Unmapped: 12
 
 ---
 *Requirements defined: 2026-02-02*
-*Last updated: 2026-02-02 after Phase 47 completion*
+*Last updated: 2026-02-02 after v1.11 milestone start*
