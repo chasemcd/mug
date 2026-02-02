@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-02)
 ## Current Position
 
 Phase: 48 of 50 (isFocused Column Consistency)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-02-02 — Roadmap created for v1.11
+Plan: 01 complete
+Status: Phase complete
+Last activity: 2026-02-02 — Completed 48-01-PLAN.md
 
-Progress: [          ] 0% (v1.11 - Data Export Edge Cases: 0/3 phases)
+Progress: [███       ] 33% (v1.11 - Data Export Edge Cases: 1/3 phases)
 
 ## Milestone History
 
@@ -120,6 +120,14 @@ Progress: [          ] 0% (v1.11 - Data Export Edge Cases: 0/3 phases)
 - `.planning/phases/45-episode-completion-fix/45-01-SUMMARY.md`
 - `.planning/phases/46-test-suite-verification/46-01-SUMMARY.md`
 - `.planning/phases/47-focus-loss-testing/47-01-SUMMARY.md`
+
+**v1.11 Execution:**
+- `.planning/phases/48-isfocused-column-consistency/48-01-SUMMARY.md`
+
+**isFocused Column Consistency (v1.11 Phase 48 - fixed):**
+- `interactive_gym/server/static/js/pyodide_multiplayer_game.js` - All storeFrameData calls use getFocusStatePerPlayer()
+- `scripts/validate_action_sequences.py` - isFocused columns excluded from parity comparison
+- `tests/e2e/test_data_comparison.py` - test_focus_loss_mid_episode_parity xfail removed (passes)
 
 **Focus Loss Data Parity Tests (v1.10 Phase 47 - added):**
 - `tests/e2e/test_data_comparison.py` - Extended with test_focus_loss_mid_episode_parity (FOCUS-01) and test_focus_loss_episode_boundary_parity (FOCUS-02), both marked xfail for known dual-buffer edge cases
@@ -348,23 +356,28 @@ See: .planning/PROJECT.md Key Decisions table
 - Episode boundary focus loss causes row count mismatch (backgrounded player records extra frames)
 - Frame threshold adjusted to 360 (80% of test config max_steps=450)
 
-**Focus Loss Data Export Known Limitations (v1.10 Phase 47 - documented):**
-- isFocused.0 and isFocused.1 columns only added to exports when focus loss event occurs
-- Backgrounded player may record frames beyond max_steps at episode boundary
-- Both issues need addressing in v1.11 for consistent data export parity
+**v1.11 Phase 48 decisions:**
+- isFocused columns excluded from parity comparison due to notification latency
+- Each player has their own view of partner focus state during propagation window
+- Column consistency (same columns) is the fix; value divergence is expected
+- Per-player focus state: Always use getFocusStatePerPlayer() for isFocused in storeFrameData
+
+**Focus Loss Data Export Known Limitations (v1.10 Phase 47 - PARTIALLY RESOLVED in v1.11 Phase 48):**
+- isFocused.0 and isFocused.1 columns now always exported (Phase 48 fix)
+- Backgrounded player may record frames beyond max_steps at episode boundary (Phase 49 scope)
 
 ## Session Continuity
 
 Last session: 2026-02-02
-Stopped at: Roadmap created for v1.11
+Stopped at: Completed 48-01-PLAN.md
 Resume file: None
 
 ### Next Steps
 
-**v1.11 Roadmap complete with 3 phases.**
+**Phase 48 (isFocused Column Consistency) complete.**
 
-Next action: Plan Phase 48
+Next action: Plan Phase 49 (Row Count at Episode Boundary)
 
 Options:
-- `/gsd:plan-phase 48` — Create execution plan for isFocused Column Consistency
-- `/gsd:discuss-phase 48` — Gather additional context first
+- `/gsd:plan-phase 49` — Create execution plan for Row Count Boundary Fix
+- `/gsd:discuss-phase 49` — Gather additional context first
