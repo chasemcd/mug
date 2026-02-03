@@ -9,16 +9,16 @@ Requirements for v1.12 release. Each maps to roadmap phases.
 
 ### Bug Fixes
 
-- [ ] **BUG-01**: Stale game manager cleanup prevents old games from capturing new participants
-- [ ] **BUG-02**: Participant routing never sends players to games in progress
-- [ ] **BUG-03**: Game lifecycle cleanup runs on all exit paths (normal and abnormal termination)
+- [x] **BUG-01**: Stale game manager cleanup prevents old games from capturing new participants
+- [x] **BUG-02**: Participant routing never sends players to games in progress
+- [x] **BUG-03**: Game lifecycle cleanup runs on all exit paths (normal and abnormal termination)
 - [x] **BUG-04**: Client receives error event when waiting room state is invalid
 
 ### Session Lifecycle
 
 - [ ] **SESS-01**: Session has explicit states (WAITING → MATCHED → VALIDATING → PLAYING → ENDED)
 - [ ] **SESS-02**: Session object is destroyed (not reused) when game ends
-- [ ] **SESS-03**: Cleanup methods are idempotent (safe to call multiple times)
+- [x] **SESS-03**: Cleanup methods are idempotent (safe to call multiple times)
 
 ### Matchmaker API
 
@@ -71,13 +71,13 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| BUG-01 | Phase 52 | Pending |
-| BUG-02 | Phase 52 | Pending |
-| BUG-03 | Phase 52 | Pending |
+| BUG-01 | Phase 52 | Complete |
+| BUG-02 | Phase 52 | Complete |
+| BUG-03 | Phase 52 | Complete |
 | BUG-04 | Phase 51 | Complete |
 | SESS-01 | Phase 53 | Pending |
 | SESS-02 | Phase 53 | Pending |
-| SESS-03 | Phase 52 | Pending |
+| SESS-03 | Phase 52 | Complete |
 | MATCH-01 | Phase 55 | Pending |
 | MATCH-02 | Phase 55 | Pending |
 | MATCH-03 | Phase 55 | Pending |
@@ -93,4 +93,4 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 ---
 *Requirements defined: 2026-02-02*
-*Last updated: 2026-02-02 after phase 51 complete*
+*Last updated: 2026-02-02 after phase 52 complete*

@@ -754,7 +754,7 @@ Plans:
 **Plans:** 1 plan
 
 Plans:
-- [ ] 52-01-PLAN.md - Idempotent cleanup_game() with subject-level cleanup, all exit paths call cleanup
+- [x] 52-01-PLAN.md - Idempotent cleanup_game() with subject-level cleanup, all exit paths call cleanup
 
 #### Phase 53: Session Lifecycle
 **Goal:** Each game has explicit lifecycle, Session destroyed when game ends
@@ -857,7 +857,7 @@ Plans:
 | 49. Episode Boundary Row | v1.11 | 1/1 | Complete | 2026-02-02 |
 | 50. Stress Verification | v1.11 | 1/1 | Complete | 2026-02-02 |
 | 51. Diagnostic Logging | v1.12 | 1/1 | Complete | 2026-02-02 |
-| 52. Comprehensive Cleanup | v1.12 | 0/1 | Planned | — |
+| 52. Comprehensive Cleanup | v1.12 | 1/1 | Complete | 2026-02-02 |
 | 53. Session Lifecycle | v1.12 | 0/1 | Not started | — |
 | 54. ParticipantStateTracker | v1.12 | 0/1 | Not started | — |
 | 55. Matchmaker Base Class | v1.12 | 0/2 | Not started | — |
@@ -865,4 +865,4 @@ Plans:
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-02 after Phase 52 plan created*
+*Last updated: 2026-02-02 after Phase 52 complete*
