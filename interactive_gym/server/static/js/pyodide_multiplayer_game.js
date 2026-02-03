@@ -351,7 +351,7 @@ const P2P_MSG_FOCUS_STATE = 0x14;  // Focus state notification (focused/backgrou
  * @returns {ArrayBuffer} Encoded packet
  */
 function encodeInputPacket(playerId, currentFrame, inputs) {
-    const inputCount = Math.min(inputs.length, 5);
+    const inputCount = Math.min(inputs.length, 15);  // Support up to 15 inputs for redundancy
     const buffer = new ArrayBuffer(9 + inputCount * 5);
     const view = new DataView(buffer);
 
@@ -844,7 +844,7 @@ class P2PInputSender {
         // Track recent inputs for redundant sending
         // [{frame, action}, ...] - most recent at end
         this.recentInputs = [];
-        this.maxRecentInputs = 10;  // Keep larger buffer than redundancy needs
+        this.maxRecentInputs = 20;  // Keep larger buffer than redundancy needs
 
         // Buffer congestion threshold (bytes)
         this.bufferThreshold = 16384;
@@ -5591,7 +5591,7 @@ json.dumps({'cumulative_rewards': {str(k): v for k, v in _cumulative_rewards.ite
                 this.p2pInputSender = new P2PInputSender(
                     this.webrtcManager,
                     myPlayerIndex,
-                    3  // redundancy count
+                    10  // redundancy count - higher for packet loss resilience
                 );
             }
 
