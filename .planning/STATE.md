@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-03)
 ## Current Position
 
 Phase: 61 of 66 (Input Confirmation Protocol)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-02-03 — Roadmap created (6 phases)
+Plan: 01 of 01 complete
+Status: Phase complete
+Last activity: 2026-02-03 — Completed 61-01-PLAN.md
 
-Progress: ░░░░░░░░░░ 0%
+Progress: █░░░░░░░░░ 17% (1/6 phases in v1.14)
 
 ## Milestone History
 
@@ -150,6 +150,13 @@ Progress: ░░░░░░░░░░ 0%
 - `interactive_gym/server/app.py` - Removed remove_from_group_waitroom call
 - `interactive_gym/server/admin/aggregator.py` - Removed group_waitrooms references
 
+**Input Confirmation Protocol (v1.14 Phase 61 - added):**
+- `interactive_gym/scenes/gym_scene.py` - input_confirmation_timeout_ms attribute (500ms default), pyodide() parameter
+- `interactive_gym/server/static/js/pyodide_multiplayer_game.js` - _waitForInputConfirmation() method, async _checkEpisodeSyncAndReset(), inputConfirmationTimeoutMs config
+
+**v1.14 Execution:**
+- `.planning/phases/61-input-confirmation-protocol/61-01-SUMMARY.md`
+
 **Matchmaker RTT Integration (v1.13 Phase 59 - added):**
 - `interactive_gym/server/matchmaker.py` - max_p2p_rtt_ms param, should_reject_for_rtt() method
 - `interactive_gym/server/game_manager.py` - probe_coordinator param, _pending_matches, _probe_and_create_game(), _on_probe_complete(), _remove_from_waitroom(), _create_game_for_match_internal()
@@ -263,6 +270,12 @@ See: .planning/PROJECT.md Key Decisions table
 - waiting_room_error event includes error_code and details for client debugging
 - Consistent log prefixes: [JoinGame:Diag] for diagnostics, [StateValidation] for validation
 
+**v1.14 Phase 61 decisions:**
+- 500ms default timeout handles 200ms+ RTT with margin for packet retransmission
+- Timeout triggers graceful degradation (warning log, proceed) not crash
+- Only P2P mode waits for confirmation (server-authoritative has different sync)
+- 10ms polling interval allows event loop to process incoming packets
+
 ### Pending Todos
 
 (None)
@@ -284,22 +297,21 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-02-03
-Stopped at: Roadmap created (6 phases, 20 requirements)
+Stopped at: Completed 61-01-PLAN.md
 Resume file: None
 
 ### Next Steps
 
-**v1.14 roadmap created:**
-- Phase 61: Input Confirmation Protocol (PARITY-01, PARITY-02)
+**v1.14 Phase 61 complete:**
+- Input confirmation wait implemented before episode export
+- 500ms configurable timeout with graceful degradation
+- Ready for Phase 62 data parity validation tests
+
+**Remaining phases:**
 - Phase 62: Data Parity Validation (PARITY-03, PARITY-04, PARITY-05)
 - Phase 63: Parity Test Stabilization (PARITY-06, PARITY-07)
 - Phase 64: Multi-Participant Test Infrastructure (STRESS-01)
 - Phase 65: Multi-Episode and Lifecycle Stress Tests (STRESS-02 through STRESS-07)
 - Phase 66: Server Recovery Validation (RECOVERY-01 through RECOVERY-06)
 
-Root cause for data parity bug identified:
-- `_promoteRemainingAtBoundary()` force-promotes unconfirmed speculative data at episode end
-- Under packet loss + active inputs, rollback replay uses predicted actions instead of confirmed inputs
-- Players record what they executed (may differ if packets were lost)
-
-Next action: `/gsd:plan-phase 61`
+Next action: `/gsd:plan-phase 62`
