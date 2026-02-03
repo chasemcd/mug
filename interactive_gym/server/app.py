@@ -533,6 +533,7 @@ def advance_scene(data):
                 participant_state_tracker=PARTICIPANT_TRACKER,
                 matchmaker=current_scene.matchmaker,
                 match_logger=MATCH_LOGGER,  # Phase 56
+                probe_coordinator=PROBE_COORDINATOR,  # Phase 59: P2P RTT probing
             )
             GAME_MANAGERS[current_scene.scene_id] = game_manager
         else:
