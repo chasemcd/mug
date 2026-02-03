@@ -33,6 +33,7 @@ from interactive_gym.configurations import (
 )
 from interactive_gym.server import remote_game, utils, pyodide_game_coordinator, player_pairing_manager
 from interactive_gym.server.remote_game import SessionState
+from interactive_gym.server.participant_state import ParticipantState
 from interactive_gym.scenes import stager, gym_scene, scene
 import flask_socketio
 
@@ -51,6 +52,7 @@ class GameManager:
         pyodide_coordinator: pyodide_game_coordinator.PyodideGameCoordinator | None = None,
         pairing_manager: player_pairing_manager.PlayerPairingManager | None = None,
         get_subject_rtt: callable | None = None,
+        participant_state_tracker=None,  # Optional for backward compatibility
     ):
         assert isinstance(scene, gym_scene.GymScene)
         self.scene = scene
@@ -59,6 +61,7 @@ class GameManager:
         self.pyodide_coordinator = pyodide_coordinator
         self.pairing_manager = pairing_manager
         self.get_subject_rtt = get_subject_rtt  # Callback to get RTT for a subject
+        self.participant_state_tracker = participant_state_tracker  # Phase 54
 
         # Data structure to save subjects by their socket id
         self.subject = utils.ThreadSafeDict()
@@ -734,6 +737,10 @@ class GameManager:
         with game.lock:
             self.remove_subject(subject_id)
 
+            # Reset participant state (Phase 54)
+            if self.participant_state_tracker:
+                self.participant_state_tracker.reset(subject_id)
+
             game_was_active = (
                 game.game_id in self.active_games
                 and game.status
@@ -866,6 +873,13 @@ class GameManager:
             f"Starting game {game.game_id} with {actual_human_players} subjects: "
             f"{[sid for sid in game.human_players.values()]}"
         )
+
+        # Transition all players to IN_GAME (Phase 54)
+        if self.participant_state_tracker:
+            for subject_id in game.human_players.values():
+                if subject_id and subject_id != utils.Available:
+                    self.participant_state_tracker.transition_to(subject_id, ParticipantState.IN_GAME)
+
         self.active_games.add(game.game_id)
 
         self.sio.emit(
@@ -1135,6 +1149,12 @@ class GameManager:
 
         # Transition to ENDED before cleanup (SESS-02: session destroyed after ENDED)
         game.transition_to(SessionState.ENDED)
+
+        # Transition all players to GAME_ENDED (Phase 54)
+        if self.participant_state_tracker:
+            for subject_id in list(game.human_players.values()):
+                if subject_id and subject_id != utils.Available:
+                    self.participant_state_tracker.transition_to(subject_id, ParticipantState.GAME_ENDED)
 
         # Clean up subject tracking for ALL players in this game
         for subject_id in list(game.human_players.values()):
