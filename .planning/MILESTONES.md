@@ -1,5 +1,133 @@
 # Project Milestones: Interactive Gym P2P Multiplayer
 
+## v1.11 Data Export Edge Cases (Shipped: 2026-02-02)
+
+**Delivered:** Fixed dual-buffer data recording edge cases so all E2E stress tests pass and research data exports are identical between both players.
+
+**Phases completed:** 48-50 (3 plans total)
+
+**Key accomplishments:**
+
+- Fixed isFocused column consistency — both players always export isFocused.0 and isFocused.1 columns
+- Fixed episode boundary row parity — fast-forward respects syncedTerminationFrame, both players export exactly max_steps rows
+- All 17 E2E stress tests pass with no xfail markers
+- Validated data parity under network latency (100ms, 200ms), packet loss (15%), and focus loss (mid-episode and boundary)
+
+**Stats:**
+
+- 17 files created/modified
+- +1,527/-92 lines
+- 3 phases, 3 plans
+- 1 day (2026-02-02)
+
+**Git range:** `fix(48-01)` → `docs(50)` (11 commits)
+
+**What's next:** Production-ready data export parity. Consider v2.0 features (CI/CD integration, headless mode).
+
+---
+
+## v1.10 E2E Test Fix (Shipped: 2026-02-02)
+
+**Delivered:** All E2E tests pass in headed mode with data parity validation under network stress conditions.
+
+**Phases completed:** 45-47 (3 plans total)
+
+**Key accomplishments:**
+
+- Fixed Playwright visibility override (FocusManager was blocking frames when document.hidden=true)
+- 15 tests passing (12 passed + 3 xpassed)
+- Identified 5 edge cases in dual-buffer data recording (fixed in v1.11)
+- Focus loss data parity tests in place
+
+---
+
+## v1.9 Data Parity Testing (Shipped: 2026-02-01)
+
+**Delivered:** Playwright E2E test infrastructure with network condition simulation and data comparison pipeline.
+
+**Phases completed:** 40-44 (6 plans total)
+
+**Key accomplishments:**
+
+- Playwright test fixtures (flask_server, player_contexts)
+- CDP-based latency injection tests (100ms, 200ms, jitter)
+- Packet loss and tab focus simulation tests
+- Export collection and comparison helpers
+- Manual test protocol documentation
+
+---
+
+## v1.8 Data Export Parity (Shipped: 2026-01-30)
+
+**Delivered:** Both players export identical game state data regardless of rollbacks, fast-forwards, or latency.
+
+**Phases completed:** 36-39 (4 plans total)
+
+**Key accomplishments:**
+
+- Dual-buffer architecture (speculative → canonical frame data)
+- Fast-forward frames properly promoted to canonical buffer
+- Episode boundary confirmation ensures complete data export
+- wasSpeculative per-frame metadata and rollbackEvents array in export
+
+---
+
+## v1.7 Admin Console Improvement (Shipped: 2026-01-25)
+
+**Delivered:** A clean, usable admin console for effective experiment monitoring.
+
+**Phases completed:** 32-35 (4 plans total)
+
+---
+
+## v1.6 Input Latency Diagnosis (Partial: 2026-01-24)
+
+**Delivered:** Pipeline instrumentation for latency diagnosis. Root cause fix deferred.
+
+**Phases completed:** 28 (1 plan)
+
+---
+
+## v1.5 Focus Loss Handling (Shipped: 2026-01-23)
+
+**Delivered:** Resilient focus loss handling with Web Worker timing and fast-forward resync.
+
+**Phases completed:** 24-27 (4 plans total)
+
+---
+
+## v1.4 Partner Disconnection Handling (Shipped: 2026-01-22)
+
+**Delivered:** Improved partner disconnect experience with in-page overlay.
+
+**Phases completed:** 23 (1 plan)
+
+---
+
+## v1.3 P2P Connection Validation (Shipped: 2026-01-22)
+
+**Delivered:** Reliable P2P connections with pre-game validation and reconnection handling.
+
+**Phases completed:** 19-22 (5 plans total)
+
+---
+
+## v1.2 Participant Exclusion (Shipped: 2026-01-22)
+
+**Delivered:** Configurable participant exclusion system.
+
+**Phases completed:** 15-18 (4 plans total)
+
+---
+
+## v1.1 Sync Validation (Shipped: 2026-01-21)
+
+**Delivered:** Validation system for action sequences and state hashes.
+
+**Phases completed:** 11-14 (4 plans total)
+
+---
+
 ## v1.0 P2P Multiplayer (Shipped: 2026-01-19)
 
 **Delivered:** True peer-to-peer multiplayer with GGPO-style rollback netcode, replacing the pseudo-P2P "host client" architecture to achieve fighting-game-smooth responsiveness for research experiments.

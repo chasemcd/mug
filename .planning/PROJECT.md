@@ -8,16 +8,15 @@ A framework for running browser-based reinforcement learning experiments with hu
 
 Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
 
-## Current Milestone: v1.11 Data Export Edge Cases
+## Previous Milestone: v1.11 Data Export Edge Cases (Shipped: 2026-02-02)
 
-**Goal:** Fix dual-buffer data recording edge cases so all xfail tests pass and research data exports are identical between both players.
+**Delivered:** Fixed dual-buffer data recording edge cases so all E2E stress tests pass and research data exports are identical between both players.
 
-**Target features:**
-- Fix isFocused column asymmetry (consistent columns in both player exports)
-- Fix episode boundary row count mismatch during focus loss
-- Fix dual-buffer promotion edge cases under stress (active inputs + latency/packet loss)
-- All 5 xfail tests pass without markers
-- Research experiments produce valid, identical data from both players
+**Key accomplishments:**
+- Fixed isFocused column consistency (both players always export isFocused.0 and isFocused.1)
+- Fixed episode boundary row parity (both players export exactly max_steps rows)
+- All 17 E2E tests pass with no xfail markers
+- Validated data parity under latency (100ms, 200ms), packet loss (15%), and focus loss
 
 ## Previous Milestone: v1.10 E2E Test Fix (Shipped: 2026-02-02)
 
@@ -192,11 +191,13 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 
 ### Active
 
-- [ ] Fix isFocused column asymmetry in exports
-- [ ] Fix episode boundary row count mismatch during focus loss
-- [ ] Fix dual-buffer promotion edge cases under stress
-- [ ] All xfail tests pass without markers
-- [ ] Research data exports identical between both players
+(Planning next milestone)
+
+*Shipped in v1.11:*
+- ✓ isFocused column consistency (both players export isFocused.0/isFocused.1) — v1.11
+- ✓ Episode boundary row parity (both players export exactly max_steps rows) — v1.11
+- ✓ Dual-buffer stress handling (all stress tests pass without xfail) — v1.11
+- ✓ Research data exports identical between both players — v1.11
 
 *Shipped in v1.8:*
 - ✓ Identical frame counts between both players' exports — v1.8
@@ -280,7 +281,9 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 | Open Relay Project for TURN | Free 20GB/month tier sufficient for research | ✓ Good |
 
 | Dual-buffer data recording | Separates speculative from confirmed frame data for export parity | ✓ Good |
-| Playwright MCP for testing | Browser automation with network condition control | — Pending |
+| Playwright MCP for testing | Browser automation with network condition control | ✓ Good |
+| isFocused exclusion from parity | Focus state has notification latency, column consistency is sufficient | ✓ Good |
+| BOUND-02/03 guards | Defense-in-depth at episode boundaries in async paths | ✓ Good |
 
 ---
-*Last updated: 2026-02-02 after v1.11 milestone start*
+*Last updated: 2026-02-02 after v1.11 milestone complete*

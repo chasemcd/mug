@@ -13,7 +13,7 @@
 - ✅ **v1.8 Data Export Parity** - Phases 36-39 (shipped 2026-01-30)
 - ✅ **v1.9 Data Parity Testing** - Phases 40-44 (shipped 2026-02-01)
 - ✅ **v1.10 E2E Test Fix** - Phases 45-47 (shipped 2026-02-02)
-- ✅ **v1.11 Data Export Edge Cases** - Phases 48-50 (shipped 2026-02-02)
+- ✅ **v1.11 Data Export Edge Cases** - Phases 48-50 (shipped 2026-02-02) → [archive](milestones/v1.11-ROADMAP.md)
 
 ## Phases
 
@@ -666,59 +666,20 @@ Plans:
 
 </details>
 
-### v1.11 Data Export Edge Cases (In Progress)
+<details>
+<summary>v1.11 Data Export Edge Cases (Phases 48-50) - SHIPPED 2026-02-02</summary>
 
 **Milestone Goal:** Fix dual-buffer data recording edge cases so all xfail tests pass and research data exports are identical between both players.
 
-### Phase 48: isFocused Column Consistency
-**Goal:** Both players export consistent focus state columns
-**Depends on:** v1.10 complete (existing test infrastructure)
-**Requirements:** FOCUS-COL-01, FOCUS-COL-02
-**Success Criteria** (what must be TRUE):
-  1. Both players export isFocused.0 and isFocused.1 columns regardless of focus events
-  2. isFocused values reflect actual focus state (true when focused, false when backgrounded)
-**Research flag:** Unlikely (straightforward data collection fix)
-**Plans:** 1 plan
+- [x] **Phase 48: isFocused Column Consistency** (1/1 plans) — completed 2026-02-02
+- [x] **Phase 49: Episode Boundary Row Parity** (1/1 plans) — completed 2026-02-02
+- [x] **Phase 50: Stress Test Verification** (1/1 plans) — completed 2026-02-02
 
-Plans:
-- [x] 48-01-PLAN.md — Update storeFrameData calls to use getFocusStatePerPlayer()
+See [milestones/v1.11-ROADMAP.md](milestones/v1.11-ROADMAP.md) for full details.
 
-### Phase 49: Episode Boundary Row Parity
-**Goal:** Both players export identical row counts at episode boundaries
-**Depends on:** Phase 48
-**Requirements:** BOUND-01, BOUND-02, BOUND-03
-**Success Criteria** (what must be TRUE):
-  1. Both players export exactly the same number of rows (0 tolerance)
-  2. Fast-forward processing stops precisely at episode boundary
-  3. `_promoteRemainingAtBoundary()` handles backgrounded player correctly
-**Research flag:** Complete (root cause identified in research phase)
-**Plans:** 1 plan
-
-Plans:
-- [x] 49-01-PLAN.md — Cap fast-forward at episode boundary, filter promotion
-
-### Phase 50: Stress Test Verification
-**Goal:** All xfail tests pass without markers under network stress
-**Depends on:** Phase 49
-**Requirements:** STRESS-01, STRESS-02, STRESS-03, STRESS-04, STRESS-05, VERIFY-01, VERIFY-02
-**Success Criteria** (what must be TRUE):
-  1. test_active_input_with_latency[100] passes
-  2. test_active_input_with_latency[200] passes
-  3. test_active_input_with_packet_loss passes
-  4. test_focus_loss_mid_episode_parity passes
-  5. test_focus_loss_episode_boundary_parity passes
-  6. All E2E tests pass with no xfail markers remaining
-  7. Research exports are byte-identical (ignoring timestamps)
-**Research flag:** Unlikely (verification of prior fixes)
-**Plans:** 1 plan
-
-Plans:
-- [x] 50-01-PLAN.md — Remove xfail markers and verify all tests pass
+</details>
 
 ## Progress
-
-**Execution Order:**
-Phases execute in numeric order: 48 → 49 → 50
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -763,4 +724,4 @@ Phases execute in numeric order: 48 → 49 → 50
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-02 after Phase 50 complete*
+*Last updated: 2026-02-02 after v1.11 milestone complete*
