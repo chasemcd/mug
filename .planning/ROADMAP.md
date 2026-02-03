@@ -795,11 +795,11 @@ Plans:
   4. FIFOMatchmaker default implementation works (current behavior preserved)
   5. Matchmaker configurable per-scene via experiment config
 **Research flag:** Unlikely (oTree pattern well-documented)
-**Plans:** 1 plan
+**Plans:** 2 plans
 
 Plans:
-- [ ] 55-01: Matchmaker base class and FIFOMatchmaker
-- [ ] 55-02: Configuration integration
+- [ ] 55-01-PLAN.md — Matchmaker ABC, MatchCandidate, FIFOMatchmaker, GameManager delegation
+- [ ] 55-02-PLAN.md — Scene configuration, app.py wiring, E2E verification
 
 #### Phase 56: Custom Attributes & Assignment Logging
 **Goal:** Researchers can pass attributes and analyze match decisions
@@ -812,7 +812,7 @@ Plans:
 **Plans:** 1 plan
 
 Plans:
-- [ ] 56-01: Assignment logging and RTT exposure
+- [ ] 56-01-PLAN.md — Assignment logging and RTT exposure
 
 ## Progress
 
@@ -860,9 +860,9 @@ Plans:
 | 52. Comprehensive Cleanup | v1.12 | 1/1 | Complete | 2026-02-02 |
 | 53. Session Lifecycle | v1.12 | 1/1 | Complete | 2026-02-03 |
 | 54. ParticipantStateTracker | v1.12 | 1/1 | Complete | 2026-02-03 |
-| 55. Matchmaker Base Class | v1.12 | 0/2 | Not started | — |
+| 55. Matchmaker Base Class | v1.12 | 0/2 | Planned | — |
 | 56. Custom Attributes | v1.12 | 0/1 | Not started | — |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-03 after Phase 54 execution complete*
+*Last updated: 2026-02-03 after Phase 55 planning complete*
