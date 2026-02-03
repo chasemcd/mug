@@ -536,132 +536,279 @@ class GameManager:
         logger.debug(f"RTT compatible: {subject_id} (RTT={subject_rtt}ms)")
         return True
 
+    def _get_waiting_subject_ids(self) -> list[SubjectID]:
+        """Get list of subject IDs currently waiting in the waitroom.
+
+        Collects subjects from all games in the waiting_games queue.
+        """
+        waiting_subjects = []
+        for game_id in self.waiting_games:
+            game = self.games.get(game_id)
+            if game:
+                for player_id, subject_id in game.human_players.items():
+                    if subject_id and subject_id != utils.Available:
+                        waiting_subjects.append(subject_id)
+        return waiting_subjects
+
+    def _get_group_size(self) -> int:
+        """Get the number of human players needed for a full game."""
+        return len([
+            p for p in self.scene.policy_mapping.values()
+            if p == configuration_constants.PolicyTypes.Human
+        ])
+
     def _add_to_fifo_queue(
         self, subject_id: SubjectID
     ) -> remote_game.RemoteGameV2:
         """Add a subject to the standard FIFO matching queue.
 
-        If matchmaking_max_rtt is configured, will only pair with games where
-        all existing players have RTT within the allowed difference.
+        Uses the matchmaker to decide when to form groups. If matchmaking_max_rtt
+        is configured, RTT filtering is applied before the matchmaker decision.
+
+        Phase 55: Delegates matching decision to self.matchmaker.find_match()
         """
         # Use lock to prevent race conditions when multiple participants join simultaneously
         with self.waiting_games_lock:
-            # Find a compatible game based on RTT
-            compatible_game = None
+            # Build MatchCandidate for arriving participant
+            arriving = MatchCandidate(
+                subject_id=subject_id,
+                rtt_ms=self.get_subject_rtt(subject_id) if self.get_subject_rtt else None,
+            )
+
+            # Build waiting list from RTT-compatible participants
+            # Note: RTT filtering is applied here, before calling the matchmaker
+            waiting = []
             for game_id in self.waiting_games:
                 candidate_game = self.games.get(game_id)
                 if candidate_game and self._is_rtt_compatible(subject_id, candidate_game):
-                    compatible_game = candidate_game
-                    break
+                    for player_id, sid in candidate_game.human_players.items():
+                        if sid and sid != utils.Available:
+                            waiting.append(MatchCandidate(
+                                subject_id=sid,
+                                rtt_ms=self.get_subject_rtt(sid) if self.get_subject_rtt else None,
+                            ))
 
-            if compatible_game is None:
-                # No compatible game found, create a new one
-                logger.info(f"No RTT-compatible game found for {subject_id}. Creating a new game.")
-                self._create_game()
-                logger.info(f"Created game. waiting_games now: {self.waiting_games}")
-                # The newly created game will be at the end of waiting_games
-                compatible_game = self.games[self.waiting_games[-1]]
+            group_size = self._get_group_size()
 
-            game = compatible_game
-            current_players = game.cur_num_human_players()
-            expected_players = len([
-                p for p in self.scene.policy_mapping.values()
-                if p == configuration_constants.PolicyTypes.Human
-            ])
-            logger.info(
-                f"Adding subject {subject_id} to game {game.game_id}. "
-                f"Current players: {current_players}/{expected_players}"
-            )
+            # Delegate matching decision to matchmaker (Phase 55)
+            matched = self.matchmaker.find_match(arriving, waiting, group_size)
 
-            # Safety check: verify game isn't already at capacity before proceeding
-            if game.is_at_player_capacity():
+            if matched is None:
+                # No match yet - add arriving participant to waitroom
+                logger.info(f"Matchmaker returned None for {subject_id}. Adding to waitroom. "
+                           f"Waiting: {len(waiting)}, Group size: {group_size}")
+                return self._add_to_waitroom(subject_id)
+
+            # Match found - create game for matched participants
+            logger.info(f"Matchmaker matched {len(matched)} participants: "
+                       f"{[c.subject_id for c in matched]}")
+            return self._create_game_for_match(matched, subject_id)
+
+    def _add_to_waitroom(self, subject_id: SubjectID) -> remote_game.RemoteGameV2:
+        """Add a participant to the waitroom when no match is available yet.
+
+        Creates a new game or finds existing RTT-compatible game to place participant.
+        """
+        # Find a compatible game based on RTT
+        compatible_game = None
+        for game_id in self.waiting_games:
+            candidate_game = self.games.get(game_id)
+            if candidate_game and self._is_rtt_compatible(subject_id, candidate_game):
+                compatible_game = candidate_game
+                break
+
+        if compatible_game is None:
+            # No compatible game found, create a new one
+            logger.info(f"No RTT-compatible game found for {subject_id}. Creating a new game.")
+            self._create_game()
+            logger.info(f"Created game. waiting_games now: {self.waiting_games}")
+            compatible_game = self.games[self.waiting_games[-1]]
+
+        game = compatible_game
+
+        with game.lock:
+            # Double-check availability inside the lock
+            available_human_agent_ids = game.get_available_human_agent_ids()
+            if not available_human_agent_ids:
                 logger.error(
-                    f"Race condition detected: Game {game.game_id} is already at capacity "
-                    f"({current_players}/{expected_players} players). "
-                    f"Subject {subject_id} will be added to a new game instead."
+                    f"No available slots in game {game.game_id} after acquiring lock. "
+                    f"This indicates a race condition. Creating new game for {subject_id}."
                 )
-                # Create a new game for this subject
-                self._create_game()
-                game = self.games[self.waiting_games[-1]]
-                logger.info(f"Created new game {game.game_id} for subject {subject_id}")
+                game = None
 
-            with game.lock:
-                # Double-check availability inside the lock
-                available_human_agent_ids = game.get_available_human_agent_ids()
-                if not available_human_agent_ids:
+        # Handle the case where we need to create a new game due to race condition
+        if game is None:
+            self._create_game()
+            game = self.games[self.waiting_games[-1]]
+            logger.info(f"Created new game {game.game_id} for subject {subject_id} after race condition")
+
+        with game.lock:
+            self.subject_games[subject_id] = game.game_id
+            self.subject_rooms[subject_id] = game.game_id
+            self.reset_events[game.game_id][subject_id] = eventlet.event.Event()
+            flask_socketio.join_room(game.game_id)
+
+            available_human_agent_ids = game.get_available_human_agent_ids()
+            player_id = None
+            if not available_human_agent_ids:
+                logger.warning(
+                    f"No available human agent IDs for game {game.game_id}. Adding as a spectator."
+                )
+            else:
+                player_id = random.choice(available_human_agent_ids)
+                player_added = game.add_player(player_id, subject_id)
+                if not player_added:
                     logger.error(
-                        f"No available slots in game {game.game_id} after acquiring lock. "
-                        f"This indicates a race condition. Creating new game for {subject_id}."
-                    )
-                    # Release lock and create new game
-                    # Note: We need to exit this lock context first
-                    game = None
-
-            # Handle the case where we need to create a new game due to race condition
-            if game is None:
-                self._create_game()
-                game = self.games[self.waiting_games[-1]]
-                logger.info(f"Created new game {game.game_id} for subject {subject_id} after race condition")
-
-            with game.lock:
-                self.subject_games[subject_id] = game.game_id
-                self.subject_rooms[subject_id] = game.game_id
-                self.reset_events[game.game_id][subject_id] = eventlet.event.Event()
-                flask_socketio.join_room(game.game_id)
-
-                available_human_agent_ids = game.get_available_human_agent_ids()
-                player_id = None
-                player_added = False
-                if not available_human_agent_ids:
-                    logger.warning(
-                        f"No available human agent IDs for game {game.game_id}. Adding as a spectator."
-                    )
-                else:
-                    player_id = random.choice(available_human_agent_ids)
-                    player_added = game.add_player(player_id, subject_id)
-                    if not player_added:
-                        logger.error(
-                            f"Failed to add player {subject_id} to slot {player_id} in game {game.game_id}. "
-                            f"This should not happen if locks are working correctly."
-                        )
-
-                # If multiplayer Pyodide, add player to coordinator
-                if self.scene.pyodide_multiplayer and self.pyodide_coordinator and player_id is not None:
-                    self.pyodide_coordinator.add_player(
-                        game_id=game.game_id,
-                        player_id=player_id,
-                        socket_id=flask.request.sid,
-                        subject_id=subject_id  # Pass subject_id for data logging
-                    )
-                    logger.info(
-                        f"Added player {player_id} (subject: {subject_id}) to Pyodide coordinator for game {game.game_id}"
+                        f"Failed to add player {subject_id} to slot {player_id} in game {game.game_id}. "
+                        f"This should not happen if locks are working correctly."
                     )
 
-                if self.scene.game_page_html_fn is not None:
-                    self.sio.emit(
-                        "update_game_page_text",
-                        {
-                            "game_page_text": self.scene.game_page_html_fn(
-                                game, subject_id
-                            )
-                        },
-                        room=subject_id,
+            # If multiplayer Pyodide, add player to coordinator
+            if self.scene.pyodide_multiplayer and self.pyodide_coordinator and player_id is not None:
+                self.pyodide_coordinator.add_player(
+                    game_id=game.game_id,
+                    player_id=player_id,
+                    socket_id=flask.request.sid,
+                    subject_id=subject_id
+                )
+                logger.info(
+                    f"Added player {player_id} (subject: {subject_id}) to Pyodide coordinator for game {game.game_id}"
+                )
+
+            if self.scene.game_page_html_fn is not None:
+                self.sio.emit(
+                    "update_game_page_text",
+                    {
+                        "game_page_text": self.scene.game_page_html_fn(game, subject_id)
+                    },
+                    room=subject_id,
+                )
+
+            # Broadcast to all players in the room so everyone sees updated count
+            self.broadcast_waiting_room_status(game.game_id)
+
+        return game
+
+    def _create_game_for_match(
+        self,
+        matched: list[MatchCandidate],
+        arriving_subject_id: SubjectID
+    ) -> remote_game.RemoteGameV2:
+        """Create and start a game for matched participants.
+
+        Handles the case where some participants are already in waitroom games
+        and need to be moved to the new match game.
+        """
+        # Separate arriving from already-waiting participants
+        waiting_matched = [c for c in matched if c.subject_id != arriving_subject_id]
+
+        # Find existing game to use (from the first waiting participant)
+        # This preserves the RTT-compatible game assignment
+        existing_game = None
+        for candidate in waiting_matched:
+            game_id = self.subject_games.get(candidate.subject_id)
+            if game_id and game_id in self.waiting_games:
+                existing_game = self.games.get(game_id)
+                break
+
+        if existing_game is None:
+            # No existing game - create one
+            self._create_game()
+            existing_game = self.games[self.waiting_games[-1]]
+
+        game = existing_game
+        current_players = game.cur_num_human_players()
+        expected_players = self._get_group_size()
+        logger.info(
+            f"Creating match in game {game.game_id}. "
+            f"Current players: {current_players}/{expected_players}"
+        )
+
+        # Safety check: verify game isn't already at capacity before proceeding
+        if game.is_at_player_capacity():
+            logger.error(
+                f"Race condition detected: Game {game.game_id} is already at capacity "
+                f"({current_players}/{expected_players} players). "
+                f"Subject {arriving_subject_id} will be added to a new game instead."
+            )
+            self._create_game()
+            game = self.games[self.waiting_games[-1]]
+            logger.info(f"Created new game {game.game_id} for subject {arriving_subject_id}")
+
+        with game.lock:
+            # Double-check availability inside the lock
+            available_human_agent_ids = game.get_available_human_agent_ids()
+            if not available_human_agent_ids:
+                logger.error(
+                    f"No available slots in game {game.game_id} after acquiring lock. "
+                    f"This indicates a race condition. Creating new game for {arriving_subject_id}."
+                )
+                game = None
+
+        # Handle the case where we need to create a new game due to race condition
+        if game is None:
+            self._create_game()
+            game = self.games[self.waiting_games[-1]]
+            logger.info(f"Created new game {game.game_id} for subject {arriving_subject_id} after race condition")
+
+        with game.lock:
+            # Add the arriving participant
+            self.subject_games[arriving_subject_id] = game.game_id
+            self.subject_rooms[arriving_subject_id] = game.game_id
+            self.reset_events[game.game_id][arriving_subject_id] = eventlet.event.Event()
+            flask_socketio.join_room(game.game_id)
+
+            available_human_agent_ids = game.get_available_human_agent_ids()
+            player_id = None
+            player_added = False
+            if not available_human_agent_ids:
+                logger.warning(
+                    f"No available human agent IDs for game {game.game_id}. Adding as a spectator."
+                )
+            else:
+                player_id = random.choice(available_human_agent_ids)
+                player_added = game.add_player(player_id, arriving_subject_id)
+                if not player_added:
+                    logger.error(
+                        f"Failed to add player {arriving_subject_id} to slot {player_id} in game {game.game_id}. "
+                        f"This should not happen if locks are working correctly."
                     )
 
-                # If the game is ready to start, we'll remove it from WAITING_GAMES.
-                is_ready = game.is_ready_to_start()
-                logger.info(f"Game {game.game_id} ready to start: {is_ready}. Available slots: {game.get_available_human_agent_ids()}")
-                if is_ready:
-                    logger.info(f"Removing game {game.game_id} from waiting_games")
-                    self.waiting_games.remove(game.game_id)
-                    assert game.game_id not in self.waiting_games
+            # If multiplayer Pyodide, add player to coordinator
+            if self.scene.pyodide_multiplayer and self.pyodide_coordinator and player_id is not None:
+                self.pyodide_coordinator.add_player(
+                    game_id=game.game_id,
+                    player_id=player_id,
+                    socket_id=flask.request.sid,
+                    subject_id=arriving_subject_id
+                )
+                logger.info(
+                    f"Added player {player_id} (subject: {arriving_subject_id}) to Pyodide coordinator for game {game.game_id}"
+                )
 
-                if is_ready:
-                    game.transition_to(SessionState.MATCHED)
-                    self.start_game(game)
-                else:
-                    # Broadcast to all players in the room so everyone sees updated count
-                    self.broadcast_waiting_room_status(game.game_id)
+            if self.scene.game_page_html_fn is not None:
+                self.sio.emit(
+                    "update_game_page_text",
+                    {
+                        "game_page_text": self.scene.game_page_html_fn(game, arriving_subject_id)
+                    },
+                    room=arriving_subject_id,
+                )
+
+            # Check if the game is ready to start
+            is_ready = game.is_ready_to_start()
+            logger.info(f"Game {game.game_id} ready to start: {is_ready}. Available slots: {game.get_available_human_agent_ids()}")
+            if is_ready:
+                logger.info(f"Removing game {game.game_id} from waiting_games")
+                self.waiting_games.remove(game.game_id)
+                assert game.game_id not in self.waiting_games
+
+            if is_ready:
+                game.transition_to(SessionState.MATCHED)
+                self.start_game(game)
+            else:
+                # Broadcast to all players in the room so everyone sees updated count
+                self.broadcast_waiting_room_status(game.game_id)
 
         return game
 
