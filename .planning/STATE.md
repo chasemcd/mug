@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-02)
 
 **Core value:** Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
-**Current focus:** Planning next milestone
+**Current focus:** v1.12 Waiting Room Overhaul
 
 ## Current Position
 
-Phase: — (v1.11 complete, planning next milestone)
+Phase: — (run /gsd:create-roadmap)
 Plan: —
-Status: Ready for next milestone
-Last activity: 2026-02-02 — v1.11 milestone archived
+Status: Defining requirements
+Last activity: 2026-02-02 — Milestone v1.12 started
 
-Progress: [██████████] 100% (v1.11 complete)
+Progress: [░░░░░░░░░░] 0% (v1.12 starting)
 
 ## Milestone History
 
@@ -336,6 +336,12 @@ See: .planning/PROJECT.md Key Decisions table
 
 ### Blockers/Concerns
 
+**v1.12 Known Bug (fixing this milestone):**
+- New participants sometimes routed to stale games — "Start button disappears, nothing happens"
+- Console shows "Joining game in session [ID]" but UI doesn't change
+- Server shows "Game manager already exists for scene X, reusing it"
+- Root cause: likely stale game manager state from previous sessions
+
 **Known issues to address in future milestones:**
 - Episode start sync can timeout on slow connections (mitigated with retry + two-way ack)
 - Rollback visual corrections cause brief teleporting (smoothing not yet implemented)
@@ -391,17 +397,17 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-02-02
-Stopped at: v1.11 milestone archived
+Stopped at: v1.12 milestone initialized
 Resume file: None
 
 ### Next Steps
 
-**v1.11 Milestone Archived.**
+**v1.12 Waiting Room Overhaul initialized.**
 
-All data export edge cases have been fixed and verified. The P2P multiplayer system is production-ready with validated data export parity under all tested stress conditions.
+Goals:
+1. Fix stale game manager bug (new participants routed to old games)
+2. Build Matchmaker abstraction for custom participant pairing
 
-**To start next milestone:**
-1. `/gsd:discuss-milestone` — thinking partner, creates context file
-2. `/gsd:new-milestone` — update PROJECT.md with new goals
-3. `/gsd:define-requirements` — scope what to build
-4. `/gsd:create-roadmap` — plan how to build it
+**Next:**
+1. `/gsd:define-requirements` — scope what to build (or skip if scope is clear)
+2. `/gsd:create-roadmap` — plan phases for bug fixes + Matchmaker abstraction
