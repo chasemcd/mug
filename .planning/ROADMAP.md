@@ -723,7 +723,7 @@ See [milestones/v1.11-ROADMAP.md](milestones/v1.11-ROADMAP.md) for full details.
 | 49. Episode Boundary Row | v1.11 | 1/1 | Complete | 2026-02-02 |
 | 50. Stress Verification | v1.11 | 1/1 | Complete | 2026-02-02 |
 
-### 🚧 v1.12 Waiting Room Overhaul (In Progress)
+### v1.12 Waiting Room Overhaul (In Progress)
 
 **Milestone Goal:** Fix waiting room bugs and build a pluggable Matchmaker abstraction for custom participant pairing logic.
 
@@ -754,14 +754,14 @@ Plans:
 **Plans:** 1 plan
 
 Plans:
-- [ ] 52-01: Comprehensive cleanup implementation
+- [ ] 52-01-PLAN.md - Idempotent cleanup_game() with subject-level cleanup, all exit paths call cleanup
 
 #### Phase 53: Session Lifecycle
 **Goal:** Each game has explicit lifecycle, Session destroyed when game ends
 **Depends on:** Phase 52
 **Requirements:** SESS-01, SESS-02
 **Success Criteria** (what must be TRUE):
-  1. Session has explicit states (WAITING → MATCHED → VALIDATING → PLAYING → ENDED)
+  1. Session has explicit states (WAITING -> MATCHED -> VALIDATING -> PLAYING -> ENDED)
   2. Session object is destroyed (not reused) when game ends
   3. GameManager creates Session per-game, not per-scene
 **Research flag:** Maybe (`python-statemachine` integration with Flask-SocketIO async)
@@ -857,7 +857,7 @@ Plans:
 | 49. Episode Boundary Row | v1.11 | 1/1 | Complete | 2026-02-02 |
 | 50. Stress Verification | v1.11 | 1/1 | Complete | 2026-02-02 |
 | 51. Diagnostic Logging | v1.12 | 1/1 | Complete | 2026-02-02 |
-| 52. Comprehensive Cleanup | v1.12 | 0/1 | Not started | — |
+| 52. Comprehensive Cleanup | v1.12 | 0/1 | Planned | — |
 | 53. Session Lifecycle | v1.12 | 0/1 | Not started | — |
 | 54. ParticipantStateTracker | v1.12 | 0/1 | Not started | — |
 | 55. Matchmaker Base Class | v1.12 | 0/2 | Not started | — |
@@ -865,4 +865,4 @@ Plans:
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-02 after v1.12 roadmap created (6 phases, 14 requirements)*
+*Last updated: 2026-02-02 after Phase 52 plan created*
