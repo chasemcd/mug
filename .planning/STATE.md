@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-02)
 ## Current Position
 
 Phase: 51 of 56 (Diagnostic Logging & State Validation)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-02-02 — Roadmap created (6 phases, 14 requirements)
+Plan: 01 complete
+Status: In progress
+Last activity: 2026-02-02 — Completed 51-01-PLAN.md
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [█░░░░░░░░░] 10%
 
 ## Milestone History
 
@@ -126,6 +126,13 @@ Progress: [░░░░░░░░░░] 0%
 - `.planning/phases/49-episode-boundary-row-parity/49-01-SUMMARY.md`
 - `.planning/phases/50-stress-test-verification/50-01-SUMMARY.md`
 
+**v1.12 Execution:**
+- `.planning/phases/51-diagnostic-logging/51-01-SUMMARY.md`
+
+**Diagnostic Logging Infrastructure (v1.12 Phase 51 - added):**
+- `interactive_gym/server/app.py` - [JoinGame:Diag] diagnostic logging at join_game entry, state validation integration, waiting_room_error event, post-add state counts
+- `interactive_gym/server/game_manager.py` - validate_subject_state() method with [StateValidation] logging and auto-cleanup
+
 **Stress Test Verification (v1.11 Phase 50 - complete):**
 - `tests/e2e/test_latency_injection.py` - xfail removed from test_active_input_with_latency
 - `tests/e2e/test_network_disruption.py` - xfail removed from test_active_input_with_packet_loss, flaky rollback assertion fixed
@@ -214,6 +221,12 @@ Progress: [░░░░░░░░░░] 0%
 ### Decisions
 
 See: .planning/PROJECT.md Key Decisions table
+
+**v1.12 Phase 51 decisions:**
+- Log full state snapshot at join_game entry (subject_games, active_games, waiting_games)
+- Auto-cleanup orphaned entries during validation rather than returning error (self-healing)
+- waiting_room_error event includes error_code and details for client debugging
+- Consistent log prefixes: [JoinGame:Diag] for diagnostics, [StateValidation] for validation
 
 **v1.11 Phase 50 decisions:**
 - Rollback assertion in packet loss test changed to warning (timing-dependent, not deterministic)
@@ -397,15 +410,15 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-02-02
-Stopped at: Roadmap created for v1.12
+Stopped at: Completed 51-01-PLAN.md
 Resume file: None
 
 ### Next Steps
 
-**v1.12 Roadmap created.**
+**v1.12 Phase 51 Plan 01 complete.**
 
 Phases 51-56:
-1. Phase 51: Diagnostic Logging & State Validation
+1. Phase 51: Diagnostic Logging & State Validation - Plan 01 complete
 2. Phase 52: Comprehensive Cleanup
 3. Phase 53: Session Lifecycle
 4. Phase 54: ParticipantStateTracker
@@ -413,4 +426,4 @@ Phases 51-56:
 6. Phase 56: Custom Attributes & Assignment Logging
 
 **Next:**
-`/gsd:plan-phase 51`
+`/gsd:plan-phase 52` or continue with additional Phase 51 plans if needed
