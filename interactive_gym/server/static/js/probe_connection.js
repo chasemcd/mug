@@ -222,6 +222,98 @@ export class ProbeConnection {
     }
 
     /**
+     * Measure RTT using application-level ping-pong protocol.
+     * Sends multiple pings and returns median RTT for stable measurement.
+     *
+     * @param {Object} options - Measurement options
+     * @param {number} options.numPings - Number of pings to send (default 5)
+     * @param {number} options.pingTimeout - Timeout per ping in ms (default 2000)
+     * @param {number} options.pingInterval - Delay between pings in ms (default 100)
+     * @returns {Promise<number|null>} Median RTT in milliseconds or null if all pings failed
+     */
+    async measureRTT({ numPings = 5, pingTimeout = 2000, pingInterval = 100 } = {}) {
+        if (!this.webrtcManager.dataChannel ||
+            this.webrtcManager.dataChannel.readyState !== 'open') {
+            console.warn(`[Probe ${this.probeSessionId}] Cannot measure RTT - DataChannel not open`);
+            return null;
+        }
+
+        const rtts = [];
+
+        for (let i = 0; i < numPings; i++) {
+            const seq = this.nextPingSeq++;
+
+            console.log(`[Probe ${this.probeSessionId}] Sending ping seq=${seq}`);
+
+            try {
+                const rtt = await this._sendPing(seq, pingTimeout);
+                rtts.push(rtt);
+            } catch (e) {
+                // Timeout or error - log and continue to next ping
+                console.warn(`[Probe ${this.probeSessionId}] Ping seq=${seq} timed out`);
+            }
+
+            // Wait between pings (except after the last one)
+            if (i < numPings - 1) {
+                await new Promise(resolve => setTimeout(resolve, pingInterval));
+            }
+        }
+
+        // Calculate median of successful measurements
+        if (rtts.length === 0) {
+            console.warn(`[Probe ${this.probeSessionId}] Measurement complete: 0/${numPings} pings succeeded`);
+            return null;
+        }
+
+        const sortedRtts = rtts.slice().sort((a, b) => a - b);
+        const mid = Math.floor(sortedRtts.length / 2);
+        const medianRtt = sortedRtts.length % 2 !== 0
+            ? sortedRtts[mid]
+            : Math.round((sortedRtts[mid - 1] + sortedRtts[mid]) / 2);
+
+        console.log(`[Probe ${this.probeSessionId}] Measurement complete: ${rtts.length}/${numPings} pings, median RTT=${medianRtt}ms`);
+
+        return medianRtt;
+    }
+
+    /**
+     * Send a single ping and wait for pong response.
+     *
+     * @param {number} seq - Sequence number for this ping
+     * @param {number} timeout - Timeout in milliseconds
+     * @returns {Promise<number>} RTT in milliseconds
+     * @private
+     */
+    _sendPing(seq, timeout) {
+        return new Promise((resolve, reject) => {
+            const sentAt = Date.now();
+
+            // Set timeout for this ping
+            const timeoutId = setTimeout(() => {
+                this.pendingPings.delete(seq);
+                reject(new Error(`Ping seq=${seq} timed out`));
+            }, timeout);
+
+            // Store pending measurement
+            this.pendingPings.set(seq, {
+                resolve,
+                reject,
+                timeout: timeoutId,
+                sentAt
+            });
+
+            // Send ping message
+            const ping = {
+                type: 'ping',
+                seq: seq,
+                ts: sentAt
+            };
+
+            this.webrtcManager.dataChannel.send(JSON.stringify(ping));
+        });
+    }
+
+    /**
      * Close the probe connection and clean up.
      */
     close() {
