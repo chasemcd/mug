@@ -1114,8 +1114,25 @@ class GameManager:
         )
 
     def cleanup_game(self, game_id: GameID):
-        """End a game and persist player groups."""
+        """End a game and clean up ALL associated state.
+
+        Idempotent: safe to call multiple times for the same game_id.
+        """
+        # Guard: make idempotent
+        if game_id not in self.games:
+            logger.debug(f"cleanup_game called for already-cleaned game {game_id}")
+            return
+
         game = self.games[game_id]
+
+        # Clean up subject tracking for ALL players in this game
+        for subject_id in list(game.human_players.values()):
+            if subject_id and subject_id != utils.Available:
+                if subject_id in self.subject_games:
+                    del self.subject_games[subject_id]
+                if subject_id in self.subject_rooms:
+                    del self.subject_rooms[subject_id]
+                logger.debug(f"Cleaned subject mappings for {subject_id}")
 
         # Always record player groups when a game ends
         # This allows future scenes to either require the same group or allow new matches
