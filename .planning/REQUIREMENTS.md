@@ -16,8 +16,8 @@ Requirements for v1.12 release. Each maps to roadmap phases.
 
 ### Session Lifecycle
 
-- [ ] **SESS-01**: Session has explicit states (WAITING → MATCHED → VALIDATING → PLAYING → ENDED)
-- [ ] **SESS-02**: Session object is destroyed (not reused) when game ends
+- [x] **SESS-01**: Session has explicit states (WAITING → MATCHED → VALIDATING → PLAYING → ENDED)
+- [x] **SESS-02**: Session object is destroyed (not reused) when game ends
 - [x] **SESS-03**: Cleanup methods are idempotent (safe to call multiple times)
 
 ### Matchmaker API
@@ -75,8 +75,8 @@ Which phases cover which requirements. Updated by create-roadmap.
 | BUG-02 | Phase 52 | Complete |
 | BUG-03 | Phase 52 | Complete |
 | BUG-04 | Phase 51 | Complete |
-| SESS-01 | Phase 53 | Pending |
-| SESS-02 | Phase 53 | Pending |
+| SESS-01 | Phase 53 | Complete |
+| SESS-02 | Phase 53 | Complete |
 | SESS-03 | Phase 52 | Complete |
 | MATCH-01 | Phase 55 | Pending |
 | MATCH-02 | Phase 55 | Pending |
@@ -93,4 +93,4 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 ---
 *Requirements defined: 2026-02-02*
-*Last updated: 2026-02-02 after phase 52 complete*
+*Last updated: 2026-02-03 after phase 53 complete*
