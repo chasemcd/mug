@@ -18,10 +18,10 @@ Requirements for v1.13 Matchmaker Hardening. Each maps to roadmap phases.
 
 ### Game Creation
 
-- [ ] **GAME-01**: All games created through single path: Matchmaker.find_match() → match → create game
-- [ ] **GAME-02**: No other code paths create games
-- [ ] **GAME-03**: Game only exists when all matched participants are assigned
-- [ ] **GAME-04**: Group reunion flow is bypassed and documented as future matchmaker variant
+- [x] **GAME-01**: All games created through single path: Matchmaker.find_match() → match → create game
+- [x] **GAME-02**: No other code paths create games
+- [x] **GAME-03**: Game only exists when all matched participants are assigned
+- [x] **GAME-04**: Group reunion flow is bypassed and documented as future matchmaker variant
 
 ## v2 Requirements
 
@@ -61,10 +61,10 @@ Which phases cover which requirements. Updated by create-roadmap.
 | RTT-04 | Phase 59 | Complete |
 | RTT-05 | Phase 59 | Complete |
 | RTT-06 | Phase 59 | Complete |
-| GAME-01 | Phase 60 | Pending |
-| GAME-02 | Phase 60 | Pending |
-| GAME-03 | Phase 60 | Pending |
-| GAME-04 | Phase 60 | Pending |
+| GAME-01 | Phase 60 | Complete |
+| GAME-02 | Phase 60 | Complete |
+| GAME-03 | Phase 60 | Complete |
+| GAME-04 | Phase 60 | Complete |
 
 **Coverage:**
 - v1 requirements: 10 total
@@ -73,4 +73,4 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 ---
 *Requirements defined: 2026-02-03*
-*Last updated: 2026-02-03 after Phase 59 complete*
+*Last updated: 2026-02-03 after Phase 60 complete*
