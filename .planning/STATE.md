@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-03)
 ## Current Position
 
 Phase: 57 of 60 (P2P Probe Infrastructure)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-02-03 — v1.13 roadmap created
+Plan: 01 complete
+Status: Phase in progress
+Last activity: 2026-02-03 - Completed 57-01-PLAN.md (P2P Probe Infrastructure)
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [██░░░░░░░░] 25%
 
 ## Milestone History
 
@@ -136,6 +136,13 @@ Progress: [░░░░░░░░░░] 0%
 - `.planning/phases/55-matchmaker-base-class/55-02-SUMMARY.md`
 - `.planning/phases/56-custom-attributes-logging/56-01-SUMMARY.md`
 
+**v1.13 Execution:**
+- `.planning/phases/57-p2p-probe-infrastructure/57-01-SUMMARY.md`
+
+**P2P Probe Infrastructure (v1.13 Phase 57 - added):**
+- `interactive_gym/server/probe_coordinator.py` - ProbeCoordinator class for server-side probe orchestration
+- `interactive_gym/server/app.py` - PROBE_COORDINATOR global, get_socket_for_subject(), probe_ready/probe_signal/probe_result handlers
+
 **Match Assignment Logging (v1.12 Phase 56 - added):**
 - `interactive_gym/server/match_logger.py` - MatchAssignment dataclass, MatchAssignmentLogger class
 - `interactive_gym/server/game_manager.py` - match_logger parameter, log_match() calls in _create_game_for_match() and _create_game_for_group()
@@ -253,6 +260,14 @@ Progress: [░░░░░░░░░░] 0%
 ### Decisions
 
 See: .planning/PROJECT.md Key Decisions table
+
+**v1.13 Phase 57 decisions:**
+- Probes work independently of games (no game_id needed, only subject_ids)
+- Two-phase initialization (prepare -> ready -> start) prevents signaling race conditions
+- Fresh socket lookup via get_socket_for_subject() avoids stale socket references
+- Separate probe_* events from webrtc_signal to avoid collision with game signaling
+- 15 second default timeout for entire probe lifecycle
+- on_complete callback receives None RTT on failure or timeout
 
 **v1.12 Phase 56 decisions:**
 - Synchronous file I/O (no threading) - match rate is low, simplicity preferred
@@ -467,17 +482,17 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-02-03
-Stopped at: v1.13 roadmap created (4 phases, 10 requirements)
+Stopped at: Completed 57-01-PLAN.md (P2P Probe Infrastructure)
 Resume file: None
 
 ### Next Steps
 
-**v1.13 Matchmaker Hardening roadmap created.**
+**Phase 57 Plan 01 complete.** Server-side probe infrastructure ready.
 
-Next action: `/gsd:plan-phase 57`
+Next action: `/gsd:plan-phase 58` or continue with remaining Phase 57 plans (if any)
 
 Phases:
-- Phase 57: P2P Probe Infrastructure (RTT-01, RTT-03)
+- Phase 57: P2P Probe Infrastructure (RTT-01, RTT-03) - Plan 01 complete
 - Phase 58: RTT Measurement (RTT-02)
 - Phase 59: Matchmaker RTT Integration (RTT-04, RTT-05, RTT-06)
 - Phase 60: Single Game Creation Path (GAME-01, GAME-02, GAME-03, GAME-04)
