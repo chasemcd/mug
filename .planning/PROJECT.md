@@ -8,29 +8,34 @@ A framework for running browser-based reinforcement learning experiments with hu
 
 Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
 
-## Current Milestone: v1.13 Matchmaker Hardening
+## Current Milestone: v1.14 Data Parity Fix
 
-**Goal:** Make matchmaking safer and smarter with P2P RTT probing and a single game creation path.
+**Goal:** Fix the rare data parity divergence bug where players export different actions under packet loss + active inputs.
+
+**Problem:** `_promoteRemainingAtBoundary()` force-promotes unconfirmed speculative data at episode end. When packets are lost, rollback replay may use predicted actions instead of confirmed inputs. Both players record what they executed, which may differ.
 
 **Target features:**
-
-*P2P RTT probing:*
-- [ ] P2P probe helper to measure actual latency between candidates during matching
-- [ ] WebRTC connection established between candidates in waiting room
-- [ ] Matchmaker can use measured RTT in `find_match()` decision logic
-- [ ] Configurable `max_p2p_rtt_ms` threshold for match acceptance
-
-*Single game creation path:*
-- [ ] Remove group reunion flow (document as future TODO)
-- [ ] All games created through: Matchmaker.find_match() → match → create game
-- [ ] No other code paths create games
-- [ ] Game only exists when all matched participants are assigned
+- [ ] Wait for input confirmation before episode export
+- [ ] Re-request lost packets if confirmation timeout
+- [ ] Ensure both players export identical action sequences for every frame
+- [ ] E2E test `test_active_input_with_latency` passes consistently
 
 **What done looks like:**
-- Matchmaker can measure actual P2P latency between candidates before matching
-- Only one code path creates games (matchmaker match → game)
-- No isolated participants — game only exists when all participants assigned
-- Group reunion documented as future matchmaker variant
+- Data parity is EXACT — both players export identical data for every frame
+- No tolerance needed in validation scripts
+- All E2E stress tests pass (17/17, no flaky tests)
+- `_promoteRemainingAtBoundary()` only promotes confirmed data
+
+## Previous Milestone: v1.13 Matchmaker Hardening (Shipped: 2026-02-03)
+
+**Delivered:** P2P RTT probing for latency-based match filtering and a single game creation path.
+
+**Key accomplishments:**
+- P2P probe infrastructure (ProbeCoordinator, ProbeConnection, ProbeManager)
+- RTT ping-pong measurement protocol via WebRTC DataChannel
+- Matchmaker RTT integration with configurable max_p2p_rtt_ms threshold
+- Removed group reunion flow (~230 lines), single game creation path
+- Game only exists when all matched participants are assigned
 
 ## Previous Milestone: v1.12 Waiting Room Overhaul (Shipped: 2026-02-03)
 
@@ -227,12 +232,18 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 
 ### Active
 
-*v1.13 Matchmaker Hardening:*
-- [ ] P2P RTT probe helper for measuring actual latency between candidates
-- [ ] WebRTC probe connection during matchmaking consideration
-- [ ] Configurable max_p2p_rtt_ms threshold for match decisions
-- [ ] Single game creation path (matchmaker → match → game)
-- [ ] Remove group reunion flow (TODO for future matchmaker variant)
+*v1.14 Data Parity Fix:*
+- [ ] Wait for input confirmation before episode export
+- [ ] Re-request lost packets if confirmation timeout
+- [ ] Ensure both players export identical action sequences
+- [ ] E2E test `test_active_input_with_latency` passes consistently
+
+*Shipped in v1.13:*
+- ✓ P2P RTT probe helper for measuring actual latency between candidates — v1.13
+- ✓ WebRTC probe connection during matchmaking consideration — v1.13
+- ✓ Configurable max_p2p_rtt_ms threshold for match decisions — v1.13
+- ✓ Single game creation path (matchmaker → match → game) — v1.13
+- ✓ Remove group reunion flow (documented as future matchmaker variant) — v1.13
 
 *Shipped in v1.12:*
 - ✓ Diagnostic logging for stale game routing — v1.12
@@ -308,6 +319,7 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 - Episode start sync can timeout on slow connections (mitigated with retry mechanism)
 - Rollback visual corrections cause brief teleporting (smoothing not yet implemented)
 - **[CRITICAL]** Users report 1-2 second local input lag in Overcooked (investigating in v1.6)
+- **[RARE, FIXING in v1.14]** Data parity divergence under packet loss + active inputs — `_promoteRemainingAtBoundary()` force-promotes unconfirmed speculative data at episode end; if packets are lost, players may export different actions for the same frame. Affects <1% of stress test runs. Fix requires waiting for input confirmation before export.
 - ~~**[RESOLVED]** Data export parity issues — fixed in v1.8 with dual-buffer architecture~~
 - ~~**[RESOLVED]** New participants sometimes routed to stale games — fixed in v1.12 with state validation and comprehensive cleanup~~
 
@@ -337,4 +349,4 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 | BOUND-02/03 guards | Defense-in-depth at episode boundaries in async paths | ✓ Good |
 
 ---
-*Last updated: 2026-02-03 after v1.13 milestone started*
+*Last updated: 2026-02-03 after v1.14 milestone started*

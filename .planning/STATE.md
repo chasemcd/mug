@@ -5,21 +5,22 @@
 See: .planning/PROJECT.md (updated 2026-02-03)
 
 **Core value:** Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
-**Current focus:** v1.13 Matchmaker Hardening - COMPLETE
+**Current focus:** v1.14 Data Parity Fix - Starting
 
 ## Current Position
 
-Phase: 60 of 60 (Single Game Creation Path)
-Plan: 01 of 01
-Status: Complete
-Last activity: 2026-02-03 - Completed 60-01-PLAN.md
+Phase: Not yet planned
+Plan: None
+Status: Milestone initialized
+Last activity: 2026-02-03 - Initialized v1.14 milestone
 
-Progress: [##########] 100%
+Progress: [          ] 0%
 
 ## Milestone History
 
 | Milestone | Phases | Status | Shipped |
 |-----------|--------|--------|---------|
+| v1.14 Data Parity Fix | TBD | Starting | - |
 | v1.13 Matchmaker Hardening | 57-60 | Complete | 2026-02-03 |
 | v1.12 Waiting Room Overhaul | 51-56 | Complete | 2026-02-03 |
 | v1.11 Data Export Edge Cases | 48-50 | Complete | 2026-02-03 |
@@ -283,19 +284,18 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-02-03
-Stopped at: Completed 60-01-PLAN.md
+Stopped at: Initialized v1.14 milestone
 Resume file: None
 
 ### Next Steps
 
-**v1.13 Matchmaker Hardening milestone complete.**
+**v1.14 Data Parity Fix milestone initialized.**
 
-All requirements for v1.13 are complete:
-- RTT-01 through RTT-06: P2P RTT probing and filtering (Phases 57-59)
-- GAME-01 through GAME-04: Single game creation path (Phase 60)
+Goal: Fix the rare data parity divergence bug in `_promoteRemainingAtBoundary()`.
 
-Next action: `/gsd:audit-milestone`
+Root cause identified:
+- `_promoteRemainingAtBoundary()` force-promotes unconfirmed speculative data at episode end
+- Under packet loss + active inputs, rollback replay uses predicted actions instead of confirmed inputs
+- Players record what they executed (may differ if packets were lost)
 
-Future work documented in REQUIREMENTS.md:
-- v2 Requirements: MATCH-01/02/03 (enhanced matching)
-- v2 Requirements: REUN-01/REUN-02 (group reunion matchmaker variant)
+Next action: `/gsd:define-requirements` or `/gsd:research-phase`
