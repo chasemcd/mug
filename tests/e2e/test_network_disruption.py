@@ -13,14 +13,6 @@ Key behaviors tested:
 1. Packet loss causes late/lost inputs, triggering GGPO rollbacks
 2. Tab backgrounding causes frame deficit, triggering fast-forward on refocus
 3. Both disruption types complete episode without data corruption
-
-Known flaky tests (documented bugs, not test issues):
-- test_active_input_with_packet_loss: Intermittently fails with data parity
-  divergences. Root cause: under packet loss + active inputs, rollback replay
-  may use predicted actions if confirmed inputs haven't arrived yet. Both players
-  record what they executed, which may differ. This is a real bug in
-  _promoteRemainingAtBoundary() which force-promotes unconfirmed speculative
-  data at episode end. Tracked for future fix.
 """
 import pytest
 import time

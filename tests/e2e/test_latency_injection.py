@@ -20,16 +20,6 @@ Known limitations:
   effect of 500ms round-trip on BOTH players exceeds reasonable thresholds.
   However, asymmetric (one player at 500ms) works fine, which covers the
   realistic scenario of mismatched network conditions.
-
-Known flaky tests (documented bugs, not test issues):
-- test_active_input_with_latency[chromium-100]: Intermittently fails with data
-  parity divergences. Root cause: under packet loss + active inputs, rollback
-  replay may use predicted actions if confirmed inputs haven't arrived yet.
-  Both players record what they executed, which may differ. This is a real bug
-  in _promoteRemainingAtBoundary() which force-promotes unconfirmed speculative
-  data at episode end. Tracked for future fix - requires waiting for input
-  confirmation or re-requesting lost packets before export.
-- test_active_input_with_packet_loss: Same root cause as above.
 """
 import pytest
 from tests.fixtures.network_helpers import apply_latency, JitterEmulator, set_tab_visibility
