@@ -156,6 +156,11 @@ class GymScene(scene.Scene):
         # Set to 0 for no input delay (not recommended for multiplayer)
         self.input_delay: int = 0  # frames of input delay
 
+        # Input confirmation timeout for episode boundaries (Phase 61: PARITY-01, PARITY-02)
+        # Waits for partner input confirmation before episode export
+        # Default 500ms handles 200ms+ RTT with margin for packet retransmission
+        self.input_confirmation_timeout_ms: int = 500
+
         # Lobby/waitroom display settings
         self.hide_lobby_count: bool = False  # If True, hide participant count in waitroom
 
@@ -601,6 +606,7 @@ class GymScene(scene.Scene):
         realtime_mode: bool = NotProvided,
         input_buffer_size: int = NotProvided,
         input_delay: int = NotProvided,
+        input_confirmation_timeout_ms: int = NotProvided,
     ):
         """Configure Pyodide-related settings for the GymScene.
 
@@ -639,6 +645,10 @@ class GymScene(scene.Scene):
             many frames, ensuring both clients execute the same actions on the same frame. Default is 2.
             Set to 0 for no delay (not recommended for multiplayer). defaults to NotProvided
         :type input_delay: int, optional
+        :param input_confirmation_timeout_ms: Time in milliseconds to wait for partner input confirmation
+            at episode boundaries before proceeding with export. Default is 500ms which handles 200ms+ RTT.
+            Set to 0 to disable waiting (not recommended). defaults to NotProvided
+        :type input_confirmation_timeout_ms: int, optional
         :return: The GymScene instance (self)
         :rtype: GymScene
         """
@@ -694,6 +704,11 @@ class GymScene(scene.Scene):
         if input_delay is not NotProvided:
             assert isinstance(input_delay, int) and input_delay >= 0
             self.input_delay = input_delay
+
+        if input_confirmation_timeout_ms is not NotProvided:
+            if not isinstance(input_confirmation_timeout_ms, int) or input_confirmation_timeout_ms < 0:
+                raise ValueError("input_confirmation_timeout_ms must be a non-negative integer")
+            self.input_confirmation_timeout_ms = input_confirmation_timeout_ms
 
         return self
 
