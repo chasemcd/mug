@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-02-03)
 ## Current Position
 
 Phase: 57 of 60 (P2P Probe Infrastructure)
-Plan: 01 complete
-Status: Phase in progress
-Last activity: 2026-02-03 - Completed 57-01-PLAN.md (P2P Probe Infrastructure)
+Plan: 02 complete
+Status: Phase complete
+Last activity: 2026-02-03 - Completed 57-02-PLAN.md (Client-Side Probe Infrastructure)
 
 Progress: [██░░░░░░░░] 25%
 
@@ -138,10 +138,13 @@ Progress: [██░░░░░░░░] 25%
 
 **v1.13 Execution:**
 - `.planning/phases/57-p2p-probe-infrastructure/57-01-SUMMARY.md`
+- `.planning/phases/57-p2p-probe-infrastructure/57-02-SUMMARY.md`
 
 **P2P Probe Infrastructure (v1.13 Phase 57 - added):**
 - `interactive_gym/server/probe_coordinator.py` - ProbeCoordinator class for server-side probe orchestration
 - `interactive_gym/server/app.py` - PROBE_COORDINATOR global, get_socket_for_subject(), probe_ready/probe_signal/probe_result handlers
+- `interactive_gym/server/static/js/probe_connection.js` - ProbeConnection class wrapping WebRTCManager for probe-only use
+- `interactive_gym/server/static/js/index.js` - ProbeManager object for client-side probe lifecycle handling
 
 **Match Assignment Logging (v1.12 Phase 56 - added):**
 - `interactive_gym/server/match_logger.py` - MatchAssignment dataclass, MatchAssignmentLogger class
@@ -268,6 +271,9 @@ See: .planning/PROJECT.md Key Decisions table
 - Separate probe_* events from webrtc_signal to avoid collision with game signaling
 - 15 second default timeout for entire probe lifecycle
 - on_complete callback receives None RTT on failure or timeout
+- ProbeConnection wraps WebRTCManager, overrides _sendSignal for probe routing
+- 10 second client-side connection timeout for probes
+- 500ms stabilization delay before RTT measurement after connection
 
 **v1.12 Phase 56 decisions:**
 - Synchronous file I/O (no threading) - match rate is low, simplicity preferred
@@ -482,17 +488,17 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-02-03
-Stopped at: Completed 57-01-PLAN.md (P2P Probe Infrastructure)
+Stopped at: Completed 57-02-PLAN.md (Client-Side Probe Infrastructure)
 Resume file: None
 
 ### Next Steps
 
-**Phase 57 Plan 01 complete.** Server-side probe infrastructure ready.
+**Phase 57 complete.** Both server-side and client-side probe infrastructure ready.
 
-Next action: `/gsd:plan-phase 58` or continue with remaining Phase 57 plans (if any)
+Next action: `/gsd:plan-phase 58`
 
 Phases:
-- Phase 57: P2P Probe Infrastructure (RTT-01, RTT-03) - Plan 01 complete
+- Phase 57: P2P Probe Infrastructure (RTT-01, RTT-03) - Complete
 - Phase 58: RTT Measurement (RTT-02)
 - Phase 59: Matchmaker RTT Integration (RTT-04, RTT-05, RTT-06)
 - Phase 60: Single Game Creation Path (GAME-01, GAME-02, GAME-03, GAME-04)
