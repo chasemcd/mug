@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-02-02)
 ## Current Position
 
 Phase: 55 of 56 (Matchmaker Base Class)
-Plan: 01 of 01 complete
+Plan: 02 of 02 complete
 Status: Phase complete
-Last activity: 2026-02-03 — Completed 55-01-PLAN.md
+Last activity: 2026-02-03 — Completed 55-02-PLAN.md
 
 Progress: [████████░░] 83%
 
@@ -132,10 +132,13 @@ Progress: [████████░░] 83%
 - `.planning/phases/53-session-lifecycle/53-01-SUMMARY.md`
 - `.planning/phases/54-participant-state-tracker/54-01-SUMMARY.md`
 - `.planning/phases/55-matchmaker-base-class/55-01-SUMMARY.md`
+- `.planning/phases/55-matchmaker-base-class/55-02-SUMMARY.md`
 
 **Matchmaker Base Class (v1.12 Phase 55 - added):**
 - `interactive_gym/server/matchmaker.py` - Matchmaker ABC with @abstractmethod find_match(), MatchCandidate dataclass, FIFOMatchmaker implementation
 - `interactive_gym/server/game_manager.py` - matchmaker parameter in __init__(), find_match() delegation in _add_to_fifo_queue()
+- `interactive_gym/scenes/gym_scene.py` - GymScene.matchmaking() matchmaker parameter, _matchmaker attribute, matchmaker property
+- `interactive_gym/server/app.py` - matchmaker=scene.matchmaker passed to GameManager
 
 **ParticipantStateTracker (v1.12 Phase 54 - added):**
 - `interactive_gym/server/participant_state.py` - ParticipantState enum (IDLE, IN_WAITROOM, IN_GAME, GAME_ENDED), VALID_TRANSITIONS, ParticipantStateTracker class
@@ -249,6 +252,8 @@ See: .planning/PROJECT.md Key Decisions table
 - RTT filtering applied before matchmaker (not inside matchmaker)
 - matchmaker parameter optional for backward compatibility
 - MatchCandidate dataclass extensible for Phase 56 custom attributes
+- TYPE_CHECKING import avoids circular dependency (scene imports matchmaker at runtime only when needed)
+- scene.matchmaker property returns None for default (GameManager handles None by using FIFO)
 
 **v1.12 Phase 54 decisions:**
 - ParticipantState is complementary to SessionState (participant lifecycle vs game lifecycle)
@@ -455,12 +460,12 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-02-03
-Stopped at: Completed 55-01-PLAN.md
+Stopped at: Completed 55-02-PLAN.md
 Resume file: None
 
 ### Next Steps
 
-**Phase 55 complete.** Matchmaker ABC provides pluggable matchmaking abstraction with FIFOMatchmaker default preserving existing FIFO behavior.
+**Phase 55 complete.** Matchmaker abstraction fully integrated: ABC with FIFOMatchmaker default, scene API configuration via `scene.matchmaking(matchmaker=...)`, and end-to-end wiring to GameManager.
 
 Remaining phase:
 1. Phase 56: Custom Attributes & Assignment Logging
