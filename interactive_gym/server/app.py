@@ -36,6 +36,7 @@ from flask_login import LoginManager
 from interactive_gym.server.admin import admin_bp, AdminUser
 from interactive_gym.server.admin.namespace import AdminNamespace
 from interactive_gym.server.admin.aggregator import AdminEventAggregator
+from interactive_gym.server.match_logger import MatchAssignmentLogger
 
 
 @dataclasses.dataclass
@@ -107,6 +108,9 @@ GROUP_MANAGER: player_pairing_manager.PlayerGroupManager | None = None
 
 # Admin event aggregator for dashboard state collection
 ADMIN_AGGREGATOR: AdminEventAggregator | None = None
+
+# Match assignment logger for research data collection (Phase 56)
+MATCH_LOGGER: MatchAssignmentLogger | None = None
 
 # Mapping of users to locks associated with the ID. Enforces user-level serialization
 USER_LOCKS = utils.ThreadSafeDict()
@@ -498,6 +502,12 @@ def advance_scene(data):
             logger.info(
                 f"Instantiating game manager for scene {current_scene.scene_id}"
             )
+
+            # Initialize match logger if not already done (Phase 56)
+            global MATCH_LOGGER
+            if MATCH_LOGGER is None:
+                MATCH_LOGGER = MatchAssignmentLogger(admin_aggregator=ADMIN_AGGREGATOR)
+
             game_manager = gm.GameManager(
                 scene=current_scene,
                 experiment_config=CONFIG,
@@ -507,6 +517,7 @@ def advance_scene(data):
                 get_subject_rtt=_get_subject_rtt,
                 participant_state_tracker=PARTICIPANT_TRACKER,
                 matchmaker=current_scene.matchmaker,
+                match_logger=MATCH_LOGGER,  # Phase 56
             )
             GAME_MANAGERS[current_scene.scene_id] = game_manager
         else:
