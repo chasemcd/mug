@@ -1,403 +1,460 @@
-# Architecture Research: Rollback Netcode Data Collection
+# Architecture Research: Waiting Room & Session Management
 
-**Domain:** P2P rollback netcode data collection for research export
-**Researched:** 2026-01-30
-**Confidence:** HIGH (based on codebase analysis + GGPO principles)
+**Domain:** Multiplayer game session lifecycle management
+**Researched:** 2026-02-02
+**Overall confidence:** HIGH (based on codebase analysis + industry patterns)
+
+---
+
+> **Note:** This document supersedes previous architecture research for v1.12. Prior research on rollback netcode data collection remains valid but is focused on a different aspect of the system.
+
+---
 
 ## Executive Summary
 
-The current implementation has a well-structured `frameDataBuffer` mechanism that correctly handles rollback data correction. However, analysis reveals the **fast-forward path bypasses the confirmation check**, and data is recorded based on **frame execution** rather than **frame confirmation**. This creates the divergence problem: both peers record the same frames but potentially with different speculative values before correction propagates.
+The current architecture tightly couples matchmaking logic with session management in the `GameManager` class, leading to the "stale game" bug where participants are routed to old games. The fix requires clear separation of concerns: a **Matchmaker** (matching participants), a **SessionManager** (game instance lifecycle), and proper **state machine** governance over participant journeys. The key insight is that each game session must have an explicit, finite lifecycle with deterministic cleanup - not implicit cleanup that can fail silently.
 
-The key architectural insight: **Data should only be exported for confirmed frames** - frames where ALL players' inputs have been received and the state is deterministically identical on both peers.
+## Component Separation
 
-## Data Collection Architecture
+### Current Architecture (Problems)
+
+```
+GAME_MANAGERS[scene_id] (global dict)
+    -> GameManager (1 per scene, REUSED across participants)
+        -> waiting_games[] (list of game_ids waiting for players)
+        -> games{} (dict of active RemoteGameV2)
+        -> subject_games{} (dict of subject -> game mappings)
+
+PyodideGameCoordinator (global singleton)
+    -> games{} (dict of PyodideGameState)
+```
+
+**Problems:**
+1. `GameManager` is reused across ALL participants for a scene - if cleanup fails, stale state persists
+2. No single source of truth for "what state is this participant in?"
+3. `waiting_games[]` can contain stale game_ids if removal fails
+4. No explicit lifecycle governance - state transitions are implicit
+
+### Recommended Architecture
+
+```
+                    +------------------+
+                    |   Orchestrator   |  (new: coordinates all state)
+                    +------------------+
+                            |
+        +-------------------+-------------------+
+        |                   |                   |
++---------------+   +----------------+   +------------------+
+|  Matchmaker   |   | SessionManager |   | ParticipantState |
+| (per-scene)   |   |   (per-game)   |   |   (per-subject)  |
++---------------+   +----------------+   +------------------+
+```
+
+**Matchmaker** (1 per GymScene):
+- Owns the waiting queue
+- Matches participants by criteria (RTT, group membership)
+- Creates sessions when match is made
+- Does NOT manage game state
+
+**SessionManager** (1 per game instance):
+- Owns a single game's lifecycle
+- Knows its participants and their player_ids
+- Handles P2P coordination for that game
+- Destroyed when game ends (not reused!)
+
+**ParticipantStateTracker** (global singleton):
+- Single source of truth for "where is this participant?"
+- States: `IDLE`, `IN_WAITROOM`, `VALIDATING_P2P`, `IN_GAME`, `GAME_ENDED`
+- Prevents routing to wrong game
+
+### Component Boundaries
+
+| Component | Responsibility | Does NOT Own |
+|-----------|---------------|--------------|
+| Matchmaker | Matching logic, queue management | Game execution, cleanup |
+| SessionManager | Single game lifecycle, P2P setup | Matching, other games |
+| ParticipantStateTracker | Participant state across scenes | Game logic |
+| Orchestrator | State transitions, cleanup triggers | Direct game execution |
+
+## Lifecycle Flow
 
 ### Current Flow (Problematic)
 
 ```
-                         PEER A                                    PEER B
-                           |                                          |
-  Frame N tick  ------>  step()                                    step()  <------ Frame N tick
-                           |                                          |
-                     [speculative]                               [speculative]
-                      local input                                 local input
-                      predicted partner                           predicted partner
-                           |                                          |
-                     storeFrameData(N)  <--- PROBLEM --->   storeFrameData(N)
-                     (may use prediction)                   (may use prediction)
-                           |                                          |
-                       frameNumber++                              frameNumber++
-                           |                                          |
-               [late input arrives]                       [late input arrives]
-                           |                                          |
-                     performRollback()                          performRollback()
-                           |                                          |
-                     clearFrameData(N)                          clearFrameData(N)
-                     replay + re-store                          replay + re-store
-                           |                                          |
-                    Episode ends -----> EXPORT <--------- Episode ends
-                                        (both export corrected data)
+Participant clicks Start
+  -> GameManager.add_subject_to_game()
+     -> Checks waiting_games[] (may be stale)
+     -> Creates or joins game
+     -> If ready: start_game()
+     -> If not ready: send to waiting room
 
-  PROBLEM: Fast-forward path does NOT use confirmation check
-           Background player exports frames with isFocused=false
-           but data may still diverge due to timing
+Game ends
+  -> cleanup_game() (may not be called)
+  -> _remove_game() (may fail silently)
+  -> State persists in GAME_MANAGERS
 ```
-
-### The Core Issue
-
-1. **Speculative Storage**: `storeFrameData()` is called in `step()` BEFORE confirmation is verified
-2. **Rollback Corrects It**: `performRollback()` properly clears and re-stores data
-3. **Fast-Forward Gap**: `_performFastForward()` stores data without rollback-style correction
-4. **Export Timing**: Episode ends export from `frameDataBuffer` - but timing determines what's "final"
 
 ### Recommended Flow
 
 ```
-                         PEER A                                    PEER B
-                           |                                          |
-  Frame N tick  ------>  step()                                    step()  <------ Frame N tick
-                           |                                          |
-                     [speculative step]                         [speculative step]
-                           |                                          |
-                     speculativeBuffer[N]                       speculativeBuffer[N]
-                     (temporary storage)                        (temporary storage)
-                           |                                          |
-               [inputs exchange + confirm]               [inputs exchange + confirm]
-                           |                                          |
-                     _updateConfirmedFrame()                    _updateConfirmedFrame()
-                           |                                          |
-              confirmedFrame >= N?  ----------------------> confirmedFrame >= N?
-                     YES                                           YES
-                           |                                          |
-                     promoteToCanonical(N)                     promoteToCanonical(N)
-                     frameDataBuffer[N] =                      frameDataBuffer[N] =
-                       speculativeBuffer[N]                      speculativeBuffer[N]
-                           |                                          |
-                    Episode ends -----> EXPORT <--------- Episode ends
-                         (only confirmed data)              (only confirmed data)
-                         GUARANTEED PARITY                  GUARANTEED PARITY
+Phase 1: MATCHMAKING
+  Participant clicks Start
+    -> Orchestrator.request_match(subject_id, scene_id)
+    -> ParticipantStateTracker.set_state(subject_id, IN_WAITROOM)
+    -> Matchmaker.enqueue(subject_id)
+
+  Matchmaker finds match
+    -> Orchestrator.create_session(subject_ids, scene_id)
+    -> Returns session_id
+
+Phase 2: SESSION_CREATION
+  Orchestrator.create_session()
+    -> SessionManager.create(session_id, subject_ids)
+    -> PyodideCoordinator.create_game(session_id)
+    -> For each subject: ParticipantStateTracker.set_state(subject_id, VALIDATING_P2P)
+    -> Emit 'pyodide_player_assigned' to each
+
+Phase 3: P2P_VALIDATION
+  All players report P2P ready
+    -> SessionManager.start_game()
+    -> ParticipantStateTracker.set_state(*, IN_GAME)
+    -> Emit 'pyodide_game_ready'
+
+Phase 4: GAMEPLAY
+  Game runs normally
+  Disconnect detected
+    -> SessionManager.handle_disconnect(player_id)
+    -> Attempts reconnection or triggers end
+
+Phase 5: CLEANUP (CRITICAL)
+  Game ends (normal or early)
+    -> Orchestrator.end_session(session_id)
+    -> PyodideCoordinator.remove_game(session_id)
+    -> SessionManager.destroy()  <- Explicit destruction
+    -> For each subject: ParticipantStateTracker.set_state(subject_id, GAME_ENDED)
+    -> GroupManager.record_group(subject_ids)
 ```
 
-### Key Insight
-
-**The architectural change needed:** Separate "speculative recording" from "canonical history."
-
-Current code conflates these - `frameDataBuffer` holds both speculative and confirmed data, relying on rollback to correct errors. This works for rollback scenarios but fails for:
-
-1. Fast-forward (bulk processing without rollback correction)
-2. Episode boundaries (export happens at arbitrary confirmation points)
-3. Focus divergence (one peer backgrounds, their data differs until sync)
-
-## Component Responsibilities
-
-| Component | Current Responsibility | Recommended Change |
-|-----------|------------------------|-------------------|
-| `frameDataBuffer` | Stores all frame data, corrected on rollback | Store ONLY confirmed frames |
-| `storeFrameData()` | Called after every step | Call only when frame confirmed |
-| `clearFrameDataFromRollback()` | Clears frames >= target | Keep as safety valve |
-| `_updateConfirmedFrame()` | Tracks confirmation, triggers hash | ALSO trigger data promotion |
-| `exportEpisodeDataFromBuffer()` | Exports frameDataBuffer contents | No change (buffer now clean) |
-| NEW: `speculativeData` | N/A | Temporary storage for unconfirmed frames |
-
-### Component Ownership
+### State Machine
 
 ```
-                    +------------------+
-                    |  Game Loop       |
-                    |  (step())        |
-                    +--------+---------+
-                             |
-             +---------------+---------------+
-             |                               |
-    +--------v---------+          +----------v----------+
-    | Speculative      |          | Confirmation        |
-    | Layer            |          | Layer               |
-    +------------------+          +---------------------+
-    | - speculativeData|          | - confirmedFrame    |
-    | - predictions    |          | - inputBuffer       |
-    | - temp rewards   |          | - hashHistory       |
-    +--------+---------+          +----------+----------+
-             |                               |
-             |    Frame confirmed?           |
-             +----------+--------------------+
-                        |
-               +--------v--------+
-               | Canonical       |
-               | History         |
-               +-----------------+
-               | - frameDataBuffer|  <-- Only confirmed
-               | - actionSequence|
-               | - cumulativeValid|
-               +-----------------+
-                        |
-               +--------v--------+
-               | Export Layer    |
-               +-----------------+
-               | - emitEpisodeData|
-               | - validation data|
-               +-----------------+
+                            [Start Click]
+                                 |
+                                 v
+                          +-------------+
+                          |   IDLE      |
+                          +-------------+
+                                 |
+                                 v
+                          +-------------+
+            +------------>| IN_WAITROOM |
+            |             +-------------+
+            |                    |
+            |         [Match found]
+            |                    v
+            |           +-----------------+
+            |           | VALIDATING_P2P  |
+            |           +-----------------+
+            |              /          \
+            |    [Validation      [Validation
+            |      fails]          succeeds]
+            |        /                  \
+            |       v                    v
+            |  +-------------+    +-------------+
+            +--| RE_POOLED   |    |  IN_GAME    |
+               +-------------+    +-------------+
+                                        |
+                                  [Game ends]
+                                        |
+                                        v
+                                 +-------------+
+                                 | GAME_ENDED  |
+                                 +-------------+
+                                        |
+                            [Advance scene or redirect]
+                                        |
+                                        v
+                                 +-------------+
+                                 |   IDLE      |
+                                 +-------------+
 ```
 
-## Recording Points
+## State Ownership
 
-### When to Record
+### Who Owns What
 
-| Event | Record to Speculative? | Promote to Canonical? | Rationale |
-|-------|------------------------|----------------------|-----------|
-| Speculative step | YES | NO | Need data for potential rollback replay |
-| Post-rollback step | YES (replaces) | NO | Corrected data, but may rollback again |
-| Frame confirmed | N/A | YES | All inputs received, state is final |
-| Fast-forward step | YES | NO | Bulk processing, needs confirmation check |
-| Episode end | N/A | Promote remaining | Force-confirm at boundary |
+| State | Owner | Cleanup Trigger |
+|-------|-------|-----------------|
+| Participant current state | ParticipantStateTracker | Socket disconnect OR explicit transition |
+| Waiting queue | Matchmaker | Match made OR timeout |
+| Game instance | SessionManager | Game end (normal or error) |
+| P2P connection state | PyodideCoordinator | Game cleanup |
+| Player groups | GroupManager | Never (persist for re-matching) |
 
-### Frame Confirmation Logic
+### Cleanup Chain
 
-A frame N is "confirmed" when:
-1. ALL human players have inputs in `inputBuffer.get(N)`
-2. Frame N <= `confirmedFrame` (monotonically increasing)
-3. No rollback is in progress (`!rollbackInProgress`)
+When a game ends, cleanup MUST happen in order:
 
-Current code in `_hasAllInputsForFrame()` and `_updateConfirmedFrame()` correctly implements this.
+1. **Notify participants** (emit events)
+2. **Export data** (save game data)
+3. **Stop game runner** (if server-authoritative)
+4. **Remove from PyodideCoordinator** (release P2P resources)
+5. **Destroy SessionManager** (release game state)
+6. **Update ParticipantStateTracker** (mark as GAME_ENDED)
+7. **Remove from Matchmaker** (if was in waiting queue)
 
-### Canonical History Buffer Structure
+**Current bug source:** Step 5 doesn't happen reliably because `GameManager` is reused, not destroyed.
 
-```javascript
-// NEW: Speculative buffer (temporary, may be overwritten)
-this.speculativeFrameData = new Map();  // frameNumber -> {actions, rewards, ...}
+### Orphan Prevention
 
-// EXISTING: Canonical buffer (only confirmed, exported)
-this.frameDataBuffer = new Map();  // frameNumber -> {actions, rewards, ...}
+```python
+class SessionManager:
+    def __init__(self, session_id, ...):
+        self._cleanup_scheduled = False
+        self._created_at = time.time()
 
-// Promotion happens in _updateConfirmedFrame():
-async _updateConfirmedFrame() {
-    // ... existing confirmation logic ...
+    def schedule_cleanup(self, reason: str, delay_ms: int = 0):
+        """Guarantee cleanup happens, even if errors occur."""
+        if self._cleanup_scheduled:
+            return  # Already scheduled
+        self._cleanup_scheduled = True
 
-    for (let frame = startFrame; frame < this.frameNumber; frame++) {
-        if (this._hasAllInputsForFrame(frame, humanPlayerIds)) {
-            this.confirmedFrame = frame;
+        if delay_ms > 0:
+            eventlet.spawn_after(delay_ms / 1000, self._do_cleanup, reason)
+        else:
+            self._do_cleanup(reason)
 
-            // NEW: Promote speculative data to canonical
-            if (this.speculativeFrameData.has(frame)) {
-                this.frameDataBuffer.set(frame, this.speculativeFrameData.get(frame));
-                this.speculativeFrameData.delete(frame);
-            }
-
-            // Existing: hash computation
-            await this._computeAndStoreConfirmedHash(frame);
-        } else {
-            break;
-        }
-    }
-}
+    def _do_cleanup(self, reason: str):
+        """Idempotent cleanup - safe to call multiple times."""
+        try:
+            # 1. Notify participants
+            # 2. Export data
+            # 3. Stop runners
+            # 4. Remove from coordinator
+            # 5. Update participant states
+        finally:
+            # Always mark as cleaned up
+            self._destroyed = True
 ```
 
-## Data Flow Patterns
+## Event Flow
 
-### Pattern 1: Speculative-Then-Confirm
-
-**What:** Store data speculatively on step, promote to canonical on confirmation.
-
-**When to use:** Normal gameplay flow where inputs arrive within a few frames.
-
-**Trade-offs:**
-- (+) Simple mental model
-- (+) Works with existing rollback flow
-- (-) Requires two buffers
-- (-) Must handle promotion timing carefully
-
-```javascript
-// In step():
-this.speculativeFrameData.set(this.frameNumber, {
-    actions: finalActions,
-    rewards: Object.fromEntries(rewards),
-    // ...
-});
-
-// In _updateConfirmedFrame():
-if (this._hasAllInputsForFrame(frame, humanPlayerIds)) {
-    // Promote to canonical
-    this.frameDataBuffer.set(frame, this.speculativeFrameData.get(frame));
-}
-```
-
-### Pattern 2: Delayed Recording
-
-**What:** Don't record at step time. Record only when confirmed.
-
-**When to use:** When memory is tight and most frames confirm quickly.
-
-**Trade-offs:**
-- (+) Single buffer, simpler
-- (-) Must re-extract data from actionSequence/rewards on confirmation
-- (-) Loses per-frame timing information
-
-```javascript
-// In step(): Don't store to frameDataBuffer
-
-// In _updateConfirmedFrame():
-if (this._hasAllInputsForFrame(frame, humanPlayerIds)) {
-    // Reconstruct data from actionSequence
-    const record = this.actionSequence.find(r => r.frame === frame);
-    this.frameDataBuffer.set(frame, {
-        actions: record.actions,
-        // Must track rewards separately...
-    });
-}
-```
-
-### Pattern 3: Force-Confirm at Boundaries
-
-**What:** At episode end, force all remaining speculative frames to confirmed.
-
-**When to use:** Episode boundaries where determinism is guaranteed by sync.
-
-**Trade-offs:**
-- (+) Ensures complete data export
-- (+) Handles edge cases at boundaries
-- (-) May include frames with prediction (though rare at boundary)
-
-```javascript
-// In signalEpisodeComplete():
-// Force-promote any remaining speculative data
-for (const [frame, data] of this.speculativeFrameData) {
-    if (!this.frameDataBuffer.has(frame)) {
-        this.frameDataBuffer.set(frame, data);
-    }
-}
-this.speculativeFrameData.clear();
-
-// Then export
-this._emitEpisodeDataFromBuffer();
-```
-
-### Recommended Pattern: Hybrid
-
-Use Pattern 1 (Speculative-Then-Confirm) for normal flow, with Pattern 3 (Force-Confirm at Boundaries) for episode endings:
+### Happy Path Events
 
 ```
-Normal tick: step() -> speculativeFrameData -> _updateConfirmedFrame() -> frameDataBuffer
-Episode end: force promote remaining -> export -> clear
+[Participant A clicks Start]
+  -> Server: request_match(A)
+  -> Server: A enters waitroom
+  <- Client A: waiting_room{cur: 1, needed: 1}
+
+[Participant B clicks Start]
+  -> Server: request_match(B)
+  -> Server: Match found (A, B)
+  -> Server: create_session(A, B)
+  <- Client A: pyodide_player_assigned{player_id: 0}
+  <- Client B: pyodide_player_assigned{player_id: 1}
+
+[P2P Validation]
+  -> Server: p2p_validation_success(A)
+  -> Server: p2p_validation_success(B)
+  -> Server: start_game()
+  <- Client A, B: pyodide_game_ready{}
+  <- Client A, B: server_episode_start{state}
+
+[Game Ends]
+  -> Server: game_completed(session_id)
+  -> Server: cleanup_session(session_id)
+  <- Client A, B: p2p_game_ended{reason: 'completed'}
 ```
 
-## Anti-Patterns
+### Error Path Events
 
-### Anti-Pattern 1: Recording Before Inputs Are Known
-
-**What it does:** Stores data immediately after `step()` without checking confirmation.
-
-**Why it causes divergence:**
-- Peer A may have all inputs (confirmed)
-- Peer B may be using prediction (speculative)
-- Both store to `frameDataBuffer`
-- If no rollback occurs before export, data differs
-
-**Current code doing this:**
-```javascript
-// In step(), line ~2441:
-this.storeFrameData(this.frameNumber, {
-    actions: finalActions,  // May include predictions!
-    rewards: Object.fromEntries(rewards),
-    // ...
-});
+```
+[Player Disconnects Mid-Game]
+  -> Server: socket_disconnect(B)
+  -> Server: handle_disconnect(session_id, B)
+  <- Client A: p2p_game_ended{reason: 'partner_disconnected'}
+  -> Server: schedule_cleanup(session_id, 'disconnect')
+  -> Server: [cleanup chain executes]
 ```
 
-### Anti-Pattern 2: Fast-Forward Without Confirmation Check
+### Events to Add
 
-**What it does:** Bulk-processes frames and stores data without verifying confirmation.
+| Event | Direction | Purpose |
+|-------|-----------|---------|
+| `session_created` | S -> C | Confirm participant is in a session |
+| `session_cleanup_started` | S -> C | Warn participants cleanup is happening |
+| `participant_state_changed` | S -> C | Sync state machine to client |
 
-**Why it causes divergence:**
-- Fast-forward happens when one peer backgrounds
-- That peer bulk-processes frames using buffered inputs
-- No rollback correction happens (it's not a rollback, it's catch-up)
-- Data may include prediction if inputs were lost
+## Integration Points
 
-**Current code doing this:**
-```javascript
-// In _performFastForward(), line ~4965:
-for (const frameData of ffResult.per_frame_data) {
-    this.storeFrameData(frameData.frame, {
-        actions: frameData.actions,
-        // No confirmation check!
-    });
-}
+### How Matchmaker Integrates
+
+```python
+# In app.py advance_scene()
+
+if isinstance(current_scene, gym_scene.GymScene):
+    # Get or create matchmaker for this scene
+    matchmaker = MATCHMAKERS.get(current_scene.scene_id)
+    if matchmaker is None:
+        matchmaker = Matchmaker(
+            scene_id=current_scene.scene_id,
+            required_players=len([p for p in scene.policy_mapping.values()
+                                 if p == PolicyTypes.Human]),
+            orchestrator=ORCHESTRATOR,
+            group_manager=GROUP_MANAGER,
+        )
+        MATCHMAKERS[current_scene.scene_id] = matchmaker
+
+# In join_game()
+
+matchmaker = MATCHMAKERS.get(current_scene.scene_id)
+matchmaker.enqueue(subject_id)  # Matchmaker handles the rest
 ```
 
-### Anti-Pattern 3: Exporting at Episode End Without Confirmation Sync
+### Current Integration Points to Preserve
 
-**What it does:** Exports `frameDataBuffer` at episode end without ensuring both peers are at same confirmation point.
+1. **PyodideGameCoordinator** - Keep as is, but SessionManager wraps it
+2. **GroupManager** - Keep as is, called during cleanup
+3. **PARTICIPANT_SESSIONS** - Becomes part of ParticipantStateTracker
+4. **Socket events** - Most stay the same, add new ones
 
-**Why it causes divergence:**
-- Episode end is detected locally
-- P2P sync ensures both peers agree on END frame
-- But confirmation may lag behind current frame
-- Peer A: confirmed=N-5, Peer B: confirmed=N-2
-- Both export, but with different "final" data
+### Integration with Existing Code
 
-**Mitigation in current code:** Episode sync waits for peer agreement. But this doesn't wait for confirmation to catch up.
+The new architecture wraps existing components:
 
-### Anti-Pattern 4: Clearing Buffer Before Export
+```python
+class SessionManager:
+    def __init__(self, coordinator: PyodideGameCoordinator, ...):
+        self.coordinator = coordinator
 
-**What it does:** Clears `frameDataBuffer` immediately after emit, before confirmation of receipt.
+    def create(self):
+        # Creates game in existing coordinator
+        self.coordinator.create_game(...)
 
-**Why it causes issues:**
-- If emit fails, data is lost
-- No retry mechanism
-- Current code does this (line ~3726)
+    def add_player(self, player_id, socket_id, subject_id):
+        # Uses existing coordinator method
+        self.coordinator.add_player(...)
+```
 
-**Better:** Mark as "pending export" and clear only after server ACK.
+## Suggested Build Order
 
-## Implementation Recommendations
+Based on dependencies, build in this order:
 
-### Phase 1: Add Speculative Buffer (Low Risk)
+### Phase 1: Foundation (No Breaking Changes)
 
-1. Add `speculativeFrameData` Map
-2. Change `storeFrameData()` to write to speculative buffer
-3. Add `promoteToCanonical()` call in `_updateConfirmedFrame()`
-4. No changes to export logic (it reads from frameDataBuffer which now only has confirmed)
+1. **ParticipantStateTracker** - New class, no integration yet
+   - Define states enum
+   - Track state per participant
+   - Unit tests
 
-### Phase 2: Fix Fast-Forward Path (Medium Risk)
+2. **SessionManager** - New class wrapping existing
+   - Wraps PyodideGameCoordinator.create_game()
+   - Has explicit destroy() method
+   - Idempotent cleanup
 
-1. After fast-forward batch processing, call `_updateConfirmedFrame()`
-2. Only promote frames that are actually confirmed
-3. Handle remaining speculative frames appropriately
+### Phase 2: Orchestrator Integration
 
-### Phase 3: Add Force-Confirm at Boundaries (Low Risk)
+3. **Orchestrator** - Coordinates state transitions
+   - Integrates ParticipantStateTracker
+   - Integrates SessionManager
+   - Handles cleanup chain
 
-1. Before `_emitEpisodeDataFromBuffer()`, promote remaining speculative
-2. Log warning if promoting unconfirmed frames (indicates sync issue)
+4. **Wire to advance_scene/join_game** - Replace GameManager usage
+   - Use Orchestrator instead of direct GameManager
+   - Keep GameManager for backward compat (mark deprecated)
 
-### Phase 4: Add Export Confirmation (Optional)
+### Phase 3: Matchmaker Extraction
 
-1. Don't clear buffer immediately on emit
-2. Wait for server ACK before clearing
-3. Retry on failure
+5. **Matchmaker** - Extract from GameManager
+   - Move waiting_games logic
+   - Move RTT matching logic
+   - Move group wait logic
 
-## Verification
+6. **Complete Migration** - Remove GameManager
+   - Verify no remaining usages
+   - Remove deprecated code
 
-To verify the fix works:
+### Dependency Graph
 
-1. **Action Parity Test:**
-   - Run two peers through episode with artificial rollbacks
-   - Export data from both
-   - Run `validate_action_sequences.py`
-   - Should show 0 mismatches
+```
+ParticipantStateTracker (no deps)
+            |
+            v
+   SessionManager (depends on ParticipantStateTracker, PyodideCoordinator)
+            |
+            v
+   Orchestrator (depends on SessionManager, ParticipantStateTracker)
+            |
+            v
+   Matchmaker (depends on Orchestrator)
+```
 
-2. **Fast-Forward Test:**
-   - One peer backgrounds for 5+ seconds
-   - Refocuses and fast-forwards
-   - Compare exported data
-   - Should show identical actions/rewards for all frames
+## Recommendations for v1.12
 
-3. **Boundary Test:**
-   - Episode ends while frames still unconfirmed
-   - Both peers should export identical data
-   - Verify no prediction-based differences
+### Immediate Fixes (v1.12 Scope)
+
+1. **Add session-per-game instead of manager-per-scene**
+   - Create `Session` class that owns a single game
+   - Session is destroyed when game ends
+   - Fixes the "reusing GameManager" bug
+
+2. **Add ParticipantStateTracker**
+   - Single source of truth
+   - Check state before routing to game
+   - Prevents routing to stale games
+
+3. **Explicit cleanup chain**
+   - Schedule cleanup at every exit point
+   - Idempotent cleanup methods
+   - Log cleanup for debugging
+
+### Deferred to Later (Post-v1.12)
+
+- Full Matchmaker extraction (works now, just coupled)
+- Orchestrator class (can inline logic initially)
+- Event-based state sync to clients
+
+### Migration Strategy
+
+```
+v1.12 (This milestone):
+  - Add Session class that wraps game lifecycle
+  - Add ParticipantStateTracker
+  - Keep GameManager but use Session internally
+  - Fix the stale game bug
+
+v1.13 (Future):
+  - Extract Matchmaker from GameManager
+  - Add Orchestrator
+  - Deprecate direct GameManager usage
+
+v1.14 (Future):
+  - Remove GameManager
+  - Full component separation
+```
+
+## Confidence Assessment
+
+| Area | Level | Reason |
+|------|-------|--------|
+| Root cause diagnosis | HIGH | Clear from code: GameManager reuse + no explicit cleanup |
+| Session-per-game fix | HIGH | Standard industry pattern, straightforward implementation |
+| State machine approach | HIGH | Well-established pattern for game lifecycles |
+| Migration strategy | MEDIUM | Depends on codebase complexity, may need adjustment |
+| Component boundaries | MEDIUM | May need refinement during implementation |
 
 ## Sources
 
-- [GGPO Official Documentation](https://www.ggpo.net/) - Rollback networking fundamentals
-- [SnapNet: Netcode Architectures Part 2 - Rollback](https://www.snapnet.dev/blog/netcode-architectures-part-2-rollback/) - Confirmed vs speculative frames
-- [Gaffer On Games: Deterministic Lockstep](https://gafferongames.com/post/deterministic_lockstep/) - Frame confirmation concepts
-- [GitHub: WillKirkmanM/rollback-netcode](https://github.com/WillKirkmanM/rollback-netcode) - Confirmed frame cleanup patterns
-- [GitHub: Corrade/netcode-lockstep](https://github.com/Corrade/netcode-lockstep) - P2P lockstep reference implementation
-- Codebase analysis: `/Users/chasemcd/Repositories/interactive-gym/interactive_gym/server/static/js/pyodide_multiplayer_game.js`
+### Codebase Analysis
+- `/interactive_gym/server/game_manager.py` - Current GameManager implementation
+- `/interactive_gym/server/pyodide_game_coordinator.py` - P2P coordination
+- `/interactive_gym/server/app.py:507` - "Game manager already exists" bug location
+- `/interactive_gym/server/player_pairing_manager.py` - Group tracking
+
+### Industry Patterns
+- [Game Matchmaking Architecture - AccelByte](https://accelbyte.io/blog/scaling-matchmaking-to-one-million-players) - Matchmaking service patterns
+- [Session-Based Games Best Practices - OpenKruise](https://openkruise.io/kruisegame/best-practices/session-based-game) - State management for game rooms
+- [Multiplayer State Machine with Durable Objects](https://www.astahmer.dev/posts/multiplayer-state-machine-with-durable-objects) - XState for game state machines
+- [Microsoft PlayFab Server Lifecycle](https://learn.microsoft.com/en-us/gaming/playfab/multiplayer/servers/multiplayer-game-server-lifecycle) - Server lifecycle patterns
+- [GarbageTruck: Distributed Garbage Collection](https://medium.com/@ronantech/garbagetruck-lease-based-distributed-garbage-collection-for-microservice-architectures-874d60c921f0) - Orphan cleanup patterns

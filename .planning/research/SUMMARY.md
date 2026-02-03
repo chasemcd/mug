@@ -1,190 +1,229 @@
-# Project Research Summary
+# Research Summary: v1.12 Waiting Room Overhaul
 
 **Project:** Interactive Gym — P2P Multiplayer
-**Domain:** Rollback netcode data collection for research export parity
-**Researched:** 2026-01-30
-**Confidence:** HIGH
+**Milestone:** v1.12 Waiting Room Overhaul
+**Researched:** 2026-02-02
+**Overall confidence:** HIGH
+
+---
 
 ## Executive Summary
 
-The data export parity problem has a clear root cause: **data is recorded speculatively during frame execution, before inputs are confirmed**. While the existing GGPO-style rollback system correctly clears and re-records data during rollbacks, two critical gaps remain:
+The "Start button disappears but nothing happens" bug is a **stale GameManager capture** problem. When `GAME_MANAGERS` is keyed by `scene_id` and reused across participant sessions, new participants get routed to a GameManager whose internal state (`waiting_games`, `subject_games`, `active_games`) reflects completed games. The fix requires:
 
-1. **Fast-forward path**: When a tab is backgrounded and refocused, the fast-forward bulk processing may not follow the same confirmation-gated recording path
-2. **Export timing**: Episode end exports from `frameDataBuffer` without verifying that all frames are confirmed
+1. **Explicit session lifecycle** — Each game gets a Session object that is destroyed (not reused) when the game ends
+2. **Participant state tracking** — Single source of truth for "what state is this participant in?"
+3. **Comprehensive cleanup** — All state cleaned on every exit path, not just `games` dict
 
-The fix is architecturally straightforward: **separate speculative data storage from canonical (confirmed) data storage**, and only export from the canonical buffer. The existing `confirmedFrame` tracking and `_hasAllInputsForFrame()` infrastructure already provides the confirmation mechanism — it just needs to gate data promotion.
+For the Matchmaker abstraction, the oTree pattern (callback-based `find_match()` method) is ideal for research use cases — simple, Pythonic, and researchers already know Python.
 
-## Key Findings
+---
 
-### Recommended Stack/Patterns
+## Key Findings by Dimension
 
-The codebase already implements GGPO patterns correctly. The gap is at the export boundary.
+### Stack (Session Lifecycle)
 
-**Core concepts already in place:**
-- `confirmedFrame` — highest consecutive frame with all inputs received
-- `inputBuffer` — stores received inputs indexed by frame
-- `stateSnapshots` — enables rollback to any recent frame
-- `clearFrameDataFromRollback()` — clears speculative data on rollback
+| Finding | Confidence |
+|---------|------------|
+| Root cause: GameManager reuse without state reset | HIGH |
+| Pattern: Explicit state machine (WAITING → MATCHED → PLAYING → ENDED → DISPOSED) | HIGH |
+| Library: `python-statemachine` for lifecycle callbacks | MEDIUM |
+| Anti-pattern: Cleanup in multiple uncoordinated places | HIGH |
 
-**Missing piece:**
-- `speculativeFrameData` buffer — temporary storage before confirmation
-- Promotion logic in `_updateConfirmedFrame()` — move data to canonical buffer only when confirmed
+**Critical insight:** The current code has 4+ cleanup paths (`_remove_game()`, `cleanup_game()`, `leave_game()`, `remove_player()`) that don't clean all state consistently.
 
-### Expected Features (Data Recording Rules)
+### Features (Matchmaker API)
 
-**Must have (table stakes):**
-- Record only CONFIRMED frames — speculative frames may use wrong inputs
-- Clear speculative data on rollback — already implemented
-- Re-record during replay — already implemented
-- Buffer until confirmation — NEW: separate speculative from confirmed buffer
-- Export from confirmed buffer only — NEW: modify export logic
+| Finding | Confidence |
+|---------|------------|
+| Research matchmaking ≠ game matchmaking (validity > engagement) | HIGH |
+| oTree's callback pattern is the right model | HIGH |
+| Table stakes: FIFO, timeout, configurable group size | HIGH |
+| Differentiator: Custom attributes, historical performance access | MEDIUM |
+| Anti-features: SBMM, global pools, backfill, complex DSLs | HIGH |
 
-**Should have (research value-add):**
-- Track `wasSpeculative` per frame — understand prediction accuracy
-- Include `rollbackCount` metadata — correlate with network conditions
-- Hash verification status — know which frames were cryptographically verified
+**Recommended API:**
+```python
+class Matchmaker(ABC):
+    @abstractmethod
+    def find_match(self, arriving: ParticipantData, waiting: list[ParticipantData], group_size: int) -> list | None:
+        """Return matched group or None to keep waiting."""
 
-### Architecture Approach
-
-**Two-buffer pattern:**
-
-```
-Frame executed → speculativeFrameData[N]
-                        ↓
-        _updateConfirmedFrame() promotes
-                        ↓
-              frameDataBuffer[N] (canonical)
-                        ↓
-               Episode end export
+    def on_timeout(self, participant: ParticipantData) -> TimeoutAction: ...
+    def on_dropout(self, dropped: ParticipantData, remaining: list) -> DropoutAction: ...
 ```
 
-**Key changes needed:**
-1. `storeFrameData()` writes to `speculativeFrameData` instead of `frameDataBuffer`
-2. `_updateConfirmedFrame()` promotes confirmed frames to `frameDataBuffer`
-3. `_performFastForward()` uses same confirmation-gated storage
-4. Episode end force-confirms remaining frames before export
+### Architecture (Component Separation)
 
-### Critical Pitfalls
+| Finding | Confidence |
+|---------|------------|
+| Session-per-game (not manager-per-scene) is industry standard | HIGH |
+| Need ParticipantStateTracker as single source of truth | HIGH |
+| Cleanup chain must be explicit and idempotent | HIGH |
+| Matchmaker extraction can be deferred (works, just coupled) | MEDIUM |
 
-1. **Recording speculative data as ground truth** — data recorded before confirmation may use predicted (wrong) inputs
-   - *Prevention:* Only promote to export buffer after confirmation
+**Recommended separation:**
+- **Matchmaker** — Matching logic, queue management
+- **Session** — Single game lifecycle (destroyed when game ends)
+- **ParticipantStateTracker** — States: IDLE → IN_WAITROOM → VALIDATING_P2P → IN_GAME → GAME_ENDED
 
-2. **Fast-forward bulk processing without re-recording** — fast-forward may skip data recording or bypass confirmation
-   - *Prevention:* Fast-forward path must mirror normal step() data recording
+### Pitfalls (Bug Prevention)
 
-3. **Episode boundary masking** — desync happens late, episode ends before detection
-   - *Prevention:* Final hash validation before clearing buffers
+| Finding | Confidence |
+|---------|------------|
+| Stale `waiting_games` list is likely root cause | HIGH |
+| Stale `subject_games`/`subject_rooms` not cleaned on disconnect | HIGH |
+| 4 race condition patterns documented with prevention code | HIGH |
+| Invariant assertions catch bugs early | HIGH |
 
-4. **Input delay temporal mismatch** — with INPUT_DELAY > 0, actions paired with wrong observations
-   - *Prevention:* Record action at execution frame, not input frame
+**Likely root cause path:**
+1. Previous game completed, `cleanup_game()` called
+2. Removed from `games` dict but `subject_games` not cleaned
+3. New participant joins, gets captured by stale mapping
+4. No `waiting_room` event emitted due to inconsistent state
 
-5. **Cumulative reward divergence** — rewards incremented speculatively, not restored on rollback
-   - *Prevention:* Include cumulative_rewards in state snapshot (verify this)
+---
 
 ## Implications for Roadmap
 
-Based on research, suggested phase structure:
+Based on research, suggested phase structure for v1.12:
 
-### Phase 36: Speculative/Canonical Buffer Split
+### Phase 51: Diagnostic Logging & State Validation
 
-**Rationale:** This is the core architectural fix that enables all other changes
-**Delivers:** Separate `speculativeFrameData` buffer, promotion logic in `_updateConfirmedFrame()`
-**Addresses:** Pitfall #1 (speculative as ground truth)
-**Risk:** LOW — additive change, doesn't break existing logic
+**Goal:** Understand exact failure path and add immediate prevention
 
-**Tasks:**
-1. Add `speculativeFrameData` Map
-2. Modify `storeFrameData()` to write to speculative buffer
-3. Add `_promoteConfirmedFrames()` method
-4. Call promotion in `_updateConfirmedFrame()`
+- Add logging at `join_game` entry: `subject_id in subject_games?`
+- Add state validation before routing to GameManager
+- Add invariant assertions after state mutations
+- Emit error event to client when state is invalid
 
-### Phase 37: Fast-Forward Data Recording Fix
+**Addresses:** PITFALLS.md Strategy 1, 2
+**Uses:** Existing logging infrastructure
+**Risk:** Low (observation only)
 
-**Rationale:** Fast-forward is the main divergence source identified in research
-**Delivers:** Confirmation-gated recording in `_performFastForward()`
-**Addresses:** Pitfall #2 (fast-forward bulk processing)
-**Uses:** Buffer split from Phase 36
-**Risk:** MEDIUM — must audit fast-forward code path carefully
+### Phase 52: Comprehensive Cleanup
 
-**Tasks:**
-1. Audit `_performFastForward()` data recording
-2. Ensure fast-forward writes to speculative buffer
-3. Call `_updateConfirmedFrame()` after fast-forward completes
-4. Verify no frame gaps in export after tab refocus
+**Goal:** All exit paths clean all state
 
-### Phase 38: Episode Boundary Confirmation
+- Make `cleanup_game()` clean `subject_games`, `subject_rooms`, `active_games`
+- Make `_remove_game()` idempotent
+- Cancel timeout handlers on game start
+- Clean PyodideCoordinator state on game end
+- Add `assert_invariants()` after cleanup
 
-**Rationale:** Episode end is the export trigger — must ensure all data confirmed
-**Delivers:** Force-confirm logic at episode end, export only from canonical buffer
-**Addresses:** Pitfall #3 (episode boundary masking)
-**Risk:** LOW — focused change at episode boundary
+**Addresses:** PITFALLS.md Failure 1-4
+**Uses:** Existing cleanup methods
+**Avoids:** Cleanup failure pitfalls
+**Risk:** Medium (touches critical paths)
 
-**Tasks:**
-1. Add force-confirm at episode end (promote remaining speculative)
-2. Wait for peer sync before exporting
-3. Log warning if promoting unconfirmed frames
-4. Verify both players export identical frame counts
+### Phase 53: Session Lifecycle
 
-### Phase 39: Verification & Metadata (Optional)
+**Goal:** Each game has explicit lifecycle, Session destroyed when game ends
 
-**Rationale:** Research value-add for understanding data quality
-**Delivers:** Per-frame metadata (`wasSpeculative`, `rollbackCount`), offline validation tool
-**Addresses:** "Looks synchronized but isn't" scenarios
-**Risk:** LOW — additive metadata, no core logic changes
+- Create `Session` class wrapping game lifecycle
+- Session has explicit states: WAITING → MATCHED → VALIDATING → PLAYING → ENDED
+- Session is destroyed (not reused) when game ends
+- GameManager creates Session per-game, not per-scene
 
-**Tasks:**
-1. Add `wasSpeculative` field to frame data
-2. Track rollback count per frame
-3. Include hash verification status from Phase 11-14
-4. Create export comparison script for validation
+**Addresses:** ARCHITECTURE.md state machine, STACK.md Pattern 1
+**Uses:** Potentially `python-statemachine` library
+**Avoids:** Stale state reuse
+**Risk:** Medium (new abstraction layer)
 
-### Phase Ordering Rationale
+### Phase 54: ParticipantStateTracker
 
-- **Phase 36 first:** Buffer split is prerequisite for all other changes
-- **Phase 37 second:** Fast-forward fix depends on buffer split
-- **Phase 38 third:** Episode boundary depends on both being correct
-- **Phase 39 optional:** Metadata adds value but not required for parity
+**Goal:** Single source of truth prevents routing to wrong game
 
-### Research Flags
+- Create `ParticipantStateTracker` singleton
+- Track participant states: IDLE, IN_WAITROOM, VALIDATING_P2P, IN_GAME, GAME_ENDED
+- Check state before routing to GameManager
+- Update state at every transition point
 
-**Phases with standard patterns (minimal research needed):**
-- Phase 36: Well-documented pattern from GGPO/NetplayJS
-- Phase 38: Standard boundary handling
+**Addresses:** ARCHITECTURE.md state ownership
+**Uses:** STACK.md Pattern 2 (ownership tracking)
+**Avoids:** Routing bugs
+**Risk:** Low (additive, non-breaking)
 
-**Phases likely needing deeper review during planning:**
-- Phase 37: Fast-forward code path is complex, needs careful audit
+### Phase 55: Matchmaker Base Class
 
-## Confidence Assessment
+**Goal:** Pluggable matchmaking abstraction
 
-| Area | Confidence | Notes |
-|------|------------|-------|
-| Stack | HIGH | Patterns directly from GGPO, NetplayJS, existing codebase |
-| Features | HIGH | Frame state lifecycle clearly defined |
-| Architecture | HIGH | Two-buffer pattern is standard, codebase analysis confirms gaps |
-| Pitfalls | HIGH | All pitfalls verified against codebase implementation |
+- Create `Matchmaker` abstract base class
+- Create `FIFOMatchmaker` default implementation (refactor existing logic)
+- Create `ParticipantData` container with session metadata
+- Add `on_timeout()` and `on_dropout()` hooks
+- Wire into GameManager
 
-**Overall confidence:** HIGH
+**Addresses:** FEATURES.md recommendations
+**Uses:** oTree callback pattern
+**Avoids:** Over-engineering (no DSL, no global pools)
+**Risk:** Medium (API design)
 
-### Gaps to Address
+### Phase 56: Custom Attributes & Assignment Logging
 
-- **Fast-forward code audit:** Need to trace exact data recording in `_performFastForward()` during planning
-- **Episode-end sync timing:** Verify `p2pEpisodeSync` waits for confirmation, not just peer agreement
+**Goal:** Researchers can pass attributes and analyze match decisions
 
-## Sources
+- Propagate custom attributes from URL params to matchmaker
+- Add assignment logging (who matched with whom)
+- Expose RTT and prior partners to matchmaker
+- Documentation and examples
 
-### Primary (HIGH confidence)
-- `pyodide_multiplayer_game.js` — existing GGPO implementation analysis
-- [GGPO Developer Guide](https://github.com/pond3r/ggpo/blob/master/doc/DeveloperGuide.md) — canonical patterns
-- [NetplayJS](https://github.com/rameshvarun/netplayjs) — TypeScript rollback reference
-
-### Secondary (HIGH confidence)
-- [SnapNet: Rollback Netcode](https://www.snapnet.dev/blog/netcode-architectures-part-2-rollback/) — confirmed vs speculative frames
-- [INVERSUS Rollback Networking](https://www.gamedeveloper.com/design/rollback-networking-in-inversus) — symmetric P2P patterns
-
-### Tertiary (MEDIUM confidence)
-- [Jimmy's Blog: GGPO-style rollback](https://outof.pizza/posts/rollback/) — fixed-point arithmetic
-- [Gaffer on Games: Deterministic Lockstep](https://gafferongames.com/post/deterministic_lockstep/) — input confirmation protocol
+**Addresses:** FEATURES.md differentiators
+**Uses:** Existing `ParticipantSession` data
+**Risk:** Low (additive)
 
 ---
-*Research completed: 2026-01-30*
-*Ready for roadmap: yes*
+
+## Phase Ordering Rationale
+
+1. **Diagnostic first (51)** — Can't fix what you can't see. Logging reveals exact failure path.
+2. **Cleanup before new abstractions (52)** — Fixes immediate bug with minimal risk.
+3. **Session lifecycle (53)** before **StateTracker (54)** — Session provides the boundaries that StateTracker tracks.
+4. **Matchmaker (55)** after lifecycle is solid — Don't build new features on broken foundation.
+5. **Attributes/logging (56)** last — Polish once core is stable.
+
+---
+
+## Research Flags for Phases
+
+| Phase | Research Needed? | Reason |
+|-------|------------------|--------|
+| 51 Diagnostic | No | Standard logging patterns |
+| 52 Cleanup | No | Codebase-specific, patterns documented |
+| 53 Session | Maybe | `python-statemachine` integration with Flask-SocketIO async |
+| 54 StateTracker | No | Simple state tracking |
+| 55 Matchmaker | No | oTree pattern well-documented |
+| 56 Attributes | No | Extension of existing data flow |
+
+---
+
+## Open Questions
+
+1. **Should GameManagers be deleted entirely or just reset?** — Research suggests per-session is cleaner, but reset() is less disruptive.
+
+2. **Which cleanup path(s) actually run on normal completion?** — Need diagnostic logging to confirm.
+
+3. **Is `waiting_games_lock` consistently used on all paths?** — Race condition risk if not.
+
+4. **How should Matchmaker be configured per-scene?** — Property on GymScene vs separate config file.
+
+---
+
+## Files Created
+
+| File | Purpose |
+|------|---------|
+| `.planning/research/STACK.md` | Session lifecycle patterns, cleanup strategies |
+| `.planning/research/FEATURES.md` | Matchmaker API design, table stakes vs differentiators |
+| `.planning/research/ARCHITECTURE.md` | Component separation, state machine, build order |
+| `.planning/research/PITFALLS.md` | Bug patterns, race conditions, prevention strategies |
+| `.planning/research/SUMMARY.md` | This synthesis with roadmap implications |
+
+---
+
+## Next Steps
+
+1. `/gsd:define-requirements` — Finalize checkable requirements from this research
+2. `/gsd:create-roadmap` — Create phases 51-56 based on implications above
+
+<sub>`/clear` first for fresh context</sub>
