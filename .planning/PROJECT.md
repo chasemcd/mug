@@ -8,29 +8,41 @@ A framework for running browser-based reinforcement learning experiments with hu
 
 Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
 
-## Current Milestone: v1.12 Waiting Room Overhaul
+## Current Milestone: v1.13 Matchmaker Hardening
 
-**Goal:** Fix waiting room bugs and build a pluggable Matchmaker abstraction for custom participant pairing logic.
+**Goal:** Make matchmaking safer and smarter with P2P RTT probing and a single game creation path.
 
 **Target features:**
 
-*Bug fixes (priority):*
-- [ ] Eliminate stale game manager capturing new participants
-- [ ] Clean participant routing — never join games in progress
-- [ ] Proper cleanup when games end (normal or abnormal)
-- [ ] Fix "Start button disappears but nothing happens" edge case
+*P2P RTT probing:*
+- [ ] P2P probe helper to measure actual latency between candidates during matching
+- [ ] WebRTC connection established between candidates in waiting room
+- [ ] Matchmaker can use measured RTT in `find_match()` decision logic
+- [ ] Configurable `max_p2p_rtt_ms` threshold for match acceptance
 
-*Matchmaker abstraction:*
-- [ ] `Matchmaker` base class researchers can subclass
-- [ ] Input: participant data (session metadata, custom attributes, historical performance)
-- [ ] Output: matched group of N participants (configurable group size)
-- [ ] Default implementation: FIFO queue (current behavior)
-- [ ] Timeout handling: configurable redirect when no match found
+*Single game creation path:*
+- [ ] Remove group reunion flow (document as future TODO)
+- [ ] All games created through: Matchmaker.find_match() → match → create game
+- [ ] No other code paths create games
+- [ ] Game only exists when all matched participants are assigned
 
 **What done looks like:**
-- New participant always goes to waiting room → fresh game with matched group
-- No lingering games, no stale routing
-- Researchers can implement custom matching logic by subclassing Matchmaker
+- Matchmaker can measure actual P2P latency between candidates before matching
+- Only one code path creates games (matchmaker match → game)
+- No isolated participants — game only exists when all participants assigned
+- Group reunion documented as future matchmaker variant
+
+## Previous Milestone: v1.12 Waiting Room Overhaul (Shipped: 2026-02-03)
+
+**Delivered:** Fixed waiting room bugs and built pluggable Matchmaker abstraction for custom participant pairing logic.
+
+**Key accomplishments:**
+- Diagnostic logging and state validation for stale game routing
+- Comprehensive cleanup on all exit paths (idempotent)
+- Session lifecycle state machine (WAITING → MATCHED → VALIDATING → PLAYING → ENDED)
+- Participant state tracker (single source of truth for routing)
+- Matchmaker base class with FIFOMatchmaker default
+- Match assignment logging (JSONL + admin dashboard)
 
 ## Previous Milestone: v1.11 Data Export Edge Cases (Shipped: 2026-02-02)
 
@@ -215,15 +227,21 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 
 ### Active
 
-*v1.12 Waiting Room Overhaul:*
-- [ ] Stale game manager cleanup — prevent old games from capturing new participants
-- [ ] Participant routing fix — never route to games in progress
-- [ ] Game lifecycle cleanup — proper teardown on normal and abnormal termination
-- [ ] Matchmaker base class — subclassable abstraction for custom pairing logic
-- [ ] Matchmaker receives session metadata, custom attributes, historical performance
-- [ ] Configurable N-player group sizes
-- [ ] Default FIFO matchmaker implementation
-- [ ] Timeout → redirect behavior (existing, cleaner implementation)
+*v1.13 Matchmaker Hardening:*
+- [ ] P2P RTT probe helper for measuring actual latency between candidates
+- [ ] WebRTC probe connection during matchmaking consideration
+- [ ] Configurable max_p2p_rtt_ms threshold for match decisions
+- [ ] Single game creation path (matchmaker → match → game)
+- [ ] Remove group reunion flow (TODO for future matchmaker variant)
+
+*Shipped in v1.12:*
+- ✓ Diagnostic logging for stale game routing — v1.12
+- ✓ State validation before GameManager routing — v1.12
+- ✓ Idempotent cleanup on all exit paths — v1.12
+- ✓ Session lifecycle state machine — v1.12
+- ✓ Participant state tracker — v1.12
+- ✓ Matchmaker base class with FIFOMatchmaker — v1.12
+- ✓ Match assignment logging (JSONL + admin) — v1.12
 
 *Shipped in v1.11:*
 - ✓ isFocused column consistency (both players export isFocused.0/isFocused.1) — v1.11
@@ -291,7 +309,7 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 - Rollback visual corrections cause brief teleporting (smoothing not yet implemented)
 - **[CRITICAL]** Users report 1-2 second local input lag in Overcooked (investigating in v1.6)
 - ~~**[RESOLVED]** Data export parity issues — fixed in v1.8 with dual-buffer architecture~~
-- **[CRITICAL]** New participants sometimes routed to stale games — "Start button disappears, nothing happens" (fixing in v1.12)
+- ~~**[RESOLVED]** New participants sometimes routed to stale games — fixed in v1.12 with state validation and comprehensive cleanup~~
 
 ## Constraints
 
@@ -319,4 +337,4 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 | BOUND-02/03 guards | Defense-in-depth at episode boundaries in async paths | ✓ Good |
 
 ---
-*Last updated: 2026-02-02 after v1.12 milestone started*
+*Last updated: 2026-02-03 after v1.13 milestone started*

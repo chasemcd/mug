@@ -2,19 +2,19 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-02-02)
+See: .planning/PROJECT.md (updated 2026-02-03)
 
 **Core value:** Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
-**Current focus:** v1.12 Waiting Room Overhaul
+**Current focus:** v1.13 Matchmaker Hardening
 
 ## Current Position
 
-Phase: 56 of 56 (Custom Attributes Logging)
-Plan: 01 of 01 complete
-Status: Milestone complete
-Last activity: 2026-02-03 — Completed 56-01-PLAN.md
+Phase: Not started (run /gsd:define-requirements or /gsd:create-roadmap)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-02-03 — Milestone v1.13 started
 
-Progress: [██████████] 100%
+Progress: [░░░░░░░░░░] 0%
 
 ## Milestone History
 
@@ -412,12 +412,6 @@ See: .planning/PROJECT.md Key Decisions table
 
 ### Blockers/Concerns
 
-**v1.12 Known Bug (fixing this milestone):**
-- New participants sometimes routed to stale games — "Start button disappears, nothing happens"
-- Console shows "Joining game in session [ID]" but UI doesn't change
-- Server shows "Game manager already exists for scene X, reusing it"
-- Root cause: likely stale game manager state from previous sessions
-
 **Known issues to address in future milestones:**
 - Episode start sync can timeout on slow connections (mitigated with retry + two-way ack)
 - Rollback visual corrections cause brief teleporting (smoothing not yet implemented)
@@ -473,23 +467,20 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-02-03
-Stopped at: Completed 56-01-PLAN.md
+Stopped at: Milestone v1.13 initialized
 Resume file: None
 
 ### Next Steps
 
-**v1.12 Waiting Room Overhaul COMPLETE.**
+**v1.13 Matchmaker Hardening initialized.**
 
-All phases delivered:
-- Phase 51: Diagnostic logging infrastructure
-- Phase 52: Comprehensive cleanup
-- Phase 53: Session lifecycle state machine
-- Phase 54: Participant state tracker
-- Phase 55: Matchmaker base class abstraction
-- Phase 56: Match assignment logging
+Next actions:
+1. `/gsd:define-requirements` — Define checkable requirements for v1.13
+2. `/gsd:create-roadmap` — Create phases for v1.13
 
-The milestone delivers:
-- Robust session and participant state tracking
-- Pluggable matchmaker architecture
-- Research data logging for match assignments with RTT values
-- Admin dashboard integration for match events
+Target features:
+- P2P RTT probe helper for measuring actual latency between candidates
+- WebRTC probe connection during matchmaking consideration
+- Configurable max_p2p_rtt_ms threshold for match decisions
+- Single game creation path (matchmaker → match → game)
+- Remove group reunion flow (TODO for future matchmaker variant)
