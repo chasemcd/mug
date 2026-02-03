@@ -389,7 +389,7 @@ Plans:
   2. Pipeline stage causing delay identified with supporting data
   3. Root cause documented with evidence and proposed fix
 **Research flag:** Likely (may need to investigate Pyodide performance, browser quirks)
-**Plans:** TBD
+**Plans:** 1 plan
 Plans:
 - [ ] 29-01-PLAN.md — Data collection, analysis, root cause identification
 
@@ -403,7 +403,7 @@ Plans:
   3. Fix verified working in multiplayer mode
   4. Fix verified specifically in Overcooked environment
 **Research flag:** Unknown (depends on what root cause is found)
-**Plans:** TBD
+**Plans:** 1 plan
 Plans:
 - [ ] 30-01-PLAN.md — Implement fix for identified root cause
 
@@ -417,7 +417,7 @@ Plans:
   3. Latency outliers (>100ms) flagged and counted in export
   4. Per-stage latency breakdown available in exported data
 **Research flag:** Unlikely (extends existing telemetry patterns from v1.3/v1.5)
-**Plans:** TBD
+**Plans:** 1 plan
 Plans:
 - [ ] 31-01-PLAN.md — Latency stats computation and export integration
 
@@ -736,10 +736,10 @@ See [milestones/v1.11-ROADMAP.md](milestones/v1.11-ROADMAP.md) for full details.
   2. State validation runs before routing to GameManager
   3. Client receives error event when waiting room state is invalid
 **Research flag:** Unlikely (standard logging patterns)
-**Plans:** TBD
+**Plans:** 1 plan
 
 Plans:
-- [ ] 51-01: Diagnostic logging and client error event
+- [ ] 51-01-PLAN.md - Diagnostic logging, state validation, client error event
 
 #### Phase 52: Comprehensive Cleanup
 **Goal:** All exit paths clean all state
@@ -751,7 +751,7 @@ Plans:
   3. Cleanup runs on all exit paths (normal and abnormal termination)
   4. Cleanup methods are idempotent (safe to call multiple times)
 **Research flag:** Unlikely (codebase-specific, patterns documented)
-**Plans:** TBD
+**Plans:** 1 plan
 
 Plans:
 - [ ] 52-01: Comprehensive cleanup implementation
@@ -765,7 +765,7 @@ Plans:
   2. Session object is destroyed (not reused) when game ends
   3. GameManager creates Session per-game, not per-scene
 **Research flag:** Maybe (`python-statemachine` integration with Flask-SocketIO async)
-**Plans:** TBD
+**Plans:** 1 plan
 
 Plans:
 - [ ] 53-01: Session lifecycle with explicit states
@@ -779,7 +779,7 @@ Plans:
   2. State checked before routing to GameManager
   3. State updated at every transition point
 **Research flag:** Unlikely (simple state tracking)
-**Plans:** TBD
+**Plans:** 1 plan
 
 Plans:
 - [ ] 54-01: ParticipantStateTracker implementation
@@ -795,7 +795,7 @@ Plans:
   4. FIFOMatchmaker default implementation works (current behavior preserved)
   5. Matchmaker configurable per-scene via experiment config
 **Research flag:** Unlikely (oTree pattern well-documented)
-**Plans:** TBD
+**Plans:** 1 plan
 
 Plans:
 - [ ] 55-01: Matchmaker base class and FIFOMatchmaker
@@ -809,7 +809,7 @@ Plans:
   1. Assignment logging records match decisions (who matched with whom, timestamp)
   2. RTT to server exposed in ParticipantData for matchmaker use
 **Research flag:** Unlikely (additive)
-**Plans:** TBD
+**Plans:** 1 plan
 
 Plans:
 - [ ] 56-01: Assignment logging and RTT exposure
