@@ -12,9 +12,9 @@ Requirements for v1.13 Matchmaker Hardening. Each maps to roadmap phases.
 - [ ] **RTT-01**: Matchmaker can establish WebRTC probe connection between candidate participants
 - [x] **RTT-02**: Probe measures actual P2P RTT between candidates (specified number of pings)
 - [ ] **RTT-03**: Probe connection is closed after measurement completes
-- [ ] **RTT-04**: Matchmaker constructor accepts `max_p2p_rtt_ms` threshold parameter
-- [ ] **RTT-05**: `find_match()` receives measured RTT between candidates
-- [ ] **RTT-06**: Match is rejected if RTT exceeds configured threshold
+- [x] **RTT-04**: Matchmaker constructor accepts `max_p2p_rtt_ms` threshold parameter
+- [x] **RTT-05**: `find_match()` receives measured RTT between candidates
+- [x] **RTT-06**: Match is rejected if RTT exceeds configured threshold
 
 ### Game Creation
 
@@ -58,9 +58,9 @@ Which phases cover which requirements. Updated by create-roadmap.
 | RTT-01 | Phase 57 | Complete |
 | RTT-02 | Phase 58 | Complete |
 | RTT-03 | Phase 57 | Complete |
-| RTT-04 | Phase 59 | Pending |
-| RTT-05 | Phase 59 | Pending |
-| RTT-06 | Phase 59 | Pending |
+| RTT-04 | Phase 59 | Complete |
+| RTT-05 | Phase 59 | Complete |
+| RTT-06 | Phase 59 | Complete |
 | GAME-01 | Phase 60 | Pending |
 | GAME-02 | Phase 60 | Pending |
 | GAME-03 | Phase 60 | Pending |
@@ -73,4 +73,4 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 ---
 *Requirements defined: 2026-02-03*
-*Last updated: 2026-02-03 after Phase 58 complete*
+*Last updated: 2026-02-03 after Phase 59 complete*
