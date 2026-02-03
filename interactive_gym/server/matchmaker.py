@@ -6,6 +6,12 @@ to customize how participants are grouped together for games.
 The default FIFOMatchmaker implements first-in-first-out matching (current behavior).
 Researchers can implement custom Matchmaker subclasses for RTT-based matching,
 skill-based matching, or other grouping strategies.
+
+RTT Configuration Notes:
+    - rtt_ms in MatchCandidate is SERVER RTT (client <-> server round-trip)
+    - max_p2p_rtt_ms is P2P RTT (peer-to-peer via WebRTC DataChannel)
+    - P2P RTT filtering happens AFTER matchmaker proposes, not inside find_match()
+    - GameManager orchestrates: propose match -> probe P2P RTT -> accept/reject
 """
 
 from __future__ import annotations
@@ -44,7 +50,41 @@ class Matchmaker(ABC):
     Thread safety: find_match() is called under the GameManager's waiting_games_lock.
     Custom matchmakers should not spawn threads or access external resources
     that could cause race conditions.
+
+    P2P RTT Filtering:
+        If max_p2p_rtt_ms is set, GameManager will probe the P2P RTT between
+        matched candidates AFTER find_match() proposes them. If P2P RTT exceeds
+        the threshold, the match is rejected and candidates are re-pooled.
+        Subclasses can override should_reject_for_rtt() to customize rejection logic.
     """
+
+    def __init__(self, max_p2p_rtt_ms: int | None = None):
+        """Initialize matchmaker.
+
+        Args:
+            max_p2p_rtt_ms: Maximum allowed P2P RTT in milliseconds for matched pairs.
+                            If None (default), no P2P RTT filtering is applied.
+                            If set, matches exceeding this threshold are rejected.
+        """
+        self.max_p2p_rtt_ms = max_p2p_rtt_ms
+
+    def should_reject_for_rtt(self, measured_rtt_ms: float | None) -> bool:
+        """Determine if a match should be rejected based on measured P2P RTT.
+
+        Called by GameManager after probing P2P RTT between matched candidates.
+        Subclasses can override for custom rejection logic.
+
+        Args:
+            measured_rtt_ms: Measured P2P RTT in milliseconds, or None if measurement failed.
+
+        Returns:
+            True if match should be rejected, False if acceptable.
+        """
+        if self.max_p2p_rtt_ms is None:
+            return False  # No threshold configured, accept all
+        if measured_rtt_ms is None:
+            return True  # Measurement failed, reject for safety
+        return measured_rtt_ms > self.max_p2p_rtt_ms
 
     @abstractmethod
     def find_match(
@@ -84,6 +124,10 @@ class FIFOMatchmaker(Matchmaker):
     Matches participants in arrival order without any filtering.
     This replicates the original hard-coded matching behavior.
 
+    If max_p2p_rtt_ms is set, GameManager will probe P2P RTT between
+    matched candidates after find_match() proposes them. Matches
+    exceeding the threshold are rejected and candidates re-pooled.
+
     Example:
         For a 2-player game with group_size=2:
         - Player A arrives, waiting=[] -> returns None (wait)
@@ -93,7 +137,13 @@ class FIFOMatchmaker(Matchmaker):
         - Player A arrives, waiting=[] -> returns None (wait)
         - Player B arrives, waiting=[A] -> returns None (wait)
         - Player C arrives, waiting=[A, B] -> returns [A, B, C] (match)
+
+    Args:
+        max_p2p_rtt_ms: Maximum allowed P2P RTT in ms. None disables filtering.
     """
+
+    def __init__(self, max_p2p_rtt_ms: int | None = None):
+        super().__init__(max_p2p_rtt_ms=max_p2p_rtt_ms)
 
     def find_match(
         self,
