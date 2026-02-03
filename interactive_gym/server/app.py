@@ -506,6 +506,7 @@ def advance_scene(data):
                 pairing_manager=GROUP_MANAGER,
                 get_subject_rtt=_get_subject_rtt,
                 participant_state_tracker=PARTICIPANT_TRACKER,
+                matchmaker=current_scene.matchmaker,
             )
             GAME_MANAGERS[current_scene.scene_id] = game_manager
         else:
