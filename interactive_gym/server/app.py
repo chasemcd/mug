@@ -37,6 +37,7 @@ from interactive_gym.server.admin import admin_bp, AdminUser
 from interactive_gym.server.admin.namespace import AdminNamespace
 from interactive_gym.server.admin.aggregator import AdminEventAggregator
 from interactive_gym.server.match_logger import MatchAssignmentLogger
+from interactive_gym.server.probe_coordinator import ProbeCoordinator
 
 
 @dataclasses.dataclass
@@ -112,6 +113,9 @@ ADMIN_AGGREGATOR: AdminEventAggregator | None = None
 # Match assignment logger for research data collection (Phase 56)
 MATCH_LOGGER: MatchAssignmentLogger | None = None
 
+# Probe coordinator for P2P RTT measurement (Phase 57)
+PROBE_COORDINATOR: ProbeCoordinator | None = None
+
 # Mapping of users to locks associated with the ID. Enforces user-level serialization
 USER_LOCKS = utils.ThreadSafeDict()
 
@@ -136,6 +140,17 @@ PENDING_MULTIPLAYER_METRICS: dict[tuple[str, str], dict] = utils.ThreadSafeDict(
 def get_subject_id_from_session_id(session_id: str) -> SubjectID:
     subject_id = SESSION_ID_TO_SUBJECT_ID.get(session_id, None)
     return subject_id
+
+
+def get_socket_for_subject(subject_id: str) -> str | None:
+    """Get current socket_id for a subject_id from PARTICIPANT_SESSIONS.
+
+    Used by ProbeCoordinator to look up socket IDs fresh (not cached).
+    """
+    session = PARTICIPANT_SESSIONS.get(subject_id)
+    if session and session.is_connected:
+        return session.socket_id
+    return None
 
 
 # List of subject names that have entered a game (collected on end_game)
@@ -1671,6 +1686,69 @@ def handle_webrtc_signal(data):
     )
 
 
+#####################################
+# P2P Probe Event Handlers (Phase 57)
+#####################################
+
+
+@socketio.on('probe_ready')
+def handle_probe_ready(data):
+    """Handle client reporting ready for probe connection.
+
+    After receiving probe_prepare, clients initialize their ProbeConnection
+    and emit probe_ready. Once both clients report ready, the coordinator
+    emits probe_start to trigger WebRTC connection establishment.
+    """
+    if PROBE_COORDINATOR is None:
+        logger.warning("Probe ready received but no coordinator")
+        return
+
+    probe_session_id = data.get('probe_session_id')
+    subject_id = get_subject_id_from_session_id(flask.request.sid)
+
+    logger.debug(f"[Probe] Ready: session={probe_session_id}, subject={subject_id}")
+    PROBE_COORDINATOR.handle_ready(probe_session_id, subject_id)
+
+
+@socketio.on('probe_signal')
+def handle_probe_signal(data):
+    """Relay WebRTC signaling for probe connections.
+
+    Routes SDP offers/answers and ICE candidates between probe peers.
+    Uses separate event name from game signaling to avoid collision.
+    """
+    if PROBE_COORDINATOR is None:
+        logger.warning("Probe signal received but no coordinator")
+        return
+
+    PROBE_COORDINATOR.handle_signal(
+        probe_session_id=data.get('probe_session_id'),
+        target_subject_id=data.get('target_subject_id'),
+        signal_type=data.get('type'),
+        payload=data.get('payload'),
+        sender_socket_id=flask.request.sid
+    )
+
+
+@socketio.on('probe_result')
+def handle_probe_result(data):
+    """Handle probe measurement result from client.
+
+    Called when a client reports the RTT measurement result.
+    The coordinator invokes the on_complete callback and cleans up.
+    """
+    if PROBE_COORDINATOR is None:
+        logger.warning("Probe result received but no coordinator")
+        return
+
+    probe_session_id = data.get('probe_session_id')
+    rtt_ms = data.get('rtt_ms')
+    success = data.get('success', False)
+
+    logger.info(f"[Probe] Result: session={probe_session_id}, rtt={rtt_ms}ms, success={success}")
+    PROBE_COORDINATOR.handle_result(probe_session_id, rtt_ms, success)
+
+
 @socketio.on("pyodide_player_action")
 def on_pyodide_player_action(data):
     """
@@ -2686,7 +2764,7 @@ def on_disconnect():
 
 
 def run(config):
-    global app, CONFIG, logger, GENERIC_STAGER, PYODIDE_COORDINATOR, GROUP_MANAGER, ADMIN_AGGREGATOR
+    global app, CONFIG, logger, GENERIC_STAGER, PYODIDE_COORDINATOR, GROUP_MANAGER, ADMIN_AGGREGATOR, PROBE_COORDINATOR
     CONFIG = config
     GENERIC_STAGER = config.stager
 
@@ -2708,6 +2786,15 @@ def run(config):
     # Initialize player group manager
     GROUP_MANAGER = player_pairing_manager.PlayerGroupManager()
     logger.info("Initialized player group manager")
+
+    # Initialize probe coordinator for P2P RTT measurement (Phase 57)
+    PROBE_COORDINATOR = ProbeCoordinator(
+        sio=socketio,
+        get_socket_for_subject=get_socket_for_subject,
+        turn_username=CONFIG.turn_username,
+        turn_credential=CONFIG.turn_credential,
+    )
+    logger.info("Initialized probe coordinator for P2P RTT measurement")
 
     # Initialize admin event aggregator
     ADMIN_AGGREGATOR = AdminEventAggregator(
