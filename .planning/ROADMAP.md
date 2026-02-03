@@ -14,7 +14,7 @@
 - ✅ **v1.9 Data Parity Testing** - Phases 40-44 (shipped 2026-02-01)
 - ✅ **v1.10 E2E Test Fix** - Phases 45-47 (shipped 2026-02-02)
 - ✅ **v1.11 Data Export Edge Cases** - Phases 48-50 (shipped 2026-02-02) → [archive](milestones/v1.11-ROADMAP.md)
-- 🚧 **v1.12 Waiting Room Overhaul** - Phases 51-56 (in progress)
+- ✅ **v1.12 Waiting Room Overhaul** - Phases 51-56 (shipped 2026-02-03)
 
 ## Phases
 
@@ -812,7 +812,7 @@ Plans:
 **Plans:** 1 plan
 
 Plans:
-- [ ] 56-01-PLAN.md — Assignment logging and RTT exposure
+- [x] 56-01-PLAN.md — Assignment logging and RTT exposure
 
 ## Progress
 
@@ -861,8 +861,8 @@ Plans:
 | 53. Session Lifecycle | v1.12 | 1/1 | Complete | 2026-02-03 |
 | 54. ParticipantStateTracker | v1.12 | 1/1 | Complete | 2026-02-03 |
 | 55. Matchmaker Base Class | v1.12 | 2/2 | Complete | 2026-02-03 |
-| 56. Custom Attributes | v1.12 | 0/1 | Not started | — |
+| 56. Custom Attributes | v1.12 | 1/1 | Complete | 2026-02-03 |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-03 after Phase 55 execution complete*
+*Last updated: 2026-02-03 after Phase 56 execution complete — v1.12 shipped*

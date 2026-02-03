@@ -30,8 +30,8 @@ Requirements for v1.12 release. Each maps to roadmap phases.
 
 ### Data & Observability
 
-- [ ] **DATA-01**: Assignment logging records match decisions (who matched with whom, timestamp)
-- [ ] **DATA-02**: RTT to server exposed in ParticipantData for matchmaker use
+- [x] **DATA-01**: Assignment logging records match decisions (who matched with whom, timestamp)
+- [x] **DATA-02**: RTT to server exposed in ParticipantData for matchmaker use
 
 ## v2 Requirements
 
@@ -83,8 +83,8 @@ Which phases cover which requirements. Updated by create-roadmap.
 | MATCH-03 | Phase 55 | Complete |
 | MATCH-04 | Phase 55 | Complete |
 | MATCH-05 | Phase 55 | Complete |
-| DATA-01 | Phase 56 | Pending |
-| DATA-02 | Phase 56 | Pending |
+| DATA-01 | Phase 56 | Complete |
+| DATA-02 | Phase 56 | Complete |
 
 **Coverage:**
 - v1 requirements: 14 total
@@ -93,4 +93,4 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 ---
 *Requirements defined: 2026-02-02*
-*Last updated: 2026-02-03 after phase 55 complete*
+*Last updated: 2026-02-03 after phase 56 complete*
