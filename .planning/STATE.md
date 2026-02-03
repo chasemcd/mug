@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-02)
 ## Current Position
 
 Phase: 52 of 56 (Comprehensive Cleanup)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-02-02 — Phase 51 complete
+Plan: 01 of 01 complete
+Status: Phase complete
+Last activity: 2026-02-03 — Completed 52-01-PLAN.md
 
-Progress: [█░░░░░░░░░] 17%
+Progress: [██░░░░░░░░] 20%
 
 ## Milestone History
 
@@ -128,6 +128,11 @@ Progress: [█░░░░░░░░░] 17%
 
 **v1.12 Execution:**
 - `.planning/phases/51-diagnostic-logging/51-01-SUMMARY.md`
+- `.planning/phases/52-comprehensive-cleanup/52-01-SUMMARY.md`
+
+**Comprehensive Cleanup (v1.12 Phase 52 - added):**
+- `interactive_gym/server/game_manager.py` - cleanup_game() now idempotent with subject-level cleanup
+- `interactive_gym/server/app.py` - All exit paths (reconnection timeout, validation failed, mid-game exclusion) call cleanup_game()
 
 **Diagnostic Logging Infrastructure (v1.12 Phase 51 - added):**
 - `interactive_gym/server/app.py` - [JoinGame:Diag] diagnostic logging at join_game entry, state validation integration, waiting_room_error event, post-add state counts
@@ -221,6 +226,11 @@ Progress: [█░░░░░░░░░] 17%
 ### Decisions
 
 See: .planning/PROJECT.md Key Decisions table
+
+**v1.12 Phase 52 decisions:**
+- cleanup_game() checks game_id in self.games and returns early if not found (idempotent)
+- cleanup_game() iterates all human_players.values() to clean subject_games and subject_rooms
+- All exit paths find GameManager by game_id and call cleanup_game() consistently
 
 **v1.12 Phase 51 decisions:**
 - Log full state snapshot at join_game entry (subject_games, active_games, waiting_games)
@@ -409,20 +419,19 @@ See: .planning/PROJECT.md Key Decisions table
 
 ## Session Continuity
 
-Last session: 2026-02-02
-Stopped at: Completed 51-01-PLAN.md
+Last session: 2026-02-03
+Stopped at: Completed 52-01-PLAN.md
 Resume file: None
 
 ### Next Steps
 
-**Phase 51 complete.** Diagnostic logging and state validation added.
+**Phase 52 complete.** Comprehensive cleanup with idempotent cleanup_game() and all exit paths calling it.
 
-Remaining phases 52-56:
-1. Phase 52: Comprehensive Cleanup
-2. Phase 53: Session Lifecycle
-3. Phase 54: ParticipantStateTracker
-4. Phase 55: Matchmaker Base Class
-5. Phase 56: Custom Attributes & Assignment Logging
+Remaining phases 53-56:
+1. Phase 53: Session Lifecycle
+2. Phase 54: ParticipantStateTracker
+3. Phase 55: Matchmaker Base Class
+4. Phase 56: Custom Attributes & Assignment Logging
 
 **Next:**
-`/gsd:plan-phase 52`
+`/gsd:plan-phase 53`
