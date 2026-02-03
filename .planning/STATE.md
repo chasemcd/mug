@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-03)
 ## Current Position
 
 Phase: 58 of 60 (RTT Measurement)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-02-03 — Phase 57 verified and complete
+Plan: 01 complete
+Status: Phase 58 complete
+Last activity: 2026-02-03 — Completed 58-01-PLAN.md
 
-Progress: [██░░░░░░░░] 25%
+Progress: [███░░░░░░░] 27%
 
 ## Milestone History
 
@@ -139,6 +139,11 @@ Progress: [██░░░░░░░░] 25%
 **v1.13 Execution:**
 - `.planning/phases/57-p2p-probe-infrastructure/57-01-SUMMARY.md`
 - `.planning/phases/57-p2p-probe-infrastructure/57-02-SUMMARY.md`
+- `.planning/phases/58-rtt-measurement/58-01-SUMMARY.md`
+
+**RTT Ping-Pong Protocol (v1.13 Phase 58 - added):**
+- `interactive_gym/server/static/js/probe_connection.js` - pendingPings Map, _handleDataChannelMessage(), measureRTT(), _sendPing()
+- `interactive_gym/server/static/js/index.js` - ProbeManager._onProbeConnected uses measureRTT()
 
 **P2P Probe Infrastructure (v1.13 Phase 57 - added):**
 - `interactive_gym/server/probe_coordinator.py` - ProbeCoordinator class for server-side probe orchestration
@@ -264,6 +269,12 @@ Progress: [██░░░░░░░░] 25%
 
 See: .planning/PROJECT.md Key Decisions table
 
+**v1.13 Phase 58 decisions:**
+- JSON message format for ping/pong (not binary) - small payload, simplicity over micro-optimization
+- 5 pings default, 2s timeout per ping, 100ms interval - balance stability and speed
+- Median over mean for RTT aggregation - robust to outliers
+- No stabilization delay before ping-pong - getStats() needed it, ping-pong measures directly
+
 **v1.13 Phase 57 decisions:**
 - Probes work independently of games (no game_id needed, only subject_ids)
 - Two-phase initialization (prepare -> ready -> start) prevents signaling race conditions
@@ -273,7 +284,7 @@ See: .planning/PROJECT.md Key Decisions table
 - on_complete callback receives None RTT on failure or timeout
 - ProbeConnection wraps WebRTCManager, overrides _sendSignal for probe routing
 - 10 second client-side connection timeout for probes
-- 500ms stabilization delay before RTT measurement after connection
+- 500ms stabilization delay before RTT measurement after connection (superseded by Phase 58 ping-pong)
 
 **v1.12 Phase 56 decisions:**
 - Synchronous file I/O (no threading) - match rate is low, simplicity preferred
@@ -488,17 +499,17 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-02-03
-Stopped at: Phase 57 verified and complete
+Stopped at: Completed 58-01-PLAN.md
 Resume file: None
 
 ### Next Steps
 
-**Phase 57 verified.** P2P probe infrastructure ready (server and client).
+**Phase 58 complete.** RTT ping-pong protocol implemented.
 
-Next action: `/gsd:plan-phase 58`
+Next action: `/gsd:plan-phase 59`
 
 Phases:
-- Phase 57: P2P Probe Infrastructure (RTT-01, RTT-03) ✓
-- Phase 58: RTT Measurement (RTT-02) ← next
-- Phase 59: Matchmaker RTT Integration (RTT-04, RTT-05, RTT-06)
+- Phase 57: P2P Probe Infrastructure (RTT-01, RTT-03) [Complete]
+- Phase 58: RTT Measurement (RTT-02) [Complete]
+- Phase 59: Matchmaker RTT Integration (RTT-04, RTT-05, RTT-06) [Next]
 - Phase 60: Single Game Creation Path (GAME-01, GAME-02, GAME-03, GAME-04)
