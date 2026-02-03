@@ -3,12 +3,123 @@ import {startUnityScene, terminateUnityScene, shutdownUnityGame, preloadUnityGam
 import {graphics_start, graphics_end, addStateToBuffer, getRemoteGameData, pressedKeys} from './phaser_gym_graphics.js';
 import {RemoteGame} from './pyodide_remote_game.js';
 import {MultiplayerPyodideGame} from './pyodide_multiplayer_game.js';
+import {ProbeConnection} from './probe_connection.js';
 
 window.socket = io({
     transports: ['websocket'],
     upgrade: false
 });
 var socket = window.socket;
+
+// ============================================
+// Probe Manager for P2P RTT measurement during matchmaking
+// Handles probe_prepare -> ProbeConnection -> measurement -> probe_result flow
+// ============================================
+const ProbeManager = {
+    activeProbe: null,
+    mySubjectId: null,
+    socket: null,
+
+    /**
+     * Initialize probe handling with socket and subject identity.
+     * @param {Object} socket - SocketIO socket
+     * @param {string} subjectId - This participant's subject_id
+     */
+    init(socket, subjectId) {
+        this.socket = socket;
+        this.mySubjectId = subjectId;
+
+        // Handle server requesting probe connection
+        socket.on('probe_prepare', (data) => this._handleProbePrepare(data));
+
+        // Handle server signaling probe start
+        socket.on('probe_start', (data) => this._handleProbeStart(data));
+
+        console.log('[ProbeManager] Initialized for subject', subjectId);
+    },
+
+    _handleProbePrepare(data) {
+        const { probe_session_id, peer_subject_id, turn_username, turn_credential } = data;
+
+        console.log(`[ProbeManager] Preparing probe ${probe_session_id} with peer ${peer_subject_id}`);
+
+        // Close any existing probe
+        if (this.activeProbe) {
+            console.warn('[ProbeManager] Closing existing probe before new one');
+            this.activeProbe.close();
+        }
+
+        // Create new probe connection
+        this.activeProbe = new ProbeConnection(
+            this.socket,
+            probe_session_id,
+            this.mySubjectId,
+            peer_subject_id,
+            { turnUsername: turn_username, turnCredential: turn_credential }
+        );
+
+        // Set up callbacks
+        this.activeProbe.onConnected = () => this._onProbeConnected(probe_session_id);
+        this.activeProbe.onFailed = () => this._onProbeFailed(probe_session_id);
+
+        // Signal ready to server
+        this.socket.emit('probe_ready', { probe_session_id });
+    },
+
+    _handleProbeStart(data) {
+        const { probe_session_id } = data;
+
+        if (!this.activeProbe || this.activeProbe.probeSessionId !== probe_session_id) {
+            console.warn(`[ProbeManager] probe_start for unknown session ${probe_session_id}`);
+            return;
+        }
+
+        console.log(`[ProbeManager] Starting probe ${probe_session_id}`);
+        this.activeProbe.start();
+    },
+
+    async _onProbeConnected(probeSessionId) {
+        console.log(`[ProbeManager] Probe ${probeSessionId} connected, measuring RTT`);
+
+        // Give connection a moment to stabilize, then measure RTT
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        // Get RTT measurement
+        const rtt = await this.activeProbe.getRTT();
+        console.log(`[ProbeManager] Probe ${probeSessionId} RTT: ${rtt}ms`);
+
+        // Report result to server
+        this.socket.emit('probe_result', {
+            probe_session_id: probeSessionId,
+            rtt_ms: rtt,
+            success: rtt !== null,
+        });
+
+        // Clean up probe connection
+        this._cleanupProbe();
+    },
+
+    _onProbeFailed(probeSessionId) {
+        console.log(`[ProbeManager] Probe ${probeSessionId} failed`);
+
+        // Report failure to server
+        this.socket.emit('probe_result', {
+            probe_session_id: probeSessionId,
+            rtt_ms: null,
+            success: false,
+        });
+
+        // Clean up probe connection
+        this._cleanupProbe();
+    },
+
+    _cleanupProbe() {
+        if (this.activeProbe) {
+            this.activeProbe.close();
+            this.activeProbe = null;
+        }
+    },
+};
 
 // ============================================
 // Console log capture for admin dashboard
@@ -491,6 +602,10 @@ socket.on('connect', function() {
         subject_id: subjectName,
         interactiveGymGlobals: window.interactiveGymGlobals || {}
     });
+
+    // Initialize ProbeManager for P2P RTT probing during matchmaking
+    ProbeManager.init(socket, subjectName);
+
     $("#invalidSession").hide();
     $('#hudText').hide()
 });
