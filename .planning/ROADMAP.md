@@ -200,7 +200,7 @@ See [milestones/v1.11-ROADMAP.md](milestones/v1.11-ROADMAP.md) for full details.
 
 **Milestone Goal:** Fix the rare data parity divergence bug and add comprehensive multi-participant E2E stress tests. Data parity must be EXACT — both players export identical data for every frame under all network conditions.
 
-- [ ] **Phase 61: Input Confirmation Protocol** - Wait for partner input confirmation before export
+- [x] **Phase 61: Input Confirmation Protocol** - Wait for partner input confirmation before export
 - [ ] **Phase 62: Data Parity Validation** - Ensure identical exports for actions/rewards/infos
 - [ ] **Phase 63: Parity Test Stabilization** - E2E tests pass consistently (10+ runs)
 - [ ] **Phase 64: Multi-Participant Test Infrastructure** - Support 6 concurrent participants
@@ -221,7 +221,7 @@ See [milestones/v1.11-ROADMAP.md](milestones/v1.11-ROADMAP.md) for full details.
 **Plans:** 1 plan
 
 Plans:
-- [ ] 61-01-PLAN.md — Add confirmation timeout config and wait logic before episode export
+- [x] 61-01-PLAN.md — Add confirmation timeout config and wait logic before episode export
 
 ### Phase 62: Data Parity Validation
 **Goal**: Ensure both players export identical data for every frame
@@ -316,7 +316,7 @@ Plans:
 | 48-50 | v1.11 | — | Complete | 2026-02-02 |
 | 51-56 | v1.12 | — | Complete | 2026-02-03 |
 | 57-60 | v1.13 | — | Complete | 2026-02-03 |
-| 61. Input Confirmation Protocol | v1.14 | 0/1 | Planned | - |
+| 61. Input Confirmation Protocol | v1.14 | 1/1 | Complete | 2026-02-03 |
 | 62. Data Parity Validation | v1.14 | 0/TBD | Not started | - |
 | 63. Parity Test Stabilization | v1.14 | 0/TBD | Not started | - |
 | 64. Multi-Participant Test Infrastructure | v1.14 | 0/TBD | Not started | - |
@@ -325,4 +325,4 @@ Plans:
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-03 after Phase 61 planning*
+*Last updated: 2026-02-03 after Phase 61 complete*

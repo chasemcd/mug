@@ -9,8 +9,8 @@ Requirements for v1.14 Data Parity Fix. Each maps to roadmap phases.
 
 ### Data Parity Fix
 
-- [ ] **PARITY-01**: Episode export waits for partner input confirmation before writing
-- [ ] **PARITY-02**: Configurable confirmation timeout (default reasonable for 200ms+ latency)
+- [x] **PARITY-01**: Episode export waits for partner input confirmation before writing
+- [x] **PARITY-02**: Configurable confirmation timeout (default reasonable for 200ms+ latency)
 - [ ] **PARITY-03**: Both players export identical action sequences for every frame
 - [ ] **PARITY-04**: Both players export identical rewards for every frame
 - [ ] **PARITY-05**: Both players export identical infos for every frame
@@ -74,8 +74,8 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PARITY-01 | Phase 61 | Pending |
-| PARITY-02 | Phase 61 | Pending |
+| PARITY-01 | Phase 61 | Complete |
+| PARITY-02 | Phase 61 | Complete |
 | PARITY-03 | Phase 62 | Pending |
 | PARITY-04 | Phase 62 | Pending |
 | PARITY-05 | Phase 62 | Pending |
@@ -122,4 +122,4 @@ Requirements completed in previous milestone, preserved for reference.
 
 ---
 *Requirements defined: 2026-02-03*
-*Last updated: 2026-02-03 after v1.14 roadmap created*
+*Last updated: 2026-02-03 after Phase 61 complete*
