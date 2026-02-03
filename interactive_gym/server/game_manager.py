@@ -35,6 +35,7 @@ from interactive_gym.server import remote_game, utils, pyodide_game_coordinator,
 from interactive_gym.server.remote_game import SessionState
 from interactive_gym.server.participant_state import ParticipantState
 from interactive_gym.server.matchmaker import Matchmaker, MatchCandidate, FIFOMatchmaker
+from interactive_gym.server.match_logger import MatchAssignmentLogger
 from interactive_gym.scenes import stager, gym_scene, scene
 import flask_socketio
 
@@ -55,6 +56,7 @@ class GameManager:
         get_subject_rtt: callable | None = None,
         participant_state_tracker=None,  # Optional for backward compatibility
         matchmaker: Matchmaker | None = None,  # Phase 55: pluggable matchmaking
+        match_logger: MatchAssignmentLogger | None = None,  # Phase 56: assignment logging
     ):
         assert isinstance(scene, gym_scene.GymScene)
         self.scene = scene
@@ -65,6 +67,7 @@ class GameManager:
         self.get_subject_rtt = get_subject_rtt  # Callback to get RTT for a subject
         self.participant_state_tracker = participant_state_tracker  # Phase 54
         self.matchmaker = matchmaker or FIFOMatchmaker()  # Phase 55: defaults to FIFO
+        self.match_logger = match_logger  # Phase 56: assignment logging
 
         # Data structure to save subjects by their socket id
         self.subject = utils.ThreadSafeDict()
@@ -433,6 +436,24 @@ class GameManager:
 
             self.waiting_games.remove(game.game_id)
             game.transition_to(SessionState.MATCHED)
+
+            # Log match assignment for group reunion (Phase 56)
+            if self.match_logger:
+                # Build MatchCandidate list from subject_ids
+                candidates = [
+                    MatchCandidate(
+                        subject_id=sid,
+                        rtt_ms=self.get_subject_rtt(sid) if self.get_subject_rtt else None
+                    )
+                    for sid in subject_ids
+                ]
+                self.match_logger.log_match(
+                    scene_id=self.scene.scene_id,
+                    game_id=game.game_id,
+                    matched_candidates=candidates,
+                    matchmaker_class="GroupReunion",
+                )
+
             self.start_game(game)
 
         return game
@@ -805,6 +826,16 @@ class GameManager:
 
             if is_ready:
                 game.transition_to(SessionState.MATCHED)
+
+                # Log match assignment (Phase 56)
+                if self.match_logger:
+                    self.match_logger.log_match(
+                        scene_id=self.scene.scene_id,
+                        game_id=game.game_id,
+                        matched_candidates=matched,
+                        matchmaker_class=type(self.matchmaker).__name__,
+                    )
+
                 self.start_game(game)
             else:
                 # Broadcast to all players in the room so everyone sees updated count
