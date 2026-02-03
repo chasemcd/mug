@@ -32,6 +32,7 @@ from interactive_gym.configurations import (
     remote_config,
 )
 from interactive_gym.server import remote_game, utils, pyodide_game_coordinator, player_pairing_manager
+from interactive_gym.server.remote_game import SessionState
 from interactive_gym.scenes import stager, gym_scene, scene
 import flask_socketio
 
@@ -151,6 +152,7 @@ class GameManager:
             # Even if we're using Pyodide, we'll still instantiate a RemoteGame, since
             # it'll track the players within a game.
             # TODO(chase): check if we actually do need this for Pyodide-based games...
+            # Game starts in SessionState.WAITING (set in RemoteGameV2.__init__)
             game = remote_game.RemoteGameV2(
                 self.scene,
                 experiment_config=self.experiment_config,
@@ -424,6 +426,7 @@ class GameManager:
                 return None
 
             self.waiting_games.remove(game.game_id)
+            game.transition_to(SessionState.MATCHED)
             self.start_game(game)
 
         return game
@@ -648,6 +651,7 @@ class GameManager:
                     assert game.game_id not in self.waiting_games
 
                 if is_ready:
+                    game.transition_to(SessionState.MATCHED)
                     self.start_game(game)
                 else:
                     # Broadcast to all players in the room so everyone sees updated count
@@ -875,7 +879,11 @@ class GameManager:
         )
 
         if not self.scene.run_through_pyodide:
+            # Non-pyodide games go straight to PLAYING (no validation phase)
+            game.transition_to(SessionState.PLAYING)
             self.sio.start_background_task(self.run_server_game, game)
+        # Note: For pyodide_multiplayer games, transition to VALIDATING/PLAYING
+        # happens in PyodideGameCoordinator (see Task 3)
 
     def run_server_game(self, game: remote_game.RemoteGameV2):
         """Run a remote game on the server."""
@@ -1124,6 +1132,9 @@ class GameManager:
             return
 
         game = self.games[game_id]
+
+        # Transition to ENDED before cleanup (SESS-02: session destroyed after ENDED)
+        game.transition_to(SessionState.ENDED)
 
         # Clean up subject tracking for ALL players in this game
         for subject_id in list(game.human_players.values()):
