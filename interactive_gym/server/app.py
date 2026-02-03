@@ -30,6 +30,7 @@ from interactive_gym.server import game_manager as gm
 from interactive_gym.scenes import unity_scene
 from interactive_gym.server import pyodide_game_coordinator
 from interactive_gym.server import player_pairing_manager
+from interactive_gym.server.participant_state import ParticipantState, ParticipantStateTracker
 
 from flask_login import LoginManager
 from interactive_gym.server.admin import admin_bp, AdminUser
@@ -117,6 +118,10 @@ SESSION_ID_TO_SUBJECT_ID = utils.ThreadSafeDict()
 # Participant session storage for session restoration after disconnect
 # Maps subject_id -> ParticipantSession
 PARTICIPANT_SESSIONS: dict[SubjectID, ParticipantSession] = utils.ThreadSafeDict()
+
+# Participant state tracker - single source of truth for participant lifecycle states
+# Prevents routing to wrong games by tracking IDLE/IN_WAITROOM/IN_GAME/GAME_ENDED
+PARTICIPANT_TRACKER: ParticipantStateTracker = ParticipantStateTracker()
 
 # Pending multiplayer metrics for aggregation
 # Maps (scene_id, game_id) -> {player_id: metrics, ...}
@@ -500,6 +505,7 @@ def advance_scene(data):
                 pyodide_coordinator=PYODIDE_COORDINATOR,
                 pairing_manager=GROUP_MANAGER,
                 get_subject_rtt=_get_subject_rtt,
+                participant_state_tracker=PARTICIPANT_TRACKER,
             )
             GAME_MANAGERS[current_scene.scene_id] = game_manager
         else:
@@ -562,6 +568,26 @@ def join_game(data):
                 room=flask.request.sid,
             )
             return
+
+        # Check participant state before routing (Phase 54)
+        if not PARTICIPANT_TRACKER.can_join_waitroom(subject_id):
+            current_state = PARTICIPANT_TRACKER.get_state(subject_id)
+            logger.warning(
+                f"[JoinGame] Subject {subject_id} cannot join waitroom, current state: {current_state.name}"
+            )
+            socketio.emit(
+                "waiting_room_error",
+                {
+                    "message": f"Cannot join game while in state: {current_state.name}",
+                    "error_code": "INVALID_PARTICIPANT_STATE",
+                    "details": f"Current state: {current_state.name}"
+                },
+                room=flask.request.sid,
+            )
+            return
+
+        # Transition to IN_WAITROOM (Phase 54)
+        PARTICIPANT_TRACKER.transition_to(subject_id, ParticipantState.IN_WAITROOM)
 
         # Diagnostic logging for stale game routing bug (BUG-04)
         logger.info(
@@ -720,6 +746,9 @@ def leave_game(data):
                             )
                         PYODIDE_COORDINATOR.remove_player(game_id, player_id, notify_others=True)
                     break
+
+        # Reset participant state (Phase 54)
+        PARTICIPANT_TRACKER.reset(subject_id)
 
         PROCESSED_SUBJECT_NAMES.append(subject_id)
 
@@ -1855,6 +1884,10 @@ def handle_multiplayer_game_complete(data):
             )
             logger.info(f"[GameComplete] Archived session {game_id} with {len(subject_ids)} players")
 
+            # Transition all players to GAME_ENDED (Phase 54)
+            for sid in subject_ids:
+                PARTICIPANT_TRACKER.transition_to(sid, ParticipantState.GAME_ENDED)
+
 
 @socketio.on("participant_terminal_state")
 def handle_participant_terminal_state(data):
@@ -1886,6 +1919,9 @@ def handle_participant_terminal_state(data):
         f"[TerminalState] Subject {subject_id} entered terminal state: {reason} "
         f"(game: {game_id}, scene: {scene_id})"
     )
+
+    # Transition to GAME_ENDED (Phase 54)
+    PARTICIPANT_TRACKER.transition_to(subject_id, ParticipantState.GAME_ENDED)
 
     # Add to processed subjects so aggregator shows them as 'completed'
     if subject_id not in PROCESSED_SUBJECT_NAMES:
