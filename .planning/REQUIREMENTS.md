@@ -74,31 +74,31 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PARITY-01 | TBD | Pending |
-| PARITY-02 | TBD | Pending |
-| PARITY-03 | TBD | Pending |
-| PARITY-04 | TBD | Pending |
-| PARITY-05 | TBD | Pending |
-| PARITY-06 | TBD | Pending |
-| PARITY-07 | TBD | Pending |
-| STRESS-01 | TBD | Pending |
-| STRESS-02 | TBD | Pending |
-| STRESS-03 | TBD | Pending |
-| STRESS-04 | TBD | Pending |
-| STRESS-05 | TBD | Pending |
-| STRESS-06 | TBD | Pending |
-| STRESS-07 | TBD | Pending |
-| RECOVERY-01 | TBD | Pending |
-| RECOVERY-02 | TBD | Pending |
-| RECOVERY-03 | TBD | Pending |
-| RECOVERY-04 | TBD | Pending |
-| RECOVERY-05 | TBD | Pending |
-| RECOVERY-06 | TBD | Pending |
+| PARITY-01 | Phase 61 | Pending |
+| PARITY-02 | Phase 61 | Pending |
+| PARITY-03 | Phase 62 | Pending |
+| PARITY-04 | Phase 62 | Pending |
+| PARITY-05 | Phase 62 | Pending |
+| PARITY-06 | Phase 63 | Pending |
+| PARITY-07 | Phase 63 | Pending |
+| STRESS-01 | Phase 64 | Pending |
+| STRESS-02 | Phase 65 | Pending |
+| STRESS-03 | Phase 65 | Pending |
+| STRESS-04 | Phase 65 | Pending |
+| STRESS-05 | Phase 65 | Pending |
+| STRESS-06 | Phase 65 | Pending |
+| STRESS-07 | Phase 65 | Pending |
+| RECOVERY-01 | Phase 66 | Pending |
+| RECOVERY-02 | Phase 66 | Pending |
+| RECOVERY-03 | Phase 66 | Pending |
+| RECOVERY-04 | Phase 66 | Pending |
+| RECOVERY-05 | Phase 66 | Pending |
+| RECOVERY-06 | Phase 66 | Pending |
 
 **Coverage:**
 - v1 requirements: 20 total
-- Mapped to phases: 0 (awaiting roadmap)
-- Unmapped: 20
+- Mapped to phases: 20 ✓
+- Unmapped: 0
 
 ## Completed Requirements (v1.13)
 
@@ -122,4 +122,4 @@ Requirements completed in previous milestone, preserved for reference.
 
 ---
 *Requirements defined: 2026-02-03*
-*Last updated: 2026-02-03 after v1.14 requirements defined*
+*Last updated: 2026-02-03 after v1.14 roadmap created*

@@ -9,18 +9,18 @@ See: .planning/PROJECT.md (updated 2026-02-03)
 
 ## Current Position
 
-Phase: Not yet planned
-Plan: None
-Status: Milestone initialized
-Last activity: 2026-02-03 - Initialized v1.14 milestone
+Phase: 61 of 66 (Input Confirmation Protocol)
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-02-03 — Roadmap created (6 phases)
 
-Progress: [          ] 0%
+Progress: ░░░░░░░░░░ 0%
 
 ## Milestone History
 
 | Milestone | Phases | Status | Shipped |
 |-----------|--------|--------|---------|
-| v1.14 Data Parity Fix | TBD | Starting | - |
+| v1.14 Data Parity Fix | 61-66 | In Progress | - |
 | v1.13 Matchmaker Hardening | 57-60 | Complete | 2026-02-03 |
 | v1.12 Waiting Room Overhaul | 51-56 | Complete | 2026-02-03 |
 | v1.11 Data Export Edge Cases | 48-50 | Complete | 2026-02-03 |
@@ -284,28 +284,22 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-02-03
-Stopped at: Initialized v1.14 milestone
+Stopped at: Roadmap created (6 phases, 20 requirements)
 Resume file: None
 
 ### Next Steps
 
-**v1.14 Data Parity Fix milestone initialized.**
-
-Two-part goal:
-1. Fix the rare data parity divergence bug in `_promoteRemainingAtBoundary()`
-2. Add comprehensive multi-participant E2E stress tests
+**v1.14 roadmap created:**
+- Phase 61: Input Confirmation Protocol (PARITY-01, PARITY-02)
+- Phase 62: Data Parity Validation (PARITY-03, PARITY-04, PARITY-05)
+- Phase 63: Parity Test Stabilization (PARITY-06, PARITY-07)
+- Phase 64: Multi-Participant Test Infrastructure (STRESS-01)
+- Phase 65: Multi-Episode and Lifecycle Stress Tests (STRESS-02 through STRESS-07)
+- Phase 66: Server Recovery Validation (RECOVERY-01 through RECOVERY-06)
 
 Root cause for data parity bug identified:
 - `_promoteRemainingAtBoundary()` force-promotes unconfirmed speculative data at episode end
 - Under packet loss + active inputs, rollback replay uses predicted actions instead of confirmed inputs
 - Players record what they executed (may differ if packets were lost)
 
-New stress tests needed:
-- Many participants going through same server session
-- Multiple episodes per participant
-- Mid-game disconnection scenarios
-- Waiting room disconnection scenarios
-- Focus loss during gameplay
-- Mixed lifecycle scenarios (disconnect + complete + focus loss)
-
-Next action: `/gsd:define-requirements` or `/gsd:research-phase`
+Next action: `/gsd:plan-phase 61`
