@@ -864,7 +864,7 @@ Plans:
 | 55. Matchmaker Base Class | v1.12 | 2/2 | Complete | 2026-02-03 |
 | 56. Custom Attributes | v1.12 | 1/1 | Complete | 2026-02-03 |
 
-### 🚧 v1.13 Matchmaker Hardening (In Progress)
+### v1.13 Matchmaker Hardening (In Progress)
 
 **Milestone Goal:** Make matchmaking safer and smarter with P2P RTT probing and a single game creation path.
 
@@ -876,11 +876,12 @@ Plans:
   1. Matchmaker can signal two candidates to establish WebRTC probe connection
   2. Probe connection uses DataChannel (same as game connections)
   3. Probe connection closed automatically after measurement completes
-**Research flag:** Likely (WebRTC probe connection lifecycle without game context)
-**Plans:** TBD
+**Research flag:** Complete (WebRTC probe connection lifecycle documented in 57-RESEARCH.md)
+**Plans:** 2 plans
 
 Plans:
-- [ ] 57-01-PLAN.md — P2P probe signaling, connection lifecycle, cleanup
+- [ ] 57-01-PLAN.md — Server-side ProbeCoordinator and SocketIO handlers
+- [ ] 57-02-PLAN.md — Client-side ProbeConnection and ProbeManager integration
 
 #### Phase 58: RTT Measurement
 **Goal:** Reliable RTT measurement between matched candidates
@@ -931,11 +932,11 @@ Plans:
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 57. P2P Probe Infrastructure | v1.13 | 0/TBD | Not started | - |
+| 57. P2P Probe Infrastructure | v1.13 | 0/2 | Planned | - |
 | 58. RTT Measurement | v1.13 | 0/TBD | Not started | - |
 | 59. Matchmaker RTT Integration | v1.13 | 0/TBD | Not started | - |
 | 60. Single Game Creation Path | v1.13 | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-03 after v1.13 roadmap created (4 phases, 10 requirements)*
+*Last updated: 2026-02-03 after Phase 57 planned (2 plans)*
