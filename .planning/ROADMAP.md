@@ -880,8 +880,8 @@ Plans:
 **Plans:** 2 plans
 
 Plans:
-- [ ] 57-01-PLAN.md — Server-side ProbeCoordinator and SocketIO handlers
-- [ ] 57-02-PLAN.md — Client-side ProbeConnection and ProbeManager integration
+- [x] 57-01-PLAN.md — Server-side ProbeCoordinator and SocketIO handlers
+- [x] 57-02-PLAN.md — Client-side ProbeConnection and ProbeManager integration
 
 #### Phase 58: RTT Measurement
 **Goal:** Reliable RTT measurement between matched candidates
@@ -932,11 +932,11 @@ Plans:
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 57. P2P Probe Infrastructure | v1.13 | 0/2 | Planned | - |
+| 57. P2P Probe Infrastructure | v1.13 | 2/2 | Complete | 2026-02-03 |
 | 58. RTT Measurement | v1.13 | 0/TBD | Not started | - |
 | 59. Matchmaker RTT Integration | v1.13 | 0/TBD | Not started | - |
 | 60. Single Game Creation Path | v1.13 | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-03 after Phase 57 planned (2 plans)*
+*Last updated: 2026-02-03 after Phase 57 complete*

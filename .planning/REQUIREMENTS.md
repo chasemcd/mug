@@ -55,9 +55,9 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| RTT-01 | Phase 57 | Pending |
+| RTT-01 | Phase 57 | Complete |
 | RTT-02 | Phase 58 | Pending |
-| RTT-03 | Phase 57 | Pending |
+| RTT-03 | Phase 57 | Complete |
 | RTT-04 | Phase 59 | Pending |
 | RTT-05 | Phase 59 | Pending |
 | RTT-06 | Phase 59 | Pending |
@@ -73,4 +73,4 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 ---
 *Requirements defined: 2026-02-03*
-*Last updated: 2026-02-03 after roadmap created*
+*Last updated: 2026-02-03 after Phase 57 complete*
