@@ -11,9 +11,9 @@ Requirements for v1.14 Data Parity Fix. Each maps to roadmap phases.
 
 - [x] **PARITY-01**: Episode export waits for partner input confirmation before writing
 - [x] **PARITY-02**: Configurable confirmation timeout (default reasonable for 200ms+ latency)
-- [ ] **PARITY-03**: Both players export identical action sequences for every frame
-- [ ] **PARITY-04**: Both players export identical rewards for every frame
-- [ ] **PARITY-05**: Both players export identical infos for every frame
+- [x] **PARITY-03**: Both players export identical action sequences for every frame
+- [x] **PARITY-04**: Both players export identical rewards for every frame
+- [x] **PARITY-05**: Both players export identical infos for every frame
 - [ ] **PARITY-06**: `test_active_input_with_latency[chromium-100]` passes consistently (10+ runs)
 - [ ] **PARITY-07**: `test_active_input_with_packet_loss` passes consistently (10+ runs)
 
@@ -76,9 +76,9 @@ Which phases cover which requirements. Updated by create-roadmap.
 |-------------|-------|--------|
 | PARITY-01 | Phase 61 | Complete |
 | PARITY-02 | Phase 61 | Complete |
-| PARITY-03 | Phase 62 | Pending |
-| PARITY-04 | Phase 62 | Pending |
-| PARITY-05 | Phase 62 | Pending |
+| PARITY-03 | Phase 62 | Complete |
+| PARITY-04 | Phase 62 | Complete |
+| PARITY-05 | Phase 62 | Complete |
 | PARITY-06 | Phase 63 | Pending |
 | PARITY-07 | Phase 63 | Pending |
 | STRESS-01 | Phase 64 | Pending |
@@ -122,4 +122,4 @@ Requirements completed in previous milestone, preserved for reference.
 
 ---
 *Requirements defined: 2026-02-03*
-*Last updated: 2026-02-03 after Phase 61 complete*
+*Last updated: 2026-02-03 after Phase 62 complete*
