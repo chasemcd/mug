@@ -10,7 +10,7 @@ Requirements for v1.13 Matchmaker Hardening. Each maps to roadmap phases.
 ### P2P RTT Probing
 
 - [ ] **RTT-01**: Matchmaker can establish WebRTC probe connection between candidate participants
-- [ ] **RTT-02**: Probe measures actual P2P RTT between candidates (specified number of pings)
+- [x] **RTT-02**: Probe measures actual P2P RTT between candidates (specified number of pings)
 - [ ] **RTT-03**: Probe connection is closed after measurement completes
 - [ ] **RTT-04**: Matchmaker constructor accepts `max_p2p_rtt_ms` threshold parameter
 - [ ] **RTT-05**: `find_match()` receives measured RTT between candidates
@@ -56,7 +56,7 @@ Which phases cover which requirements. Updated by create-roadmap.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | RTT-01 | Phase 57 | Complete |
-| RTT-02 | Phase 58 | Pending |
+| RTT-02 | Phase 58 | Complete |
 | RTT-03 | Phase 57 | Complete |
 | RTT-04 | Phase 59 | Pending |
 | RTT-05 | Phase 59 | Pending |
@@ -73,4 +73,4 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 ---
 *Requirements defined: 2026-02-03*
-*Last updated: 2026-02-03 after Phase 57 complete*
+*Last updated: 2026-02-03 after Phase 58 complete*
