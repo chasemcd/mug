@@ -34,6 +34,7 @@ from interactive_gym.configurations import (
 from interactive_gym.server import remote_game, utils, pyodide_game_coordinator, player_pairing_manager
 from interactive_gym.server.remote_game import SessionState
 from interactive_gym.server.participant_state import ParticipantState
+from interactive_gym.server.matchmaker import Matchmaker, MatchCandidate, FIFOMatchmaker
 from interactive_gym.scenes import stager, gym_scene, scene
 import flask_socketio
 
@@ -53,6 +54,7 @@ class GameManager:
         pairing_manager: player_pairing_manager.PlayerPairingManager | None = None,
         get_subject_rtt: callable | None = None,
         participant_state_tracker=None,  # Optional for backward compatibility
+        matchmaker: Matchmaker | None = None,  # Phase 55: pluggable matchmaking
     ):
         assert isinstance(scene, gym_scene.GymScene)
         self.scene = scene
@@ -62,6 +64,7 @@ class GameManager:
         self.pairing_manager = pairing_manager
         self.get_subject_rtt = get_subject_rtt  # Callback to get RTT for a subject
         self.participant_state_tracker = participant_state_tracker  # Phase 54
+        self.matchmaker = matchmaker or FIFOMatchmaker()  # Phase 55: defaults to FIFO
 
         # Data structure to save subjects by their socket id
         self.subject = utils.ThreadSafeDict()
