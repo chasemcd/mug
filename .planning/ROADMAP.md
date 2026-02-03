@@ -739,7 +739,7 @@ See [milestones/v1.11-ROADMAP.md](milestones/v1.11-ROADMAP.md) for full details.
 **Plans:** 1 plan
 
 Plans:
-- [ ] 51-01-PLAN.md - Diagnostic logging, state validation, client error event
+- [x] 51-01-PLAN.md - Diagnostic logging, state validation, client error event
 
 #### Phase 52: Comprehensive Cleanup
 **Goal:** All exit paths clean all state
@@ -856,7 +856,7 @@ Plans:
 | 48. isFocused Column | v1.11 | 1/1 | Complete | 2026-02-02 |
 | 49. Episode Boundary Row | v1.11 | 1/1 | Complete | 2026-02-02 |
 | 50. Stress Verification | v1.11 | 1/1 | Complete | 2026-02-02 |
-| 51. Diagnostic Logging | v1.12 | 0/1 | Not started | — |
+| 51. Diagnostic Logging | v1.12 | 1/1 | Complete | 2026-02-02 |
 | 52. Comprehensive Cleanup | v1.12 | 0/1 | Not started | — |
 | 53. Session Lifecycle | v1.12 | 0/1 | Not started | — |
 | 54. ParticipantStateTracker | v1.12 | 0/1 | Not started | — |

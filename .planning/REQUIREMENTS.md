@@ -12,7 +12,7 @@ Requirements for v1.12 release. Each maps to roadmap phases.
 - [ ] **BUG-01**: Stale game manager cleanup prevents old games from capturing new participants
 - [ ] **BUG-02**: Participant routing never sends players to games in progress
 - [ ] **BUG-03**: Game lifecycle cleanup runs on all exit paths (normal and abnormal termination)
-- [ ] **BUG-04**: Client receives error event when waiting room state is invalid
+- [x] **BUG-04**: Client receives error event when waiting room state is invalid
 
 ### Session Lifecycle
 
@@ -74,7 +74,7 @@ Which phases cover which requirements. Updated by create-roadmap.
 | BUG-01 | Phase 52 | Pending |
 | BUG-02 | Phase 52 | Pending |
 | BUG-03 | Phase 52 | Pending |
-| BUG-04 | Phase 51 | Pending |
+| BUG-04 | Phase 51 | Complete |
 | SESS-01 | Phase 53 | Pending |
 | SESS-02 | Phase 53 | Pending |
 | SESS-03 | Phase 52 | Pending |
@@ -93,4 +93,4 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 ---
 *Requirements defined: 2026-02-02*
-*Last updated: 2026-02-02 after roadmap created*
+*Last updated: 2026-02-02 after phase 51 complete*
