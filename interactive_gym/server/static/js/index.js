@@ -79,14 +79,10 @@ const ProbeManager = {
     },
 
     async _onProbeConnected(probeSessionId) {
-        console.log(`[ProbeManager] Probe ${probeSessionId} connected, measuring RTT`);
+        console.log(`[ProbeManager] Probe ${probeSessionId} connected, measuring RTT via ping-pong`);
 
-        // Give connection a moment to stabilize, then measure RTT
-        await new Promise(resolve => setTimeout(resolve, 500));
-
-        // Get RTT measurement
-        const rtt = await this.activeProbe.getRTT();
-        console.log(`[ProbeManager] Probe ${probeSessionId} RTT: ${rtt}ms`);
+        // Measure RTT using ping-pong protocol (no stabilization delay needed)
+        const rtt = await this.activeProbe.measureRTT();
 
         // Report result to server
         this.socket.emit('probe_result', {
