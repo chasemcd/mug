@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-03)
 ## Current Position
 
 Phase: 59 of 60 (Matchmaker RTT Integration)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-02-03 — Phase 58 verified and complete
+Plan: 01 of 01 (complete)
+Status: Phase complete
+Last activity: 2026-02-03 — Completed 59-01-PLAN.md
 
-Progress: [█████░░░░░] 50%
+Progress: [██████░░░░] 60%
 
 ## Milestone History
 
@@ -140,6 +140,12 @@ Progress: [█████░░░░░] 50%
 - `.planning/phases/57-p2p-probe-infrastructure/57-01-SUMMARY.md`
 - `.planning/phases/57-p2p-probe-infrastructure/57-02-SUMMARY.md`
 - `.planning/phases/58-rtt-measurement/58-01-SUMMARY.md`
+- `.planning/phases/59-matchmaker-rtt-integration/59-01-SUMMARY.md`
+
+**Matchmaker RTT Integration (v1.13 Phase 59 - added):**
+- `interactive_gym/server/matchmaker.py` - max_p2p_rtt_ms param, should_reject_for_rtt() method
+- `interactive_gym/server/game_manager.py` - probe_coordinator param, _pending_matches, _probe_and_create_game(), _on_probe_complete(), _remove_from_waitroom(), _create_game_for_match_internal()
+- `interactive_gym/server/app.py` - probe_coordinator=PROBE_COORDINATOR passed to GameManager
 
 **RTT Ping-Pong Protocol (v1.13 Phase 58 - added):**
 - `interactive_gym/server/static/js/probe_connection.js` - pendingPings Map, _handleDataChannelMessage(), measureRTT(), _sendPing()
@@ -268,6 +274,13 @@ Progress: [█████░░░░░] 50%
 ### Decisions
 
 See: .planning/PROJECT.md Key Decisions table
+
+**v1.13 Phase 59 decisions:**
+- P2P RTT filtering after matchmaker proposes (not inside find_match)
+- Candidates added to waitroom during probe (stay there on rejection)
+- None threshold = no probing (default behavior unchanged)
+- Measurement failure (None RTT) triggers rejection for safety
+- _pending_matches keyed by probe_session_id for async callback lookup
 
 **v1.13 Phase 58 decisions:**
 - JSON message format for ping/pong (not binary) - small payload, simplicity over micro-optimization
@@ -499,17 +512,17 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-02-03
-Stopped at: Completed 58-01-PLAN.md
+Stopped at: Completed 59-01-PLAN.md
 Resume file: None
 
 ### Next Steps
 
-**Phase 58 complete.** RTT ping-pong protocol implemented.
+**Phase 59 complete.** Matchmaker RTT integration implemented.
 
-Next action: `/gsd:plan-phase 59`
+Next action: `/gsd:plan-phase 60`
 
 Phases:
 - Phase 57: P2P Probe Infrastructure (RTT-01, RTT-03) [Complete]
 - Phase 58: RTT Measurement (RTT-02) [Complete]
-- Phase 59: Matchmaker RTT Integration (RTT-04, RTT-05, RTT-06) [Next]
-- Phase 60: Single Game Creation Path (GAME-01, GAME-02, GAME-03, GAME-04)
+- Phase 59: Matchmaker RTT Integration (RTT-04, RTT-05, RTT-06) [Complete]
+- Phase 60: Single Game Creation Path (GAME-01, GAME-02, GAME-03, GAME-04) [Next]
