@@ -914,7 +914,7 @@ Plans:
 - [x] 59-01-PLAN.md — Matchmaker RTT config, probe-then-match orchestration, rejection handling
 
 #### Phase 60: Single Game Creation Path
-**Goal:** One code path creates games (matchmaker → game)
+**Goal:** One code path creates games (matchmaker -> game)
 **Depends on:** Phase 59
 **Requirements:** GAME-01, GAME-02, GAME-03, GAME-04
 **Success Criteria** (what must be TRUE):
@@ -923,7 +923,7 @@ Plans:
   3. Game object only created after all participants assigned
   4. No orphaned participants in created games
 **Research flag:** Unlikely (refactoring existing code paths)
-**Plans:** TBD
+**Plans:** 1 plan
 
 Plans:
 - [ ] 60-01-PLAN.md — Remove group reunion, enforce single creation path, document TODO
@@ -935,8 +935,8 @@ Plans:
 | 57. P2P Probe Infrastructure | v1.13 | 2/2 | Complete | 2026-02-03 |
 | 58. RTT Measurement | v1.13 | 1/1 | Complete | 2026-02-03 |
 | 59. Matchmaker RTT Integration | v1.13 | 1/1 | Complete | 2026-02-03 |
-| 60. Single Game Creation Path | v1.13 | 0/TBD | Not started | - |
+| 60. Single Game Creation Path | v1.13 | 0/1 | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-03 after Phase 59 complete*
+*Last updated: 2026-02-03 after Phase 60 planned*
