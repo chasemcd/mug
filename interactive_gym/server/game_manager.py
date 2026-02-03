@@ -94,6 +94,55 @@ class GameManager:
     def subject_in_game(self, subject_id: SubjectID) -> bool:
         return subject_id in self.subject_games
 
+    def validate_subject_state(self, subject_id: SubjectID) -> tuple[bool, str | None]:
+        """Validate subject state before adding to a game.
+
+        Checks for invalid states that could cause routing issues:
+        - Subject already in subject_games but game doesn't exist
+        - Subject in subject_rooms but not in subject_games
+        - Subject in a game that's already ended
+
+        Returns:
+            (is_valid, error_message) - True if state is valid, False with error message if not
+        """
+        # Check for orphaned subject_games entry
+        if subject_id in self.subject_games:
+            game_id = self.subject_games[subject_id]
+            if game_id not in self.games:
+                logger.warning(
+                    f"[StateValidation] Subject {subject_id} has orphaned subject_games entry. "
+                    f"game_id={game_id} not in games. Cleaning up."
+                )
+                # Clean up orphaned entry
+                del self.subject_games[subject_id]
+                if subject_id in self.subject_rooms:
+                    del self.subject_rooms[subject_id]
+                return (True, None)  # Cleaned up, can proceed
+
+            game = self.games[game_id]
+            # Check if game is in a terminal state
+            if game.status == remote_game.GameStatus.Done or game.status == remote_game.GameStatus.Inactive:
+                logger.warning(
+                    f"[StateValidation] Subject {subject_id} mapped to finished game. "
+                    f"game_id={game_id}, status={game.status}. Cleaning up."
+                )
+                # Clean up stale entry
+                game.remove_human_player(subject_id)
+                del self.subject_games[subject_id]
+                if subject_id in self.subject_rooms:
+                    del self.subject_rooms[subject_id]
+                return (True, None)  # Cleaned up, can proceed
+
+        # Check for orphaned subject_rooms entry (should not exist without subject_games)
+        if subject_id in self.subject_rooms and subject_id not in self.subject_games:
+            logger.warning(
+                f"[StateValidation] Subject {subject_id} has orphaned subject_rooms entry. Cleaning up."
+            )
+            del self.subject_rooms[subject_id]
+            return (True, None)  # Cleaned up, can proceed
+
+        return (True, None)  # All checks passed
+
     def _create_game(self) -> remote_game.RemoteGameV2:
         """Create a Game object corresponding to the specified Scene."""
         try:
