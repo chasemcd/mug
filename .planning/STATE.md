@@ -294,6 +294,8 @@ All requirements for v1.13 are complete:
 - RTT-01 through RTT-06: P2P RTT probing and filtering (Phases 57-59)
 - GAME-01 through GAME-04: Single game creation path (Phase 60)
 
+Next action: `/gsd:audit-milestone`
+
 Future work documented in REQUIREMENTS.md:
 - v2 Requirements: MATCH-01/02/03 (enhanced matching)
 - v2 Requirements: REUN-01/REUN-02 (group reunion matchmaker variant)
