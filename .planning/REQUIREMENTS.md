@@ -20,16 +20,16 @@ Requirements for v1.11 Data Export Edge Cases milestone. Each maps to roadmap ph
 
 ### Dual-Buffer Stress Handling
 
-- [ ] **STRESS-01**: `test_active_input_with_latency[100]` passes without xfail marker
-- [ ] **STRESS-02**: `test_active_input_with_latency[200]` passes without xfail marker
-- [ ] **STRESS-03**: `test_active_input_with_packet_loss` passes without xfail marker
-- [ ] **STRESS-04**: `test_focus_loss_mid_episode_parity` passes without xfail marker
-- [ ] **STRESS-05**: `test_focus_loss_episode_boundary_parity` passes without xfail marker
+- [x] **STRESS-01**: `test_active_input_with_latency[100]` passes without xfail marker
+- [x] **STRESS-02**: `test_active_input_with_latency[200]` passes without xfail marker
+- [x] **STRESS-03**: `test_active_input_with_packet_loss` passes without xfail marker
+- [x] **STRESS-04**: `test_focus_loss_mid_episode_parity` passes without xfail marker
+- [x] **STRESS-05**: `test_focus_loss_episode_boundary_parity` passes without xfail marker
 
 ### Verification
 
-- [ ] **VERIFY-01**: All E2E tests pass with no xfail markers remaining
-- [ ] **VERIFY-02**: Research data exports from both players are byte-identical (ignoring timestamps)
+- [x] **VERIFY-01**: All E2E tests pass with no xfail markers remaining
+- [x] **VERIFY-02**: Research data exports from both players are byte-identical (ignoring timestamps)
 
 ## v2 Requirements
 
@@ -64,13 +64,13 @@ Deferred to future release.
 | BOUND-01 | Phase 49 | Complete |
 | BOUND-02 | Phase 49 | Complete |
 | BOUND-03 | Phase 49 | Complete |
-| STRESS-01 | Phase 50 | Pending |
-| STRESS-02 | Phase 50 | Pending |
-| STRESS-03 | Phase 50 | Pending |
-| STRESS-04 | Phase 50 | Pending |
-| STRESS-05 | Phase 50 | Pending |
-| VERIFY-01 | Phase 50 | Pending |
-| VERIFY-02 | Phase 50 | Pending |
+| STRESS-01 | Phase 50 | Complete |
+| STRESS-02 | Phase 50 | Complete |
+| STRESS-03 | Phase 50 | Complete |
+| STRESS-04 | Phase 50 | Complete |
+| STRESS-05 | Phase 50 | Complete |
+| VERIFY-01 | Phase 50 | Complete |
+| VERIFY-02 | Phase 50 | Complete |
 
 **Coverage:**
 - v1.11 requirements: 12 total
@@ -79,4 +79,4 @@ Deferred to future release.
 
 ---
 *Requirements defined: 2026-02-02*
-*Last updated: 2026-02-02 after Phase 49 complete*
+*Last updated: 2026-02-02 after Phase 50 complete (v1.11 milestone complete)*
