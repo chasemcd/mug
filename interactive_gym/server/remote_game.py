@@ -8,6 +8,7 @@ import threading
 import time
 import typing
 import uuid
+from enum import Enum, auto
 
 import eventlet
 import numpy as np
@@ -21,6 +22,19 @@ from interactive_gym.server import utils
 from interactive_gym.scenes import scene, gym_scene
 
 logger = logging.getLogger(__name__)
+
+
+class SessionState(Enum):
+    """Session lifecycle states per SESS-01.
+
+    These states track the overall session lifecycle, orthogonal to GameStatus
+    which tracks the game-loop phase (Active/Reset/Done).
+    """
+    WAITING = auto()     # In waiting room, waiting for players
+    MATCHED = auto()     # All players matched, about to validate
+    VALIDATING = auto()  # P2P validation in progress
+    PLAYING = auto()     # Game running
+    ENDED = auto()       # Terminal, session will be destroyed
 
 
 @dataclasses.dataclass(frozen=True)
@@ -40,6 +54,7 @@ class RemoteGameV2:
     ):
         self.scene = scene
         self.status = GameStatus.Inactive
+        self.session_state = SessionState.WAITING  # Session lifecycle state (SESS-01)
         self.lock = threading.Lock()
         self.reset_event: eventlet.event.Event | None = None
         self.set_reset_event()
@@ -93,6 +108,37 @@ class RemoteGameV2:
     def set_reset_event(self) -> None:
         """Reinitialize the reset event."""
         self.reset_event = eventlet.event.Event()
+
+    # Valid session state transitions (SESS-01)
+    VALID_TRANSITIONS = {
+        SessionState.WAITING: {SessionState.MATCHED, SessionState.ENDED},
+        SessionState.MATCHED: {SessionState.VALIDATING, SessionState.ENDED},
+        SessionState.VALIDATING: {SessionState.PLAYING, SessionState.WAITING, SessionState.ENDED},
+        SessionState.PLAYING: {SessionState.ENDED},
+        SessionState.ENDED: set(),  # Terminal state
+    }
+
+    def transition_to(self, new_state: SessionState) -> bool:
+        """Transition session to new state if valid.
+
+        Args:
+            new_state: Target session state
+
+        Returns:
+            True if transition successful, False if invalid
+        """
+        if new_state not in self.VALID_TRANSITIONS.get(self.session_state, set()):
+            logger.error(
+                f"Invalid session transition: {self.session_state} -> {new_state}. "
+                f"Valid transitions from {self.session_state}: "
+                f"{self.VALID_TRANSITIONS.get(self.session_state, set())}"
+            )
+            return False
+
+        old_state = self.session_state
+        self.session_state = new_state
+        logger.info(f"Session {self.game_id}: {old_state.name} -> {new_state.name}")
+        return True
 
     def _build_env(self) -> None:
         self.env = self.scene.env_creator(
