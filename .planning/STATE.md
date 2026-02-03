@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-02)
 ## Current Position
 
 Phase: 54 of 56 (ParticipantStateTracker)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-02-03 — Phase 53 complete
+Plan: 01 of 01 complete
+Status: Phase complete
+Last activity: 2026-02-03 — Completed 54-01-PLAN.md
 
-Progress: [█████░░░░░] 50%
+Progress: [██████░░░░] 54%
 
 ## Milestone History
 
@@ -130,6 +130,12 @@ Progress: [█████░░░░░] 50%
 - `.planning/phases/51-diagnostic-logging/51-01-SUMMARY.md`
 - `.planning/phases/52-comprehensive-cleanup/52-01-SUMMARY.md`
 - `.planning/phases/53-session-lifecycle/53-01-SUMMARY.md`
+- `.planning/phases/54-participant-state-tracker/54-01-SUMMARY.md`
+
+**ParticipantStateTracker (v1.12 Phase 54 - added):**
+- `interactive_gym/server/participant_state.py` - ParticipantState enum (IDLE, IN_WAITROOM, IN_GAME, GAME_ENDED), VALID_TRANSITIONS, ParticipantStateTracker class
+- `interactive_gym/server/app.py` - PARTICIPANT_TRACKER global, can_join_waitroom() check in join_game, state transitions at game completion handlers
+- `interactive_gym/server/game_manager.py` - participant_state_tracker parameter, IN_GAME/GAME_ENDED transitions
 
 **Session Lifecycle (v1.12 Phase 53 - added):**
 - `interactive_gym/server/remote_game.py` - SessionState enum (WAITING, MATCHED, VALIDATING, PLAYING, ENDED), VALID_TRANSITIONS, transition_to() method
@@ -232,6 +238,12 @@ Progress: [█████░░░░░] 50%
 ### Decisions
 
 See: .planning/PROJECT.md Key Decisions table
+
+**v1.12 Phase 54 decisions:**
+- ParticipantState is complementary to SessionState (participant lifecycle vs game lifecycle)
+- IDLE is implicit (not tracked) - only tracked when in waitroom/game/ended
+- transition_to() returns bool and logs invalid transitions (doesn't throw)
+- participant_state_tracker parameter optional in GameManager for backward compatibility
 
 **v1.12 Phase 53 decisions:**
 - SessionState is orthogonal to GameStatus (lifecycle vs game-loop phase)
@@ -432,17 +444,16 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-02-03
-Stopped at: Completed 53-01-PLAN.md
+Stopped at: Completed 54-01-PLAN.md
 Resume file: None
 
 ### Next Steps
 
-**Phase 53 complete.** Session lifecycle states with explicit SessionState enum (WAITING, MATCHED, VALIDATING, PLAYING, ENDED), validated transitions, and logged state changes.
+**Phase 54 complete.** ParticipantStateTracker as single source of truth for participant lifecycle states with validated transitions at join, start, end, and leave points.
 
-Remaining phases 54-56:
-1. Phase 54: ParticipantStateTracker
-2. Phase 55: Matchmaker Base Class
-3. Phase 56: Custom Attributes & Assignment Logging
+Remaining phases 55-56:
+1. Phase 55: Matchmaker Base Class
+2. Phase 56: Custom Attributes & Assignment Logging
 
 **Next:**
-`/gsd:plan-phase 54`
+`/gsd:plan-phase 55`
