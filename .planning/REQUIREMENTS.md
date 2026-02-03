@@ -71,26 +71,26 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| BUG-01 | Pending | Pending |
-| BUG-02 | Pending | Pending |
-| BUG-03 | Pending | Pending |
-| BUG-04 | Pending | Pending |
-| SESS-01 | Pending | Pending |
-| SESS-02 | Pending | Pending |
-| SESS-03 | Pending | Pending |
-| MATCH-01 | Pending | Pending |
-| MATCH-02 | Pending | Pending |
-| MATCH-03 | Pending | Pending |
-| MATCH-04 | Pending | Pending |
-| MATCH-05 | Pending | Pending |
-| DATA-01 | Pending | Pending |
-| DATA-02 | Pending | Pending |
+| BUG-01 | Phase 52 | Pending |
+| BUG-02 | Phase 52 | Pending |
+| BUG-03 | Phase 52 | Pending |
+| BUG-04 | Phase 51 | Pending |
+| SESS-01 | Phase 53 | Pending |
+| SESS-02 | Phase 53 | Pending |
+| SESS-03 | Phase 52 | Pending |
+| MATCH-01 | Phase 55 | Pending |
+| MATCH-02 | Phase 55 | Pending |
+| MATCH-03 | Phase 55 | Pending |
+| MATCH-04 | Phase 55 | Pending |
+| MATCH-05 | Phase 55 | Pending |
+| DATA-01 | Phase 56 | Pending |
+| DATA-02 | Phase 56 | Pending |
 
 **Coverage:**
 - v1 requirements: 14 total
-- Mapped to phases: 0
-- Unmapped: 14 ⚠️
+- Mapped to phases: 14 ✓
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-02*
-*Last updated: 2026-02-02 after initial definition*
+*Last updated: 2026-02-02 after roadmap created*

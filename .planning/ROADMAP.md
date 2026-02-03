@@ -14,6 +14,7 @@
 - ✅ **v1.9 Data Parity Testing** - Phases 40-44 (shipped 2026-02-01)
 - ✅ **v1.10 E2E Test Fix** - Phases 45-47 (shipped 2026-02-02)
 - ✅ **v1.11 Data Export Edge Cases** - Phases 48-50 (shipped 2026-02-02) → [archive](milestones/v1.11-ROADMAP.md)
+- 🚧 **v1.12 Waiting Room Overhaul** - Phases 51-56 (in progress)
 
 ## Phases
 
@@ -722,6 +723,146 @@ See [milestones/v1.11-ROADMAP.md](milestones/v1.11-ROADMAP.md) for full details.
 | 49. Episode Boundary Row | v1.11 | 1/1 | Complete | 2026-02-02 |
 | 50. Stress Verification | v1.11 | 1/1 | Complete | 2026-02-02 |
 
+### 🚧 v1.12 Waiting Room Overhaul (In Progress)
+
+**Milestone Goal:** Fix waiting room bugs and build a pluggable Matchmaker abstraction for custom participant pairing logic.
+
+#### Phase 51: Diagnostic Logging & State Validation
+**Goal:** Understand exact failure path and add immediate prevention
+**Depends on:** Phase 50
+**Requirements:** BUG-04
+**Success Criteria** (what must be TRUE):
+  1. `join_game` logs whether `subject_id in subject_games` at entry
+  2. State validation runs before routing to GameManager
+  3. Client receives error event when waiting room state is invalid
+**Research flag:** Unlikely (standard logging patterns)
+**Plans:** TBD
+
+Plans:
+- [ ] 51-01: Diagnostic logging and client error event
+
+#### Phase 52: Comprehensive Cleanup
+**Goal:** All exit paths clean all state
+**Depends on:** Phase 51
+**Requirements:** BUG-01, BUG-02, BUG-03, SESS-03
+**Success Criteria** (what must be TRUE):
+  1. `cleanup_game()` cleans `subject_games`, `subject_rooms`, `active_games`
+  2. New participants never routed to games in progress
+  3. Cleanup runs on all exit paths (normal and abnormal termination)
+  4. Cleanup methods are idempotent (safe to call multiple times)
+**Research flag:** Unlikely (codebase-specific, patterns documented)
+**Plans:** TBD
+
+Plans:
+- [ ] 52-01: Comprehensive cleanup implementation
+
+#### Phase 53: Session Lifecycle
+**Goal:** Each game has explicit lifecycle, Session destroyed when game ends
+**Depends on:** Phase 52
+**Requirements:** SESS-01, SESS-02
+**Success Criteria** (what must be TRUE):
+  1. Session has explicit states (WAITING → MATCHED → VALIDATING → PLAYING → ENDED)
+  2. Session object is destroyed (not reused) when game ends
+  3. GameManager creates Session per-game, not per-scene
+**Research flag:** Maybe (`python-statemachine` integration with Flask-SocketIO async)
+**Plans:** TBD
+
+Plans:
+- [ ] 53-01: Session lifecycle with explicit states
+
+#### Phase 54: ParticipantStateTracker
+**Goal:** Single source of truth prevents routing to wrong game
+**Depends on:** Phase 53
+**Requirements:** (infrastructure supporting BUG-01, BUG-02)
+**Success Criteria** (what must be TRUE):
+  1. ParticipantStateTracker tracks participant states (IDLE, IN_WAITROOM, IN_GAME, GAME_ENDED)
+  2. State checked before routing to GameManager
+  3. State updated at every transition point
+**Research flag:** Unlikely (simple state tracking)
+**Plans:** TBD
+
+Plans:
+- [ ] 54-01: ParticipantStateTracker implementation
+
+#### Phase 55: Matchmaker Base Class
+**Goal:** Pluggable matchmaking abstraction
+**Depends on:** Phase 54
+**Requirements:** MATCH-01, MATCH-02, MATCH-03, MATCH-04, MATCH-05
+**Success Criteria** (what must be TRUE):
+  1. Matchmaker abstract base class with `find_match()` method
+  2. `find_match()` receives arriving participant, waiting list, and group size
+  3. `find_match()` returns list of matched participants or None to continue waiting
+  4. FIFOMatchmaker default implementation works (current behavior preserved)
+  5. Matchmaker configurable per-scene via experiment config
+**Research flag:** Unlikely (oTree pattern well-documented)
+**Plans:** TBD
+
+Plans:
+- [ ] 55-01: Matchmaker base class and FIFOMatchmaker
+- [ ] 55-02: Configuration integration
+
+#### Phase 56: Custom Attributes & Assignment Logging
+**Goal:** Researchers can pass attributes and analyze match decisions
+**Depends on:** Phase 55
+**Requirements:** DATA-01, DATA-02
+**Success Criteria** (what must be TRUE):
+  1. Assignment logging records match decisions (who matched with whom, timestamp)
+  2. RTT to server exposed in ParticipantData for matchmaker use
+**Research flag:** Unlikely (additive)
+**Plans:** TBD
+
+Plans:
+- [ ] 56-01: Assignment logging and RTT exposure
+
+## Progress
+
+| Phase | Milestone | Plans Complete | Status | Completed |
+|-------|-----------|----------------|--------|-----------|
+| 11. Hash Infrastructure | v1.1 | 1/1 | Complete | 2026-01-21 |
+| 12. P2P Hash Exchange | v1.1 | 1/1 | Complete | 2026-01-21 |
+| 13. Mismatch Detection | v1.1 | 1/1 | Complete | 2026-01-21 |
+| 14. Validation Export | v1.1 | 1/1 | Complete | 2026-01-21 |
+| 15. Entry Screening Rules | v1.2 | 1/1 | Complete | 2026-01-21 |
+| 16. Continuous Monitoring | v1.2 | 1/1 | Complete | 2026-01-21 |
+| 17. Multiplayer Exclusion | v1.2 | 1/1 | Complete | 2026-01-21 |
+| 18. Custom Callbacks | v1.2 | 1/1 | Complete | 2026-01-22 |
+| 19. Waiting Room Validation | v1.3 | 1/1 | Complete | 2026-01-22 |
+| 20. Mid-Game Reconnection | v1.3 | 2/2 | Complete | 2026-01-22 |
+| 21. Per-Round Health Check | v1.3 | 1/1 | Complete | 2026-01-22 |
+| 22. Latency Telemetry | v1.3 | 1/1 | Complete | 2026-01-22 |
+| 23. Partner Disconnection | v1.4 | 1/1 | Complete | 2026-01-22 |
+| 24. Web Worker Timer | v1.5 | 1/1 | Complete | 2026-01-23 |
+| 25. Focus Detection | v1.5 | 1/1 | Complete | 2026-01-23 |
+| 26. Resync & Partner UX | v1.5 | 1/1 | Complete | 2026-01-23 |
+| 27. Timeout & Telemetry | v1.5 | 1/1 | Complete | 2026-01-23 |
+| 28. Pipeline Instrumentation | v1.6 | 1/1 | Complete | 2026-01-24 |
+| 29-31. Deferred | v1.6 | — | Deferred | — |
+| 32. Dashboard Summary | v1.7 | 1/1 | Complete | 2026-01-25 |
+| 33. Session List | v1.7 | 1/1 | Complete | 2026-01-25 |
+| 34. Session Detail | v1.7 | 1/1 | Complete | 2026-01-25 |
+| 35. Layout & Polish | v1.7 | 1/1 | Complete | 2026-01-25 |
+| 36. Buffer Split | v1.8 | 1/1 | Complete | 2026-01-30 |
+| 37. Fast-Forward Fix | v1.8 | 1/1 | Complete | 2026-01-30 |
+| 38. Episode Boundary | v1.8 | 1/1 | Complete | 2026-01-30 |
+| 39. Verification & Metadata | v1.8 | 1/1 | Complete | 2026-01-30 |
+| 40. Test Infrastructure | v1.9 | 2/2 | Complete | 2026-01-31 |
+| 41. Latency Injection | v1.9 | 1/1 | Complete | 2026-01-31 |
+| 42. Network Disruption | v1.9 | 1/1 | Complete | 2026-01-31 |
+| 43. Data Comparison | v1.9 | 1/1 | Complete | 2026-01-31 |
+| 44. Manual Protocol | v1.9 | 1/1 | Complete | 2026-02-01 |
+| 45. Episode Completion Fix | v1.10 | 1/1 | Complete | 2026-02-02 |
+| 46. Test Suite Verification | v1.10 | 1/1 | Complete | 2026-02-02 |
+| 47. Focus Loss Testing | v1.10 | 1/1 | Complete | 2026-02-02 |
+| 48. isFocused Column | v1.11 | 1/1 | Complete | 2026-02-02 |
+| 49. Episode Boundary Row | v1.11 | 1/1 | Complete | 2026-02-02 |
+| 50. Stress Verification | v1.11 | 1/1 | Complete | 2026-02-02 |
+| 51. Diagnostic Logging | v1.12 | 0/1 | Not started | — |
+| 52. Comprehensive Cleanup | v1.12 | 0/1 | Not started | — |
+| 53. Session Lifecycle | v1.12 | 0/1 | Not started | — |
+| 54. ParticipantStateTracker | v1.12 | 0/1 | Not started | — |
+| 55. Matchmaker Base Class | v1.12 | 0/2 | Not started | — |
+| 56. Custom Attributes | v1.12 | 0/1 | Not started | — |
+
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-02 after v1.11 milestone complete*
+*Last updated: 2026-02-02 after v1.12 roadmap created (6 phases, 14 requirements)*
