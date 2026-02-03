@@ -2642,8 +2642,19 @@ def run(config):
     CONFIG = config
     GENERIC_STAGER = config.stager
 
-    # Initialize Pyodide coordinator
-    PYODIDE_COORDINATOR = pyodide_game_coordinator.PyodideGameCoordinator(socketio)
+    # Helper to look up GameManager by game_id for session state transitions
+    def get_game_manager_for_game(game_id):
+        """Look up which GameManager owns a specific game_id."""
+        for scene_id, gm_instance in GAME_MANAGERS.items():
+            if game_id in gm_instance.games:
+                return gm_instance
+        return None
+
+    # Initialize Pyodide coordinator with game_manager_getter for session state transitions
+    PYODIDE_COORDINATOR = pyodide_game_coordinator.PyodideGameCoordinator(
+        socketio,
+        game_manager_getter=get_game_manager_for_game
+    )
     logger.info("Initialized Pyodide multiplayer coordinator")
 
     # Initialize player group manager

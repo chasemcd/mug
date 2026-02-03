@@ -87,10 +87,11 @@ class PyodideGameCoordinator:
     5. Assign player IDs to symmetric peers
     """
 
-    def __init__(self, sio: flask_socketio.SocketIO):
+    def __init__(self, sio: flask_socketio.SocketIO, game_manager_getter: callable = None):
         self.sio = sio
         self.games: Dict[str, PyodideGameState] = {}
         self.lock = threading.Lock()
+        self.get_game_manager = game_manager_getter  # Returns GameManager for a game_id
 
         # Configuration
         self.action_timeout = 5.0  # Seconds to wait for actions
@@ -252,6 +253,15 @@ class PyodideGameCoordinator:
         """Mark game as active once all players joined."""
         game = self.games[game_id]
         game.is_active = True
+
+        # Transition RemoteGameV2 to PLAYING
+        if self.get_game_manager:
+            gm = self.get_game_manager(game_id)
+            if gm:
+                remote_game = gm.games.get(game_id)
+                if remote_game:
+                    from interactive_gym.server.remote_game import SessionState
+                    remote_game.transition_to(SessionState.PLAYING)
 
         # Initialize server runner if enabled
         if game.server_authoritative and game.server_runner:
@@ -665,6 +675,16 @@ class PyodideGameCoordinator:
 
             game.validation_start_time = time.time()
             game.p2p_validated_players = set()
+
+            # Transition RemoteGameV2 to VALIDATING if we have access
+            if self.get_game_manager:
+                gm = self.get_game_manager(game_id)
+                if gm:
+                    remote_game = gm.games.get(game_id)
+                    if remote_game:
+                        from interactive_gym.server.remote_game import SessionState
+                        remote_game.transition_to(SessionState.VALIDATING)
+
             logger.info(f"P2P validation started for game {game_id}")
             return True
 
