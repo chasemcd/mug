@@ -893,7 +893,7 @@ Plans:
   3. Measurement handles packet loss (timeout + retry)
   4. Measurement result returned to matchmaker
 **Research flag:** Unlikely (standard ping-pong over DataChannel)
-**Plans:** TBD
+**Plans:** 1 plan
 
 Plans:
 - [ ] 58-01-PLAN.md — RTT ping-pong protocol, measurement collection, timeout handling
@@ -933,10 +933,10 @@ Plans:
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 57. P2P Probe Infrastructure | v1.13 | 2/2 | Complete | 2026-02-03 |
-| 58. RTT Measurement | v1.13 | 0/TBD | Not started | - |
+| 58. RTT Measurement | v1.13 | 0/1 | Planned | - |
 | 59. Matchmaker RTT Integration | v1.13 | 0/TBD | Not started | - |
 | 60. Single Game Creation Path | v1.13 | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-03 after Phase 57 complete*
+*Last updated: 2026-02-03 after Phase 58 planned*
