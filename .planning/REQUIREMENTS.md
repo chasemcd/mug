@@ -1,57 +1,42 @@
-# Requirements: Interactive Gym v1.12 — Waiting Room Overhaul
+# Requirements: Interactive Gym v1.13
 
-**Defined:** 2026-02-02
+**Defined:** 2026-02-03
 **Core Value:** Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
 
 ## v1 Requirements
 
-Requirements for v1.12 release. Each maps to roadmap phases.
+Requirements for v1.13 Matchmaker Hardening. Each maps to roadmap phases.
 
-### Bug Fixes
+### P2P RTT Probing
 
-- [x] **BUG-01**: Stale game manager cleanup prevents old games from capturing new participants
-- [x] **BUG-02**: Participant routing never sends players to games in progress
-- [x] **BUG-03**: Game lifecycle cleanup runs on all exit paths (normal and abnormal termination)
-- [x] **BUG-04**: Client receives error event when waiting room state is invalid
+- [ ] **RTT-01**: Matchmaker can establish WebRTC probe connection between candidate participants
+- [ ] **RTT-02**: Probe measures actual P2P RTT between candidates (specified number of pings)
+- [ ] **RTT-03**: Probe connection is closed after measurement completes
+- [ ] **RTT-04**: Matchmaker constructor accepts `max_p2p_rtt_ms` threshold parameter
+- [ ] **RTT-05**: `find_match()` receives measured RTT between candidates
+- [ ] **RTT-06**: Match is rejected if RTT exceeds configured threshold
 
-### Session Lifecycle
+### Game Creation
 
-- [x] **SESS-01**: Session has explicit states (WAITING → MATCHED → VALIDATING → PLAYING → ENDED)
-- [x] **SESS-02**: Session object is destroyed (not reused) when game ends
-- [x] **SESS-03**: Cleanup methods are idempotent (safe to call multiple times)
-
-### Matchmaker API
-
-- [x] **MATCH-01**: Matchmaker abstract base class with `find_match()` method
-- [x] **MATCH-02**: `find_match()` receives arriving participant, waiting list, and group size
-- [x] **MATCH-03**: `find_match()` returns list of matched participants or None to continue waiting
-- [x] **MATCH-04**: FIFOMatchmaker default implementation (current behavior)
-- [x] **MATCH-05**: Matchmaker configurable per-scene via experiment config
-
-### Data & Observability
-
-- [x] **DATA-01**: Assignment logging records match decisions (who matched with whom, timestamp)
-- [x] **DATA-02**: RTT to server exposed in ParticipantData for matchmaker use
+- [ ] **GAME-01**: All games created through single path: Matchmaker.find_match() → match → create game
+- [ ] **GAME-02**: No other code paths create games
+- [ ] **GAME-03**: Game only exists when all matched participants are assigned
+- [ ] **GAME-04**: Group reunion flow is bypassed and documented as future matchmaker variant
 
 ## v2 Requirements
 
 Deferred to future release. Tracked but not in current roadmap.
 
-### Matchmaker API
+### Enhanced Matching
 
-- **MATCH-06**: `on_timeout()` hook for custom timeout behavior
-- **MATCH-07**: `on_dropout()` hook for handling waiting room disconnects
-- **MATCH-08**: Custom attribute matching (pass arbitrary key-value pairs)
-- **MATCH-09**: Prior partners list exposed for blocking repeat matches
+- **MATCH-01**: Wait time relaxation (progressively relax criteria as wait time increases)
+- **MATCH-02**: Priority queuing for dropout recovery
+- **MATCH-03**: Pre-match validation hook (beyond RTT, e.g., custom compatibility checks)
 
-### Session Lifecycle
+### Group Reunion
 
-- **SESS-04**: State machine library integration (`python-statemachine`)
-- **SESS-05**: Participant state tracker as single source of truth
-
-### Data & Observability
-
-- **DATA-03**: Historical performance access (prior games, scores, partners)
+- **REUN-01**: Matchmaker variant that reunites previous groups
+- **REUN-02**: Configurable reunion timeout before falling back to FIFO
 
 ## Out of Scope
 
@@ -59,11 +44,10 @@ Explicitly excluded. Documented to prevent scope creep.
 
 | Feature | Reason |
 |---------|--------|
-| Skill-based matchmaking (SBMM/MMR) | Game industry pattern; research needs explicit criteria control |
-| Global player pools | Cross-experiment contamination; each experiment needs isolation |
+| Skill-based matchmaking (SBMM) | Game-focused pattern, not research validity |
+| Global player pools | Cross-experiment contamination |
 | Mid-game backfill | Invalidates experimental conditions |
-| Complex rule DSLs | Over-engineered; researchers already know Python |
-| N-player support (>2) | Deferred to future milestone (currently 2-player only) |
+| Persistent P2P connections during matchmaking | User specified: probe then close |
 
 ## Traceability
 
@@ -71,26 +55,22 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| BUG-01 | Phase 52 | Complete |
-| BUG-02 | Phase 52 | Complete |
-| BUG-03 | Phase 52 | Complete |
-| BUG-04 | Phase 51 | Complete |
-| SESS-01 | Phase 53 | Complete |
-| SESS-02 | Phase 53 | Complete |
-| SESS-03 | Phase 52 | Complete |
-| MATCH-01 | Phase 55 | Complete |
-| MATCH-02 | Phase 55 | Complete |
-| MATCH-03 | Phase 55 | Complete |
-| MATCH-04 | Phase 55 | Complete |
-| MATCH-05 | Phase 55 | Complete |
-| DATA-01 | Phase 56 | Complete |
-| DATA-02 | Phase 56 | Complete |
+| RTT-01 | TBD | Pending |
+| RTT-02 | TBD | Pending |
+| RTT-03 | TBD | Pending |
+| RTT-04 | TBD | Pending |
+| RTT-05 | TBD | Pending |
+| RTT-06 | TBD | Pending |
+| GAME-01 | TBD | Pending |
+| GAME-02 | TBD | Pending |
+| GAME-03 | TBD | Pending |
+| GAME-04 | TBD | Pending |
 
 **Coverage:**
-- v1 requirements: 14 total
-- Mapped to phases: 14 ✓
-- Unmapped: 0
+- v1 requirements: 10 total
+- Mapped to phases: 0
+- Unmapped: 10 ⚠️
 
 ---
-*Requirements defined: 2026-02-02*
-*Last updated: 2026-02-03 after phase 56 complete*
+*Requirements defined: 2026-02-03*
+*Last updated: 2026-02-03 after initial definition*
