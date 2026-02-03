@@ -22,11 +22,11 @@ Requirements for v1.12 release. Each maps to roadmap phases.
 
 ### Matchmaker API
 
-- [ ] **MATCH-01**: Matchmaker abstract base class with `find_match()` method
-- [ ] **MATCH-02**: `find_match()` receives arriving participant, waiting list, and group size
-- [ ] **MATCH-03**: `find_match()` returns list of matched participants or None to continue waiting
-- [ ] **MATCH-04**: FIFOMatchmaker default implementation (current behavior)
-- [ ] **MATCH-05**: Matchmaker configurable per-scene via experiment config
+- [x] **MATCH-01**: Matchmaker abstract base class with `find_match()` method
+- [x] **MATCH-02**: `find_match()` receives arriving participant, waiting list, and group size
+- [x] **MATCH-03**: `find_match()` returns list of matched participants or None to continue waiting
+- [x] **MATCH-04**: FIFOMatchmaker default implementation (current behavior)
+- [x] **MATCH-05**: Matchmaker configurable per-scene via experiment config
 
 ### Data & Observability
 
@@ -78,11 +78,11 @@ Which phases cover which requirements. Updated by create-roadmap.
 | SESS-01 | Phase 53 | Complete |
 | SESS-02 | Phase 53 | Complete |
 | SESS-03 | Phase 52 | Complete |
-| MATCH-01 | Phase 55 | Pending |
-| MATCH-02 | Phase 55 | Pending |
-| MATCH-03 | Phase 55 | Pending |
-| MATCH-04 | Phase 55 | Pending |
-| MATCH-05 | Phase 55 | Pending |
+| MATCH-01 | Phase 55 | Complete |
+| MATCH-02 | Phase 55 | Complete |
+| MATCH-03 | Phase 55 | Complete |
+| MATCH-04 | Phase 55 | Complete |
+| MATCH-05 | Phase 55 | Complete |
 | DATA-01 | Phase 56 | Pending |
 | DATA-02 | Phase 56 | Pending |
 
@@ -93,4 +93,4 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 ---
 *Requirements defined: 2026-02-02*
-*Last updated: 2026-02-03 after phase 53 complete*
+*Last updated: 2026-02-03 after phase 55 complete*
