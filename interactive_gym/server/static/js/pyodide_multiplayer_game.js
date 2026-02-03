@@ -1315,6 +1315,15 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
                 this.config.pause_on_partner_background = data.scene_metadata.pause_on_partner_background;
             }
 
+            // Configure input confirmation timeout from scene config (Phase 61: PARITY-01, PARITY-02)
+            // Waits for partner input confirmation at episode boundaries before export
+            if (data.scene_metadata?.input_confirmation_timeout_ms !== undefined) {
+                this.inputConfirmationTimeoutMs = data.scene_metadata.input_confirmation_timeout_ms;
+                p2pLog.info(`Input confirmation timeout: ${this.inputConfirmationTimeoutMs}ms`);
+            } else {
+                this.inputConfirmationTimeoutMs = 500;  // Default 500ms
+            }
+
             // Initialize action queues for other players
             for (const playerId of data.players) {
                 if (playerId != this.myPlayerId) {
@@ -2987,6 +2996,63 @@ obs, rewards, terminateds, truncateds, infos, render_state
         if (promoted.length > 0) {
             p2pLog.debug(`Promoted ${promoted.length} frames to canonical buffer (up to frame ${this.confirmedFrame})`);
         }
+    }
+
+    /**
+     * Wait for input confirmation before episode export (Phase 61: PARITY-01).
+     * Called at episode end to ensure all partner inputs are confirmed before exporting.
+     * This prevents data divergence under packet loss - both players wait for confirmation
+     * or timeout before promoting speculative data.
+     *
+     * @param {number} timeoutMs - Maximum time to wait for confirmation
+     * @returns {Promise<boolean>} True if all inputs confirmed, false if timeout
+     */
+    async _waitForInputConfirmation(timeoutMs) {
+        // Skip if not P2P mode or no timeout configured
+        if (this.serverAuthoritative || timeoutMs <= 0) {
+            return true;
+        }
+
+        const targetFrame = (this.p2pEpisodeSync.syncedTerminationFrame ?? this.frameNumber) - 1;
+        const humanPlayerIds = this._getHumanPlayerIds();
+
+        if (humanPlayerIds.length === 0) {
+            return true;  // No human players to wait for
+        }
+
+        // Check if already confirmed
+        if (this._hasAllInputsForFrame(targetFrame, humanPlayerIds)) {
+            await this._updateConfirmedFrame();
+            p2pLog.debug(`[Input Confirmation] Already confirmed up to frame ${targetFrame}`);
+            return true;
+        }
+
+        p2pLog.info(`[Input Confirmation] Waiting for inputs on frame ${targetFrame} ` +
+            `(confirmedFrame=${this.confirmedFrame}, timeout=${timeoutMs}ms)`);
+
+        const startTime = performance.now();
+
+        while (performance.now() - startTime < timeoutMs) {
+            // Process any pending inputs that may have arrived
+            this._processQueuedInputs();
+
+            // Check if target frame is now confirmed
+            if (this._hasAllInputsForFrame(targetFrame, humanPlayerIds)) {
+                await this._updateConfirmedFrame();
+                const elapsed = Math.round(performance.now() - startTime);
+                p2pLog.info(`[Input Confirmation] Confirmed after ${elapsed}ms`);
+                return true;
+            }
+
+            // Small delay to allow event loop to process incoming packets
+            await new Promise(resolve => setTimeout(resolve, 10));
+        }
+
+        // Timeout - log warning but proceed
+        console.warn(`[Input Confirmation] Timeout after ${timeoutMs}ms. ` +
+            `confirmedFrame=${this.confirmedFrame}, target=${targetFrame}. ` +
+            `Proceeding with episode export (data may diverge).`);
+        return false;
     }
 
     /**
@@ -7254,12 +7320,14 @@ json.dumps({'cumulative_rewards': {str(k): v for k, v in _cumulative_rewards.ite
         this._checkEpisodeSyncAndReset();
     }
 
-    _checkEpisodeSyncAndReset() {
+    async _checkEpisodeSyncAndReset() {
         /**
          * Check if both peers have detected episode end and trigger synchronized reset.
          * This is called:
          * 1. When we detect episode end locally (after broadcasting)
          * 2. When we receive episode end from peer
+         *
+         * Phase 61 (PARITY-01): Waits for input confirmation before signaling episode complete.
          */
         const sync = this.p2pEpisodeSync;
 
@@ -7272,6 +7340,14 @@ json.dumps({'cumulative_rewards': {str(k): v for k, v in _cumulative_rewards.ite
         const frameDiff = Math.abs((sync.localEpisodeEndFrame || 0) - (sync.remoteEpisodeEndFrame || 0));
         if (frameDiff > 5) {
             p2pLog.warn(`Large frame difference at episode end: ${frameDiff} frames`);
+        }
+
+        // Phase 61 (PARITY-01): Wait for input confirmation before completing episode
+        // This ensures both players have confirmed inputs before promoting speculative data
+        const confirmed = await this._waitForInputConfirmation(this.inputConfirmationTimeoutMs);
+        if (!confirmed) {
+            // Timeout occurred - _waitForInputConfirmation already logged warning
+            // Proceed with export anyway (graceful degradation, same as current behavior)
         }
 
         // Clear sync state for next episode
