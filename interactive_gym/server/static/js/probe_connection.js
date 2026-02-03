@@ -50,6 +50,11 @@ export class ProbeConnection {
         this.connectionTimeout = null;
         this.connectionTimeoutMs = 10000;
 
+        // Pending ping measurements keyed by sequence number
+        // Each entry: { resolve: Function, reject: Function, timeout: number, sentAt: number }
+        this.pendingPings = new Map();
+        this.nextPingSeq = 0;
+
         this._setupCallbacks();
         this._setupSignaling();
     }
@@ -71,6 +76,43 @@ export class ProbeConnection {
             console.log(`[Probe ${this.probeSessionId}] DataChannel closed`);
             this.onClosed?.();
         };
+
+        // Handle ping/pong messages over DataChannel
+        this.webrtcManager.onDataChannelMessage = (data) => {
+            this._handleDataChannelMessage(data);
+        };
+    }
+
+    /**
+     * Handle incoming DataChannel messages for ping-pong protocol.
+     * @param {string} data - DataChannel message data (JSON string)
+     */
+    _handleDataChannelMessage(data) {
+        try {
+            const message = JSON.parse(data);
+
+            if (message.type === 'ping') {
+                // Received ping - immediately send back pong with same seq and ts
+                const pong = {
+                    type: 'pong',
+                    seq: message.seq,
+                    ts: message.ts
+                };
+                this.webrtcManager.dataChannel?.send(JSON.stringify(pong));
+            } else if (message.type === 'pong') {
+                // Received pong - resolve pending measurement
+                const pending = this.pendingPings.get(message.seq);
+                if (pending) {
+                    clearTimeout(pending.timeout);
+                    const rtt = Date.now() - pending.sentAt;
+                    console.log(`[Probe ${this.probeSessionId}] Received pong seq=${message.seq}, RTT=${rtt}ms`);
+                    this.pendingPings.delete(message.seq);
+                    pending.resolve(rtt);
+                }
+            }
+        } catch (e) {
+            console.warn(`[Probe ${this.probeSessionId}] Failed to parse DataChannel message:`, e);
+        }
     }
 
     _setupSignaling() {
