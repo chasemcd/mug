@@ -105,12 +105,6 @@ class GameManager:
         # this is not used when running with Pyodide
         self.reset_events = utils.ThreadSafeDict()
 
-        # Group waitrooms: group_id -> list of subject_ids waiting together
-        # Used when wait_for_known_group=True to reunite players from previous games
-        self.group_waitrooms: dict[str, list[SubjectID]] = utils.ThreadSafeDict()
-        # Track when each subject started waiting for their group members
-        self.group_wait_start_times: dict[SubjectID, float] = utils.ThreadSafeDict()
-
     def subject_in_game(self, subject_id: SubjectID) -> bool:
         return subject_id in self.subject_games
 
@@ -289,184 +283,25 @@ class GameManager:
     ) -> remote_game.RemoteGameV2 | None:
         """Add a subject to a game and return it.
 
-        If wait_for_known_group is enabled and the subject has known group members,
-        they will be added to a group-specific waitroom. Returns None if waiting
-        for group members.
+        All games are created through the matchmaker path (FIFO queue by default).
+        The matchmaker decides when to form groups based on waiting participants.
 
-        Supports groups of any size (2 or more players).
+        Note: Group reunion (wait_for_known_group) is deferred to a future matchmaker
+        variant (see REUN-01/REUN-02 in REQUIREMENTS.md). The wait_for_known_group
+        config is accepted but currently behaves as FIFO matching.
         """
         logger.info(f"add_subject_to_game called for {subject_id}. Current waiting_games: {self.waiting_games}")
 
-        # Check if we should wait for known group members
-        if self.scene.wait_for_known_group and self.pairing_manager:
-            group_members = self.pairing_manager.get_group_members(subject_id)
-            if group_members:
-                logger.info(f"Subject {subject_id} has known group members: {group_members}. Using group waitroom.")
-                return self._join_or_wait_for_group(subject_id, group_members)
+        # Group reunion is deferred to future matchmaker variant (REUN-01/REUN-02)
+        if self.scene.wait_for_known_group:
+            logger.warning(
+                f"[GroupReunion] wait_for_known_group=True is currently deferred. "
+                f"Subject {subject_id} will use standard FIFO matching. "
+                f"See REUN-01/REUN-02 for future matchmaker variant."
+            )
 
-        # Standard FIFO matching
+        # All games go through standard matchmaker path
         return self._add_to_fifo_queue(subject_id)
-
-    def _join_or_wait_for_group(
-        self,
-        subject_id: SubjectID,
-        group_members: list[SubjectID]
-    ) -> remote_game.RemoteGameV2 | None:
-        """Handle matching with known group members.
-
-        Supports groups of any size (2 or more players).
-        Returns the game if all group members have arrived, None if still waiting.
-        """
-        group_id = self.pairing_manager.get_group_id(subject_id)
-        if not group_id:
-            logger.warning(f"Subject {subject_id} has group members but no group_id. Falling back to FIFO.")
-            return self._add_to_fifo_queue(subject_id)
-
-        # Get all members of this group
-        all_group_members = self.pairing_manager.get_all_group_members(subject_id)
-        num_players_needed = len([
-            policy for policy in self.scene.policy_mapping.values()
-            if policy == configuration_constants.PolicyTypes.Human
-        ])
-
-        # Check if group member(s) are already waiting
-        if group_id in self.group_waitrooms:
-            waiting_subjects = self.group_waitrooms[group_id]
-
-            # Add this subject to the waitroom
-            if subject_id not in waiting_subjects:
-                waiting_subjects.append(subject_id)
-                self.group_wait_start_times[subject_id] = time.time()
-                logger.info(f"Subject {subject_id} joined group waitroom {group_id}. "
-                           f"Now {len(waiting_subjects)}/{num_players_needed} players waiting.")
-
-            # Check if all group members have arrived
-            if len(waiting_subjects) >= num_players_needed:
-                logger.info(f"All group members arrived for group {group_id}. Creating game.")
-                # Clear the group waitroom
-                del self.group_waitrooms[group_id]
-                for sid in waiting_subjects:
-                    if sid in self.group_wait_start_times:
-                        del self.group_wait_start_times[sid]
-                # Create game for these specific group members
-                return self._create_game_for_group(waiting_subjects)
-            else:
-                # Still waiting for more group members
-                self._broadcast_group_waiting_status(subject_id, group_id, waiting_subjects, num_players_needed)
-                return None
-        else:
-            # Start a new group waitroom
-            self.group_waitrooms[group_id] = [subject_id]
-            self.group_wait_start_times[subject_id] = time.time()
-            logger.info(f"Subject {subject_id} started group waitroom {group_id}. "
-                       f"Waiting for {num_players_needed - 1} more group member(s).")
-            self._broadcast_group_waiting_status(subject_id, group_id, [subject_id], num_players_needed)
-            return None
-
-    def _broadcast_group_waiting_status(
-        self,
-        subject_id: SubjectID,
-        group_id: str,
-        waiting_subjects: list[SubjectID],
-        num_players_needed: int
-    ):
-        """Broadcast waiting status to subjects waiting for their group members."""
-        group_wait_timeout = self.scene.group_wait_timeout
-        start_time = self.group_wait_start_times.get(subject_id, time.time())
-        elapsed_ms = (time.time() - start_time) * 1000
-        remaining_ms = max(0, group_wait_timeout - elapsed_ms)
-
-        self.sio.emit(
-            "waiting_for_group",
-            {
-                "message": "Waiting for your group members from the previous game...",
-                "cur_num_players": len(waiting_subjects),
-                "players_needed": num_players_needed - len(waiting_subjects),
-                "ms_remaining": remaining_ms,
-            },
-            room=flask.request.sid,
-        )
-
-    def _create_game_for_group(
-        self,
-        subject_ids: list[SubjectID]
-    ) -> remote_game.RemoteGameV2 | None:
-        """Create a game for a specific group of players.
-
-        Returns the game if successfully created and started, None if there was an error.
-        """
-        # Safety validation: check group size matches expected player count
-        expected_human_players = len([
-            p for p in self.scene.policy_mapping.values()
-            if p == configuration_constants.PolicyTypes.Human
-        ])
-
-        if len(subject_ids) != expected_human_players:
-            logger.error(
-                f"Group size mismatch! Expected {expected_human_players} players, "
-                f"got {len(subject_ids)}: {subject_ids}. Aborting group game creation."
-            )
-            return None
-
-        # Check for duplicates in the group
-        if len(subject_ids) != len(set(subject_ids)):
-            logger.error(
-                f"Duplicate subjects in group! Subject IDs: {subject_ids}. "
-                f"Aborting group game creation."
-            )
-            return None
-
-        with self.waiting_games_lock:
-            # Create a new game
-            self._create_game()
-            game: remote_game.RemoteGameV2 = self.games[self.waiting_games[-1]]
-
-            # Add each partner to the game, tracking success
-            added_subjects = []
-            for subject_id in subject_ids:
-                if self._add_subject_to_specific_game(subject_id, game):
-                    added_subjects.append(subject_id)
-                else:
-                    logger.error(
-                        f"Failed to add subject {subject_id} to group game {game.game_id}. "
-                        f"Successfully added: {added_subjects}. Cleaning up."
-                    )
-                    # Clean up the game since we can't complete the group
-                    self._remove_game(game.game_id)
-                    return None
-
-            # Final validation: ensure game is ready with correct player count
-            if not game.is_ready_to_start():
-                logger.error(
-                    f"Group game {game.game_id} is not ready after adding all players! "
-                    f"Added: {added_subjects}, Available slots: {game.get_available_human_agent_ids()}"
-                )
-                self._remove_game(game.game_id)
-                return None
-
-            self.waiting_games.remove(game.game_id)
-            game.transition_to(SessionState.MATCHED)
-
-            # Log match assignment for group reunion (Phase 56)
-            if self.match_logger:
-                # Build MatchCandidate list from subject_ids
-                candidates = [
-                    MatchCandidate(
-                        subject_id=sid,
-                        rtt_ms=self.get_subject_rtt(sid) if self.get_subject_rtt else None
-                    )
-                    for sid in subject_ids
-                ]
-                self.match_logger.log_match(
-                    scene_id=self.scene.scene_id,
-                    game_id=game.game_id,
-                    matched_candidates=candidates,
-                    matchmaker_class="GroupReunion",
-                )
-
-            self.start_game(game)
-
-        return game
 
     def _add_subject_to_specific_game(
         self,
@@ -1661,75 +1496,6 @@ class GameManager:
 
         logger.info(f"Quietly removed subject {subject_id} from game {game_id}")
         return True
-
-    def remove_from_group_waitroom(self, subject_id: SubjectID) -> bool:
-        """Remove a subject from a group waitroom if they're waiting.
-
-        Returns True if subject was in a group waitroom, False otherwise.
-        """
-        # Find if subject is in any group waitroom
-        for group_id, waiting_subjects in list(self.group_waitrooms.items()):
-            if subject_id in waiting_subjects:
-                waiting_subjects.remove(subject_id)
-                if subject_id in self.group_wait_start_times:
-                    del self.group_wait_start_times[subject_id]
-
-                # If waitroom is now empty, remove it
-                if not waiting_subjects:
-                    del self.group_waitrooms[group_id]
-                else:
-                    # Notify remaining subjects that a group member left
-                    for remaining_sid in waiting_subjects:
-                        self.sio.emit(
-                            "waiting_room_player_left",
-                            {
-                                "message": "A group member disconnected. You will be redirected shortly..."
-                            },
-                            room=remaining_sid,
-                        )
-
-                logger.info(f"Removed subject {subject_id} from group waitroom {group_id}")
-                return True
-
-        return False
-
-    def check_group_wait_timeouts(self) -> list[SubjectID]:
-        """Check for subjects who have exceeded their group wait timeout.
-
-        Returns list of subject IDs that timed out.
-        """
-        timed_out = []
-        current_time = time.time()
-        timeout_seconds = self.scene.group_wait_timeout / 1000
-
-        for subject_id, start_time in list(self.group_wait_start_times.items()):
-            if current_time - start_time > timeout_seconds:
-                timed_out.append(subject_id)
-
-        return timed_out
-
-    def handle_group_wait_timeout(self, subject_id: SubjectID):
-        """Handle a group wait timeout by removing from waitroom and redirecting."""
-        # Remove from group waitroom
-        self.remove_from_group_waitroom(subject_id)
-
-        # Redirect to timeout URL
-        redirect_url = self.scene.waitroom_timeout_redirect_url
-        if redirect_url:
-            self.sio.emit(
-                "request_redirect",
-                {"redirect_url": redirect_url},
-                room=subject_id,
-            )
-            logger.info(f"Redirecting timed-out subject {subject_id} to {redirect_url}")
-        else:
-            # No redirect URL configured, emit error
-            self.sio.emit(
-                "end_game",
-                {"message": "Group members did not arrive in time. Please try again later."},
-                room=subject_id,
-            )
-            logger.info(f"Subject {subject_id} timed out waiting for group members, no redirect URL configured")
 
     def is_subject_in_active_game(self, subject_id: SubjectID) -> bool:
         """Check if a subject is currently in an active game.
