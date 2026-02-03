@@ -2658,9 +2658,7 @@ def on_disconnect():
         game_manager = GAME_MANAGERS.get(current_scene.scene_id, None)
         if game_manager and game_manager.is_subject_in_active_game(subject_id):
             is_in_active_gym_scene = True
-        # Also check if player is in a group waitroom
-        if game_manager:
-            game_manager.remove_from_group_waitroom(subject_id)
+        # Note: Group reunion deferred to future matchmaker variant (REUN-01/REUN-02)
 
     # Handle Pyodide multiplayer games
     if PYODIDE_COORDINATOR is not None:

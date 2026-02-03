@@ -902,29 +902,7 @@ class AdminEventAggregator:
                     return None
 
         for scene_id, game_manager in list(self.game_managers.items()):
-            # Check group waitrooms
-            if hasattr(game_manager, 'group_waitrooms'):
-                wait_times = getattr(game_manager, 'group_wait_start_times', {})
-                for group_id, waitroom in game_manager.group_waitrooms.items():
-                    if waitroom:
-                        waiting_subjects = list(waitroom) if isinstance(waitroom, list) else list(waitroom.keys())
-                        if subject_id in waiting_subjects:
-                            wait_start = wait_times.get(subject_id, now)
-                            wait_duration_ms = int((now - wait_start) * 1000)
-
-                            # Get target size
-                            target_size = 2
-                            if hasattr(game_manager, 'scene') and game_manager.scene:
-                                target_size = getattr(game_manager.scene, 'num_players', 2)
-
-                            return {
-                                'scene_id': scene_id,
-                                'group_id': group_id,
-                                'wait_duration_ms': wait_duration_ms,
-                                'waiting_count': len(waiting_subjects),
-                                'target_size': target_size
-                            }
-
+            # Note: Group reunion waitrooms removed (deferred to REUN-01/REUN-02)
             # Check individual waiting games
             if hasattr(game_manager, 'waiting_games') and game_manager.waiting_games:
                 for game_id in game_manager.waiting_games:
@@ -1023,38 +1001,9 @@ class AdminEventAggregator:
                 if hasattr(scene, 'num_players'):
                     target_size = scene.num_players
 
-            # Check for group waitrooms if they exist
-            import time
-            now = time.time()
-            total_wait_ms = 0
-            wait_count = 0
-
-            if hasattr(game_manager, 'group_waitrooms'):
-                # Get wait start times dict if available
-                wait_times = getattr(game_manager, 'group_wait_start_times', {})
-
-                for group_id, waitroom in game_manager.group_waitrooms.items():
-                    if waitroom:
-                        waiting_subjects = list(waitroom) if isinstance(waitroom, list) else list(waitroom.keys())
-
-                        # Calculate wait duration from earliest member
-                        group_wait_ms = 0
-                        for sid in waiting_subjects:
-                            if sid in wait_times:
-                                wait_ms = int((now - wait_times[sid]) * 1000)
-                                group_wait_ms = max(group_wait_ms, wait_ms)
-                                total_wait_ms += wait_ms
-                                wait_count += 1
-
-                        groups.append({
-                            'group_id': group_id,
-                            'waiting_subjects': waiting_subjects,
-                            'waiting_count': len(waiting_subjects),
-                            'wait_duration_ms': group_wait_ms
-                        })
-
-            # Calculate average wait duration
-            avg_wait_ms = int(total_wait_ms / wait_count) if wait_count > 0 else 0
+            # Note: Group reunion waitrooms removed (deferred to REUN-01/REUN-02)
+            # Average wait time tracked through _wait_time_samples
+            avg_wait_ms = 0
 
             return {
                 'scene_id': scene_id,
