@@ -9,17 +9,18 @@ See: .planning/PROJECT.md (updated 2026-02-02)
 
 ## Current Position
 
-Phase: 55 of 56 (Matchmaker Base Class)
-Plan: 02 of 02 complete
-Status: Phase complete
-Last activity: 2026-02-03 — Completed 55-02-PLAN.md
+Phase: 56 of 56 (Custom Attributes Logging)
+Plan: 01 of 01 complete
+Status: Milestone complete
+Last activity: 2026-02-03 — Completed 56-01-PLAN.md
 
-Progress: [████████░░] 83%
+Progress: [██████████] 100%
 
 ## Milestone History
 
 | Milestone | Phases | Status | Shipped |
 |-----------|--------|--------|---------|
+| v1.12 Waiting Room Overhaul | 51-56 | Complete | 2026-02-03 |
 | v1.11 Data Export Edge Cases | 48-50 | Complete | 2026-02-03 |
 | v1.10 E2E Test Fix | 45-47 | Complete | 2026-02-02 |
 | v1.9 Data Parity Testing | 40-44 | Complete | 2026-02-01 |
@@ -133,6 +134,12 @@ Progress: [████████░░] 83%
 - `.planning/phases/54-participant-state-tracker/54-01-SUMMARY.md`
 - `.planning/phases/55-matchmaker-base-class/55-01-SUMMARY.md`
 - `.planning/phases/55-matchmaker-base-class/55-02-SUMMARY.md`
+- `.planning/phases/56-custom-attributes-logging/56-01-SUMMARY.md`
+
+**Match Assignment Logging (v1.12 Phase 56 - added):**
+- `interactive_gym/server/match_logger.py` - MatchAssignment dataclass, MatchAssignmentLogger class
+- `interactive_gym/server/game_manager.py` - match_logger parameter, log_match() calls in _create_game_for_match() and _create_game_for_group()
+- `interactive_gym/server/app.py` - MATCH_LOGGER global, passed to GameManager
 
 **Matchmaker Base Class (v1.12 Phase 55 - added):**
 - `interactive_gym/server/matchmaker.py` - Matchmaker ABC with @abstractmethod find_match(), MatchCandidate dataclass, FIFOMatchmaker implementation
@@ -246,6 +253,12 @@ Progress: [████████░░] 83%
 ### Decisions
 
 See: .planning/PROJECT.md Key Decisions table
+
+**v1.12 Phase 56 decisions:**
+- Synchronous file I/O (no threading) - match rate is low, simplicity preferred
+- Shared MATCH_LOGGER instance across all scenes (initialized once)
+- GroupReunion logged with synthetic MatchCandidate objects built from subject_ids
+- Admin activity logged with first participant as subject_id (for timeline)
 
 **v1.12 Phase 55 decisions:**
 - FIFOMatchmaker produces identical behavior to original code
@@ -460,15 +473,23 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-02-03
-Stopped at: Completed 55-02-PLAN.md
+Stopped at: Completed 56-01-PLAN.md
 Resume file: None
 
 ### Next Steps
 
-**Phase 55 complete.** Matchmaker abstraction fully integrated: ABC with FIFOMatchmaker default, scene API configuration via `scene.matchmaking(matchmaker=...)`, and end-to-end wiring to GameManager.
+**v1.12 Waiting Room Overhaul COMPLETE.**
 
-Remaining phase:
-1. Phase 56: Custom Attributes & Assignment Logging
+All phases delivered:
+- Phase 51: Diagnostic logging infrastructure
+- Phase 52: Comprehensive cleanup
+- Phase 53: Session lifecycle state machine
+- Phase 54: Participant state tracker
+- Phase 55: Matchmaker base class abstraction
+- Phase 56: Match assignment logging
 
-**Next:**
-`/gsd:plan-phase 56`
+The milestone delivers:
+- Robust session and participant state tracking
+- Pluggable matchmaker architecture
+- Research data logging for match assignments with RTT values
+- Admin dashboard integration for match events
