@@ -572,6 +572,23 @@ def join_game(data):
             f"waiting_games={game_manager.waiting_games}"
         )
 
+        # State validation before routing (BUG-04)
+        is_valid, error_message = game_manager.validate_subject_state(subject_id)
+        if not is_valid:
+            logger.error(
+                f"[JoinGame] State validation failed for {subject_id}: {error_message}"
+            )
+            socketio.emit(
+                "waiting_room_error",
+                {
+                    "message": "Unable to join game due to invalid state. Please refresh the page.",
+                    "error_code": "INVALID_STATE",
+                    "details": error_message
+                },
+                room=flask.request.sid,
+            )
+            return
+
         # Check if the participant is already in a game in this scene.
         # This can happen if a previous session didn't clean up properly (browser crash, network issue, etc.)
         if game_manager.subject_in_game(subject_id):
@@ -602,13 +619,13 @@ def join_game(data):
             if game is not None:
                 logger.info(
                     f"[JoinGame] Subject {subject_id} successfully added to game {game.game_id}. "
-                    f"Game starting."
+                    f"Game starting. Post-add state: subject_games has {len(game_manager.subject_games)} entries."
                 )
             else:
                 # game is None when waiting for group members or in waiting room
                 logger.info(
                     f"[JoinGame] Subject {subject_id} added to waiting room for scene {current_scene.scene_id}. "
-                    f"Waiting for more players."
+                    f"Waiting for more players. Post-add state: subject_games has {len(game_manager.subject_games)} entries."
                 )
         except Exception as e:
             logger.exception(
