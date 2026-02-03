@@ -1,42 +1,60 @@
-# Requirements: Interactive Gym v1.13
+# Requirements: Interactive Gym v1.14
 
 **Defined:** 2026-02-03
 **Core Value:** Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
 
 ## v1 Requirements
 
-Requirements for v1.13 Matchmaker Hardening. Each maps to roadmap phases.
+Requirements for v1.14 Data Parity Fix. Each maps to roadmap phases.
 
-### P2P RTT Probing
+### Data Parity Fix
 
-- [ ] **RTT-01**: Matchmaker can establish WebRTC probe connection between candidate participants
-- [x] **RTT-02**: Probe measures actual P2P RTT between candidates (specified number of pings)
-- [ ] **RTT-03**: Probe connection is closed after measurement completes
-- [x] **RTT-04**: Matchmaker constructor accepts `max_p2p_rtt_ms` threshold parameter
-- [x] **RTT-05**: `find_match()` receives measured RTT between candidates
-- [x] **RTT-06**: Match is rejected if RTT exceeds configured threshold
+- [ ] **PARITY-01**: Episode export waits for partner input confirmation before writing
+- [ ] **PARITY-02**: Configurable confirmation timeout (default reasonable for 200ms+ latency)
+- [ ] **PARITY-03**: Both players export identical action sequences for every frame
+- [ ] **PARITY-04**: Both players export identical rewards for every frame
+- [ ] **PARITY-05**: Both players export identical infos for every frame
+- [ ] **PARITY-06**: `test_active_input_with_latency[chromium-100]` passes consistently (10+ runs)
+- [ ] **PARITY-07**: `test_active_input_with_packet_loss` passes consistently (10+ runs)
 
-### Game Creation
+### Multi-Participant Stress Tests
 
-- [x] **GAME-01**: All games created through single path: Matchmaker.find_match() → match → create game
-- [x] **GAME-02**: No other code paths create games
-- [x] **GAME-03**: Game only exists when all matched participants are assigned
-- [x] **GAME-04**: Group reunion flow is bypassed and documented as future matchmaker variant
+- [ ] **STRESS-01**: Test infrastructure supports 6 concurrent participants (3 simultaneous games)
+- [ ] **STRESS-02**: Multi-episode test: participants complete 2+ episodes back-to-back
+- [ ] **STRESS-03**: Mid-game disconnection test: participant disconnects during gameplay
+- [ ] **STRESS-04**: Waiting room disconnection test: participant disconnects while waiting
+- [ ] **STRESS-05**: Focus loss test: tab goes to background during gameplay
+- [ ] **STRESS-06**: Mixed lifecycle test: combines disconnect + completion + focus loss scenarios
+- [ ] **STRESS-07**: All completed games' exports validated for exact parity
+
+### Server Recovery Test
+
+- [ ] **RECOVERY-01**: Test runs concurrent episodes to completion
+- [ ] **RECOVERY-02**: Test has participants leave mid-game
+- [ ] **RECOVERY-03**: Test has participants leave during waiting room
+- [ ] **RECOVERY-04**: Test has participants leave due to focus loss timeout
+- [ ] **RECOVERY-05**: After all chaos events, new participant pair can enter and complete experiment
+- [ ] **RECOVERY-06**: New pair's data exports pass exact parity validation
 
 ## v2 Requirements
 
 Deferred to future release. Tracked but not in current roadmap.
 
-### Enhanced Matching
+### Enhanced Matching (from v1.13)
 
 - **MATCH-01**: Wait time relaxation (progressively relax criteria as wait time increases)
 - **MATCH-02**: Priority queuing for dropout recovery
 - **MATCH-03**: Pre-match validation hook (beyond RTT, e.g., custom compatibility checks)
 
-### Group Reunion
+### Group Reunion (from v1.13)
 
 - **REUN-01**: Matchmaker variant that reunites previous groups
 - **REUN-02**: Configurable reunion timeout before falling back to FIFO
+
+### Data Parity Enhancements
+
+- **PARITY-V2-01**: Re-request lost packets if confirmation timeout (more robust than wait-only)
+- **PARITY-V2-02**: Packet loss telemetry in export metadata
 
 ## Out of Scope
 
@@ -47,7 +65,8 @@ Explicitly excluded. Documented to prevent scope creep.
 | Skill-based matchmaking (SBMM) | Game-focused pattern, not research validity |
 | Global player pools | Cross-experiment contamination |
 | Mid-game backfill | Invalidates experimental conditions |
-| Persistent P2P connections during matchmaking | User specified: probe then close |
+| Tolerance in parity validation | Data must be EXACT for research validity |
+| Load testing (100+ participants) | Research experiments typically <20 concurrent |
 
 ## Traceability
 
@@ -55,22 +74,52 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| RTT-01 | Phase 57 | Complete |
-| RTT-02 | Phase 58 | Complete |
-| RTT-03 | Phase 57 | Complete |
-| RTT-04 | Phase 59 | Complete |
-| RTT-05 | Phase 59 | Complete |
-| RTT-06 | Phase 59 | Complete |
-| GAME-01 | Phase 60 | Complete |
-| GAME-02 | Phase 60 | Complete |
-| GAME-03 | Phase 60 | Complete |
-| GAME-04 | Phase 60 | Complete |
+| PARITY-01 | TBD | Pending |
+| PARITY-02 | TBD | Pending |
+| PARITY-03 | TBD | Pending |
+| PARITY-04 | TBD | Pending |
+| PARITY-05 | TBD | Pending |
+| PARITY-06 | TBD | Pending |
+| PARITY-07 | TBD | Pending |
+| STRESS-01 | TBD | Pending |
+| STRESS-02 | TBD | Pending |
+| STRESS-03 | TBD | Pending |
+| STRESS-04 | TBD | Pending |
+| STRESS-05 | TBD | Pending |
+| STRESS-06 | TBD | Pending |
+| STRESS-07 | TBD | Pending |
+| RECOVERY-01 | TBD | Pending |
+| RECOVERY-02 | TBD | Pending |
+| RECOVERY-03 | TBD | Pending |
+| RECOVERY-04 | TBD | Pending |
+| RECOVERY-05 | TBD | Pending |
+| RECOVERY-06 | TBD | Pending |
 
 **Coverage:**
-- v1 requirements: 10 total
-- Mapped to phases: 10 ✓
-- Unmapped: 0
+- v1 requirements: 20 total
+- Mapped to phases: 0 (awaiting roadmap)
+- Unmapped: 20
+
+## Completed Requirements (v1.13)
+
+Requirements completed in previous milestone, preserved for reference.
+
+### P2P RTT Probing (v1.13)
+
+- [x] **RTT-01**: Matchmaker can establish WebRTC probe connection between candidate participants
+- [x] **RTT-02**: Probe measures actual P2P RTT between candidates (specified number of pings)
+- [x] **RTT-03**: Probe connection is closed after measurement completes
+- [x] **RTT-04**: Matchmaker constructor accepts `max_p2p_rtt_ms` threshold parameter
+- [x] **RTT-05**: `find_match()` receives measured RTT between candidates
+- [x] **RTT-06**: Match is rejected if RTT exceeds configured threshold
+
+### Game Creation (v1.13)
+
+- [x] **GAME-01**: All games created through single path: Matchmaker.find_match() → match → create game
+- [x] **GAME-02**: No other code paths create games
+- [x] **GAME-03**: Game only exists when all matched participants are assigned
+- [x] **GAME-04**: Group reunion flow is bypassed and documented as future matchmaker variant
 
 ---
 *Requirements defined: 2026-02-03*
-*Last updated: 2026-02-03 after Phase 60 complete*
+*Last updated: 2026-02-03 after v1.14 requirements defined*
