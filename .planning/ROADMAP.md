@@ -908,10 +908,10 @@ Plans:
   3. Match rejected and candidates re-pooled if RTT exceeds threshold
   4. Subclasses can override RTT handling behavior
 **Research flag:** Unlikely (extends existing Matchmaker API)
-**Plans:** TBD
+**Plans:** 1 plan
 
 Plans:
-- [ ] 59-01-PLAN.md — Matchmaker RTT config, find_match() integration, rejection handling
+- [ ] 59-01-PLAN.md — Matchmaker RTT config, probe-then-match orchestration, rejection handling
 
 #### Phase 60: Single Game Creation Path
 **Goal:** One code path creates games (matchmaker → game)
@@ -934,9 +934,9 @@ Plans:
 |-------|-----------|----------------|--------|-----------|
 | 57. P2P Probe Infrastructure | v1.13 | 2/2 | Complete | 2026-02-03 |
 | 58. RTT Measurement | v1.13 | 1/1 | Complete | 2026-02-03 |
-| 59. Matchmaker RTT Integration | v1.13 | 0/TBD | Not started | - |
+| 59. Matchmaker RTT Integration | v1.13 | 0/1 | Planned | - |
 | 60. Single Game Creation Path | v1.13 | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-03 after Phase 58 executed*
+*Last updated: 2026-02-03 after Phase 59 planned*
