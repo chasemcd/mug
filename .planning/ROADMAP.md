@@ -217,11 +217,11 @@ See [milestones/v1.11-ROADMAP.md](milestones/v1.11-ROADMAP.md) for full details.
   1. Episode export does not begin until partner inputs are confirmed for final frame
   2. Confirmation timeout is configurable (default handles 200ms+ latency)
   3. Timeout triggers graceful handling (not crash or data loss)
-**Research flag:** Likely (integration with existing _promoteRemainingAtBoundary flow)
-**Plans**: TBD
+**Research flag:** Complete (61-RESEARCH.md)
+**Plans:** 1 plan
 
 Plans:
-- [ ] 61-01: TBD
+- [ ] 61-01-PLAN.md — Add confirmation timeout config and wait logic before episode export
 
 ### Phase 62: Data Parity Validation
 **Goal**: Ensure both players export identical data for every frame
@@ -316,7 +316,7 @@ Plans:
 | 48-50 | v1.11 | — | Complete | 2026-02-02 |
 | 51-56 | v1.12 | — | Complete | 2026-02-03 |
 | 57-60 | v1.13 | — | Complete | 2026-02-03 |
-| 61. Input Confirmation Protocol | v1.14 | 0/TBD | Not started | - |
+| 61. Input Confirmation Protocol | v1.14 | 0/1 | Planned | - |
 | 62. Data Parity Validation | v1.14 | 0/TBD | Not started | - |
 | 63. Parity Test Stabilization | v1.14 | 0/TBD | Not started | - |
 | 64. Multi-Participant Test Infrastructure | v1.14 | 0/TBD | Not started | - |
@@ -325,4 +325,4 @@ Plans:
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-03 after v1.14 roadmap created*
+*Last updated: 2026-02-03 after Phase 61 planning*
