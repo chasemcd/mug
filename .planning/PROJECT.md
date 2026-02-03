@@ -10,21 +10,33 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 
 ## Current Milestone: v1.14 Data Parity Fix
 
-**Goal:** Fix the rare data parity divergence bug where players export different actions under packet loss + active inputs.
+**Goal:** Fix the rare data parity divergence bug and add comprehensive multi-participant E2E stress tests.
 
 **Problem:** `_promoteRemainingAtBoundary()` force-promotes unconfirmed speculative data at episode end. When packets are lost, rollback replay may use predicted actions instead of confirmed inputs. Both players record what they executed, which may differ.
 
 **Target features:**
+
+*Data parity fix:*
 - [ ] Wait for input confirmation before episode export
 - [ ] Re-request lost packets if confirmation timeout
 - [ ] Ensure both players export identical action sequences for every frame
 - [ ] E2E test `test_active_input_with_latency` passes consistently
 
+*Multi-participant stress tests:*
+- [ ] Test with many participants going through same server session
+- [ ] Test participants playing multiple episodes
+- [ ] Test mid-game disconnection scenarios
+- [ ] Test waiting room disconnection scenarios
+- [ ] Test focus loss during gameplay
+- [ ] Test mixed scenarios (some disconnect, some complete, some lose focus)
+
 **What done looks like:**
 - Data parity is EXACT — both players export identical data for every frame
 - No tolerance needed in validation scripts
-- All E2E stress tests pass (17/17, no flaky tests)
+- All existing E2E stress tests pass (17/17, no flaky tests)
+- New multi-participant stress tests pass reliably
 - `_promoteRemainingAtBoundary()` only promotes confirmed data
+- Server handles concurrent participant lifecycles correctly
 
 ## Previous Milestone: v1.13 Matchmaker Hardening (Shipped: 2026-02-03)
 
@@ -237,6 +249,12 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 - [ ] Re-request lost packets if confirmation timeout
 - [ ] Ensure both players export identical action sequences
 - [ ] E2E test `test_active_input_with_latency` passes consistently
+- [ ] Multi-participant stress test (many participants, same server session)
+- [ ] Multi-episode stress test (participants complete multiple episodes)
+- [ ] Mid-game disconnection stress test
+- [ ] Waiting room disconnection stress test
+- [ ] Focus loss stress test
+- [ ] Mixed lifecycle stress test (disconnect + complete + focus loss combinations)
 
 *Shipped in v1.13:*
 - ✓ P2P RTT probe helper for measuring actual latency between candidates — v1.13

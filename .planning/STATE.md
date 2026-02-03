@@ -291,11 +291,21 @@ Resume file: None
 
 **v1.14 Data Parity Fix milestone initialized.**
 
-Goal: Fix the rare data parity divergence bug in `_promoteRemainingAtBoundary()`.
+Two-part goal:
+1. Fix the rare data parity divergence bug in `_promoteRemainingAtBoundary()`
+2. Add comprehensive multi-participant E2E stress tests
 
-Root cause identified:
+Root cause for data parity bug identified:
 - `_promoteRemainingAtBoundary()` force-promotes unconfirmed speculative data at episode end
 - Under packet loss + active inputs, rollback replay uses predicted actions instead of confirmed inputs
 - Players record what they executed (may differ if packets were lost)
+
+New stress tests needed:
+- Many participants going through same server session
+- Multiple episodes per participant
+- Mid-game disconnection scenarios
+- Waiting room disconnection scenarios
+- Focus loss during gameplay
+- Mixed lifecycle scenarios (disconnect + complete + focus loss)
 
 Next action: `/gsd:define-requirements` or `/gsd:research-phase`
