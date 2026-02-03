@@ -563,9 +563,28 @@ def join_game(data):
             )
             return
 
+        # Diagnostic logging for stale game routing bug (BUG-04)
+        logger.info(
+            f"[JoinGame:Diag] subject_id={subject_id}, "
+            f"in_subject_games={subject_id in game_manager.subject_games}, "
+            f"subject_games_keys={list(game_manager.subject_games.keys())}, "
+            f"active_games={list(game_manager.active_games)}, "
+            f"waiting_games={game_manager.waiting_games}"
+        )
+
         # Check if the participant is already in a game in this scene.
         # This can happen if a previous session didn't clean up properly (browser crash, network issue, etc.)
         if game_manager.subject_in_game(subject_id):
+            # Diagnostic logging for stale game entry (BUG-04)
+            stale_game_id = game_manager.subject_games.get(subject_id)
+            stale_game = game_manager.games.get(stale_game_id)
+            logger.warning(
+                f"[JoinGame:Diag] Subject {subject_id} has stale game entry. "
+                f"game_id={stale_game_id}, "
+                f"game_exists={stale_game is not None}, "
+                f"game_status={stale_game.status if stale_game else 'N/A'}, "
+                f"game_active={stale_game_id in game_manager.active_games if stale_game_id else False}"
+            )
             logger.warning(
                 f"Subject {subject_id} already has a game entry in scene {current_scene.scene_id}. "
                 f"Cleaning up stale entry before rejoining."
