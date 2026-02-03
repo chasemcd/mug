@@ -1748,6 +1748,13 @@ def on_mid_game_exclusion(data):
         frame_number=frame_number
     )
 
+    # Clean up GameManager state (Phase 52)
+    for scene_id, game_manager in GAME_MANAGERS.items():
+        if game_id in game_manager.games:
+            game_manager.cleanup_game(game_id)
+            logger.info(f"Cleaned up GameManager state for mid-game exclusion in game {game_id}")
+            break
+
 
 @socketio.on("p2p_validation_status")
 def handle_p2p_validation_status(data):
@@ -1954,20 +1961,12 @@ def handle_p2p_validation_failed(data):
     # Clean up game from coordinator
     PYODIDE_COORDINATOR.remove_game(game_id)
 
-    # Clean up game from game manager
-    # Find the scene's game manager and remove the game
+    # Clean up GameManager state using cleanup_game() (Phase 52)
+    # This handles subject_games, subject_rooms, and game removal
     for scene_id, game_manager in GAME_MANAGERS.items():
         if game_id in game_manager.games:
-            # Remove subjects from game tracking
-            game = game_manager.games.get(game_id)
-            if game:
-                for subject_id in list(game.human_players.values()):
-                    if subject_id in game_manager.subject_games:
-                        del game_manager.subject_games[subject_id]
-                    if subject_id in game_manager.subject_rooms:
-                        del game_manager.subject_rooms[subject_id]
-            game_manager._remove_game(game_id)
-            logger.info(f"Cleaned up game {game_id} from GameManager for scene {scene_id}")
+            game_manager.cleanup_game(game_id)
+            logger.info(f"Cleaned up GameManager state for failed P2P validation game {game_id}")
             break
 
 
@@ -2095,8 +2094,15 @@ def handle_p2p_reconnection_timeout(data):
         room=game_id
     )
 
-    # Clean up game
+    # Clean up game from Pyodide coordinator
     PYODIDE_COORDINATOR.remove_game(game_id)
+
+    # Clean up GameManager state for both players (Phase 52)
+    for scene_id, game_manager in GAME_MANAGERS.items():
+        if game_id in game_manager.games:
+            game_manager.cleanup_game(game_id)
+            logger.info(f"Cleaned up GameManager state for reconnection timeout game {game_id}")
+            break
 
 
 @socketio.on('execute_entry_callback')
