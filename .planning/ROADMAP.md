@@ -15,6 +15,7 @@
 - ✅ **v1.10 E2E Test Fix** - Phases 45-47 (shipped 2026-02-02)
 - ✅ **v1.11 Data Export Edge Cases** - Phases 48-50 (shipped 2026-02-02) → [archive](milestones/v1.11-ROADMAP.md)
 - ✅ **v1.12 Waiting Room Overhaul** - Phases 51-56 (shipped 2026-02-03)
+- 🚧 **v1.13 Matchmaker Hardening** - Phases 57-60 (in progress)
 
 ## Phases
 
@@ -863,6 +864,78 @@ Plans:
 | 55. Matchmaker Base Class | v1.12 | 2/2 | Complete | 2026-02-03 |
 | 56. Custom Attributes | v1.12 | 1/1 | Complete | 2026-02-03 |
 
+### 🚧 v1.13 Matchmaker Hardening (In Progress)
+
+**Milestone Goal:** Make matchmaking safer and smarter with P2P RTT probing and a single game creation path.
+
+#### Phase 57: P2P Probe Infrastructure
+**Goal:** Establish temporary WebRTC connection for RTT measurement
+**Depends on:** Phase 56
+**Requirements:** RTT-01, RTT-03
+**Success Criteria** (what must be TRUE):
+  1. Matchmaker can signal two candidates to establish WebRTC probe connection
+  2. Probe connection uses DataChannel (same as game connections)
+  3. Probe connection closed automatically after measurement completes
+**Research flag:** Likely (WebRTC probe connection lifecycle without game context)
+**Plans:** TBD
+
+Plans:
+- [ ] 57-01-PLAN.md — P2P probe signaling, connection lifecycle, cleanup
+
+#### Phase 58: RTT Measurement
+**Goal:** Reliable RTT measurement between matched candidates
+**Depends on:** Phase 57
+**Requirements:** RTT-02
+**Success Criteria** (what must be TRUE):
+  1. Probe sends configurable number of pings (default 5)
+  2. RTT calculated from ping-pong round trips
+  3. Measurement handles packet loss (timeout + retry)
+  4. Measurement result returned to matchmaker
+**Research flag:** Unlikely (standard ping-pong over DataChannel)
+**Plans:** TBD
+
+Plans:
+- [ ] 58-01-PLAN.md — RTT ping-pong protocol, measurement collection, timeout handling
+
+#### Phase 59: Matchmaker RTT Integration
+**Goal:** Match decisions consider actual P2P latency
+**Depends on:** Phase 58
+**Requirements:** RTT-04, RTT-05, RTT-06
+**Success Criteria** (what must be TRUE):
+  1. Matchmaker constructor accepts `max_p2p_rtt_ms` parameter
+  2. `find_match()` receives `measured_rtt_ms` for candidate pairs
+  3. Match rejected and candidates re-pooled if RTT exceeds threshold
+  4. Subclasses can override RTT handling behavior
+**Research flag:** Unlikely (extends existing Matchmaker API)
+**Plans:** TBD
+
+Plans:
+- [ ] 59-01-PLAN.md — Matchmaker RTT config, find_match() integration, rejection handling
+
+#### Phase 60: Single Game Creation Path
+**Goal:** One code path creates games (matchmaker → game)
+**Depends on:** Phase 59
+**Requirements:** GAME-01, GAME-02, GAME-03, GAME-04
+**Success Criteria** (what must be TRUE):
+  1. Matchmaker.find_match() is the only entry point for game creation
+  2. Group reunion flow removed (documented as future TODO)
+  3. Game object only created after all participants assigned
+  4. No orphaned participants in created games
+**Research flag:** Unlikely (refactoring existing code paths)
+**Plans:** TBD
+
+Plans:
+- [ ] 60-01-PLAN.md — Remove group reunion, enforce single creation path, document TODO
+
+## v1.13 Progress
+
+| Phase | Milestone | Plans Complete | Status | Completed |
+|-------|-----------|----------------|--------|-----------|
+| 57. P2P Probe Infrastructure | v1.13 | 0/TBD | Not started | - |
+| 58. RTT Measurement | v1.13 | 0/TBD | Not started | - |
+| 59. Matchmaker RTT Integration | v1.13 | 0/TBD | Not started | - |
+| 60. Single Game Creation Path | v1.13 | 0/TBD | Not started | - |
+
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-03 after Phase 56 execution complete — v1.12 shipped*
+*Last updated: 2026-02-03 after v1.13 roadmap created (4 phases, 10 requirements)*

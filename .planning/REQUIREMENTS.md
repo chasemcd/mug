@@ -55,22 +55,22 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| RTT-01 | TBD | Pending |
-| RTT-02 | TBD | Pending |
-| RTT-03 | TBD | Pending |
-| RTT-04 | TBD | Pending |
-| RTT-05 | TBD | Pending |
-| RTT-06 | TBD | Pending |
-| GAME-01 | TBD | Pending |
-| GAME-02 | TBD | Pending |
-| GAME-03 | TBD | Pending |
-| GAME-04 | TBD | Pending |
+| RTT-01 | Phase 57 | Pending |
+| RTT-02 | Phase 58 | Pending |
+| RTT-03 | Phase 57 | Pending |
+| RTT-04 | Phase 59 | Pending |
+| RTT-05 | Phase 59 | Pending |
+| RTT-06 | Phase 59 | Pending |
+| GAME-01 | Phase 60 | Pending |
+| GAME-02 | Phase 60 | Pending |
+| GAME-03 | Phase 60 | Pending |
+| GAME-04 | Phase 60 | Pending |
 
 **Coverage:**
 - v1 requirements: 10 total
-- Mapped to phases: 0
-- Unmapped: 10 ⚠️
+- Mapped to phases: 10 ✓
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-03*
-*Last updated: 2026-02-03 after initial definition*
+*Last updated: 2026-02-03 after roadmap created*
