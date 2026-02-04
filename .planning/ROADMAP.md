@@ -202,7 +202,7 @@ See [milestones/v1.11-ROADMAP.md](milestones/v1.11-ROADMAP.md) for full details.
 
 - [x] **Phase 61: Input Confirmation Protocol** - Wait for partner input confirmation before export
 - [x] **Phase 62: Data Parity Validation** - Ensure identical exports for actions/rewards/infos
-- [ ] **Phase 63: Parity Test Stabilization** - E2E tests pass consistently (10+ runs)
+- [x] **Phase 63: Parity Test Stabilization** - E2E tests pass consistently (10+ runs)
 - [ ] **Phase 64: Multi-Participant Test Infrastructure** - Support 6 concurrent participants
 - [ ] **Phase 65: Multi-Episode and Lifecycle Stress Tests** - Comprehensive lifecycle coverage
 - [ ] **Phase 66: Server Recovery Validation** - Prove server recovers from chaos correctly
@@ -259,11 +259,11 @@ Plans:
   1. Test fixture can launch 6 browser contexts simultaneously
   2. Test fixture can orchestrate 3 concurrent games
   3. Infrastructure handles staggered participant arrival
-**Research flag:** Likely (Playwright concurrent context management, resource limits)
-**Plans**: TBD
+**Research flag:** Complete (64-RESEARCH.md)
+**Plans:** 1 plan
 
 Plans:
-- [ ] 64-01: TBD
+- [ ] 64-01-PLAN.md — Add multi_participant_contexts fixture, GameOrchestrator class, and validation tests
 
 ### Phase 65: Multi-Episode and Lifecycle Stress Tests
 **Goal**: Comprehensive stress test coverage for all participant lifecycle scenarios
@@ -319,10 +319,10 @@ Plans:
 | 61. Input Confirmation Protocol | v1.14 | 1/1 | Complete | 2026-02-03 |
 | 62. Data Parity Validation | v1.14 | 1/1 | Complete | 2026-02-03 |
 | 63. Parity Test Stabilization | v1.14 | 1/1 | Complete | 2026-02-03 |
-| 64. Multi-Participant Test Infrastructure | v1.14 | 0/TBD | Not started | - |
+| 64. Multi-Participant Test Infrastructure | v1.14 | 0/1 | Planned | - |
 | 65. Multi-Episode Lifecycle Stress | v1.14 | 0/TBD | Not started | - |
 | 66. Server Recovery Validation | v1.14 | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-03 after Phase 63 execution*
+*Last updated: 2026-02-03 after Phase 64 planning*
