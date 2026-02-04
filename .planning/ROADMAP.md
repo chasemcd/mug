@@ -203,7 +203,7 @@ See [milestones/v1.11-ROADMAP.md](milestones/v1.11-ROADMAP.md) for full details.
 - [x] **Phase 61: Input Confirmation Protocol** - Wait for partner input confirmation before export
 - [x] **Phase 62: Data Parity Validation** - Ensure identical exports for actions/rewards/infos
 - [x] **Phase 63: Parity Test Stabilization** - E2E tests pass consistently (10+ runs)
-- [ ] **Phase 64: Multi-Participant Test Infrastructure** - Support 6 concurrent participants
+- [x] **Phase 64: Multi-Participant Test Infrastructure** - Support 6 concurrent participants
 - [ ] **Phase 65: Multi-Episode and Lifecycle Stress Tests** - Comprehensive lifecycle coverage
 - [ ] **Phase 66: Server Recovery Validation** - Prove server recovers from chaos correctly
 
@@ -276,11 +276,12 @@ Plans:
   4. Focus loss test passes (game ends gracefully after timeout)
   5. Mixed lifecycle test passes (combinations of above scenarios)
   6. All completed games pass exact parity validation
-**Research flag:** Unlikely (builds on Phase 64 infrastructure)
-**Plans**: TBD
+**Research flag:** Complete (65-RESEARCH.md)
+**Plans:** 2 plans
 
 Plans:
-- [ ] 65-01: TBD
+- [ ] 65-01-PLAN.md — Create test server configs (multi-episode + focus-timeout) and pytest fixtures
+- [ ] 65-02-PLAN.md — Create lifecycle stress tests (STRESS-02 through STRESS-07)
 
 ### Phase 66: Server Recovery Validation
 **Goal**: Prove server handles chaos gracefully and recovers correctly for new participants
@@ -320,9 +321,9 @@ Plans:
 | 62. Data Parity Validation | v1.14 | 1/1 | Complete | 2026-02-03 |
 | 63. Parity Test Stabilization | v1.14 | 1/1 | Complete | 2026-02-03 |
 | 64. Multi-Participant Test Infrastructure | v1.14 | 1/1 | Complete | 2026-02-03 |
-| 65. Multi-Episode Lifecycle Stress | v1.14 | 0/TBD | Not started | - |
+| 65. Multi-Episode Lifecycle Stress | v1.14 | 0/2 | Not started | - |
 | 66. Server Recovery Validation | v1.14 | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-03 after Phase 64 execution*
+*Last updated: 2026-02-03 after Phase 65 planning*
