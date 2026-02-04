@@ -156,6 +156,140 @@ def player_contexts(browser):
     context2.close()
 
 
+@pytest.fixture(scope="module")
+def flask_server_multi_episode():
+    """
+    Start multi-episode Flask server as subprocess before tests, stop after.
+
+    Scope: module (starts once per test module, not per test)
+    Yields: dict with 'url', 'process', 'num_episodes' keys
+
+    Uses overcooked_human_human_multiplayer_multi_episode_test config with:
+    - num_episodes=2 for back-to-back episode testing
+    - No RTT limit, no focus timeout
+    - Port 5703 (different from standard test port 5702)
+    """
+    port = 5703
+    base_url = f"http://localhost:{port}"
+
+    process = subprocess.Popen(
+        [
+            "python",
+            "-m",
+            "interactive_gym.examples.cogrid.overcooked_human_human_multiplayer_multi_episode_test",
+            "--port",
+            str(port),
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+
+    # Wait for server to be ready (poll health endpoint)
+    max_retries = 30
+    for attempt in range(max_retries):
+        try:
+            conn = HTTPConnection("localhost", port, timeout=1)
+            conn.request("GET", "/")
+            response = conn.getresponse()
+            conn.close()
+            if response.status < 500:
+                break
+        except (ConnectionRefusedError, OSError, TimeoutError):
+            pass
+
+        if process.poll() is not None:
+            stdout, stderr = process.communicate()
+            raise RuntimeError(
+                f"Multi-episode Flask server exited unexpectedly (code {process.returncode}).\n"
+                f"stdout: {stdout.decode()}\n"
+                f"stderr: {stderr.decode()}"
+            )
+
+        time.sleep(1)
+    else:
+        process.terminate()
+        process.wait(timeout=5)
+        raise RuntimeError(
+            f"Multi-episode Flask server failed to start after {max_retries} retries"
+        )
+
+    yield {"url": base_url, "process": process, "num_episodes": 2}
+
+    process.terminate()
+    try:
+        process.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait()
+
+
+@pytest.fixture(scope="module")
+def flask_server_focus_timeout():
+    """
+    Start focus timeout Flask server as subprocess before tests, stop after.
+
+    Scope: module (starts once per test module, not per test)
+    Yields: dict with 'url', 'process', 'focus_timeout_ms' keys
+
+    Uses overcooked_human_human_multiplayer_focus_timeout_test config with:
+    - focus_loss_config(timeout_ms=10000) for 10 second focus timeout
+    - No RTT limit, single episode
+    - Port 5704 (different from other test ports)
+    """
+    port = 5704
+    base_url = f"http://localhost:{port}"
+
+    process = subprocess.Popen(
+        [
+            "python",
+            "-m",
+            "interactive_gym.examples.cogrid.overcooked_human_human_multiplayer_focus_timeout_test",
+            "--port",
+            str(port),
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+
+    # Wait for server to be ready (poll health endpoint)
+    max_retries = 30
+    for attempt in range(max_retries):
+        try:
+            conn = HTTPConnection("localhost", port, timeout=1)
+            conn.request("GET", "/")
+            response = conn.getresponse()
+            conn.close()
+            if response.status < 500:
+                break
+        except (ConnectionRefusedError, OSError, TimeoutError):
+            pass
+
+        if process.poll() is not None:
+            stdout, stderr = process.communicate()
+            raise RuntimeError(
+                f"Focus timeout Flask server exited unexpectedly (code {process.returncode}).\n"
+                f"stdout: {stdout.decode()}\n"
+                f"stderr: {stderr.decode()}"
+            )
+
+        time.sleep(1)
+    else:
+        process.terminate()
+        process.wait(timeout=5)
+        raise RuntimeError(
+            f"Focus timeout Flask server failed to start after {max_retries} retries"
+        )
+
+    yield {"url": base_url, "process": process, "focus_timeout_ms": 10000}
+
+    process.terminate()
+    try:
+        process.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait()
+
+
 @pytest.fixture(scope="function")
 def multi_participant_contexts(browser):
     """
