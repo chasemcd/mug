@@ -1145,6 +1145,7 @@ class GameManager:
         if self.participant_state_tracker:
             for subject_id in game.human_players.values():
                 if subject_id and subject_id != utils.Available:
+                    logger.info(f"[StartGame] Transitioning {subject_id} to IN_GAME for game {game.game_id}")
                     self.participant_state_tracker.transition_to(subject_id, ParticipantState.IN_GAME)
 
         self.active_games.add(game.game_id)

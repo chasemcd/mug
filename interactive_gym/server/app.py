@@ -306,6 +306,31 @@ def register_subject(data):
     SESSION_ID_TO_SUBJECT_ID[sid] = subject_id
     logger.info(f"Registered session ID {sid} with subject {subject_id}")
 
+    # Clean up stale participant state on fresh connection
+    # If participant is IN_GAME/IN_WAITROOM but no game exists, reset to IDLE
+    # If participant is GAME_ENDED, also reset (allows new game in same session)
+    current_participant_state = PARTICIPANT_TRACKER.get_state(subject_id)
+    if current_participant_state == ParticipantState.GAME_ENDED:
+        # Game ended - reset for potential new game (e.g., multi-episode experiments, tests)
+        logger.info(
+            f"[RegisterSession] Participant {subject_id} reconnecting after GAME_ENDED. "
+            f"Resetting to IDLE for fresh start."
+        )
+        PARTICIPANT_TRACKER.reset(subject_id)
+    elif current_participant_state in (ParticipantState.IN_GAME, ParticipantState.IN_WAITROOM):
+        # Check if they're actually in a game
+        in_any_game = False
+        for game_manager in GAME_MANAGERS.values():
+            if game_manager.subject_in_game(subject_id):
+                in_any_game = True
+                break
+        if not in_any_game:
+            logger.warning(
+                f"[RegisterSession] Participant {subject_id} has stale state {current_participant_state.name} "
+                f"but is not in any game. Resetting to IDLE."
+            )
+            PARTICIPANT_TRACKER.reset(subject_id)
+
     # Log activity for admin dashboard
     if ADMIN_AGGREGATOR:
         ADMIN_AGGREGATOR.log_activity("join", subject_id, {"socket_id": sid})
@@ -470,6 +495,17 @@ def advance_scene(data):
     participant_stager: stager.Stager | None = STAGERS.get(subject_id, None)
     if participant_stager is None:
         raise ValueError(f"No stager found for subject {subject_id}")
+
+    # Reset participant state when advancing to a new scene
+    # This ensures participants can join new games after completing previous scenes
+    current_state = PARTICIPANT_TRACKER.get_state(subject_id)
+    if current_state != ParticipantState.IDLE:
+        logger.info(
+            f"[AdvanceScene] Resetting participant {subject_id} from {current_state.name} to IDLE "
+            f"for new scene"
+        )
+        PARTICIPANT_TRACKER.reset(subject_id)
+
     participant_stager.advance(socketio, room=flask.request.sid)
 
     # If the current scene is a GymScene, we'll instantiate a
@@ -598,8 +634,12 @@ def join_game(data):
             return
 
         # Check participant state before routing (Phase 54)
+        current_state = PARTICIPANT_TRACKER.get_state(subject_id)
+        logger.info(
+            f"[JoinGame:StateCheck] Subject {subject_id} current state: {current_state.name}, "
+            f"tracked_subjects={list(PARTICIPANT_TRACKER._states.keys())}"
+        )
         if not PARTICIPANT_TRACKER.can_join_waitroom(subject_id):
-            current_state = PARTICIPANT_TRACKER.get_state(subject_id)
             logger.warning(
                 f"[JoinGame] Subject {subject_id} cannot join waitroom, current state: {current_state.name}"
             )
@@ -2071,6 +2111,17 @@ def handle_p2p_validation_failed(data):
 
     logger.warning(f"P2P validation failed for game {game_id}: {reason}")
 
+    # Collect subject IDs before cleanup for state reset
+    subject_ids_to_reset = []
+    for scene_id, game_manager in GAME_MANAGERS.items():
+        game = game_manager.games.get(game_id)
+        if game:
+            subject_ids_to_reset = [
+                sid for sid in game.human_players.values()
+                if sid and sid != utils.Available
+            ]
+            break
+
     # Get socket IDs before cleanup
     socket_ids = PYODIDE_COORDINATOR.handle_validation_failure(game_id, player_id, reason)
 
@@ -2088,13 +2139,26 @@ def handle_p2p_validation_failed(data):
     # Clean up game from coordinator
     PYODIDE_COORDINATOR.remove_game(game_id)
 
-    # Clean up GameManager state using cleanup_game() (Phase 52)
-    # This handles subject_games, subject_rooms, and game removal
+    # Clean up GameManager state - use _remove_game to avoid GAME_ENDED transition
+    # which would block re-pooling (need IDLE state to rejoin waitroom)
     for scene_id, game_manager in GAME_MANAGERS.items():
         if game_id in game_manager.games:
-            game_manager.cleanup_game(game_id)
+            # Manual cleanup without transitioning to GAME_ENDED
+            game = game_manager.games[game_id]
+            for subject_id in list(game.human_players.values()):
+                if subject_id and subject_id != utils.Available:
+                    if subject_id in game_manager.subject_games:
+                        del game_manager.subject_games[subject_id]
+                    if subject_id in game_manager.subject_rooms:
+                        del game_manager.subject_rooms[subject_id]
+            game_manager._remove_game(game_id)
             logger.info(f"Cleaned up GameManager state for failed P2P validation game {game_id}")
             break
+
+    # Reset participant state to IDLE so they can re-pool (not GAME_ENDED)
+    for subject_id in subject_ids_to_reset:
+        PARTICIPANT_TRACKER.reset(subject_id)
+        logger.info(f"Reset participant {subject_id} to IDLE after P2P validation failure")
 
 
 # ========== Mid-Game Reconnection Handlers (Phase 20) ==========
