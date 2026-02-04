@@ -8,35 +8,42 @@ A framework for running browser-based reinforcement learning experiments with hu
 
 Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
 
-## Current Milestone: v1.14 Data Parity Fix
+## Current Milestone: v1.15 E2E Test Reliability
 
-**Goal:** Fix the rare data parity divergence bug and add comprehensive multi-participant E2E stress tests.
+**Goal:** Achieve 100% pass rate for all E2E tests with zero flakiness.
 
-**Problem:** `_promoteRemainingAtBoundary()` force-promotes unconfirmed speculative data at episode end. When packets are lost, rollback replay may use predicted actions instead of confirmed inputs. Both players record what they executed, which may differ.
+**Problem:** Multi-participant stress tests have intermittent failures due to P2P concurrent load issues. WebRTC connection establishment times out when 3+ games start simultaneously, causing players to be re-pooled and tests to fail.
 
 **Target features:**
 
-*Data parity fix:*
-- [ ] Wait for input confirmation before episode export
-- [ ] Re-request lost packets if confirmation timeout
-- [ ] Ensure both players export identical action sequences for every frame
-- [ ] E2E test `test_active_input_with_latency` passes consistently
-
-*Multi-participant stress tests:*
-- [ ] Test with many participants going through same server session
-- [ ] Test participants playing multiple episodes
-- [ ] Test mid-game disconnection scenarios
-- [ ] Test waiting room disconnection scenarios
-- [ ] Test focus loss during gameplay
-- [ ] Test mixed scenarios (some disconnect, some complete, some lose focus)
+*Test reliability:*
+- [ ] Investigate each failing test and identify root cause
+- [ ] Fix P2P concurrent load issues (WebRTC establishment timeouts)
+- [ ] All multi-participant tests pass reliably (STRESS-01 through STRESS-07)
+- [ ] All lifecycle stress tests pass reliably
+- [ ] All single-participant tests continue passing
 
 **What done looks like:**
-- Data parity is EXACT — both players export identical data for every frame
-- No tolerance needed in validation scripts
-- All existing E2E stress tests pass (17/17, no flaky tests)
-- New multi-participant stress tests pass reliably
-- `_promoteRemainingAtBoundary()` only promotes confirmed data
-- Server handles concurrent participant lifecycles correctly
+- All E2E tests pass 100% of the time
+- Zero flakiness — no intermittent failures
+- Tests can run in any order without affecting results
+- Clear documentation of any infrastructure requirements
+
+## Previous Milestone: v1.14 Data Parity Fix (Shipped: 2026-02-04)
+
+**Delivered:** Fixed data parity divergence bug, added multi-participant test infrastructure, and comprehensive lifecycle stress tests.
+
+**Key accomplishments:**
+- Input confirmation protocol before episode export
+- Increased P2P input redundancy (3→10 inputs per packet)
+- Multi-participant test infrastructure (6 contexts, 3 concurrent games)
+- GameOrchestrator class for test orchestration
+- Data export parity validation helpers
+- Fixed GAME-01 violation (games pre-created in waitroom)
+- Fixed PyodideGameCoordinator eventlet deadlock
+- 5 lifecycle stress test functions (STRESS-02 through STRESS-07)
+
+**Known limitation:** P2P validation timeouts under concurrent load (deferred to v1.15)
 
 ## Previous Milestone: v1.13 Matchmaker Hardening (Shipped: 2026-02-03)
 
@@ -244,17 +251,22 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 
 ### Active
 
-*v1.14 Data Parity Fix:*
-- [ ] Wait for input confirmation before episode export
-- [ ] Re-request lost packets if confirmation timeout
-- [ ] Ensure both players export identical action sequences
-- [ ] E2E test `test_active_input_with_latency` passes consistently
-- [ ] Multi-participant stress test (many participants, same server session)
-- [ ] Multi-episode stress test (participants complete multiple episodes)
-- [ ] Mid-game disconnection stress test
-- [ ] Waiting room disconnection stress test
-- [ ] Focus loss stress test
-- [ ] Mixed lifecycle stress test (disconnect + complete + focus loss combinations)
+*v1.15 E2E Test Reliability:*
+- [ ] Investigate P2P concurrent load failures (WebRTC establishment timeouts)
+- [ ] Fix multi-participant stress tests (STRESS-01)
+- [ ] Fix multi-episode stress tests (STRESS-02)
+- [ ] Fix mid-game disconnection stress tests
+- [ ] Fix waiting room disconnection stress tests
+- [ ] Fix focus loss stress tests
+- [ ] Fix mixed lifecycle stress tests
+- [ ] Achieve 100% pass rate with zero flakiness
+
+*Shipped in v1.14:*
+- ✓ Wait for input confirmation before episode export — v1.14
+- ✓ Ensure both players export identical action sequences — v1.14
+- ✓ Multi-participant test infrastructure (6 contexts, 3 concurrent games) — v1.14
+- ✓ Data export parity validation helpers — v1.14
+- ✓ GameOrchestrator for multi-participant test orchestration — v1.14
 
 *Shipped in v1.13:*
 - ✓ P2P RTT probe helper for measuring actual latency between candidates — v1.13
@@ -367,4 +379,4 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 | BOUND-02/03 guards | Defense-in-depth at episode boundaries in async paths | ✓ Good |
 
 ---
-*Last updated: 2026-02-03 after v1.14 milestone started*
+*Last updated: 2026-02-04 after v1.15 milestone started*

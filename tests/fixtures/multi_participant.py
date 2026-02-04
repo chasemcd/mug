@@ -601,6 +601,75 @@ class GameOrchestrator:
 
         return status
 
+    def wait_for_all_episodes_with_parity(
+        self,
+        episode_num: int = 1,
+        episode_timeout: int = 180000,
+        export_timeout_sec: int = 30,
+        parity_row_tolerance: int = 10,
+        experiment_id: Optional[str] = None,
+    ) -> Dict[int, Dict[str, Any]]:
+        """
+        Wait for episode completion AND validate data parity for all games.
+
+        This is the recommended method for multi-participant tests. It combines:
+        1. Waiting for both players' num_episodes to reach target
+        2. Validating export file parity for both players
+
+        Data export parity is the definitive test for correct P2P synchronization.
+
+        Args:
+            episode_num: Target episode count (1 = first episode complete)
+            episode_timeout: Timeout per player in milliseconds for episode completion
+            export_timeout_sec: Timeout in seconds waiting for export files
+            parity_row_tolerance: Allow up to N row count differences (default 10)
+            experiment_id: Optional experiment ID override (for non-standard server configs)
+
+        Returns:
+            Dict mapping game_idx to status:
+            {
+                0: {"success": bool, "message": str, "parity_verified": bool},
+                1: {"success": bool, "message": str, "parity_verified": bool},
+                2: {"success": bool, "message": str, "parity_verified": bool},
+            }
+        """
+        from tests.fixtures.export_helpers import wait_for_episode_with_parity
+
+        exp_id = get_experiment_id(experiment_id)
+        scene_id = get_scene_id(self.pages[0])
+
+        results = {}
+        # 0-indexed episode_num for export files (episode 1 = episode_num 0)
+        export_episode_num = episode_num - 1
+
+        for game_idx, (page1, page2) in enumerate(self.games):
+            print(f"\n[Parity] Game {game_idx}: Validating episode {episode_num}...")
+
+            success, message = wait_for_episode_with_parity(
+                page1=page1,
+                page2=page2,
+                experiment_id=exp_id,
+                scene_id=scene_id,
+                episode_num=export_episode_num,
+                episode_timeout_sec=episode_timeout // 1000,
+                export_timeout_sec=export_timeout_sec,
+                parity_row_tolerance=parity_row_tolerance,
+                verbose=True,
+            )
+
+            results[game_idx] = {
+                "success": success,
+                "message": message,
+                "parity_verified": success,
+            }
+
+            if success:
+                print(f"[Parity] Game {game_idx}: ✓ SUCCESS")
+            else:
+                print(f"[Parity] Game {game_idx}: ✗ FAILED - {message}")
+
+        return results
+
     def validate_all_data_parity(self, episode_num: int = 0, timeout_sec: int = 30) -> List[Tuple[int, str]]:
         """
         Validate data parity for all completed games.

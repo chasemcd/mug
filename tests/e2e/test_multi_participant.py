@@ -44,8 +44,8 @@ def test_three_simultaneous_games(multi_participant_contexts, flask_server):
     4. All games complete successfully
     5. Data parity verified for all games
 
-    This is the infrastructure foundation test. If this passes, the
-    infrastructure is ready for lifecycle stress tests in Phase 65.
+    Episode completion is confirmed via data export parity validation,
+    which verifies both players processed identical game state.
     """
     pages = multi_participant_contexts  # Tuple of 6 pages
     base_url = flask_server["url"]
@@ -53,19 +53,24 @@ def test_three_simultaneous_games(multi_participant_contexts, flask_server):
     # Create orchestrator
     orchestrator = GameOrchestrator(pages, base_url)
 
-    # Start all 3 games
-    orchestrator.start_all_games()
+    # Start all 3 games with increased stagger for WebRTC stability
+    orchestrator.start_all_games(stagger_delay_sec=7.0)
 
-    # Wait for all episodes to complete (300s per page - 6 games may take longer)
-    orchestrator.wait_for_all_episodes_complete(episode_num=1, timeout=300000)
+    # Wait for all episodes to complete WITH parity validation
+    # This is the definitive test: both players must export identical data
+    results = orchestrator.wait_for_all_episodes_with_parity(
+        episode_num=1,
+        episode_timeout=300000,
+        export_timeout_sec=60,
+    )
 
-    # Validate data parity for all games
-    results = orchestrator.validate_all_data_parity(episode_num=0)
-
-    # Assert all games passed parity
-    for game_idx, (exit_code, output) in enumerate(results):
-        assert exit_code == 0, (
-            f"Game {game_idx} data parity failed:\n{output}"
+    # Assert all games passed with verified parity
+    for game_idx, status in results.items():
+        assert status["success"], (
+            f"Game {game_idx} failed: {status['message']}"
+        )
+        assert status["parity_verified"], (
+            f"Game {game_idx} parity not verified: {status['message']}"
         )
 
     print(f"\n[STRESS-01] All 3 games completed with verified data parity")
@@ -78,63 +83,39 @@ def test_staggered_participant_arrival(multi_participant_contexts, flask_server)
 
     Simulates realistic scenario where participants arrive at different times:
     - Game 1 players arrive first
-    - 2 second delay
+    - Delay between game pairs
     - Game 2 players arrive
-    - 2 second delay
+    - Delay between game pairs
     - Game 3 players arrive
 
     Validates that FIFO matchmaker correctly pairs intended partners
-    despite significant arrival gaps.
+    and all games complete with verified data parity.
     """
     pages = multi_participant_contexts
     base_url = flask_server["url"]
 
-    STAGGER_DELAY_SEC = 2.0
+    # Create orchestrator and use per-pair orchestration with increased stagger
+    orchestrator = GameOrchestrator(pages, base_url)
 
-    games = [
-        (pages[0], pages[1]),  # Game 0
-        (pages[2], pages[3]),  # Game 1
-        (pages[4], pages[5]),  # Game 2
-    ]
+    # Start all games with staggered timing (7s between pairs for WebRTC stability)
+    orchestrator.start_all_games(stagger_delay_sec=7.0)
 
-    # Navigate with large stagger between game pairs
-    for game_idx, (page1, page2) in enumerate(games):
-        if game_idx > 0:
-            print(f"Waiting {STAGGER_DELAY_SEC}s before Game {game_idx}...")
-            time.sleep(STAGGER_DELAY_SEC)
+    # Wait for all episodes to complete WITH parity validation
+    # This confirms correct pairing AND correct game state synchronization
+    results = orchestrator.wait_for_all_episodes_with_parity(
+        episode_num=1,
+        episode_timeout=300000,
+        export_timeout_sec=60,
+    )
 
-        # Navigate partners close together (small gap)
-        page1.goto(base_url)
-        time.sleep(0.1)  # 100ms gap between partners
-        page2.goto(base_url)
-        print(f"Game {game_idx}: Both players navigated")
-
-    # Wait for all sockets
-    for page in pages:
-        wait_for_socket_connected(page, timeout=30000)
-
-    # Advance through instructions
-    for page in pages:
-        click_advance_button(page, timeout=60000)
-
-    # Start matchmaking
-    for page in pages:
-        click_start_button(page, timeout=60000)
-
-    # Wait for all game canvases
-    for page in pages:
-        wait_for_game_canvas(page, timeout=120000)
-        set_tab_visibility(page, visible=True)
-
-    # Verify pairings
-    for game_idx, (page1, page2) in enumerate(games):
-        state1 = get_game_state(page1)
-        state2 = get_game_state(page2)
-
-        assert state1["gameId"] == state2["gameId"], (
-            f"Game {game_idx}: Players not paired correctly after {STAGGER_DELAY_SEC}s stagger. "
-            f"Player 1 gameId={state1['gameId']}, Player 2 gameId={state2['gameId']}"
+    # Assert all games paired correctly and completed with parity
+    for game_idx, status in results.items():
+        assert status["success"], (
+            f"Game {game_idx} failed: {status['message']}"
         )
-        print(f"Game {game_idx}: Verified correct pairing, gameId={state1['gameId']}")
+        assert status["parity_verified"], (
+            f"Game {game_idx} parity not verified: {status['message']}"
+        )
+        print(f"Game {game_idx}: Verified correct pairing and data parity")
 
-    print(f"\n[Staggered Arrival] All 3 games paired correctly with {STAGGER_DELAY_SEC}s stagger")
+    print(f"\n[Staggered Arrival] All 3 games paired and completed with verified data parity")

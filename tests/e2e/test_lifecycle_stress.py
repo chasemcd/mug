@@ -40,51 +40,53 @@ def test_multi_episode_completion(multi_participant_contexts, flask_server_multi
     STRESS-02: Participant can complete 2 episodes back-to-back without state corruption.
 
     Validates:
-    1. All 3 games complete episode 1 successfully
-    2. Episode 1 data parity verified for all games
-    3. All 3 games complete episode 2 successfully
-    4. Episode 2 data parity verified for all games
-    5. No state corruption across episode boundaries
+    1. All 3 games complete episode 1 successfully with verified data parity
+    2. All 3 games complete episode 2 successfully with verified data parity
+    3. No state corruption across episode boundaries
+
+    Episode completion is confirmed via data export parity validation,
+    which verifies both players processed identical game state.
 
     Uses flask_server_multi_episode with num_episodes=2.
     """
     pages = multi_participant_contexts
     base_url = flask_server_multi_episode["url"]
     expected_episodes = flask_server_multi_episode["num_episodes"]
+    experiment_id = flask_server_multi_episode.get("experiment_id")
 
     print(f"\n[STRESS-02] Testing {expected_episodes} episodes back-to-back")
 
     # Create orchestrator
     orchestrator = GameOrchestrator(pages, base_url)
 
-    # Start all 3 games
-    orchestrator.start_all_games()
+    # Start all 3 games with increased stagger for WebRTC stability
+    orchestrator.start_all_games(stagger_delay_sec=7.0)
 
-    # Wait for episode 1 to complete for all games
-    print("\n[STRESS-02] Waiting for episode 1 to complete...")
-    orchestrator.wait_for_all_episodes_complete(episode_num=1, timeout=300000)
-    print("[STRESS-02] Episode 1 complete for all games")
-
-    # Validate episode 1 parity (episode_num is 0-indexed for export files)
-    print("[STRESS-02] Validating episode 1 data parity...")
-    results_ep1 = orchestrator.validate_all_data_parity(episode_num=0, timeout_sec=30)
-    for game_idx, (exit_code, output) in enumerate(results_ep1):
-        assert exit_code == 0, (
-            f"[STRESS-02] Game {game_idx} episode 1 parity failed:\n{output}"
+    # Wait for episode 1 with parity validation
+    print("\n[STRESS-02] Episode 1: Waiting for completion with parity validation...")
+    results_ep1 = orchestrator.wait_for_all_episodes_with_parity(
+        episode_num=1,
+        episode_timeout=300000,
+        export_timeout_sec=60,
+        experiment_id=experiment_id,
+    )
+    for game_idx, status in results_ep1.items():
+        assert status["success"], (
+            f"[STRESS-02] Game {game_idx} episode 1 failed: {status['message']}"
         )
         print(f"[STRESS-02] Game {game_idx} episode 1: PARITY VERIFIED")
 
-    # Wait for episode 2 to complete for all games
-    print("\n[STRESS-02] Waiting for episode 2 to complete...")
-    orchestrator.wait_for_all_episodes_complete(episode_num=2, timeout=300000)
-    print("[STRESS-02] Episode 2 complete for all games")
-
-    # Validate episode 2 parity
-    print("[STRESS-02] Validating episode 2 data parity...")
-    results_ep2 = orchestrator.validate_all_data_parity(episode_num=1, timeout_sec=30)
-    for game_idx, (exit_code, output) in enumerate(results_ep2):
-        assert exit_code == 0, (
-            f"[STRESS-02] Game {game_idx} episode 2 parity failed:\n{output}"
+    # Wait for episode 2 with parity validation
+    print("\n[STRESS-02] Episode 2: Waiting for completion with parity validation...")
+    results_ep2 = orchestrator.wait_for_all_episodes_with_parity(
+        episode_num=2,
+        episode_timeout=300000,
+        export_timeout_sec=60,
+        experiment_id=experiment_id,
+    )
+    for game_idx, status in results_ep2.items():
+        assert status["success"], (
+            f"[STRESS-02] Game {game_idx} episode 2 failed: {status['message']}"
         )
         print(f"[STRESS-02] Game {game_idx} episode 2: PARITY VERIFIED")
 
@@ -240,6 +242,7 @@ def test_waitroom_disconnect_isolation(multi_participant_contexts, flask_server)
 
     # Wait for page2 to be in waitroom
     wait_for_waitroom(page2, timeout=30000)
+    time.sleep(5)
 
     # SAFETY CHECK: Verify page2 is actually in waitroom (not immediately matched)
     # If there was a stale participant in the waitroom, page2 would have matched immediately

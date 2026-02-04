@@ -2,25 +2,25 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-02-03)
+See: .planning/PROJECT.md (updated 2026-02-04)
 
 **Core value:** Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
-**Current focus:** v1.14 Data Parity Fix - In Progress
+**Current focus:** v1.15 E2E Test Reliability - In Progress
 
 ## Current Position
 
-Phase: 65 of 66 (Multi-Episode and Lifecycle Stress Tests)
-Plan: 01 complete
-Status: In progress
-Last activity: 2026-02-03 — Completed 65-01-PLAN.md (test server configs and fixtures)
+Milestone: v1.15 E2E Test Reliability
+Status: Starting — Investigating P2P concurrent load failures
+Last activity: 2026-02-04 — Started v1.15 milestone
 
-Progress: █████░░░░░ 83% (5/6 phases in v1.14)
+Progress: ░░░░░░░░░░ 0% (investigation phase)
 
 ## Milestone History
 
 | Milestone | Phases | Status | Shipped |
 |-----------|--------|--------|---------|
-| v1.14 Data Parity Fix | 61-66 | In Progress | - |
+| v1.15 E2E Test Reliability | TBD | In Progress | - |
+| v1.14 Data Parity Fix | 61-65 | Complete | 2026-02-04 |
 | v1.13 Matchmaker Hardening | 57-60 | Complete | 2026-02-03 |
 | v1.12 Waiting Room Overhaul | 51-56 | Complete | 2026-02-03 |
 | v1.11 Data Export Edge Cases | 48-50 | Complete | 2026-02-03 |
@@ -163,6 +163,7 @@ Progress: █████░░░░░ 83% (5/6 phases in v1.14)
 - `.planning/phases/63-parity-test-stabilization/63-01-SUMMARY.md`
 - `.planning/phases/64-multi-participant-test-infrastructure/64-01-SUMMARY.md`
 - `.planning/phases/65-multi-episode-lifecycle-stress-tests/65-01-SUMMARY.md`
+- `.planning/phases/65-multi-episode-lifecycle-stress-tests/65-02-SUMMARY.md`
 
 **Multi-Participant Test Infrastructure (v1.14 Phase 64 - added):**
 - `tests/conftest.py` - multi_participant_contexts fixture for 6 browser contexts
@@ -312,6 +313,13 @@ See: .planning/PROJECT.md Key Decisions table
 - Reset participant state after P2P validation failure to allow re-pooling
 - STRESS-01 requirement satisfied (6 contexts, 3 concurrent games with data parity)
 
+**v1.14 Phase 65 decisions:**
+- Games must NOT be pre-created in waitroom - only created when matchmaker forms complete match (GAME-01 fix)
+- Socket.IO emits must occur outside threading.Lock() blocks to avoid eventlet deadlocks
+- waitroom_participants list tracks waiting subjects without pre-allocated games
+- P2P validation timeout (10s) may cause failures under concurrent load - known infrastructure limitation
+- STRESS-02 through STRESS-07 test implementations complete
+
 ### Pending Todos
 
 (None)
@@ -332,20 +340,23 @@ See: .planning/PROJECT.md Key Decisions table
 
 ## Session Continuity
 
-Last session: 2026-02-03
-Stopped at: Completed 65-01-PLAN.md (test server configs and fixtures)
+Last session: 2026-02-04
+Stopped at: Started v1.15 E2E Test Reliability milestone
 Resume file: None
 
 ### Next Steps
 
-**Phase 65: Multi-Episode and Lifecycle Stress Tests (In Progress)**
-- Plan 01: Test server configs and fixtures (COMPLETE)
-- Plan 02: Multi-episode tests (STRESS-02) (PENDING)
-- Plan 03: Disconnect/focus loss tests (STRESS-03, STRESS-04, STRESS-05) (PENDING)
-- Plan 04: Mixed lifecycle scenarios (STRESS-06, STRESS-07) (PENDING)
+**v1.15 E2E Test Reliability (In Progress)**
+Goal: 100% pass rate for all E2E tests with zero flakiness
 
-Next action: Execute 65-02-PLAN.md
+**Known failing tests:**
+- `test_three_simultaneous_games` - Intermittent P2P timeout under concurrent load
+- `test_staggered_participant_arrival` - Intermittent P2P timeout
+- `test_multi_episode_completion` - Episode completion timeout
 
-**Remaining phases:**
-- Phase 65: Multi-Episode and Lifecycle Stress Tests (plans 02-04 remaining)
-- Phase 66: Server Recovery Validation (RECOVERY-01 through RECOVERY-06)
+**Investigation needed:**
+1. Identify root cause of P2P concurrent load failures (WebRTC establishment timeouts)
+2. Determine why 7s stagger is insufficient for reliable connections
+3. Analyze if TURN server or signaling is the bottleneck
+
+Next action: Run failing tests with verbose logging to identify root cause patterns

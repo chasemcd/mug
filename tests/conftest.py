@@ -213,11 +213,21 @@ def flask_server_multi_episode():
             f"Multi-episode Flask server failed to start after {max_retries} retries"
         )
 
-    yield {"url": base_url, "process": process, "num_episodes": 2}
+    yield {
+        "url": base_url,
+        "process": process,
+        "num_episodes": 2,
+        "experiment_id": "overcooked_multiplayer_hh_multi_episode_test",
+    }
 
     process.terminate()
     try:
-        process.wait(timeout=5)
+        stdout, stderr = process.communicate(timeout=5)
+        # Save server output for debugging
+        with open("/tmp/server_multi_episode_stdout.txt", "wb") as f:
+            f.write(stdout)
+        with open("/tmp/server_multi_episode_stderr.txt", "wb") as f:
+            f.write(stderr)
     except subprocess.TimeoutExpired:
         process.kill()
         process.wait()
