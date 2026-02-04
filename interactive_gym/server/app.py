@@ -2808,18 +2808,29 @@ def on_disconnect():
         return
 
     # Determine whether to notify group members or remove quietly
+    logger.info(
+        f"[Disconnect:Route] subject={subject_id}, "
+        f"is_in_active_gym_scene={is_in_active_gym_scene}, "
+        f"subject_in_game={game_manager.subject_in_game(subject_id)}, "
+        f"waiting_games={game_manager.waiting_games}"
+    )
     if is_in_active_gym_scene:
         logger.info(
             f"Subject {subject_id} disconnected from active game, triggering leave_game."
         )
         game_manager.leave_game(subject_id=subject_id)
     else:
-        # Subject is not in an active game scene (e.g., in a survey)
+        # Subject is not in an active game scene (e.g., in waitroom or survey)
         # Remove quietly without notifying group members
         logger.info(
-            f"Subject {subject_id} disconnected from non-active scene, removing quietly."
+            f"Subject {subject_id} disconnected from waitroom/non-active scene, "
+            f"calling remove_subject_quietly."
         )
-        game_manager.remove_subject_quietly(subject_id)
+        result = game_manager.remove_subject_quietly(subject_id)
+        logger.info(
+            f"[Disconnect:Route] remove_subject_quietly returned {result}, "
+            f"waiting_games after={game_manager.waiting_games}"
+        )
 
     # Clean up group manager
     if GROUP_MANAGER:

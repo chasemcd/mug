@@ -16,8 +16,11 @@ RTT Configuration Notes:
 
 from __future__ import annotations
 
+import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -151,10 +154,24 @@ class FIFOMatchmaker(Matchmaker):
         waiting: list[MatchCandidate],
         group_size: int,
     ) -> list[MatchCandidate] | None:
+        logger.info(
+            f"[FIFOMatchmaker] find_match called: "
+            f"arriving={arriving.subject_id}, "
+            f"waiting={[w.subject_id for w in waiting]}, "
+            f"group_size={group_size}"
+        )
+
         # Need enough participants to form a group
         if len(waiting) + 1 < group_size:
+            logger.info(
+                f"[FIFOMatchmaker] Not enough participants: "
+                f"{len(waiting) + 1} < {group_size}. Returning None (wait)."
+            )
             return None
 
         # Take first (group_size - 1) waiting participants + arriving
         matched = waiting[: group_size - 1] + [arriving]
+        logger.info(
+            f"[FIFOMatchmaker] Match found! Returning: {[m.subject_id for m in matched]}"
+        )
         return matched

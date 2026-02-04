@@ -447,16 +447,33 @@ class GameManager:
 
             # Build waiting list from RTT-compatible participants
             # Note: RTT filtering is applied here, before calling the matchmaker
+            logger.info(
+                f"[Matchmaker:Build] Building waiting list for {subject_id}. "
+                f"waiting_games={self.waiting_games}"
+            )
             waiting = []
             for game_id in self.waiting_games:
                 candidate_game = self.games.get(game_id)
                 if candidate_game and self._is_rtt_compatible(subject_id, candidate_game):
+                    logger.info(
+                        f"[Matchmaker:Build] Checking game {game_id}: "
+                        f"human_players={candidate_game.human_players}"
+                    )
                     for player_id, sid in candidate_game.human_players.items():
                         if sid and sid != utils.Available:
+                            logger.info(
+                                f"[Matchmaker:Build] Found waiting participant: "
+                                f"player_id={player_id}, subject_id={sid}"
+                            )
                             waiting.append(MatchCandidate(
                                 subject_id=sid,
                                 rtt_ms=self.get_subject_rtt(sid) if self.get_subject_rtt else None,
                             ))
+                        else:
+                            logger.debug(
+                                f"[Matchmaker:Build] Skipping slot: "
+                                f"player_id={player_id}, sid={sid} (Available or None)"
+                            )
 
             group_size = self._get_group_size()
 
@@ -1467,21 +1484,39 @@ class GameManager:
         """Remove a subject from their game without notifying other players.
 
         Used when a player disconnects from a non-active scene (e.g., during a survey)
-        so their group members don't receive a disconnect notification.
+        or from the waitroom before being matched.
 
         Returns True if subject was removed, False if not found.
         """
         game_id = self.subject_games.get(subject_id)
+        logger.info(
+            f"[RemoveQuietly] Called for {subject_id}. "
+            f"game_id={game_id}, "
+            f"subject_games keys={list(self.subject_games.keys())}"
+        )
         if game_id is None:
+            logger.warning(f"[RemoveQuietly] {subject_id} not found in subject_games")
             return False
 
         game = self.games.get(game_id)
         if game is None:
+            logger.warning(f"[RemoveQuietly] Game {game_id} not found in games dict")
             return False
+
+        logger.info(
+            f"[RemoveQuietly] Before removal: game {game_id} "
+            f"human_players={game.human_players}, "
+            f"in_waiting_games={game_id in self.waiting_games}"
+        )
 
         with game.lock:
             # Just remove the subject without any notifications
             game.remove_human_player(subject_id)
+
+            logger.info(
+                f"[RemoveQuietly] After remove_human_player: "
+                f"human_players={game.human_players}"
+            )
 
             if subject_id in self.subject_games:
                 del self.subject_games[subject_id]
@@ -1491,11 +1526,23 @@ class GameManager:
             flask_socketio.leave_room(game_id)
 
             # If game is now empty, clean it up quietly
-            if game.cur_num_human_players() == 0:
+            num_players = game.cur_num_human_players()
+            logger.info(
+                f"[RemoveQuietly] cur_num_human_players={num_players}"
+            )
+            if num_players == 0:
+                logger.info(
+                    f"[RemoveQuietly] Game {game_id} is empty, cleaning up. "
+                    f"waiting_games before={self.waiting_games}"
+                )
                 game.tear_down()
                 self._remove_game(game_id)
+                logger.info(
+                    f"[RemoveQuietly] After cleanup: "
+                    f"waiting_games={self.waiting_games}"
+                )
 
-        logger.info(f"Quietly removed subject {subject_id} from game {game_id}")
+        logger.info(f"[RemoveQuietly] Successfully removed {subject_id} from game {game_id}")
         return True
 
     def is_subject_in_active_game(self, subject_id: SubjectID) -> bool:
