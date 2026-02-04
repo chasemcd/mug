@@ -208,14 +208,29 @@ class RemoteGameV2:
         )
 
     def remove_human_player(self, subject_id) -> None:
-        """Remove a human player from the game"""
-        if subject_id not in self.human_players:
+        """Remove a human player from the game.
+
+        Args:
+            subject_id: The subject identifier to remove.
+
+        Note: human_players is keyed by player_id (slot), with subject_id as value.
+        We need to find the player_id that maps to this subject_id.
+        """
+        # Find the player_id (slot) that has this subject_id
+        player_id_to_remove = None
+        for player_id, sid in self.human_players.items():
+            if sid == subject_id:
+                player_id_to_remove = player_id
+                break
+
+        if player_id_to_remove is None:
             logger.warning(
-                f"Attempted to remove {subject_id} but player wasn't found."
+                f"Attempted to remove {subject_id} but player wasn't found in human_players."
             )
             return
 
-        self.human_players[subject_id] = utils.Available
+        self.human_players[player_id_to_remove] = utils.Available
+        logger.debug(f"Removed {subject_id} from slot {player_id_to_remove}")
 
         if subject_id in self.document_focus_status:
             del self.document_focus_status[subject_id]
