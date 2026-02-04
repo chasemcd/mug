@@ -414,6 +414,193 @@ class GameOrchestrator:
         for game_idx, (page1, page2) in enumerate(self.games):
             self.subject_ids[game_idx] = get_subject_ids_from_pages(page1, page2)
 
+    def start_single_game_pair(self, game_idx: int, stagger_delay_sec: float = 0.0) -> bool:
+        """
+        Start a single game pair through the full startup flow.
+
+        Extracts the per-pair orchestration logic for use by tests that need
+        to start games at different times (e.g., mixed lifecycle scenarios).
+
+        Args:
+            game_idx: Game index (0, 1, or 2)
+            stagger_delay_sec: Optional delay before starting (for staggering)
+
+        Returns:
+            bool: True if game started successfully, False on error
+
+        Raises:
+            ValueError: If game_idx is not 0, 1, or 2
+        """
+        if game_idx < 0 or game_idx >= len(self.games):
+            raise ValueError(f"Invalid game_idx {game_idx}, must be 0-{len(self.games)-1}")
+
+        page1, page2 = self.games[game_idx]
+        page1_idx = game_idx * 2
+        page2_idx = game_idx * 2 + 1
+
+        if stagger_delay_sec > 0:
+            print(f"Waiting {stagger_delay_sec}s before Game {game_idx}...")
+            time.sleep(stagger_delay_sec)
+
+        print(f"\n--- Game {game_idx} (pages {page1_idx}, {page2_idx}) ---")
+
+        try:
+            # Step 1: Navigate
+            print(f"Game {game_idx}: Navigating...")
+            page1.goto(self.base_url)
+            time.sleep(0.1)  # Small gap between partners
+            page2.goto(self.base_url)
+
+            # Validate: pages loaded
+            log_page_state(page1, f"Game{game_idx}-P1 after navigate")
+            log_page_state(page2, f"Game{game_idx}-P2 after navigate")
+
+            # Step 2: Wait for socket
+            print(f"Game {game_idx}: Waiting for sockets...")
+            wait_for_socket_connected(page1, timeout=30000)
+            wait_for_socket_connected(page2, timeout=30000)
+
+            # Validate: sockets connected
+            s1 = log_page_state(page1, f"Game{game_idx}-P1 after socket")
+            s2 = log_page_state(page2, f"Game{game_idx}-P2 after socket")
+            assert s1['socket_connected'], f"Game {game_idx} P1: Socket not connected"
+            assert s2['socket_connected'], f"Game {game_idx} P2: Socket not connected"
+
+            # Step 3: Wait for advance button, then click
+            print(f"Game {game_idx}: Waiting for advance buttons...")
+            wait_for_advance_button(page1, timeout=30000)
+            wait_for_advance_button(page2, timeout=30000)
+
+            s1 = log_page_state(page1, f"Game{game_idx}-P1 before advance click")
+            s2 = log_page_state(page2, f"Game{game_idx}-P2 before advance click")
+            assert s1['advance_button_visible'], f"Game {game_idx} P1: Advance button not visible"
+            assert s2['advance_button_visible'], f"Game {game_idx} P2: Advance button not visible"
+
+            print(f"Game {game_idx}: Clicking advance buttons...")
+            page1.locator("#advanceButton").click()
+            page2.locator("#advanceButton").click()
+
+            # Validate: advance button clicked, should now see start button
+            time.sleep(0.5)  # Brief wait for scene transition
+            log_page_state(page1, f"Game{game_idx}-P1 after advance click")
+            log_page_state(page2, f"Game{game_idx}-P2 after advance click")
+
+            # Step 4: Wait for start button to be enabled, then click
+            print(f"Game {game_idx}: Waiting for start buttons to be enabled...")
+            wait_for_start_button_enabled(page1, timeout=60000)
+            wait_for_start_button_enabled(page2, timeout=60000)
+
+            s1 = log_page_state(page1, f"Game{game_idx}-P1 before start click")
+            s2 = log_page_state(page2, f"Game{game_idx}-P2 before start click")
+            assert s1['start_button_visible'], f"Game {game_idx} P1: Start button not visible"
+            assert s1['start_button_enabled'], f"Game {game_idx} P1: Start button not enabled"
+            assert s2['start_button_visible'], f"Game {game_idx} P2: Start button not visible"
+            assert s2['start_button_enabled'], f"Game {game_idx} P2: Start button not enabled"
+
+            print(f"Game {game_idx}: Clicking start buttons...")
+            page1.locator("#startButton").click()
+            time.sleep(0.5)  # Wait for P1 to enter waitroom before P2 clicks
+            page2.locator("#startButton").click()
+
+            # Validate: start button clicked, should enter waitroom/matchmaking
+            time.sleep(0.5)  # Brief wait for matchmaking to start
+            s1 = log_page_state(page1, f"Game{game_idx}-P1 after start click")
+            s2 = log_page_state(page2, f"Game{game_idx}-P2 after start click")
+
+            # Check for errors
+            if s1['error_text_visible']:
+                print(f"Game {game_idx} P1: Error after start click: {s1['error_text_content']}")
+                return False
+            if s2['error_text_visible']:
+                print(f"Game {game_idx} P2: Error after start click: {s2['error_text_content']}")
+                return False
+
+            # Step 5: Wait for game canvas
+            print(f"Game {game_idx}: Waiting for game to start...")
+            self._wait_for_pair_game_started(page1, page2, timeout=120000)
+
+            # Validate: game started
+            s1 = log_page_state(page1, f"Game{game_idx}-P1 after game start")
+            s2 = log_page_state(page2, f"Game{game_idx}-P2 after game start")
+            assert s1['game_canvas_visible'], f"Game {game_idx} P1: Canvas not visible"
+            assert s1['game_object_exists'], f"Game {game_idx} P1: Game object not found"
+            assert s2['game_canvas_visible'], f"Game {game_idx} P2: Canvas not visible"
+            assert s2['game_object_exists'], f"Game {game_idx} P2: Game object not found"
+
+            # Step 6: Verify pairing
+            state1 = get_game_state(page1)
+            state2 = get_game_state(page2)
+            assert state1["gameId"] == state2["gameId"], (
+                f"Game {game_idx}: Players not matched correctly. "
+                f"Player 1 gameId={state1['gameId']}, Player 2 gameId={state2['gameId']}"
+            )
+            self.game_ids[game_idx] = state1["gameId"]
+            print(f"Game {game_idx}: Started and verified, gameId={state1['gameId']}")
+            return True
+
+        except Exception as e:
+            print(f"Game {game_idx}: Failed to start - {e}")
+            return False
+
+    def get_game_completion_status(self) -> Dict[int, Dict[str, Any]]:
+        """
+        Get completion status for all games.
+
+        Returns dict with game status for each game index:
+        {
+            0: {"completed": bool, "disconnected": bool, "error": str|None, "frame_count": int|None},
+            1: {"completed": bool, "disconnected": bool, "error": str|None, "frame_count": int|None},
+            2: {"completed": bool, "disconnected": bool, "error": str|None, "frame_count": int|None},
+        }
+
+        Used to track which games completed normally vs failed, for selective
+        parity validation (only validate completed games).
+        """
+        status = {}
+
+        for game_idx, (page1, page2) in enumerate(self.games):
+            game_status = {
+                "completed": False,
+                "disconnected": False,
+                "error": None,
+                "frame_count": None,
+            }
+
+            try:
+                # Try to get game state from page1
+                state1 = page1.evaluate("""() => {
+                    const game = window.game;
+                    if (!game) return null;
+                    return {
+                        state: game.state,
+                        numEpisodes: game.num_episodes,
+                        frameNumber: game.frameNumber,
+                        partnerDisconnected: game.partnerDisconnectedTerminal || false,
+                    };
+                }""")
+
+                if state1 is None:
+                    # Game object not found - page may be closed
+                    game_status["disconnected"] = True
+                    game_status["error"] = "Game object not found on page1"
+                elif state1.get("partnerDisconnected"):
+                    game_status["disconnected"] = True
+                    game_status["frame_count"] = state1.get("frameNumber")
+                elif state1.get("state") == "done" or state1.get("numEpisodes", 0) >= 1:
+                    game_status["completed"] = True
+                    game_status["frame_count"] = state1.get("frameNumber")
+                else:
+                    game_status["frame_count"] = state1.get("frameNumber")
+
+            except Exception as e:
+                # Page may be closed or context destroyed
+                game_status["disconnected"] = True
+                game_status["error"] = str(e)
+
+            status[game_idx] = game_status
+
+        return status
+
     def validate_all_data_parity(self, episode_num: int = 0, timeout_sec: int = 30) -> List[Tuple[int, str]]:
         """
         Validate data parity for all completed games.
