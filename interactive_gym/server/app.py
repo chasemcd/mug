@@ -2774,12 +2774,32 @@ def on_disconnect():
                     # CRITICAL: Also clean up GameManager state
                     # The player may be in GameManager's waitroom (subject_games, waiting_games)
                     # even though they're also registered in PYODIDE_COORDINATOR
+                    logger.info(
+                        f"[Disconnect:Pyodide] Checking GameManager cleanup for {subject_id}. "
+                        f"current_scene={current_scene.scene_id if current_scene else None}"
+                    )
                     game_manager = GAME_MANAGERS.get(current_scene.scene_id, None) if current_scene else None
-                    if game_manager and game_manager.subject_in_game(subject_id):
+                    if game_manager:
+                        in_game = game_manager.subject_in_game(subject_id)
                         logger.info(
-                            f"[Disconnect:Pyodide] Also cleaning up GameManager state for {subject_id}"
+                            f"[Disconnect:Pyodide] game_manager found, subject_in_game={in_game}, "
+                            f"subject_games={list(game_manager.subject_games.keys())}, "
+                            f"waiting_games={game_manager.waiting_games}"
                         )
-                        game_manager.remove_subject_quietly(subject_id)
+                        if in_game:
+                            logger.info(
+                                f"[Disconnect:Pyodide] Calling remove_subject_quietly for {subject_id}"
+                            )
+                            game_manager.remove_subject_quietly(subject_id)
+                            logger.info(
+                                f"[Disconnect:Pyodide] After cleanup: "
+                                f"subject_games={list(game_manager.subject_games.keys())}, "
+                                f"waiting_games={game_manager.waiting_games}"
+                            )
+                    else:
+                        logger.warning(
+                            f"[Disconnect:Pyodide] No game_manager found for scene {current_scene.scene_id if current_scene else 'None'}"
+                        )
 
                     # Clean up group manager
                     if GROUP_MANAGER:
