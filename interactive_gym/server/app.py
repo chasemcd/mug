@@ -2770,6 +2770,17 @@ def on_disconnect():
                         player_id=player_id,
                         notify_others=is_in_active_pyodide_game
                     )
+
+                    # CRITICAL: Also clean up GameManager state
+                    # The player may be in GameManager's waitroom (subject_games, waiting_games)
+                    # even though they're also registered in PYODIDE_COORDINATOR
+                    game_manager = GAME_MANAGERS.get(current_scene.scene_id, None) if current_scene else None
+                    if game_manager and game_manager.subject_in_game(subject_id):
+                        logger.info(
+                            f"[Disconnect:Pyodide] Also cleaning up GameManager state for {subject_id}"
+                        )
+                        game_manager.remove_subject_quietly(subject_id)
+
                     # Clean up group manager
                     if GROUP_MANAGER:
                         GROUP_MANAGER.cleanup_subject(subject_id)
