@@ -14,8 +14,8 @@ Requirements for v1.14 Data Parity Fix. Each maps to roadmap phases.
 - [x] **PARITY-03**: Both players export identical action sequences for every frame
 - [x] **PARITY-04**: Both players export identical rewards for every frame
 - [x] **PARITY-05**: Both players export identical infos for every frame
-- [ ] **PARITY-06**: `test_active_input_with_latency[chromium-100]` passes consistently (10+ runs)
-- [ ] **PARITY-07**: `test_active_input_with_packet_loss` passes consistently (10+ runs)
+- [x] **PARITY-06**: `test_active_input_with_latency[chromium-100]` passes consistently (10+ runs)
+- [x] **PARITY-07**: `test_active_input_with_packet_loss` passes consistently (10+ runs)
 
 ### Multi-Participant Stress Tests
 
@@ -79,8 +79,8 @@ Which phases cover which requirements. Updated by create-roadmap.
 | PARITY-03 | Phase 62 | Complete |
 | PARITY-04 | Phase 62 | Complete |
 | PARITY-05 | Phase 62 | Complete |
-| PARITY-06 | Phase 63 | Pending |
-| PARITY-07 | Phase 63 | Pending |
+| PARITY-06 | Phase 63 | Complete |
+| PARITY-07 | Phase 63 | Complete |
 | STRESS-01 | Phase 64 | Pending |
 | STRESS-02 | Phase 65 | Pending |
 | STRESS-03 | Phase 65 | Pending |

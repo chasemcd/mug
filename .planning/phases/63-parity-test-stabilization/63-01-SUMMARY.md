@@ -14,13 +14,13 @@ Stabilize E2E parity tests for CI reliability by fixing the underlying packet lo
 | 1 | Increase input confirmation timeout in test config | d3a295a |
 | 2 | Clean up test docstrings (remove flaky warnings) | 07c3a97 |
 | 3 | Increase P2P input redundancy from 3 to 10 | 9f34419 |
-| 4 | Verify test stability with 10 consecutive runs | (verification) |
+| 4 | Verify test stability with 10 consecutive runs | (verified - 10/10 both tests) |
 
 ## Deliverables
 
 1. **Test configuration with higher timeout**
    - `interactive_gym/examples/cogrid/overcooked_human_human_multiplayer_test.py`
-   - Added `input_confirmation_timeout_ms=1500` for packet loss test resilience
+   - Added `input_confirmation_timeout_ms=2000` for packet loss test resilience
 
 2. **Clean test docstrings**
    - `tests/e2e/test_network_disruption.py` - Removed "Known flaky tests" section
