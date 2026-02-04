@@ -154,3 +154,43 @@ def player_contexts(browser):
     # Teardown: close contexts
     context1.close()
     context2.close()
+
+
+@pytest.fixture(scope="function")
+def multi_participant_contexts(browser):
+    """
+    Create 6 isolated browser contexts for multi-participant stress testing.
+
+    Scope: function (fresh contexts for each test)
+    Yields: tuple of 6 pages (page1, page2, page3, page4, page5, page6)
+
+    Intended grouping: (page1, page2) = Game 1, (page3, page4) = Game 2, (page5, page6) = Game 3
+
+    Note: Uses standard Chrome user agent to pass browser entry screening.
+    Browser contexts are lightweight (KB not MB) so 6 contexts per browser is safe.
+    """
+    chrome_ua = (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/120.0.0.0 Safari/537.36"
+    )
+
+    contexts = []
+    pages = []
+
+    try:
+        for i in range(6):
+            ctx = browser.new_context(user_agent=chrome_ua)
+            page = ctx.new_page()
+            contexts.append(ctx)
+            pages.append(page)
+
+        yield tuple(pages)
+
+    finally:
+        # Cleanup: close all contexts even on error
+        for ctx in contexts:
+            try:
+                ctx.close()
+            except Exception:
+                pass
