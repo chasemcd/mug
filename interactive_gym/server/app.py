@@ -177,9 +177,12 @@ socketio = flask_socketio.SocketIO(
     cors_allowed_origins="*",
     logger=app.config["DEBUG"],
     # engineio_logger=False,
-    # More aggressive ping settings for faster disconnect detection
-    ping_interval=2,  # Ping every 2 seconds (default: 25)
-    ping_timeout=2,   # Wait 2 seconds for pong before disconnect (default: 5)
+    # Ping settings balanced for disconnect detection while allowing Pyodide initialization
+    # Pyodide can block the main thread for several seconds during startup,
+    # so we need enough buffer to avoid false disconnects during heavy initialization
+    # (especially when running multiple concurrent games)
+    ping_interval=8,   # Ping every 8 seconds (default: 25)
+    ping_timeout=8,    # Wait 8 seconds for pong before disconnect (default: 5)
 )
 
 # Flask-Login setup for admin authentication
@@ -570,6 +573,7 @@ def advance_scene(data):
                 matchmaker=current_scene.matchmaker,
                 match_logger=MATCH_LOGGER,  # Phase 56
                 probe_coordinator=PROBE_COORDINATOR,  # Phase 59: P2P RTT probing
+                get_socket_for_subject=get_socket_for_subject,  # Phase 60+: waitroom->match
             )
             GAME_MANAGERS[current_scene.scene_id] = game_manager
         else:

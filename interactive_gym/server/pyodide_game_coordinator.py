@@ -21,6 +21,12 @@ import eventlet
 import flask_socketio
 
 logger = logging.getLogger(__name__)
+# Add console handler to see pyodide_game_coordinator logs
+if not logger.handlers:
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+    logger.addHandler(_handler)
+    logger.setLevel(logging.INFO)
 
 
 @dataclasses.dataclass
@@ -220,6 +226,10 @@ class PyodideGameCoordinator:
             socket_id: Player's socket connection ID
             subject_id: Subject/participant identifier (for data logging)
         """
+        # Collect emit data while holding lock, emit outside to avoid deadlock
+        emit_assigned_data = None
+        start_game_data = None
+
         with self.lock:
             if game_id not in self.games:
                 logger.error(f"Attempted to add player to non-existent game {game_id}")
@@ -230,15 +240,16 @@ class PyodideGameCoordinator:
             if subject_id is not None:
                 game.player_subjects[player_id] = subject_id
 
-            # Send player assignment to all players (symmetric - no host distinction)
-            self.sio.emit('pyodide_player_assigned',
-                         {
-                             'player_id': player_id,
-                             'game_id': game_id,
-                             'game_seed': game.rng_seed,
-                             'num_players': game.num_expected_players
-                         },
-                         room=socket_id)
+            # Prepare player assignment data (emit later outside lock)
+            emit_assigned_data = {
+                'socket_id': socket_id,
+                'payload': {
+                    'player_id': player_id,
+                    'game_id': game_id,
+                    'game_seed': game.rng_seed,
+                    'num_players': game.num_expected_players
+                }
+            }
 
             logger.info(
                 f"Player {player_id} assigned to game {game_id} "
@@ -247,10 +258,22 @@ class PyodideGameCoordinator:
 
             # Check if game is ready to start
             if len(game.players) == game.num_expected_players:
-                self._start_game(game_id)
+                start_game_data = self._prepare_start_game(game_id)
 
-    def _start_game(self, game_id: str):
-        """Mark game as active once all players joined."""
+        # Emit OUTSIDE the lock to avoid eventlet deadlock
+        if emit_assigned_data:
+            self.sio.emit('pyodide_player_assigned',
+                         emit_assigned_data['payload'],
+                         room=emit_assigned_data['socket_id'])
+
+        if start_game_data:
+            self._execute_start_game(start_game_data)
+
+    def _prepare_start_game(self, game_id: str) -> dict:
+        """Prepare game start data while holding lock. Returns data for later emit.
+
+        Must be called while holding self.lock.
+        """
         game = self.games[game_id]
         game.is_active = True
 
@@ -263,7 +286,8 @@ class PyodideGameCoordinator:
                     from interactive_gym.server.remote_game import SessionState
                     remote_game.transition_to(SessionState.PLAYING)
 
-        # Initialize server runner if enabled
+        # Initialize server runner if enabled (this is CPU-bound, OK to do in lock)
+        server_runner = None
         if game.server_authoritative and game.server_runner:
             # Add all players to the server runner
             for player_id in game.players.keys():
@@ -276,8 +300,7 @@ class PyodideGameCoordinator:
                     f"Server runner initialized for game {game_id} "
                     f"with seed {game.rng_seed}"
                 )
-                # Start real-time loop
-                game.server_runner.start_realtime()
+                server_runner = game.server_runner
             else:
                 logger.error(
                     f"Failed to initialize server runner for game {game_id}"
@@ -289,34 +312,46 @@ class PyodideGameCoordinator:
             f"Emitting pyodide_game_ready to room {game_id} with players {list(game.players.keys())}, "
             f"server_authoritative={game.server_authoritative}"
         )
-        self.sio.emit('pyodide_game_ready',
-                     {
-                         'game_id': game_id,
-                         'players': list(game.players.keys()),
-                         'player_subjects': game.player_subjects,
-                         'server_authoritative': game.server_authoritative,
-                         # Include TURN config only if credentials are provided
-                         'turn_config': {
-                             'username': game.turn_username,
-                             'credential': game.turn_credential,
-                             'force_relay': game.force_turn_relay,
-                         } if game.turn_username else None,
-                         # Include scene metadata for client configuration
-                         'scene_metadata': game.scene_metadata,
-                     },
-                     room=game_id)
 
-        # Broadcast initial episode state so clients can sync before starting
-        # Clients wait for this server_episode_start event before beginning the game loop
-        if game.server_authoritative and game.server_runner:
-            game.server_runner.broadcast_state(event_type="server_episode_start")
-            logger.info(
-                f"Broadcast initial episode state for game {game_id}"
-            )
+        # Return data for emit outside lock
+        return {
+            'game_id': game_id,
+            'emit_payload': {
+                'game_id': game_id,
+                'players': list(game.players.keys()),
+                'player_subjects': dict(game.player_subjects),  # Copy to avoid concurrent modification
+                'server_authoritative': game.server_authoritative,
+                # Include TURN config only if credentials are provided
+                'turn_config': {
+                    'username': game.turn_username,
+                    'credential': game.turn_credential,
+                    'force_relay': game.force_turn_relay,
+                } if game.turn_username else None,
+                # Include scene metadata for client configuration
+                'scene_metadata': dict(game.scene_metadata) if game.scene_metadata else {},
+            },
+            'server_runner': server_runner,
+            'server_authoritative': game.server_authoritative,
+            'num_players': len(game.players),
+        }
+
+    def _execute_start_game(self, start_data: dict):
+        """Execute game start emits and runner startup. Called outside lock."""
+        game_id = start_data['game_id']
+
+        # Emit game ready event
+        self.sio.emit('pyodide_game_ready', start_data['emit_payload'], room=game_id)
+
+        # Start real-time loop for server runner (this spawns eventlet greenlets)
+        if start_data['server_runner']:
+            start_data['server_runner'].start_realtime()
+            # Broadcast initial episode state
+            start_data['server_runner'].broadcast_state(event_type="server_episode_start")
+            logger.info(f"Broadcast initial episode state for game {game_id}")
 
         logger.info(
-            f"Game {game_id} started with {len(game.players)} players"
-            f"{' (server-authoritative)' if game.server_authoritative else ' (host-based)'}"
+            f"Game {game_id} started with {start_data['num_players']} players"
+            f"{' (server-authoritative)' if start_data['server_authoritative'] else ' (host-based)'}"
         )
 
     def receive_action(
@@ -416,6 +451,10 @@ class PyodideGameCoordinator:
             player_id: Player who disconnected
             notify_others: Whether to notify remaining players (default True)
         """
+        # Collect data while holding lock, then emit outside lock to avoid deadlock
+        sockets_to_notify = []
+        should_notify = False
+
         with self.lock:
             if game_id not in self.games:
                 return
@@ -435,23 +474,14 @@ class PyodideGameCoordinator:
 
             logger.info(f"Player {player_id} disconnected from game {game_id}")
 
-            # Notify remaining players that the game has ended due to disconnection
+            # Determine if we should notify (collect data, don't emit yet)
             if notify_others and len(remaining_player_sockets) > 0:
+                should_notify = True
+                sockets_to_notify = remaining_player_sockets[:]  # Copy list
                 logger.info(
                     f"Notifying {len(remaining_player_sockets)} remaining players "
                     f"about disconnection in game {game_id}"
                 )
-                for socket_id in remaining_player_sockets:
-                    # Emit p2p_game_ended so client handles with proper overlay and completion code
-                    self.sio.emit(
-                        'p2p_game_ended',
-                        {
-                            'game_id': game_id,
-                            'reason': 'partner_disconnected',
-                            'disconnected_player_id': player_id
-                        },
-                        room=socket_id
-                    )
 
             # If no players left, remove game
             if len(game.players) == 0:
@@ -467,6 +497,20 @@ class PyodideGameCoordinator:
                     game.server_runner.stop()
                 del self.games[game_id]
                 logger.info(f"Removed game {game_id} after player disconnection")
+
+        # Emit OUTSIDE the lock to avoid eventlet deadlock
+        if should_notify:
+            for socket_id in sockets_to_notify:
+                # Emit p2p_game_ended so client handles with proper overlay and completion code
+                self.sio.emit(
+                    'p2p_game_ended',
+                    {
+                        'game_id': game_id,
+                        'reason': 'partner_disconnected',
+                        'disconnected_player_id': player_id
+                    },
+                    room=socket_id
+                )
 
     def _log_game_diagnostics(self, game: PyodideGameState):
         """

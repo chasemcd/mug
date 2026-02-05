@@ -35,7 +35,7 @@ from tests.fixtures.network_helpers import set_tab_visibility, wait_for_focus_ma
 # =============================================================================
 
 @pytest.mark.timeout(600)  # 10 minutes for 2 episodes x 3 games
-def test_multi_episode_completion(multi_participant_contexts, flask_server_multi_episode):
+def test_multi_episode_completion(multi_participant_contexts, flask_server_multi_episode_fresh):
     """
     STRESS-02: Participant can complete 2 episodes back-to-back without state corruption.
 
@@ -47,20 +47,20 @@ def test_multi_episode_completion(multi_participant_contexts, flask_server_multi
     Episode completion is confirmed via data export parity validation,
     which verifies both players processed identical game state.
 
-    Uses flask_server_multi_episode with num_episodes=2.
+    Uses flask_server_multi_episode_fresh with num_episodes=2.
     """
     pages = multi_participant_contexts
-    base_url = flask_server_multi_episode["url"]
-    expected_episodes = flask_server_multi_episode["num_episodes"]
-    experiment_id = flask_server_multi_episode.get("experiment_id")
+    base_url = flask_server_multi_episode_fresh["url"]
+    expected_episodes = flask_server_multi_episode_fresh["num_episodes"]
+    experiment_id = flask_server_multi_episode_fresh.get("experiment_id")
 
     print(f"\n[STRESS-02] Testing {expected_episodes} episodes back-to-back")
 
     # Create orchestrator
     orchestrator = GameOrchestrator(pages, base_url)
 
-    # Start all 3 games with increased stagger for WebRTC stability
-    orchestrator.start_all_games(stagger_delay_sec=7.0)
+    # Start all 3 games - should work without timing hacks
+    orchestrator.start_all_games(stagger_delay_sec=5.0)
 
     # Wait for episode 1 with parity validation
     print("\n[STRESS-02] Episode 1: Waiting for completion with parity validation...")
@@ -98,7 +98,7 @@ def test_multi_episode_completion(multi_participant_contexts, flask_server_multi
 # =============================================================================
 
 @pytest.mark.timeout(300)  # 5 minutes
-def test_mid_game_disconnect(player_contexts, flask_server):
+def test_mid_game_disconnect(player_contexts, flask_server_fresh):
     """
     STRESS-03: Mid-game disconnect shows overlay to partner and exports data.
 
@@ -109,10 +109,10 @@ def test_mid_game_disconnect(player_contexts, flask_server):
     4. Game state transitions to 'done' or shows overlay
     5. Data export triggered for completed frames
 
-    Uses standard flask_server with 2-player game.
+    Uses flask_server_fresh with 2-player game.
     """
     page1, page2 = player_contexts
-    base_url = flask_server["url"]
+    base_url = flask_server_fresh["url"]
 
     print("\n[STRESS-03] Testing mid-game disconnection handling")
 
@@ -180,7 +180,7 @@ def test_mid_game_disconnect(player_contexts, flask_server):
 # =============================================================================
 
 @pytest.mark.timeout(600)  # 10 minutes
-def test_waitroom_disconnect_isolation(multi_participant_contexts, flask_server):
+def test_waitroom_disconnect_isolation(multi_participant_contexts, flask_server_fresh):
     """
     STRESS-04: Waiting room disconnect does not affect other participants.
 
@@ -194,7 +194,7 @@ def test_waitroom_disconnect_isolation(multi_participant_contexts, flask_server)
     Demonstrates server state isolation between games.
     """
     pages = multi_participant_contexts
-    base_url = flask_server["url"]
+    base_url = flask_server_fresh["url"]
 
     print("\n[STRESS-04] Testing waiting room disconnect isolation")
 
@@ -427,7 +427,7 @@ def test_focus_loss_timeout(player_contexts, flask_server_focus_timeout):
 # =============================================================================
 
 @pytest.mark.timeout(600)  # 10 minutes
-def test_mixed_lifecycle_scenarios(multi_participant_contexts, flask_server):
+def test_mixed_lifecycle_scenarios(multi_participant_contexts, flask_server_fresh):
     """
     STRESS-06: Mixed lifecycle scenarios complete without server state corruption.
     STRESS-07: All completed games pass exact parity validation.
@@ -444,7 +444,7 @@ def test_mixed_lifecycle_scenarios(multi_participant_contexts, flask_server):
     4. Data parity verified for Game 1 and Game 3 (STRESS-07)
     """
     pages = multi_participant_contexts
-    base_url = flask_server["url"]
+    base_url = flask_server_fresh["url"]
 
     print("\n[STRESS-06] Testing mixed lifecycle scenarios")
 

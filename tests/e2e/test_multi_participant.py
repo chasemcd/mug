@@ -33,7 +33,7 @@ from tests.fixtures.network_helpers import set_tab_visibility
 # =============================================================================
 
 @pytest.mark.timeout(600)  # 10 minutes for 3 concurrent games
-def test_three_simultaneous_games(multi_participant_contexts, flask_server):
+def test_three_simultaneous_games(multi_participant_contexts, flask_server_fresh):
     """
     STRESS-01: Test infrastructure supports 6 concurrent participants.
 
@@ -48,13 +48,13 @@ def test_three_simultaneous_games(multi_participant_contexts, flask_server):
     which verifies both players processed identical game state.
     """
     pages = multi_participant_contexts  # Tuple of 6 pages
-    base_url = flask_server["url"]
+    base_url = flask_server_fresh["url"]
 
     # Create orchestrator
     orchestrator = GameOrchestrator(pages, base_url)
 
-    # Start all 3 games with increased stagger for WebRTC stability
-    orchestrator.start_all_games(stagger_delay_sec=7.0)
+    # Start all 3 games with stagger for WebRTC stability
+    orchestrator.start_all_games(stagger_delay_sec=5.0)
 
     # Wait for all episodes to complete WITH parity validation
     # This is the definitive test: both players must export identical data
@@ -77,7 +77,7 @@ def test_three_simultaneous_games(multi_participant_contexts, flask_server):
 
 
 @pytest.mark.timeout(600)  # 10 minutes
-def test_staggered_participant_arrival(multi_participant_contexts, flask_server):
+def test_staggered_participant_arrival(multi_participant_contexts, flask_server_fresh):
     """
     Test that infrastructure handles staggered participant arrival correctly.
 
@@ -92,13 +92,13 @@ def test_staggered_participant_arrival(multi_participant_contexts, flask_server)
     and all games complete with verified data parity.
     """
     pages = multi_participant_contexts
-    base_url = flask_server["url"]
+    base_url = flask_server_fresh["url"]
 
     # Create orchestrator and use per-pair orchestration with increased stagger
     orchestrator = GameOrchestrator(pages, base_url)
 
-    # Start all games with staggered timing (7s between pairs for WebRTC stability)
-    orchestrator.start_all_games(stagger_delay_sec=7.0)
+    # Start all games - should work without timing hacks
+    orchestrator.start_all_games(stagger_delay_sec=5.0)
 
     # Wait for all episodes to complete WITH parity validation
     # This confirms correct pairing AND correct game state synchronization

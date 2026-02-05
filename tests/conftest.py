@@ -122,6 +122,77 @@ def flask_server():
 
 
 @pytest.fixture(scope="function")
+def flask_server_fresh():
+    """
+    Start Flask server as subprocess for each test function.
+
+    Scope: function (fresh server per test for test isolation)
+    Yields: dict with 'url' and 'process' keys
+
+    Use this fixture for multi-participant stress tests that require
+    clean server state between tests. The module-scoped flask_server
+    can accumulate state that causes later tests to fail.
+    """
+    port = 5705  # Different port from other fixtures to avoid conflicts
+    base_url = f"http://localhost:{port}"
+
+    # Start the Flask server as a subprocess
+    process = subprocess.Popen(
+        [
+            "python",
+            "-m",
+            "interactive_gym.examples.cogrid.overcooked_human_human_multiplayer_test",
+            "--port",
+            str(port),
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+
+    # Wait for server to be ready (poll health endpoint)
+    max_retries = 30
+    for attempt in range(max_retries):
+        try:
+            conn = HTTPConnection("localhost", port, timeout=1)
+            conn.request("GET", "/")
+            response = conn.getresponse()
+            conn.close()
+            if response.status < 500:
+                break
+        except (ConnectionRefusedError, OSError, TimeoutError):
+            pass
+
+        if process.poll() is not None:
+            stdout, stderr = process.communicate()
+            raise RuntimeError(
+                f"Flask server exited unexpectedly (code {process.returncode}).\n"
+                f"stdout: {stdout.decode()}\n"
+                f"stderr: {stderr.decode()}"
+            )
+
+        time.sleep(1)
+    else:
+        process.terminate()
+        process.wait(timeout=5)
+        raise RuntimeError(
+            f"Flask server failed to start after {max_retries} retries"
+        )
+
+    yield {"url": base_url, "process": process}
+
+    # Teardown: stop the server and wait for port release
+    process.terminate()
+    try:
+        process.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait()
+
+    # Wait for port to be fully released (important for sequential test runs)
+    time.sleep(3)
+
+
+@pytest.fixture(scope="function")
 def player_contexts(browser):
     """
     Create two isolated browser contexts for multiplayer testing.
@@ -233,6 +304,78 @@ def flask_server_multi_episode():
         process.wait()
 
 
+@pytest.fixture(scope="function")
+def flask_server_multi_episode_fresh():
+    """
+    Start multi-episode Flask server as subprocess for each test function.
+
+    Scope: function (fresh server per test for test isolation)
+    Yields: dict with 'url', 'process', 'num_episodes', 'experiment_id' keys
+
+    Use this fixture for lifecycle stress tests that require clean server state.
+    """
+    port = 5706  # Different port for fresh multi-episode server
+    base_url = f"http://localhost:{port}"
+
+    process = subprocess.Popen(
+        [
+            "python",
+            "-m",
+            "interactive_gym.examples.cogrid.overcooked_human_human_multiplayer_multi_episode_test",
+            "--port",
+            str(port),
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+
+    # Wait for server to be ready
+    max_retries = 30
+    for attempt in range(max_retries):
+        try:
+            conn = HTTPConnection("localhost", port, timeout=1)
+            conn.request("GET", "/")
+            response = conn.getresponse()
+            conn.close()
+            if response.status < 500:
+                break
+        except (ConnectionRefusedError, OSError, TimeoutError):
+            pass
+
+        if process.poll() is not None:
+            stdout, stderr = process.communicate()
+            raise RuntimeError(
+                f"Multi-episode Flask server exited unexpectedly (code {process.returncode}).\n"
+                f"stdout: {stdout.decode()}\n"
+                f"stderr: {stderr.decode()}"
+            )
+
+        time.sleep(1)
+    else:
+        process.terminate()
+        process.wait(timeout=5)
+        raise RuntimeError(
+            f"Multi-episode Flask server failed to start after {max_retries} retries"
+        )
+
+    yield {
+        "url": base_url,
+        "process": process,
+        "num_episodes": 2,
+        "experiment_id": "overcooked_multiplayer_hh_multi_episode_test",
+    }
+
+    process.terminate()
+    try:
+        process.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait()
+
+    # Wait for port to be fully released (important for sequential test runs)
+    time.sleep(3)
+
+
 @pytest.fixture(scope="module")
 def flask_server_focus_timeout():
     """
@@ -332,9 +475,36 @@ def multi_participant_contexts(browser):
         yield tuple(pages)
 
     finally:
-        # Cleanup: close all contexts even on error
+        # Cleanup: close WebRTC connections before closing contexts
+        # This ensures cleaner teardown and prevents resource leaks
+        for page in pages:
+            try:
+                # Close any active WebRTC connections
+                page.evaluate("""() => {
+                    // Close WebRTC peer connections
+                    if (window.webrtcManager && window.webrtcManager.peerConnection) {
+                        window.webrtcManager.peerConnection.close();
+                    }
+                    // Close probe connections if any
+                    if (window.probeConnection && window.probeConnection.peerConnection) {
+                        window.probeConnection.peerConnection.close();
+                    }
+                    // Disconnect socket
+                    if (window.socket && window.socket.connected) {
+                        window.socket.disconnect();
+                    }
+                }""")
+            except Exception:
+                pass  # Page may already be closed
+
+        # Close all contexts
         for ctx in contexts:
             try:
                 ctx.close()
             except Exception:
                 pass
+
+        # Pause to allow server-side cleanup to process disconnect events
+        # This is critical for test isolation - ensures all WebRTC connections
+        # are fully cleaned up before next test starts
+        time.sleep(5)
