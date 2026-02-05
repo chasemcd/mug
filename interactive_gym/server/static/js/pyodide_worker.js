@@ -238,8 +238,9 @@ if not isinstance(truncateds, dict):
 (obs, rewards, terminateds, truncateds, infos, render_state)
     `);
 
-    // Convert PyProxy to JS objects for transfer across Worker boundary
-    const jsResult = result.toJs({ depth: 2 });
+    // Convert PyProxy to plain JS objects for postMessage transfer
+    // dict_converter: Object.fromEntries produces plain objects (not Maps)
+    const jsResult = result.toJs({ dict_converter: Object.fromEntries });
     result.destroy();  // Prevent memory leak
 
     const [obs, rewards, terminateds, truncateds, infos, render_state] = jsResult;
@@ -288,8 +289,8 @@ if not isinstance(obs, dict):
 (obs, infos, render_state)
     `);
 
-    // Convert PyProxy to JS objects for transfer
-    const jsResult = result.toJs({ depth: 2 });
+    // Convert PyProxy to plain JS objects for postMessage transfer
+    const jsResult = result.toJs({ dict_converter: Object.fromEntries });
     result.destroy();  // Prevent memory leak
 
     const [obs, infos, render_state] = jsResult;
@@ -502,10 +503,10 @@ render_state = env.render()
 render_state
     `);
 
-    // Convert PyProxy to JS if needed
+    // Convert PyProxy to plain JS objects for postMessage transfer
     let jsResult;
     if (result && typeof result.toJs === 'function') {
-        jsResult = result.toJs({ depth: 2 });
+        jsResult = result.toJs({ dict_converter: Object.fromEntries });
         result.destroy();
     } else {
         jsResult = result;
