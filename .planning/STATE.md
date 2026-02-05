@@ -5,17 +5,17 @@
 See: .planning/PROJECT.md (updated 2026-02-04)
 
 **Core value:** Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
-**Current focus:** v1.16 Pyodide Web Worker - Planned
+**Current focus:** v1.16 Pyodide Web Worker - In progress
 
 ## Current Position
 
 Milestone: v1.16 Pyodide Web Worker
 Phase: 67 of 70 (Core Worker Infrastructure)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-02-04 — Roadmap created with 4 phases (67-70)
+Plan: 01 complete
+Status: In progress
+Last activity: 2026-02-05 — Completed 67-01-PLAN.md (Core Worker Infrastructure)
 
-Progress: ░░░░░░░░░░ 0%
+Progress: ██░░░░░░░░ 25%
 
 ## Milestone History
 
@@ -167,6 +167,14 @@ Progress: ░░░░░░░░░░ 0%
 - `.planning/phases/64-multi-participant-test-infrastructure/64-01-SUMMARY.md`
 - `.planning/phases/65-multi-episode-lifecycle-stress-tests/65-01-SUMMARY.md`
 - `.planning/phases/65-multi-episode-lifecycle-stress-tests/65-02-SUMMARY.md`
+
+**v1.16 Execution:**
+- `.planning/phases/67-core-worker-infrastructure/67-01-SUMMARY.md`
+
+**PyodideWorker Infrastructure (v1.16 Phase 67 - added):**
+- `interactive_gym/server/static/js/pyodide_worker.js` - Worker script with READY gate pattern, typed message handlers
+- `interactive_gym/server/static/js/PyodideWorker.js` - Main thread class with async init/step/reset API
+- `interactive_gym/server/static/js/test_pyodide_worker.html` - Browser verification test page
 
 **Multi-Participant Test Infrastructure (v1.14 Phase 64 - added):**
 - `tests/conftest.py` - multi_participant_contexts fixture for 6 browser contexts
@@ -323,6 +331,12 @@ See: .planning/PROJECT.md Key Decisions table
 - P2P validation timeout (10s) may cause failures under concurrent load - known infrastructure limitation
 - STRESS-02 through STRESS-07 test implementations complete
 
+**v1.16 Phase 67 decisions:**
+- Separate .js file for Worker (not inline Blob) for easier debugging
+- READY gate pattern with messageQueue prevents race conditions
+- toJs({depth: 2}) for PyProxy conversion before postMessage
+- destroy() cleans PyProxy references to prevent memory leaks
+
 ### Pending Todos
 
 (None)
@@ -343,15 +357,15 @@ See: .planning/PROJECT.md Key Decisions table
 
 ## Session Continuity
 
-Last session: 2026-02-04
-Stopped at: Roadmap created for v1.16 Pyodide Web Worker (4 phases)
+Last session: 2026-02-05
+Stopped at: Completed 67-01-PLAN.md
 Resume file: None
 
 ### Next Steps
 
-**Phase 67: Core Worker Infrastructure** — Ready to plan
-- Create pyodide_worker.js and PyodideWorker class
-- Implement init/step/reset operations via postMessage
-- Requirements: WORKER-01, WORKER-02, WORKER-03
+**Phase 68: RemoteGame Integration** — Ready to plan
+- Migrate RemoteGame to use PyodideWorker
+- Keep existing API surface unchanged
+- Requirements: REMOTE-01, REMOTE-02, REMOTE-03
 
-Next action: `/gsd:plan-phase 67`
+Next action: `/gsd:plan-phase 68`
