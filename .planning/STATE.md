@@ -11,11 +11,11 @@ See: .planning/PROJECT.md (updated 2026-02-05)
 
 Milestone: v1.17 E2E Test Reliability
 Phase: 73 of 74 (Production Bug Fixes)
-Plan: 01 of 01 (complete, gaps found)
-Status: Gap closure needed — 4/5 must-haves verified, step_num rollback accounting gap
-Last activity: 2026-02-05 — 73-01 executed, VERIFICATION.md reports gaps_found
+Plan: 02 of 02 (complete, gap closed)
+Status: Complete — 5/5 must-haves verified, all 8 E2E tests pass
+Last activity: 2026-02-05 — 73-02 executed, step_num rollback accounting fixed
 
-Progress: ██████░░░░ 62% (2.5 of 4 phases)
+Progress: ███████░░░ 75% (3 of 4 phases)
 
 ## Milestone History
 
@@ -437,17 +437,13 @@ See: .planning/PROJECT.md Key Decisions table
 - Fixed by passing interactiveGymGlobals via Worker globals payload (commit 9e733d5)
 - Additional fixes: toJs DataCloneError (c9477dc), action key type mismatch (ec0e492)
 
-**Active Input Data Parity Bug (discovered Phase 71, FIXED in Phase 73):**
+**Active Input Data Parity Bug (discovered Phase 71, FIXED in Phase 73-01 and 73-02):**
 - Root cause 1: Promotion race -- speculative data promoted without rollback correction in _waitForInputConfirmation()
 - Root cause 2: State sync disabled -- validateStateSync() ran before reset(), cogrid env_agents=None, stateSyncSupported=false permanently
-- Fix: Promotion guards on all paths + post-reset state sync revalidation + NumpyEncoder for state serialization
-- Result: 2/3 target tests pass (active_input_parity, packet_loss). Latency test has pre-existing episode boundary issue (step_num double-counting during rollback)
-
-**Pre-existing: step_num double-counting during rollback (NOT YET FIXED):**
-- `this.step_num += replayLog.length` in performRollback() inflates step_num
-- Causes premature episode termination under high rollback frequency (latency scenarios)
-- Removing the line breaks episode termination entirely
-- Affects: test_active_input_with_latency[100] (episode boundary divergence only)
+- Root cause 3: step_num double-counting during rollback -- snapshots saved with wrong step_num compounded across cascading rollbacks
+- Fix 73-01: Promotion guards on all paths + post-reset state sync revalidation + NumpyEncoder for state serialization
+- Fix 73-02: restoredStepNum capture + frame-based snapshot step_num calculation + explicit post-replay step_num assignment
+- Result: 3/3 target tests pass (active_input_parity, packet_loss, latency). All 8 E2E tests pass.
 
 **Known issues to address in future milestones:**
 - Episode start sync can timeout on slow connections (mitigated with retry + two-way ack)
@@ -468,20 +464,25 @@ See: .planning/PROJECT.md Key Decisions table
 - NumpyEncoder for state serialization (cogrid state contains numpy arrays in bit_generator.state)
 - Warning (not error) in signalEpisodeComplete for uncorrected pending rollback (safety net)
 
+**v1.17 Phase 73 decisions (continued in 73-02):**
+- Capture restoredStepNum after loadStateSnapshot for per-frame step_num calculation
+- Use frame-based offset (restoredStepNum + (frame - snapshotFrame)) for snapshot step_num
+- Use explicit assignment (=) instead of increment (+=) for post-replay step_num
+
 **v1.17 Phase 73 execution:**
 - `.planning/phases/73-production-bug-fixes/73-01-SUMMARY.md`
+- `.planning/phases/73-production-bug-fixes/73-02-SUMMARY.md`
 
 ## Session Continuity
 
 Last session: 2026-02-05
-Stopped at: Phase 73 gap closure needed (4/5 must-haves, step_num rollback accounting gap)
+Stopped at: Phase 73 complete (5/5 must-haves verified, 8/8 E2E tests pass)
 Resume file: None
 
 ### Next Steps
 
-**Phase 73 Gap Closure** — Fix step_num double-counting during rollback replay.
-- 73-01 complete: rollback/promotion race fixed (2/3 target tests pass)
-- Gap: test_active_input_with_latency[100] fails with ~20 divergences at episode boundary
-- Root cause: `step_num += replayLog.length` in performRollback() inflates step_num under high rollback frequency
-- VERIFICATION.md documents gap at `.planning/phases/73-production-bug-fixes/73-VERIFICATION.md`
-- Next action: `/gsd:plan-phase 73 --gaps`
+**Phase 74 (Stability Validation)** — Validate full E2E test suite stability.
+- 73-01 and 73-02 complete: all production bugs fixed
+- 3/3 target tests pass (active_input_parity, packet_loss, latency)
+- 5/5 regression tests pass
+- Ready for Phase 74 execution
