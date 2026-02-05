@@ -1486,11 +1486,8 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
 
             // Get current state and send it
             try {
-                const envState = await this.pyodide.runPythonAsync(`
-import json
-env.get_state()
-                `);
-                const stateDict = envState.toJs({ dict_converter: Object.fromEntries });
+                const stateJson = await this.worker.getState();
+                const stateDict = JSON.parse(stateJson).env_state;
 
                 socket.emit('p2p_state_response', {
                     game_id: this.gameId,
@@ -1760,42 +1757,14 @@ env.get_state()
          * and client (Pyodide) for detecting state divergence.
          */
 
-        const result = await this.pyodide.runPythonAsync(`
-# Check if environment has required methods for state synchronization
-has_get_state = hasattr(env, 'get_state') and callable(getattr(env, 'get_state'))
-has_set_state = hasattr(env, 'set_state') and callable(getattr(env, 'set_state'))
-
-env_type = type(env).__name__
-env_module = type(env).__module__
-
-if not has_get_state or not has_set_state:
-    missing = []
-    if not has_get_state:
-        missing.append("get_state()")
-    if not has_set_state:
-        missing.append("set_state()")
-    print(f"[Python] ⚠️ Environment {env_type} is missing required methods: {', '.join(missing)}")
-    print(f"[Python] ⚠️ State synchronization (hash comparison, P2P resync) will be DISABLED.")
-    print(f"[Python] ⚠️ To enable, implement get_state() and set_state() that return/accept JSON-serializable dicts.")
-else:
-    print(f"[Python] ✓ Environment {env_type} has get_state() and set_state() methods")
-
-{
-    'has_get_state': has_get_state,
-    'has_set_state': has_set_state,
-    'env_type': env_type,
-    'env_module': env_module,
-}
-        `);
-
-        // Store the capability for later use
-        const capabilities = result.toJs({ dict_converter: Object.fromEntries });
-        this.stateSyncSupported = capabilities.has_get_state && capabilities.has_set_state;
-
-        if (this.stateSyncSupported) {
-            p2pLog.debug(`State sync enabled for ${capabilities.env_type}`);
-        } else {
-            p2pLog.warn(`State sync DISABLED - environment missing get_state/set_state`);
+        try {
+            // Try to get state - if this works, get_state/set_state are supported
+            await this.worker.getState();
+            this.stateSyncSupported = true;
+            p2pLog.debug('State sync enabled (get_state/set_state verified via Worker)');
+        } catch (e) {
+            this.stateSyncSupported = false;
+            p2pLog.warn('State sync DISABLED - environment missing get_state/set_state');
         }
     }
 
@@ -1804,16 +1773,7 @@ else:
          * Seed Python's random number generators for determinism
          */
 
-        await this.pyodide.runPythonAsync(`
-import numpy as np
-import random
-
-# Seed both numpy and Python's random module
-np.random.seed(${seed})
-random.seed(${seed})
-
-print(f"[Python] Seeded RNG with {${seed}}")
-        `);
+        await this.worker.seedRng(seed);
     }
 
     async reset() {
@@ -1895,55 +1855,20 @@ print(f"[Python] Seeded RNG with {${seed}}")
                 // set_state() on an uninitialized env, causing errors in environments like cogrid
                 // where get_obs() relies on env_agents being set up during reset().
 
-                // Convert env_state to JSON string for safe passing to Python
-                const envStateJson = JSON.stringify(serverState.env_state);
+                // Reset to initialize internal structures, then apply server state
+                const resetResult = await this.worker.reset(this.gameSeed || null);
 
-                const result = await this.pyodide.runPythonAsync(`
-import numpy as np
-import json
+                // Apply server state to overwrite with authoritative values
+                const envStateJson = JSON.stringify({ env_state: serverState.env_state });
+                await this.worker.setState(envStateJson);
 
-# First reset to initialize internal structures (env_agents, etc.)
-obs, infos = env.reset(seed=${this.gameSeed || 'None'})
+                // Get fresh render after state application
+                const renderResult = await this.worker.render();
 
-# Now apply server state to overwrite with authoritative values
-env_state = json.loads('''${envStateJson.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}''')
-env.set_state(env_state)
-
-# Re-get observations after state is applied (internal structures now initialized)
-if hasattr(env, 'get_obs'):
-    obs = env.get_obs()
-elif hasattr(env, '_get_obs'):
-    obs = env._get_obs()
-
-# Render with the correct state
-render_state = env.render()
-
-if not isinstance(obs, dict):
-    obs = obs.reshape(-1).astype(np.float32)
-elif isinstance(obs, dict) and isinstance([*obs.values()][0], dict):
-    obs = {k: {kk: vv.reshape(-1).astype(np.float32) for kk, vv in v.items()} for k, v in obs.items()}
-elif isinstance(obs, dict):
-    obs = {k: v.reshape(-1).astype(np.float32) for k, v in obs.items()}
-
-if not isinstance(obs, dict):
-    obs = {"human": obs}
-
-obs, infos, render_state
-                `);
-
-                let [obs, infos, render_state] = await this.pyodide.toPy(result).toJs();
-
-                // Handle RGB array rendering if needed
-                let game_image_binary = null;
-                if (Array.isArray(render_state) && Array.isArray(render_state[0])) {
-                    game_image_binary = this.convertRGBArrayToImage(render_state);
-                }
-
-                render_state = {
-                    "game_state_objects": game_image_binary ? null : render_state.map(item => convertUndefinedToNull(item)),
-                    "game_image_base64": game_image_binary,
-                    "step": this.step_num,
-                };
+                // Use obs from reset (Worker handles normalization), render from after setState
+                let obs = this._convertToMap(resetResult.obs);
+                let infos = resetResult.infos;
+                let render_state = this._processRenderState(renderResult.render_state);
 
                 // State is already synced from server
                 this.step_num = serverState.step_num || 0;
@@ -1996,42 +1921,14 @@ obs, infos, render_state
         }
 
         const startTime = performance.now();
-        const result = await this.pyodide.runPythonAsync(`
-import numpy as np
-obs, infos = env.reset(seed=${this.gameSeed || 'None'})
-render_state = env.render()
-
-if not isinstance(obs, dict):
-    obs = obs.reshape(-1).astype(np.float32)
-elif isinstance(obs, dict) and isinstance([*obs.values()][0], dict):
-    obs = {k: {kk: vv.reshape(-1).astype(np.float32) for kk, vv in v.items()} for k, v in obs.items()}
-elif isinstance(obs, dict):
-    obs = {k: v.reshape(-1).astype(np.float32) for k, v in obs.items()}
-else:
-    raise ValueError(f"obs is not a valid type, got {type(obs)} but need array, dict, or dict of dicts.")
-
-if not isinstance(obs, dict):
-    obs = {"human": obs}
-
-obs, infos, render_state
-        `);
+        const result = await this.worker.reset(this.gameSeed || null);
 
         const endTime = performance.now();
         p2pLog.debug(`Reset took ${(endTime - startTime).toFixed(1)}ms`);
 
-        let [obs, infos, render_state] = await this.pyodide.toPy(result).toJs();
-
-        // Handle RGB array rendering if needed
-        let game_image_binary = null;
-        if (Array.isArray(render_state) && Array.isArray(render_state[0])) {
-            game_image_binary = this.convertRGBArrayToImage(render_state);
-        }
-
-        render_state = {
-            "game_state_objects": game_image_binary ? null : render_state.map(item => convertUndefinedToNull(item)),
-            "game_image_base64": game_image_binary,
-            "step": this.step_num,
-        };
+        let obs = this._convertToMap(result.obs);
+        let infos = result.infos;
+        let render_state = this._processRenderState(result.render_state);
 
         this.step_num = 0;
         this.frameNumber = 0;
@@ -2069,12 +1966,8 @@ obs, infos, render_state
         if (!this.serverAuthoritative && this.webrtcManager?.isReady()) {
             try {
                 // Compute state hash for verification
-                const stateHash = await this.pyodide.runPythonAsync(`
-import json
-import hashlib
-_state = env.get_state()
-hashlib.md5(json.dumps(_state, sort_keys=True).encode()).hexdigest()[:8]
-                `);
+                const hashResult = await this.worker.computeHash();
+                const stateHash = hashResult.hash;
 
                 // Broadcast that we're ready and wait for peer
                 this._broadcastEpisodeReady(stateHash);
@@ -2397,14 +2290,9 @@ hashlib.md5(json.dumps(_state, sort_keys=True).encode()).hexdigest()[:8]
         // This helps trace divergence by comparing exact states/actions between clients
         if (this.frameNumber < 100) {
             try {
-                const preHashResult = await this.pyodide.runPythonAsync(`
-import json
-import hashlib
-_st = env.get_state()
-hashlib.md5(json.dumps(_st, sort_keys=True).encode()).hexdigest()[:8]
-                `);
+                const preHashResult = await this.worker.computeHash();
                 const actionsStr = Object.entries(finalActions).map(([p, a]) => `${p}:${a}`).join(',');
-                p2pLog.debug(`FRAME: ${this.frameNumber} pre_hash=${preHashResult} actions={${actionsStr}} rollback=${rollbackOccurred}`);
+                p2pLog.debug(`FRAME: ${this.frameNumber} pre_hash=${preHashResult.hash} actions={${actionsStr}} rollback=${rollbackOccurred}`);
             } catch (e) {
                 p2pLog.debug(`Could not compute pre-step hash: ${e}`);
             }
@@ -2427,13 +2315,8 @@ hashlib.md5(json.dumps(_st, sort_keys=True).encode()).hexdigest()[:8]
         // DEBUG: Log state hash after step for sync verification
         if (this.frameNumber < 100) {
             try {
-                const hashResult = await this.pyodide.runPythonAsync(`
-import json
-import hashlib
-_st = env.get_state()
-hashlib.md5(json.dumps(_st, sort_keys=True).encode()).hexdigest()[:8]
-                `);
-                p2pLog.debug(`FRAME: ${this.frameNumber} post_hash=${hashResult}`);
+                const hashResult = await this.worker.computeHash();
+                p2pLog.debug(`FRAME: ${this.frameNumber} post_hash=${hashResult.hash}`);
             } catch (e) {
                 p2pLog.debug(`Could not compute post-step hash: ${e}`);
             }
@@ -2546,8 +2429,8 @@ hashlib.md5(json.dumps(_st, sort_keys=True).encode()).hexdigest()[:8]
         let finalRenderState = render_state;
         if (rollbackOccurred) {
             try {
-                const freshRender = await this.pyodide.runPythonAsync(`env.render()`);
-                let freshRenderState = await this.pyodide.toPy(freshRender).toJs();
+                const renderResult = await this.worker.render();
+                let freshRenderState = renderResult.render_state;
 
                 // Handle RGB array rendering if needed
                 let game_image_base64 = null;
@@ -2705,45 +2588,19 @@ hashlib.md5(json.dumps(_st, sort_keys=True).encode()).hexdigest()[:8]
 
     async stepWithActions(actions) {
         /**
-         * Step environment with collected actions from all players
+         * Step environment with collected actions from all players.
+         * Uses structured Worker step() command - Worker handles on_game_step_code
+         * injection and obs/rewards normalization.
          */
-        const pyActions = this.pyodide.toPy(actions);
+        const result = await this.worker.step(actions);
 
-        const result = await this.pyodide.runPythonAsync(`
-${this.config.on_game_step_code || ''}
-import numpy as np
+        let { obs, rewards, terminateds, truncateds, infos, render_state } = result;
 
-# Convert action keys to proper types
-agent_actions = {int(k) if k.isnumeric() or isinstance(k, (float, int)) else k: v for k, v in ${pyActions}.items()}
-
-obs, rewards, terminateds, truncateds, infos = env.step(agent_actions)
-render_state = env.render()
-
-# Flatten observations for consistency
-if not isinstance(obs, dict):
-    obs = obs.reshape(-1).astype(np.float32)
-elif isinstance(obs, dict) and isinstance([*obs.values()][0], dict):
-    obs = {k: {kk: vv.reshape(-1).astype(np.float32) for kk, vv in v.items()} for k, v in obs.items()}
-elif isinstance(obs, dict):
-    obs = {k: v.reshape(-1).astype(np.float32) for k, v in obs.items()}
-
-if isinstance(rewards, (float, int)):
-    rewards = {"human": rewards}
-
-if not isinstance(obs, dict):
-    obs = {"human": obs}
-
-if not isinstance(terminateds, dict):
-    terminateds = {"human": terminateds}
-
-if not isinstance(truncateds, dict):
-    truncateds = {"human": truncateds}
-
-obs, rewards, terminateds, truncateds, infos, render_state
-        `);
-
-        let [obs, rewards, terminateds, truncateds, infos, render_state] =
-            await this.pyodide.toPy(result).toJs();
+        // Convert to Maps for downstream compatibility
+        obs = this._convertToMap(obs);
+        rewards = this._convertToMap(rewards);
+        terminateds = this._convertToMap(terminateds);
+        truncateds = this._convertToMap(truncateds);
 
         // Update cumulative rewards (convert keys to strings for consistency)
         for (let [key, value] of rewards.entries()) {
@@ -2755,17 +2612,8 @@ obs, rewards, terminateds, truncateds, infos, render_state
         // Update HUD
         ui_utils.updateHUDText(this.getHUDText());
 
-        // Handle RGB array rendering if needed
-        let game_image_base64 = null;
-        if (Array.isArray(render_state) && Array.isArray(render_state[0])) {
-            game_image_base64 = this.convertRGBArrayToImage(render_state);
-        }
-
-        render_state = {
-            "game_state_objects": game_image_base64 ? null : render_state.map(item => convertUndefinedToNull(item)),
-            "game_image_base64": game_image_base64,
-            "step": this.step_num,
-        };
+        // Process render_state
+        render_state = this._processRenderState(render_state);
 
         return [obs, rewards, terminateds, truncateds, infos, render_state];
     }
@@ -3166,29 +3014,8 @@ obs, rewards, terminateds, truncateds, infos, render_state
         }
 
         const stateJson = JSON.stringify(envState);
-        const hashResult = await this.pyodide.runPythonAsync(`
-import json
-import hashlib
-
-def _normalize_floats(obj, precision=10):
-    """Recursively normalize floats to fixed precision for deterministic hashing."""
-    if isinstance(obj, float):
-        return round(obj, precision)
-    elif isinstance(obj, dict):
-        return {k: _normalize_floats(v, precision) for k, v in obj.items()}
-    elif isinstance(obj, (list, tuple)):
-        return [_normalize_floats(item, precision) for item in obj]
-    return obj
-
-_state_to_hash = json.loads('''${stateJson.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}''')
-_normalized_state = _normalize_floats(_state_to_hash)
-
-# SHA-256 hash with deterministic JSON serialization (HASH-03)
-_json_str = json.dumps(_normalized_state, sort_keys=True, separators=(',', ':'))
-_hash = hashlib.sha256(_json_str.encode()).hexdigest()[:16]
-_hash
-        `);
-        return hashResult;
+        const result = await this.worker.computeHash(stateJson);
+        return result.hash;
     }
 
     /**
@@ -3330,12 +3157,8 @@ _hash
         let stateDump = null;
         try {
             if (this.stateSyncSupported) {
-                const stateJson = await this.pyodide.runPythonAsync(`
-import json
-_env_state_dump = env.get_state()
-json.dumps(_env_state_dump, sort_keys=True, default=str)
-`);
-                stateDump = JSON.parse(stateJson);
+                const stateJson = await this.worker.getState();
+                stateDump = JSON.parse(stateJson).env_state;
             }
         } catch (e) {
             p2pLog.warn(`Failed to capture state dump for desync: ${e.message}`);
@@ -3365,8 +3188,8 @@ json.dumps(_env_state_dump, sort_keys=True, default=str)
     async computeQuickStateHash() {
         /**
          * Compute SHA-256 hash of env_state with float normalization.
-         * Uses SHA-256 for cross-platform reliability (HASH-03).
-         * Normalizes floats to 10 decimal places before hashing for determinism (HASH-02).
+         * Uses Worker's computeHash command which handles normalization,
+         * sorted JSON serialization, and SHA-256 hashing.
          * Returns first 16 chars of SHA-256 hash for efficient storage/transmission.
          *
          * Requires the environment to implement get_state() returning a
@@ -3377,30 +3200,8 @@ json.dumps(_env_state_dump, sort_keys=True, default=str)
             return null;
         }
 
-        const hashResult = await this.pyodide.runPythonAsync(`
-import json
-import hashlib
-
-def _normalize_floats(obj, precision=10):
-    """Recursively normalize floats to fixed precision for deterministic hashing."""
-    if isinstance(obj, float):
-        return round(obj, precision)
-    elif isinstance(obj, dict):
-        return {k: _normalize_floats(v, precision) for k, v in obj.items()}
-    elif isinstance(obj, (list, tuple)):
-        return [_normalize_floats(item, precision) for item in obj]
-    return obj
-
-_env_state_for_hash = env.get_state()
-_normalized_state = _normalize_floats(_env_state_for_hash)
-
-# SHA-256 hash with deterministic JSON serialization (HASH-03)
-# Using separators=(',', ':') for compact, consistent JSON output
-_json_str = json.dumps(_normalized_state, sort_keys=True, separators=(',', ':'))
-_hash = hashlib.sha256(_json_str.encode()).hexdigest()[:16]
-_hash
-        `);
-        return hashResult;
+        const result = await this.worker.computeHash();
+        return result.hash;
     }
 
     async applyServerState(state) {
@@ -3421,33 +3222,11 @@ _hash
             renderEnd: 0,
         };
 
-        // If server provides env_state, apply it
+        // If server provides env_state, apply it via Worker
         if (state.env_state) {
             applyTiming.pythonStart = performance.now();
-            await this.pyodide.runPythonAsync(`
-import numpy as np
-import time
-
-_apply_start = time.time()
-
-env_state = ${this.pyodide.toPy(state.env_state)}
-
-_convert_time = (time.time() - _apply_start) * 1000
-
-if not hasattr(env, 'set_state') or not callable(getattr(env, 'set_state')):
-    raise RuntimeError(
-        "Environment does not implement set_state(). "
-        "State synchronization requires get_state() and set_state() methods "
-        "that return/accept JSON-serializable dicts with primitive types only."
-    )
-
-_deser_start = time.time()
-env.set_state(env_state)
-_deser_time = (time.time() - _deser_start) * 1000
-
-_total_time = (time.time() - _apply_start) * 1000
-print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, deserialize={_deser_time:.1f}ms, total={_total_time:.1f}ms")
-            `);
+            const statePayload = JSON.stringify({ env_state: state.env_state });
+            await this.worker.setState(statePayload);
             applyTiming.pythonEnd = performance.now();
         }
 
@@ -3475,7 +3254,7 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
         // Trigger a re-render to show the corrected state
         applyTiming.renderStart = performance.now();
         try {
-            await this.pyodide.runPythonAsync(`env.render()`);
+            await this.worker.render();
             // The render state will be picked up on the next frame
             applyTiming.renderEnd = performance.now();
         } catch (e) {
@@ -4206,14 +3985,9 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
         // P2P RESYNC - key event, always log at info level
         p2pLog.debug(`P2P RESYNC: applying peer state frame=${frameNumber} step=${stepNum}`);
 
-        // Apply environment state via set_state
-        const envStateJson = JSON.stringify(envState);
-        await this.pyodide.runPythonAsync(`
-import json
-
-env_state = json.loads('''${envStateJson.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}''')
-env.set_state(env_state)
-        `);
+        // Apply environment state via Worker setState
+        const statePayload = JSON.stringify({ env_state: envState });
+        await this.worker.setState(statePayload);
 
         // Sync JavaScript-side state
         this.frameNumber = frameNumber;
@@ -4446,39 +4220,10 @@ env.set_state(env_state)
         }
 
         try {
-            // Capture both environment state and RNG state
-            const stateJson = await this.pyodide.runPythonAsync(`
-import json
-import numpy as np
-import random
+            // Capture both environment state and RNG state via Worker
+            const stateJson = await this.worker.getState();
 
-# Get environment state
-_env_state = env.get_state()
-
-# Capture numpy RNG state (convert to list for JSON serialization)
-_np_rng_state = np.random.get_state()
-_np_rng_serializable = (
-    _np_rng_state[0],  # 'MT19937'
-    _np_rng_state[1].tolist(),  # state array as list
-    _np_rng_state[2],  # pos
-    _np_rng_state[3],  # has_gauss
-    _np_rng_state[4]   # cached_gaussian
-)
-
-# Capture Python random state
-_py_rng_state = random.getstate()
-
-# Combine into snapshot
-_snapshot = {
-    'env_state': _env_state,
-    'np_rng_state': _np_rng_serializable,
-    'py_rng_state': _py_rng_state
-}
-
-json.dumps(_snapshot)
-            `);
-
-            // Parse the Python snapshot and add JavaScript-side state
+            // Parse the Worker snapshot and add JavaScript-side state
             const snapshotData = JSON.parse(stateJson);
             snapshotData.cumulative_rewards = {...this.cumulative_rewards};  // Clone rewards
             snapshotData.step_num = this.step_num;
@@ -4535,69 +4280,17 @@ json.dumps(_snapshot)
         }
 
         try {
-            // Escape the JSON string for embedding in Python code
-            const escapedJson = stateJson.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+            const snapshotData = JSON.parse(stateJson);
 
             // Log what we're restoring for debugging
-            const snapshotData = JSON.parse(stateJson);
             const agentStates = snapshotData.env_state?.agents || {};
             const agentSummary = Object.entries(agentStates).map(([id, a]) =>
                 `${id}:pos=${a.pos},inv=${a.inventory?.length || 0}`
             ).join(' ');
             p2pLog.debug(`LOAD_SNAPSHOT: frame=${frameNumber} agents=[${agentSummary}]`);
 
-            // Verify state restoration with Python-side logging
-            const verifyResult = await this.pyodide.runPythonAsync(`
-import json
-import numpy as np
-import random
-
-_snapshot = json.loads('''${escapedJson}''')
-
-# Get state BEFORE restore for comparison
-_before_state = env.get_state()
-
-# Restore environment state
-env.set_state(_snapshot['env_state'])
-
-# Get state AFTER restore to verify
-_after_state = env.get_state()
-
-# Restore numpy RNG state
-if 'np_rng_state' in _snapshot:
-    _np_state = _snapshot['np_rng_state']
-    # Convert list back to numpy array for the state
-    _np_rng_tuple = (
-        _np_state[0],  # 'MT19937'
-        np.array(_np_state[1], dtype=np.uint32),  # state array
-        _np_state[2],  # pos
-        _np_state[3],  # has_gauss
-        _np_state[4]   # cached_gaussian
-    )
-    np.random.set_state(_np_rng_tuple)
-
-# Restore Python random state
-if 'py_rng_state' in _snapshot:
-    # Convert lists back to tuples as needed by setstate
-    _py_state = _snapshot['py_rng_state']
-    if isinstance(_py_state, list):
-        _py_state = (
-            _py_state[0],
-            tuple(_py_state[1]),
-            _py_state[2] if len(_py_state) > 2 else None
-        )
-    random.setstate(_py_state)
-
-# Return verification info
-json.dumps({
-    'snapshot_t': _snapshot['env_state'].get('t', 'N/A'),
-    'before_t': _before_state.get('t', 'N/A'),
-    'after_t': _after_state.get('t', 'N/A'),
-    'match': _snapshot['env_state'] == _after_state
-})
-            `);
-            const verify = JSON.parse(verifyResult);
-            p2pLog.debug(`VERIFY_RESTORE: snapshot_t=${verify.snapshot_t} before_t=${verify.before_t} after_t=${verify.after_t} match=${verify.match}`);
+            // Restore via Worker (setState handles env_state + RNG state)
+            await this.worker.setState(stateJson);
 
             // Restore JavaScript-side state (cumulative_rewards, step_num)
             if (snapshotData.cumulative_rewards) {
