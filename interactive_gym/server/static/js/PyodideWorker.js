@@ -131,7 +131,32 @@ export class PyodideWorker {
      */
     async runPythonAsync(code) {
         this._assertReady();
-        return this._sendRequest('runPython', { code });
+        const result = await this._sendRequest('runPython', { code });
+        return PyodideWorker._wrapResult(result);
+    }
+
+    /**
+     * Wrap a Worker result in a PyProxy-like object so existing code that calls
+     * result.toJs({dict_converter}) or result.destroy() doesn't crash.
+     * Worker already converts via toJs({depth:2}), so toJs() is a passthrough.
+     * @param {*} value - JS value from Worker
+     * @returns {*} Value with .toJs() and .destroy() methods added
+     * @private
+     * @static
+     */
+    static _wrapResult(value) {
+        if (value === null || value === undefined || typeof value !== 'object') {
+            return value;
+        }
+        // Add PyProxy-compatible methods
+        value.toJs = function(options) {
+            if (options && options.dict_converter === Object.fromEntries && this instanceof Map) {
+                return Object.fromEntries(this);
+            }
+            return this;
+        };
+        value.destroy = function() {};  // No-op: no PyProxy to clean up
+        return value;
     }
 
     /**
