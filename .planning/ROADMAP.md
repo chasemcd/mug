@@ -232,10 +232,10 @@ Key deliverables:
   2. Main thread receives READY event before any commands are sent
   3. Main thread can run console.log('ping') every 500ms during Pyodide init without interruption (proves non-blocking)
 **Research flag:** Unlikely (Web Worker patterns well-documented, existing GameTimerWorker provides template)
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 67-01: TBD
+- [ ] 67-01-PLAN.md — Create pyodide_worker.js and PyodideWorker class with typed message protocol
 
 ### Phase 68: RemoteGame Integration
 **Goal**: Single-player games use PyodideWorker for all Pyodide operations
@@ -304,7 +304,7 @@ Phases execute in numeric order: 67 → 68 → 69 → 70
 | 51-56 | v1.12 | — | Complete | 2026-02-03 |
 | 57-60 | v1.13 | — | Complete | 2026-02-03 |
 | 61-66 | v1.14 | — | Complete | 2026-02-04 |
-| 67. Core Worker Infrastructure | v1.16 | 0/TBD | Not started | - |
+| 67. Core Worker Infrastructure | v1.16 | 0/1 | Not started | - |
 | 68. RemoteGame Integration | v1.16 | 0/TBD | Not started | - |
 | 69. Multiplayer Batch Operations | v1.16 | 0/TBD | Not started | - |
 | 70. Validation and Cleanup | v1.16 | 0/TBD | Not started | - |
