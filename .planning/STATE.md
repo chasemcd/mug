@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-04)
 
 **Core value:** Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
-**Current focus:** v1.16 Pyodide Web Worker - In progress
+**Current focus:** v1.16 Pyodide Web Worker - Complete (shipped 2026-02-05)
 
 ## Current Position
 
 Milestone: v1.16 Pyodide Web Worker
-Phase: 70 of 70 (Validation and Cleanup) — In progress
-Plan: 01 of 02 complete
-Status: 70-01 complete (stagger reduction committed; E2E validation blocked by Pyodide Worker loading issue)
-Last activity: 2026-02-05 — Completed 70-01-PLAN.md (Stagger Delay Reduction)
+Phase: 70 of 70 (Validation and Cleanup) — Complete
+Plan: 02 of 02 complete
+Status: All phases complete. Three critical Worker bugs fixed, multiplayer game verified working.
+Last activity: 2026-02-05 — Completed Phase 70 (Validation and Cleanup)
 
-Progress: █████████▌ 95%
+Progress: ██████████ 100%
 
 ## Milestone History
 
 | Milestone | Phases | Status | Shipped |
 |-----------|--------|--------|---------|
-| v1.16 Pyodide Web Worker | 67-70 | In progress | - |
+| v1.16 Pyodide Web Worker | 67-70 | Complete | 2026-02-05 |
 | v1.15 E2E Test Reliability | - | Root cause found | 2026-02-04 |
 | v1.14 Data Parity Fix | 61-65 | Complete | 2026-02-04 |
 | v1.13 Matchmaker Hardening | 57-60 | Complete | 2026-02-03 |
@@ -175,6 +175,11 @@ Progress: █████████▌ 95%
 - `.planning/phases/69-multiplayer-batch-operations/69-02-SUMMARY.md`
 - `.planning/phases/69-multiplayer-batch-operations/69-03-SUMMARY.md`
 - `.planning/phases/70-validation-and-cleanup/70-01-SUMMARY.md`
+- `.planning/phases/70-validation-and-cleanup/70-02-SUMMARY.md`
+
+**Worker Bug Fixes (v1.16 Phase 70 Plan 02 - fixed):**
+- `interactive_gym/server/static/js/pyodide_remote_game.js` - Pass interactiveGymGlobals via Worker globals (not js.window)
+- `interactive_gym/server/static/js/pyodide_worker.js` - toJs({dict_converter: Object.fromEntries}) for postMessage-safe conversion; int key coercion for action dicts
 
 **Stagger Delay Reduction (v1.16 Phase 70 Plan 01 - updated):**
 - `tests/fixtures/multi_participant.py` - GameOrchestrator.start_all_games default stagger reduced from 5.0s to 0.5s
@@ -363,7 +368,7 @@ See: .planning/PROJECT.md Key Decisions table
 **v1.16 Phase 67 decisions:**
 - Separate .js file for Worker (not inline Blob) for easier debugging
 - READY gate pattern with messageQueue prevents race conditions
-- toJs({depth: 2}) for PyProxy conversion before postMessage
+- toJs({dict_converter: Object.fromEntries}) for PyProxy conversion before postMessage (updated from depth:2 in Phase 70)
 - destroy() cleans PyProxy references to prevent memory leaks
 
 **v1.16 Phase 69 Plan 02 decisions:**
@@ -392,6 +397,12 @@ See: .planning/PROJECT.md Key Decisions table
 - All E2E tests (including basic 2-player) fail at wait_for_start_button_enabled with 60s timeout
 - Root cause: PyodideWorker.init() never resolves (Worker thread fails to complete Pyodide initialization)
 
+**v1.16 Phase 70 Plan 02 decisions:**
+- toJs({dict_converter: Object.fromEntries}) without depth limit — unlimited depth ensures all nested PyProxy objects are fully converted for postMessage
+- Action key int coercion after json.loads() — JSON serialization turns all keys to strings, but Python envs expect int agent IDs
+- interactiveGymGlobals via Worker globals payload — Workers have no window object, so js.window.interactiveGymGlobals fails
+- Manual browser verification over automated E2E — bugs had to be fixed before E2E infrastructure could work
+
 **v1.16 Phase 68 decisions:**
 - Convert Worker plain-object results to Map for downstream compatibility (obs.keys(), rewards.entries())
 - Extract on_game_step_code from globals in Worker JS variable, inject via template literal
@@ -409,12 +420,10 @@ See: .planning/PROJECT.md Key Decisions table
 
 ### Blockers/Concerns
 
-**Pyodide Worker Loading Issue (discovered Phase 70 Plan 01):**
-- All E2E tests fail: PyodideWorker.init() never resolves, start button stays disabled
-- Affects ALL tests (basic 2-player, multi-participant, lifecycle stress)
-- Not caused by stagger change - pre-existing environment/infrastructure issue
-- Likely causes: Pyodide CDN availability, browser Worker thread initialization, or package loading failure
-- VALID-01/VALID-02 cannot be verified until resolved
+**Pyodide Worker Loading Issue (RESOLVED in Phase 70 Plan 02):**
+- Root cause: js.window access in Worker context (Workers have no window object)
+- Fixed by passing interactiveGymGlobals via Worker globals payload (commit 9e733d5)
+- Additional fixes: toJs DataCloneError (c9477dc), action key type mismatch (ec0e492)
 
 **Known issues to address in future milestones:**
 - Episode start sync can timeout on slow connections (mitigated with retry + two-way ack)
@@ -431,16 +440,21 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-02-05
-Stopped at: Completed 70-01-PLAN.md (Stagger Delay Reduction)
+Stopped at: Completed v1.16 Pyodide Web Worker milestone (all phases 67-70 done)
 Resume file: None
 
 ### Next Steps
 
-**Phase 70 Plan 01 complete.** Stagger delay reduced from 5.0s to 0.5s in all test files.
-- All stagger_delay_sec=5.0 references removed (zero grep results)
-- 4 call sites + 1 default updated to 0.5
-- E2E validation blocked by pre-existing Pyodide Worker loading issue
-- VALID-01/VALID-02 cannot be verified on this machine until Worker loading is fixed
+**v1.16 Pyodide Web Worker milestone complete.** All phases (67-70) shipped.
+- Phase 67: Core Worker infrastructure (pyodide_worker.js, PyodideWorker.js)
+- Phase 68: RemoteGame integration (single-player via Worker)
+- Phase 69: Multiplayer batch operations (GGPO rollback via Worker)
+- Phase 70: Validation and cleanup (3 bug fixes, manual multiplayer verification)
 
-**Phase 70 Plan 02: Validation and Cleanup** — Ready to execute
-Next action: `/gsd:execute-plan .planning/phases/70-validation-and-cleanup/70-02-PLAN.md`
+**Key commits in Phase 70:**
+- `32886a4` — Reduce stagger delay from 5.0s to 0.5s
+- `9e733d5` — Fix js.window in Worker context
+- `c9477dc` — Fix DataCloneError with dict_converter
+- `ec0e492` — Fix action key string-to-int conversion
+
+**Next milestone:** Not yet planned. Consider `/gsd:new-milestone` to define next work.

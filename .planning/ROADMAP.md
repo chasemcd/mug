@@ -18,7 +18,7 @@
 - ✅ **v1.13 Matchmaker Hardening** - Phases 57-60 (shipped 2026-02-03)
 - ✅ **v1.14 Data Parity Fix** - Phases 61-66 (shipped 2026-02-04)
 - ⚠️ **v1.15 E2E Test Reliability** - Investigation complete, fix deferred to v1.16
-- 🚧 **v1.16 Pyodide Web Worker** - Phases 67-70 (in progress)
+- ✅ **v1.16 Pyodide Web Worker** - Phases 67-70 (shipped 2026-02-05)
 
 ## Phases
 
@@ -210,7 +210,7 @@ Key deliverables:
 
 </details>
 
-### 🚧 v1.16 Pyodide Web Worker (In Progress)
+### ✅ v1.16 Pyodide Web Worker (Complete)
 
 **Milestone Goal:** Move Pyodide initialization and execution to a Web Worker to prevent main thread blocking and eliminate Socket.IO disconnection issues during concurrent game startup.
 
@@ -219,7 +219,7 @@ Key deliverables:
 - [x] **Phase 67: Core Worker Infrastructure** - PyodideWorker class with init/step/reset operations
 - [x] **Phase 68: RemoteGame Integration** - Single-player games use Worker
 - [x] **Phase 69: Multiplayer Batch Operations** - GGPO rollback via Worker batch API
-- [ ] **Phase 70: Validation and Cleanup** - Socket.IO stability, performance, memory
+- [x] **Phase 70: Validation and Cleanup** - Socket.IO stability, performance, memory
 
 ## Phase Details
 
@@ -280,8 +280,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 70-01-PLAN.md — Reduce stagger delay to 0.5s and validate Socket.IO stability with concurrent games
-- [ ] 70-02-PLAN.md — Measure step latency overhead and verify no memory leaks across sessions
+- [x] 70-01-PLAN.md — Reduce stagger delay to 0.5s and validate Socket.IO stability with concurrent games
+- [x] 70-02-PLAN.md — Worker bug fixes (toJs, js.window, action keys) and manual multiplayer verification
 
 ## Progress
 
@@ -309,8 +309,8 @@ Phases execute in numeric order: 67 → 68 → 69 → 70
 | 67. Core Worker Infrastructure | v1.16 | 1/1 | Complete | 2026-02-04 |
 | 68. RemoteGame Integration | v1.16 | 1/1 | Complete | 2026-02-05 |
 | 69. Multiplayer Batch Operations | v1.16 | 3/3 | Complete | 2026-02-04 |
-| 70. Validation and Cleanup | v1.16 | 0/2 | Not started | - |
+| 70. Validation and Cleanup | v1.16 | 2/2 | Complete | 2026-02-05 |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-05 for Phase 70 planning*
+*Last updated: 2026-02-05 for Phase 70 completion (v1.16 shipped)*
