@@ -269,7 +269,7 @@ class GameOrchestrator:
         set_tab_visibility(page1, visible=True)
         set_tab_visibility(page2, visible=True)
 
-    def start_all_games(self, stagger_delay_sec: float = 5.0) -> None:
+    def start_all_games(self, stagger_delay_sec: float = 0.5) -> None:
         """
         Run all games through the full startup flow with per-pair orchestration.
 

@@ -60,7 +60,7 @@ def test_multi_episode_completion(multi_participant_contexts, flask_server_multi
     orchestrator = GameOrchestrator(pages, base_url)
 
     # Start all 3 games - should work without timing hacks
-    orchestrator.start_all_games(stagger_delay_sec=5.0)
+    orchestrator.start_all_games(stagger_delay_sec=0.5)
 
     # Wait for episode 1 with parity validation
     print("\n[STRESS-02] Episode 1: Waiting for completion with parity validation...")
@@ -453,7 +453,7 @@ def test_mixed_lifecycle_scenarios(multi_participant_contexts, flask_server_fres
 
     # Start all 3 games with stagger
     print("[STRESS-06] Starting all 3 games...")
-    orchestrator.start_all_games(stagger_delay_sec=5.0)
+    orchestrator.start_all_games(stagger_delay_sec=0.5)
 
     # Let games run for 5 seconds
     print("[STRESS-06] Letting games run for 5 seconds...")

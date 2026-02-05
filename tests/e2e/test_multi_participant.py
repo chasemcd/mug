@@ -54,7 +54,7 @@ def test_three_simultaneous_games(multi_participant_contexts, flask_server_fresh
     orchestrator = GameOrchestrator(pages, base_url)
 
     # Start all 3 games with stagger for WebRTC stability
-    orchestrator.start_all_games(stagger_delay_sec=5.0)
+    orchestrator.start_all_games(stagger_delay_sec=0.5)
 
     # Wait for all episodes to complete WITH parity validation
     # This is the definitive test: both players must export identical data
@@ -98,7 +98,7 @@ def test_staggered_participant_arrival(multi_participant_contexts, flask_server_
     orchestrator = GameOrchestrator(pages, base_url)
 
     # Start all games - should work without timing hacks
-    orchestrator.start_all_games(stagger_delay_sec=5.0)
+    orchestrator.start_all_games(stagger_delay_sec=0.5)
 
     # Wait for all episodes to complete WITH parity validation
     # This confirms correct pairing AND correct game state synchronization
