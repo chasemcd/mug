@@ -227,7 +227,7 @@ Key deliverables:
 
 **Milestone Goal:** All existing E2E tests pass green with zero xfail, skips, or flakiness after the v1.16 Worker migration.
 
-- [ ] **Phase 71: Test Audit** - Run full suite, catalog and root-cause all failures
+- [x] **Phase 71: Test Audit** - Run full suite, catalog and root-cause all failures
 - [ ] **Phase 72: Test Infrastructure Fixes** - Update fixtures, selectors, timeouts for Worker
 - [ ] **Phase 73: Production Bug Fixes** - Fix Worker-related production bugs revealed by tests
 - [ ] **Phase 74: Stability Validation** - Zero xfail/skip, 3 consecutive green runs
@@ -246,7 +246,7 @@ Key deliverables:
 **Plans:** 1 plan
 
 Plans:
-- [ ] 71-01-PLAN.md -- Run full E2E suite, analyze failures, produce categorized audit
+- [x] 71-01-PLAN.md -- Run full E2E suite, analyze failures, produce categorized audit
 
 ### Phase 72: Test Infrastructure Fixes
 **Goal**: Fix test fixtures, selectors, and timeouts for Worker-based Pyodide
@@ -316,11 +316,11 @@ Phases execute in numeric order: 71 → 72 → 73 → 74
 | 57-60 | v1.13 | — | Complete | 2026-02-03 |
 | 61-66 | v1.14 | — | Complete | 2026-02-04 |
 | 67-70 | v1.16 | — | Complete | 2026-02-05 |
-| 71. Test Audit | v1.17 | 0/1 | In Progress | - |
+| 71. Test Audit | v1.17 | 1/1 | Complete | 2026-02-05 |
 | 72. Test Infrastructure Fixes | v1.17 | 0/1 | Not started | - |
 | 73. Production Bug Fixes | v1.17 | 0/1 | Not started | - |
 | 74. Stability Validation | v1.17 | 0/1 | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-05 for v1.17 Phase 71 planning*
+*Last updated: 2026-02-05 for v1.17 Phase 71 complete*

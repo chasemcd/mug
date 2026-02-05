@@ -9,8 +9,8 @@ Requirements for v1.17 E2E Test Reliability. Each maps to roadmap phases.
 
 ### Test Audit
 
-- [ ] **AUDIT-01**: Full E2E test suite executed and all failures cataloged
-- [ ] **AUDIT-02**: Each failure root-caused as test infrastructure, fixture issue, or production bug
+- [x] **AUDIT-01**: Full E2E test suite executed and all failures cataloged
+- [x] **AUDIT-02**: Each failure root-caused as test infrastructure, fixture issue, or production bug
 
 ### Test Infrastructure
 
@@ -57,8 +57,8 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| AUDIT-01 | Phase 71 | Pending |
-| AUDIT-02 | Phase 71 | Pending |
+| AUDIT-01 | Phase 71 | Complete |
+| AUDIT-02 | Phase 71 | Complete |
 | INFRA-01 | Phase 72 | Pending |
 | INFRA-02 | Phase 72 | Pending |
 | INFRA-03 | Phase 72 | Pending |
@@ -77,4 +77,4 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 ---
 *Requirements defined: 2026-02-05*
-*Last updated: 2026-02-05 after roadmap creation (phases 71-74)*
+*Last updated: 2026-02-05 after Phase 71 complete*
