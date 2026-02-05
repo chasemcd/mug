@@ -1,5 +1,94 @@
 # Project Milestones: Interactive Gym P2P Multiplayer
 
+## v1.16 Pyodide Web Worker (In Progress)
+
+**Goal:** Move Pyodide initialization and execution to a Web Worker to prevent main thread blocking and eliminate Socket.IO disconnection issues during game startup.
+
+**Status:** Planning
+
+**Target features:**
+
+- PyodideWorker class with message protocol for main thread ↔ worker communication
+- Move loadPyodide() and package installation to dedicated Web Worker
+- Move pyodide.runPythonAsync() calls to worker
+- Proxy environment state (observations, render_state) back to main thread
+- Update RemoteGame and MultiplayerPyodideGame to use PyodideWorker
+- Remove stagger delay from multi-participant tests
+
+**Root cause (from v1.15 investigation):**
+
+- Pyodide `loadPyodide()` blocks main thread during WASM compilation (~5-15 seconds)
+- Socket.IO ping/pong requires main thread event loop access
+- With multiple games starting concurrently, blocking exceeds ping timeout (8s)
+- Result: False disconnects during game startup
+
+---
+
+## v1.15 E2E Test Reliability (Complete: 2026-02-04)
+
+**Delivered:** Root cause analysis of multi-participant test failures. Identified Pyodide main thread blocking as the source of Socket.IO disconnects.
+
+**Key findings:**
+
+- Pyodide initialization blocks browser main thread during WASM compilation
+- Socket.IO ping timeout (8s) exceeded when multiple games start concurrently
+- 5-second stagger delay workaround allows sequential Pyodide init
+- Permanent fix requires Web Worker architecture (deferred to v1.16)
+
+---
+
+## v1.14 Data Parity Fix (Shipped: 2026-02-04)
+
+**Delivered:** Fixed data parity divergence bug, added multi-participant test infrastructure, and comprehensive lifecycle stress tests.
+
+**Phases completed:** 61-65 (5 phases)
+
+**Key accomplishments:**
+
+- Input confirmation protocol before episode export
+- Increased P2P input redundancy (3→10 inputs per packet)
+- Multi-participant test infrastructure (6 contexts, 3 concurrent games)
+- GameOrchestrator class for test orchestration
+- Data export parity validation helpers
+- Fixed GAME-01 violation (games pre-created in waitroom)
+- Fixed PyodideGameCoordinator eventlet deadlock
+- 5 lifecycle stress test functions (STRESS-02 through STRESS-07)
+
+---
+
+## v1.13 Matchmaker Hardening (Shipped: 2026-02-03)
+
+**Delivered:** P2P RTT probing for latency-based match filtering and a single game creation path.
+
+**Phases completed:** 57-60 (4 phases)
+
+**Key accomplishments:**
+
+- P2P probe infrastructure (ProbeCoordinator, ProbeConnection, ProbeManager)
+- RTT ping-pong measurement protocol via WebRTC DataChannel
+- Matchmaker RTT integration with configurable max_p2p_rtt_ms threshold
+- Removed group reunion flow (~230 lines), single game creation path
+- Game only exists when all matched participants are assigned
+
+---
+
+## v1.12 Waiting Room Overhaul (Shipped: 2026-02-03)
+
+**Delivered:** Fixed waiting room bugs and built pluggable Matchmaker abstraction for custom participant pairing logic.
+
+**Phases completed:** 51-56 (6 phases)
+
+**Key accomplishments:**
+
+- Diagnostic logging and state validation for stale game routing
+- Comprehensive cleanup on all exit paths (idempotent)
+- Session lifecycle state machine (WAITING → MATCHED → VALIDATING → PLAYING → ENDED)
+- Participant state tracker (single source of truth for routing)
+- Matchmaker base class with FIFOMatchmaker default
+- Match assignment logging (JSONL + admin dashboard)
+
+---
+
 ## v1.11 Data Export Edge Cases (Shipped: 2026-02-02)
 
 **Delivered:** Fixed dual-buffer data recording edge cases so all E2E stress tests pass and research data exports are identical between both players.

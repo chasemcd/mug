@@ -5,21 +5,22 @@
 See: .planning/PROJECT.md (updated 2026-02-04)
 
 **Core value:** Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
-**Current focus:** v1.15 E2E Test Reliability - In Progress
+**Current focus:** v1.16 Pyodide Web Worker - Planned
 
 ## Current Position
 
-Milestone: v1.15 E2E Test Reliability
-Status: Starting — Investigating P2P concurrent load failures
-Last activity: 2026-02-04 — Started v1.15 milestone
+Milestone: v1.16 Pyodide Web Worker
+Status: Planning — Move Pyodide to Web Worker to prevent Socket.IO disconnects
+Last activity: 2026-02-04 — Created milestone after v1.15 root cause analysis
 
-Progress: ░░░░░░░░░░ 0% (investigation phase)
+Progress: ░░░░░░░░░░ 0% (planning phase)
 
 ## Milestone History
 
 | Milestone | Phases | Status | Shipped |
 |-----------|--------|--------|---------|
-| v1.15 E2E Test Reliability | TBD | In Progress | - |
+| v1.16 Pyodide Web Worker | TBD | Planning | - |
+| v1.15 E2E Test Reliability | - | Root cause found | 2026-02-04 |
 | v1.14 Data Parity Fix | 61-65 | Complete | 2026-02-04 |
 | v1.13 Matchmaker Hardening | 57-60 | Complete | 2026-02-03 |
 | v1.12 Waiting Room Overhaul | 51-56 | Complete | 2026-02-03 |
@@ -341,22 +342,34 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-02-04
-Stopped at: Started v1.15 E2E Test Reliability milestone
+Stopped at: Created v1.16 Pyodide Web Worker milestone
 Resume file: None
 
 ### Next Steps
 
-**v1.15 E2E Test Reliability (In Progress)**
-Goal: 100% pass rate for all E2E tests with zero flakiness
+**v1.16 Pyodide Web Worker (Planned)**
+Goal: Move Pyodide to Web Worker to prevent Socket.IO disconnects during initialization
 
-**Known failing tests:**
-- `test_three_simultaneous_games` - Intermittent P2P timeout under concurrent load
-- `test_staggered_participant_arrival` - Intermittent P2P timeout
-- `test_multi_episode_completion` - Episode completion timeout
+**Root cause identified (v1.15 investigation):**
+- Pyodide `loadPyodide()` blocks main thread during WASM compilation
+- Socket.IO ping/pong requires main thread event loop
+- With multiple games starting concurrently, blocking exceeds ping timeout (8s)
+- Result: False disconnects during game startup
 
-**Investigation needed:**
-1. Identify root cause of P2P concurrent load failures (WebRTC establishment timeouts)
-2. Determine why 7s stagger is insufficient for reliable connections
-3. Analyze if TURN server or signaling is the bottleneck
+**Solution approach:**
+1. Create PyodideWorker class with message protocol
+2. Move all Pyodide operations to dedicated Web Worker
+3. Main thread stays responsive for Socket.IO
+4. Proxy game state back to main thread for rendering
 
-Next action: Run failing tests with verbose logging to identify root cause patterns
+**Key files to modify:**
+- `interactive_gym/server/static/js/pyodide_remote_game.js` - RemoteGame class
+- `interactive_gym/server/static/js/pyodide_multiplayer_game.js` - MultiplayerPyodideGame class
+- New: `interactive_gym/server/static/js/pyodide_worker.js` - Web Worker implementation
+
+**Testing plan:**
+- Remove 5s stagger delay from multi-participant tests
+- All STRESS tests should pass with 0.5s stagger
+- Socket.IO connections stable during Pyodide init
+
+Next action: Create PyodideWorker class and message protocol design

@@ -8,26 +8,68 @@ A framework for running browser-based reinforcement learning experiments with hu
 
 Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
 
-## Current Milestone: v1.15 E2E Test Reliability
+## Current Milestone: v1.16 Pyodide Web Worker
+
+**Goal:** Move Pyodide initialization and execution to a Web Worker to prevent main thread blocking and eliminate Socket.IO disconnection issues during game startup.
+
+**Problem:** Pyodide initialization blocks the browser's main thread for several seconds during WASM compilation. This prevents Socket.IO from responding to ping messages, causing false disconnects when multiple games start concurrently. The 5-second stagger delay is a workaround, not a fix.
+
+**Root cause:**
+- `loadPyodide()` downloads ~15MB of WASM/Python packages
+- WASM compilation blocks the main thread (synchronous)
+- Socket.IO ping/pong requires main thread event loop access
+- With ping_interval=8s, any >8s blocking causes disconnect
+
+**Target features:**
+
+*Web Worker architecture:*
+- [ ] Create PyodideWorker class that manages Pyodide in a dedicated Web Worker
+- [ ] Define message protocol for main thread ↔ worker communication
+- [ ] Move `loadPyodide()` and package installation to worker
+- [ ] Move `pyodide.runPythonAsync()` calls to worker
+- [ ] Proxy environment state (observations, render_state) back to main thread
+
+*Integration:*
+- [ ] Update RemoteGame to use PyodideWorker instead of direct Pyodide
+- [ ] Update MultiplayerPyodideGame to use PyodideWorker
+- [ ] Ensure game step() calls work asynchronously via worker
+- [ ] Maintain backward compatibility for single-player games
+
+*Testing:*
+- [ ] Remove stagger delay from multi-participant tests
+- [ ] All E2E tests pass with 0.5s stagger (near-simultaneous)
+- [ ] Socket.IO connections remain stable during Pyodide init
+- [ ] No performance regression for game loop execution
+
+**What done looks like:**
+- Pyodide runs entirely in a Web Worker (off main thread)
+- Socket.IO pings are always answered promptly
+- Multi-participant tests pass without timing hacks
+- Game responsiveness unchanged or improved
+
+## Previous Milestone: v1.15 E2E Test Reliability (In Progress)
 
 **Goal:** Achieve 100% pass rate for all E2E tests with zero flakiness.
 
-**Problem:** Multi-participant stress tests have intermittent failures due to P2P concurrent load issues. WebRTC connection establishment times out when 3+ games start simultaneously, causing players to be re-pooled and tests to fail.
+**Problem:** Multi-participant stress tests have intermittent failures due to Socket.IO disconnects during Pyodide initialization. The root cause is main thread blocking during WASM compilation.
+
+**Status:** Investigation complete. Root cause identified as Pyodide blocking main thread. Solution: Move to Web Worker (v1.16).
+
+**Workaround (current):** 5-second stagger delay between game pairs allows each pair to complete Pyodide init before the next starts.
 
 **Target features:**
 
 *Test reliability:*
-- [ ] Investigate each failing test and identify root cause
-- [ ] Fix P2P concurrent load issues (WebRTC establishment timeouts)
+- [x] Investigate each failing test and identify root cause
+- [ ] Fix P2P concurrent load issues → Deferred to v1.16 (Pyodide Web Worker)
 - [ ] All multi-participant tests pass reliably (STRESS-01 through STRESS-07)
 - [ ] All lifecycle stress tests pass reliably
 - [ ] All single-participant tests continue passing
 
 **What done looks like:**
-- All E2E tests pass 100% of the time
-- Zero flakiness — no intermittent failures
-- Tests can run in any order without affecting results
-- Clear documentation of any infrastructure requirements
+- Root cause documented ✓
+- Workaround in place (5s stagger) ✓
+- Permanent fix planned (v1.16 Web Worker)
 
 ## Previous Milestone: v1.14 Data Parity Fix (Shipped: 2026-02-04)
 
@@ -251,15 +293,17 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 
 ### Active
 
-*v1.15 E2E Test Reliability:*
-- [ ] Investigate P2P concurrent load failures (WebRTC establishment timeouts)
-- [ ] Fix multi-participant stress tests (STRESS-01)
-- [ ] Fix multi-episode stress tests (STRESS-02)
-- [ ] Fix mid-game disconnection stress tests
-- [ ] Fix waiting room disconnection stress tests
-- [ ] Fix focus loss stress tests
-- [ ] Fix mixed lifecycle stress tests
-- [ ] Achieve 100% pass rate with zero flakiness
+*v1.16 Pyodide Web Worker (Planned):*
+- [ ] PyodideWorker class with message protocol
+- [ ] Move loadPyodide() to Web Worker
+- [ ] Move runPythonAsync() to Web Worker
+- [ ] Update RemoteGame and MultiplayerPyodideGame
+- [ ] Remove stagger delay, tests pass with near-simultaneous starts
+
+*v1.15 E2E Test Reliability (In Progress):*
+- [x] Investigate root cause (Pyodide blocks main thread → Socket.IO disconnect)
+- [ ] Workaround: 5s stagger delay between game pairs
+- [ ] Document permanent fix plan (v1.16)
 
 *Shipped in v1.14:*
 - ✓ Wait for input confirmation before episode export — v1.14
@@ -379,4 +423,4 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 | BOUND-02/03 guards | Defense-in-depth at episode boundaries in async paths | ✓ Good |
 
 ---
-*Last updated: 2026-02-04 after v1.15 milestone started*
+*Last updated: 2026-02-04 after v1.16 Pyodide Web Worker milestone started*
