@@ -10,12 +10,12 @@ See: .planning/PROJECT.md (updated 2026-02-04)
 ## Current Position
 
 Milestone: v1.16 Pyodide Web Worker
-Phase: 67 of 70 (Core Worker Infrastructure)
+Phase: 68 of 70 (RemoteGame Integration)
 Plan: 01 complete
 Status: In progress
-Last activity: 2026-02-05 — Completed 67-01-PLAN.md (Core Worker Infrastructure)
+Last activity: 2026-02-05 — Completed 68-01-PLAN.md (RemoteGame Integration)
 
-Progress: ██░░░░░░░░ 25%
+Progress: █████░░░░░ 50%
 
 ## Milestone History
 
@@ -170,11 +170,17 @@ Progress: ██░░░░░░░░ 25%
 
 **v1.16 Execution:**
 - `.planning/phases/67-core-worker-infrastructure/67-01-SUMMARY.md`
+- `.planning/phases/68-remotegame-integration/68-01-SUMMARY.md`
 
 **PyodideWorker Infrastructure (v1.16 Phase 67 - added):**
 - `interactive_gym/server/static/js/pyodide_worker.js` - Worker script with READY gate pattern, typed message handlers
 - `interactive_gym/server/static/js/PyodideWorker.js` - Main thread class with async init/step/reset API
 - `interactive_gym/server/static/js/test_pyodide_worker.html` - Browser verification test page
+
+**RemoteGame Worker Migration (v1.16 Phase 68 - modified):**
+- `interactive_gym/server/static/js/pyodide_remote_game.js` - Uses PyodideWorker for all Pyodide operations, _convertToMap() for backward compat, _processRenderState() helper, destroy() method
+- `interactive_gym/server/static/js/pyodide_worker.js` - onGameStepCode extraction/storage/injection, obs/rewards normalization in step/reset
+- `interactive_gym/server/static/js/test_pyodide_worker.html` - RemoteGame operations test with CartPole-v1
 
 **Multi-Participant Test Infrastructure (v1.14 Phase 64 - added):**
 - `tests/conftest.py` - multi_participant_contexts fixture for 6 browser contexts
@@ -337,6 +343,12 @@ See: .planning/PROJECT.md Key Decisions table
 - toJs({depth: 2}) for PyProxy conversion before postMessage
 - destroy() cleans PyProxy references to prevent memory leaks
 
+**v1.16 Phase 68 decisions:**
+- Convert Worker plain-object results to Map for downstream compatibility (obs.keys(), rewards.entries())
+- Extract on_game_step_code from globals in Worker JS variable, inject via template literal
+- Keep normalization logic in Worker to avoid PyProxy transfer overhead
+- Add depth check for RGB array detection (3 nested arrays) vs object list
+
 ### Pending Todos
 
 (None)
@@ -358,14 +370,14 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-02-05
-Stopped at: Completed 67-01-PLAN.md
+Stopped at: Completed 68-01-PLAN.md
 Resume file: None
 
 ### Next Steps
 
-**Phase 68: RemoteGame Integration** — Ready to plan
-- Migrate RemoteGame to use PyodideWorker
-- Keep existing API surface unchanged
-- Requirements: REMOTE-01, REMOTE-02, REMOTE-03
+**Phase 69: Multiplayer Integration** — Ready to plan
+- Migrate multiplayer game to use PyodideWorker
+- Ensure P2P games work with Worker-based execution
+- No blockers identified
 
-Next action: `/gsd:plan-phase 68`
+Next action: `/gsd:plan-phase 69`
