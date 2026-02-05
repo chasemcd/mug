@@ -217,7 +217,7 @@ Key deliverables:
 **Problem:** Pyodide initialization blocks the browser's main thread for several seconds during WASM compilation, preventing Socket.IO from responding to ping messages and causing false disconnects when multiple games start concurrently.
 
 - [x] **Phase 67: Core Worker Infrastructure** - PyodideWorker class with init/step/reset operations
-- [ ] **Phase 68: RemoteGame Integration** - Single-player games use Worker
+- [x] **Phase 68: RemoteGame Integration** - Single-player games use Worker
 - [ ] **Phase 69: Multiplayer Batch Operations** - GGPO rollback via Worker batch API
 - [ ] **Phase 70: Validation and Cleanup** - Socket.IO stability, performance, memory
 
@@ -250,7 +250,7 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 68-01-PLAN.md — Migrate RemoteGame to PyodideWorker with environment code injection support
+- [x] 68-01-PLAN.md — Migrate RemoteGame to PyodideWorker with environment code injection support
 
 ### Phase 69: Multiplayer Batch Operations
 **Goal**: GGPO rollback works via Worker with batch API for single round-trip execution
@@ -305,10 +305,10 @@ Phases execute in numeric order: 67 → 68 → 69 → 70
 | 57-60 | v1.13 | — | Complete | 2026-02-03 |
 | 61-66 | v1.14 | — | Complete | 2026-02-04 |
 | 67. Core Worker Infrastructure | v1.16 | 1/1 | Complete | 2026-02-04 |
-| 68. RemoteGame Integration | v1.16 | 0/1 | Not started | - |
+| 68. RemoteGame Integration | v1.16 | 1/1 | Complete | 2026-02-05 |
 | 69. Multiplayer Batch Operations | v1.16 | 0/TBD | Not started | - |
 | 70. Validation and Cleanup | v1.16 | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-05 for Phase 68 planning*
+*Last updated: 2026-02-05 for Phase 68 execution complete*

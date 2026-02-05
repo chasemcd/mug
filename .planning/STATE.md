@@ -10,10 +10,10 @@ See: .planning/PROJECT.md (updated 2026-02-04)
 ## Current Position
 
 Milestone: v1.16 Pyodide Web Worker
-Phase: 68 of 70 (RemoteGame Integration)
-Plan: 01 complete
-Status: In progress
-Last activity: 2026-02-05 — Completed 68-01-PLAN.md (RemoteGame Integration)
+Phase: 68 of 70 (RemoteGame Integration) — COMPLETE
+Plan: All plans complete
+Status: Phase 68 verified, moving to Phase 69
+Last activity: 2026-02-05 — Completed Phase 68 (RemoteGame Integration)
 
 Progress: █████░░░░░ 50%
 
@@ -178,8 +178,9 @@ Progress: █████░░░░░ 50%
 - `interactive_gym/server/static/js/test_pyodide_worker.html` - Browser verification test page
 
 **RemoteGame Worker Migration (v1.16 Phase 68 - modified):**
-- `interactive_gym/server/static/js/pyodide_remote_game.js` - Uses PyodideWorker for all Pyodide operations, _convertToMap() for backward compat, _processRenderState() helper, destroy() method
-- `interactive_gym/server/static/js/pyodide_worker.js` - onGameStepCode extraction/storage/injection, obs/rewards normalization in step/reset
+- `interactive_gym/server/static/js/pyodide_remote_game.js` - Uses PyodideWorker for all Pyodide operations, _convertToMap() for backward compat, _processRenderState() helper, destroy() method, this.pyodide = this.worker shim for multiplayer subclass
+- `interactive_gym/server/static/js/pyodide_worker.js` - onGameStepCode extraction/storage/injection, obs/rewards normalization in step/reset, handleRunPython for arbitrary Python execution
+- `interactive_gym/server/static/js/PyodideWorker.js` - runPythonAsync() shim, toPy() shim with toString()/toJs(), _wrapResult() for PyProxy-like return values
 - `interactive_gym/server/static/js/test_pyodide_worker.html` - RemoteGame operations test with CartPole-v1
 
 **Multi-Participant Test Infrastructure (v1.14 Phase 64 - added):**
@@ -348,6 +349,11 @@ See: .planning/PROJECT.md Key Decisions table
 - Extract on_game_step_code from globals in Worker JS variable, inject via template literal
 - Keep normalization logic in Worker to avoid PyProxy transfer overhead
 - Add depth check for RGB array detection (3 nested arrays) vs object list
+- Backward-compat shim: this.pyodide = this.worker, so MultiplayerPyodideGame subclass doesn't crash
+- runPythonAsync() via Worker for arbitrary Python execution (shim for multiplayer)
+- toPy() returns wrapper with toString() for template embedding and toJs() for passthrough
+- _wrapResult() adds .toJs({dict_converter}) and .destroy() to runPythonAsync results
+- All shims are temporary, will be removed in Phase 69 when multiplayer migrates
 
 ### Pending Todos
 
@@ -370,14 +376,14 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-02-05
-Stopped at: Completed 68-01-PLAN.md
+Stopped at: Completed Phase 68 (RemoteGame Integration)
 Resume file: None
 
 ### Next Steps
 
-**Phase 69: Multiplayer Integration** — Ready to plan
-- Migrate multiplayer game to use PyodideWorker
-- Ensure P2P games work with Worker-based execution
-- No blockers identified
+**Phase 69: Multiplayer Batch Operations** — Ready to plan
+- Migrate MultiplayerPyodideGame to use PyodideWorker (remove backward-compat shims)
+- GGPO rollback via Worker batch API for single round-trip execution
+- Research flag: Likely (GGPO state buffer location, batch API design)
 
 Next action: `/gsd:plan-phase 69`
