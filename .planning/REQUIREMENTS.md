@@ -16,7 +16,7 @@ Requirements for v1.16 Pyodide Web Worker. Each maps to roadmap phases.
 ### Game Integration
 
 - [x] **INTEG-01**: RemoteGame uses PyodideWorker for all Pyodide operations
-- [ ] **INTEG-02**: MultiplayerPyodideGame uses PyodideWorker for all Pyodide operations
+- [x] **INTEG-02**: MultiplayerPyodideGame uses PyodideWorker for all Pyodide operations
 - [x] **INTEG-03**: step() and reset() operations work via Worker postMessage
 - [x] **INTEG-04**: render_state is proxied back to main thread for Phaser rendering
 
@@ -61,7 +61,7 @@ Which phases cover which requirements. Updated by create-roadmap.
 | WORKER-02 | Phase 67 | Complete |
 | WORKER-03 | Phase 67 | Complete |
 | INTEG-01 | Phase 68 | Complete |
-| INTEG-02 | Phase 69 | Pending |
+| INTEG-02 | Phase 69 | Complete |
 | INTEG-03 | Phase 68 | Complete |
 | INTEG-04 | Phase 68 | Complete |
 | VALID-01 | Phase 70 | Pending |
@@ -94,4 +94,4 @@ Requirements completed in previous milestone, preserved for reference.
 
 ---
 *Requirements defined: 2026-02-04*
-*Last updated: 2026-02-05 for Phase 68 completion*
+*Last updated: 2026-02-04 for Phase 69 completion*
