@@ -25,6 +25,7 @@ importScripts('https://cdn.jsdelivr.net/pyodide/v0.26.2/full/pyodide.js');
 let pyodide = null;
 let pyodideReady = false;
 const messageQueue = [];
+let onGameStepCode = '';  // Stores code to run before each step (e.g., policy calls)
 
 /**
  * Initialize Pyodide immediately on Worker start.
@@ -154,8 +155,13 @@ async function handleInstallPackages(id, payload) {
  * @param {Object} payload - { envCode: string, globals?: Object }
  */
 async function handleInitEnv(id, payload) {
-    // Set globals from main thread if provided
+    // Extract on_game_step_code if present, store in Worker-level variable
+    // Remove it from globals before setting Python globals
     if (payload.globals) {
+        if (payload.globals.on_game_step_code !== undefined) {
+            onGameStepCode = payload.globals.on_game_step_code || '';
+            delete payload.globals.on_game_step_code;  // Don't set as Python global
+        }
         for (const [key, value] of Object.entries(payload.globals)) {
             pyodide.globals.set(key, pyodide.toPy(value));
         }
@@ -177,16 +183,43 @@ async function handleStep(id, payload) {
     // Convert actions to Python-compatible format
     const pyActions = JSON.stringify(payload.actions);
 
+    // Build Python code: on_game_step_code first, then step, then normalize
     const result = await pyodide.runPythonAsync(`
 import json
+import numpy as np
+
+# Run any environment-specific pre-step code (e.g., policy calls)
+${onGameStepCode}
+
 agent_actions = json.loads('''${pyActions}''')
 obs, rewards, terminateds, truncateds, infos = env.step(agent_actions)
 render_state = env.render()
+
+# Normalize obs to dict with numpy arrays flattened
+if not isinstance(obs, dict):
+    obs = obs.reshape(-1).astype(np.float32)
+elif isinstance(obs, dict) and len(obs) > 0 and isinstance([*obs.values()][0], dict):
+    obs = {k: {kk: vv.reshape(-1).astype(np.float32) for kk, vv in v.items()} for k, v in obs.items()}
+elif isinstance(obs, dict):
+    obs = {k: v.reshape(-1).astype(np.float32) if hasattr(v, 'reshape') else v for k, v in obs.items()}
+
+if not isinstance(obs, dict):
+    obs = {"human": obs}
+
+# Normalize rewards to dict
+if isinstance(rewards, (float, int)):
+    rewards = {"human": rewards}
+
+# Normalize terminateds/truncateds to dict
+if not isinstance(terminateds, dict):
+    terminateds = {"human": terminateds}
+if not isinstance(truncateds, dict):
+    truncateds = {"human": truncateds}
+
 (obs, rewards, terminateds, truncateds, infos, render_state)
     `);
 
     // Convert PyProxy to JS objects for transfer across Worker boundary
-    // Use depth: 2 to handle nested structures (dicts with lists, etc.)
     const jsResult = result.toJs({ depth: 2 });
     result.destroy();  // Prevent memory leak
 
@@ -210,8 +243,21 @@ async function handleReset(id, payload) {
         : 'None';
 
     const result = await pyodide.runPythonAsync(`
+import numpy as np
 obs, infos = env.reset(seed=${seedValue})
 render_state = env.render()
+
+# Normalize obs to dict with numpy arrays flattened
+if not isinstance(obs, dict):
+    obs = obs.reshape(-1).astype(np.float32)
+elif isinstance(obs, dict) and len(obs) > 0 and isinstance([*obs.values()][0], dict):
+    obs = {k: {kk: vv.reshape(-1).astype(np.float32) for kk, vv in v.items()} for k, v in obs.items()}
+elif isinstance(obs, dict):
+    obs = {k: v.reshape(-1).astype(np.float32) if hasattr(v, 'reshape') else v for k, v in obs.items()}
+
+if not isinstance(obs, dict):
+    obs = {"human": obs}
+
 (obs, infos, render_state)
     `);
 
