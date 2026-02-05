@@ -10,12 +10,12 @@ See: .planning/PROJECT.md (updated 2026-02-04)
 ## Current Position
 
 Milestone: v1.16 Pyodide Web Worker
-Phase: 68 of 70 (RemoteGame Integration) — COMPLETE
-Plan: All plans complete
-Status: Phase 68 verified, moving to Phase 69
-Last activity: 2026-02-05 — Completed Phase 68 (RemoteGame Integration)
+Phase: 69 of 70 (Multiplayer Batch Operations) — In progress
+Plan: 01 of 03 complete
+Status: Plan 69-01 complete, ready for Plan 69-02
+Last activity: 2026-02-05 — Completed 69-01-PLAN.md (Worker Protocol Extension)
 
-Progress: █████░░░░░ 50%
+Progress: ██████░░░░ 60%
 
 ## Milestone History
 
@@ -171,6 +171,11 @@ Progress: █████░░░░░ 50%
 **v1.16 Execution:**
 - `.planning/phases/67-core-worker-infrastructure/67-01-SUMMARY.md`
 - `.planning/phases/68-remotegame-integration/68-01-SUMMARY.md`
+- `.planning/phases/69-multiplayer-batch-operations/69-01-SUMMARY.md`
+
+**Worker Protocol Extension (v1.16 Phase 69 Plan 01 - added):**
+- `interactive_gym/server/static/js/pyodide_worker.js` - handleGetState, handleSetState, handleComputeHash, handleSeedRng, handleRender, handleBatch handlers + Internal variants; handleStep/handleReset refactored to Internal pattern
+- `interactive_gym/server/static/js/PyodideWorker.js` - getState(), setState(), computeHash(), seedRng(), render(), batch() public async methods
 
 **PyodideWorker Infrastructure (v1.16 Phase 67 - added):**
 - `interactive_gym/server/static/js/pyodide_worker.js` - Worker script with READY gate pattern, typed message handlers
@@ -344,6 +349,13 @@ See: .planning/PROJECT.md Key Decisions table
 - toJs({depth: 2}) for PyProxy conversion before postMessage
 - destroy() cleans PyProxy references to prevent memory leaks
 
+**v1.16 Phase 69 Plan 01 decisions:**
+- Internal/External handler split: *Internal does work and returns, * wraps with postMessage for batch reuse
+- getState returns raw JSON string (caller parses) for minimal transfer overhead
+- computeHash normalizes floats to 10 decimal places for deterministic cross-platform hashing
+- Batch error includes failedIndex and partialResults for precise error reporting
+- handleRunPython and backward-compat shims preserved for Plan 02/03 migration
+
 **v1.16 Phase 68 decisions:**
 - Convert Worker plain-object results to Map for downstream compatibility (obs.keys(), rewards.entries())
 - Extract on_game_step_code from globals in Worker JS variable, inject via template literal
@@ -376,14 +388,19 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-02-05
-Stopped at: Completed Phase 68 (RemoteGame Integration)
+Stopped at: Completed 69-01-PLAN.md (Worker Protocol Extension)
 Resume file: None
 
 ### Next Steps
 
-**Phase 69: Multiplayer Batch Operations** — Ready to plan
-- Migrate MultiplayerPyodideGame to use PyodideWorker (remove backward-compat shims)
-- GGPO rollback via Worker batch API for single round-trip execution
-- Research flag: Likely (GGPO state buffer location, batch API design)
+**Phase 69 Plan 02: Multiplayer Call Site Migration** — Ready to execute
+- Migrate all ~25 this.pyodide.runPythonAsync() calls to structured Worker commands
+- Use batch() for rollback and fast-forward operations
+- Convert stepWithActions to use this.worker.step()
 
-Next action: `/gsd:plan-phase 69`
+**Phase 69 Plan 03: Shim Removal** — Blocked on Plan 02
+- Remove runPythonAsync/toPy/_wrapResult shims from PyodideWorker.js
+- Remove handleRunPython from pyodide_worker.js
+- Remove this.pyodide = this.worker shim from pyodide_remote_game.js
+
+Next action: `/gsd:execute-plan .planning/phases/69-multiplayer-batch-operations/69-02-PLAN.md`
