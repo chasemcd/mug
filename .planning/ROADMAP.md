@@ -229,7 +229,7 @@ Key deliverables:
 
 - [x] **Phase 71: Test Audit** - Run full suite, catalog and root-cause all failures
 - [x] **Phase 72: Test Infrastructure Fixes** - Update fixtures, selectors, timeouts for Worker
-- [ ] **Phase 73: Production Bug Fixes** - Fix Worker-related production bugs revealed by tests
+- [x] **Phase 73: Production Bug Fixes** - Fix Worker-related production bugs revealed by tests
 - [ ] **Phase 74: Stability Validation** - Zero xfail/skip, 3 consecutive green runs
 
 ## Phase Details
@@ -275,7 +275,7 @@ Plans:
 
 Plans:
 - [x] 73-01-PLAN.md -- Fix rollback/promotion race in dual-buffer, guard all promotion paths against pending rollbacks
-- [ ] 73-02-PLAN.md -- Fix step_num double-counting during rollback replay (gap closure)
+- [x] 73-02-PLAN.md -- Fix step_num double-counting during rollback replay (gap closure)
 
 ### Phase 74: Stability Validation
 **Goal**: Full test suite passes consistently with no exemptions
@@ -288,10 +288,10 @@ Plans:
   4. Zero skip markers remain in test suite
   5. Full suite passes 3 consecutive runs with zero failures
 **Research flag:** Unlikely (validation of previous phases)
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 74-01: Run full suite 3x and confirm zero failures
+- [ ] 74-01-PLAN.md -- Run full suite 3x, remove xfail/skip markers, confirm zero failures
 
 ## Progress
 
@@ -319,9 +319,9 @@ Phases execute in numeric order: 71 → 72 → 73 → 74
 | 67-70 | v1.16 | — | Complete | 2026-02-05 |
 | 71. Test Audit | v1.17 | 1/1 | Complete | 2026-02-05 |
 | 72. Test Infrastructure Fixes | v1.17 | 1/1 | Complete | 2026-02-05 |
-| 73. Production Bug Fixes | v1.17 | 1/2 | In progress | - |
-| 74. Stability Validation | v1.17 | 0/1 | Not started | - |
+| 73. Production Bug Fixes | v1.17 | 2/2 | Complete | 2026-02-05 |
+| 74. Stability Validation | v1.17 | 0/1 | Planned | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-05 for v1.17 Phase 73 gap closure plan*
+*Last updated: 2026-02-05 for Phase 74 planning*

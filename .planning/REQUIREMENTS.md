@@ -20,8 +20,8 @@ Requirements for v1.17 E2E Test Reliability. Each maps to roadmap phases.
 
 ### Production Bug Fixes
 
-- [ ] **PROD-01**: Production code bugs revealed by E2E tests are fixed (postMessage, serialization, Worker lifecycle)
-- [ ] **PROD-02**: Pre-existing functionality regressions from Worker migration are fixed
+- [x] **PROD-01**: Production code bugs revealed by E2E tests are fixed (postMessage, serialization, Worker lifecycle)
+- [x] **PROD-02**: Pre-existing functionality regressions from Worker migration are fixed
 
 ### Stability Validation
 
@@ -62,8 +62,8 @@ Which phases cover which requirements. Updated by create-roadmap.
 | INFRA-01 | Phase 72 | Complete |
 | INFRA-02 | Phase 72 | Complete |
 | INFRA-03 | Phase 72 | Complete |
-| PROD-01 | Phase 73 | Pending |
-| PROD-02 | Phase 73 | Pending |
+| PROD-01 | Phase 73 | Complete |
+| PROD-02 | Phase 73 | Complete |
 | STAB-01 | Phase 74 | Pending |
 | STAB-02 | Phase 74 | Pending |
 | STAB-03 | Phase 74 | Pending |
@@ -77,4 +77,4 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 ---
 *Requirements defined: 2026-02-05*
-*Last updated: 2026-02-05 after Phase 71 complete*
+*Last updated: 2026-02-05 after Phase 73 complete*
