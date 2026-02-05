@@ -218,7 +218,7 @@ Key deliverables:
 
 - [x] **Phase 67: Core Worker Infrastructure** - PyodideWorker class with init/step/reset operations
 - [x] **Phase 68: RemoteGame Integration** - Single-player games use Worker
-- [ ] **Phase 69: Multiplayer Batch Operations** - GGPO rollback via Worker batch API
+- [x] **Phase 69: Multiplayer Batch Operations** - GGPO rollback via Worker batch API
 - [ ] **Phase 70: Validation and Cleanup** - Socket.IO stability, performance, memory
 
 ## Phase Details
@@ -277,10 +277,11 @@ Plans:
   3. Step latency not degraded vs baseline (measure before Worker migration)
   4. 10 consecutive games show no memory growth (check via Performance tab)
 **Research flag:** Unlikely (integration testing of previous phases)
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 70-01: TBD
+- [ ] 70-01-PLAN.md — Reduce stagger delay to 0.5s and validate Socket.IO stability with concurrent games
+- [ ] 70-02-PLAN.md — Measure step latency overhead and verify no memory leaks across sessions
 
 ## Progress
 
@@ -308,8 +309,8 @@ Phases execute in numeric order: 67 → 68 → 69 → 70
 | 67. Core Worker Infrastructure | v1.16 | 1/1 | Complete | 2026-02-04 |
 | 68. RemoteGame Integration | v1.16 | 1/1 | Complete | 2026-02-05 |
 | 69. Multiplayer Batch Operations | v1.16 | 3/3 | Complete | 2026-02-04 |
-| 70. Validation and Cleanup | v1.16 | 0/TBD | Not started | - |
+| 70. Validation and Cleanup | v1.16 | 0/2 | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-04 for Phase 69 execution complete*
+*Last updated: 2026-02-05 for Phase 70 planning*
