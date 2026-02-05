@@ -8,6 +8,7 @@
  * Message Protocol:
  *   Incoming: { type, id, payload }
  *     - type: 'installPackages' | 'initEnv' | 'step' | 'reset' | 'runPython'
+ *              | 'getState' | 'setState' | 'computeHash' | 'seedRng' | 'render' | 'batch'
  *     - id: request ID for response correlation
  *     - payload: type-specific data
  *
@@ -105,6 +106,24 @@ async function handleMessage(msg) {
             case 'runPython':
                 await handleRunPython(id, payload);
                 break;
+            case 'getState':
+                await handleGetState(id, payload);
+                break;
+            case 'setState':
+                await handleSetState(id, payload);
+                break;
+            case 'computeHash':
+                await handleComputeHash(id, payload);
+                break;
+            case 'seedRng':
+                await handleSeedRng(id, payload);
+                break;
+            case 'render':
+                await handleRender(id, payload);
+                break;
+            case 'batch':
+                await handleBatch(id, payload);
+                break;
             default:
                 self.postMessage({
                     type: 'error',
@@ -177,12 +196,12 @@ async function handleInitEnv(id, payload) {
 }
 
 /**
- * Execute one environment step with provided actions.
- * Converts Python objects to JS before sending via postMessage.
- * @param {number} id - Request ID
+ * Execute one environment step with provided actions (internal, no postMessage).
+ * Used by handleStep and handleBatch.
  * @param {Object} payload - { actions: Object }
+ * @returns {Object} Step result: { obs, rewards, terminateds, truncateds, infos, render_state }
  */
-async function handleStep(id, payload) {
+async function handleStepInternal(payload) {
     // Convert actions to Python-compatible format
     const pyActions = JSON.stringify(payload.actions);
 
@@ -228,19 +247,27 @@ if not isinstance(truncateds, dict):
 
     const [obs, rewards, terminateds, truncateds, infos, render_state] = jsResult;
 
-    self.postMessage({
-        type: 'result',
-        id,
-        result: { obs, rewards, terminateds, truncateds, infos, render_state }
-    });
+    return { obs, rewards, terminateds, truncateds, infos, render_state };
 }
 
 /**
- * Reset the environment with optional seed.
+ * Execute one environment step with provided actions.
+ * Converts Python objects to JS before sending via postMessage.
  * @param {number} id - Request ID
- * @param {Object} payload - { seed?: number }
+ * @param {Object} payload - { actions: Object }
  */
-async function handleReset(id, payload) {
+async function handleStep(id, payload) {
+    const result = await handleStepInternal(payload);
+    self.postMessage({ type: 'result', id, result });
+}
+
+/**
+ * Reset the environment with optional seed (internal, no postMessage).
+ * Used by handleReset and handleBatch.
+ * @param {Object} payload - { seed?: number }
+ * @returns {Object} Reset result: { obs, infos, render_state }
+ */
+async function handleResetInternal(payload) {
     const seedValue = payload.seed !== null && payload.seed !== undefined
         ? payload.seed
         : 'None';
@@ -270,11 +297,288 @@ if not isinstance(obs, dict):
 
     const [obs, infos, render_state] = jsResult;
 
-    self.postMessage({
-        type: 'result',
-        id,
-        result: { obs, infos, render_state }
-    });
+    return { obs, infos, render_state };
+}
+
+/**
+ * Reset the environment with optional seed.
+ * @param {number} id - Request ID
+ * @param {Object} payload - { seed?: number }
+ */
+async function handleReset(id, payload) {
+    const result = await handleResetInternal(payload);
+    self.postMessage({ type: 'result', id, result });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// State management and batch handlers (Phase 69)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Capture the current environment state and RNG states (internal, no postMessage).
+ * Returns a JSON string containing env_state, numpy RNG state, and Python random state.
+ * Used by handleGetState and handleBatch.
+ * @param {Object} payload - {} (empty)
+ * @returns {string} JSON string of { env_state, np_rng_state, py_rng_state }
+ */
+async function handleGetStateInternal(payload) {
+    const result = await pyodide.runPythonAsync(`
+import json
+import numpy as np
+import random
+
+_env_state = env.get_state()
+
+_np_rng_state = np.random.get_state()
+_np_rng_serializable = (
+    _np_rng_state[0],
+    _np_rng_state[1].tolist(),
+    _np_rng_state[2],
+    _np_rng_state[3],
+    _np_rng_state[4]
+)
+_py_rng_state = random.getstate()
+
+json.dumps({
+    'env_state': _env_state,
+    'np_rng_state': _np_rng_serializable,
+    'py_rng_state': _py_rng_state
+})
+    `);
+
+    return result;
+}
+
+/**
+ * Capture the current environment state and RNG states.
+ * @param {number} id - Request ID
+ * @param {Object} payload - {} (empty)
+ */
+async function handleGetState(id, payload) {
+    const result = await handleGetStateInternal(payload);
+    self.postMessage({ type: 'result', id, result });
+}
+
+/**
+ * Restore environment state and RNG states from a JSON snapshot (internal, no postMessage).
+ * Used by handleSetState and handleBatch.
+ * @param {Object} payload - { stateJson: string }
+ * @returns {Object} { ok: true }
+ */
+async function handleSetStateInternal(payload) {
+    const escapedJson = payload.stateJson.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+
+    await pyodide.runPythonAsync(`
+import json
+import numpy as np
+import random
+
+_snapshot = json.loads('''${escapedJson}''')
+
+env.set_state(_snapshot['env_state'])
+
+if 'np_rng_state' in _snapshot:
+    _np_state = _snapshot['np_rng_state']
+    _np_rng_tuple = (
+        _np_state[0],
+        np.array(_np_state[1], dtype=np.uint32),
+        _np_state[2],
+        _np_state[3],
+        _np_state[4]
+    )
+    np.random.set_state(_np_rng_tuple)
+
+if 'py_rng_state' in _snapshot:
+    _py_state = _snapshot['py_rng_state']
+    if isinstance(_py_state, list):
+        _py_state = (_py_state[0], tuple(_py_state[1]),
+                     _py_state[2] if len(_py_state) > 2 else None)
+    random.setstate(_py_state)
+    `);
+
+    return { ok: true };
+}
+
+/**
+ * Restore environment state and RNG states from a JSON snapshot.
+ * @param {number} id - Request ID
+ * @param {Object} payload - { stateJson: string }
+ */
+async function handleSetState(id, payload) {
+    const result = await handleSetStateInternal(payload);
+    self.postMessage({ type: 'result', id, result });
+}
+
+/**
+ * Compute a SHA-256 hash of the current environment state or a provided state (internal, no postMessage).
+ * Normalizes floats to 10 decimal places for deterministic hashing.
+ * Used by handleComputeHash and handleBatch.
+ * @param {Object} payload - {} to hash current env state, or { stateJson: string } to hash provided state
+ * @returns {Object} { hash: string } - First 16 chars of SHA-256 hex digest
+ */
+async function handleComputeHashInternal(payload) {
+    let pythonCode;
+    if (payload.stateJson) {
+        const escapedJson = payload.stateJson.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        pythonCode = `
+import json
+import hashlib
+
+_state_to_hash = json.loads('''${escapedJson}''')
+`;
+    } else {
+        pythonCode = `
+import json
+import hashlib
+
+_state_to_hash = env.get_state()
+`;
+    }
+
+    pythonCode += `
+def _normalize_for_hash(obj):
+    if isinstance(obj, float):
+        return round(obj, 10)
+    elif isinstance(obj, dict):
+        return {k: _normalize_for_hash(v) for k, v in obj.items()}
+    elif isinstance(obj, (list, tuple)):
+        return [_normalize_for_hash(v) for v in obj]
+    return obj
+
+_normalized = _normalize_for_hash(_state_to_hash)
+_json_str = json.dumps(_normalized, sort_keys=True, separators=(',', ':'))
+hashlib.sha256(_json_str.encode()).hexdigest()[:16]
+`;
+
+    const result = await pyodide.runPythonAsync(pythonCode);
+    return { hash: result };
+}
+
+/**
+ * Compute a SHA-256 hash of the current environment state or a provided state.
+ * @param {number} id - Request ID
+ * @param {Object} payload - {} to hash current env state, or { stateJson: string } to hash provided state
+ */
+async function handleComputeHash(id, payload) {
+    const result = await handleComputeHashInternal(payload);
+    self.postMessage({ type: 'result', id, result });
+}
+
+/**
+ * Seed numpy and Python random number generators (internal, no postMessage).
+ * Used by handleSeedRng and handleBatch.
+ * @param {Object} payload - { seed: number }
+ * @returns {Object} { ok: true }
+ */
+async function handleSeedRngInternal(payload) {
+    await pyodide.runPythonAsync(`
+import numpy as np
+import random
+
+np.random.seed(${payload.seed})
+random.seed(${payload.seed})
+    `);
+
+    return { ok: true };
+}
+
+/**
+ * Seed numpy and Python random number generators.
+ * @param {number} id - Request ID
+ * @param {Object} payload - { seed: number }
+ */
+async function handleSeedRng(id, payload) {
+    const result = await handleSeedRngInternal(payload);
+    self.postMessage({ type: 'result', id, result });
+}
+
+/**
+ * Render the current environment state (internal, no postMessage).
+ * Returns raw render_state data; caller is responsible for processing.
+ * Used by handleRender and handleBatch.
+ * @param {Object} payload - {} (empty)
+ * @returns {Object} { render_state: any }
+ */
+async function handleRenderInternal(payload) {
+    const result = await pyodide.runPythonAsync(`
+render_state = env.render()
+render_state
+    `);
+
+    // Convert PyProxy to JS if needed
+    let jsResult;
+    if (result && typeof result.toJs === 'function') {
+        jsResult = result.toJs({ depth: 2 });
+        result.destroy();
+    } else {
+        jsResult = result;
+    }
+
+    return { render_state: jsResult };
+}
+
+/**
+ * Render the current environment state.
+ * @param {number} id - Request ID
+ * @param {Object} payload - {} (empty)
+ */
+async function handleRender(id, payload) {
+    const result = await handleRenderInternal(payload);
+    self.postMessage({ type: 'result', id, result });
+}
+
+/**
+ * Execute a batch of operations sequentially in a single round-trip.
+ * Stops on first error, returning partial results.
+ * @param {number} id - Request ID
+ * @param {Object} payload - { operations: [{ op: string, params: object }] }
+ */
+async function handleBatch(id, payload) {
+    const results = [];
+
+    for (let i = 0; i < payload.operations.length; i++) {
+        const { op, params } = payload.operations[i];
+        try {
+            switch (op) {
+                case 'setState':
+                    results.push(await handleSetStateInternal(params));
+                    break;
+                case 'getState':
+                    results.push(await handleGetStateInternal(params));
+                    break;
+                case 'step':
+                    results.push(await handleStepInternal(params));
+                    break;
+                case 'reset':
+                    results.push(await handleResetInternal(params));
+                    break;
+                case 'computeHash':
+                    results.push(await handleComputeHashInternal(params));
+                    break;
+                case 'render':
+                    results.push(await handleRenderInternal(params));
+                    break;
+                case 'seedRng':
+                    results.push(await handleSeedRngInternal(params));
+                    break;
+                default:
+                    throw new Error(`Unknown batch operation: ${op}`);
+            }
+        } catch (error) {
+            self.postMessage({
+                type: 'error', id,
+                error: {
+                    message: `Batch operation ${i} (${op}) failed: ${error.message}`,
+                    stack: error.stack,
+                    failedIndex: i,
+                    partialResults: results
+                }
+            });
+            return;
+        }
+    }
+
+    self.postMessage({ type: 'result', id, result: results });
 }
 
 /**
