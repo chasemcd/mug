@@ -5,15 +5,15 @@
 See: .planning/PROJECT.md (updated 2026-02-05)
 
 **Core value:** Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
-**Current focus:** v1.17 E2E Test Reliability - Starting
+**Current focus:** Phase 71 — Test Audit
 
 ## Current Position
 
 Milestone: v1.17 E2E Test Reliability
-Phase: Not started (run /gsd:create-roadmap)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-02-05 — Milestone v1.17 started
+Phase: 71 of 74 (Test Audit)
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-02-05 — Roadmap created (4 phases, 12 requirements)
 
 Progress: ░░░░░░░░░░ 0%
 
@@ -440,12 +440,10 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-02-05
-Stopped at: Started v1.17 E2E Test Reliability milestone
+Stopped at: Roadmap created for v1.17 (phases 71-74)
 Resume file: None
 
 ### Next Steps
 
-**v1.17 E2E Test Reliability milestone started.**
-- Goal: All existing E2E tests pass green, zero xfail/skips/flakiness
-- Scope: Fix whatever it takes — test infra, fixtures, or production code
-- Next action: `/gsd:create-roadmap` or `/gsd:define-requirements`
+**Phase 71: Test Audit** — Run full E2E suite, catalog and root-cause all failures.
+- Next action: `/gsd:plan-phase 71`

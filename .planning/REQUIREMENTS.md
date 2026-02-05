@@ -57,24 +57,24 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| AUDIT-01 | - | Pending |
-| AUDIT-02 | - | Pending |
-| INFRA-01 | - | Pending |
-| INFRA-02 | - | Pending |
-| INFRA-03 | - | Pending |
-| PROD-01 | - | Pending |
-| PROD-02 | - | Pending |
-| STAB-01 | - | Pending |
-| STAB-02 | - | Pending |
-| STAB-03 | - | Pending |
-| STAB-04 | - | Pending |
-| STAB-05 | - | Pending |
+| AUDIT-01 | Phase 71 | Pending |
+| AUDIT-02 | Phase 71 | Pending |
+| INFRA-01 | Phase 72 | Pending |
+| INFRA-02 | Phase 72 | Pending |
+| INFRA-03 | Phase 72 | Pending |
+| PROD-01 | Phase 73 | Pending |
+| PROD-02 | Phase 73 | Pending |
+| STAB-01 | Phase 74 | Pending |
+| STAB-02 | Phase 74 | Pending |
+| STAB-03 | Phase 74 | Pending |
+| STAB-04 | Phase 74 | Pending |
+| STAB-05 | Phase 74 | Pending |
 
 **Coverage:**
 - v1 requirements: 12 total
-- Mapped to phases: 0
-- Unmapped: 12 ⚠️
+- Mapped to phases: 12 ✓
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-02-05*
-*Last updated: 2026-02-05 after initial definition*
+*Last updated: 2026-02-05 after roadmap creation (phases 71-74)*

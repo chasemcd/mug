@@ -19,6 +19,7 @@
 - ✅ **v1.14 Data Parity Fix** - Phases 61-66 (shipped 2026-02-04)
 - ⚠️ **v1.15 E2E Test Reliability** - Investigation complete, fix deferred to v1.16
 - ✅ **v1.16 Pyodide Web Worker** - Phases 67-70 (shipped 2026-02-05)
+- 🚧 **v1.17 E2E Test Reliability** - Phases 71-74 (in progress)
 
 ## Phases
 
@@ -210,78 +211,86 @@ Key deliverables:
 
 </details>
 
-### ✅ v1.16 Pyodide Web Worker (Complete)
+<details>
+<summary>✅ v1.16 Pyodide Web Worker (Phases 67-70) - SHIPPED 2026-02-05</summary>
 
 **Milestone Goal:** Move Pyodide initialization and execution to a Web Worker to prevent main thread blocking and eliminate Socket.IO disconnection issues during concurrent game startup.
-
-**Problem:** Pyodide initialization blocks the browser's main thread for several seconds during WASM compilation, preventing Socket.IO from responding to ping messages and causing false disconnects when multiple games start concurrently.
 
 - [x] **Phase 67: Core Worker Infrastructure** - PyodideWorker class with init/step/reset operations
 - [x] **Phase 68: RemoteGame Integration** - Single-player games use Worker
 - [x] **Phase 69: Multiplayer Batch Operations** - GGPO rollback via Worker batch API
 - [x] **Phase 70: Validation and Cleanup** - Socket.IO stability, performance, memory
 
+</details>
+
+### 🚧 v1.17 E2E Test Reliability (In Progress)
+
+**Milestone Goal:** All existing E2E tests pass green with zero xfail, skips, or flakiness after the v1.16 Worker migration.
+
+- [ ] **Phase 71: Test Audit** - Run full suite, catalog and root-cause all failures
+- [ ] **Phase 72: Test Infrastructure Fixes** - Update fixtures, selectors, timeouts for Worker
+- [ ] **Phase 73: Production Bug Fixes** - Fix Worker-related production bugs revealed by tests
+- [ ] **Phase 74: Stability Validation** - Zero xfail/skip, 3 consecutive green runs
+
 ## Phase Details
 
-### Phase 67: Core Worker Infrastructure
-**Goal**: Create pyodide_worker.js and PyodideWorker class with init, step, reset operations
-**Depends on**: Nothing (first phase of v1.16)
-**Requirements**: WORKER-01, WORKER-02, WORKER-03
+### Phase 71: Test Audit
+**Goal**: Run full E2E test suite and catalog all failures with root causes
+**Depends on**: Nothing (first phase of v1.17)
+**Requirements**: AUDIT-01, AUDIT-02
 **Success Criteria** (what must be TRUE):
-  1. PyodideWorker class can initialize Pyodide in a Web Worker
-  2. Main thread receives READY event before any commands are sent
-  3. Main thread can run console.log('ping') every 500ms during Pyodide init without interruption (proves non-blocking)
-**Research flag:** Unlikely (Web Worker patterns well-documented, existing GameTimerWorker provides template)
-**Plans**: 1 plan
+  1. Full `pytest tests/e2e/ -v` has been run and output captured
+  2. Every failure is documented with root cause (test infrastructure vs production bug)
+  3. A categorized failure list exists to drive phases 72-73
+**Research flag:** Unlikely (running tests and reading output)
+**Plans**: TBD
 
 Plans:
-- [x] 67-01-PLAN.md — Create pyodide_worker.js and PyodideWorker class with typed message protocol
+- [ ] 71-01: Run full E2E suite and catalog failures
 
-### Phase 68: RemoteGame Integration
-**Goal**: Single-player games use PyodideWorker for all Pyodide operations
-**Depends on**: Phase 67
-**Requirements**: INTEG-01, INTEG-03, INTEG-04
+### Phase 72: Test Infrastructure Fixes
+**Goal**: Fix test fixtures, selectors, and timeouts for Worker-based Pyodide
+**Depends on**: Phase 71
+**Requirements**: INFRA-01, INFRA-02, INFRA-03
 **Success Criteria** (what must be TRUE):
-  1. RemoteGame loads environment via PyodideWorker
-  2. step() and reset() work via postMessage round-trip
-  3. render_state arrives on main thread for Phaser rendering
-  4. Single-player demo works identically to before (no visible change to users)
-**Research flag:** Unlikely (straightforward refactoring, no novel patterns)
-**Plans**: 1 plan
+  1. Test fixtures correctly set up and tear down Worker-based Pyodide
+  2. Playwright selectors/locators work with any Worker migration UI changes
+  3. Test waits and timeouts account for Worker async initialization patterns
+**Research flag:** Unlikely (test infrastructure updates, standard patterns)
+**Plans**: TBD
 
 Plans:
-- [x] 68-01-PLAN.md — Migrate RemoteGame to PyodideWorker with environment code injection support
+- [ ] 72-01: Update test fixtures and infrastructure for Worker patterns
 
-### Phase 69: Multiplayer Batch Operations
-**Goal**: GGPO rollback works via Worker with batch API for single round-trip execution
-**Depends on**: Phase 68
-**Requirements**: INTEG-02
+### Phase 73: Production Bug Fixes
+**Goal**: Fix production code bugs revealed by E2E test failures
+**Depends on**: Phase 72
+**Requirements**: PROD-01, PROD-02
 **Success Criteria** (what must be TRUE):
-  1. MultiplayerPyodideGame uses PyodideWorker for all Pyodide operations
-  2. Rollback batches (setState + N steps + getState) execute in single postMessage round-trip
-  3. Two-player game completes with rollback events and data parity intact
-**Plans**: 3 plans
+  1. Worker lifecycle bugs (postMessage serialization, Worker init) are fixed
+  2. Pre-existing functionality regressions from v1.16 Worker migration are fixed
+  3. Tests that were failing due to production bugs now pass individually
+**Research flag:** Unlikely (debugging with test output as guide)
+**Plans**: TBD
 
 Plans:
-- [x] 69-01-PLAN.md — Extend Worker protocol with getState, setState, computeHash, seedRng, render, batch commands
-- [x] 69-02-PLAN.md — Migrate all individual multiplayer call sites to structured Worker commands
-- [x] 69-03-PLAN.md — Migrate batch operations (rollback + fast-forward) and remove all backward-compat shims
+- [ ] 73-01: Fix production bugs identified in audit
 
-### Phase 70: Validation and Cleanup
-**Goal**: Verify Socket.IO stability, performance, and memory under concurrent load
-**Depends on**: Phase 69
-**Requirements**: VALID-01, VALID-02, VALID-03, VALID-04
+### Phase 74: Stability Validation
+**Goal**: Full test suite passes consistently with no exemptions
+**Depends on**: Phase 73
+**Requirements**: STAB-01, STAB-02, STAB-03, STAB-04, STAB-05
 **Success Criteria** (what must be TRUE):
-  1. 3 concurrent games start without Socket.IO disconnects
-  2. Multi-participant tests pass with 0.5s stagger delay (down from 5s)
-  3. Step latency not degraded vs baseline (measure before Worker migration)
-  4. 10 consecutive games show no memory growth (check via Performance tab)
-**Research flag:** Unlikely (integration testing of previous phases)
-**Plans**: 2 plans
+  1. All multi-participant tests pass (STRESS-01 through STRESS-07)
+  2. All single-participant tests pass
+  3. Zero xfail markers remain in test suite
+  4. Zero skip markers remain in test suite
+  5. Full suite passes 3 consecutive runs with zero failures
+**Research flag:** Unlikely (validation of previous phases)
+**Plans**: TBD
 
 Plans:
-- [x] 70-01-PLAN.md — Reduce stagger delay to 0.5s and validate Socket.IO stability with concurrent games
-- [x] 70-02-PLAN.md — Worker bug fixes (toJs, js.window, action keys) and manual multiplayer verification
+- [ ] 74-01: Run full suite 3x and confirm zero failures
 
 ## Progress
 
@@ -306,11 +315,12 @@ Phases execute in numeric order: 67 → 68 → 69 → 70
 | 51-56 | v1.12 | — | Complete | 2026-02-03 |
 | 57-60 | v1.13 | — | Complete | 2026-02-03 |
 | 61-66 | v1.14 | — | Complete | 2026-02-04 |
-| 67. Core Worker Infrastructure | v1.16 | 1/1 | Complete | 2026-02-04 |
-| 68. RemoteGame Integration | v1.16 | 1/1 | Complete | 2026-02-05 |
-| 69. Multiplayer Batch Operations | v1.16 | 3/3 | Complete | 2026-02-04 |
-| 70. Validation and Cleanup | v1.16 | 2/2 | Complete | 2026-02-05 |
+| 67-70 | v1.16 | — | Complete | 2026-02-05 |
+| 71. Test Audit | v1.17 | 0/1 | Not started | - |
+| 72. Test Infrastructure Fixes | v1.17 | 0/1 | Not started | - |
+| 73. Production Bug Fixes | v1.17 | 0/1 | Not started | - |
+| 74. Stability Validation | v1.17 | 0/1 | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-05 for Phase 70 completion (v1.16 shipped)*
+*Last updated: 2026-02-05 for v1.17 E2E Test Reliability roadmap (phases 71-74)*
