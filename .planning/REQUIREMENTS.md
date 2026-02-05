@@ -1,60 +1,43 @@
-# Requirements: Interactive Gym v1.14
+# Requirements: Interactive Gym v1.16
 
-**Defined:** 2026-02-03
+**Defined:** 2026-02-04
 **Core Value:** Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
 
 ## v1 Requirements
 
-Requirements for v1.14 Data Parity Fix. Each maps to roadmap phases.
+Requirements for v1.16 Pyodide Web Worker. Each maps to roadmap phases.
 
-### Data Parity Fix
+### Web Worker Infrastructure
 
-- [x] **PARITY-01**: Episode export waits for partner input confirmation before writing
-- [x] **PARITY-02**: Configurable confirmation timeout (default reasonable for 200ms+ latency)
-- [x] **PARITY-03**: Both players export identical action sequences for every frame
-- [x] **PARITY-04**: Both players export identical rewards for every frame
-- [x] **PARITY-05**: Both players export identical infos for every frame
-- [x] **PARITY-06**: `test_active_input_with_latency[chromium-100]` passes consistently (10+ runs)
-- [x] **PARITY-07**: `test_active_input_with_packet_loss` passes consistently (10+ runs)
+- [ ] **WORKER-01**: PyodideWorker class loads Pyodide in dedicated Web Worker
+- [ ] **WORKER-02**: Main thread remains responsive during Pyodide initialization (can respond to Socket.IO pings)
+- [ ] **WORKER-03**: Worker sends READY event before accepting commands
 
-### Multi-Participant Stress Tests
+### Game Integration
 
-- [ ] **STRESS-01**: Test infrastructure supports 6 concurrent participants (3 simultaneous games)
-- [ ] **STRESS-02**: Multi-episode test: participants complete 2+ episodes back-to-back
-- [ ] **STRESS-03**: Mid-game disconnection test: participant disconnects during gameplay
-- [ ] **STRESS-04**: Waiting room disconnection test: participant disconnects while waiting
-- [ ] **STRESS-05**: Focus loss test: tab goes to background during gameplay
-- [ ] **STRESS-06**: Mixed lifecycle test: combines disconnect + completion + focus loss scenarios
-- [ ] **STRESS-07**: All completed games' exports validated for exact parity
+- [ ] **INTEG-01**: RemoteGame uses PyodideWorker for all Pyodide operations
+- [ ] **INTEG-02**: MultiplayerPyodideGame uses PyodideWorker for all Pyodide operations
+- [ ] **INTEG-03**: step() and reset() operations work via Worker postMessage
+- [ ] **INTEG-04**: render_state is proxied back to main thread for Phaser rendering
 
-### Server Recovery Test
+### Validation
 
-- [ ] **RECOVERY-01**: Test runs concurrent episodes to completion
-- [ ] **RECOVERY-02**: Test has participants leave mid-game
-- [ ] **RECOVERY-03**: Test has participants leave during waiting room
-- [ ] **RECOVERY-04**: Test has participants leave due to focus loss timeout
-- [ ] **RECOVERY-05**: After all chaos events, new participant pair can enter and complete experiment
-- [ ] **RECOVERY-06**: New pair's data exports pass exact parity validation
+- [ ] **VALID-01**: Socket.IO connections remain stable during concurrent Pyodide init (3+ games)
+- [ ] **VALID-02**: Multi-participant tests pass with 0.5s stagger delay (down from 5s)
+- [ ] **VALID-03**: Game loop step latency unchanged or improved vs direct Pyodide
+- [ ] **VALID-04**: No memory leaks across multiple game sessions
 
 ## v2 Requirements
 
 Deferred to future release. Tracked but not in current roadmap.
 
-### Enhanced Matching (from v1.13)
+### Enhanced Worker Features
 
-- **MATCH-01**: Wait time relaxation (progressively relax criteria as wait time increases)
-- **MATCH-02**: Priority queuing for dropout recovery
-- **MATCH-03**: Pre-match validation hook (beyond RTT, e.g., custom compatibility checks)
-
-### Group Reunion (from v1.13)
-
-- **REUN-01**: Matchmaker variant that reunites previous groups
-- **REUN-02**: Configurable reunion timeout before falling back to FIFO
-
-### Data Parity Enhancements
-
-- **PARITY-V2-01**: Re-request lost packets if confirmation timeout (more robust than wait-only)
-- **PARITY-V2-02**: Packet loss telemetry in export metadata
+- **WORKER-V2-01**: Progress events during loading ("Loading Pyodide...", "Installing packages...")
+- **WORKER-V2-02**: Batch API for GGPO rollback (single round-trip for setState + N steps)
+- **WORKER-V2-03**: Graceful Worker termination with cleanup
+- **WORKER-V2-04**: Request/response correlation with IDs and timeouts
+- **WORKER-V2-05**: Backward compatibility config flag for direct Pyodide mode
 
 ## Out of Scope
 
@@ -62,11 +45,11 @@ Explicitly excluded. Documented to prevent scope creep.
 
 | Feature | Reason |
 |---------|--------|
-| Skill-based matchmaking (SBMM) | Game-focused pattern, not research validity |
-| Global player pools | Cross-experiment contamination |
-| Mid-game backfill | Invalidates experimental conditions |
-| Tolerance in parity validation | Data must be EXACT for research validity |
-| Load testing (100+ participants) | Research experiments typically <20 concurrent |
+| SharedArrayBuffer | Requires COOP/COEP headers, overkill for this use case |
+| Comlink library | RPC abstraction doesn't fit async WASM with progress events |
+| Multi-Worker support | Single Pyodide instance is sufficient |
+| Hot reload | Environment code without Worker restart is complex |
+| Zero-stagger (0s) | 0.5s stagger is sufficient; true zero requires more optimization |
 
 ## Traceability
 
@@ -74,52 +57,41 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PARITY-01 | Phase 61 | Complete |
-| PARITY-02 | Phase 61 | Complete |
-| PARITY-03 | Phase 62 | Complete |
-| PARITY-04 | Phase 62 | Complete |
-| PARITY-05 | Phase 62 | Complete |
-| PARITY-06 | Phase 63 | Complete |
-| PARITY-07 | Phase 63 | Complete |
-| STRESS-01 | Phase 64 | Pending |
-| STRESS-02 | Phase 65 | Pending |
-| STRESS-03 | Phase 65 | Pending |
-| STRESS-04 | Phase 65 | Pending |
-| STRESS-05 | Phase 65 | Pending |
-| STRESS-06 | Phase 65 | Pending |
-| STRESS-07 | Phase 65 | Pending |
-| RECOVERY-01 | Phase 66 | Pending |
-| RECOVERY-02 | Phase 66 | Pending |
-| RECOVERY-03 | Phase 66 | Pending |
-| RECOVERY-04 | Phase 66 | Pending |
-| RECOVERY-05 | Phase 66 | Pending |
-| RECOVERY-06 | Phase 66 | Pending |
+| WORKER-01 | TBD | Pending |
+| WORKER-02 | TBD | Pending |
+| WORKER-03 | TBD | Pending |
+| INTEG-01 | TBD | Pending |
+| INTEG-02 | TBD | Pending |
+| INTEG-03 | TBD | Pending |
+| INTEG-04 | TBD | Pending |
+| VALID-01 | TBD | Pending |
+| VALID-02 | TBD | Pending |
+| VALID-03 | TBD | Pending |
+| VALID-04 | TBD | Pending |
 
 **Coverage:**
-- v1 requirements: 20 total
-- Mapped to phases: 20 ✓
-- Unmapped: 0
+- v1 requirements: 11 total
+- Mapped to phases: 0 (awaiting roadmap)
+- Unmapped: 11
 
-## Completed Requirements (v1.13)
+## Completed Requirements (v1.14)
 
 Requirements completed in previous milestone, preserved for reference.
 
-### P2P RTT Probing (v1.13)
+### Data Parity Fix (v1.14)
 
-- [x] **RTT-01**: Matchmaker can establish WebRTC probe connection between candidate participants
-- [x] **RTT-02**: Probe measures actual P2P RTT between candidates (specified number of pings)
-- [x] **RTT-03**: Probe connection is closed after measurement completes
-- [x] **RTT-04**: Matchmaker constructor accepts `max_p2p_rtt_ms` threshold parameter
-- [x] **RTT-05**: `find_match()` receives measured RTT between candidates
-- [x] **RTT-06**: Match is rejected if RTT exceeds configured threshold
+- [x] **PARITY-01**: Episode export waits for partner input confirmation before writing
+- [x] **PARITY-02**: Configurable confirmation timeout (default reasonable for 200ms+ latency)
+- [x] **PARITY-03**: Both players export identical action sequences for every frame
+- [x] **PARITY-04**: Both players export identical rewards for every frame
+- [x] **PARITY-05**: Both players export identical infos for every frame
+- [x] **PARITY-06**: `test_active_input_with_latency[chromium-100]` passes consistently
+- [x] **PARITY-07**: `test_active_input_with_packet_loss` passes consistently
 
-### Game Creation (v1.13)
+### Multi-Participant Infrastructure (v1.14)
 
-- [x] **GAME-01**: All games created through single path: Matchmaker.find_match() → match → create game
-- [x] **GAME-02**: No other code paths create games
-- [x] **GAME-03**: Game only exists when all matched participants are assigned
-- [x] **GAME-04**: Group reunion flow is bypassed and documented as future matchmaker variant
+- [x] **STRESS-01**: Test infrastructure supports 6 concurrent participants (3 simultaneous games)
 
 ---
-*Requirements defined: 2026-02-03*
-*Last updated: 2026-02-03 after Phase 62 complete*
+*Requirements defined: 2026-02-04*
+*Last updated: 2026-02-04 for v1.16 Pyodide Web Worker*
