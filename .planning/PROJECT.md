@@ -8,46 +8,43 @@ A framework for running browser-based reinforcement learning experiments with hu
 
 Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
 
-## Current Milestone: v1.16 Pyodide Web Worker
+## Current Milestone: v1.17 E2E Test Reliability
 
-**Goal:** Move Pyodide initialization and execution to a Web Worker to prevent main thread blocking and eliminate Socket.IO disconnection issues during game startup.
+**Goal:** All existing E2E tests pass green with zero xfail, skips, or flakiness after the v1.16 Worker migration.
 
-**Problem:** Pyodide initialization blocks the browser's main thread for several seconds during WASM compilation. This prevents Socket.IO from responding to ping messages, causing false disconnects when multiple games start concurrently. The 5-second stagger delay is a workaround, not a fix.
-
-**Root cause:**
-- `loadPyodide()` downloads ~15MB of WASM/Python packages
-- WASM compilation blocks the main thread (synchronous)
-- Socket.IO ping/pong requires main thread event loop access
-- With ping_interval=8s, any >8s blocking causes disconnect
+**Problem:** The v1.16 Pyodide Web Worker migration changed how Pyodide initialization, step(), reset(), and render() work. No E2E tests have been run since the migration. Tests may fail due to Worker-specific issues (postMessage serialization, timing changes, missing fixtures) or reveal real bugs in the migrated code.
 
 **Target features:**
 
-*Web Worker architecture:*
-- [ ] Create PyodideWorker class that manages Pyodide in a dedicated Web Worker
-- [ ] Define message protocol for main thread ↔ worker communication
-- [ ] Move `loadPyodide()` and package installation to worker
-- [ ] Move `pyodide.runPythonAsync()` calls to worker
-- [ ] Proxy environment state (observations, render_state) back to main thread
-
-*Integration:*
-- [ ] Update RemoteGame to use PyodideWorker instead of direct Pyodide
-- [ ] Update MultiplayerPyodideGame to use PyodideWorker
-- [ ] Ensure game step() calls work asynchronously via worker
-- [ ] Maintain backward compatibility for single-player games
-
-*Testing:*
-- [ ] Remove stagger delay from multi-participant tests
-- [ ] All E2E tests pass with 0.5s stagger (near-simultaneous)
-- [ ] Socket.IO connections remain stable during Pyodide init
-- [ ] No performance regression for game loop execution
+*Test audit and fixes:*
+- [ ] Run full E2E test suite and catalog all failures
+- [ ] Fix test infrastructure issues (fixtures, timeouts, selectors)
+- [ ] Fix production code bugs revealed by tests
+- [ ] All multi-participant tests pass (STRESS-01 through STRESS-07)
+- [ ] All lifecycle stress tests pass reliably
+- [ ] All single-participant tests pass
+- [ ] Zero xfail markers, zero skips
 
 **What done looks like:**
-- Pyodide runs entirely in a Web Worker (off main thread)
-- Socket.IO pings are always answered promptly
-- Multi-participant tests pass without timing hacks
-- Game responsiveness unchanged or improved
+- `pytest tests/e2e/ -v` passes 100% on every run
+- No flaky tests (run 3x to confirm stability)
+- Any production bugs found during testing are fixed and committed
 
-## Previous Milestone: v1.15 E2E Test Reliability (In Progress)
+## Previous Milestone: v1.16 Pyodide Web Worker (Shipped: 2026-02-05)
+
+**Delivered:** Pyodide runs entirely in a Web Worker, freeing the main thread. Socket.IO stays responsive during initialization. GGPO rollback works via Worker batch API. Three critical Worker bugs fixed.
+
+**Phases completed:** 67-70 (4 phases, 8 plans)
+
+**Key accomplishments:**
+- PyodideWorker class with typed message protocol
+- RemoteGame and MultiplayerPyodideGame use Worker for all Pyodide operations
+- Batch API for GGPO rollback (setState + N steps + getState in single round-trip)
+- Fixed js.window in Worker context, DataCloneError on postMessage, action key type mismatch
+- Stagger delay reduced from 5.0s to 0.5s
+- Step latency 3.8-7.6ms (verified in browser)
+
+## Previous Milestone: v1.15 E2E Test Reliability (Investigation Complete)
 
 **Goal:** Achieve 100% pass rate for all E2E tests with zero flakiness.
 
@@ -293,17 +290,26 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 
 ### Active
 
-*v1.16 Pyodide Web Worker (Planned):*
-- [ ] PyodideWorker class with message protocol
-- [ ] Move loadPyodide() to Web Worker
-- [ ] Move runPythonAsync() to Web Worker
-- [ ] Update RemoteGame and MultiplayerPyodideGame
-- [ ] Remove stagger delay, tests pass with near-simultaneous starts
+*v1.17 E2E Test Reliability:*
+- [ ] Full E2E test suite audit — run all tests, catalog failures
+- [ ] Fix test infrastructure issues (fixtures, timeouts, selectors)
+- [ ] Fix production code bugs revealed by tests
+- [ ] All multi-participant tests pass (STRESS-01 through STRESS-07)
+- [ ] All lifecycle stress tests pass reliably
+- [ ] Zero xfail markers, zero skips
+- [ ] Stability confirmed (3 consecutive green runs)
 
-*v1.15 E2E Test Reliability (In Progress):*
-- [x] Investigate root cause (Pyodide blocks main thread → Socket.IO disconnect)
-- [ ] Workaround: 5s stagger delay between game pairs
-- [ ] Document permanent fix plan (v1.16)
+*Shipped in v1.16:*
+- ✓ PyodideWorker class with typed message protocol — v1.16
+- ✓ Pyodide runs in Web Worker (loadPyodide, runPythonAsync) — v1.16
+- ✓ RemoteGame and MultiplayerPyodideGame use Worker — v1.16
+- ✓ Batch API for GGPO rollback — v1.16
+- ✓ Stagger delay reduced to 0.5s — v1.16
+- ✓ Worker bug fixes (js.window, DataCloneError, action keys) — v1.16
+
+*Shipped in v1.15:*
+- ✓ Root cause investigation (Pyodide blocks main thread) — v1.15
+- ✓ Documented permanent fix plan (Web Worker) — v1.15
 
 *Shipped in v1.14:*
 - ✓ Wait for input confirmation before episode export — v1.14
@@ -423,4 +429,4 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 | BOUND-02/03 guards | Defense-in-depth at episode boundaries in async paths | ✓ Good |
 
 ---
-*Last updated: 2026-02-04 after v1.16 Pyodide Web Worker milestone started*
+*Last updated: 2026-02-05 after v1.17 E2E Test Reliability milestone started*

@@ -1,26 +1,37 @@
 # Project Milestones: Interactive Gym P2P Multiplayer
 
-## v1.16 Pyodide Web Worker (In Progress)
+## v1.17 E2E Test Reliability (In Progress)
 
-**Goal:** Move Pyodide initialization and execution to a Web Worker to prevent main thread blocking and eliminate Socket.IO disconnection issues during game startup.
+**Goal:** All existing E2E tests pass green with zero xfail, skips, or flakiness after the v1.16 Worker migration.
 
-**Status:** Planning
+**Status:** Starting
 
 **Target features:**
 
-- PyodideWorker class with message protocol for main thread ↔ worker communication
-- Move loadPyodide() and package installation to dedicated Web Worker
-- Move pyodide.runPythonAsync() calls to worker
-- Proxy environment state (observations, render_state) back to main thread
-- Update RemoteGame and MultiplayerPyodideGame to use PyodideWorker
-- Remove stagger delay from multi-participant tests
+- Full E2E test suite audit — run all tests, catalog failures
+- Fix test infrastructure issues (fixtures, timeouts, selectors)
+- Fix production code bugs revealed by tests
+- All multi-participant tests pass (STRESS-01 through STRESS-07)
+- All lifecycle stress tests pass reliably
+- Zero xfail markers, zero skips
+- Stability confirmed (3 consecutive green runs)
 
-**Root cause (from v1.15 investigation):**
+---
 
-- Pyodide `loadPyodide()` blocks main thread during WASM compilation (~5-15 seconds)
-- Socket.IO ping/pong requires main thread event loop access
-- With multiple games starting concurrently, blocking exceeds ping timeout (8s)
-- Result: False disconnects during game startup
+## v1.16 Pyodide Web Worker (Shipped: 2026-02-05)
+
+**Delivered:** Pyodide runs entirely in a Web Worker, freeing the main thread. GGPO rollback works via Worker batch API. Three critical Worker bugs fixed.
+
+**Phases completed:** 67-70 (4 phases, 8 plans)
+
+**Key accomplishments:**
+
+- PyodideWorker class with typed message protocol (init, step, reset, render, batch)
+- RemoteGame and MultiplayerPyodideGame use Worker for all Pyodide operations
+- Batch API for GGPO rollback (setState + N steps + getState in single round-trip)
+- Fixed js.window in Worker context, DataCloneError on postMessage, action key type mismatch
+- Stagger delay reduced from 5.0s to 0.5s
+- Step latency 3.8-7.6ms (verified in browser)
 
 ---
 

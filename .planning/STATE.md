@@ -2,20 +2,20 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-02-04)
+See: .planning/PROJECT.md (updated 2026-02-05)
 
 **Core value:** Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
-**Current focus:** v1.16 Pyodide Web Worker - Complete (shipped 2026-02-05)
+**Current focus:** v1.17 E2E Test Reliability - Starting
 
 ## Current Position
 
-Milestone: v1.16 Pyodide Web Worker
-Phase: 70 of 70 (Validation and Cleanup) — Complete
-Plan: 02 of 02 complete
-Status: All phases complete. Three critical Worker bugs fixed, multiplayer game verified working.
-Last activity: 2026-02-05 — Completed Phase 70 (Validation and Cleanup)
+Milestone: v1.17 E2E Test Reliability
+Phase: Not started (run /gsd:create-roadmap)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-02-05 — Milestone v1.17 started
 
-Progress: ██████████ 100%
+Progress: ░░░░░░░░░░ 0%
 
 ## Milestone History
 
@@ -440,21 +440,12 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-02-05
-Stopped at: Completed v1.16 Pyodide Web Worker milestone (all phases 67-70 done)
+Stopped at: Started v1.17 E2E Test Reliability milestone
 Resume file: None
 
 ### Next Steps
 
-**v1.16 Pyodide Web Worker milestone complete.** All phases (67-70) shipped.
-- Phase 67: Core Worker infrastructure (pyodide_worker.js, PyodideWorker.js)
-- Phase 68: RemoteGame integration (single-player via Worker)
-- Phase 69: Multiplayer batch operations (GGPO rollback via Worker)
-- Phase 70: Validation and cleanup (3 bug fixes, manual multiplayer verification)
-
-**Key commits in Phase 70:**
-- `32886a4` — Reduce stagger delay from 5.0s to 0.5s
-- `9e733d5` — Fix js.window in Worker context
-- `c9477dc` — Fix DataCloneError with dict_converter
-- `ec0e492` — Fix action key string-to-int conversion
-
-**Next milestone:** Not yet planned. Consider `/gsd:new-milestone` to define next work.
+**v1.17 E2E Test Reliability milestone started.**
+- Goal: All existing E2E tests pass green, zero xfail/skips/flakiness
+- Scope: Fix whatever it takes — test infra, fixtures, or production code
+- Next action: `/gsd:create-roadmap` or `/gsd:define-requirements`
