@@ -13,10 +13,12 @@
 - ✅ **v1.8 Data Export Parity** - Phases 36-39 (shipped 2026-01-30)
 - ✅ **v1.9 Data Parity Testing** - Phases 40-44 (shipped 2026-02-01)
 - ✅ **v1.10 E2E Test Fix** - Phases 45-47 (shipped 2026-02-02)
-- ✅ **v1.11 Data Export Edge Cases** - Phases 48-50 (shipped 2026-02-02) → [archive](milestones/v1.11-ROADMAP.md)
+- ✅ **v1.11 Data Export Edge Cases** - Phases 48-50 (shipped 2026-02-02)
 - ✅ **v1.12 Waiting Room Overhaul** - Phases 51-56 (shipped 2026-02-03)
 - ✅ **v1.13 Matchmaker Hardening** - Phases 57-60 (shipped 2026-02-03)
-- 🚧 **v1.14 Data Parity Fix** - Phases 61-66 (in progress)
+- ✅ **v1.14 Data Parity Fix** - Phases 61-66 (shipped 2026-02-04)
+- ⚠️ **v1.15 E2E Test Reliability** - Investigation complete, fix deferred to v1.16
+- 🚧 **v1.16 Pyodide Web Worker** - Phases 67-70 (in progress)
 
 ## Phases
 
@@ -166,8 +168,6 @@ Key deliverables:
 - [x] **Phase 49: Episode Boundary Row Parity** - Both players export exactly max_steps rows
 - [x] **Phase 50: Stress Test Verification** - All 17 E2E tests pass
 
-See [milestones/v1.11-ROADMAP.md](milestones/v1.11-ROADMAP.md) for full details.
-
 </details>
 
 <details>
@@ -196,109 +196,95 @@ See [milestones/v1.11-ROADMAP.md](milestones/v1.11-ROADMAP.md) for full details.
 
 </details>
 
-### 🚧 v1.14 Data Parity Fix (In Progress)
+<details>
+<summary>v1.14 Data Parity Fix (Phases 61-66) - SHIPPED 2026-02-04</summary>
 
-**Milestone Goal:** Fix the rare data parity divergence bug and add comprehensive multi-participant E2E stress tests. Data parity must be EXACT — both players export identical data for every frame under all network conditions.
+**Milestone Goal:** Fix the rare data parity divergence bug and add comprehensive multi-participant E2E stress tests.
 
 - [x] **Phase 61: Input Confirmation Protocol** - Wait for partner input confirmation before export
 - [x] **Phase 62: Data Parity Validation** - Ensure identical exports for actions/rewards/infos
 - [x] **Phase 63: Parity Test Stabilization** - E2E tests pass consistently (10+ runs)
 - [x] **Phase 64: Multi-Participant Test Infrastructure** - Support 6 concurrent participants
-- [ ] **Phase 65: Multi-Episode and Lifecycle Stress Tests** - Comprehensive lifecycle coverage
-- [ ] **Phase 66: Server Recovery Validation** - Prove server recovers from chaos correctly
+- [x] **Phase 65: Multi-Episode Lifecycle Stress** - Comprehensive lifecycle coverage
+- [x] **Phase 66: Server Recovery Validation** - Server handles chaos and recovers correctly
+
+</details>
+
+### 🚧 v1.16 Pyodide Web Worker (In Progress)
+
+**Milestone Goal:** Move Pyodide initialization and execution to a Web Worker to prevent main thread blocking and eliminate Socket.IO disconnection issues during concurrent game startup.
+
+**Problem:** Pyodide initialization blocks the browser's main thread for several seconds during WASM compilation, preventing Socket.IO from responding to ping messages and causing false disconnects when multiple games start concurrently.
+
+- [ ] **Phase 67: Core Worker Infrastructure** - PyodideWorker class with init/step/reset operations
+- [ ] **Phase 68: RemoteGame Integration** - Single-player games use Worker
+- [ ] **Phase 69: Multiplayer Batch Operations** - GGPO rollback via Worker batch API
+- [ ] **Phase 70: Validation and Cleanup** - Socket.IO stability, performance, memory
 
 ## Phase Details
 
-### Phase 61: Input Confirmation Protocol
-**Goal**: Implement protocol to wait for partner input confirmation before episode export
-**Depends on**: Phase 60 (v1.13 complete)
-**Requirements**: PARITY-01, PARITY-02
+### Phase 67: Core Worker Infrastructure
+**Goal**: Create pyodide_worker.js and PyodideWorker class with init, step, reset operations
+**Depends on**: Nothing (first phase of v1.16)
+**Requirements**: WORKER-01, WORKER-02, WORKER-03
 **Success Criteria** (what must be TRUE):
-  1. Episode export does not begin until partner inputs are confirmed for final frame
-  2. Confirmation timeout is configurable (default handles 200ms+ latency)
-  3. Timeout triggers graceful handling (not crash or data loss)
-**Research flag:** Complete (61-RESEARCH.md)
-**Plans:** 1 plan
-
-Plans:
-- [x] 61-01-PLAN.md — Add confirmation timeout config and wait logic before episode export
-
-### Phase 62: Data Parity Validation
-**Goal**: Ensure both players export identical data for every frame
-**Depends on**: Phase 61
-**Requirements**: PARITY-03, PARITY-04, PARITY-05
-**Success Criteria** (what must be TRUE):
-  1. Both players' exports contain identical action columns for every frame
-  2. Both players' exports contain identical reward columns for every frame
-  3. Both players' exports contain identical info columns for every frame
-**Research flag:** Unlikely (verification of Phase 61 fix)
-**Plans:** 1 plan
-
-Plans:
-- [x] 62-01-PLAN.md — Run parity tests to validate Phase 61 fix
-
-### Phase 63: Parity Test Stabilization
-**Goal**: E2E parity tests pass consistently with no tolerance or xfail markers
-**Depends on**: Phase 62
-**Requirements**: PARITY-06, PARITY-07
-**Success Criteria** (what must be TRUE):
-  1. `test_active_input_with_latency[chromium-100]` passes 10 consecutive runs
-  2. `test_active_input_with_packet_loss` passes 10 consecutive runs
-  3. No tolerance or xfail markers needed for parity tests
-**Research flag:** Complete (63-RESEARCH.md)
-**Plans:** 1 plan
-
-Plans:
-- [x] 63-01-PLAN.md — Increase timeout, clean up test docstrings, increase redundancy, verify 10 consecutive passes
-
-### Phase 64: Multi-Participant Test Infrastructure
-**Goal**: Build test infrastructure supporting 6 concurrent participants (3 simultaneous games)
-**Depends on**: Phase 63
-**Requirements**: STRESS-01
-**Success Criteria** (what must be TRUE):
-  1. Test fixture can launch 6 browser contexts simultaneously
-  2. Test fixture can orchestrate 3 concurrent games
-  3. Infrastructure handles staggered participant arrival
-**Research flag:** Complete (64-RESEARCH.md)
-**Plans:** 1 plan
-
-Plans:
-- [x] 64-01-PLAN.md — Add multi_participant_contexts fixture, GameOrchestrator class, and validation tests
-
-### Phase 65: Multi-Episode and Lifecycle Stress Tests
-**Goal**: Comprehensive stress test coverage for all participant lifecycle scenarios
-**Depends on**: Phase 64
-**Requirements**: STRESS-02, STRESS-03, STRESS-04, STRESS-05, STRESS-06, STRESS-07
-**Success Criteria** (what must be TRUE):
-  1. Participant can complete 2+ episodes back-to-back without state corruption
-  2. Mid-game disconnect test passes (partner sees message, data exported)
-  3. Waiting room disconnect test passes (other participants not affected)
-  4. Focus loss test passes (game ends gracefully after timeout)
-  5. Mixed lifecycle test passes (combinations of above scenarios)
-  6. All completed games pass exact parity validation
-**Research flag:** Complete (65-RESEARCH.md)
-**Plans:** 2 plans
-
-Plans:
-- [ ] 65-01-PLAN.md — Create test server configs (multi-episode + focus-timeout) and pytest fixtures
-- [ ] 65-02-PLAN.md — Create lifecycle stress tests (STRESS-02 through STRESS-07)
-
-### Phase 66: Server Recovery Validation
-**Goal**: Prove server handles chaos gracefully and recovers correctly for new participants
-**Depends on**: Phase 65
-**Requirements**: RECOVERY-01, RECOVERY-02, RECOVERY-03, RECOVERY-04, RECOVERY-05, RECOVERY-06
-**Success Criteria** (what must be TRUE):
-  1. After concurrent completions, disconnections, and focus loss events, server state is clean
-  2. New participant pair entering after chaos completes experiment successfully
-  3. New pair's exported data passes exact parity validation
-  4. No stale state affects new participants
-**Research flag:** Unlikely (integration test of previous phases)
+  1. PyodideWorker class can initialize Pyodide in a Web Worker
+  2. Main thread receives READY event before any commands are sent
+  3. Main thread can run console.log('ping') every 500ms during Pyodide init without interruption (proves non-blocking)
+**Research flag:** Unlikely (Web Worker patterns well-documented, existing GameTimerWorker provides template)
 **Plans**: TBD
 
 Plans:
-- [ ] 66-01: TBD
+- [ ] 67-01: TBD
+
+### Phase 68: RemoteGame Integration
+**Goal**: Single-player games use PyodideWorker for all Pyodide operations
+**Depends on**: Phase 67
+**Requirements**: INTEG-01, INTEG-03, INTEG-04
+**Success Criteria** (what must be TRUE):
+  1. RemoteGame loads environment via PyodideWorker
+  2. step() and reset() work via postMessage round-trip
+  3. render_state arrives on main thread for Phaser rendering
+  4. Single-player demo works identically to before (no visible change to users)
+**Research flag:** Unlikely (straightforward refactoring, no novel patterns)
+**Plans**: TBD
+
+Plans:
+- [ ] 68-01: TBD
+
+### Phase 69: Multiplayer Batch Operations
+**Goal**: GGPO rollback works via Worker with batch API for single round-trip execution
+**Depends on**: Phase 68
+**Requirements**: INTEG-02
+**Success Criteria** (what must be TRUE):
+  1. MultiplayerPyodideGame uses PyodideWorker for all Pyodide operations
+  2. Rollback batches (setState + N steps + getState) execute in single postMessage round-trip
+  3. Two-player game completes with rollback events and data parity intact
+**Research flag:** Likely (GGPO state buffer location needs decision, batch API design needs exploration)
+**Plans**: TBD
+
+Plans:
+- [ ] 69-01: TBD
+
+### Phase 70: Validation and Cleanup
+**Goal**: Verify Socket.IO stability, performance, and memory under concurrent load
+**Depends on**: Phase 69
+**Requirements**: VALID-01, VALID-02, VALID-03, VALID-04
+**Success Criteria** (what must be TRUE):
+  1. 3 concurrent games start without Socket.IO disconnects
+  2. Multi-participant tests pass with 0.5s stagger delay (down from 5s)
+  3. Step latency not degraded vs baseline (measure before Worker migration)
+  4. 10 consecutive games show no memory growth (check via Performance tab)
+**Research flag:** Unlikely (integration testing of previous phases)
+**Plans**: TBD
+
+Plans:
+- [ ] 70-01: TBD
 
 ## Progress
+
+**Execution Order:**
+Phases execute in numeric order: 67 → 68 → 69 → 70
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -317,13 +303,12 @@ Plans:
 | 48-50 | v1.11 | — | Complete | 2026-02-02 |
 | 51-56 | v1.12 | — | Complete | 2026-02-03 |
 | 57-60 | v1.13 | — | Complete | 2026-02-03 |
-| 61. Input Confirmation Protocol | v1.14 | 1/1 | Complete | 2026-02-03 |
-| 62. Data Parity Validation | v1.14 | 1/1 | Complete | 2026-02-03 |
-| 63. Parity Test Stabilization | v1.14 | 1/1 | Complete | 2026-02-03 |
-| 64. Multi-Participant Test Infrastructure | v1.14 | 1/1 | Complete | 2026-02-03 |
-| 65. Multi-Episode Lifecycle Stress | v1.14 | 0/2 | Not started | - |
-| 66. Server Recovery Validation | v1.14 | 0/TBD | Not started | - |
+| 61-66 | v1.14 | — | Complete | 2026-02-04 |
+| 67. Core Worker Infrastructure | v1.16 | 0/TBD | Not started | - |
+| 68. RemoteGame Integration | v1.16 | 0/TBD | Not started | - |
+| 69. Multiplayer Batch Operations | v1.16 | 0/TBD | Not started | - |
+| 70. Validation and Cleanup | v1.16 | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-03 after Phase 65 planning*
+*Last updated: 2026-02-04 for v1.16 Pyodide Web Worker*

@@ -57,22 +57,22 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| WORKER-01 | TBD | Pending |
-| WORKER-02 | TBD | Pending |
-| WORKER-03 | TBD | Pending |
-| INTEG-01 | TBD | Pending |
-| INTEG-02 | TBD | Pending |
-| INTEG-03 | TBD | Pending |
-| INTEG-04 | TBD | Pending |
-| VALID-01 | TBD | Pending |
-| VALID-02 | TBD | Pending |
-| VALID-03 | TBD | Pending |
-| VALID-04 | TBD | Pending |
+| WORKER-01 | Phase 67 | Pending |
+| WORKER-02 | Phase 67 | Pending |
+| WORKER-03 | Phase 67 | Pending |
+| INTEG-01 | Phase 68 | Pending |
+| INTEG-02 | Phase 69 | Pending |
+| INTEG-03 | Phase 68 | Pending |
+| INTEG-04 | Phase 68 | Pending |
+| VALID-01 | Phase 70 | Pending |
+| VALID-02 | Phase 70 | Pending |
+| VALID-03 | Phase 70 | Pending |
+| VALID-04 | Phase 70 | Pending |
 
 **Coverage:**
 - v1 requirements: 11 total
-- Mapped to phases: 0 (awaiting roadmap)
-- Unmapped: 11
+- Mapped to phases: 11
+- Unmapped: 0 ✓
 
 ## Completed Requirements (v1.14)
 

@@ -10,16 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-04)
 ## Current Position
 
 Milestone: v1.16 Pyodide Web Worker
-Status: Planning — Move Pyodide to Web Worker to prevent Socket.IO disconnects
-Last activity: 2026-02-04 — Created milestone after v1.15 root cause analysis
+Phase: 67 of 70 (Core Worker Infrastructure)
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-02-04 — Roadmap created with 4 phases (67-70)
 
-Progress: ░░░░░░░░░░ 0% (planning phase)
+Progress: ░░░░░░░░░░ 0%
 
 ## Milestone History
 
 | Milestone | Phases | Status | Shipped |
 |-----------|--------|--------|---------|
-| v1.16 Pyodide Web Worker | TBD | Planning | - |
+| v1.16 Pyodide Web Worker | 67-70 | In progress | - |
 | v1.15 E2E Test Reliability | - | Root cause found | 2026-02-04 |
 | v1.14 Data Parity Fix | 61-65 | Complete | 2026-02-04 |
 | v1.13 Matchmaker Hardening | 57-60 | Complete | 2026-02-03 |
@@ -342,34 +344,14 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-02-04
-Stopped at: Created v1.16 Pyodide Web Worker milestone
+Stopped at: Roadmap created for v1.16 Pyodide Web Worker (4 phases)
 Resume file: None
 
 ### Next Steps
 
-**v1.16 Pyodide Web Worker (Planned)**
-Goal: Move Pyodide to Web Worker to prevent Socket.IO disconnects during initialization
+**Phase 67: Core Worker Infrastructure** — Ready to plan
+- Create pyodide_worker.js and PyodideWorker class
+- Implement init/step/reset operations via postMessage
+- Requirements: WORKER-01, WORKER-02, WORKER-03
 
-**Root cause identified (v1.15 investigation):**
-- Pyodide `loadPyodide()` blocks main thread during WASM compilation
-- Socket.IO ping/pong requires main thread event loop
-- With multiple games starting concurrently, blocking exceeds ping timeout (8s)
-- Result: False disconnects during game startup
-
-**Solution approach:**
-1. Create PyodideWorker class with message protocol
-2. Move all Pyodide operations to dedicated Web Worker
-3. Main thread stays responsive for Socket.IO
-4. Proxy game state back to main thread for rendering
-
-**Key files to modify:**
-- `interactive_gym/server/static/js/pyodide_remote_game.js` - RemoteGame class
-- `interactive_gym/server/static/js/pyodide_multiplayer_game.js` - MultiplayerPyodideGame class
-- New: `interactive_gym/server/static/js/pyodide_worker.js` - Web Worker implementation
-
-**Testing plan:**
-- Remove 5s stagger delay from multi-participant tests
-- All STRESS tests should pass with 0.5s stagger
-- Socket.IO connections stable during Pyodide init
-
-Next action: Create PyodideWorker class and message protocol design
+Next action: `/gsd:plan-phase 67`
