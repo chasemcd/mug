@@ -10,12 +10,12 @@ See: .planning/PROJECT.md (updated 2026-02-04)
 ## Current Position
 
 Milestone: v1.16 Pyodide Web Worker
-Phase: 69 of 70 (Multiplayer Batch Operations) — In progress
-Plan: 02 of 03 complete
-Status: Plan 69-02 complete, ready for Plan 69-03
-Last activity: 2026-02-05 — Completed 69-02-PLAN.md (Multiplayer Call Site Migration)
+Phase: 69 of 70 (Multiplayer Batch Operations) — Phase complete
+Plan: 03 of 03 complete
+Status: Phase 69 complete, ready for Phase 70
+Last activity: 2026-02-05 — Completed 69-03-PLAN.md (Batch Migration + Shim Removal)
 
-Progress: ████████░░ 80%
+Progress: █████████░ 90%
 
 ## Milestone History
 
@@ -173,9 +173,16 @@ Progress: ████████░░ 80%
 - `.planning/phases/68-remotegame-integration/68-01-SUMMARY.md`
 - `.planning/phases/69-multiplayer-batch-operations/69-01-SUMMARY.md`
 - `.planning/phases/69-multiplayer-batch-operations/69-02-SUMMARY.md`
+- `.planning/phases/69-multiplayer-batch-operations/69-03-SUMMARY.md`
+
+**Batch Migration + Shim Removal (v1.16 Phase 69 Plan 03 - completed):**
+- `interactive_gym/server/static/js/pyodide_multiplayer_game.js` - performRollback() and _performFastForward() migrated to this.worker.batch(); zero this.pyodide references remain
+- `interactive_gym/server/static/js/PyodideWorker.js` - runPythonAsync(), _wrapResult(), toPy() shims removed
+- `interactive_gym/server/static/js/pyodide_worker.js` - handleRunPython removed, case 'runPython' removed from switch
+- `interactive_gym/server/static/js/pyodide_remote_game.js` - this.pyodide = this.worker shim removed from initialize()
 
 **Multiplayer Call Site Migration (v1.16 Phase 69 Plan 02 - modified):**
-- `interactive_gym/server/static/js/pyodide_multiplayer_game.js` - All 18 individual this.pyodide.runPythonAsync() calls replaced with structured this.worker.* commands; only performRollback() and _performFastForward() still use this.pyodide (Plan 03)
+- `interactive_gym/server/static/js/pyodide_multiplayer_game.js` - All 18 individual this.pyodide.runPythonAsync() calls replaced with structured this.worker.* commands
 
 **Worker Protocol Extension (v1.16 Phase 69 Plan 01 - added):**
 - `interactive_gym/server/static/js/pyodide_worker.js` - handleGetState, handleSetState, handleComputeHash, handleSeedRng, handleRender, handleBatch handlers + Internal variants; handleStep/handleReset refactored to Internal pattern
@@ -360,6 +367,12 @@ See: .planning/PROJECT.md Key Decisions table
 - applyServerState wraps env_state in {env_state: ...} for setState compatibility
 - computeHash() now uses SHA-256 (Worker) instead of MD5 (old inline Python) - both peers use same algorithm
 
+**v1.16 Phase 69 Plan 03 decisions:**
+- Batch rollback includes computeHash ops for debug logging parity with original Python
+- Hash computation uses SHA-256 (Worker) instead of MD5 (original Python) - consistent with Plan 02 migration
+- Batch rollback includes trailing getState for post-replay state capture
+- Null-safe type conversion: check instanceof Map, typeof object with null guard, fallback to { human: value }
+
 **v1.16 Phase 69 Plan 01 decisions:**
 - Internal/External handler split: *Internal does work and returns, * wraps with postMessage for batch reuse
 - getState returns raw JSON string (caller parses) for minimal transfer overhead
@@ -399,15 +412,16 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-02-05
-Stopped at: Completed 69-02-PLAN.md (Multiplayer Call Site Migration)
+Stopped at: Completed 69-03-PLAN.md (Batch Migration + Shim Removal)
 Resume file: None
 
 ### Next Steps
 
-**Phase 69 Plan 03: Batch Migration + Shim Removal** — Ready to execute
-- Migrate performRollback() and _performFastForward() to use this.worker.batch()
-- Remove runPythonAsync/toPy/_wrapResult shims from PyodideWorker.js
-- Remove handleRunPython from pyodide_worker.js
-- Remove this.pyodide = this.worker shim from pyodide_remote_game.js
+**Phase 69 complete.** All multiplayer Pyodide operations migrated to Worker commands.
+- performRollback uses worker.batch() for single-round-trip replay
+- _performFastForward uses worker.batch() for single-round-trip catch-up
+- All backward-compat shims removed
+- Zero this.pyodide references in entire JS codebase
 
-Next action: `/gsd:execute-plan .planning/phases/69-multiplayer-batch-operations/69-03-PLAN.md`
+**Phase 70 (Verification)** — Ready to execute
+Next action: Execute Phase 70 plans for final integration verification
