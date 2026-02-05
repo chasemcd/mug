@@ -14,9 +14,9 @@ Requirements for v1.17 E2E Test Reliability. Each maps to roadmap phases.
 
 ### Test Infrastructure
 
-- [ ] **INFRA-01**: Test fixtures updated for Worker-based Pyodide (setup, teardown, timeouts)
-- [ ] **INFRA-02**: Playwright selectors/locators updated for any Worker migration UI changes
-- [ ] **INFRA-03**: Test waits and timeouts adjusted for Worker async patterns
+- [x] **INFRA-01**: Test fixtures updated for Worker-based Pyodide (setup, teardown, timeouts)
+- [x] **INFRA-02**: Playwright selectors/locators updated for any Worker migration UI changes
+- [x] **INFRA-03**: Test waits and timeouts adjusted for Worker async patterns
 
 ### Production Bug Fixes
 
@@ -59,9 +59,9 @@ Which phases cover which requirements. Updated by create-roadmap.
 |-------------|-------|--------|
 | AUDIT-01 | Phase 71 | Complete |
 | AUDIT-02 | Phase 71 | Complete |
-| INFRA-01 | Phase 72 | Pending |
-| INFRA-02 | Phase 72 | Pending |
-| INFRA-03 | Phase 72 | Pending |
+| INFRA-01 | Phase 72 | Complete |
+| INFRA-02 | Phase 72 | Complete |
+| INFRA-03 | Phase 72 | Complete |
 | PROD-01 | Phase 73 | Pending |
 | PROD-02 | Phase 73 | Pending |
 | STAB-01 | Phase 74 | Pending |

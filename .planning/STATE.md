@@ -5,17 +5,17 @@
 See: .planning/PROJECT.md (updated 2026-02-05)
 
 **Core value:** Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
-**Current focus:** Phase 72 — Test Infrastructure Fixes
+**Current focus:** Phase 73 — Production Bug Fixes
 
 ## Current Position
 
 Milestone: v1.17 E2E Test Reliability
-Phase: 71 of 74 (Test Audit)
+Phase: 72 of 74 (Test Infrastructure Fixes)
 Plan: 01 of 01 (complete)
 Status: Phase complete
-Last activity: 2026-02-05 — Completed 71-01-PLAN.md (E2E Test Audit)
+Last activity: 2026-02-05 — Completed 72-01-PLAN.md (Test Infrastructure Fixes)
 
-Progress: ██░░░░░░░░ 25% (1 of 4 phases)
+Progress: ████░░░░░░ 50% (2 of 4 phases)
 
 ## Milestone History
 
@@ -457,14 +457,13 @@ See: .planning/PROJECT.md Key Decisions table
 
 ## Session Continuity
 
-Last session: 2026-02-05T18:03:33Z
-Stopped at: Completed 71-01-PLAN.md (E2E Test Audit)
+Last session: 2026-02-05
+Stopped at: Completed 72-01-PLAN.md (Test Infrastructure Fixes)
 Resume file: None
 
 ### Next Steps
 
-**Phase 72: Test Infrastructure Fixes** — Fix 5 test-infrastructure failures from audit.
-- Work queue: `.planning/phases/71-test-audit/71-AUDIT.md` "Phase 72 Work Queue" section
-- 4 server exhaustion fixes (switch to per-function fixtures)
-- 1 concurrent load timeout fix (increase timeout + health checks)
-- Next action: `/gsd:plan-phase 72`
+**Phase 73: Production Bug Fixes** — Fix production code bugs revealed by E2E test failures.
+- 3 active input parity failures share root cause: rollback/promotion race in dual-buffer
+- Work queue: `.planning/phases/71-test-audit/71-AUDIT.md` "Phase 73 Work Queue" section
+- Next action: `/gsd:plan-phase 73`

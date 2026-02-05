@@ -228,7 +228,7 @@ Key deliverables:
 **Milestone Goal:** All existing E2E tests pass green with zero xfail, skips, or flakiness after the v1.16 Worker migration.
 
 - [x] **Phase 71: Test Audit** - Run full suite, catalog and root-cause all failures
-- [ ] **Phase 72: Test Infrastructure Fixes** - Update fixtures, selectors, timeouts for Worker
+- [x] **Phase 72: Test Infrastructure Fixes** - Update fixtures, selectors, timeouts for Worker
 - [ ] **Phase 73: Production Bug Fixes** - Fix Worker-related production bugs revealed by tests
 - [ ] **Phase 74: Stability Validation** - Zero xfail/skip, 3 consecutive green runs
 
@@ -260,7 +260,7 @@ Plans:
 **Plans:** 1 plan
 
 Plans:
-- [ ] 72-01-PLAN.md -- Switch server fixtures to per-function scope, fix memory test, increase multi-episode timeout
+- [x] 72-01-PLAN.md -- Switch server fixtures to per-function scope, fix memory test, increase multi-episode timeout
 
 ### Phase 73: Production Bug Fixes
 **Goal**: Fix production code bugs revealed by E2E test failures
@@ -317,10 +317,10 @@ Phases execute in numeric order: 71 → 72 → 73 → 74
 | 61-66 | v1.14 | — | Complete | 2026-02-04 |
 | 67-70 | v1.16 | — | Complete | 2026-02-05 |
 | 71. Test Audit | v1.17 | 1/1 | Complete | 2026-02-05 |
-| 72. Test Infrastructure Fixes | v1.17 | 0/1 | Not started | - |
+| 72. Test Infrastructure Fixes | v1.17 | 1/1 | Complete | 2026-02-05 |
 | 73. Production Bug Fixes | v1.17 | 0/1 | Not started | - |
 | 74. Stability Validation | v1.17 | 0/1 | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-05 for v1.17 Phase 72 planned*
+*Last updated: 2026-02-05 for v1.17 Phase 72 complete*
