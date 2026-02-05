@@ -2785,6 +2785,12 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
      * Triggers hash computation for newly confirmed frames (HASH-01).
      */
     async _updateConfirmedFrame() {
+        // Phase 73: Don't advance confirmedFrame during rollback
+        // The rollback will clear and re-store frame data; advancing confirmedFrame
+        // here could promote frames with uncorrected predicted actions.
+        if (this.rollbackInProgress) {
+            return;
+        }
         const humanPlayerIds = this._getHumanPlayerIds();
         if (humanPlayerIds.length === 0) return;
 
@@ -2828,6 +2834,15 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
      * This ensures only data with confirmed inputs is exported.
      */
     _promoteConfirmedFrames() {
+        // Phase 73: Guard against promoting uncorrected speculative data
+        // If a rollback is pending, the speculative buffer may contain frames with
+        // predicted (wrong) actions that haven't been corrected yet by replay.
+        // Skip promotion until rollback completes and data is corrected.
+        if (this.pendingRollbackFrame !== null || this.rollbackInProgress) {
+            p2pLog.debug(`PROMOTE_GUARD: Skipping promotion - ` +
+                `pendingRollback=${this.pendingRollbackFrame} rollbackInProgress=${this.rollbackInProgress}`);
+            return;
+        }
         const promoted = [];
         for (const [frame, data] of this.speculativeFrameData.entries()) {
             if (frame <= this.confirmedFrame) {
@@ -2870,6 +2885,12 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
 
         // Check if already confirmed
         if (this._hasAllInputsForFrame(targetFrame, humanPlayerIds)) {
+            // Phase 73: Execute any pending rollback before promoting
+            if (this.pendingRollbackFrame !== null) {
+                const rollbackFrame = this.pendingRollbackFrame;
+                this.pendingRollbackFrame = null;
+                await this.performRollback(rollbackFrame, humanPlayerIds);
+            }
             await this._updateConfirmedFrame();
             p2pLog.debug(`[Input Confirmation] Already confirmed up to frame ${targetFrame}`);
             return true;
@@ -2884,6 +2905,17 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
             // Process any pending inputs that may have arrived
             this._processQueuedInputs();
 
+            // Phase 73: Execute any pending rollback triggered by newly-arrived inputs
+            // This is critical: _processQueuedInputs -> storeRemoteInput may detect that
+            // we predicted wrong actions and set pendingRollbackFrame. We MUST replay
+            // with correct actions before promoting frames to canonical buffer.
+            if (this.pendingRollbackFrame !== null) {
+                const rollbackFrame = this.pendingRollbackFrame;
+                this.pendingRollbackFrame = null;
+                p2pLog.info(`[Input Confirmation] Executing pending rollback to frame ${rollbackFrame}`);
+                await this.performRollback(rollbackFrame, humanPlayerIds);
+            }
+
             // Check if target frame is now confirmed
             if (this._hasAllInputsForFrame(targetFrame, humanPlayerIds)) {
                 await this._updateConfirmedFrame();
@@ -2896,7 +2928,14 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
             await new Promise(resolve => setTimeout(resolve, 10));
         }
 
-        // Timeout - log warning but proceed
+        // Timeout - execute any final pending rollback before proceeding
+        if (this.pendingRollbackFrame !== null) {
+            const rollbackFrame = this.pendingRollbackFrame;
+            this.pendingRollbackFrame = null;
+            p2pLog.info(`[Input Confirmation] Timeout - executing final rollback to frame ${rollbackFrame}`);
+            await this.performRollback(rollbackFrame, humanPlayerIds);
+        }
+
         console.warn(`[Input Confirmation] Timeout after ${timeoutMs}ms. ` +
             `confirmedFrame=${this.confirmedFrame}, target=${targetFrame}. ` +
             `Proceeding with episode export (data may diverge).`);
@@ -3615,6 +3654,17 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
          * on the scene and emits terminate_scene with full metadata.
          * That in turn calls terminateGymScene() which saves data via emit_remote_game_data.
          */
+
+        // Phase 73: Execute any pending rollback before promoting remaining frames
+        // At episode end, there may be frames in speculativeFrameData that were
+        // predicted with wrong actions. Rollback corrects them before promotion.
+        // Note: This is a synchronous-ish safety check. If pendingRollbackFrame is set,
+        // we log a warning. The actual rollback should have been executed by
+        // _waitForInputConfirmation in _checkEpisodeSyncAndReset, but this is a safety net.
+        if (this.pendingRollbackFrame !== null) {
+            console.warn(`[Episode Complete] WARNING: pendingRollbackFrame=${this.pendingRollbackFrame} ` +
+                `still set at episode complete. Rollback should have been handled by _waitForInputConfirmation.`);
+        }
 
         // Phase 38 (EDGE-02): Promote any remaining unconfirmed frames before export
         // At episode end, all frames have real inputs - just not yet confirmed via packets
