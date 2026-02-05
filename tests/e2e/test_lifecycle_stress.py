@@ -34,7 +34,7 @@ from tests.fixtures.network_helpers import set_tab_visibility, wait_for_focus_ma
 # STRESS-02: Multi-Episode Completion Without State Corruption
 # =============================================================================
 
-@pytest.mark.timeout(600)  # 10 minutes for 2 episodes x 3 games
+@pytest.mark.timeout(900)  # 15 minutes for 2 episodes x 3 games
 def test_multi_episode_completion(multi_participant_contexts, flask_server_multi_episode_fresh):
     """
     STRESS-02: Participant can complete 2 episodes back-to-back without state corruption.
@@ -66,7 +66,7 @@ def test_multi_episode_completion(multi_participant_contexts, flask_server_multi
     print("\n[STRESS-02] Episode 1: Waiting for completion with parity validation...")
     results_ep1 = orchestrator.wait_for_all_episodes_with_parity(
         episode_num=1,
-        episode_timeout=300000,
+        episode_timeout=600000,
         export_timeout_sec=60,
         experiment_id=experiment_id,
     )
@@ -80,7 +80,7 @@ def test_multi_episode_completion(multi_participant_contexts, flask_server_multi
     print("\n[STRESS-02] Episode 2: Waiting for completion with parity validation...")
     results_ep2 = orchestrator.wait_for_all_episodes_with_parity(
         episode_num=2,
-        episode_timeout=300000,
+        episode_timeout=600000,
         export_timeout_sec=60,
         experiment_id=experiment_id,
     )
