@@ -10,12 +10,12 @@ See: .planning/PROJECT.md (updated 2026-02-04)
 ## Current Position
 
 Milestone: v1.16 Pyodide Web Worker
-Phase: 69 of 70 (Multiplayer Batch Operations) — Phase complete
-Plan: 03 of 03 complete
-Status: Phase 69 complete, ready for Phase 70
-Last activity: 2026-02-05 — Completed 69-03-PLAN.md (Batch Migration + Shim Removal)
+Phase: 70 of 70 (Validation and Cleanup) — In progress
+Plan: 01 of 02 complete
+Status: 70-01 complete (stagger reduction committed; E2E validation blocked by Pyodide Worker loading issue)
+Last activity: 2026-02-05 — Completed 70-01-PLAN.md (Stagger Delay Reduction)
 
-Progress: █████████░ 90%
+Progress: █████████▌ 95%
 
 ## Milestone History
 
@@ -174,6 +174,12 @@ Progress: █████████░ 90%
 - `.planning/phases/69-multiplayer-batch-operations/69-01-SUMMARY.md`
 - `.planning/phases/69-multiplayer-batch-operations/69-02-SUMMARY.md`
 - `.planning/phases/69-multiplayer-batch-operations/69-03-SUMMARY.md`
+- `.planning/phases/70-validation-and-cleanup/70-01-SUMMARY.md`
+
+**Stagger Delay Reduction (v1.16 Phase 70 Plan 01 - updated):**
+- `tests/fixtures/multi_participant.py` - GameOrchestrator.start_all_games default stagger reduced from 5.0s to 0.5s
+- `tests/e2e/test_multi_participant.py` - Both test call sites updated to stagger_delay_sec=0.5
+- `tests/e2e/test_lifecycle_stress.py` - Both test call sites updated to stagger_delay_sec=0.5
 
 **Batch Migration + Shim Removal (v1.16 Phase 69 Plan 03 - completed):**
 - `interactive_gym/server/static/js/pyodide_multiplayer_game.js` - performRollback() and _performFastForward() migrated to this.worker.batch(); zero this.pyodide references remain
@@ -380,6 +386,12 @@ See: .planning/PROJECT.md Key Decisions table
 - Batch error includes failedIndex and partialResults for precise error reporting
 - handleRunPython and backward-compat shims preserved for Plan 02/03 migration
 
+**v1.16 Phase 70 Plan 01 decisions:**
+- Stagger delay reduced to 0.5s (not 0s) - WebRTC signaling needs inter-pair delay
+- Pre-existing Pyodide Worker loading issue prevents E2E test execution - not caused by stagger change
+- All E2E tests (including basic 2-player) fail at wait_for_start_button_enabled with 60s timeout
+- Root cause: PyodideWorker.init() never resolves (Worker thread fails to complete Pyodide initialization)
+
 **v1.16 Phase 68 decisions:**
 - Convert Worker plain-object results to Map for downstream compatibility (obs.keys(), rewards.entries())
 - Extract on_game_step_code from globals in Worker JS variable, inject via template literal
@@ -397,6 +409,13 @@ See: .planning/PROJECT.md Key Decisions table
 
 ### Blockers/Concerns
 
+**Pyodide Worker Loading Issue (discovered Phase 70 Plan 01):**
+- All E2E tests fail: PyodideWorker.init() never resolves, start button stays disabled
+- Affects ALL tests (basic 2-player, multi-participant, lifecycle stress)
+- Not caused by stagger change - pre-existing environment/infrastructure issue
+- Likely causes: Pyodide CDN availability, browser Worker thread initialization, or package loading failure
+- VALID-01/VALID-02 cannot be verified until resolved
+
 **Known issues to address in future milestones:**
 - Episode start sync can timeout on slow connections (mitigated with retry + two-way ack)
 - Rollback visual corrections cause brief teleporting (smoothing not yet implemented)
@@ -411,18 +430,17 @@ See: .planning/PROJECT.md Key Decisions table
 
 ## Session Continuity
 
-Last session: 2026-02-04
-Stopped at: Phase 69 execution complete, verified
+Last session: 2026-02-05
+Stopped at: Completed 70-01-PLAN.md (Stagger Delay Reduction)
 Resume file: None
 
 ### Next Steps
 
-**Phase 69 verified.** All multiplayer Pyodide operations migrated to Worker commands.
-- performRollback uses worker.batch() for single-round-trip replay
-- _performFastForward uses worker.batch() for single-round-trip catch-up
-- All backward-compat shims removed
-- Zero this.pyodide references in entire JS codebase
-- 3/3 must-haves verified against codebase
+**Phase 70 Plan 01 complete.** Stagger delay reduced from 5.0s to 0.5s in all test files.
+- All stagger_delay_sec=5.0 references removed (zero grep results)
+- 4 call sites + 1 default updated to 0.5
+- E2E validation blocked by pre-existing Pyodide Worker loading issue
+- VALID-01/VALID-02 cannot be verified on this machine until Worker loading is fixed
 
-**Phase 70: Validation and Cleanup** — Ready to plan
-Next action: `/gsd:plan-phase 70`
+**Phase 70 Plan 02: Validation and Cleanup** — Ready to execute
+Next action: `/gsd:execute-plan .planning/phases/70-validation-and-cleanup/70-02-PLAN.md`
