@@ -10,12 +10,12 @@ See: .planning/PROJECT.md (updated 2026-02-05)
 ## Current Position
 
 Milestone: v1.17 E2E Test Reliability
-Phase: 72 of 74 (Test Infrastructure Fixes)
+Phase: 73 of 74 (Production Bug Fixes)
 Plan: 01 of 01 (complete)
 Status: Phase complete
-Last activity: 2026-02-05 — Completed 72-01-PLAN.md (Test Infrastructure Fixes)
+Last activity: 2026-02-05 — Completed 73-01-PLAN.md (Production Bug Fixes)
 
-Progress: ████░░░░░░ 50% (2 of 4 phases)
+Progress: ███████░░░ 75% (3 of 4 phases)
 
 ## Milestone History
 
@@ -437,11 +437,17 @@ See: .planning/PROJECT.md Key Decisions table
 - Fixed by passing interactiveGymGlobals via Worker globals payload (commit 9e733d5)
 - Additional fixes: toJs DataCloneError (c9477dc), action key type mismatch (ec0e492)
 
-**Active Input Data Parity Bug (discovered Phase 71, fix in Phase 73):**
-- Speculative frame data with predicted Noop actions promoted to canonical buffer before rollback can correct
-- Affects: test_active_input_parity, test_active_input_with_latency[100], test_active_input_with_packet_loss
-- Root cause: rollback/promotion race in _promoteConfirmedFrames() vs performRollback() timing
-- Likely related to v1.16 Worker migration making env stepping async (worker.batch())
+**Active Input Data Parity Bug (discovered Phase 71, FIXED in Phase 73):**
+- Root cause 1: Promotion race -- speculative data promoted without rollback correction in _waitForInputConfirmation()
+- Root cause 2: State sync disabled -- validateStateSync() ran before reset(), cogrid env_agents=None, stateSyncSupported=false permanently
+- Fix: Promotion guards on all paths + post-reset state sync revalidation + NumpyEncoder for state serialization
+- Result: 2/3 target tests pass (active_input_parity, packet_loss). Latency test has pre-existing episode boundary issue (step_num double-counting during rollback)
+
+**Pre-existing: step_num double-counting during rollback (NOT YET FIXED):**
+- `this.step_num += replayLog.length` in performRollback() inflates step_num
+- Causes premature episode termination under high rollback frequency (latency scenarios)
+- Removing the line breaks episode termination entirely
+- Affects: test_active_input_with_latency[100] (episode boundary divergence only)
 
 **Known issues to address in future milestones:**
 - Episode start sync can timeout on slow connections (mitigated with retry + two-way ack)
@@ -455,15 +461,25 @@ See: .planning/PROJECT.md Key Decisions table
 - Group reunion feature deferred to REUN-01/REUN-02 as future matchmaker variant
 - wait_for_known_group=True logs warning but uses FIFO matching
 
+**v1.17 Phase 73 decisions:**
+- Guard _promoteConfirmedFrames and _updateConfirmedFrame against pending rollback/rollbackInProgress
+- Execute pending rollbacks inside _waitForInputConfirmation polling loop before promoting
+- Re-validate state sync after first reset (cogrid env_agents populated during reset, not __init__)
+- NumpyEncoder for state serialization (cogrid state contains numpy arrays in bit_generator.state)
+- Warning (not error) in signalEpisodeComplete for uncorrected pending rollback (safety net)
+
+**v1.17 Phase 73 execution:**
+- `.planning/phases/73-production-bug-fixes/73-01-SUMMARY.md`
+
 ## Session Continuity
 
 Last session: 2026-02-05
-Stopped at: Completed 72-01-PLAN.md (Test Infrastructure Fixes)
+Stopped at: Completed 73-01-PLAN.md (Production Bug Fixes)
 Resume file: None
 
 ### Next Steps
 
-**Phase 73: Production Bug Fixes** — Fix production code bugs revealed by E2E test failures.
-- 3 active input parity failures share root cause: rollback/promotion race in dual-buffer
-- Work queue: `.planning/phases/71-test-audit/71-AUDIT.md` "Phase 73 Work Queue" section
-- Next action: `/gsd:plan-phase 73`
+**Phase 74: Stability Validation** — Full test suite passes consistently with no exemptions.
+- 7/8 target tests pass after Phase 73 fix
+- Pre-existing latency test episode boundary issue (step_num double-counting) not yet resolved
+- Next action: `/gsd:plan-phase 74`
