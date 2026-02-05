@@ -57,13 +57,13 @@ def test_step_latency_not_degraded(flask_server, player_contexts):
     click_advance_button(page1)
     click_advance_button(page2)
 
-    # Step 3: Start multiplayer
-    click_start_button(page1)
-    click_start_button(page2)
+    # Step 3: Start multiplayer (120s timeout -- Pyodide CDN load can be slow)
+    click_start_button(page1, timeout=120000)
+    click_start_button(page2, timeout=120000)
 
     # Step 4: Wait for game to start
-    wait_for_game_canvas(page1, timeout=90000)
-    wait_for_game_canvas(page2, timeout=90000)
+    wait_for_game_canvas(page1, timeout=120000)
+    wait_for_game_canvas(page2, timeout=120000)
     wait_for_game_object(page1)
     wait_for_game_object(page2)
 
@@ -170,9 +170,9 @@ def test_no_memory_growth_across_sessions(flask_server_fresh, browser):
             click_advance_button(page1, timeout=30000)
             click_advance_button(page2, timeout=30000)
 
-            # Start multiplayer
-            click_start_button(page1, timeout=60000)
-            click_start_button(page2, timeout=60000)
+            # Start multiplayer (120s timeout -- Pyodide CDN load can be slow)
+            click_start_button(page1, timeout=120000)
+            click_start_button(page2, timeout=120000)
 
             # Wait for game
             wait_for_game_canvas(page1, timeout=120000)
