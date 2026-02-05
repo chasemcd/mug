@@ -4800,49 +4800,53 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
                 focusStateForFF[playerId] = String(playerId) !== String(this.myPlayerId);
             }
 
-            // 6. Execute ALL fast-forward steps in a single Python call (no rendering)
+            // 6. Execute ALL fast-forward steps in a single Worker batch (single round-trip)
             // This is much faster than calling stepWithActions for each frame
             // Track per-frame data for rollback-safe logging
             p2pLog.info(`FAST-FORWARD: batch stepping ${fastForwardFrames.length} frames`);
 
-            const result = await this.pyodide.runPythonAsync(`
-import json
-import numpy as np
-_ff_frames = ${JSON.stringify(fastForwardFrames)}
-_cumulative_rewards = {}
-_per_frame_data = []
-for _ff in _ff_frames:
-    _frame = _ff['frame']
-    _actions = {int(k) if str(k).isdigit() else k: v for k, v in _ff['actions'].items()}
-    _obs, _rewards, _terms, _truncs, _infos = env.step(_actions)
-    # Convert to dicts with string keys for JSON
-    _rewards_dict = {str(k): v for k, v in _rewards.items()} if isinstance(_rewards, dict) else {'human': _rewards}
-    _term_dict = {str(k): v for k, v in _terms.items()} if isinstance(_terms, dict) else {'human': _terms}
-    _trunc_dict = {str(k): v for k, v in _truncs.items()} if isinstance(_truncs, dict) else {'human': _truncs}
-    _info_dict = {str(k): v for k, v in _infos.items()} if isinstance(_infos, dict) else {'human': _infos}
-    # Store per-frame data
-    _per_frame_data.append({
-        'frame': _frame,
-        'actions': _ff['actions'],
-        'rewards': _rewards_dict,
-        'terminateds': _term_dict,
-        'truncateds': _trunc_dict,
-        'infos': _info_dict
-    })
-    # Accumulate rewards
-    for _agent_id, _reward in _rewards.items():
-        if _agent_id not in _cumulative_rewards:
-            _cumulative_rewards[_agent_id] = 0
-        _cumulative_rewards[_agent_id] += _reward
-json.dumps({'cumulative_rewards': {str(k): v for k, v in _cumulative_rewards.items()}, 'per_frame_data': _per_frame_data})
-            `);
+            // Build batch of step operations
+            const batchOps = fastForwardFrames.map(ff => ({
+                op: 'step',
+                params: { actions: ff.actions }
+            }));
 
-            // Parse result and update state
-            const ffResult = JSON.parse(result);
+            // Execute entire batch in single Worker round-trip
+            const batchResults = await this.worker.batch(batchOps);
+
+            // Process results - each is a step result
+            const perFrameData = [];
+            const ffCumulativeRewards = {};
+
+            for (let i = 0; i < fastForwardFrames.length; i++) {
+                const ff = fastForwardFrames[i];
+                const stepResult = batchResults[i];
+                let { rewards, terminateds, truncateds, infos } = stepResult;
+
+                // Convert to plain objects for storage (Worker returns plain objects or Maps)
+                const rewardsDict = rewards instanceof Map ? Object.fromEntries(rewards) : (typeof rewards === 'object' && rewards !== null ? rewards : { human: rewards });
+                const termDict = terminateds instanceof Map ? Object.fromEntries(terminateds) : (typeof terminateds === 'object' && terminateds !== null ? terminateds : { human: terminateds });
+                const truncDict = truncateds instanceof Map ? Object.fromEntries(truncateds) : (typeof truncateds === 'object' && truncateds !== null ? truncateds : { human: truncateds });
+                const infosDict = infos instanceof Map ? Object.fromEntries(infos) : (typeof infos === 'object' && infos !== null ? infos : { human: infos });
+
+                perFrameData.push({
+                    frame: ff.frame,
+                    actions: ff.actions,
+                    rewards: rewardsDict,
+                    terminateds: termDict,
+                    truncateds: truncDict,
+                    infos: infosDict
+                });
+
+                // Accumulate rewards
+                for (const [agentId, reward] of Object.entries(rewardsDict)) {
+                    ffCumulativeRewards[agentId] = (ffCumulativeRewards[agentId] || 0) + reward;
+                }
+            }
 
             // Update cumulative rewards from fast-forward
-            if (ffResult.cumulative_rewards) {
-                for (const [key, value] of Object.entries(ffResult.cumulative_rewards)) {
+            if (Object.keys(ffCumulativeRewards).length > 0) {
+                for (const [key, value] of Object.entries(ffCumulativeRewards)) {
                     if (this.cumulative_rewards[key] !== undefined) {
                         this.cumulative_rewards[key] += value;
                     } else {
@@ -4856,7 +4860,7 @@ json.dumps({'cumulative_rewards': {str(k): v for k, v in _cumulative_rewards.ite
             // Phase 49 (BOUND-03): Skip frames at or beyond episode boundary
             const terminationFrame = this.p2pEpisodeSync?.syncedTerminationFrame;
             let storedCount = 0;
-            for (const frameData of ffResult.per_frame_data) {
+            for (const frameData of perFrameData) {
                 // Skip frames at or beyond episode boundary
                 if (terminationFrame !== null && terminationFrame !== undefined) {
                     if (frameData.frame >= terminationFrame) {
@@ -4874,7 +4878,7 @@ json.dumps({'cumulative_rewards': {str(k): v for k, v in _cumulative_rewards.ite
                 });
                 storedCount++;
             }
-            p2pLog.debug(`Stored ${storedCount} fast-forward frames in data buffer (${ffResult.per_frame_data.length - storedCount} skipped)`);
+            p2pLog.debug(`Stored ${storedCount} fast-forward frames in data buffer (${perFrameData.length - storedCount} skipped)`);
 
             framesProcessed = fastForwardFrames.length;
 

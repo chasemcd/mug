@@ -57,12 +57,6 @@ export class RemoteGame {
         // Initialize Worker (loads Pyodide in background thread)
         await this.worker.init();
 
-        // Backward-compatibility shim: MultiplayerPyodideGame extends RemoteGame
-        // and calls this.pyodide.runPythonAsync() at 30+ sites. PyodideWorker exposes
-        // runPythonAsync() which routes through the Worker's postMessage protocol.
-        // This shim will be removed in Phase 69 when multiplayer is migrated.
-        this.pyodide = this.worker;
-
         // Install required packages
         if (this.config.packages_to_install?.length > 0) {
             console.log("Installing packages via Worker:", this.config.packages_to_install);
