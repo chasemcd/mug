@@ -263,7 +263,7 @@ Plans:
 - [x] 72-01-PLAN.md -- Switch server fixtures to per-function scope, fix memory test, increase multi-episode timeout
 
 ### Phase 73: Production Bug Fixes
-**Goal**: Fix rollback/promotion race condition in dual-buffer data recording that causes active input data parity divergences
+**Goal**: Fix rollback/promotion race condition and step_num rollback accounting bug that cause active input data parity divergences
 **Depends on**: Phase 72
 **Requirements**: PROD-01, PROD-02
 **Success Criteria** (what must be TRUE):
@@ -271,10 +271,11 @@ Plans:
   2. Pre-existing functionality regressions from v1.16 Worker migration are fixed
   3. Tests that were failing due to production bugs now pass individually
 **Research flag:** Unlikely (debugging with test output as guide)
-**Plans:** 1 plan
+**Plans:** 2 plans
 
 Plans:
-- [ ] 73-01-PLAN.md -- Fix rollback/promotion race in dual-buffer, guard all promotion paths against pending rollbacks
+- [x] 73-01-PLAN.md -- Fix rollback/promotion race in dual-buffer, guard all promotion paths against pending rollbacks
+- [ ] 73-02-PLAN.md -- Fix step_num double-counting during rollback replay (gap closure)
 
 ### Phase 74: Stability Validation
 **Goal**: Full test suite passes consistently with no exemptions
@@ -318,9 +319,9 @@ Phases execute in numeric order: 71 → 72 → 73 → 74
 | 67-70 | v1.16 | — | Complete | 2026-02-05 |
 | 71. Test Audit | v1.17 | 1/1 | Complete | 2026-02-05 |
 | 72. Test Infrastructure Fixes | v1.17 | 1/1 | Complete | 2026-02-05 |
-| 73. Production Bug Fixes | v1.17 | 0/1 | Not started | - |
+| 73. Production Bug Fixes | v1.17 | 1/2 | In progress | - |
 | 74. Stability Validation | v1.17 | 0/1 | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-05 for v1.17 Phase 73 planned*
+*Last updated: 2026-02-05 for v1.17 Phase 73 gap closure plan*
