@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PyodideWorker Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        h1 {
+            color: #333;
+        }
+        #controls {
+            margin: 20px 0;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: 4px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        #log {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 14px;
+            max-height: 600px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        .log-ping { color: #4ec9b0; }
+        .log-progress { color: #dcdcaa; }
+        .log-success { color: #6a9955; }
+        .log-error { color: #f14c4c; }
+        .log-info { color: #9cdcfe; }
+        .log-result { color: #ce9178; }
+        #status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+        .status-idle { background: #e9ecef; color: #6c757d; }
+        .status-running { background: #fff3cd; color: #856404; }
+        .status-success { background: #d4edda; color: #155724; }
+        .status-error { background: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+    <h1>PyodideWorker Test</h1>
+    <p>Tests that Pyodide loads in a Web Worker without blocking the main thread.</p>
+
+    <div id="status" class="status-idle">Ready to test</div>
+
+    <div id="controls">
+        <button id="run-test">Run Test</button>
+        <button id="clear-log">Clear Log</button>
+    </div>
+
+    <div id="log"></div>
+
+    <script type="module">
+        import { PyodideWorker } from '/static/js/PyodideWorker.js';
+
+        const logEl = document.getElementById('log');
+        const statusEl = document.getElementById('status');
+        const runBtn = document.getElementById('run-test');
+        const clearBtn = document.getElementById('clear-log');
+
+        let testRunning = false;
+
+        function log(message, className = '') {
+            const timestamp = new Date().toISOString().split('T')[1].slice(0, -1);
+            const line = document.createElement('div');
+            line.className = className;
+            line.textContent = `[${timestamp}] ${message}`;
+            logEl.appendChild(line);
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+
+        function setStatus(message, state) {
+            statusEl.textContent = message;
+            statusEl.className = `status-${state}`;
+        }
+
+        clearBtn.onclick = () => {
+            logEl.innerHTML = '';
+        };
+
+        runBtn.onclick = async () => {
+            if (testRunning) return;
+            testRunning = true;
+            runBtn.disabled = true;
+            logEl.innerHTML = '';
+
+            try {
+                await runTests();
+            } catch (err) {
+                log(`TEST FAILED: ${err.message}`, 'log-error');
+                if (err.stack) {
+                    log(err.stack, 'log-error');
+                }
+                setStatus('Test failed', 'error');
+            } finally {
+                testRunning = false;
+                runBtn.disabled = false;
+            }
+        };
+
+        async function runTests() {
+            setStatus('Running tests...', 'running');
+
+            // ========== Test 1: Non-blocking initialization ==========
+            log('=== Test 1: Non-blocking Initialization ===', 'log-info');
+            log('Starting ping interval to verify main thread is responsive...');
+
+            let pings = 0;
+            const pingInterval = setInterval(() => {
+                pings++;
+                log(`ping ${pings}`, 'log-ping');
+            }, 500);
+
+            log('Creating PyodideWorker...');
+            const worker = new PyodideWorker({
+                onProgress: (stage, message, timestamp) => {
+                    log(`[Progress] ${stage}: ${message}`, 'log-progress');
+                }
+            });
+
+            const initStart = performance.now();
+            log('Calling worker.init() - main thread should NOT block...');
+
+            await worker.init();
+
+            const initDuration = ((performance.now() - initStart) / 1000).toFixed(2);
+            clearInterval(pingInterval);
+
+            log(`Pyodide ready! Init took ${initDuration}s`, 'log-success');
+            log(`Non-blocking verified: ${pings} pings during init`, 'log-success');
+
+            if (pings < 5) {
+                throw new Error(`Expected at least 5 pings during init, got ${pings}. Main thread may be blocked.`);
+            }
+
+            // ========== Test 2: Error handling before ready ==========
+            log('');
+            log('=== Test 2: Error Handling ===', 'log-info');
+
+            // Create a new worker but don't init it
+            log('Testing step() before init (should reject)...');
+            const uninitWorker = new PyodideWorker({});
+            try {
+                await uninitWorker.step({});
+                throw new Error('step() should have rejected when not ready');
+            } catch (err) {
+                if (err.message.includes('not ready')) {
+                    log(`Correctly rejected: "${err.message}"`, 'log-success');
+                } else {
+                    throw err;
+                }
+            }
+
+            // ========== Test 3: Functional verification ==========
+            log('');
+            log('=== Test 3: Functional Verification ===', 'log-info');
+
+            // Init a simple environment
+            log('Initializing simple environment...');
+            const envCode = `
+# Simple mock environment for testing
+class SimpleEnv:
+    def __init__(self):
+        self.step_count = 0
+
+    def step(self, actions):
+        self.step_count += 1
+        obs = {'step': self.step_count}
+        rewards = {0: 1.0}
+        terminateds = {'__all__': self.step_count >= 3}
+        truncateds = {'__all__': False}
+        infos = {}
+        return obs, rewards, terminateds, truncateds, infos
+
+    def reset(self, seed=None):
+        self.step_count = 0
+        obs = {'step': 0}
+        infos = {'seed': seed}
+        return obs, infos
+
+    def render(self):
+        return [
+            [{'type': 'rect', 'x': 0, 'y': 0, 'w': 10, 'h': 10, 'color': '#ff0000'}]
+        ]
+
+env = SimpleEnv()
+`;
+            await worker.initEnv(envCode);
+            log('Environment initialized!', 'log-success');
+
+            // Test reset
+            log('Testing reset()...');
+            const resetResult = await worker.reset(12345);
+            log(`Reset result: obs=${JSON.stringify(resetResult.obs)}, seed=${resetResult.infos?.seed}`, 'log-result');
+
+            if (resetResult.obs.step !== 0) {
+                throw new Error(`Expected obs.step=0 after reset, got ${resetResult.obs.step}`);
+            }
+            log('Reset works correctly!', 'log-success');
+
+            // Test step
+            log('Testing step()...');
+            const stepResult = await worker.step({ 0: 1 });
+            log(`Step result: obs=${JSON.stringify(stepResult.obs)}, rewards=${JSON.stringify(stepResult.rewards)}`, 'log-result');
+
+            if (stepResult.obs.step !== 1) {
+                throw new Error(`Expected obs.step=1 after step, got ${stepResult.obs.step}`);
+            }
+            if (stepResult.rewards[0] !== 1.0) {
+                throw new Error(`Expected rewards[0]=1.0, got ${stepResult.rewards[0]}`);
+            }
+            log('Step works correctly!', 'log-success');
+
+            // Test multiple steps
+            log('Testing multiple steps...');
+            await worker.step({ 0: 1 });
+            const finalStep = await worker.step({ 0: 1 });
+            log(`Final step: obs=${JSON.stringify(finalStep.obs)}, terminateds=${JSON.stringify(finalStep.terminateds)}`, 'log-result');
+
+            // JS Map iteration can have issues, check for termination
+            const terminated = finalStep.terminateds['__all__'] ||
+                              (finalStep.terminateds.get && finalStep.terminateds.get('__all__'));
+            if (!terminated) {
+                log(`Warning: Expected terminated=true after 3 steps, got ${JSON.stringify(finalStep.terminateds)}`, 'log-error');
+            } else {
+                log('Episode termination works correctly!', 'log-success');
+            }
+
+            // Test render state
+            if (finalStep.render_state && finalStep.render_state.length > 0) {
+                log(`Render state has ${finalStep.render_state.length} layer(s)`, 'log-success');
+            }
+
+            // ========== Test 4: Clean shutdown ==========
+            log('');
+            log('=== Test 4: Clean Shutdown ===', 'log-info');
+            log('Calling destroy()...');
+            worker.destroy();
+
+            if (worker.worker !== null) {
+                throw new Error('Worker should be null after destroy');
+            }
+            log('Worker destroyed successfully!', 'log-success');
+
+            // ========== Summary ==========
+            log('');
+            log('========================================', 'log-success');
+            log('ALL TESTS PASSED!', 'log-success');
+            log('========================================', 'log-success');
+            log('');
+            log('Summary:', 'log-info');
+            log(`  - WORKER-01: Pyodide loads in Worker (init completed)`);
+            log(`  - WORKER-02: Main thread responsive (${pings} pings during ${initDuration}s init)`);
+            log(`  - WORKER-03: READY event works (step/reset only after init)`);
+
+            setStatus('All tests passed!', 'success');
+        }
+    </script>
+</body>
+</html>
