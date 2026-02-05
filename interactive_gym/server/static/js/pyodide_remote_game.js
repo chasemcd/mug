@@ -65,15 +65,14 @@ export class RemoteGame {
         }
 
         // Initialize environment with code injection
-        // Build envCode that sets up globals and creates env
+        // Pass interactiveGymGlobals via Worker globals (Workers don't have window)
         const envCode = `
-import js
-interactive_gym_globals = dict(js.window.interactiveGymGlobals.object_entries())
 ${this.config.environment_initialization_code}
         `;
 
         await this.worker.initEnv(envCode, {
-            on_game_step_code: this.config.on_game_step_code || ''
+            on_game_step_code: this.config.on_game_step_code || '',
+            interactive_gym_globals: this.interactive_gym_globals || {}
         });
 
         this.state = "ready";
@@ -99,15 +98,16 @@ ${this.config.environment_initialization_code}
         }
 
         // Re-initialize environment via Worker
+        // Pass fresh interactiveGymGlobals via Worker globals (Workers don't have window)
+        const freshGlobals = config.interactive_gym_globals || config.interactiveGymGlobals || this.interactive_gym_globals || {};
         const envCode = `
-import js
-interactive_gym_globals = dict(js.window.interactiveGymGlobals.object_entries())
 print("Globals on initialization: ", interactive_gym_globals)
 ${config.environment_initialization_code}
         `;
 
         await this.worker.initEnv(envCode, {
-            on_game_step_code: config.on_game_step_code || ''
+            on_game_step_code: config.on_game_step_code || '',
+            interactive_gym_globals: freshGlobals
         });
 
         this.setAttributes(config);
