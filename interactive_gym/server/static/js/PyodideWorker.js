@@ -16,6 +16,12 @@
  *   await worker.initEnv('import gymnasium; env = gymnasium.make("CartPole-v1")');
  *   const { obs, infos, render_state } = await worker.reset();
  *   const { obs, rewards, terminateds, truncateds, infos, render_state } = await worker.step({ 0: 1 });
+ *   const stateJson = await worker.getState();       // Capture env + RNG state as JSON
+ *   await worker.setState(stateJson);                 // Restore env + RNG state from JSON
+ *   const { hash } = await worker.computeHash();      // SHA-256 hash of current env state
+ *   await worker.seedRng(42);                          // Seed numpy + Python random
+ *   const { render_state } = await worker.render();    // Standalone env.render()
+ *   const results = await worker.batch([...]);         // Sequential multi-op execution
  *   worker.destroy();
  *
  * @module PyodideWorker
@@ -118,6 +124,81 @@ export class PyodideWorker {
     async reset(seed = null) {
         this._assertReady();
         return this._sendRequest('reset', { seed });
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // State management and batch methods (Phase 69)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Capture the current environment state and RNG states.
+     * Returns a JSON string containing env_state, numpy RNG state, and Python random state.
+     * The caller can store/parse this string as needed.
+     * @returns {Promise<string>} JSON string of { env_state, np_rng_state, py_rng_state }
+     * @throws {Error} If Worker not ready or state capture fails
+     */
+    async getState() {
+        this._assertReady();
+        return this._sendRequest('getState', {});
+    }
+
+    /**
+     * Restore environment state and RNG states from a JSON snapshot.
+     * @param {string} stateJson - JSON string from getState() (full snapshot)
+     * @returns {Promise<Object>} { ok: true }
+     * @throws {Error} If Worker not ready or state restoration fails
+     */
+    async setState(stateJson) {
+        this._assertReady();
+        return this._sendRequest('setState', { stateJson });
+    }
+
+    /**
+     * Compute a SHA-256 hash of the environment state.
+     * If stateJson is provided, hashes that state. Otherwise hashes the current env state.
+     * @param {string|null} [stateJson=null] - Optional JSON state to hash (null = hash current env)
+     * @returns {Promise<Object>} { hash: string } - First 16 chars of SHA-256 hex digest
+     * @throws {Error} If Worker not ready or hash computation fails
+     */
+    async computeHash(stateJson = null) {
+        this._assertReady();
+        return this._sendRequest('computeHash', { stateJson });
+    }
+
+    /**
+     * Seed numpy and Python random number generators.
+     * @param {number} seed - Seed value for both numpy and Python random
+     * @returns {Promise<Object>} { ok: true }
+     * @throws {Error} If Worker not ready or seeding fails
+     */
+    async seedRng(seed) {
+        this._assertReady();
+        return this._sendRequest('seedRng', { seed });
+    }
+
+    /**
+     * Render the current environment state.
+     * Returns raw render_state data; caller is responsible for processing
+     * (e.g., via _processRenderState on the game class).
+     * @returns {Promise<Object>} { render_state: any }
+     * @throws {Error} If Worker not ready or render fails
+     */
+    async render() {
+        this._assertReady();
+        return this._sendRequest('render', {});
+    }
+
+    /**
+     * Execute a batch of operations sequentially in a single Worker round-trip.
+     * Operations are executed in order. Stops on first error with partial results.
+     * Supported ops: 'setState', 'getState', 'step', 'reset', 'computeHash', 'render', 'seedRng'
+     * @param {Array<{op: string, params: Object}>} operations - Array of operations
+     * @returns {Promise<Array>} Array of results in same order as operations
+     * @throws {Error} If Worker not ready, or a batch operation fails (error includes failedIndex and partialResults)
+     */
+    async batch(operations) {
+        this._assertReady();
+        return this._sendRequest('batch', { operations });
     }
 
     /**
