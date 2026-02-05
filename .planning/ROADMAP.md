@@ -263,7 +263,7 @@ Plans:
 - [x] 72-01-PLAN.md -- Switch server fixtures to per-function scope, fix memory test, increase multi-episode timeout
 
 ### Phase 73: Production Bug Fixes
-**Goal**: Fix production code bugs revealed by E2E test failures
+**Goal**: Fix rollback/promotion race condition in dual-buffer data recording that causes active input data parity divergences
 **Depends on**: Phase 72
 **Requirements**: PROD-01, PROD-02
 **Success Criteria** (what must be TRUE):
@@ -271,10 +271,10 @@ Plans:
   2. Pre-existing functionality regressions from v1.16 Worker migration are fixed
   3. Tests that were failing due to production bugs now pass individually
 **Research flag:** Unlikely (debugging with test output as guide)
-**Plans**: TBD
+**Plans:** 1 plan
 
 Plans:
-- [ ] 73-01: Fix production bugs identified in audit
+- [ ] 73-01-PLAN.md -- Fix rollback/promotion race in dual-buffer, guard all promotion paths against pending rollbacks
 
 ### Phase 74: Stability Validation
 **Goal**: Full test suite passes consistently with no exemptions
@@ -323,4 +323,4 @@ Phases execute in numeric order: 71 → 72 → 73 → 74
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-05 for v1.17 Phase 72 complete*
+*Last updated: 2026-02-05 for v1.17 Phase 73 planned*
