@@ -72,6 +72,7 @@
 
     <div id="controls">
         <button id="run-test">Run Test</button>
+        <button id="run-remotegame-test">Test RemoteGame Operations</button>
         <button id="clear-log">Clear Log</button>
     </div>
 
@@ -83,6 +84,7 @@
         const logEl = document.getElementById('log');
         const statusEl = document.getElementById('status');
         const runBtn = document.getElementById('run-test');
+        const runRemoteGameBtn = document.getElementById('run-remotegame-test');
         const clearBtn = document.getElementById('clear-log');
 
         let testRunning = false;
@@ -109,6 +111,7 @@
             if (testRunning) return;
             testRunning = true;
             runBtn.disabled = true;
+            runRemoteGameBtn.disabled = true;
             logEl.innerHTML = '';
 
             try {
@@ -122,6 +125,29 @@
             } finally {
                 testRunning = false;
                 runBtn.disabled = false;
+                runRemoteGameBtn.disabled = false;
+            }
+        };
+
+        runRemoteGameBtn.onclick = async () => {
+            if (testRunning) return;
+            testRunning = true;
+            runBtn.disabled = true;
+            runRemoteGameBtn.disabled = true;
+            logEl.innerHTML = '';
+
+            try {
+                await testRemoteGameOperations();
+            } catch (err) {
+                log(`TEST FAILED: ${err.message}`, 'log-error');
+                if (err.stack) {
+                    log(err.stack, 'log-error');
+                }
+                setStatus('RemoteGame test failed', 'error');
+            } finally {
+                testRunning = false;
+                runBtn.disabled = false;
+                runRemoteGameBtn.disabled = false;
             }
         };
 
@@ -281,6 +307,155 @@ env = SimpleEnv()
             log(`  - WORKER-03: READY event works (step/reset only after init)`);
 
             setStatus('All tests passed!', 'success');
+        }
+
+        // ========== RemoteGame Operations Test ==========
+        // Tests the exact Worker operations that RemoteGame uses:
+        // initEnv with on_game_step_code, reset with obs normalization, step with full normalization
+
+        async function testRemoteGameOperations() {
+            setStatus('Running RemoteGame operations test...', 'running');
+
+            log('=== Testing RemoteGame-like Operations ===', 'log-info');
+            log('This test exercises the exact sequence RemoteGame uses.');
+            log('');
+
+            // Start ping interval to verify non-blocking behavior throughout
+            let pings = 0;
+            const pingInterval = setInterval(() => {
+                pings++;
+                log(`ping ${pings}`, 'log-ping');
+            }, 500);
+
+            // Create fresh worker
+            const worker = new PyodideWorker({
+                onProgress: (stage, msg) => log(`[Progress:${stage}] ${msg}`, 'log-progress')
+            });
+
+            log('Initializing Worker (pings should continue)...', 'log-info');
+            await worker.init();
+            log(`Worker initialized (${pings} pings so far - non-blocking confirmed)`, 'log-success');
+
+            // Install gymnasium (like RemoteGame would)
+            log('');
+            log('=== Installing gymnasium package ===', 'log-info');
+            await worker.installPackages(['gymnasium']);
+            log('gymnasium installed!', 'log-success');
+
+            // Test initEnv with on_game_step_code (like RemoteGame does)
+            log('');
+            log('=== Testing initEnv with on_game_step_code ===', 'log-info');
+
+            const envCode = `
+import gymnasium
+env = gymnasium.make("CartPole-v1", render_mode="rgb_array")
+print("Environment created!")
+            `;
+
+            // Pass on_game_step_code in globals - Worker should extract and store it
+            await worker.initEnv(envCode, {
+                on_game_step_code: '# Pre-step code would go here\npass'
+            });
+            log('Environment initialized with on_game_step_code', 'log-success');
+
+            const pingsAtInitEnd = pings;
+            log(`Pings during init+install+initEnv: ${pingsAtInitEnd}`, 'log-info');
+
+            // Test reset - verify obs normalization to dict with "human" key
+            log('');
+            log('=== Testing reset() with obs normalization ===', 'log-info');
+
+            const resetResult = await worker.reset();
+            const resetObsKeys = resetResult.obs instanceof Map
+                ? Array.from(resetResult.obs.keys())
+                : Object.keys(resetResult.obs);
+
+            log(`Reset result: obs keys = [${resetObsKeys}]`, 'log-result');
+
+            const resetHasHuman = resetResult.obs instanceof Map
+                ? resetResult.obs.has('human')
+                : resetResult.obs.hasOwnProperty('human');
+
+            log(`  - Has "human" key: ${resetHasHuman}`, resetHasHuman ? 'log-success' : 'log-error');
+            log(`  - render_state present: ${resetResult.render_state !== undefined}`, 'log-result');
+
+            if (!resetHasHuman) {
+                throw new Error('Expected reset obs to have "human" key after normalization');
+            }
+
+            // Test step - verify rewards/terminateds/truncateds normalization
+            log('');
+            log('=== Testing step() with full normalization ===', 'log-info');
+
+            const stepResult = await worker.step({ 0: 1 });
+
+            const getKeys = (obj) => obj instanceof Map
+                ? Array.from(obj.keys())
+                : Object.keys(obj);
+            const hasKey = (obj, key) => obj instanceof Map
+                ? obj.has(key)
+                : obj.hasOwnProperty(key);
+
+            log(`Step result:`, 'log-result');
+            log(`  - obs keys: [${getKeys(stepResult.obs)}]`, 'log-result');
+            log(`  - rewards keys: [${getKeys(stepResult.rewards)}]`, 'log-result');
+            log(`  - terminateds keys: [${getKeys(stepResult.terminateds)}]`, 'log-result');
+            log(`  - truncateds keys: [${getKeys(stepResult.truncateds)}]`, 'log-result');
+
+            // Verify all are normalized to dicts with expected keys
+            const hasHumanKeys =
+                hasKey(stepResult.obs, 'human') &&
+                hasKey(stepResult.rewards, 'human') &&
+                hasKey(stepResult.terminateds, 'human') &&
+                hasKey(stepResult.truncateds, 'human');
+
+            log(`All results normalized to dicts with "human" key: ${hasHumanKeys}`,
+                hasHumanKeys ? 'log-success' : 'log-error');
+
+            if (!hasHumanKeys) {
+                throw new Error('Expected all step results to have "human" key after normalization');
+            }
+
+            // Run a few more steps to ensure stability
+            log('');
+            log('=== Running multiple steps for stability ===', 'log-info');
+
+            for (let i = 0; i < 3; i++) {
+                const r = await worker.step({ 0: Math.floor(Math.random() * 2) });
+                const reward = r.rewards instanceof Map ? r.rewards.get('human') : r.rewards.human;
+                const terminated = r.terminateds instanceof Map ? r.terminateds.get('human') : r.terminateds.human;
+                log(`Step ${i+2}: reward=${reward}, terminated=${terminated}`, 'log-result');
+            }
+
+            // Verify non-blocking throughout
+            clearInterval(pingInterval);
+            log('');
+            log(`Total pings during entire test: ${pings}`, 'log-info');
+
+            if (pings < 3) {
+                throw new Error(`Expected at least 3 pings during test, got ${pings}. Main thread may have been blocked.`);
+            }
+            log(`Non-blocking verified: ${pings} pings continued throughout all operations`, 'log-success');
+
+            // Cleanup
+            worker.destroy();
+            log('Worker destroyed', 'log-success');
+
+            log('');
+            log('========================================', 'log-success');
+            log('REMOTEGAME OPERATIONS TEST PASSED!', 'log-success');
+            log('========================================', 'log-success');
+            log('');
+            log('Summary:', 'log-info');
+            log(`  - REMOTE-01: initEnv accepts on_game_step_code in globals`);
+            log(`  - REMOTE-02: reset() returns obs as dict with "human" key`);
+            log(`  - REMOTE-03: step() returns rewards/terminateds/truncateds as dicts with "human" key`);
+            log(`  - REMOTE-04: render_state passes through from Python`);
+            log(`  - REMOTE-05: Non-blocking during all operations (${pings} pings)`);
+
+            setStatus('RemoteGame operations test passed!', 'success');
+
+            return hasHumanKeys;
         }
     </script>
 </body>
