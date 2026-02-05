@@ -145,7 +145,7 @@ def clean_data_dir():
 
 
 @pytest.mark.timeout(300)  # 5 minutes max for full flow
-def test_export_parity_basic(flask_server, player_contexts, clean_data_dir):
+def test_export_parity_basic(flask_server_fresh, player_contexts, clean_data_dir):
     """
     Test that export files from both players are identical after basic episode.
 
@@ -160,7 +160,7 @@ def test_export_parity_basic(flask_server, player_contexts, clean_data_dir):
     5. Assert exit code is 0 (files identical)
     """
     page1, page2 = player_contexts
-    base_url = flask_server["url"]
+    base_url = flask_server_fresh["url"]
 
     # Run full episode flow
     final_state1, final_state2 = run_full_episode_flow(page1, page2, base_url)
@@ -207,7 +207,7 @@ def test_export_parity_basic(flask_server, player_contexts, clean_data_dir):
 
 
 @pytest.mark.timeout(300)  # 5 minutes max for full flow
-def test_export_parity_with_latency(flask_server, player_contexts, clean_data_dir):
+def test_export_parity_with_latency(flask_server_fresh, player_contexts, clean_data_dir):
     """
     Test that export files are identical even under network latency.
 
@@ -222,7 +222,7 @@ def test_export_parity_with_latency(flask_server, player_contexts, clean_data_di
     - Player 2: 100ms latency
     """
     page1, page2 = player_contexts
-    base_url = flask_server["url"]
+    base_url = flask_server_fresh["url"]
 
     # Apply latency to player 2 BEFORE navigation
     cdp2 = apply_latency(page2, latency_ms=100)
@@ -283,7 +283,7 @@ def test_export_parity_with_latency(flask_server, player_contexts, clean_data_di
 
 
 @pytest.mark.timeout(300)  # 5 minutes max for full flow
-def test_active_input_parity(flask_server, player_contexts, clean_data_dir):
+def test_active_input_parity(flask_server_fresh, player_contexts, clean_data_dir):
     """
     Test that export files are identical when both players actively input actions.
 
@@ -299,7 +299,7 @@ def test_active_input_parity(flask_server, player_contexts, clean_data_dir):
     - Different intervals create input conflicts that stress rollback handling
     """
     page1, page2 = player_contexts
-    base_url = flask_server["url"]
+    base_url = flask_server_fresh["url"]
 
     # Run through to gameplay (shared helper handles matchmaking + tutorial)
     run_full_episode_flow_until_gameplay(page1, page2, base_url)
@@ -378,7 +378,7 @@ def test_active_input_parity(flask_server, player_contexts, clean_data_dir):
 
 
 @pytest.mark.timeout(300)
-def test_focus_loss_mid_episode_parity(flask_server, player_contexts, clean_data_dir):
+def test_focus_loss_mid_episode_parity(flask_server_fresh, player_contexts, clean_data_dir):
     """
     FOCUS-01: Test data parity maintained when one client loses focus mid-episode.
 
@@ -403,7 +403,7 @@ def test_focus_loss_mid_episode_parity(flask_server, player_contexts, clean_data
     - Phase 49: Episode boundary row parity (BOUND-02/03 guards)
     """
     page1, page2 = player_contexts
-    base_url = flask_server["url"]
+    base_url = flask_server_fresh["url"]
 
     # Run through to gameplay (shared helper handles matchmaking + UI flow)
     run_full_episode_flow_until_gameplay(page1, page2, base_url)
@@ -502,7 +502,7 @@ def test_focus_loss_mid_episode_parity(flask_server, player_contexts, clean_data
 
 
 @pytest.mark.timeout(300)
-def test_focus_loss_episode_boundary_parity(flask_server, player_contexts, clean_data_dir):
+def test_focus_loss_episode_boundary_parity(flask_server_fresh, player_contexts, clean_data_dir):
     """
     FOCUS-02: Test data parity maintained when one client loses focus at episode boundary.
 
@@ -520,7 +520,7 @@ def test_focus_loss_episode_boundary_parity(flask_server, player_contexts, clean
     - Data consistency at episode boundaries with pending fast-forward
     """
     page1, page2 = player_contexts
-    base_url = flask_server["url"]
+    base_url = flask_server_fresh["url"]
 
     # Run through to gameplay (shared helper handles matchmaking + UI flow)
     run_full_episode_flow_until_gameplay(page1, page2, base_url)

@@ -121,7 +121,7 @@ def run_full_episode_flow(
 
 @pytest.mark.parametrize("latency_ms", [100, 200])
 @pytest.mark.timeout(300)  # 5 minutes max per test
-def test_episode_completion_under_fixed_latency(flask_server, player_contexts, latency_ms):
+def test_episode_completion_under_fixed_latency(flask_server_fresh, player_contexts, latency_ms):
     """
     Test that episode completes under fixed symmetric latency.
 
@@ -131,7 +131,7 @@ def test_episode_completion_under_fixed_latency(flask_server, player_contexts, l
     Both players experience the same latency (symmetric condition).
     """
     page1, page2 = player_contexts
-    base_url = flask_server["url"]
+    base_url = flask_server_fresh["url"]
 
     # Apply same latency to both players BEFORE navigation
     # (CDP session created on existing page, affects subsequent requests)
@@ -166,7 +166,7 @@ def test_episode_completion_under_fixed_latency(flask_server, player_contexts, l
 # =============================================================================
 
 @pytest.mark.timeout(300)  # 5 minutes max
-def test_episode_completion_under_asymmetric_latency(flask_server, player_contexts):
+def test_episode_completion_under_asymmetric_latency(flask_server_fresh, player_contexts):
     """
     Test that episode completes when players have different latencies.
 
@@ -182,7 +182,7 @@ def test_episode_completion_under_asymmetric_latency(flask_server, player_contex
     cross-continental connections).
     """
     page1, page2 = player_contexts
-    base_url = flask_server["url"]
+    base_url = flask_server_fresh["url"]
 
     # Apply different latencies to each player
     cdp1 = apply_latency(page1, latency_ms=50)   # Player 1: low latency (local)
@@ -219,7 +219,7 @@ def test_episode_completion_under_asymmetric_latency(flask_server, player_contex
 # =============================================================================
 
 @pytest.mark.timeout(300)  # 5 minutes max
-def test_episode_completion_under_jitter(flask_server, player_contexts):
+def test_episode_completion_under_jitter(flask_server_fresh, player_contexts):
     """
     Test that episode completes under variable latency (jitter).
 
@@ -236,7 +236,7 @@ def test_episode_completion_under_jitter(flask_server, player_contexts):
     Jitter is applied AFTER game setup to avoid affecting WebRTC signaling.
     """
     page1, page2 = player_contexts
-    base_url = flask_server["url"]
+    base_url = flask_server_fresh["url"]
 
     # Run through to gameplay BEFORE applying jitter
     # This avoids jitter interfering with WebRTC signaling/matchmaking
@@ -291,7 +291,7 @@ def test_episode_completion_under_jitter(flask_server, player_contexts):
 
 @pytest.mark.parametrize("latency_ms", [100, 200])
 @pytest.mark.timeout(300)  # 5 minutes max per test
-def test_active_input_with_latency(flask_server, player_contexts, latency_ms):
+def test_active_input_with_latency(flask_server_fresh, player_contexts, latency_ms):
     """
     Test data parity when both players actively input actions under latency.
 
@@ -314,7 +314,7 @@ def test_active_input_with_latency(flask_server, player_contexts, latency_ms):
     - Different intervals create input conflicts that stress rollback handling
     """
     page1, page2 = player_contexts
-    base_url = flask_server["url"]
+    base_url = flask_server_fresh["url"]
 
     # Apply latency to player 2 BEFORE navigation
     cdp2 = apply_latency(page2, latency_ms=latency_ms)
