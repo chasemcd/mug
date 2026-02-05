@@ -11,11 +11,11 @@ See: .planning/PROJECT.md (updated 2026-02-04)
 
 Milestone: v1.16 Pyodide Web Worker
 Phase: 69 of 70 (Multiplayer Batch Operations) — In progress
-Plan: 01 of 03 complete
-Status: Plan 69-01 complete, ready for Plan 69-02
-Last activity: 2026-02-05 — Completed 69-01-PLAN.md (Worker Protocol Extension)
+Plan: 02 of 03 complete
+Status: Plan 69-02 complete, ready for Plan 69-03
+Last activity: 2026-02-05 — Completed 69-02-PLAN.md (Multiplayer Call Site Migration)
 
-Progress: ██████░░░░ 60%
+Progress: ████████░░ 80%
 
 ## Milestone History
 
@@ -172,6 +172,10 @@ Progress: ██████░░░░ 60%
 - `.planning/phases/67-core-worker-infrastructure/67-01-SUMMARY.md`
 - `.planning/phases/68-remotegame-integration/68-01-SUMMARY.md`
 - `.planning/phases/69-multiplayer-batch-operations/69-01-SUMMARY.md`
+- `.planning/phases/69-multiplayer-batch-operations/69-02-SUMMARY.md`
+
+**Multiplayer Call Site Migration (v1.16 Phase 69 Plan 02 - modified):**
+- `interactive_gym/server/static/js/pyodide_multiplayer_game.js` - All 18 individual this.pyodide.runPythonAsync() calls replaced with structured this.worker.* commands; only performRollback() and _performFastForward() still use this.pyodide (Plan 03)
 
 **Worker Protocol Extension (v1.16 Phase 69 Plan 01 - added):**
 - `interactive_gym/server/static/js/pyodide_worker.js` - handleGetState, handleSetState, handleComputeHash, handleSeedRng, handleRender, handleBatch handlers + Internal variants; handleStep/handleReset refactored to Internal pattern
@@ -349,6 +353,13 @@ See: .planning/PROJECT.md Key Decisions table
 - toJs({depth: 2}) for PyProxy conversion before postMessage
 - destroy() cleans PyProxy references to prevent memory leaks
 
+**v1.16 Phase 69 Plan 02 decisions:**
+- validateStateSync uses getState() probe instead of Python hasattr check
+- Server-auth reset path: reset() + setState() + render() sequence replaces monolithic Python block
+- loadStateSnapshot drops verification step (before/after state comparison) - setState is tested Worker command
+- applyServerState wraps env_state in {env_state: ...} for setState compatibility
+- computeHash() now uses SHA-256 (Worker) instead of MD5 (old inline Python) - both peers use same algorithm
+
 **v1.16 Phase 69 Plan 01 decisions:**
 - Internal/External handler split: *Internal does work and returns, * wraps with postMessage for batch reuse
 - getState returns raw JSON string (caller parses) for minimal transfer overhead
@@ -388,19 +399,15 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-02-05
-Stopped at: Completed 69-01-PLAN.md (Worker Protocol Extension)
+Stopped at: Completed 69-02-PLAN.md (Multiplayer Call Site Migration)
 Resume file: None
 
 ### Next Steps
 
-**Phase 69 Plan 02: Multiplayer Call Site Migration** — Ready to execute
-- Migrate all ~25 this.pyodide.runPythonAsync() calls to structured Worker commands
-- Use batch() for rollback and fast-forward operations
-- Convert stepWithActions to use this.worker.step()
-
-**Phase 69 Plan 03: Shim Removal** — Blocked on Plan 02
+**Phase 69 Plan 03: Batch Migration + Shim Removal** — Ready to execute
+- Migrate performRollback() and _performFastForward() to use this.worker.batch()
 - Remove runPythonAsync/toPy/_wrapResult shims from PyodideWorker.js
 - Remove handleRunPython from pyodide_worker.js
 - Remove this.pyodide = this.worker shim from pyodide_remote_game.js
 
-Next action: `/gsd:execute-plan .planning/phases/69-multiplayer-batch-operations/69-02-PLAN.md`
+Next action: `/gsd:execute-plan .planning/phases/69-multiplayer-batch-operations/69-03-PLAN.md`
