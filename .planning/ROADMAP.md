@@ -249,7 +249,7 @@ Plans:
 - [x] 71-01-PLAN.md -- Run full E2E suite, analyze failures, produce categorized audit
 
 ### Phase 72: Test Infrastructure Fixes
-**Goal**: Fix test fixtures, selectors, and timeouts for Worker-based Pyodide
+**Goal**: Fix 5 test-infrastructure failures: switch exhausted module-scoped server fixtures to per-function fixtures, reduce memory test sessions, increase concurrent load timeouts
 **Depends on**: Phase 71
 **Requirements**: INFRA-01, INFRA-02, INFRA-03
 **Success Criteria** (what must be TRUE):
@@ -257,10 +257,10 @@ Plans:
   2. Playwright selectors/locators work with any Worker migration UI changes
   3. Test waits and timeouts account for Worker async initialization patterns
 **Research flag:** Unlikely (test infrastructure updates, standard patterns)
-**Plans**: TBD
+**Plans:** 1 plan
 
 Plans:
-- [ ] 72-01: Update test fixtures and infrastructure for Worker patterns
+- [ ] 72-01-PLAN.md -- Switch server fixtures to per-function scope, fix memory test, increase multi-episode timeout
 
 ### Phase 73: Production Bug Fixes
 **Goal**: Fix production code bugs revealed by E2E test failures
@@ -323,4 +323,4 @@ Phases execute in numeric order: 71 → 72 → 73 → 74
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-05 for v1.17 Phase 71 complete*
+*Last updated: 2026-02-05 for v1.17 Phase 72 planned*
