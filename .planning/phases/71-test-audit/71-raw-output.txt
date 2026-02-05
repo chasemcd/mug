@@ -1,0 +1,2133 @@
+========== E2E Test Suite Run - Thu Feb  5 17:35:31 UTC 2026 ==========
+
+Test collection:
+============================= test session starts ==============================
+platform darwin -- Python 3.11.7, pytest-9.0.2, pluggy-1.6.0
+rootdir: /Users/chasemcd/Repositories/interactive-gym
+configfile: pytest.ini
+plugins: playwright-0.7.2, timeout-2.4.0, base-url-2.1.0, jaxtyping-0.3.6, anyio-4.2.0
+collected 26 items
+
+<Dir interactive-gym>
+  <Package tests>
+    <Package e2e>
+      <Module test_data_comparison.py>
+        <Function test_export_parity_basic[chromium]>
+        <Function test_export_parity_with_latency[chromium]>
+        <Function test_active_input_parity[chromium]>
+        <Function test_focus_loss_mid_episode_parity[chromium]>
+        <Function test_focus_loss_episode_boundary_parity[chromium]>
+      <Module test_infrastructure.py>
+        <Function test_server_starts_and_contexts_connect[chromium]>
+      <Module test_latency_injection.py>
+        <Function test_episode_completion_under_fixed_latency[chromium-100]>
+        <Function test_episode_completion_under_asymmetric_latency[chromium]>
+        <Function test_episode_completion_under_jitter[chromium]>
+        <Function test_active_input_with_latency[chromium-100]>
+      <Module test_lifecycle_stress.py>
+        <Function test_multi_episode_completion[chromium]>
+        <Function test_mid_game_disconnect[chromium]>
+        <Function test_waitroom_disconnect_isolation[chromium]>
+        <Function test_focus_loss_timeout[chromium]>
+        <Function test_mixed_lifecycle_scenarios[chromium]>
+      <Module test_multi_participant.py>
+        <Function test_three_simultaneous_games[chromium]>
+        <Function test_staggered_participant_arrival[chromium]>
+      <Module test_multiplayer_basic.py>
+        <Function test_two_players_connect_and_complete_episode[chromium]>
+        <Function test_matchmaking_pairs_two_players[chromium]>
+      <Module test_network_disruption.py>
+        <Function test_packet_loss_triggers_rollback[chromium]>
+        <Function test_tab_visibility_triggers_fast_forward[chromium]>
+        <Function test_active_input_with_packet_loss[chromium]>
+      <Module test_worker_validation.py>
+        <Function test_step_latency_not_degraded[chromium]>
+        <Function test_no_memory_growth_across_sessions[chromium]>
+      <Module test_latency_injection.py>
+        <Function test_episode_completion_under_fixed_latency[chromium-200]>
+        <Function test_active_input_with_latency[chromium-200]>
+
+========================= 26 tests collected in 0.02s ==========================
+
+========== tests/e2e/test_infrastructure.py ==========
+============================= test session starts ==============================
+platform darwin -- Python 3.11.7, pytest-9.0.2, pluggy-1.6.0 -- /opt/anaconda3/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/chasemcd/Repositories/interactive-gym
+configfile: pytest.ini
+plugins: playwright-0.7.2, timeout-2.4.0, base-url-2.1.0, jaxtyping-0.3.6, anyio-4.2.0
+timeout: 300.0s
+timeout method: signal
+timeout func_only: False
+collecting ... collected 1 item
+
+tests/e2e/test_infrastructure.py::test_server_starts_and_contexts_connect[chromium] PASSED [100%]
+
+============================== 1 passed in 8.36s ===============================
+
+========== tests/e2e/test_multiplayer_basic.py ==========
+============================= test session starts ==============================
+platform darwin -- Python 3.11.7, pytest-9.0.2, pluggy-1.6.0 -- /opt/anaconda3/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/chasemcd/Repositories/interactive-gym
+configfile: pytest.ini
+plugins: playwright-0.7.2, timeout-2.4.0, base-url-2.1.0, jaxtyping-0.3.6, anyio-4.2.0
+timeout: 300.0s
+timeout method: signal
+timeout func_only: False
+collecting ... collected 2 items
+
+tests/e2e/test_multiplayer_basic.py::test_two_players_connect_and_complete_episode[chromium] PASSED [ 50%]
+tests/e2e/test_multiplayer_basic.py::test_matchmaking_pairs_two_players[chromium] PASSED [100%]
+
+============================== 2 passed in 41.39s ==============================
+========== tests/e2e/test_worker_validation.py ==========
+============================= test session starts ==============================
+platform darwin -- Python 3.11.7, pytest-9.0.2, pluggy-1.6.0 -- /opt/anaconda3/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/chasemcd/Repositories/interactive-gym
+configfile: pytest.ini
+plugins: playwright-0.7.2, timeout-2.4.0, base-url-2.1.0, jaxtyping-0.3.6, anyio-4.2.0
+timeout: 300.0s
+timeout method: signal
+timeout func_only: False
+collecting ... collected 2 items
+
+tests/e2e/test_worker_validation.py::test_step_latency_not_degraded[chromium] PASSED [ 50%]
+tests/e2e/test_worker_validation.py::test_no_memory_growth_across_sessions[chromium] FAILED [100%]
+
+=================================== FAILURES ===================================
+_______________ test_no_memory_growth_across_sessions[chromium] ________________
+
+flask_server_fresh = {'process': <Popen: returncode: None args: ['python', '-m', 'interactive_gym.examples.co...>, 'url': 'http://localhost:5705'}
+browser = <Browser type=<BrowserType name=chromium executable_path=/Users/chasemcd/Library/Caches/ms-playwright/chromium-1208/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing> version=145.0.7632.6>
+
+    @pytest.mark.timeout(3000)
+    def test_no_memory_growth_across_sessions(flask_server_fresh, browser):
+        """
+        VALID-04: Run 10 consecutive game sessions and check for memory leaks.
+    
+        Each session creates two browser contexts, runs a full multiplayer episode,
+        then closes the contexts (triggering Worker.destroy()). After each session,
+        JS heap size is captured via the Performance API.
+    
+        Assertion: Iteration 10 heap size is not more than 2x iteration 1 heap size.
+        If performance.memory is unavailable, the test still validates that 10
+        consecutive sessions complete without crashes (basic stability check).
+        """
+        base_url = flask_server_fresh["url"]
+        heap_sizes = []
+    
+        chrome_ua = (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/120.0.0.0 Safari/537.36"
+        )
+    
+        for iteration in range(10):
+            print(f"\n--- Session {iteration + 1}/10 ---")
+    
+            # Create fresh browser contexts for this session
+            context1 = browser.new_context(user_agent=chrome_ua)
+            context2 = browser.new_context(user_agent=chrome_ua)
+            page1 = context1.new_page()
+            page2 = context2.new_page()
+    
+            try:
+                # Navigate and connect
+>               page1.goto(base_url)
+
+tests/e2e/test_worker_validation.py:164: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <Page url='about:blank'>, url = 'http://localhost:5705'
+
+    def goto(
+        self,
+        url: str,
+        *,
+        timeout: typing.Optional[float] = None,
+        wait_until: typing.Optional[
+            Literal["commit", "domcontentloaded", "load", "networkidle"]
+        ] = None,
+        referer: typing.Optional[str] = None,
+    ) -> typing.Optional["Response"]:
+        """Page.goto
+    
+        Returns the main resource response. In case of multiple redirects, the navigation will resolve with the first
+        non-redirect response.
+    
+        The method will throw an error if:
+        - there's an SSL error (e.g. in case of self-signed certificates).
+        - target URL is invalid.
+        - the `timeout` is exceeded during navigation.
+        - the remote server does not respond or is unreachable.
+        - the main resource failed to load.
+    
+        The method will not throw an error when any valid HTTP status code is returned by the remote server, including 404
+        \"Not Found\" and 500 \"Internal Server Error\".  The status code for such responses can be retrieved by calling
+        `response.status()`.
+    
+        **NOTE** The method either throws an error or returns a main resource response. The only exceptions are navigation
+        to `about:blank` or navigation to the same URL with a different hash, which would succeed and return `null`.
+    
+        **NOTE** Headless mode doesn't support navigation to a PDF document. See the
+        [upstream issue](https://bugs.chromium.org/p/chromium/issues/detail?id=761295).
+    
+        Parameters
+        ----------
+        url : str
+            URL to navigate page to. The url should include scheme, e.g. `https://`. When a `baseURL` via the context options
+            was provided and the passed URL is a path, it gets merged via the
+            [`new URL()`](https://developer.mozilla.org/en-US/docs/Web/API/URL/URL) constructor.
+        timeout : Union[float, None]
+            Maximum operation time in milliseconds, defaults to 30 seconds, pass `0` to disable timeout. The default value can
+            be changed by using the `browser_context.set_default_navigation_timeout()`,
+            `browser_context.set_default_timeout()`, `page.set_default_navigation_timeout()` or
+            `page.set_default_timeout()` methods.
+        wait_until : Union["commit", "domcontentloaded", "load", "networkidle", None]
+            When to consider operation succeeded, defaults to `load`. Events can be either:
+            - `'domcontentloaded'` - consider operation to be finished when the `DOMContentLoaded` event is fired.
+            - `'load'` - consider operation to be finished when the `load` event is fired.
+            - `'networkidle'` - **DISCOURAGED** consider operation to be finished when there are no network connections for
+              at least `500` ms. Don't use this method for testing, rely on web assertions to assess readiness instead.
+            - `'commit'` - consider operation to be finished when network response is received and the document started
+              loading.
+        referer : Union[str, None]
+            Referer header value. If provided it will take preference over the referer header value set by
+            `page.set_extra_http_headers()`.
+    
+        Returns
+        -------
+        Union[Response, None]
+        """
+    
+        return mapping.from_impl_nullable(
+>           self._sync(
+                self._impl_obj.goto(
+                    url=url, timeout=timeout, waitUntil=wait_until, referer=referer
+                )
+            )
+        )
+
+/opt/anaconda3/lib/python3.11/site-packages/playwright/sync_api/_generated.py:9054: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <Page url='about:blank'>, url = 'http://localhost:5705', timeout = None
+waitUntil = None, referer = None
+
+    async def goto(
+        self,
+        url: str,
+        timeout: float = None,
+        waitUntil: DocumentLoadState = None,
+        referer: str = None,
+    ) -> Optional[Response]:
+>       return await self._main_frame.goto(**locals_to_params(locals()))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+/opt/anaconda3/lib/python3.11/site-packages/playwright/_impl/_page.py:552: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <Frame name= url='about:blank'>, url = 'http://localhost:5705'
+timeout = None, waitUntil = None, referer = None
+
+    async def goto(
+        self,
+        url: str,
+        timeout: float = None,
+        waitUntil: DocumentLoadState = None,
+        referer: str = None,
+    ) -> Optional[Response]:
+        return cast(
+            Optional[Response],
+            from_nullable_channel(
+>               await self._channel.send(
+                    "goto", self._navigation_timeout, locals_to_params(locals())
+                )
+            ),
+        )
+
+/opt/anaconda3/lib/python3.11/site-packages/playwright/_impl/_frame.py:153: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <playwright._impl._connection.Channel object at 0x11e66ef50>
+method = 'goto'
+timeout_calculator = <bound method Frame._navigation_timeout of <Frame name= url='about:blank'>>
+params = {'timeout': 30000, 'url': 'http://localhost:5705'}, is_internal = False
+title = None
+
+    async def send(
+        self,
+        method: str,
+        timeout_calculator: TimeoutCalculator,
+        params: Dict = None,
+        is_internal: bool = False,
+        title: str = None,
+    ) -> Any:
+>       return await self._connection.wrap_api_call(
+            lambda: self._inner_send(method, timeout_calculator, params, False),
+            is_internal,
+            title,
+        )
+
+/opt/anaconda3/lib/python3.11/site-packages/playwright/_impl/_connection.py:69: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <playwright._impl._connection.Connection object at 0x10912fdd0>
+cb = <function Channel.send.<locals>.<lambda> at 0x11e64bb00>
+is_internal = False, title = None
+
+    async def wrap_api_call(
+        self, cb: Callable[[], Any], is_internal: bool = False, title: str = None
+    ) -> Any:
+        if self._api_zone.get():
+            return await cb()
+        task = asyncio.current_task(self._loop)
+        st: List[inspect.FrameInfo] = getattr(
+            task, "__pw_stack__", None
+        ) or inspect.stack(0)
+    
+        parsed_st = _extract_stack_trace_information_from_stack(st, is_internal, title)
+        self._api_zone.set(parsed_st)
+        try:
+            return await cb()
+        except Exception as error:
+>           raise rewrite_error(error, f"{parsed_st['apiName']}: {error}") from None
+E           playwright._impl._errors.TimeoutError: Page.goto: Timeout 30000ms exceeded.
+E           Call log:
+E             - navigating to "http://localhost:5705/", waiting until "load"
+
+/opt/anaconda3/lib/python3.11/site-packages/playwright/_impl/_connection.py:559: TimeoutError
+----------------------------- Captured stdout call -----------------------------
+
+--- Session 1/10 ---
+  Heap: used=19.8MB, total=29.2MB
+  Game: episodes=1, frames=450
+
+--- Session 2/10 ---
+  Heap: used=18.2MB, total=29.6MB
+  Game: episodes=1, frames=450
+
+--- Session 3/10 ---
+  Heap: used=19.7MB, total=29.6MB
+  Game: episodes=1, frames=450
+
+--- Session 4/10 ---
+  Heap: used=15.4MB, total=30.5MB
+  Game: episodes=1, frames=450
+
+--- Session 5/10 ---
+=========================== short test summary info ============================
+FAILED tests/e2e/test_worker_validation.py::test_no_memory_growth_across_sessions[chromium] - playwright._impl._errors.TimeoutError: Page.goto: Timeout 30000ms exceeded.
+Call log:
+  - navigating to "http://localhost:5705/", waiting until "load"
+=================== 1 failed, 1 passed in 173.67s (0:02:53) ====================
+========== tests/e2e/test_data_comparison.py ==========
+============================= test session starts ==============================
+platform darwin -- Python 3.11.7, pytest-9.0.2, pluggy-1.6.0 -- /opt/anaconda3/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/chasemcd/Repositories/interactive-gym
+configfile: pytest.ini
+plugins: playwright-0.7.2, timeout-2.4.0, base-url-2.1.0, jaxtyping-0.3.6, anyio-4.2.0
+timeout: 300.0s
+timeout method: signal
+timeout func_only: False
+collecting ... collected 5 items
+
+tests/e2e/test_data_comparison.py::test_export_parity_basic[chromium] PASSED [ 20%]
+tests/e2e/test_data_comparison.py::test_export_parity_with_latency[chromium] PASSED [ 40%]
+tests/e2e/test_data_comparison.py::test_active_input_parity[chromium] FAILED [ 60%]
+tests/e2e/test_data_comparison.py::test_focus_loss_mid_episode_parity[chromium] PASSED [ 80%]
+tests/e2e/test_data_comparison.py::test_focus_loss_episode_boundary_parity[chromium] FAILED [100%]
+
+=================================== FAILURES ===================================
+______________________ test_active_input_parity[chromium] ______________________
+
+flask_server = {'process': <Popen: returncode: None args: ['python', '-m', 'interactive_gym.examples.co...>, 'url': 'http://localhost:5702'}
+player_contexts = (<Page url='http://localhost:5702/172c4b07-61ab-462f-b84b-dc3a8aeebd89'>, <Page url='http://localhost:5702/be1b89cc-e7b0-4cff-802e-500264ade10e'>)
+clean_data_dir = 'data/overcooked_multiplayer_hh_test'
+
+    @pytest.mark.timeout(300)  # 5 minutes max for full flow
+    def test_active_input_parity(flask_server, player_contexts, clean_data_dir):
+        """
+        Test that export files are identical when both players actively input actions.
+    
+        Unlike idle tests where both players emit Noop every frame, this test
+        validates data parity with real gameplay inputs. This is critical because:
+        - Idle tests could mask bugs where action values are incorrectly recorded
+        - Rollback correction must handle real action values, not just Noop
+        - Real gameplay has both players pressing different keys at different times
+    
+        Configuration:
+        - Player 1: random actions every 150ms
+        - Player 2: random actions every 200ms
+        - Different intervals create input conflicts that stress rollback handling
+        """
+        page1, page2 = player_contexts
+        base_url = flask_server["url"]
+    
+        # Run through to gameplay (shared helper handles matchmaking + tutorial)
+        run_full_episode_flow_until_gameplay(page1, page2, base_url)
+    
+        # Verify both players are in same game
+        from tests.fixtures.game_helpers import get_game_state
+        state1 = get_game_state(page1)
+        state2 = get_game_state(page2)
+        assert state1["gameId"] == state2["gameId"], "Players should be in same game"
+        assert state1["playerId"] != state2["playerId"], "Players should have different IDs"
+    
+        # Start random action injection on both players (different intervals)
+        interval1 = start_random_actions(page1, interval_ms=150)
+        interval2 = start_random_actions(page2, interval_ms=200)
+    
+        print(f"\n[Active Input] Started random actions (P1: 150ms, P2: 200ms)")
+    
+        try:
+            # Wait for episode completion
+            wait_for_episode_complete(page1, episode_num=1, timeout=180000)
+            wait_for_episode_complete(page2, episode_num=1, timeout=180000)
+        finally:
+            # Stop actions regardless of episode completion
+            stop_random_actions(page1, interval1)
+            stop_random_actions(page2, interval2)
+    
+        # Note: Action stats verification after episode completion is unreliable
+        # because frameDataBuffer is cleared after export. The export comparison
+        # below verifies that actions were correctly recorded.
+    
+        # Get final states
+        final_state1 = get_game_state(page1)
+        final_state2 = get_game_state(page2)
+    
+        # Verify completion
+        assert final_state1["numEpisodes"] >= 1, "Player 1 should complete 1+ episodes"
+        assert final_state2["numEpisodes"] >= 1, "Player 2 should complete 1+ episodes"
+    
+        # Extract identifiers for finding export files
+        experiment_id = get_experiment_id()
+        scene_id = get_scene_id(page1)
+        assert scene_id, "Could not get scene ID from game"
+    
+        subject_ids = get_subject_ids_from_pages(page1, page2)
+        print(f"  Subject IDs: {subject_ids[0]}, {subject_ids[1]}")
+        print(f"  Scene ID: {scene_id}")
+    
+        # Wait for export files to be written
+        # Note: episode_num is 0-indexed in file names, so first episode is _ep0.csv
+        try:
+            file1, file2 = wait_for_export_files(
+                experiment_id=experiment_id,
+                scene_id=scene_id,
+                subject_ids=subject_ids,
+                episode_num=0,  # 0-indexed: first episode
+                timeout_sec=30
+            )
+        except TimeoutError as e:
+            pytest.fail(f"Export files not found: {e}")
+    
+        print(f"  Found export files: {file1}, {file2}")
+    
+        # Run comparison
+        exit_code, output = run_comparison(file1, file2, verbose=True)
+    
+        # Print output for diagnostics
+        print(f"\nComparison output:\n{output}")
+    
+        # Assert parity
+        if exit_code != 0:
+>           pytest.fail(
+                f"Data parity check failed with active inputs (exit code {exit_code}):\n{output}"
+            )
+E           Failed: Data parity check failed with active inputs (exit code 1):
+E           Comparing: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv vs be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv
+E           ======================================================================
+E           Rows: 450 vs 450
+E           Columns: 36 vs 36
+E           
+E           DIVERGENCES FOUND:
+E             Column 'actions.0' has 98 divergences
+E               Row 7: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=2, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=6
+E               Row 10: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=0, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=6
+E               Row 14: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=1, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=6
+E               Row 19: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=1, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=6
+E               Row 23: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=1, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=6
+E               ... and 93 more divergences
+E             Column 'infos.0.col' has 316 divergences
+E               Row 7: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=2, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=3
+E               Row 8: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=2, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=3
+E               Row 9: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=2, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=3
+E               Row 10: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=2, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=3
+E               Row 11: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=2, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=3
+E               ... and 311 more divergences
+E             Column 'infos.0.direction' has 314 divergences
+E               Row 7: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=2, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=1
+E               Row 8: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=2, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=1
+E               Row 9: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=2, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=1
+E               Row 10: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=3, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=1
+E               Row 11: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=3, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=1
+E               ... and 309 more divergences
+E             Column 'infos.0.onion_in_pot_reward' has 1 divergences
+E               Row 178: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=1, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=0
+E             Column 'infos.0.row' has 208 divergences
+E               Row 10: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=2, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=3
+E               Row 11: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=2, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=3
+E               Row 12: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=2, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=3
+E               Row 13: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=2, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=3
+E               Row 55: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=2, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=3
+E               ... and 203 more divergences
+E             Column 'infos.1.col' has 282 divergences
+E               Row 10: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=3, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=4
+E               Row 11: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=3, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=4
+E               Row 12: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=3, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=4
+E               Row 13: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=3, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=4
+E               Row 14: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=3, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=4
+E               ... and 277 more divergences
+E             Column 'infos.1.row' has 18 divergences
+E               Row 93: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=3, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=2
+E               Row 94: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=3, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=2
+E               Row 95: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=3, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=2
+E               Row 96: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=3, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=2
+E               Row 97: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=3, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=2
+E               ... and 13 more divergences
+
+tests/e2e/test_data_comparison.py:373: Failed
+----------------------------- Captured stdout call -----------------------------
+
+[Active Input] Started random actions (P1: 150ms, P2: 200ms)
+  Subject IDs: 172c4b07-61ab-462f-b84b-dc3a8aeebd89, be1b89cc-e7b0-4cff-802e-500264ade10e
+  Scene ID: cramped_room_hh
+  Found export files: data/overcooked_multiplayer_hh_test/cramped_room_hh/172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv, data/overcooked_multiplayer_hh_test/cramped_room_hh/be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv
+
+Comparison output:
+Comparing: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv vs be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv
+======================================================================
+Rows: 450 vs 450
+Columns: 36 vs 36
+
+DIVERGENCES FOUND:
+  Column 'actions.0' has 98 divergences
+    Row 7: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=2, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=6
+    Row 10: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=0, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=6
+    Row 14: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=1, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=6
+    Row 19: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=1, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=6
+    Row 23: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=1, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=6
+    ... and 93 more divergences
+  Column 'infos.0.col' has 316 divergences
+    Row 7: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=2, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=3
+    Row 8: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=2, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=3
+    Row 9: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=2, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=3
+    Row 10: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=2, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=3
+    Row 11: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=2, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=3
+    ... and 311 more divergences
+  Column 'infos.0.direction' has 314 divergences
+    Row 7: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=2, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=1
+    Row 8: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=2, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=1
+    Row 9: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=2, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=1
+    Row 10: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=3, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=1
+    Row 11: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=3, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=1
+    ... and 309 more divergences
+  Column 'infos.0.onion_in_pot_reward' has 1 divergences
+    Row 178: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=1, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=0
+  Column 'infos.0.row' has 208 divergences
+    Row 10: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=2, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=3
+    Row 11: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=2, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=3
+    Row 12: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=2, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=3
+    Row 13: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=2, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=3
+    Row 55: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=2, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=3
+    ... and 203 more divergences
+  Column 'infos.1.col' has 282 divergences
+    Row 10: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=3, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=4
+    Row 11: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=3, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=4
+    Row 12: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=3, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=4
+    Row 13: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=3, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=4
+    Row 14: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=3, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=4
+    ... and 277 more divergences
+  Column 'infos.1.row' has 18 divergences
+    Row 93: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=3, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=2
+    Row 94: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=3, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=2
+    Row 95: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=3, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=2
+    Row 96: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=3, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=2
+    Row 97: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=3, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=2
+    ... and 13 more divergences
+______________ test_focus_loss_episode_boundary_parity[chromium] _______________
+
+flask_server = {'process': <Popen: returncode: None args: ['python', '-m', 'interactive_gym.examples.co...>, 'url': 'http://localhost:5702'}
+player_contexts = (<Page url='about:blank'>, <Page url='about:blank'>)
+clean_data_dir = 'data/overcooked_multiplayer_hh_test'
+
+    @pytest.mark.timeout(300)
+    def test_focus_loss_episode_boundary_parity(flask_server, player_contexts, clean_data_dir):
+        """
+        FOCUS-02: Test data parity maintained when one client loses focus at episode boundary.
+    
+        Strategy:
+        1. Run both players to active gameplay
+        2. Wait until close to episode end (frame count approaching max)
+        3. Hide player 1's tab near the boundary
+        4. Episode ends while player 1 is backgrounded
+        5. Player 1 refocuses after episode boundary promotion occurs
+        6. Compare export files for parity
+    
+        This validates that the dual-buffer data recording correctly handles:
+        - _promoteRemainingAtBoundary() when player is backgrounded
+        - Episode completion detection while backgrounded
+        - Data consistency at episode boundaries with pending fast-forward
+        """
+        page1, page2 = player_contexts
+        base_url = flask_server["url"]
+    
+        # Run through to gameplay (shared helper handles matchmaking + UI flow)
+>       run_full_episode_flow_until_gameplay(page1, page2, base_url)
+
+tests/e2e/test_data_comparison.py:526: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+page1 = <Page url='about:blank'>, page2 = <Page url='about:blank'>
+base_url = 'http://localhost:5702'
+
+    def run_full_episode_flow_until_gameplay(page1: Page, page2: Page, base_url: str) -> None:
+        """
+        Progress both players from navigation to active gameplay.
+    
+        This helper runs both players through:
+        1. Navigate to base URL
+        2. Wait for socket connection
+        3. Click advance button (instructions)
+        4. Click start button (multiplayer matchmaking)
+        5. Wait for game canvas and game object
+    
+        Note: Tutorial scene is disabled in test config for faster execution.
+    
+        After this function returns, both players are in-game and ready
+        for action injection or waiting for episode completion.
+    
+        Args:
+            page1: Playwright Page for player 1
+            page2: Playwright Page for player 2
+            base_url: Flask server URL
+        """
+        # Navigate to game
+>       page1.goto(base_url)
+
+tests/fixtures/game_helpers.py:255: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <Page url='about:blank'>, url = 'http://localhost:5702'
+
+    def goto(
+        self,
+        url: str,
+        *,
+        timeout: typing.Optional[float] = None,
+        wait_until: typing.Optional[
+            Literal["commit", "domcontentloaded", "load", "networkidle"]
+        ] = None,
+        referer: typing.Optional[str] = None,
+    ) -> typing.Optional["Response"]:
+        """Page.goto
+    
+        Returns the main resource response. In case of multiple redirects, the navigation will resolve with the first
+        non-redirect response.
+    
+        The method will throw an error if:
+        - there's an SSL error (e.g. in case of self-signed certificates).
+        - target URL is invalid.
+        - the `timeout` is exceeded during navigation.
+        - the remote server does not respond or is unreachable.
+        - the main resource failed to load.
+    
+        The method will not throw an error when any valid HTTP status code is returned by the remote server, including 404
+        \"Not Found\" and 500 \"Internal Server Error\".  The status code for such responses can be retrieved by calling
+        `response.status()`.
+    
+        **NOTE** The method either throws an error or returns a main resource response. The only exceptions are navigation
+        to `about:blank` or navigation to the same URL with a different hash, which would succeed and return `null`.
+    
+        **NOTE** Headless mode doesn't support navigation to a PDF document. See the
+        [upstream issue](https://bugs.chromium.org/p/chromium/issues/detail?id=761295).
+    
+        Parameters
+        ----------
+        url : str
+            URL to navigate page to. The url should include scheme, e.g. `https://`. When a `baseURL` via the context options
+            was provided and the passed URL is a path, it gets merged via the
+            [`new URL()`](https://developer.mozilla.org/en-US/docs/Web/API/URL/URL) constructor.
+        timeout : Union[float, None]
+            Maximum operation time in milliseconds, defaults to 30 seconds, pass `0` to disable timeout. The default value can
+            be changed by using the `browser_context.set_default_navigation_timeout()`,
+            `browser_context.set_default_timeout()`, `page.set_default_navigation_timeout()` or
+            `page.set_default_timeout()` methods.
+        wait_until : Union["commit", "domcontentloaded", "load", "networkidle", None]
+            When to consider operation succeeded, defaults to `load`. Events can be either:
+            - `'domcontentloaded'` - consider operation to be finished when the `DOMContentLoaded` event is fired.
+            - `'load'` - consider operation to be finished when the `load` event is fired.
+            - `'networkidle'` - **DISCOURAGED** consider operation to be finished when there are no network connections for
+              at least `500` ms. Don't use this method for testing, rely on web assertions to assess readiness instead.
+            - `'commit'` - consider operation to be finished when network response is received and the document started
+              loading.
+        referer : Union[str, None]
+            Referer header value. If provided it will take preference over the referer header value set by
+            `page.set_extra_http_headers()`.
+    
+        Returns
+        -------
+        Union[Response, None]
+        """
+    
+        return mapping.from_impl_nullable(
+>           self._sync(
+                self._impl_obj.goto(
+                    url=url, timeout=timeout, waitUntil=wait_until, referer=referer
+                )
+            )
+        )
+
+/opt/anaconda3/lib/python3.11/site-packages/playwright/sync_api/_generated.py:9054: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <Page url='about:blank'>, url = 'http://localhost:5702', timeout = None
+waitUntil = None, referer = None
+
+    async def goto(
+        self,
+        url: str,
+        timeout: float = None,
+        waitUntil: DocumentLoadState = None,
+        referer: str = None,
+    ) -> Optional[Response]:
+>       return await self._main_frame.goto(**locals_to_params(locals()))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+/opt/anaconda3/lib/python3.11/site-packages/playwright/_impl/_page.py:552: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <Frame name= url='about:blank'>, url = 'http://localhost:5702'
+timeout = None, waitUntil = None, referer = None
+
+    async def goto(
+        self,
+        url: str,
+        timeout: float = None,
+        waitUntil: DocumentLoadState = None,
+        referer: str = None,
+    ) -> Optional[Response]:
+        return cast(
+            Optional[Response],
+            from_nullable_channel(
+>               await self._channel.send(
+                    "goto", self._navigation_timeout, locals_to_params(locals())
+                )
+            ),
+        )
+
+/opt/anaconda3/lib/python3.11/site-packages/playwright/_impl/_frame.py:153: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <playwright._impl._connection.Channel object at 0x108672410>
+method = 'goto'
+timeout_calculator = <bound method Frame._navigation_timeout of <Frame name= url='about:blank'>>
+params = {'timeout': 30000, 'url': 'http://localhost:5702'}, is_internal = False
+title = None
+
+    async def send(
+        self,
+        method: str,
+        timeout_calculator: TimeoutCalculator,
+        params: Dict = None,
+        is_internal: bool = False,
+        title: str = None,
+    ) -> Any:
+>       return await self._connection.wrap_api_call(
+            lambda: self._inner_send(method, timeout_calculator, params, False),
+            is_internal,
+            title,
+        )
+
+/opt/anaconda3/lib/python3.11/site-packages/playwright/_impl/_connection.py:69: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <playwright._impl._connection.Connection object at 0x10415e6d0>
+cb = <function Channel.send.<locals>.<lambda> at 0x1086e3f60>
+is_internal = False, title = None
+
+    async def wrap_api_call(
+        self, cb: Callable[[], Any], is_internal: bool = False, title: str = None
+    ) -> Any:
+        if self._api_zone.get():
+            return await cb()
+        task = asyncio.current_task(self._loop)
+        st: List[inspect.FrameInfo] = getattr(
+            task, "__pw_stack__", None
+        ) or inspect.stack(0)
+    
+        parsed_st = _extract_stack_trace_information_from_stack(st, is_internal, title)
+        self._api_zone.set(parsed_st)
+        try:
+            return await cb()
+        except Exception as error:
+>           raise rewrite_error(error, f"{parsed_st['apiName']}: {error}") from None
+E           playwright._impl._errors.TimeoutError: Page.goto: Timeout 30000ms exceeded.
+E           Call log:
+E             - navigating to "http://localhost:5702/", waiting until "load"
+
+/opt/anaconda3/lib/python3.11/site-packages/playwright/_impl/_connection.py:559: TimeoutError
+=========================== short test summary info ============================
+FAILED tests/e2e/test_data_comparison.py::test_active_input_parity[chromium] - Failed: Data parity check failed with active inputs (exit code 1):
+Comparing: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv vs be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv
+======================================================================
+Rows: 450 vs 450
+Columns: 36 vs 36
+
+DIVERGENCES FOUND:
+  Column 'actions.0' has 98 divergences
+    Row 7: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=2, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=6
+    Row 10: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=0, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=6
+    Row 14: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=1, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=6
+    Row 19: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=1, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=6
+    Row 23: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=1, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=6
+    ... and 93 more divergences
+  Column 'infos.0.col' has 316 divergences
+    Row 7: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=2, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=3
+    Row 8: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=2, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=3
+    Row 9: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=2, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=3
+    Row 10: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=2, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=3
+    Row 11: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=2, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=3
+    ... and 311 more divergences
+  Column 'infos.0.direction' has 314 divergences
+    Row 7: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=2, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=1
+    Row 8: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=2, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=1
+    Row 9: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=2, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=1
+    Row 10: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=3, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=1
+    Row 11: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=3, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=1
+    ... and 309 more divergences
+  Column 'infos.0.onion_in_pot_reward' has 1 divergences
+    Row 178: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=1, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=0
+  Column 'infos.0.row' has 208 divergences
+    Row 10: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=2, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=3
+    Row 11: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=2, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=3
+    Row 12: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=2, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=3
+    Row 13: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=2, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=3
+    Row 55: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=2, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=3
+    ... and 203 more divergences
+  Column 'infos.1.col' has 282 divergences
+    Row 10: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=3, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=4
+    Row 11: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=3, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=4
+    Row 12: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=3, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=4
+    Row 13: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=3, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=4
+    Row 14: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=3, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=4
+    ... and 277 more divergences
+  Column 'infos.1.row' has 18 divergences
+    Row 93: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=3, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=2
+    Row 94: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=3, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=2
+    Row 95: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=3, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=2
+    Row 96: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=3, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=2
+    Row 97: 172c4b07-61ab-462f-b84b-dc3a8aeebd89_ep0.csv=3, be1b89cc-e7b0-4cff-802e-500264ade10e_ep0.csv=2
+    ... and 13 more divergences
+FAILED tests/e2e/test_data_comparison.py::test_focus_loss_episode_boundary_parity[chromium] - playwright._impl._errors.TimeoutError: Page.goto: Timeout 30000ms exceeded.
+Call log:
+  - navigating to "http://localhost:5702/", waiting until "load"
+=================== 2 failed, 3 passed in 144.99s (0:02:24) ====================
+========== tests/e2e/test_latency_injection.py ==========
+============================= test session starts ==============================
+platform darwin -- Python 3.11.7, pytest-9.0.2, pluggy-1.6.0 -- /opt/anaconda3/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/chasemcd/Repositories/interactive-gym
+configfile: pytest.ini
+plugins: playwright-0.7.2, timeout-2.4.0, base-url-2.1.0, jaxtyping-0.3.6, anyio-4.2.0
+timeout: 300.0s
+timeout method: signal
+timeout func_only: False
+collecting ... collected 6 items
+
+tests/e2e/test_latency_injection.py::test_episode_completion_under_fixed_latency[chromium-100] PASSED [ 16%]
+tests/e2e/test_latency_injection.py::test_episode_completion_under_asymmetric_latency[chromium] PASSED [ 33%]
+tests/e2e/test_latency_injection.py::test_episode_completion_under_jitter[chromium] PASSED [ 50%]
+tests/e2e/test_latency_injection.py::test_active_input_with_latency[chromium-100] FAILED [ 66%]
+tests/e2e/test_latency_injection.py::test_episode_completion_under_fixed_latency[chromium-200] FAILED [ 83%]
+tests/e2e/test_latency_injection.py::test_active_input_with_latency[chromium-200] FAILED [100%]
+
+=================================== FAILURES ===================================
+_________________ test_active_input_with_latency[chromium-100] _________________
+
+flask_server = {'process': <Popen: returncode: None args: ['python', '-m', 'interactive_gym.examples.co...>, 'url': 'http://localhost:5702'}
+player_contexts = (<Page url='http://localhost:5702/9225c40b-1477-494b-86dd-9a5ed2e400f6'>, <Page url='http://localhost:5702/ff157dd7-6505-4b92-81bf-25081ce1b337'>)
+latency_ms = 100
+
+    @pytest.mark.parametrize("latency_ms", [100, 200])
+    @pytest.mark.timeout(300)  # 5 minutes max per test
+    def test_active_input_with_latency(flask_server, player_contexts, latency_ms):
+        """
+        Test data parity when both players actively input actions under latency.
+    
+        This is the critical test: real inputs + real latency = realistic gameplay.
+        Previous tests let players idle (Noop action), which could mask bugs in
+        action recording during rollbacks.
+    
+        Validates dual-buffer fixes from Phases 48-49:
+        - Phase 48: isFocused column consistency (getFocusStatePerPlayer)
+        - Phase 49: Episode boundary row parity (BOUND-02/03 guards)
+    
+        This test validates that:
+        1. Real inputs are correctly recorded under latency
+        2. Rollback correction handles real action values, not just Noop
+        3. Both players export identical data despite network delays
+    
+        Configuration:
+        - Player 1: random actions every 150ms
+        - Player 2: random actions every 200ms + network latency
+        - Different intervals create input conflicts that stress rollback handling
+        """
+        page1, page2 = player_contexts
+        base_url = flask_server["url"]
+    
+        # Apply latency to player 2 BEFORE navigation
+        cdp2 = apply_latency(page2, latency_ms=latency_ms)
+    
+        try:
+            # Run through to gameplay
+            run_full_episode_flow_until_gameplay(page1, page2, base_url)
+    
+            # Verify both players are in same game
+            state1 = get_game_state(page1)
+            state2 = get_game_state(page2)
+            assert state1["gameId"] == state2["gameId"], "Players should be in same game"
+            assert state1["playerId"] != state2["playerId"], "Players should have different IDs"
+    
+            # Start random action injection on both players
+            interval1 = start_random_actions(page1, interval_ms=150)
+            interval2 = start_random_actions(page2, interval_ms=200)
+    
+            print(f"\n[Active Input + {latency_ms}ms Latency] Started random actions")
+    
+            try:
+                # Wait for episode completion
+                wait_for_episode_complete(page1, episode_num=1, timeout=180000)
+                wait_for_episode_complete(page2, episode_num=1, timeout=180000)
+            finally:
+                stop_random_actions(page1, interval1)
+                stop_random_actions(page2, interval2)
+    
+            # Note: Action stats verification after episode completion is unreliable
+            # because frameDataBuffer is cleared after export. The export comparison
+            # below verifies that actions were correctly recorded despite latency.
+    
+            # Get final states
+            final_state1 = get_game_state(page1)
+            final_state2 = get_game_state(page2)
+    
+            # Verify completion
+            assert final_state1["numEpisodes"] >= 1, "Player 1 should complete 1+ episodes"
+            assert final_state2["numEpisodes"] >= 1, "Player 2 should complete 1+ episodes"
+    
+            # Extract identifiers for export files
+            experiment_id = get_experiment_id()
+            scene_id = get_scene_id(page1)
+            assert scene_id, "Could not get scene ID from game"
+    
+            subject_ids = get_subject_ids_from_pages(page1, page2)
+    
+            # Wait for export files (episode_num=0 because exports are 0-indexed)
+            try:
+                file1, file2 = wait_for_export_files(
+                    experiment_id=experiment_id,
+                    scene_id=scene_id,
+                    subject_ids=subject_ids,
+                    episode_num=0,
+                    timeout_sec=30
+                )
+            except TimeoutError as e:
+                pytest.fail(f"Export files not found: {e}")
+    
+            # Run comparison
+            exit_code, output = run_comparison(file1, file2, verbose=True)
+    
+            print(f"\nComparison output:\n{output}")
+    
+            # Assert parity
+            if exit_code != 0:
+>               pytest.fail(
+                    f"Data parity check failed with active inputs + {latency_ms}ms latency "
+                    f"(exit code {exit_code}):\n{output}"
+                )
+E               Failed: Data parity check failed with active inputs + 100ms latency (exit code 1):
+E               Comparing: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv vs ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv
+E               ======================================================================
+E               Rows: 450 vs 450
+E               Columns: 36 vs 36
+E               
+E               DIVERGENCES FOUND:
+E                 Column 'actions.0' has 79 divergences
+E                   Row 3: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=6
+E                   Row 8: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=1, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=6
+E                   Row 10: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=1, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=6
+E                   Row 15: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=1, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=6
+E                   Row 19: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=0, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=6
+E                   ... and 74 more divergences
+E                 Column 'actions.1' has 59 divergences
+E                   Row 39: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=6, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=2
+E                   Row 45: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=6, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=3
+E                   Row 51: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=6, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=5
+E                   Row 57: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=6, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=4
+E                   Row 63: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=6, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=5
+E                   ... and 54 more divergences
+E                 Column 'infos.0.col' has 244 divergences
+E                   Row 56: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=3, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=4
+E                   Row 57: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=3, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=4
+E                   Row 58: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=3, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=4
+E                   Row 59: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=3, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=4
+E                   Row 60: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=3, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=4
+E                   ... and 239 more divergences
+E                 Column 'infos.0.direction' has 288 divergences
+E                   Row 3: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=0
+E                   Row 4: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=0
+E                   Row 5: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=0
+E                   Row 6: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=0
+E                   Row 7: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=0
+E                   ... and 283 more divergences
+E                 Column 'infos.0.row' has 160 divergences
+E                   Row 19: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=3
+E                   Row 20: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=3
+E                   Row 21: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=3
+E                   Row 22: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=3
+E                   Row 23: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=3
+E                   ... and 155 more divergences
+E                 Column 'infos.1.col' has 154 divergences
+E                   Row 45: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=3
+E                   Row 46: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=3
+E                   Row 47: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=3
+E                   Row 48: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=3
+E                   Row 49: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=3
+E                   ... and 149 more divergences
+E                 Column 'infos.1.direction' has 274 divergences
+E                   Row 45: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=0
+E                   Row 46: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=0
+E                   Row 47: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=0
+E                   Row 48: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=0
+E                   Row 49: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=0
+E                   ... and 269 more divergences
+E                 Column 'infos.1.row' has 114 divergences
+E                   Row 178: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=3, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=2
+E                   Row 179: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=3, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=2
+E                   Row 180: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=3, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=2
+E                   Row 181: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=3, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=2
+E                   Row 182: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=3, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=2
+E                   ... and 109 more divergences
+
+tests/e2e/test_latency_injection.py:384: Failed
+----------------------------- Captured stdout call -----------------------------
+
+[Active Input + 100ms Latency] Started random actions
+
+Comparison output:
+Comparing: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv vs ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv
+======================================================================
+Rows: 450 vs 450
+Columns: 36 vs 36
+
+DIVERGENCES FOUND:
+  Column 'actions.0' has 79 divergences
+    Row 3: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=6
+    Row 8: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=1, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=6
+    Row 10: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=1, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=6
+    Row 15: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=1, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=6
+    Row 19: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=0, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=6
+    ... and 74 more divergences
+  Column 'actions.1' has 59 divergences
+    Row 39: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=6, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=2
+    Row 45: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=6, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=3
+    Row 51: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=6, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=5
+    Row 57: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=6, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=4
+    Row 63: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=6, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=5
+    ... and 54 more divergences
+  Column 'infos.0.col' has 244 divergences
+    Row 56: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=3, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=4
+    Row 57: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=3, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=4
+    Row 58: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=3, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=4
+    Row 59: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=3, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=4
+    Row 60: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=3, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=4
+    ... and 239 more divergences
+  Column 'infos.0.direction' has 288 divergences
+    Row 3: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=0
+    Row 4: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=0
+    Row 5: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=0
+    Row 6: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=0
+    Row 7: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=0
+    ... and 283 more divergences
+  Column 'infos.0.row' has 160 divergences
+    Row 19: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=3
+    Row 20: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=3
+    Row 21: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=3
+    Row 22: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=3
+    Row 23: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=3
+    ... and 155 more divergences
+  Column 'infos.1.col' has 154 divergences
+    Row 45: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=3
+    Row 46: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=3
+    Row 47: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=3
+    Row 48: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=3
+    Row 49: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=3
+    ... and 149 more divergences
+  Column 'infos.1.direction' has 274 divergences
+    Row 45: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=0
+    Row 46: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=0
+    Row 47: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=0
+    Row 48: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=0
+    Row 49: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=0
+    ... and 269 more divergences
+  Column 'infos.1.row' has 114 divergences
+    Row 178: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=3, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=2
+    Row 179: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=3, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=2
+    Row 180: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=3, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=2
+    Row 181: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=3, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=2
+    Row 182: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=3, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=2
+    ... and 109 more divergences
+__________ test_episode_completion_under_fixed_latency[chromium-200] ___________
+
+flask_server = {'process': <Popen: returncode: None args: ['python', '-m', 'interactive_gym.examples.co...>, 'url': 'http://localhost:5702'}
+player_contexts = (<Page url='chrome-error://chromewebdata/'>, <Page url='about:blank'>)
+latency_ms = 200
+
+    @pytest.mark.parametrize("latency_ms", [100, 200])
+    @pytest.mark.timeout(300)  # 5 minutes max per test
+    def test_episode_completion_under_fixed_latency(flask_server, player_contexts, latency_ms):
+        """
+        Test that episode completes under fixed symmetric latency.
+    
+        Validates NET-01: Game should handle 100ms and 200ms symmetric latency
+        without breaking gameplay or data recording.
+    
+        Both players experience the same latency (symmetric condition).
+        """
+        page1, page2 = player_contexts
+        base_url = flask_server["url"]
+    
+        # Apply same latency to both players BEFORE navigation
+        # (CDP session created on existing page, affects subsequent requests)
+        cdp1 = apply_latency(page1, latency_ms)
+        cdp2 = apply_latency(page2, latency_ms)
+    
+        try:
+            # Run full episode flow
+>           final_state1, final_state2 = run_full_episode_flow(page1, page2, base_url)
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/e2e/test_latency_injection.py:143: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+page1 = <Page url='chrome-error://chromewebdata/'>
+page2 = <Page url='about:blank'>, base_url = 'http://localhost:5702'
+episode_timeout = 180000, setup_timeout = 120000
+
+    def run_full_episode_flow(
+        page1, page2, base_url: str,
+        episode_timeout: int = 180000,
+        setup_timeout: int = 120000
+    ) -> tuple:
+        """
+        Run the full game flow through one complete episode.
+    
+        This helper encapsulates the game progression flow shared by all latency tests.
+    
+        Args:
+            page1: Player 1's Playwright page
+            page2: Player 2's Playwright page
+            base_url: Flask server URL
+            episode_timeout: Timeout for episode completion in milliseconds
+            setup_timeout: Timeout for game setup (tutorial, matchmaking) in milliseconds
+    
+        Returns:
+            tuple: (final_state1, final_state2) with game state dicts for both players
+        """
+        # Navigate to game
+>       page1.goto(base_url)
+
+tests/e2e/test_latency_injection.py:71: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <Page url='chrome-error://chromewebdata/'>, url = 'http://localhost:5702'
+
+    def goto(
+        self,
+        url: str,
+        *,
+        timeout: typing.Optional[float] = None,
+        wait_until: typing.Optional[
+            Literal["commit", "domcontentloaded", "load", "networkidle"]
+        ] = None,
+        referer: typing.Optional[str] = None,
+    ) -> typing.Optional["Response"]:
+        """Page.goto
+    
+        Returns the main resource response. In case of multiple redirects, the navigation will resolve with the first
+        non-redirect response.
+    
+        The method will throw an error if:
+        - there's an SSL error (e.g. in case of self-signed certificates).
+        - target URL is invalid.
+        - the `timeout` is exceeded during navigation.
+        - the remote server does not respond or is unreachable.
+        - the main resource failed to load.
+    
+        The method will not throw an error when any valid HTTP status code is returned by the remote server, including 404
+        \"Not Found\" and 500 \"Internal Server Error\".  The status code for such responses can be retrieved by calling
+        `response.status()`.
+    
+        **NOTE** The method either throws an error or returns a main resource response. The only exceptions are navigation
+        to `about:blank` or navigation to the same URL with a different hash, which would succeed and return `null`.
+    
+        **NOTE** Headless mode doesn't support navigation to a PDF document. See the
+        [upstream issue](https://bugs.chromium.org/p/chromium/issues/detail?id=761295).
+    
+        Parameters
+        ----------
+        url : str
+            URL to navigate page to. The url should include scheme, e.g. `https://`. When a `baseURL` via the context options
+            was provided and the passed URL is a path, it gets merged via the
+            [`new URL()`](https://developer.mozilla.org/en-US/docs/Web/API/URL/URL) constructor.
+        timeout : Union[float, None]
+            Maximum operation time in milliseconds, defaults to 30 seconds, pass `0` to disable timeout. The default value can
+            be changed by using the `browser_context.set_default_navigation_timeout()`,
+            `browser_context.set_default_timeout()`, `page.set_default_navigation_timeout()` or
+            `page.set_default_timeout()` methods.
+        wait_until : Union["commit", "domcontentloaded", "load", "networkidle", None]
+            When to consider operation succeeded, defaults to `load`. Events can be either:
+            - `'domcontentloaded'` - consider operation to be finished when the `DOMContentLoaded` event is fired.
+            - `'load'` - consider operation to be finished when the `load` event is fired.
+            - `'networkidle'` - **DISCOURAGED** consider operation to be finished when there are no network connections for
+              at least `500` ms. Don't use this method for testing, rely on web assertions to assess readiness instead.
+            - `'commit'` - consider operation to be finished when network response is received and the document started
+              loading.
+        referer : Union[str, None]
+            Referer header value. If provided it will take preference over the referer header value set by
+            `page.set_extra_http_headers()`.
+    
+        Returns
+        -------
+        Union[Response, None]
+        """
+    
+        return mapping.from_impl_nullable(
+>           self._sync(
+                self._impl_obj.goto(
+                    url=url, timeout=timeout, waitUntil=wait_until, referer=referer
+                )
+            )
+        )
+
+/opt/anaconda3/lib/python3.11/site-packages/playwright/sync_api/_generated.py:9054: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <Page url='chrome-error://chromewebdata/'>, url = 'http://localhost:5702'
+timeout = None, waitUntil = None, referer = None
+
+    async def goto(
+        self,
+        url: str,
+        timeout: float = None,
+        waitUntil: DocumentLoadState = None,
+        referer: str = None,
+    ) -> Optional[Response]:
+>       return await self._main_frame.goto(**locals_to_params(locals()))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+/opt/anaconda3/lib/python3.11/site-packages/playwright/_impl/_page.py:552: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <Frame name= url='chrome-error://chromewebdata/'>
+url = 'http://localhost:5702', timeout = None, waitUntil = None, referer = None
+
+    async def goto(
+        self,
+        url: str,
+        timeout: float = None,
+        waitUntil: DocumentLoadState = None,
+        referer: str = None,
+    ) -> Optional[Response]:
+        return cast(
+            Optional[Response],
+            from_nullable_channel(
+>               await self._channel.send(
+                    "goto", self._navigation_timeout, locals_to_params(locals())
+                )
+            ),
+        )
+
+/opt/anaconda3/lib/python3.11/site-packages/playwright/_impl/_frame.py:153: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <playwright._impl._connection.Channel object at 0x1125cd7d0>
+method = 'goto'
+timeout_calculator = <bound method Frame._navigation_timeout of <Frame name= url='chrome-error://chromewebdata/'>>
+params = {'timeout': 30000, 'url': 'http://localhost:5702'}, is_internal = False
+title = None
+
+    async def send(
+        self,
+        method: str,
+        timeout_calculator: TimeoutCalculator,
+        params: Dict = None,
+        is_internal: bool = False,
+        title: str = None,
+    ) -> Any:
+>       return await self._connection.wrap_api_call(
+            lambda: self._inner_send(method, timeout_calculator, params, False),
+            is_internal,
+            title,
+        )
+
+/opt/anaconda3/lib/python3.11/site-packages/playwright/_impl/_connection.py:69: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <playwright._impl._connection.Connection object at 0x111c535d0>
+cb = <function Channel.send.<locals>.<lambda> at 0x1125d0360>
+is_internal = False, title = None
+
+    async def wrap_api_call(
+        self, cb: Callable[[], Any], is_internal: bool = False, title: str = None
+    ) -> Any:
+        if self._api_zone.get():
+            return await cb()
+        task = asyncio.current_task(self._loop)
+        st: List[inspect.FrameInfo] = getattr(
+            task, "__pw_stack__", None
+        ) or inspect.stack(0)
+    
+        parsed_st = _extract_stack_trace_information_from_stack(st, is_internal, title)
+        self._api_zone.set(parsed_st)
+        try:
+            return await cb()
+        except Exception as error:
+>           raise rewrite_error(error, f"{parsed_st['apiName']}: {error}") from None
+E           playwright._impl._errors.TimeoutError: Page.goto: Timeout 30000ms exceeded.
+E           Call log:
+E             - navigating to "http://localhost:5702/", waiting until "load"
+
+/opt/anaconda3/lib/python3.11/site-packages/playwright/_impl/_connection.py:559: TimeoutError
+_________________ test_active_input_with_latency[chromium-200] _________________
+
+flask_server = {'process': <Popen: returncode: None args: ['python', '-m', 'interactive_gym.examples.co...>, 'url': 'http://localhost:5702'}
+player_contexts = (<Page url='about:blank'>, <Page url='about:blank'>)
+latency_ms = 200
+
+    @pytest.mark.parametrize("latency_ms", [100, 200])
+    @pytest.mark.timeout(300)  # 5 minutes max per test
+    def test_active_input_with_latency(flask_server, player_contexts, latency_ms):
+        """
+        Test data parity when both players actively input actions under latency.
+    
+        This is the critical test: real inputs + real latency = realistic gameplay.
+        Previous tests let players idle (Noop action), which could mask bugs in
+        action recording during rollbacks.
+    
+        Validates dual-buffer fixes from Phases 48-49:
+        - Phase 48: isFocused column consistency (getFocusStatePerPlayer)
+        - Phase 49: Episode boundary row parity (BOUND-02/03 guards)
+    
+        This test validates that:
+        1. Real inputs are correctly recorded under latency
+        2. Rollback correction handles real action values, not just Noop
+        3. Both players export identical data despite network delays
+    
+        Configuration:
+        - Player 1: random actions every 150ms
+        - Player 2: random actions every 200ms + network latency
+        - Different intervals create input conflicts that stress rollback handling
+        """
+        page1, page2 = player_contexts
+        base_url = flask_server["url"]
+    
+        # Apply latency to player 2 BEFORE navigation
+        cdp2 = apply_latency(page2, latency_ms=latency_ms)
+    
+        try:
+            # Run through to gameplay
+>           run_full_episode_flow_until_gameplay(page1, page2, base_url)
+
+tests/e2e/test_latency_injection.py:324: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+page1 = <Page url='about:blank'>, page2 = <Page url='about:blank'>
+base_url = 'http://localhost:5702'
+
+    def run_full_episode_flow_until_gameplay(page1: Page, page2: Page, base_url: str) -> None:
+        """
+        Progress both players from navigation to active gameplay.
+    
+        This helper runs both players through:
+        1. Navigate to base URL
+        2. Wait for socket connection
+        3. Click advance button (instructions)
+        4. Click start button (multiplayer matchmaking)
+        5. Wait for game canvas and game object
+    
+        Note: Tutorial scene is disabled in test config for faster execution.
+    
+        After this function returns, both players are in-game and ready
+        for action injection or waiting for episode completion.
+    
+        Args:
+            page1: Playwright Page for player 1
+            page2: Playwright Page for player 2
+            base_url: Flask server URL
+        """
+        # Navigate to game
+>       page1.goto(base_url)
+
+tests/fixtures/game_helpers.py:255: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <Page url='about:blank'>, url = 'http://localhost:5702'
+
+    def goto(
+        self,
+        url: str,
+        *,
+        timeout: typing.Optional[float] = None,
+        wait_until: typing.Optional[
+            Literal["commit", "domcontentloaded", "load", "networkidle"]
+        ] = None,
+        referer: typing.Optional[str] = None,
+    ) -> typing.Optional["Response"]:
+        """Page.goto
+    
+        Returns the main resource response. In case of multiple redirects, the navigation will resolve with the first
+        non-redirect response.
+    
+        The method will throw an error if:
+        - there's an SSL error (e.g. in case of self-signed certificates).
+        - target URL is invalid.
+        - the `timeout` is exceeded during navigation.
+        - the remote server does not respond or is unreachable.
+        - the main resource failed to load.
+    
+        The method will not throw an error when any valid HTTP status code is returned by the remote server, including 404
+        \"Not Found\" and 500 \"Internal Server Error\".  The status code for such responses can be retrieved by calling
+        `response.status()`.
+    
+        **NOTE** The method either throws an error or returns a main resource response. The only exceptions are navigation
+        to `about:blank` or navigation to the same URL with a different hash, which would succeed and return `null`.
+    
+        **NOTE** Headless mode doesn't support navigation to a PDF document. See the
+        [upstream issue](https://bugs.chromium.org/p/chromium/issues/detail?id=761295).
+    
+        Parameters
+        ----------
+        url : str
+            URL to navigate page to. The url should include scheme, e.g. `https://`. When a `baseURL` via the context options
+            was provided and the passed URL is a path, it gets merged via the
+            [`new URL()`](https://developer.mozilla.org/en-US/docs/Web/API/URL/URL) constructor.
+        timeout : Union[float, None]
+            Maximum operation time in milliseconds, defaults to 30 seconds, pass `0` to disable timeout. The default value can
+            be changed by using the `browser_context.set_default_navigation_timeout()`,
+            `browser_context.set_default_timeout()`, `page.set_default_navigation_timeout()` or
+            `page.set_default_timeout()` methods.
+        wait_until : Union["commit", "domcontentloaded", "load", "networkidle", None]
+            When to consider operation succeeded, defaults to `load`. Events can be either:
+            - `'domcontentloaded'` - consider operation to be finished when the `DOMContentLoaded` event is fired.
+            - `'load'` - consider operation to be finished when the `load` event is fired.
+            - `'networkidle'` - **DISCOURAGED** consider operation to be finished when there are no network connections for
+              at least `500` ms. Don't use this method for testing, rely on web assertions to assess readiness instead.
+            - `'commit'` - consider operation to be finished when network response is received and the document started
+              loading.
+        referer : Union[str, None]
+            Referer header value. If provided it will take preference over the referer header value set by
+            `page.set_extra_http_headers()`.
+    
+        Returns
+        -------
+        Union[Response, None]
+        """
+    
+        return mapping.from_impl_nullable(
+>           self._sync(
+                self._impl_obj.goto(
+                    url=url, timeout=timeout, waitUntil=wait_until, referer=referer
+                )
+            )
+        )
+
+/opt/anaconda3/lib/python3.11/site-packages/playwright/sync_api/_generated.py:9054: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <Page url='about:blank'>, url = 'http://localhost:5702', timeout = None
+waitUntil = None, referer = None
+
+    async def goto(
+        self,
+        url: str,
+        timeout: float = None,
+        waitUntil: DocumentLoadState = None,
+        referer: str = None,
+    ) -> Optional[Response]:
+>       return await self._main_frame.goto(**locals_to_params(locals()))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+/opt/anaconda3/lib/python3.11/site-packages/playwright/_impl/_page.py:552: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <Frame name= url='about:blank'>, url = 'http://localhost:5702'
+timeout = None, waitUntil = None, referer = None
+
+    async def goto(
+        self,
+        url: str,
+        timeout: float = None,
+        waitUntil: DocumentLoadState = None,
+        referer: str = None,
+    ) -> Optional[Response]:
+        return cast(
+            Optional[Response],
+            from_nullable_channel(
+>               await self._channel.send(
+                    "goto", self._navigation_timeout, locals_to_params(locals())
+                )
+            ),
+        )
+
+/opt/anaconda3/lib/python3.11/site-packages/playwright/_impl/_frame.py:153: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <playwright._impl._connection.Channel object at 0x112579fd0>
+method = 'goto'
+timeout_calculator = <bound method Frame._navigation_timeout of <Frame name= url='about:blank'>>
+params = {'timeout': 30000, 'url': 'http://localhost:5702'}, is_internal = False
+title = None
+
+    async def send(
+        self,
+        method: str,
+        timeout_calculator: TimeoutCalculator,
+        params: Dict = None,
+        is_internal: bool = False,
+        title: str = None,
+    ) -> Any:
+>       return await self._connection.wrap_api_call(
+            lambda: self._inner_send(method, timeout_calculator, params, False),
+            is_internal,
+            title,
+        )
+
+/opt/anaconda3/lib/python3.11/site-packages/playwright/_impl/_connection.py:69: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <playwright._impl._connection.Connection object at 0x111c535d0>
+cb = <function Channel.send.<locals>.<lambda> at 0x1128004a0>
+is_internal = False, title = None
+
+    async def wrap_api_call(
+        self, cb: Callable[[], Any], is_internal: bool = False, title: str = None
+    ) -> Any:
+        if self._api_zone.get():
+            return await cb()
+        task = asyncio.current_task(self._loop)
+        st: List[inspect.FrameInfo] = getattr(
+            task, "__pw_stack__", None
+        ) or inspect.stack(0)
+    
+        parsed_st = _extract_stack_trace_information_from_stack(st, is_internal, title)
+        self._api_zone.set(parsed_st)
+        try:
+            return await cb()
+        except Exception as error:
+>           raise rewrite_error(error, f"{parsed_st['apiName']}: {error}") from None
+E           playwright._impl._errors.TimeoutError: Page.goto: Timeout 30000ms exceeded.
+E           Call log:
+E             - navigating to "http://localhost:5702/", waiting until "load"
+
+/opt/anaconda3/lib/python3.11/site-packages/playwright/_impl/_connection.py:559: TimeoutError
+=========================== short test summary info ============================
+FAILED tests/e2e/test_latency_injection.py::test_active_input_with_latency[chromium-100] - Failed: Data parity check failed with active inputs + 100ms latency (exit code 1):
+Comparing: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv vs ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv
+======================================================================
+Rows: 450 vs 450
+Columns: 36 vs 36
+
+DIVERGENCES FOUND:
+  Column 'actions.0' has 79 divergences
+    Row 3: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=6
+    Row 8: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=1, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=6
+    Row 10: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=1, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=6
+    Row 15: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=1, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=6
+    Row 19: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=0, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=6
+    ... and 74 more divergences
+  Column 'actions.1' has 59 divergences
+    Row 39: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=6, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=2
+    Row 45: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=6, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=3
+    Row 51: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=6, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=5
+    Row 57: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=6, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=4
+    Row 63: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=6, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=5
+    ... and 54 more divergences
+  Column 'infos.0.col' has 244 divergences
+    Row 56: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=3, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=4
+    Row 57: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=3, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=4
+    Row 58: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=3, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=4
+    Row 59: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=3, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=4
+    Row 60: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=3, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=4
+    ... and 239 more divergences
+  Column 'infos.0.direction' has 288 divergences
+    Row 3: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=0
+    Row 4: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=0
+    Row 5: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=0
+    Row 6: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=0
+    Row 7: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=0
+    ... and 283 more divergences
+  Column 'infos.0.row' has 160 divergences
+    Row 19: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=3
+    Row 20: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=3
+    Row 21: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=3
+    Row 22: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=3
+    Row 23: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=3
+    ... and 155 more divergences
+  Column 'infos.1.col' has 154 divergences
+    Row 45: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=3
+    Row 46: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=3
+    Row 47: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=3
+    Row 48: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=3
+    Row 49: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=3
+    ... and 149 more divergences
+  Column 'infos.1.direction' has 274 divergences
+    Row 45: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=0
+    Row 46: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=0
+    Row 47: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=0
+    Row 48: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=0
+    Row 49: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=2, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=0
+    ... and 269 more divergences
+  Column 'infos.1.row' has 114 divergences
+    Row 178: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=3, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=2
+    Row 179: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=3, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=2
+    Row 180: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=3, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=2
+    Row 181: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=3, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=2
+    Row 182: 9225c40b-1477-494b-86dd-9a5ed2e400f6_ep0.csv=3, ff157dd7-6505-4b92-81bf-25081ce1b337_ep0.csv=2
+    ... and 109 more divergences
+FAILED tests/e2e/test_latency_injection.py::test_episode_completion_under_fixed_latency[chromium-200] - playwright._impl._errors.TimeoutError: Page.goto: Timeout 30000ms exceeded.
+Call log:
+  - navigating to "http://localhost:5702/", waiting until "load"
+FAILED tests/e2e/test_latency_injection.py::test_active_input_with_latency[chromium-200] - playwright._impl._errors.TimeoutError: Page.goto: Timeout 30000ms exceeded.
+Call log:
+  - navigating to "http://localhost:5702/", waiting until "load"
+=================== 3 failed, 3 passed in 184.49s (0:03:04) ====================
+========== tests/e2e/test_network_disruption.py ==========
+============================= test session starts ==============================
+platform darwin -- Python 3.11.7, pytest-9.0.2, pluggy-1.6.0 -- /opt/anaconda3/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/chasemcd/Repositories/interactive-gym
+configfile: pytest.ini
+plugins: playwright-0.7.2, timeout-2.4.0, base-url-2.1.0, jaxtyping-0.3.6, anyio-4.2.0
+timeout: 300.0s
+timeout method: signal
+timeout func_only: False
+collecting ... collected 3 items
+
+tests/e2e/test_network_disruption.py::test_packet_loss_triggers_rollback[chromium] PASSED [ 33%]
+tests/e2e/test_network_disruption.py::test_tab_visibility_triggers_fast_forward[chromium] PASSED [ 66%]
+tests/e2e/test_network_disruption.py::test_active_input_with_packet_loss[chromium] FAILED [100%]
+
+=================================== FAILURES ===================================
+_________________ test_active_input_with_packet_loss[chromium] _________________
+
+flask_server = {'process': <Popen: returncode: None args: ['python', '-m', 'interactive_gym.examples.co...>, 'url': 'http://localhost:5702'}
+player_contexts = (<Page url='http://localhost:5702/0b755512-e9b8-4d8a-9ca9-e68854c805fb'>, <Page url='http://localhost:5702/c9bc4c89-4088-43cf-9e94-b77dcaa76b75'>)
+
+    @pytest.mark.timeout(300)  # 5 minutes max
+    def test_active_input_with_packet_loss(flask_server, player_contexts):
+        """
+        Test data parity when both players actively input actions under packet loss.
+    
+        This is the most stress-testing scenario because:
+        1. Packet loss causes rollbacks which re-predict actions
+        2. With active inputs (not just Noop), rollback correction must handle
+           real action values being overwritten and restored
+        3. Both players are injecting different actions at different times
+    
+        Validates dual-buffer fixes from Phases 48-49:
+        - Phase 48: isFocused column consistency (getFocusStatePerPlayer)
+        - Phase 49: Episode boundary row parity (BOUND-02/03 guards)
+    
+        This validates that:
+        - Rollback correctly restores actual action values
+        - The dual-buffer data recording handles misprediction correction
+        - Export parity is maintained despite frequent rollbacks
+    
+        Configuration:
+        - Player 1: random actions every 150ms, no packet loss
+        - Player 2: random actions every 200ms, 15% packet loss + 50ms latency
+        """
+        page1, page2 = player_contexts
+        base_url = flask_server["url"]
+    
+        # Apply packet loss to player 2 BEFORE navigation
+        cdp2 = apply_packet_loss(page2, packet_loss_percent=15, latency_ms=50)
+    
+        try:
+            # Run through to gameplay
+            run_full_episode_flow_until_gameplay(page1, page2, base_url)
+    
+            # Verify both players are in same game
+            state1 = get_game_state(page1)
+            state2 = get_game_state(page2)
+            assert state1["gameId"] == state2["gameId"], "Players should be in same game"
+            assert state1["playerId"] != state2["playerId"], "Players should have different IDs"
+    
+            # Start random action injection on both players
+            interval1 = start_random_actions(page1, interval_ms=150)
+            interval2 = start_random_actions(page2, interval_ms=200)
+    
+            print(f"\n[Active Input + 15% Packet Loss] Started random actions")
+    
+            try:
+                # Wait for episode completion
+                wait_for_episode_complete(page1, episode_num=1, timeout=180000)
+                wait_for_episode_complete(page2, episode_num=1, timeout=180000)
+            finally:
+                stop_random_actions(page1, interval1)
+                stop_random_actions(page2, interval2)
+    
+            # Verify rollbacks occurred (packet loss causes mispredictions)
+            stats1 = get_rollback_stats(page1)
+            stats2 = get_rollback_stats(page2)
+            total_rollbacks = (stats1['rollbackCount'] or 0) + (stats2['rollbackCount'] or 0)
+    
+            print(f"  Rollback statistics:")
+            print(f"    Player 1: rollbacks={stats1['rollbackCount']}, maxFrames={stats1['maxRollbackFrames']}")
+            print(f"    Player 2: rollbacks={stats2['rollbackCount']}, maxFrames={stats2['maxRollbackFrames']}")
+            print(f"    Total rollbacks: {total_rollbacks}")
+    
+            # Note: Rollbacks may not always occur with 15% packet loss - timing dependent.
+            # The data parity check below is the primary validation.
+            if total_rollbacks == 0:
+                print("  WARNING: No rollbacks occurred despite packet loss (timing dependent)")
+                print("  Proceeding with data parity check as primary validation")
+    
+            # Note: Action stats verification after episode completion is unreliable
+            # because frameDataBuffer is cleared after export. The export comparison
+            # below verifies that actions were correctly recorded despite packet loss.
+    
+            # Get final states
+            final_state1 = get_game_state(page1)
+            final_state2 = get_game_state(page2)
+    
+            # Verify completion
+            assert final_state1["numEpisodes"] >= 1, "Player 1 should complete 1+ episodes"
+            assert final_state2["numEpisodes"] >= 1, "Player 2 should complete 1+ episodes"
+    
+            # Extract identifiers for export files
+            experiment_id = get_experiment_id()
+            scene_id = get_scene_id(page1)
+            assert scene_id, "Could not get scene ID from game"
+    
+            subject_ids = get_subject_ids_from_pages(page1, page2)
+    
+            # Wait for export files
+            # Note: episode_num is 0-indexed in file names, so first episode is _ep0.csv
+            try:
+                file1, file2 = wait_for_export_files(
+                    experiment_id=experiment_id,
+                    scene_id=scene_id,
+                    subject_ids=subject_ids,
+                    episode_num=0,  # 0-indexed: first episode
+                    timeout_sec=30
+                )
+            except TimeoutError as e:
+                pytest.fail(f"Export files not found: {e}")
+    
+            # Run comparison
+            exit_code, output = run_comparison(file1, file2, verbose=True)
+    
+            print(f"\nComparison output:\n{output}")
+    
+            # Assert parity
+            if exit_code != 0:
+>               pytest.fail(
+                    f"Data parity check failed with active inputs + packet loss "
+                    f"(exit code {exit_code}):\n{output}"
+                )
+E               Failed: Data parity check failed with active inputs + packet loss (exit code 1):
+E               Comparing: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv vs c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv
+E               ======================================================================
+E               Rows: 450 vs 450
+E               Columns: 36 vs 36
+E               
+E               DIVERGENCES FOUND:
+E                 Column 'actions.0' has 18 divergences
+E                   Row 8: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=3, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=6
+E                   Row 11: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=2, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=6
+E                   Row 16: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=0, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=6
+E                   Row 20: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=3, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=6
+E                   Row 25: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=3, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=6
+E                   ... and 13 more divergences
+E                 Column 'actions.1' has 1 divergences
+E                   Row 150: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=6, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=4
+E                 Column 'infos.0.col' has 72 divergences
+E                   Row 8: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=4, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=3
+E                   Row 9: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=4, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=3
+E                   Row 10: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=4, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=3
+E                   Row 20: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=4, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=3
+E                   Row 21: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=4, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=3
+E                   ... and 67 more divergences
+E                 Column 'infos.0.direction' has 73 divergences
+E                   Row 8: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=0, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=1
+E                   Row 9: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=0, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=1
+E                   Row 10: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=0, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=1
+E                   Row 11: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=2, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=1
+E                   Row 12: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=2, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=1
+E                   ... and 68 more divergences
+E                 Column 'infos.0.row' has 68 divergences
+E                   Row 16: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=2, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=3
+E                   Row 17: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=2, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=3
+E                   Row 18: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=2, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=3
+E                   Row 19: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=2, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=3
+E                   Row 20: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=2, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=3
+E                   ... and 63 more divergences
+E                 Column 'infos.1.col' has 157 divergences
+E                   Row 96: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=3, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=2
+E                   Row 97: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=3, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=2
+E                   Row 98: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=3, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=2
+E                   Row 99: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=3, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=2
+E                   Row 100: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=3, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=2
+E                   ... and 152 more divergences
+E                 Column 'infos.1.row' has 31 divergences
+E                   Row 156: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=3, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=2
+E                   Row 157: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=3, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=2
+E                   Row 158: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=3, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=2
+E                   Row 159: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=3, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=2
+E                   Row 160: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=3, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=2
+E                   ... and 26 more divergences
+
+tests/e2e/test_network_disruption.py:367: Failed
+----------------------------- Captured stdout call -----------------------------
+
+[Active Input + 15% Packet Loss] Started random actions
+  Rollback statistics:
+    Player 1: rollbacks=1, maxFrames=1
+    Player 2: rollbacks=18, maxFrames=3
+    Total rollbacks: 19
+
+Comparison output:
+Comparing: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv vs c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv
+======================================================================
+Rows: 450 vs 450
+Columns: 36 vs 36
+
+DIVERGENCES FOUND:
+  Column 'actions.0' has 18 divergences
+    Row 8: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=3, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=6
+    Row 11: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=2, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=6
+    Row 16: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=0, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=6
+    Row 20: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=3, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=6
+    Row 25: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=3, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=6
+    ... and 13 more divergences
+  Column 'actions.1' has 1 divergences
+    Row 150: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=6, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=4
+  Column 'infos.0.col' has 72 divergences
+    Row 8: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=4, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=3
+    Row 9: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=4, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=3
+    Row 10: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=4, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=3
+    Row 20: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=4, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=3
+    Row 21: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=4, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=3
+    ... and 67 more divergences
+  Column 'infos.0.direction' has 73 divergences
+    Row 8: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=0, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=1
+    Row 9: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=0, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=1
+    Row 10: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=0, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=1
+    Row 11: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=2, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=1
+    Row 12: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=2, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=1
+    ... and 68 more divergences
+  Column 'infos.0.row' has 68 divergences
+    Row 16: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=2, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=3
+    Row 17: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=2, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=3
+    Row 18: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=2, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=3
+    Row 19: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=2, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=3
+    Row 20: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=2, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=3
+    ... and 63 more divergences
+  Column 'infos.1.col' has 157 divergences
+    Row 96: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=3, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=2
+    Row 97: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=3, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=2
+    Row 98: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=3, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=2
+    Row 99: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=3, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=2
+    Row 100: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=3, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=2
+    ... and 152 more divergences
+  Column 'infos.1.row' has 31 divergences
+    Row 156: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=3, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=2
+    Row 157: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=3, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=2
+    Row 158: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=3, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=2
+    Row 159: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=3, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=2
+    Row 160: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=3, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=2
+    ... and 26 more divergences
+=========================== short test summary info ============================
+FAILED tests/e2e/test_network_disruption.py::test_active_input_with_packet_loss[chromium] - Failed: Data parity check failed with active inputs + packet loss (exit code 1):
+Comparing: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv vs c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv
+======================================================================
+Rows: 450 vs 450
+Columns: 36 vs 36
+
+DIVERGENCES FOUND:
+  Column 'actions.0' has 18 divergences
+    Row 8: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=3, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=6
+    Row 11: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=2, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=6
+    Row 16: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=0, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=6
+    Row 20: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=3, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=6
+    Row 25: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=3, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=6
+    ... and 13 more divergences
+  Column 'actions.1' has 1 divergences
+    Row 150: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=6, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=4
+  Column 'infos.0.col' has 72 divergences
+    Row 8: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=4, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=3
+    Row 9: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=4, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=3
+    Row 10: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=4, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=3
+    Row 20: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=4, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=3
+    Row 21: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=4, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=3
+    ... and 67 more divergences
+  Column 'infos.0.direction' has 73 divergences
+    Row 8: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=0, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=1
+    Row 9: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=0, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=1
+    Row 10: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=0, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=1
+    Row 11: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=2, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=1
+    Row 12: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=2, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=1
+    ... and 68 more divergences
+  Column 'infos.0.row' has 68 divergences
+    Row 16: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=2, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=3
+    Row 17: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=2, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=3
+    Row 18: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=2, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=3
+    Row 19: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=2, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=3
+    Row 20: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=2, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=3
+    ... and 63 more divergences
+  Column 'infos.1.col' has 157 divergences
+    Row 96: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=3, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=2
+    Row 97: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=3, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=2
+    Row 98: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=3, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=2
+    Row 99: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=3, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=2
+    Row 100: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=3, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=2
+    ... and 152 more divergences
+  Column 'infos.1.row' has 31 divergences
+    Row 156: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=3, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=2
+    Row 157: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=3, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=2
+    Row 158: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=3, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=2
+    Row 159: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=3, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=2
+    Row 160: 0b755512-e9b8-4d8a-9ca9-e68854c805fb_ep0.csv=3, c9bc4c89-4088-43cf-9e94-b77dcaa76b75_ep0.csv=2
+    ... and 26 more divergences
+==================== 1 failed, 2 passed in 91.33s (0:01:31) ====================
+========== tests/e2e/test_multi_participant.py ==========
+============================= test session starts ==============================
+platform darwin -- Python 3.11.7, pytest-9.0.2, pluggy-1.6.0 -- /opt/anaconda3/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/chasemcd/Repositories/interactive-gym
+configfile: pytest.ini
+plugins: playwright-0.7.2, timeout-2.4.0, base-url-2.1.0, jaxtyping-0.3.6, anyio-4.2.0
+timeout: 300.0s
+timeout method: signal
+timeout func_only: False
+collecting ... collected 2 items
+
+tests/e2e/test_multi_participant.py::test_three_simultaneous_games[chromium] PASSED [ 50%]
+tests/e2e/test_multi_participant.py::test_staggered_participant_arrival[chromium] PASSED [100%]
+
+======================== 2 passed in 154.95s (0:02:34) =========================
+========== tests/e2e/test_lifecycle_stress.py ==========
+============================= test session starts ==============================
+platform darwin -- Python 3.11.7, pytest-9.0.2, pluggy-1.6.0 -- /opt/anaconda3/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/chasemcd/Repositories/interactive-gym
+configfile: pytest.ini
+plugins: playwright-0.7.2, timeout-2.4.0, base-url-2.1.0, jaxtyping-0.3.6, anyio-4.2.0
+timeout: 300.0s
+timeout method: signal
+timeout func_only: False
+collecting ... collected 5 items
+
+tests/e2e/test_lifecycle_stress.py::test_multi_episode_completion[chromium] FAILED [ 20%]
+tests/e2e/test_lifecycle_stress.py::test_mid_game_disconnect[chromium] PASSED [ 40%]
+tests/e2e/test_lifecycle_stress.py::test_waitroom_disconnect_isolation[chromium] PASSED [ 60%]
+tests/e2e/test_lifecycle_stress.py::test_focus_loss_timeout[chromium] PASSED [ 80%]
+tests/e2e/test_lifecycle_stress.py::test_mixed_lifecycle_scenarios[chromium] PASSED [100%]
+
+=================================== FAILURES ===================================
+___________________ test_multi_episode_completion[chromium] ____________________
+
+multi_participant_contexts = (<Page url='http://localhost:5706/35062cc9-f814-4135-a0ac-fd9e542154de'>, <Page url='http://localhost:5706/903b3ede-56...t:5706/67c4c474-edbe-4dab-bb07-6f56cbda842c'>, <Page url='http://localhost:5706/0854da1c-cc5c-4363-980d-8952dea7a56e'>)
+flask_server_multi_episode_fresh = {'experiment_id': 'overcooked_multiplayer_hh_multi_episode_test', 'num_episodes': 2, 'process': <Popen: returncode: None args: ['python', '-m', 'interactive_gym.examples.co...>, 'url': 'http://localhost:5706'}
+
+    @pytest.mark.timeout(600)  # 10 minutes for 2 episodes x 3 games
+    def test_multi_episode_completion(multi_participant_contexts, flask_server_multi_episode_fresh):
+        """
+        STRESS-02: Participant can complete 2 episodes back-to-back without state corruption.
+    
+        Validates:
+        1. All 3 games complete episode 1 successfully with verified data parity
+        2. All 3 games complete episode 2 successfully with verified data parity
+        3. No state corruption across episode boundaries
+    
+        Episode completion is confirmed via data export parity validation,
+        which verifies both players processed identical game state.
+    
+        Uses flask_server_multi_episode_fresh with num_episodes=2.
+        """
+        pages = multi_participant_contexts
+        base_url = flask_server_multi_episode_fresh["url"]
+        expected_episodes = flask_server_multi_episode_fresh["num_episodes"]
+        experiment_id = flask_server_multi_episode_fresh.get("experiment_id")
+    
+        print(f"\n[STRESS-02] Testing {expected_episodes} episodes back-to-back")
+    
+        # Create orchestrator
+        orchestrator = GameOrchestrator(pages, base_url)
+    
+        # Start all 3 games - should work without timing hacks
+        orchestrator.start_all_games(stagger_delay_sec=0.5)
+    
+        # Wait for episode 1 with parity validation
+        print("\n[STRESS-02] Episode 1: Waiting for completion with parity validation...")
+        results_ep1 = orchestrator.wait_for_all_episodes_with_parity(
+            episode_num=1,
+            episode_timeout=300000,
+            export_timeout_sec=60,
+            experiment_id=experiment_id,
+        )
+        for game_idx, status in results_ep1.items():
+>           assert status["success"], (
+                f"[STRESS-02] Game {game_idx} episode 1 failed: {status['message']}"
+            )
+E           AssertionError: [STRESS-02] Game 1 episode 1 failed: Player 1 episode completion timeout: Page.wait_for_function: Timeout 300000ms exceeded.
+E           assert False
+
+tests/e2e/test_lifecycle_stress.py:74: AssertionError
+----------------------------- Captured stdout call -----------------------------
+
+[STRESS-02] Testing 2 episodes back-to-back
+Starting 3 games with 6 participants (per-pair orchestration)...
+
+--- Game 0 (pages 0, 1) ---
+Game 0: Navigating...
+  [Game0-P1 after navigate] scene=None, socket=True, advance=False, start=False(enabled=False), canvas=False, game=False, waitroom=False, error=False
+  [Game0-P2 after navigate] scene=None, socket=False, advance=False, start=False(enabled=False), canvas=False, game=False, waitroom=False, error=False
+Game 0: Waiting for sockets...
+  [Game0-P1 after socket] scene=None, socket=True, advance=False, start=False(enabled=False), canvas=False, game=False, waitroom=False, error=False
+  [Game0-P2 after socket] scene=None, socket=True, advance=False, start=False(enabled=False), canvas=False, game=False, waitroom=False, error=False
+Game 0: Waiting for advance buttons...
+  [Game0-P1 before advance click] scene=None, socket=True, advance=True, start=False(enabled=False), canvas=False, game=False, waitroom=False, error=False
+  [Game0-P2 before advance click] scene=None, socket=True, advance=True, start=False(enabled=False), canvas=False, game=False, waitroom=False, error=False
+Game 0: Clicking advance buttons...
+  [Game0-P1 after advance click] scene=None, socket=True, advance=False, start=True(enabled=False), canvas=False, game=True, waitroom=False, error=False
+  [Game0-P2 after advance click] scene=None, socket=True, advance=False, start=True(enabled=False), canvas=False, game=True, waitroom=False, error=False
+Game 0: Waiting for start buttons to be enabled...
+  [Game0-P1 before start click] scene=None, socket=True, advance=False, start=True(enabled=True), canvas=False, game=True, waitroom=False, error=False
+  [Game0-P2 before start click] scene=None, socket=True, advance=False, start=True(enabled=True), canvas=False, game=True, waitroom=False, error=False
+Game 0: Clicking start buttons...
+  [Game0-P1 after start click] scene=None, socket=True, advance=False, start=False(enabled=False), canvas=True, game=True, waitroom=False, error=False
+  [Game0-P2 after start click] scene=None, socket=True, advance=False, start=False(enabled=False), canvas=True, game=True, waitroom=False, error=False
+Game 0: Waiting for game to start...
+  [Game0-P1 after game start] scene=None, socket=True, advance=False, start=False(enabled=False), canvas=True, game=True, waitroom=False, error=False
+  [Game0-P2 after game start] scene=None, socket=True, advance=False, start=False(enabled=False), canvas=True, game=True, waitroom=False, error=False
+Game 0: ✓ Started and verified, gameId=06fd81de-5c5a-4c58-979b-8baa3e5a978f
+
+Waiting 0.5s before Game 1...
+
+--- Game 1 (pages 2, 3) ---
+Game 1: Navigating...
+  [Game1-P1 after navigate] scene=None, socket=True, advance=False, start=False(enabled=False), canvas=False, game=False, waitroom=False, error=False
+  [Game1-P2 after navigate] scene=None, socket=False, advance=False, start=False(enabled=False), canvas=False, game=False, waitroom=False, error=False
+Game 1: Waiting for sockets...
+  [Game1-P1 after socket] scene=None, socket=True, advance=False, start=False(enabled=False), canvas=False, game=False, waitroom=False, error=False
+  [Game1-P2 after socket] scene=None, socket=True, advance=False, start=False(enabled=False), canvas=False, game=False, waitroom=False, error=False
+Game 1: Waiting for advance buttons...
+  [Game1-P1 before advance click] scene=None, socket=True, advance=True, start=False(enabled=False), canvas=False, game=False, waitroom=False, error=False
+  [Game1-P2 before advance click] scene=None, socket=True, advance=True, start=False(enabled=False), canvas=False, game=False, waitroom=False, error=False
+Game 1: Clicking advance buttons...
+  [Game1-P1 after advance click] scene=None, socket=True, advance=False, start=True(enabled=False), canvas=False, game=True, waitroom=False, error=False
+  [Game1-P2 after advance click] scene=None, socket=True, advance=False, start=True(enabled=False), canvas=False, game=True, waitroom=False, error=False
+Game 1: Waiting for start buttons to be enabled...
+  [Game1-P1 before start click] scene=None, socket=True, advance=False, start=True(enabled=True), canvas=False, game=True, waitroom=False, error=False
+  [Game1-P2 before start click] scene=None, socket=True, advance=False, start=True(enabled=True), canvas=False, game=True, waitroom=False, error=False
+Game 1: Clicking start buttons...
+  [Game1-P1 after start click] scene=None, socket=True, advance=False, start=False(enabled=False), canvas=True, game=True, waitroom=False, error=False
+  [Game1-P2 after start click] scene=None, socket=True, advance=False, start=False(enabled=False), canvas=True, game=True, waitroom=False, error=False
+Game 1: Waiting for game to start...
+  [Game1-P1 after game start] scene=None, socket=False, advance=False, start=False(enabled=False), canvas=True, game=True, waitroom=False, error=False
+  [Game1-P2 after game start] scene=None, socket=False, advance=False, start=False(enabled=False), canvas=True, game=True, waitroom=False, error=False
+Game 1: ✓ Started and verified, gameId=f8c06da2-be2f-4815-95a8-22a25b223a2c
+
+Waiting 0.5s before Game 2...
+
+--- Game 2 (pages 4, 5) ---
+Game 2: Navigating...
+  [Game2-P1 after navigate] scene=None, socket=True, advance=False, start=False(enabled=False), canvas=False, game=False, waitroom=False, error=False
+  [Game2-P2 after navigate] scene=None, socket=False, advance=False, start=False(enabled=False), canvas=False, game=False, waitroom=False, error=False
+Game 2: Waiting for sockets...
+  [Game2-P1 after socket] scene=None, socket=True, advance=False, start=False(enabled=False), canvas=False, game=False, waitroom=False, error=False
+  [Game2-P2 after socket] scene=None, socket=True, advance=False, start=False(enabled=False), canvas=False, game=False, waitroom=False, error=False
+Game 2: Waiting for advance buttons...
+  [Game2-P1 before advance click] scene=None, socket=True, advance=True, start=False(enabled=False), canvas=False, game=False, waitroom=False, error=False
+  [Game2-P2 before advance click] scene=None, socket=True, advance=True, start=False(enabled=False), canvas=False, game=False, waitroom=False, error=False
+Game 2: Clicking advance buttons...
+  [Game2-P1 after advance click] scene=None, socket=True, advance=False, start=True(enabled=False), canvas=False, game=True, waitroom=False, error=False
+  [Game2-P2 after advance click] scene=None, socket=True, advance=False, start=True(enabled=False), canvas=False, game=True, waitroom=False, error=False
+Game 2: Waiting for start buttons to be enabled...
+  [Game2-P1 before start click] scene=None, socket=True, advance=False, start=True(enabled=True), canvas=False, game=True, waitroom=False, error=False
+  [Game2-P2 before start click] scene=None, socket=True, advance=False, start=True(enabled=True), canvas=False, game=True, waitroom=False, error=False
+Game 2: Clicking start buttons...
+  [Game2-P1 after start click] scene=None, socket=True, advance=False, start=False(enabled=False), canvas=True, game=True, waitroom=False, error=False
+  [Game2-P2 after start click] scene=None, socket=True, advance=False, start=False(enabled=False), canvas=True, game=True, waitroom=False, error=False
+Game 2: Waiting for game to start...
+  [Game2-P1 after game start] scene=None, socket=True, advance=False, start=False(enabled=False), canvas=True, game=True, waitroom=False, error=False
+  [Game2-P2 after game start] scene=None, socket=True, advance=False, start=False(enabled=False), canvas=True, game=True, waitroom=False, error=False
+Game 2: ✓ Started and verified, gameId=d0969c86-4046-4767-ad4d-71f6bbefa0bc
+
+=== All 3 games started and verified ===
+
+[STRESS-02] Episode 1: Waiting for completion with parity validation...
+
+[Parity] Game 0: Validating episode 1...
+[Parity] Waiting for episode 1 to complete...
+[Parity] Player 1: Episode 1 complete
+[Parity] Player 2: Episode 1 complete
+[Parity] Subject IDs: ('35062cc9-f814-4135-a0ac-fd9e542154de', '903b3ede-5696-4ab2-bfd8-34500bacf1ac')
+[Parity] Export files found: 35062cc9-f814-4135-a0ac-fd9e542154de_ep0.csv, 903b3ede-5696-4ab2-bfd8-34500bacf1ac_ep0.csv
+[Parity] ✓ Episode 1 PARITY VERIFIED
+[Parity] Game 0: ✓ SUCCESS
+
+[Parity] Game 1: Validating episode 1...
+[Parity] Waiting for episode 1 to complete...
+[Parity] Game 1: ✗ FAILED - Player 1 episode completion timeout: Page.wait_for_function: Timeout 300000ms exceeded.
+
+[Parity] Game 2: Validating episode 1...
+[Parity] Waiting for episode 1 to complete...
+[Parity] Player 1: Episode 1 complete
+[Parity] Player 2: Episode 1 complete
+[Parity] Subject IDs: ('67c4c474-edbe-4dab-bb07-6f56cbda842c', '0854da1c-cc5c-4363-980d-8952dea7a56e')
+[Parity] Export files found: 67c4c474-edbe-4dab-bb07-6f56cbda842c_ep0.csv, 0854da1c-cc5c-4363-980d-8952dea7a56e_ep0.csv
+[Parity] ✓ Episode 1 PARITY VERIFIED
+[Parity] Game 2: ✓ SUCCESS
+[STRESS-02] Game 0 episode 1: PARITY VERIFIED
+=========================== short test summary info ============================
+FAILED tests/e2e/test_lifecycle_stress.py::test_multi_episode_completion[chromium] - AssertionError: [STRESS-02] Game 1 episode 1 failed: Player 1 episode completion timeout: Page.wait_for_function: Timeout 300000ms exceeded.
+assert False
+=================== 1 failed, 4 passed in 565.30s (0:09:25) ====================
+
+========== FULL RESULTS SUMMARY ==========
+Run completed: Thu Feb  5 17:59:23 UTC 2026
+tests/e2e/test_infrastructure.py::test_server_starts_and_contexts_connect[chromium] PASSED [100%]
+tests/e2e/test_multiplayer_basic.py::test_two_players_connect_and_complete_episode[chromium] PASSED [ 50%]
+tests/e2e/test_multiplayer_basic.py::test_matchmaking_pairs_two_players[chromium] PASSED [100%]
+tests/e2e/test_worker_validation.py::test_step_latency_not_degraded[chromium] PASSED [ 50%]
+tests/e2e/test_worker_validation.py::test_no_memory_growth_across_sessions[chromium] FAILED [100%]
+tests/e2e/test_data_comparison.py::test_export_parity_basic[chromium] PASSED [ 20%]
+tests/e2e/test_data_comparison.py::test_export_parity_with_latency[chromium] PASSED [ 40%]
+tests/e2e/test_data_comparison.py::test_active_input_parity[chromium] FAILED [ 60%]
+tests/e2e/test_data_comparison.py::test_focus_loss_mid_episode_parity[chromium] PASSED [ 80%]
+tests/e2e/test_data_comparison.py::test_focus_loss_episode_boundary_parity[chromium] FAILED [100%]
+tests/e2e/test_latency_injection.py::test_episode_completion_under_fixed_latency[chromium-100] PASSED [ 16%]
+tests/e2e/test_latency_injection.py::test_episode_completion_under_asymmetric_latency[chromium] PASSED [ 33%]
+tests/e2e/test_latency_injection.py::test_episode_completion_under_jitter[chromium] PASSED [ 50%]
+tests/e2e/test_latency_injection.py::test_active_input_with_latency[chromium-100] FAILED [ 66%]
+tests/e2e/test_latency_injection.py::test_episode_completion_under_fixed_latency[chromium-200] FAILED [ 83%]
+tests/e2e/test_latency_injection.py::test_active_input_with_latency[chromium-200] FAILED [100%]
+tests/e2e/test_network_disruption.py::test_packet_loss_triggers_rollback[chromium] PASSED [ 33%]
+tests/e2e/test_network_disruption.py::test_tab_visibility_triggers_fast_forward[chromium] PASSED [ 66%]
+tests/e2e/test_network_disruption.py::test_active_input_with_packet_loss[chromium] FAILED [100%]
+tests/e2e/test_multi_participant.py::test_three_simultaneous_games[chromium] PASSED [ 50%]
+tests/e2e/test_multi_participant.py::test_staggered_participant_arrival[chromium] PASSED [100%]
+tests/e2e/test_lifecycle_stress.py::test_multi_episode_completion[chromium] FAILED [ 20%]
+tests/e2e/test_lifecycle_stress.py::test_mid_game_disconnect[chromium] PASSED [ 40%]
+tests/e2e/test_lifecycle_stress.py::test_waitroom_disconnect_isolation[chromium] PASSED [ 60%]
+tests/e2e/test_lifecycle_stress.py::test_focus_loss_timeout[chromium] PASSED [ 80%]
+tests/e2e/test_lifecycle_stress.py::test_mixed_lifecycle_scenarios[chromium] PASSED [100%]
