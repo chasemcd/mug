@@ -57,9 +57,9 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| WORKER-01 | Phase 67 | Pending |
-| WORKER-02 | Phase 67 | Pending |
-| WORKER-03 | Phase 67 | Pending |
+| WORKER-01 | Phase 67 | Complete |
+| WORKER-02 | Phase 67 | Complete |
+| WORKER-03 | Phase 67 | Complete |
 | INTEG-01 | Phase 68 | Pending |
 | INTEG-02 | Phase 69 | Pending |
 | INTEG-03 | Phase 68 | Pending |

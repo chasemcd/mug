@@ -216,7 +216,7 @@ Key deliverables:
 
 **Problem:** Pyodide initialization blocks the browser's main thread for several seconds during WASM compilation, preventing Socket.IO from responding to ping messages and causing false disconnects when multiple games start concurrently.
 
-- [ ] **Phase 67: Core Worker Infrastructure** - PyodideWorker class with init/step/reset operations
+- [x] **Phase 67: Core Worker Infrastructure** - PyodideWorker class with init/step/reset operations
 - [ ] **Phase 68: RemoteGame Integration** - Single-player games use Worker
 - [ ] **Phase 69: Multiplayer Batch Operations** - GGPO rollback via Worker batch API
 - [ ] **Phase 70: Validation and Cleanup** - Socket.IO stability, performance, memory
@@ -235,7 +235,7 @@ Key deliverables:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 67-01-PLAN.md — Create pyodide_worker.js and PyodideWorker class with typed message protocol
+- [x] 67-01-PLAN.md — Create pyodide_worker.js and PyodideWorker class with typed message protocol
 
 ### Phase 68: RemoteGame Integration
 **Goal**: Single-player games use PyodideWorker for all Pyodide operations
@@ -304,7 +304,7 @@ Phases execute in numeric order: 67 → 68 → 69 → 70
 | 51-56 | v1.12 | — | Complete | 2026-02-03 |
 | 57-60 | v1.13 | — | Complete | 2026-02-03 |
 | 61-66 | v1.14 | — | Complete | 2026-02-04 |
-| 67. Core Worker Infrastructure | v1.16 | 0/1 | Not started | - |
+| 67. Core Worker Infrastructure | v1.16 | 1/1 | Complete | 2026-02-04 |
 | 68. RemoteGame Integration | v1.16 | 0/TBD | Not started | - |
 | 69. Multiplayer Batch Operations | v1.16 | 0/TBD | Not started | - |
 | 70. Validation and Cleanup | v1.16 | 0/TBD | Not started | - |
