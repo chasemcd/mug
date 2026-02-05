@@ -247,10 +247,10 @@ Plans:
   3. render_state arrives on main thread for Phaser rendering
   4. Single-player demo works identically to before (no visible change to users)
 **Research flag:** Unlikely (straightforward refactoring, no novel patterns)
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 68-01: TBD
+- [ ] 68-01-PLAN.md — Migrate RemoteGame to PyodideWorker with environment code injection support
 
 ### Phase 69: Multiplayer Batch Operations
 **Goal**: GGPO rollback works via Worker with batch API for single round-trip execution
@@ -305,10 +305,10 @@ Phases execute in numeric order: 67 → 68 → 69 → 70
 | 57-60 | v1.13 | — | Complete | 2026-02-03 |
 | 61-66 | v1.14 | — | Complete | 2026-02-04 |
 | 67. Core Worker Infrastructure | v1.16 | 1/1 | Complete | 2026-02-04 |
-| 68. RemoteGame Integration | v1.16 | 0/TBD | Not started | - |
+| 68. RemoteGame Integration | v1.16 | 0/1 | Not started | - |
 | 69. Multiplayer Batch Operations | v1.16 | 0/TBD | Not started | - |
 | 70. Validation and Cleanup | v1.16 | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-04 for v1.16 Pyodide Web Worker*
+*Last updated: 2026-02-05 for Phase 68 planning*
