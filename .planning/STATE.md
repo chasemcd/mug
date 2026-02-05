@@ -11,11 +11,11 @@ See: .planning/PROJECT.md (updated 2026-02-05)
 
 Milestone: v1.17 E2E Test Reliability
 Phase: 73 of 74 (Production Bug Fixes)
-Plan: 01 of 01 (complete)
-Status: Phase complete
-Last activity: 2026-02-05 — Completed 73-01-PLAN.md (Production Bug Fixes)
+Plan: 01 of 01 (complete, gaps found)
+Status: Gap closure needed — 4/5 must-haves verified, step_num rollback accounting gap
+Last activity: 2026-02-05 — 73-01 executed, VERIFICATION.md reports gaps_found
 
-Progress: ███████░░░ 75% (3 of 4 phases)
+Progress: ██████░░░░ 62% (2.5 of 4 phases)
 
 ## Milestone History
 
@@ -474,12 +474,14 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-02-05
-Stopped at: Completed 73-01-PLAN.md (Production Bug Fixes)
+Stopped at: Phase 73 gap closure needed (4/5 must-haves, step_num rollback accounting gap)
 Resume file: None
 
 ### Next Steps
 
-**Phase 74: Stability Validation** — Full test suite passes consistently with no exemptions.
-- 7/8 target tests pass after Phase 73 fix
-- Pre-existing latency test episode boundary issue (step_num double-counting) not yet resolved
-- Next action: `/gsd:plan-phase 74`
+**Phase 73 Gap Closure** — Fix step_num double-counting during rollback replay.
+- 73-01 complete: rollback/promotion race fixed (2/3 target tests pass)
+- Gap: test_active_input_with_latency[100] fails with ~20 divergences at episode boundary
+- Root cause: `step_num += replayLog.length` in performRollback() inflates step_num under high rollback frequency
+- VERIFICATION.md documents gap at `.planning/phases/73-production-bug-fixes/73-VERIFICATION.md`
+- Next action: `/gsd:plan-phase 73 --gaps`
