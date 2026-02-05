@@ -121,6 +121,46 @@ export class PyodideWorker {
     }
 
     /**
+     * Run arbitrary Python code in the Worker.
+     * Backward-compatibility shim for MultiplayerPyodideGame which uses
+     * this.pyodide.runPythonAsync() directly. Will be removed in Phase 69
+     * when multiplayer is migrated to structured Worker commands.
+     * @param {string} code - Python code to execute
+     * @returns {Promise<any>} Result of the Python expression (converted to JS)
+     * @throws {Error} If Worker not ready or code execution fails
+     */
+    async runPythonAsync(code) {
+        this._assertReady();
+        return this._sendRequest('runPython', { code });
+    }
+
+    /**
+     * Convert a JS value to a Python-compatible representation.
+     * Backward-compatibility shim for MultiplayerPyodideGame which uses
+     * this.pyodide.toPy(obj) in two patterns:
+     *   1. Template literal embedding: `${this.pyodide.toPy(actions)}` — toString() returns Python expr
+     *   2. Result post-processing: `this.pyodide.toPy(result).toJs()` — toJs() returns JS value
+     * Will be removed in Phase 69 when multiplayer is migrated.
+     * @param {*} value - JS value to convert
+     * @returns {Object} Wrapper with toString() for Python embedding and toJs() for passthrough
+     */
+    toPy(value) {
+        const jsonStr = JSON.stringify(value);
+        return {
+            // For template literal embedding: produces json.loads('...') Python expression
+            toString() {
+                return `json.loads('${jsonStr.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}')`;
+            },
+            // For result post-processing: Worker's handleRunPython already called
+            // toJs({depth:2}) which converts Python tuples to Arrays and dicts to Maps.
+            // Pass through unchanged.
+            toJs(_options) {
+                return value;
+            }
+        };
+    }
+
+    /**
      * Clean up Worker resources.
      * Call this when done to prevent memory leaks.
      */

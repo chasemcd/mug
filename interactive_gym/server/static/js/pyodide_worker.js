@@ -7,7 +7,7 @@
  *
  * Message Protocol:
  *   Incoming: { type, id, payload }
- *     - type: 'installPackages' | 'initEnv' | 'step' | 'reset'
+ *     - type: 'installPackages' | 'initEnv' | 'step' | 'reset' | 'runPython'
  *     - id: request ID for response correlation
  *     - payload: type-specific data
  *
@@ -101,6 +101,9 @@ async function handleMessage(msg) {
                 break;
             case 'reset':
                 await handleReset(id, payload);
+                break;
+            case 'runPython':
+                await handleRunPython(id, payload);
                 break;
             default:
                 self.postMessage({
@@ -271,5 +274,32 @@ if not isinstance(obs, dict):
         type: 'result',
         id,
         result: { obs, infos, render_state }
+    });
+}
+
+/**
+ * Run arbitrary Python code and return the result.
+ * Backward-compatibility shim for MultiplayerPyodideGame which calls
+ * this.pyodide.runPythonAsync() directly. Will be removed in Phase 69
+ * when multiplayer is migrated to use structured Worker commands.
+ * @param {number} id - Request ID
+ * @param {Object} payload - { code: string }
+ */
+async function handleRunPython(id, payload) {
+    const result = await pyodide.runPythonAsync(payload.code);
+
+    // Convert PyProxy to JS if needed
+    let jsResult;
+    if (result && typeof result.toJs === 'function') {
+        jsResult = result.toJs({ depth: 2 });
+        result.destroy();
+    } else {
+        jsResult = result;
+    }
+
+    self.postMessage({
+        type: 'result',
+        id,
+        result: jsResult
     });
 }
