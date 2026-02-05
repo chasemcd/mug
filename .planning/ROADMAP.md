@@ -260,11 +260,12 @@ Plans:
   1. MultiplayerPyodideGame uses PyodideWorker for all Pyodide operations
   2. Rollback batches (setState + N steps + getState) execute in single postMessage round-trip
   3. Two-player game completes with rollback events and data parity intact
-**Research flag:** Likely (GGPO state buffer location needs decision, batch API design needs exploration)
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 69-01: TBD
+- [ ] 69-01-PLAN.md — Extend Worker protocol with getState, setState, computeHash, seedRng, render, batch commands
+- [ ] 69-02-PLAN.md — Migrate all individual multiplayer call sites to structured Worker commands
+- [ ] 69-03-PLAN.md — Migrate batch operations (rollback + fast-forward) and remove all backward-compat shims
 
 ### Phase 70: Validation and Cleanup
 **Goal**: Verify Socket.IO stability, performance, and memory under concurrent load
@@ -306,9 +307,9 @@ Phases execute in numeric order: 67 → 68 → 69 → 70
 | 61-66 | v1.14 | — | Complete | 2026-02-04 |
 | 67. Core Worker Infrastructure | v1.16 | 1/1 | Complete | 2026-02-04 |
 | 68. RemoteGame Integration | v1.16 | 1/1 | Complete | 2026-02-05 |
-| 69. Multiplayer Batch Operations | v1.16 | 0/TBD | Not started | - |
+| 69. Multiplayer Batch Operations | v1.16 | 0/3 | Not started | - |
 | 70. Validation and Cleanup | v1.16 | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-05 for Phase 68 execution complete*
+*Last updated: 2026-02-05 for Phase 69 planning complete*
