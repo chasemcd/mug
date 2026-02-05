@@ -1926,6 +1926,15 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         const endTime = performance.now();
         p2pLog.debug(`Reset took ${(endTime - startTime).toFixed(1)}ms`);
 
+        // Phase 73: Re-validate state sync after first reset.
+        // The initial validateStateSync() in initialize() runs before reset(),
+        // when env agents may not be initialized yet (e.g., cogrid environments
+        // populate env_agents during reset()). Re-check after first reset to
+        // enable rollback for environments that support get_state/set_state.
+        if (!this.stateSyncSupported && this.num_episodes === 0) {
+            await this.validateStateSync();
+        }
+
         let obs = this._convertToMap(result.obs);
         let infos = result.infos;
         let render_state = this._processRenderState(result.render_state);

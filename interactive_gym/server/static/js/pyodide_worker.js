@@ -327,6 +327,19 @@ import json
 import numpy as np
 import random
 
+class _NumpyEncoder(json.JSONEncoder):
+    """Custom JSON encoder that handles numpy types for state serialization."""
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        if isinstance(obj, (np.integer,)):
+            return int(obj)
+        if isinstance(obj, (np.floating,)):
+            return float(obj)
+        if isinstance(obj, np.bool_):
+            return bool(obj)
+        return super().default(obj)
+
 _env_state = env.get_state()
 
 _np_rng_state = np.random.get_state()
@@ -343,7 +356,7 @@ json.dumps({
     'env_state': _env_state,
     'np_rng_state': _np_rng_serializable,
     'py_rng_state': _py_rng_state
-})
+}, cls=_NumpyEncoder)
     `);
 
     return result;
@@ -430,6 +443,7 @@ _state_to_hash = json.loads('''${escapedJson}''')
         pythonCode = `
 import json
 import hashlib
+import numpy as np
 
 _state_to_hash = env.get_state()
 `;
@@ -443,6 +457,14 @@ def _normalize_for_hash(obj):
         return {k: _normalize_for_hash(v) for k, v in obj.items()}
     elif isinstance(obj, (list, tuple)):
         return [_normalize_for_hash(v) for v in obj]
+    elif hasattr(obj, 'tolist'):
+        return _normalize_for_hash(obj.tolist())
+    elif isinstance(obj, (np.integer,)):
+        return int(obj)
+    elif isinstance(obj, (np.floating,)):
+        return float(obj)
+    elif isinstance(obj, np.bool_):
+        return bool(obj)
     return obj
 
 _normalized = _normalize_for_hash(_state_to_hash)
