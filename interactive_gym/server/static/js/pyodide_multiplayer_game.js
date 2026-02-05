@@ -4510,120 +4510,124 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
                 });
             }
 
-            // Execute ALL replay steps in a single Python call (no event loop yields)
-            // This is the key GGPO optimization - synchronous replay prevents race conditions
+            // Execute ALL replay steps in a single Worker batch (single round-trip)
+            // This is the key GGPO optimization - batch prevents multiple Worker round-trips
             if (replayFrames.length > 0) {
                 // Log replay actions for debugging
                 const replayActionsStr = replayFrames.map(rf => `${rf.frame}:{${Object.entries(rf.actions).map(([k,v]) => `${k}:${v}`).join(',')}}`).join(' ');
                 p2pLog.debug(`REPLAY: snapshotFrame=${snapshotFrame} frames=[${replayActionsStr}]`);
 
-                const replayVerify = await this.pyodide.runPythonAsync(`
-import json
-import hashlib
-import numpy as np
-import random
-_replay_frames = ${JSON.stringify(replayFrames)}
-_snapshot_interval = ${this.snapshotInterval}
-_t_before_replay = env.t if hasattr(env, 't') else 'N/A'
-_replay_log = []
-_snapshots_to_save = {}
-_cumulative_rewards = {}  # Track rewards accumulated during replay
-for _rf in _replay_frames:
-    _frame = _rf['frame']
-    _pre_state = env.get_state()
-    _pre_hash = hashlib.md5(json.dumps(_pre_state, sort_keys=True).encode()).hexdigest()[:8]
+                // Build batch operations
+                const batchOps = [];
 
-    # Save snapshot BEFORE stepping if this frame is on snapshot interval
-    # This updates old incorrect snapshots with correct state after rollback
-    if _frame % _snapshot_interval == 0:
-        _np_rng_state = np.random.get_state()
-        _np_rng_serializable = (
-            _np_rng_state[0],
-            _np_rng_state[1].tolist(),
-            _np_rng_state[2],
-            _np_rng_state[3],
-            _np_rng_state[4]
-        )
-        _py_rng_state = random.getstate()
-        _snapshots_to_save[_frame] = {
-            'env_state': _pre_state,
-            'np_rng_state': _np_rng_serializable,
-            'py_rng_state': _py_rng_state
-        }
+                for (const rf of replayFrames) {
+                    // Save snapshot BEFORE stepping if this frame is on snapshot interval
+                    if (rf.frame % this.snapshotInterval === 0) {
+                        batchOps.push({ op: 'getState', params: {} });
+                    }
 
-    _actions = {int(k) if str(k).isdigit() else k: v for k, v in _rf['actions'].items()}
-    _obs, _rewards, _term, _trunc, _info = env.step(_actions)
-    # Convert rewards/term/trunc/info to dicts with string keys for JSON
-    _rewards_dict = {str(k): v for k, v in _rewards.items()} if isinstance(_rewards, dict) else {'human': _rewards}
-    _term_dict = {str(k): v for k, v in _term.items()} if isinstance(_term, dict) else {'human': _term}
-    _trunc_dict = {str(k): v for k, v in _trunc.items()} if isinstance(_trunc, dict) else {'human': _trunc}
-    _info_dict = {str(k): v for k, v in _info.items()} if isinstance(_info, dict) else {'human': _info}
-    # Accumulate rewards from replay (critical for HUD sync)
-    if isinstance(_rewards, dict):
-        for _k, _v in _rewards.items():
-            _cumulative_rewards[str(_k)] = _cumulative_rewards.get(str(_k), 0) + _v
-    elif isinstance(_rewards, (int, float)):
-        _cumulative_rewards['human'] = _cumulative_rewards.get('human', 0) + _rewards
-    _post_state = env.get_state()
-    _post_hash = hashlib.md5(json.dumps(_post_state, sort_keys=True).encode()).hexdigest()[:8]
-    # Include per-frame data for rollback-safe logging
-    _replay_log.append({
-        'frame': _frame,
-        'actions': _rf['actions'],
-        'rewards': _rewards_dict,
-        'terminateds': _term_dict,
-        'truncateds': _trunc_dict,
-        'infos': _info_dict,
-        'pre_hash': _pre_hash,
-        'post_hash': _post_hash
-    })
-_t_after_replay = env.t if hasattr(env, 't') else 'N/A'
-_state_after = env.get_state()
-_state_hash = hashlib.md5(json.dumps(_state_after, sort_keys=True).encode()).hexdigest()[:8]
-json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps': len(_replay_frames), 'state_hash': _state_hash, 'replay_log': _replay_log, 'snapshots': {str(k): v for k, v in _snapshots_to_save.items()}, 'replay_rewards': _cumulative_rewards})
-                `);
-                const replayInfo = JSON.parse(replayVerify);
-                // Log each replay frame for comparison with client A
-                for (const entry of replayInfo.replay_log) {
+                    // Compute pre-step hash for debug logging
+                    batchOps.push({ op: 'computeHash', params: {} });
+
+                    // Step with this frame's actions
+                    batchOps.push({ op: 'step', params: { actions: rf.actions } });
+
+                    // Compute post-step hash for debug logging
+                    batchOps.push({ op: 'computeHash', params: {} });
+                }
+
+                // Get final state after all replays (for snapshot update)
+                batchOps.push({ op: 'getState', params: {} });
+
+                // Execute entire batch in single Worker round-trip
+                const batchResults = await this.worker.batch(batchOps);
+
+                // Process batch results
+                // Each replay frame produces 3-4 results depending on snapshot interval:
+                // [getState?], computeHash, step, computeHash
+                let resultIdx = 0;
+                const replayLog = [];
+                const snapshotsToSave = {};
+                const replayCumulativeRewards = {};
+
+                for (const rf of replayFrames) {
+                    // Check for snapshot getState
+                    if (rf.frame % this.snapshotInterval === 0) {
+                        const stateJson = batchResults[resultIdx++];
+                        snapshotsToSave[rf.frame] = JSON.parse(stateJson);
+                    }
+
+                    // Pre-step hash
+                    const preHash = batchResults[resultIdx++].hash;
+
+                    // Step result
+                    const stepResult = batchResults[resultIdx++];
+                    let { rewards, terminateds, truncateds, infos } = stepResult;
+
+                    // Convert to plain objects for logging (step returns plain objects from Worker)
+                    const rewardsDict = rewards instanceof Map ? Object.fromEntries(rewards) : (typeof rewards === 'object' && rewards !== null ? rewards : { human: rewards });
+                    const termDict = terminateds instanceof Map ? Object.fromEntries(terminateds) : (typeof terminateds === 'object' && terminateds !== null ? terminateds : { human: terminateds });
+                    const truncDict = truncateds instanceof Map ? Object.fromEntries(truncateds) : (typeof truncateds === 'object' && truncateds !== null ? truncateds : { human: truncateds });
+                    const infosDict = infos instanceof Map ? Object.fromEntries(infos) : (typeof infos === 'object' && infos !== null ? infos : { human: infos });
+
+                    // Accumulate rewards
+                    for (const [agentId, reward] of Object.entries(rewardsDict)) {
+                        replayCumulativeRewards[agentId] = (replayCumulativeRewards[agentId] || 0) + reward;
+                    }
+
+                    // Post-step hash
+                    const postHash = batchResults[resultIdx++].hash;
+
+                    // Build replay log entry
+                    replayLog.push({
+                        frame: rf.frame,
+                        actions: rf.actions,
+                        rewards: rewardsDict,
+                        terminateds: termDict,
+                        truncateds: truncDict,
+                        infos: infosDict,
+                        pre_hash: preHash,
+                        post_hash: postHash
+                    });
+                }
+
+                // Final getState result (post-replay state capture, available in batchResults if needed)
+                resultIdx++;
+
+                // Log each replay frame for comparison
+                for (const entry of replayLog) {
                     const actionsStr = Object.entries(entry.actions).map(([k,v]) => `${k}:${v}`).join(',');
                     p2pLog.debug(`REPLAY_FRAME: ${entry.frame} pre_hash=${entry.pre_hash} actions={${actionsStr}} post_hash=${entry.post_hash}`);
                 }
-                p2pLog.debug(`REPLAY_DONE: t_before=${replayInfo.t_before} t_after=${replayInfo.t_after} final_hash=${replayInfo.state_hash}`);
+                p2pLog.debug(`REPLAY_DONE: ${replayLog.length} frames replayed, final_state captured`);
 
                 // Update snapshots with corrected state from replay
-                // This is critical: old snapshots had pre-rollback (incorrect) state
-                if (replayInfo.snapshots) {
-                    for (const [frameStr, snapshotData] of Object.entries(replayInfo.snapshots)) {
-                        const frame = parseInt(frameStr);
-                        // Add cumulative_rewards to snapshot for future rollbacks
-                        snapshotData.cumulative_rewards = {...this.cumulative_rewards};
-                        snapshotData.step_num = this.step_num;
-                        this.stateSnapshots.set(frame, JSON.stringify(snapshotData));
-                        p2pLog.debug(`SNAPSHOT_UPDATED: frame=${frame} (corrected after rollback)`);
-                    }
+                for (const [frameStr, snapshotData] of Object.entries(snapshotsToSave)) {
+                    const frame = parseInt(frameStr);
+                    snapshotData.cumulative_rewards = {...this.cumulative_rewards};
+                    snapshotData.step_num = this.step_num;
+                    this.stateSnapshots.set(frame, JSON.stringify(snapshotData));
+                    p2pLog.debug(`SNAPSHOT_UPDATED: frame=${frame} (corrected after rollback)`);
                 }
 
                 // Add rewards accumulated during replay to cumulative_rewards
-                // This is critical: rewards from replayed frames were lost when we rolled back
-                if (replayInfo.replay_rewards) {
-                    for (const [playerId, reward] of Object.entries(replayInfo.replay_rewards)) {
+                if (Object.keys(replayCumulativeRewards).length > 0) {
+                    for (const [playerId, reward] of Object.entries(replayCumulativeRewards)) {
                         if (this.cumulative_rewards[playerId] !== undefined) {
                             this.cumulative_rewards[playerId] += reward;
                         } else {
                             this.cumulative_rewards[playerId] = reward;
                         }
                     }
-                    p2pLog.debug(`REPLAY_REWARDS: added ${JSON.stringify(replayInfo.replay_rewards)} -> total=${JSON.stringify(this.cumulative_rewards)}`);
-                    // Update HUD to reflect corrected rewards
+                    p2pLog.debug(`REPLAY_REWARDS: added ${JSON.stringify(replayCumulativeRewards)} -> total=${JSON.stringify(this.cumulative_rewards)}`);
                     ui_utils.updateHUDText(this.getHUDText());
                 }
 
-                // Update step_num to account for replayed frames
-                this.step_num += replayInfo.num_steps;
+                // Update step_num
+                this.step_num += replayLog.length;
 
                 // Store corrected frame data in the rollback-safe buffer
-                // This replaces any previously predicted data with correct data
-                for (const entry of replayInfo.replay_log) {
+                for (const entry of replayLog) {
                     this.storeFrameData(entry.frame, {
                         actions: entry.actions,
                         rewards: entry.rewards,
@@ -4633,7 +4637,7 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
                         isFocused: this.getFocusStatePerPlayer()
                     });
                 }
-                p2pLog.debug(`Stored ${replayInfo.replay_log.length} corrected frames in data buffer`);
+                p2pLog.debug(`Stored ${replayLog.length} corrected frames in data buffer`);
             }
 
             // Update JS frame counter to match Python state
