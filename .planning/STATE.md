@@ -11,11 +11,11 @@ See: .planning/PROJECT.md (updated 2026-02-05)
 
 Milestone: v1.17 E2E Test Reliability
 Phase: 71 of 74 (Test Audit)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-02-05 — Roadmap created (4 phases, 12 requirements)
+Plan: 01 of 01 (complete)
+Status: Phase complete
+Last activity: 2026-02-05 — Completed 71-01-PLAN.md (E2E Test Audit)
 
-Progress: ░░░░░░░░░░ 0%
+Progress: ██░░░░░░░░ 25% (1 of 4 phases)
 
 ## Milestone History
 
@@ -414,6 +414,18 @@ See: .planning/PROJECT.md Key Decisions table
 - _wrapResult() adds .toJs({dict_converter}) and .destroy() to runPythonAsync results
 - All shims are temporary, will be removed in Phase 69 when multiplayer migrates
 
+**v1.17 Phase 71 decisions:**
+- 18/26 E2E tests pass post-Worker-migration -- core infrastructure works
+- 3 production-bug failures share 1 root cause: active input data parity (rollback/promotion race in dual-buffer)
+- 4 test-infrastructure failures share 1 root cause: module-scoped server exhaustion (port 5702/5705)
+- 1 test-infrastructure failure is intermittent concurrent load timeout (3-game multi-episode)
+- Idle parity tests pass; only active input tests fail (Noop prediction not corrected by rollback)
+- Action value 6 = Noop in Overcooked game; presence in divergences indicates input prediction failure
+
+**E2E Test Audit (v1.17 Phase 71 - catalog):**
+- `.planning/phases/71-test-audit/71-AUDIT.md` - Categorized failure catalog with root causes
+- `.planning/phases/71-test-audit/71-raw-output.txt` - Full pytest output (2133 lines)
+
 ### Pending Todos
 
 (None)
@@ -424,6 +436,12 @@ See: .planning/PROJECT.md Key Decisions table
 - Root cause: js.window access in Worker context (Workers have no window object)
 - Fixed by passing interactiveGymGlobals via Worker globals payload (commit 9e733d5)
 - Additional fixes: toJs DataCloneError (c9477dc), action key type mismatch (ec0e492)
+
+**Active Input Data Parity Bug (discovered Phase 71, fix in Phase 73):**
+- Speculative frame data with predicted Noop actions promoted to canonical buffer before rollback can correct
+- Affects: test_active_input_parity, test_active_input_with_latency[100], test_active_input_with_packet_loss
+- Root cause: rollback/promotion race in _promoteConfirmedFrames() vs performRollback() timing
+- Likely related to v1.16 Worker migration making env stepping async (worker.batch())
 
 **Known issues to address in future milestones:**
 - Episode start sync can timeout on slow connections (mitigated with retry + two-way ack)
@@ -439,11 +457,14 @@ See: .planning/PROJECT.md Key Decisions table
 
 ## Session Continuity
 
-Last session: 2026-02-05
-Stopped at: Roadmap created for v1.17 (phases 71-74)
+Last session: 2026-02-05T18:03:33Z
+Stopped at: Completed 71-01-PLAN.md (E2E Test Audit)
 Resume file: None
 
 ### Next Steps
 
-**Phase 71: Test Audit** — Run full E2E suite, catalog and root-cause all failures.
-- Next action: `/gsd:plan-phase 71`
+**Phase 72: Test Infrastructure Fixes** — Fix 5 test-infrastructure failures from audit.
+- Work queue: `.planning/phases/71-test-audit/71-AUDIT.md` "Phase 72 Work Queue" section
+- 4 server exhaustion fixes (switch to per-function fixtures)
+- 1 concurrent load timeout fix (increase timeout + health checks)
+- Next action: `/gsd:plan-phase 72`
