@@ -212,7 +212,7 @@ Key deliverables:
 </details>
 
 <details>
-<summary>✅ v1.16 Pyodide Web Worker (Phases 67-70) - SHIPPED 2026-02-05</summary>
+<summary>v1.16 Pyodide Web Worker (Phases 67-70) - SHIPPED 2026-02-05</summary>
 
 **Milestone Goal:** Move Pyodide initialization and execution to a Web Worker to prevent main thread blocking and eliminate Socket.IO disconnection issues during concurrent game startup.
 
@@ -223,7 +223,7 @@ Key deliverables:
 
 </details>
 
-### 🚧 v1.17 E2E Test Reliability (In Progress)
+### v1.17 E2E Test Reliability (In Progress)
 
 **Milestone Goal:** All existing E2E tests pass green with zero xfail, skips, or flakiness after the v1.16 Worker migration.
 
@@ -243,10 +243,10 @@ Key deliverables:
   2. Every failure is documented with root cause (test infrastructure vs production bug)
   3. A categorized failure list exists to drive phases 72-73
 **Research flag:** Unlikely (running tests and reading output)
-**Plans**: TBD
+**Plans:** 1 plan
 
 Plans:
-- [ ] 71-01: Run full E2E suite and catalog failures
+- [ ] 71-01-PLAN.md -- Run full E2E suite, analyze failures, produce categorized audit
 
 ### Phase 72: Test Infrastructure Fixes
 **Goal**: Fix test fixtures, selectors, and timeouts for Worker-based Pyodide
@@ -295,7 +295,7 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 67 → 68 → 69 → 70
+Phases execute in numeric order: 71 → 72 → 73 → 74
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -316,11 +316,11 @@ Phases execute in numeric order: 67 → 68 → 69 → 70
 | 57-60 | v1.13 | — | Complete | 2026-02-03 |
 | 61-66 | v1.14 | — | Complete | 2026-02-04 |
 | 67-70 | v1.16 | — | Complete | 2026-02-05 |
-| 71. Test Audit | v1.17 | 0/1 | Not started | - |
+| 71. Test Audit | v1.17 | 0/1 | In Progress | - |
 | 72. Test Infrastructure Fixes | v1.17 | 0/1 | Not started | - |
 | 73. Production Bug Fixes | v1.17 | 0/1 | Not started | - |
 | 74. Stability Validation | v1.17 | 0/1 | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-05 for v1.17 E2E Test Reliability roadmap (phases 71-74)*
+*Last updated: 2026-02-05 for v1.17 Phase 71 planning*
