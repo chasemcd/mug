@@ -1,229 +1,170 @@
-# Research Summary: v1.12 Waiting Room Overhaul
+# Project Research Summary
 
-**Project:** Interactive Gym — P2P Multiplayer
-**Milestone:** v1.12 Waiting Room Overhaul
-**Researched:** 2026-02-02
-**Overall confidence:** HIGH
-
----
+**Project:** Interactive Gym v1.16 - Pyodide Web Worker
+**Domain:** WebAssembly Worker Architecture for Browser-Based Python Game Execution
+**Researched:** 2026-02-04
+**Confidence:** MEDIUM
 
 ## Executive Summary
 
-The "Start button disappears but nothing happens" bug is a **stale GameManager capture** problem. When `GAME_MANAGERS` is keyed by `scene_id` and reused across participant sessions, new participants get routed to a GameManager whose internal state (`waiting_games`, `subject_games`, `active_games`) reflects completed games. The fix requires:
+Moving Pyodide to a Web Worker is the correct solution for preventing Socket.IO disconnects during concurrent game initialization. The research confirms this is an officially supported pattern with well-documented implementation paths. The key architectural decision is to use **raw postMessage with a typed message protocol** rather than abstractions like Comlink, which aligns with existing codebase patterns (GameTimerWorker) and provides the progress event support needed during lengthy Pyodide initialization.
 
-1. **Explicit session lifecycle** — Each game gets a Session object that is destroyed (not reused) when the game ends
-2. **Participant state tracking** — Single source of truth for "what state is this participant in?"
-3. **Comprehensive cleanup** — All state cleaned on every exit path, not just `games` dict
+The recommended approach uses **composition over inheritance**: create a `PyodideWorker` class that both `RemoteGame` and `MultiplayerPyodideGame` use. This cleanly separates Worker lifecycle management from game logic. The critical technical challenge is the multiplayer rollback system, which currently executes batched Python operations to avoid event loop yields. The solution is a **batch API** that sends all rollback operations in a single postMessage, with the Worker executing them synchronously and returning all results together.
 
-For the Matchmaker abstraction, the oTree pattern (callback-based `find_match()` method) is ideal for research use cases — simple, Pythonic, and researchers already know Python.
+Key risks are (1) **memory boundary serialization** - PyProxy objects cannot cross the Worker boundary and must be converted to JavaScript first, (2) **initialization race conditions** - the Worker must signal readiness before accepting commands, and (3) **error propagation** - Worker errors must be explicitly forwarded to the main thread. All three have straightforward prevention patterns documented in the research.
 
----
+## Key Findings
 
-## Key Findings by Dimension
+### Recommended Stack
 
-### Stack (Session Lifecycle)
+The stack is minimal - native Web Worker APIs without external dependencies. This matches the existing codebase philosophy.
 
-| Finding | Confidence |
-|---------|------------|
-| Root cause: GameManager reuse without state reset | HIGH |
-| Pattern: Explicit state machine (WAITING → MATCHED → PLAYING → ENDED → DISPOSED) | HIGH |
-| Library: `python-statemachine` for lifecycle callbacks | MEDIUM |
-| Anti-pattern: Cleanup in multiple uncoordinated places | HIGH |
+**Core technologies:**
+- **Web Worker (native)**: Isolates Pyodide from main thread - fundamental browser API, HIGH confidence
+- **postMessage API**: Main-Worker communication - chosen over Comlink for progress event support and codebase consistency
+- **Transferable Objects**: Zero-copy transfer for large ArrayBuffers (render state, observations) - optional optimization
+- **Separate Worker File**: `/static/js/pyodide_worker.js` - cleaner than inline Blob for Pyodide's complexity
 
-**Critical insight:** The current code has 4+ cleanup paths (`_remove_game()`, `cleanup_game()`, `leave_game()`, `remove_player()`) that don't clean all state consistently.
+**Rejected alternatives:**
+- Comlink: RPC abstraction doesn't fit async WASM with progress events
+- SharedArrayBuffer: Requires COOP/COEP headers, overkill for this use case
+- Inline Blob Worker: Works for small workers (GameTimerWorker) but unwieldy for Pyodide
 
-### Features (Matchmaker API)
+### Expected Features
 
-| Finding | Confidence |
-|---------|------------|
-| Research matchmaking ≠ game matchmaking (validity > engagement) | HIGH |
-| oTree's callback pattern is the right model | HIGH |
-| Table stakes: FIFO, timeout, configurable group size | HIGH |
-| Differentiator: Custom attributes, historical performance access | MEDIUM |
-| Anti-features: SBMM, global pools, backfill, complex DSLs | HIGH |
+**Must have (table stakes):**
+- Non-blocking Pyodide initialization - main thread stays responsive for Socket.IO
+- Progress events during loading - user sees "Loading Pyodide...", "Installing packages..."
+- Error propagation to main thread - failures surface as UI errors, not silent hangs
+- Request/response correlation with IDs - enables timeouts and proper promise resolution
 
-**Recommended API:**
-```python
-class Matchmaker(ABC):
-    @abstractmethod
-    def find_match(self, arriving: ParticipantData, waiting: list[ParticipantData], group_size: int) -> list | None:
-        """Return matched group or None to keep waiting."""
+**Should have (competitive):**
+- Batch operations for rollback - single round-trip for state restore + N replay steps
+- Latency tracking via timestamps - performance monitoring built-in
+- Graceful Worker termination with cleanup - prevents memory leaks
 
-    def on_timeout(self, participant: ParticipantData) -> TimeoutAction: ...
-    def on_dropout(self, dropped: ParticipantData, remaining: list) -> DropoutAction: ...
+**Defer (v2+):**
+- SharedArrayBuffer for sub-ms latency (not needed at current frame rates)
+- Hot reload of environment code without Worker restart
+- Multi-Worker support for parallel environments
+
+### Architecture Approach
+
+The composition pattern keeps Worker management separate from game logic. Both `RemoteGame` (single-player) and `MultiplayerPyodideGame` use a shared `PyodideWorker` instance. The Worker is a singleton per page - Pyodide initialization is expensive (3-8 seconds) and packages stay loaded across scenes.
+
+**Major components:**
+1. **pyodide_worker.js** (Worker script) - owns Pyodide instance, handles all Python execution
+2. **PyodideWorker** (main thread class) - manages Worker lifecycle, request/response correlation, progress callbacks
+3. **Message Protocol** - typed messages with numeric IDs: INIT, STEP, RESET, BATCH, PROGRESS, ERROR
+
+**Key message types:**
+```
+Main -> Worker: INIT, INSTALL_PACKAGES, SET_GLOBALS, RUN_INIT_CODE, STEP, RESET, BATCH
+Worker -> Main: READY, INIT_COMPLETE, STEP_RESULT, RESET_RESULT, BATCH_RESULT, PROGRESS, ERROR
 ```
 
-### Architecture (Component Separation)
+### Critical Pitfalls
 
-| Finding | Confidence |
-|---------|------------|
-| Session-per-game (not manager-per-scene) is industry standard | HIGH |
-| Need ParticipantStateTracker as single source of truth | HIGH |
-| Cleanup chain must be explicit and idempotent | HIGH |
-| Matchmaker extraction can be deferred (works, just coupled) | MEDIUM |
+1. **Worker-Main Thread Memory Boundary** - PyProxy objects CANNOT be sent via postMessage. Always call `.toJs()` before sending, then `.destroy()` to prevent leaks. Test serialization with `JSON.parse(JSON.stringify(data))` before implementation.
 
-**Recommended separation:**
-- **Matchmaker** — Matching logic, queue management
-- **Session** — Single game lifecycle (destroyed when game ends)
-- **ParticipantStateTracker** — States: IDLE → IN_WAITROOM → VALIDATING_P2P → IN_GAME → GAME_ENDED
+2. **Race Conditions During Initialization** - Worker script loads before Pyodide is ready. Must queue messages until `pyodideReady` flag, then send explicit `READY` event to main thread. Main thread must await `READY` before sending commands.
 
-### Pitfalls (Bug Prevention)
+3. **Worker Error Propagation** - Uncaught Worker errors don't bubble to main thread. Wrap all Worker handlers in try/catch, send structured ERROR messages. Add timeouts to all pending requests to detect Worker crashes.
 
-| Finding | Confidence |
-|---------|------------|
-| Stale `waiting_games` list is likely root cause | HIGH |
-| Stale `subject_games`/`subject_rooms` not cleaned on disconnect | HIGH |
-| 4 race condition patterns documented with prevention code | HIGH |
-| Invariant assertions catch bugs early | HIGH |
+4. **Package Installation Timing** - `micropip.install()` takes 5-30 seconds. Send PROGRESS events during installation. Don't show game UI until ENV_READY received.
 
-**Likely root cause path:**
-1. Previous game completed, `cleanup_game()` called
-2. Removed from `games` dict but `subject_games` not cleaned
-3. New participant joins, gets captured by stale mapping
-4. No `waiting_room` event emitted due to inconsistent state
-
----
+5. **NumPy Array Conversion** - NumPy dtypes don't always map cleanly to JS TypedArrays. Use Python-side `safe_serialize()` function to convert all NumPy types to plain Python lists/floats before returning.
 
 ## Implications for Roadmap
 
-Based on research, suggested phase structure for v1.12:
+Based on research, suggested phase structure:
 
-### Phase 51: Diagnostic Logging & State Validation
+### Phase 1: Core Worker Infrastructure
+**Rationale:** Foundation must exist before any game integration. Isolated, testable.
+**Delivers:** `pyodide_worker.js` and `PyodideWorker` class with init, runPython, step, reset operations
+**Addresses:** Non-blocking initialization, progress events, error propagation
+**Avoids:** Pitfalls 2 (race conditions) and 3 (error propagation) by implementing ready-check and error forwarding from the start
+**Estimated complexity:** Medium - new file, established patterns
 
-**Goal:** Understand exact failure path and add immediate prevention
+### Phase 2: RemoteGame Integration
+**Rationale:** Single-player is simpler - no GGPO/batch concerns. Validates Worker correctness before multiplayer.
+**Delivers:** Updated `RemoteGame` using `PyodideWorker`, fallback mode for debugging
+**Uses:** All stack elements, full message protocol
+**Implements:** Main thread manager with request correlation
+**Avoids:** Pitfall 1 (memory boundary) by ensuring all state serialization works
+**Estimated complexity:** Medium - refactoring existing code
 
-- Add logging at `join_game` entry: `subject_id in subject_games?`
-- Add state validation before routing to GameManager
-- Add invariant assertions after state mutations
-- Emit error event to client when state is invalid
+### Phase 3: Multiplayer Batch Operations
+**Rationale:** GGPO rollback is the complex case. Requires batch API that doesn't exist yet.
+**Delivers:** `batch()` operation, `MultiplayerPyodideGame` integration, rollback working with Worker
+**Uses:** Batch message type, atomicity guarantees
+**Implements:** Rollback as single round-trip: setState + N steps + getState
+**Avoids:** Race conditions during replay by ensuring no event loop yields in Worker execution
+**Estimated complexity:** High - new batch API, complex state management
 
-**Addresses:** PITFALLS.md Strategy 1, 2
-**Uses:** Existing logging infrastructure
-**Risk:** Low (observation only)
+### Phase 4: Validation and Cleanup
+**Rationale:** Full system test, then remove scaffolding
+**Delivers:** Verified zero-stagger concurrent initialization, performance validation, documentation
+**Tests:** 3 concurrent games without Socket.IO disconnects, rollback parity, memory leak checks
+**Cleanup:** Remove fallback code if stable, update deployment docs
 
-### Phase 52: Comprehensive Cleanup
+### Phase Ordering Rationale
 
-**Goal:** All exit paths clean all state
+- **Phase 1 before 2**: Worker must exist before game classes can use it
+- **Phase 2 before 3**: Single-player validates Worker correctness without GGPO complexity
+- **Phase 3 needs batch API**: Rollback performance depends on single round-trip pattern
+- **Phase 4 last**: Integration testing requires all components working together
 
-- Make `cleanup_game()` clean `subject_games`, `subject_rooms`, `active_games`
-- Make `_remove_game()` idempotent
-- Cancel timeout handlers on game start
-- Clean PyodideCoordinator state on game end
-- Add `assert_invariants()` after cleanup
+The research identified that multiplayer's `performRollback()` already batches Python execution to avoid event loop yields - this pattern must be preserved in the Worker architecture via the batch API.
 
-**Addresses:** PITFALLS.md Failure 1-4
-**Uses:** Existing cleanup methods
-**Avoids:** Cleanup failure pitfalls
-**Risk:** Medium (touches critical paths)
+### Research Flags
 
-### Phase 53: Session Lifecycle
+Phases likely needing deeper research during planning:
+- **Phase 3 (Batch Operations):** GGPO state buffer location needs decision - research recommends Worker-authoritative but needs implementation exploration
+- **Phase 4 (Validation):** Playwright Worker testing capabilities are documented but not hands-on verified
 
-**Goal:** Each game has explicit lifecycle, Session destroyed when game ends
+Phases with standard patterns (skip research-phase):
+- **Phase 1 (Core Infrastructure):** Web Worker patterns well-documented, existing GameTimerWorker provides template
+- **Phase 2 (RemoteGame):** Straightforward refactoring, no novel patterns
 
-- Create `Session` class wrapping game lifecycle
-- Session has explicit states: WAITING → MATCHED → VALIDATING → PLAYING → ENDED
-- Session is destroyed (not reused) when game ends
-- GameManager creates Session per-game, not per-scene
+## Confidence Assessment
 
-**Addresses:** ARCHITECTURE.md state machine, STACK.md Pattern 1
-**Uses:** Potentially `python-statemachine` library
-**Avoids:** Stale state reuse
-**Risk:** Medium (new abstraction layer)
+| Area | Confidence | Notes |
+|------|------------|-------|
+| Stack | HIGH | Native Web Worker APIs, no exotic dependencies, matches existing codebase |
+| Features | HIGH | Based on MDN docs and existing pyodide_multiplayer_game.js patterns |
+| Architecture | MEDIUM | Composition pattern is sound; batch API needs implementation validation |
+| Pitfalls | MEDIUM-HIGH | Memory boundary and error propagation well-documented; GGPO integration needs testing |
 
-### Phase 54: ParticipantStateTracker
+**Overall confidence:** MEDIUM
 
-**Goal:** Single source of truth prevents routing to wrong game
+The core Web Worker patterns are solid, but MEDIUM overall because:
+1. Web search was unavailable - Pyodide version/API may have changed since training data
+2. Batch API for rollback is architecturally sound but unproven
+3. Playwright Worker testing capabilities inferred from docs, not validated
 
-- Create `ParticipantStateTracker` singleton
-- Track participant states: IDLE, IN_WAITROOM, VALIDATING_P2P, IN_GAME, GAME_ENDED
-- Check state before routing to GameManager
-- Update state at every transition point
+### Gaps to Address
 
-**Addresses:** ARCHITECTURE.md state ownership
-**Uses:** STACK.md Pattern 2 (ownership tracking)
-**Avoids:** Routing bugs
-**Risk:** Low (additive, non-breaking)
+- **Pyodide Version Verification**: Research assumed v0.26.x based on training data. Verify current version and any API changes at https://pyodide.org/en/stable/usage/webworker.html before Phase 1
+- **Batch API Design**: The batch operation needs detailed specification during Phase 3 planning. Current research provides concept but not full protocol
+- **GGPO State Authority**: Research recommends Worker-authoritative state, but this changes the current architecture significantly. Validate during Phase 3
+- **Performance Baselines**: Capture current timing metrics (Pyodide init time, step latency) before Worker migration to measure improvement
 
-### Phase 55: Matchmaker Base Class
+## Sources
 
-**Goal:** Pluggable matchmaking abstraction
+### Primary (HIGH confidence)
+- Existing codebase: `pyodide_multiplayer_game.js` - GameTimerWorker pattern, rollback implementation
+- Existing codebase: `pyodide_remote_game.js` - RemoteGame API contract
+- MDN Web Workers API - postMessage, Transferable objects, Worker lifecycle
 
-- Create `Matchmaker` abstract base class
-- Create `FIFOMatchmaker` default implementation (refactor existing logic)
-- Create `ParticipantData` container with session metadata
-- Add `on_timeout()` and `on_dropout()` hooks
-- Wire into GameManager
+### Secondary (MEDIUM confidence)
+- Pyodide documentation (training data) - Web Worker usage patterns
+- Phase 24 Research - Web Worker timer infrastructure patterns
 
-**Addresses:** FEATURES.md recommendations
-**Uses:** oTree callback pattern
-**Avoids:** Over-engineering (no DSL, no global pools)
-**Risk:** Medium (API design)
-
-### Phase 56: Custom Attributes & Assignment Logging
-
-**Goal:** Researchers can pass attributes and analyze match decisions
-
-- Propagate custom attributes from URL params to matchmaker
-- Add assignment logging (who matched with whom)
-- Expose RTT and prior partners to matchmaker
-- Documentation and examples
-
-**Addresses:** FEATURES.md differentiators
-**Uses:** Existing `ParticipantSession` data
-**Risk:** Low (additive)
-
----
-
-## Phase Ordering Rationale
-
-1. **Diagnostic first (51)** — Can't fix what you can't see. Logging reveals exact failure path.
-2. **Cleanup before new abstractions (52)** — Fixes immediate bug with minimal risk.
-3. **Session lifecycle (53)** before **StateTracker (54)** — Session provides the boundaries that StateTracker tracks.
-4. **Matchmaker (55)** after lifecycle is solid — Don't build new features on broken foundation.
-5. **Attributes/logging (56)** last — Polish once core is stable.
+### Tertiary (LOW confidence)
+- Comlink comparison - library may have updated since training data
+- Playwright Worker testing - capabilities inferred, not hands-on tested
 
 ---
-
-## Research Flags for Phases
-
-| Phase | Research Needed? | Reason |
-|-------|------------------|--------|
-| 51 Diagnostic | No | Standard logging patterns |
-| 52 Cleanup | No | Codebase-specific, patterns documented |
-| 53 Session | Maybe | `python-statemachine` integration with Flask-SocketIO async |
-| 54 StateTracker | No | Simple state tracking |
-| 55 Matchmaker | No | oTree pattern well-documented |
-| 56 Attributes | No | Extension of existing data flow |
-
----
-
-## Open Questions
-
-1. **Should GameManagers be deleted entirely or just reset?** — Research suggests per-session is cleaner, but reset() is less disruptive.
-
-2. **Which cleanup path(s) actually run on normal completion?** — Need diagnostic logging to confirm.
-
-3. **Is `waiting_games_lock` consistently used on all paths?** — Race condition risk if not.
-
-4. **How should Matchmaker be configured per-scene?** — Property on GymScene vs separate config file.
-
----
-
-## Files Created
-
-| File | Purpose |
-|------|---------|
-| `.planning/research/STACK.md` | Session lifecycle patterns, cleanup strategies |
-| `.planning/research/FEATURES.md` | Matchmaker API design, table stakes vs differentiators |
-| `.planning/research/ARCHITECTURE.md` | Component separation, state machine, build order |
-| `.planning/research/PITFALLS.md` | Bug patterns, race conditions, prevention strategies |
-| `.planning/research/SUMMARY.md` | This synthesis with roadmap implications |
-
----
-
-## Next Steps
-
-1. `/gsd:define-requirements` — Finalize checkable requirements from this research
-2. `/gsd:create-roadmap` — Create phases 51-56 based on implications above
-
-<sub>`/clear` first for fresh context</sub>
+*Research completed: 2026-02-04*
+*Ready for roadmap: yes*

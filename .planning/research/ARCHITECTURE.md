@@ -1,460 +1,585 @@
-# Architecture Research: Waiting Room & Session Management
+# Architecture Research: PyodideWorker Integration
 
-**Domain:** Multiplayer game session lifecycle management
-**Researched:** 2026-02-02
-**Overall confidence:** HIGH (based on codebase analysis + industry patterns)
-
----
-
-> **Note:** This document supersedes previous architecture research for v1.12. Prior research on rollback netcode data collection remains valid but is focused on a different aspect of the system.
+**Project:** Interactive Gym - Pyodide Web Worker Integration
+**Researched:** 2026-02-04
+**Focus:** How to integrate a PyodideWorker into existing game classes
 
 ---
 
 ## Executive Summary
 
-The current architecture tightly couples matchmaking logic with session management in the `GameManager` class, leading to the "stale game" bug where participants are routed to old games. The fix requires clear separation of concerns: a **Matchmaker** (matching participants), a **SessionManager** (game instance lifecycle), and proper **state machine** governance over participant journeys. The key insight is that each game session must have an explicit, finite lifecycle with deterministic cleanup - not implicit cleanup that can fail silently.
+The existing codebase has two game classes with distinct Pyodide usage patterns:
 
-## Component Separation
+1. **RemoteGame** - Single-player, simple async step/reset flow
+2. **MultiplayerPyodideGame** - Extends RemoteGame, adds GGPO rollback netcode
 
-### Current Architecture (Problems)
+Moving Pyodide to a Web Worker requires careful architectural decisions because:
+- The multiplayer game uses **synchronous rollback** (restore state, replay N frames rapidly)
+- Worker communication is inherently **async** (postMessage)
+- Both classes share substantial code via inheritance
 
-```
-GAME_MANAGERS[scene_id] (global dict)
-    -> GameManager (1 per scene, REUSED across participants)
-        -> waiting_games[] (list of game_ids waiting for players)
-        -> games{} (dict of active RemoteGameV2)
-        -> subject_games{} (dict of subject -> game mappings)
+**Recommended approach:** Composition with a PyodideWorker facade class that both game classes use, with special handling for rollback batching.
 
-PyodideGameCoordinator (global singleton)
-    -> games{} (dict of PyodideGameState)
-```
+---
 
-**Problems:**
-1. `GameManager` is reused across ALL participants for a scene - if cleanup fails, stale state persists
-2. No single source of truth for "what state is this participant in?"
-3. `waiting_games[]` can contain stale game_ids if removal fails
-4. No explicit lifecycle governance - state transitions are implicit
+## Current Architecture
 
-### Recommended Architecture
+### Class Hierarchy
 
 ```
-                    +------------------+
-                    |   Orchestrator   |  (new: coordinates all state)
-                    +------------------+
-                            |
-        +-------------------+-------------------+
-        |                   |                   |
-+---------------+   +----------------+   +------------------+
-|  Matchmaker   |   | SessionManager |   | ParticipantState |
-| (per-scene)   |   |   (per-game)   |   |   (per-subject)  |
-+---------------+   +----------------+   +------------------+
+RemoteGame
+    |
+    +-- constructor(config)
+    +-- initialize()              # Creates Pyodide instance, loads env
+    +-- reinitialize_environment()
+    +-- reset()                   # Calls pyodide.runPythonAsync
+    +-- step(actions)             # Calls pyodide.runPythonAsync
+    |
+    v
+MultiplayerPyodideGame extends RemoteGame
+    |
+    +-- constructor(config)       # Adds GGPO state
+    +-- initialize()              # super() + validateStateSync()
+    +-- reset()                   # super() + P2P sync
+    +-- step(allActionsDict)      # GGPO logic, calls stepWithActions()
+    +-- stepWithActions(actions)  # Actual pyodide.runPythonAsync
+    +-- performRollback()         # loadStateSnapshot + replay loop
+    +-- saveStateSnapshot()       # env.get_state() via Pyodide
+    +-- loadStateSnapshot()       # env.set_state() via Pyodide
 ```
 
-**Matchmaker** (1 per GymScene):
-- Owns the waiting queue
-- Matches participants by criteria (RTT, group membership)
-- Creates sessions when match is made
-- Does NOT manage game state
+### Pyodide Touchpoint Inventory
 
-**SessionManager** (1 per game instance):
-- Owns a single game's lifecycle
-- Knows its participants and their player_ids
-- Handles P2P coordination for that game
-- Destroyed when game ends (not reused!)
+| Method | Class | Pyodide Calls | Sync Requirement |
+|--------|-------|---------------|------------------|
+| `initialize()` | RemoteGame | `loadPyodide()`, `micropip.install()`, `runPythonAsync()` | Async OK |
+| `reinitialize_environment()` | RemoteGame | `micropip.install()`, `runPythonAsync()` | Async OK |
+| `reset()` | RemoteGame | `runPythonAsync()` (reset + render) | Async OK |
+| `step()` | RemoteGame | `runPythonAsync()` (step + render) | Async OK |
+| `reset()` | Multiplayer | super() + additional `runPythonAsync()` for P2P | Async OK |
+| `stepWithActions()` | Multiplayer | `runPythonAsync()` (step + render) | Async OK |
+| `saveStateSnapshot()` | Multiplayer | `runPythonAsync()` (get_state + RNG) | Async OK |
+| `loadStateSnapshot()` | Multiplayer | `runPythonAsync()` (set_state + RNG) | **RAPID** |
+| `performRollback()` | Multiplayer | load + N x step via Python batch | **BATCHED** |
+| `computeQuickStateHash()` | Multiplayer | `runPythonAsync()` (get_state + hash) | Async OK |
+| `validateStateSync()` | Multiplayer | `runPythonAsync()` (capability check) | Async OK |
+| `seedPythonEnvironment()` | Multiplayer | `runPythonAsync()` (seed RNG) | Async OK |
 
-**ParticipantStateTracker** (global singleton):
-- Single source of truth for "where is this participant?"
-- States: `IDLE`, `IN_WAITROOM`, `VALIDATING_P2P`, `IN_GAME`, `GAME_ENDED`
-- Prevents routing to wrong game
+### Critical Path: Rollback
 
-### Component Boundaries
+The `performRollback()` method is the most demanding:
 
-| Component | Responsibility | Does NOT Own |
-|-----------|---------------|--------------|
-| Matchmaker | Matching logic, queue management | Game execution, cleanup |
-| SessionManager | Single game lifecycle, P2P setup | Matching, other games |
-| ParticipantStateTracker | Participant state across scenes | Game logic |
-| Orchestrator | State transitions, cleanup triggers | Direct game execution |
+```javascript
+// Current implementation (lines 4629-4800 approx)
+async performRollback(targetFrame, playerIds) {
+    // 1. Load snapshot
+    await this.loadStateSnapshot(snapshotFrame);
 
-## Lifecycle Flow
+    // 2. Build all replay actions in JS first
+    const replayFrames = [];  // Collects {frame, actions} tuples
 
-### Current Flow (Problematic)
-
-```
-Participant clicks Start
-  -> GameManager.add_subject_to_game()
-     -> Checks waiting_games[] (may be stale)
-     -> Creates or joins game
-     -> If ready: start_game()
-     -> If not ready: send to waiting room
-
-Game ends
-  -> cleanup_game() (may not be called)
-  -> _remove_game() (may fail silently)
-  -> State persists in GAME_MANAGERS
+    // 3. Execute ALL steps in a single Python batch
+    // This is done to prevent event loop yields during replay
+    await this.pyodide.runPythonAsync(`
+        for _replay_frame, _replay_actions in _replay_sequence:
+            env.step(_replay_actions)
+    `);
+}
 ```
 
-### Recommended Flow
+The existing code already batches Python calls to avoid event loop yields. A worker-based approach must preserve this characteristic.
+
+---
+
+## Integration Approaches
+
+### Option 1: Composition (Recommended)
+
+**Pattern:** Create a `PyodideWorker` class that both game classes use via composition.
 
 ```
-Phase 1: MATCHMAKING
-  Participant clicks Start
-    -> Orchestrator.request_match(subject_id, scene_id)
-    -> ParticipantStateTracker.set_state(subject_id, IN_WAITROOM)
-    -> Matchmaker.enqueue(subject_id)
-
-  Matchmaker finds match
-    -> Orchestrator.create_session(subject_ids, scene_id)
-    -> Returns session_id
-
-Phase 2: SESSION_CREATION
-  Orchestrator.create_session()
-    -> SessionManager.create(session_id, subject_ids)
-    -> PyodideCoordinator.create_game(session_id)
-    -> For each subject: ParticipantStateTracker.set_state(subject_id, VALIDATING_P2P)
-    -> Emit 'pyodide_player_assigned' to each
-
-Phase 3: P2P_VALIDATION
-  All players report P2P ready
-    -> SessionManager.start_game()
-    -> ParticipantStateTracker.set_state(*, IN_GAME)
-    -> Emit 'pyodide_game_ready'
-
-Phase 4: GAMEPLAY
-  Game runs normally
-  Disconnect detected
-    -> SessionManager.handle_disconnect(player_id)
-    -> Attempts reconnection or triggers end
-
-Phase 5: CLEANUP (CRITICAL)
-  Game ends (normal or early)
-    -> Orchestrator.end_session(session_id)
-    -> PyodideCoordinator.remove_game(session_id)
-    -> SessionManager.destroy()  <- Explicit destruction
-    -> For each subject: ParticipantStateTracker.set_state(subject_id, GAME_ENDED)
-    -> GroupManager.record_group(subject_ids)
+                     +-------------------+
+                     |   PyodideWorker   |
+                     | (Web Worker mgmt) |
+                     +--------+----------+
+                              |
+          +-------------------+-------------------+
+          |                                       |
++---------v---------+               +-------------v-----------+
+|    RemoteGame     |               | MultiplayerPyodideGame  |
+| this.pyodideWorker|               | this.pyodideWorker      |
++-------------------+               +-------------------------+
 ```
 
-### State Machine
+**Implementation:**
 
-```
-                            [Start Click]
-                                 |
-                                 v
-                          +-------------+
-                          |   IDLE      |
-                          +-------------+
-                                 |
-                                 v
-                          +-------------+
-            +------------>| IN_WAITROOM |
-            |             +-------------+
-            |                    |
-            |         [Match found]
-            |                    v
-            |           +-----------------+
-            |           | VALIDATING_P2P  |
-            |           +-----------------+
-            |              /          \
-            |    [Validation      [Validation
-            |      fails]          succeeds]
-            |        /                  \
-            |       v                    v
-            |  +-------------+    +-------------+
-            +--| RE_POOLED   |    |  IN_GAME    |
-               +-------------+    +-------------+
-                                        |
-                                  [Game ends]
-                                        |
-                                        v
-                                 +-------------+
-                                 | GAME_ENDED  |
-                                 +-------------+
-                                        |
-                            [Advance scene or redirect]
-                                        |
-                                        v
-                                 +-------------+
-                                 |   IDLE      |
-                                 +-------------+
+```javascript
+class PyodideWorker {
+    constructor() {
+        this.worker = new Worker('pyodide_worker.js');
+        this.pendingPromises = new Map();  // id -> {resolve, reject}
+        this.nextId = 0;
+    }
+
+    // Core methods that mirror Pyodide interface
+    async runPythonAsync(code) { ... }
+    async loadPackage(pkg) { ... }
+
+    // Batch execution for rollback
+    async runBatch(operations) {
+        // Single postMessage, single response
+        // Worker executes all ops synchronously, returns all results
+    }
+
+    // State operations
+    async getState() { ... }
+    async setState(state) { ... }
+    async step(actions) { ... }
+    async reset(seed) { ... }
+}
 ```
 
-## State Ownership
+**Pros:**
+- Clean separation of concerns
+- Worker lifecycle managed in one place
+- Both game classes get worker benefits
+- Easy to add new operations
 
-### Who Owns What
+**Cons:**
+- Requires changes to both game classes
+- Need to design batch API carefully
 
-| State | Owner | Cleanup Trigger |
-|-------|-------|-----------------|
-| Participant current state | ParticipantStateTracker | Socket disconnect OR explicit transition |
-| Waiting queue | Matchmaker | Match made OR timeout |
-| Game instance | SessionManager | Game end (normal or error) |
-| P2P connection state | PyodideCoordinator | Game cleanup |
-| Player groups | GroupManager | Never (persist for re-matching) |
+### Option 2: Inheritance (Worker as Base Class)
 
-### Cleanup Chain
+**Pattern:** Create a `WorkerRemoteGame` that extends or replaces `RemoteGame`.
 
-When a game ends, cleanup MUST happen in order:
+```
+RemoteGame (keeps sync Pyodide)
+    |
+    v
+WorkerRemoteGame (worker-based)
+    |
+    v
+MultiplayerPyodideGame extends WorkerRemoteGame
+```
 
-1. **Notify participants** (emit events)
-2. **Export data** (save game data)
-3. **Stop game runner** (if server-authoritative)
-4. **Remove from PyodideCoordinator** (release P2P resources)
-5. **Destroy SessionManager** (release game state)
-6. **Update ParticipantStateTracker** (mark as GAME_ENDED)
-7. **Remove from Matchmaker** (if was in waiting queue)
+**Pros:**
+- Preserves inheritance structure
+- Could keep RemoteGame for fallback
 
-**Current bug source:** Step 5 doesn't happen reliably because `GameManager` is reused, not destroyed.
+**Cons:**
+- Tighter coupling
+- Harder to share worker between instances
+- More complex class hierarchy
 
-### Orphan Prevention
+### Option 3: Adapter/Facade
+
+**Pattern:** Create a facade that wraps Pyodide with same interface, but uses worker internally.
+
+```javascript
+class PyodideFacade {
+    // Same interface as raw Pyodide
+    async runPythonAsync(code) { ... }
+    toPy(obj) { ... }
+
+    // But internally uses worker
+    constructor(useWorker = true) {
+        if (useWorker) {
+            this.impl = new PyodideWorkerImpl();
+        } else {
+            this.impl = new PyodideDirectImpl();
+        }
+    }
+}
+```
+
+**Pros:**
+- Minimal changes to game classes (just change Pyodide reference)
+- Easy fallback to direct Pyodide
+
+**Cons:**
+- May hide worker-specific optimizations (batching)
+- Complex to implement full Pyodide interface
+
+---
+
+## Recommended Architecture: Composition with Batched Operations
+
+### Class Diagram
+
+```
++------------------+
+| PyodideWorker.js |  (Worker script - runs Pyodide in worker thread)
+| - pyodide        |
+| - env            |
+| - onmessage()    |
++------------------+
+        ^
+        | postMessage/onmessage
+        |
++------------------+
+| PyodideWorker    |  (Main thread manager)
+| - worker         |
+| - messageId      |
+| - pendingCalls   |
+|                  |
+| + init()         |
+| + runAsync(code) |
+| + step(actions)  |
+| + reset(seed)    |
+| + getState()     |
+| + setState()     |
+| + batch([ops])   |  <-- Key for rollback
+| + terminate()    |
++------------------+
+        ^
+        | composition
+        |
++------------------+     +---------------------------+
+| RemoteGame       |     | MultiplayerPyodideGame    |
+| - pyodideWorker  |     | extends RemoteGame        |
+|                  |     | - pyodideWorker (shared)  |
+| + initialize()   |     |                           |
+| + reset()        |     | + performRollback()       |
+| + step()         |     |   uses batch() for speed  |
++------------------+     +---------------------------+
+```
+
+### Message Protocol
+
+```javascript
+// Main thread -> Worker
+{
+    type: 'init',
+    id: 1,
+    config: { packages: [...], envCode: '...' }
+}
+
+{
+    type: 'step',
+    id: 2,
+    actions: { agent_left: 0, agent_right: 1 }
+}
+
+{
+    type: 'batch',
+    id: 3,
+    operations: [
+        { type: 'setState', state: {...} },
+        { type: 'step', actions: {...} },
+        { type: 'step', actions: {...} },
+        { type: 'step', actions: {...} },
+        { type: 'getState' }  // Get final state after replay
+    ]
+}
+
+// Worker -> Main thread
+{
+    type: 'result',
+    id: 2,
+    success: true,
+    data: { obs, rewards, terminateds, truncateds, render_state }
+}
+
+{
+    type: 'batch_result',
+    id: 3,
+    success: true,
+    results: [null, stepResult1, stepResult2, stepResult3, finalState]
+}
+```
+
+### Rollback with Worker
+
+```javascript
+// MultiplayerPyodideGame.performRollback()
+async performRollback(targetFrame, playerIds) {
+    // 1. Build all operations in JS
+    const ops = [];
+
+    // Load snapshot
+    ops.push({ type: 'setState', state: snapshot.env_state });
+    ops.push({ type: 'setRngState', npState: snapshot.np_rng_state, pyState: snapshot.py_rng_state });
+
+    // Build replay sequence
+    for (let frame = snapshotFrame; frame < currentFrame; frame++) {
+        const actions = this.getInputsForFrame(frame, playerIds);
+        ops.push({ type: 'step', actions });
+    }
+
+    // Get final state
+    ops.push({ type: 'getState' });
+    ops.push({ type: 'render' });
+
+    // 2. Execute all in single worker call (no event loop yields!)
+    const results = await this.pyodideWorker.batch(ops);
+
+    // 3. Process results
+    const finalState = results[results.length - 2];
+    const renderState = results[results.length - 1];
+
+    return { state: finalState, render: renderState };
+}
+```
+
+---
+
+## Worker Module Loading
+
+### Option A: Inline Worker (Current Timer Pattern)
+
+The codebase already uses inline workers via Blob URL (see `GameTimerWorker` in multiplayer game):
+
+```javascript
+// From pyodide_multiplayer_game.js lines 95-135
+const workerCode = `
+    self.onmessage = function(e) { ... }
+`;
+const blob = new Blob([workerCode], { type: 'application/javascript' });
+this.workerUrl = URL.createObjectURL(blob);
+this.worker = new Worker(this.workerUrl);
+```
+
+**Pros:**
+- Already proven pattern in codebase
+- No module bundling concerns
+- Works in all environments
+
+**Cons:**
+- Pyodide code is large - inline blob would be unwieldy
+- Can't use ES6 imports in worker
+
+### Option B: ES6 Module Worker
+
+```javascript
+const worker = new Worker('pyodide_worker.js', { type: 'module' });
+```
+
+**Pros:**
+- Clean file separation
+- Can use imports
+- Easier to maintain
+
+**Cons:**
+- Requires browser support (modern browsers OK)
+- Need to handle Pyodide CDN loading in worker
+
+### Option C: Separate Worker File (Recommended)
+
+Create a standalone worker file that loads Pyodide:
+
+```javascript
+// pyodide_worker.js
+importScripts('https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js');
+
+let pyodide = null;
+let env = null;
+
+self.onmessage = async function(e) {
+    const { type, id, ...data } = e.data;
+
+    try {
+        let result;
+        switch(type) {
+            case 'init':
+                pyodide = await loadPyodide();
+                await pyodide.loadPackage('micropip');
+                // ... setup env
+                result = { ready: true };
+                break;
+            case 'step':
+                result = await stepEnv(data.actions);
+                break;
+            // ... other cases
+        }
+        self.postMessage({ type: 'result', id, success: true, data: result });
+    } catch (error) {
+        self.postMessage({ type: 'result', id, success: false, error: error.message });
+    }
+};
+```
+
+---
+
+## Backward Compatibility
+
+### Strategy: Feature Detection + Fallback
+
+```javascript
+class RemoteGame {
+    constructor(config) {
+        // Feature detection
+        this.useWorker = config.use_worker !== false && typeof Worker !== 'undefined';
+
+        if (this.useWorker) {
+            this.pyodideWorker = new PyodideWorker();
+        } else {
+            // Direct Pyodide (fallback)
+            this.pyodide = null;  // Loaded in initialize()
+        }
+    }
+
+    async step(actions) {
+        if (this.useWorker) {
+            return await this.pyodideWorker.step(actions);
+        } else {
+            return await this._stepDirect(actions);
+        }
+    }
+}
+```
+
+### Configuration Flag
+
+Add to scene metadata:
 
 ```python
-class SessionManager:
-    def __init__(self, session_id, ...):
-        self._cleanup_scheduled = False
-        self._created_at = time.time()
-
-    def schedule_cleanup(self, reason: str, delay_ms: int = 0):
-        """Guarantee cleanup happens, even if errors occur."""
-        if self._cleanup_scheduled:
-            return  # Already scheduled
-        self._cleanup_scheduled = True
-
-        if delay_ms > 0:
-            eventlet.spawn_after(delay_ms / 1000, self._do_cleanup, reason)
-        else:
-            self._do_cleanup(reason)
-
-    def _do_cleanup(self, reason: str):
-        """Idempotent cleanup - safe to call multiple times."""
-        try:
-            # 1. Notify participants
-            # 2. Export data
-            # 3. Stop runners
-            # 4. Remove from coordinator
-            # 5. Update participant states
-        finally:
-            # Always mark as cleaned up
-            self._destroyed = True
+scene = GymScene(
+    use_pyodide_worker=True,  # New option
+    # ... existing config
+)
 ```
 
-## Event Flow
+---
 
-### Happy Path Events
+## Migration Path
 
-```
-[Participant A clicks Start]
-  -> Server: request_match(A)
-  -> Server: A enters waitroom
-  <- Client A: waiting_room{cur: 1, needed: 1}
+### Phase 1: PyodideWorker Core (No Changes to Game Classes)
 
-[Participant B clicks Start]
-  -> Server: request_match(B)
-  -> Server: Match found (A, B)
-  -> Server: create_session(A, B)
-  <- Client A: pyodide_player_assigned{player_id: 0}
-  <- Client B: pyodide_player_assigned{player_id: 1}
+1. Create `pyodide_worker.js` (worker script)
+2. Create `PyodideWorker` class (main thread manager)
+3. Test in isolation with unit tests
+4. Operations: init, step, reset, getState, setState
 
-[P2P Validation]
-  -> Server: p2p_validation_success(A)
-  -> Server: p2p_validation_success(B)
-  -> Server: start_game()
-  <- Client A, B: pyodide_game_ready{}
-  <- Client A, B: server_episode_start{state}
+### Phase 2: RemoteGame Integration
 
-[Game Ends]
-  -> Server: game_completed(session_id)
-  -> Server: cleanup_session(session_id)
-  <- Client A, B: p2p_game_ended{reason: 'completed'}
-```
+1. Add `useWorker` config option
+2. Modify `initialize()` to create worker
+3. Modify `step()` and `reset()` to use worker
+4. Keep direct Pyodide as fallback
+5. Test single-player games
 
-### Error Path Events
+### Phase 3: Multiplayer + Batch Operations
 
-```
-[Player Disconnects Mid-Game]
-  -> Server: socket_disconnect(B)
-  -> Server: handle_disconnect(session_id, B)
-  <- Client A: p2p_game_ended{reason: 'partner_disconnected'}
-  -> Server: schedule_cleanup(session_id, 'disconnect')
-  -> Server: [cleanup chain executes]
-```
+1. Add `batch()` operation to worker
+2. Modify `performRollback()` to use batch
+3. Modify `saveStateSnapshot()` and `loadStateSnapshot()`
+4. Test rollback scenarios extensively
+5. Measure performance improvement
 
-### Events to Add
+### Phase 4: Cleanup
 
-| Event | Direction | Purpose |
-|-------|-----------|---------|
-| `session_created` | S -> C | Confirm participant is in a session |
-| `session_cleanup_started` | S -> C | Warn participants cleanup is happening |
-| `participant_state_changed` | S -> C | Sync state machine to client |
+1. Remove fallback code if worker is stable
+2. Update documentation
+3. Consider deprecating direct Pyodide mode
 
-## Integration Points
+---
 
-### How Matchmaker Integrates
+## Performance Considerations
 
-```python
-# In app.py advance_scene()
+### Worker Thread Benefits
 
-if isinstance(current_scene, gym_scene.GymScene):
-    # Get or create matchmaker for this scene
-    matchmaker = MATCHMAKERS.get(current_scene.scene_id)
-    if matchmaker is None:
-        matchmaker = Matchmaker(
-            scene_id=current_scene.scene_id,
-            required_players=len([p for p in scene.policy_mapping.values()
-                                 if p == PolicyTypes.Human]),
-            orchestrator=ORCHESTRATOR,
-            group_manager=GROUP_MANAGER,
-        )
-        MATCHMAKERS[current_scene.scene_id] = matchmaker
+| Scenario | Direct Pyodide | Worker Pyodide | Benefit |
+|----------|---------------|----------------|---------|
+| Heavy step() | Blocks main thread 10-50ms | Main thread free | UI remains responsive |
+| Rollback (10 frames) | 100-500ms blocking | Same total time, non-blocking | No frame drops |
+| Background tab | Throttled timer | Worker timers unthrottled | Consistent game loop |
 
-# In join_game()
+### Worker Overhead
 
-matchmaker = MATCHMAKERS.get(current_scene.scene_id)
-matchmaker.enqueue(subject_id)  # Matchmaker handles the rest
+| Operation | Overhead |
+|-----------|----------|
+| postMessage (small) | ~0.1ms |
+| postMessage (state JSON) | 1-5ms depending on size |
+| Structured clone (arrays) | Can be significant |
+
+### Mitigation: Transferables
+
+For render state (potentially large):
+
+```javascript
+// In worker
+const renderBuffer = new Uint8Array(renderData);
+self.postMessage({ type: 'step_result', render: renderBuffer }, [renderBuffer.buffer]);
+
+// Main thread receives without copy
 ```
 
-### Current Integration Points to Preserve
+---
 
-1. **PyodideGameCoordinator** - Keep as is, but SessionManager wraps it
-2. **GroupManager** - Keep as is, called during cleanup
-3. **PARTICIPANT_SESSIONS** - Becomes part of ParticipantStateTracker
-4. **Socket events** - Most stay the same, add new ones
+## Async/Sync Considerations for Rollback
 
-### Integration with Existing Code
+### The Challenge
 
-The new architecture wraps existing components:
+Rollback currently works because:
+1. All operations are in one async function
+2. No `await` between steps in the Python batch
+3. Event loop doesn't yield during replay
 
-```python
-class SessionManager:
-    def __init__(self, coordinator: PyodideGameCoordinator, ...):
-        self.coordinator = coordinator
+With worker:
+1. Each `postMessage` could yield the event loop
+2. New inputs could arrive between replay steps
+3. Race conditions possible
 
-    def create(self):
-        # Creates game in existing coordinator
-        self.coordinator.create_game(...)
+### Solution: Batch API
 
-    def add_player(self, player_id, socket_id, subject_id):
-        # Uses existing coordinator method
-        self.coordinator.add_player(...)
+The `batch()` operation sends ALL replay steps in one message:
+
+```javascript
+// ONE postMessage, ONE response
+const results = await this.pyodideWorker.batch([
+    { type: 'setState', state },
+    { type: 'step', actions: frame1Actions },
+    { type: 'step', actions: frame2Actions },
+    // ...
+]);
 ```
 
-## Suggested Build Order
+Worker executes all synchronously, returns all results in one message.
 
-Based on dependencies, build in this order:
+### Guard During Replay
 
-### Phase 1: Foundation (No Breaking Changes)
-
-1. **ParticipantStateTracker** - New class, no integration yet
-   - Define states enum
-   - Track state per participant
-   - Unit tests
-
-2. **SessionManager** - New class wrapping existing
-   - Wraps PyodideGameCoordinator.create_game()
-   - Has explicit destroy() method
-   - Idempotent cleanup
-
-### Phase 2: Orchestrator Integration
-
-3. **Orchestrator** - Coordinates state transitions
-   - Integrates ParticipantStateTracker
-   - Integrates SessionManager
-   - Handles cleanup chain
-
-4. **Wire to advance_scene/join_game** - Replace GameManager usage
-   - Use Orchestrator instead of direct GameManager
-   - Keep GameManager for backward compat (mark deprecated)
-
-### Phase 3: Matchmaker Extraction
-
-5. **Matchmaker** - Extract from GameManager
-   - Move waiting_games logic
-   - Move RTT matching logic
-   - Move group wait logic
-
-6. **Complete Migration** - Remove GameManager
-   - Verify no remaining usages
-   - Remove deprecated code
-
-### Dependency Graph
-
-```
-ParticipantStateTracker (no deps)
-            |
-            v
-   SessionManager (depends on ParticipantStateTracker, PyodideCoordinator)
-            |
-            v
-   Orchestrator (depends on SessionManager, ParticipantStateTracker)
-            |
-            v
-   Matchmaker (depends on Orchestrator)
+```javascript
+// In step() method
+if (this.rollbackInProgress) {
+    // Queue incoming inputs, don't process
+    this.pendingInputsDuringReplay.push(input);
+    return;
+}
 ```
 
-## Recommendations for v1.12
+This pattern already exists in the codebase (`rollbackInProgress` flag).
 
-### Immediate Fixes (v1.12 Scope)
+---
 
-1. **Add session-per-game instead of manager-per-scene**
-   - Create `Session` class that owns a single game
-   - Session is destroyed when game ends
-   - Fixes the "reusing GameManager" bug
+## Open Questions
 
-2. **Add ParticipantStateTracker**
-   - Single source of truth
-   - Check state before routing to game
-   - Prevents routing to stale games
+1. **Shared Worker?** Could multiple game instances share one PyodideWorker? Probably not worth the complexity for typical usage.
 
-3. **Explicit cleanup chain**
-   - Schedule cleanup at every exit point
-   - Idempotent cleanup methods
-   - Log cleanup for debugging
+2. **Memory Management:** Pyodide in worker has separate memory. How to handle large env states efficiently? Consider Transferables or SharedArrayBuffer.
 
-### Deferred to Later (Post-v1.12)
+3. **Error Handling:** Worker crashes need graceful handling. Consider heartbeat/watchdog.
 
-- Full Matchmaker extraction (works now, just coupled)
-- Orchestrator class (can inline logic initially)
-- Event-based state sync to clients
+4. **Hot Reload:** Can we update env code without destroying worker? Would need careful state preservation.
 
-### Migration Strategy
+---
 
-```
-v1.12 (This milestone):
-  - Add Session class that wraps game lifecycle
-  - Add ParticipantStateTracker
-  - Keep GameManager but use Session internally
-  - Fix the stale game bug
+## Recommendations Summary
 
-v1.13 (Future):
-  - Extract Matchmaker from GameManager
-  - Add Orchestrator
-  - Deprecate direct GameManager usage
+1. **Use Composition pattern** - PyodideWorker class used by both game classes
+2. **Separate worker file** - Not inline blob, for maintainability
+3. **Batch API is critical** - For rollback performance and correctness
+4. **Keep fallback** - Direct Pyodide for debugging/compatibility
+5. **Incremental migration** - Start with RemoteGame, then multiplayer
 
-v1.14 (Future):
-  - Remove GameManager
-  - Full component separation
-```
-
-## Confidence Assessment
-
-| Area | Level | Reason |
-|------|-------|--------|
-| Root cause diagnosis | HIGH | Clear from code: GameManager reuse + no explicit cleanup |
-| Session-per-game fix | HIGH | Standard industry pattern, straightforward implementation |
-| State machine approach | HIGH | Well-established pattern for game lifecycles |
-| Migration strategy | MEDIUM | Depends on codebase complexity, may need adjustment |
-| Component boundaries | MEDIUM | May need refinement during implementation |
+---
 
 ## Sources
 
-### Codebase Analysis
-- `/interactive_gym/server/game_manager.py` - Current GameManager implementation
-- `/interactive_gym/server/pyodide_game_coordinator.py` - P2P coordination
-- `/interactive_gym/server/app.py:507` - "Game manager already exists" bug location
-- `/interactive_gym/server/player_pairing_manager.py` - Group tracking
-
-### Industry Patterns
-- [Game Matchmaking Architecture - AccelByte](https://accelbyte.io/blog/scaling-matchmaking-to-one-million-players) - Matchmaking service patterns
-- [Session-Based Games Best Practices - OpenKruise](https://openkruise.io/kruisegame/best-practices/session-based-game) - State management for game rooms
-- [Multiplayer State Machine with Durable Objects](https://www.astahmer.dev/posts/multiplayer-state-machine-with-durable-objects) - XState for game state machines
-- [Microsoft PlayFab Server Lifecycle](https://learn.microsoft.com/en-us/gaming/playfab/multiplayer/servers/multiplayer-game-server-lifecycle) - Server lifecycle patterns
-- [GarbageTruck: Distributed Garbage Collection](https://medium.com/@ronantech/garbagetruck-lease-based-distributed-garbage-collection-for-microservice-architectures-874d60c921f0) - Orphan cleanup patterns
+- Codebase analysis:
+  - `/interactive_gym/server/static/js/pyodide_remote_game.js` - RemoteGame class
+  - `/interactive_gym/server/static/js/pyodide_multiplayer_game.js` - MultiplayerPyodideGame class (7000+ lines)
+  - `/interactive_gym/server/static/js/index.js` - Initialization flow
+- Existing patterns:
+  - `GameTimerWorker` class (lines 78-172) - Inline worker example
+  - `performRollback()` method (lines 4629+) - Batch Python execution pattern

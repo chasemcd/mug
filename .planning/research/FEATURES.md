@@ -1,338 +1,613 @@
-# Features Research: Matchmaking Systems
+# Feature Landscape: Pyodide Web Worker Message Protocol
 
-**Domain:** Research experiment platforms with multiplayer participant matching
-**Researched:** 2026-02-02
-**Mode:** Ecosystem survey focused on features dimension
+**Domain:** Web Worker message protocol for Pyodide game execution
+**Researched:** 2026-02-04
+**Confidence:** HIGH (based on MDN documentation and existing codebase patterns)
 
 ## Executive Summary
 
-Matchmaking systems for research experiments differ fundamentally from game matchmaking: research prioritizes experimental validity (balanced groups, demographic criteria, counterbalancing) over engagement optimization (skill-based, low wait times). The core pattern across both domains is a pluggable matching function that receives participant metadata and returns grouped participants. Table stakes include FIFO queuing, timeout handling, and configurable group sizes. Research-specific differentiators include attribute-based matching (demographics, prior performance), constraint satisfaction, and reproducible assignment logs for analysis.
+This document defines a message protocol for moving Pyodide game execution from the main thread to a dedicated Web Worker. The protocol must handle:
+- Initialization (loading Pyodide, installing packages, running setup code)
+- Game operations (step, reset)
+- Render state proxy (passing game state back to main thread for Phaser rendering)
+- Error handling and lifecycle management
 
-## Table Stakes Features
+The design leverages existing patterns from `pyodide_multiplayer_game.js` (binary protocol, typed messages) and MDN Web Worker best practices (transferable objects, structured cloning).
 
-Features users expect. Missing = product feels incomplete.
+---
 
-| Feature | Why Expected | Complexity | Notes |
-|---------|--------------|------------|-------|
-| **FIFO Queue Matching** | Default behavior that "just works" - first N participants paired together | Low | Current implementation exists |
-| **Configurable Group Size** | Experiments vary from 2-player to N-player interactions | Low | Already supported via `PLAYERS_PER_GROUP` pattern |
-| **Timeout Handling** | Participants cannot wait indefinitely; redirect after max wait | Low | Current implementation exists |
-| **Participant Metadata Access** | Matchmaker needs info to make decisions (subject ID, session data) | Low | Already tracked in `PlayerGroupManager` |
-| **Waiting Room Status Updates** | Participants need feedback while waiting (count, time remaining) | Low | Current implementation exists via `waiting_room` events |
-| **Dropout Handling** | When waiting participant disconnects, remaining participants must be handled | Medium | Partially implemented; needs cleanup |
-| **Thread Safety** | Concurrent participant arrivals must not cause race conditions | Medium | Current implementation uses locks |
-| **Group Persistence** | Remember who was matched for multi-round experiments | Low | `PlayerGroupManager` already tracks this |
+## Message Type Definitions
 
-**Sources:**
-- [oTree Groups documentation](https://otree.readthedocs.io/en/latest/multiplayer/groups.html): FIFO via `group_by_arrival_time`
-- [PlayFab error handling](https://learn.microsoft.com/en-us/gaming/playfab/features/multiplayer/matchmaking/error-cases): Timeout and dropout patterns
-- Current codebase `game_manager.py`: Existing waiting room implementation
+### Type Constants
 
-## Differentiating Features
+```typescript
+// Worker Message Types (Main Thread -> Worker)
+const WORKER_MSG = {
+  // Lifecycle
+  INIT: 0x01,              // Initialize Pyodide runtime
+  DESTROY: 0x02,           // Terminate worker cleanly
 
-Features that set product apart for research use cases. Not expected, but valued.
+  // Environment Setup
+  INSTALL_PACKAGES: 0x10,  // Install micropip packages
+  SET_GLOBALS: 0x11,       // Set interactive_gym_globals
+  RUN_INIT_CODE: 0x12,     // Run environment_initialization_code
+  REINITIALIZE: 0x13,      // Reinitialize environment (new scene)
 
-| Feature | Value Proposition | Complexity | Notes |
-|---------|-------------------|------------|-------|
-| **Custom Attribute Matching** | Match by demographics, skill level, or researcher-defined criteria | Medium | oTree's `group_by_arrival_time_method` pattern |
-| **Pluggable Matchmaker Base Class** | Researchers subclass to implement any matching logic | Medium | Core v1.12 goal |
-| **Historical Performance Access** | Match based on prior game results (skill, cooperation level) | Medium | Requires data pipeline integration |
-| **RTT-Based Matching** | Pair participants with similar network latency for fair experiments | Medium | Partially implemented in current code |
-| **Constraint Satisfaction** | "2 men + 2 women per group" style constraints | High | Complex but valuable for research |
-| **Wait Time Relaxation** | Progressively relax criteria as wait time increases | Medium | FlexMatch pattern; prevents deadlocks |
-| **Reproducible Assignment Logs** | Export who was matched with whom for analysis | Low | Essential for research validity |
-| **Blocking/Exclusion Rules** | Prevent specific participants from being matched (e.g., same IP) | Medium | Prevents collusion/repeated partners |
-| **Priority Queuing** | Some participants get matched faster (compensation for prior wait) | Medium | Useful for dropout recovery |
-| **Pre-Match Callbacks** | Hook to validate match before committing (P2P connection test) | Medium | Current v1.3 validation could integrate |
+  // Game Operations
+  RESET: 0x20,             // Reset environment
+  STEP: 0x21,              // Execute env.step(actions)
 
-**Sources:**
-- [oTree group_by_arrival_time_method](https://otree.readthedocs.io/en/latest/multiplayer/waitpages.html): Custom matching callback
-- [Amazon FlexMatch rules](https://docs.aws.amazon.com/gameliftservers/latest/flexmatchguide/match-examples.html): Wait time relaxation
-- [AccelByte matchmaking](https://docs.accelbyte.io/gaming-services/services/play/matchmaking/): Skill and role-based matching
+  // Utility
+  PING: 0xF0,              // Latency measurement
+} as const;
 
-## Anti-Features
+// Main Thread Message Types (Worker -> Main Thread)
+const MAIN_MSG = {
+  // Status
+  READY: 0x01,             // Worker initialized, ready for commands
+  ERROR: 0x02,             // Error occurred
 
-Features to deliberately NOT build. Common mistakes in this domain.
+  // Lifecycle Responses
+  INIT_COMPLETE: 0x10,     // Pyodide loaded successfully
+  PACKAGES_INSTALLED: 0x11,// Packages installed
+  GLOBALS_SET: 0x12,       // Globals configured
+  ENV_READY: 0x13,         // Environment initialized
+  REINIT_COMPLETE: 0x14,   // Reinitialization complete
 
-| Anti-Feature | Why Avoid | What to Do Instead |
-|--------------|-----------|-------------------|
-| **Skill-Based Matchmaking (SBMM)** | Game industry pattern optimizing engagement, not research validity. Researchers need control over matching criteria, not opaque MMR algorithms. | Provide attribute-based matching where researchers define the criteria |
-| **Global Player Pools** | Cross-experiment matching creates contamination. Each experiment needs isolation. | Scope matchmaking to individual scenes/experiments |
-| **Automatic Backfill** | Adding new players mid-game invalidates experimental conditions | Only match at game start; handle dropouts via termination |
-| **Match Quality Scoring** | Opaque "match quality" metrics hide researcher-relevant criteria | Expose raw attributes; let researchers define "quality" |
-| **Engagement Optimization** | Optimizing for player retention irrelevant for one-shot experiments | Optimize for experimental validity (balanced groups, counterbalancing) |
-| **Complex Rule DSLs** | FlexMatch-style JSON rule languages are powerful but over-engineered for research | Simple Python subclassing; researchers already know Python |
-| **Async Match Notifications** | SSE/WebSocket complexity for "match found" events unnecessary when participants are already on waiting page | Synchronous matching on arrival; update waiting room directly |
+  // Game Operation Responses
+  RESET_RESULT: 0x20,      // Reset completed
+  STEP_RESULT: 0x21,       // Step completed
 
-**Sources:**
-- [TrueSkill Wikipedia](https://en.wikipedia.org/wiki/TrueSkill): Game-focused skill rating systems
-- [Skill-based matchmaking Wikipedia](https://en.wikipedia.org/wiki/Skill-based_matchmaking): Why SBMM is game-specific
-- [Demographics and Behaviour research](https://www.cambridge.org/core/journals/experimental-economics/article/abs/demographics-and-behaviour/020B414B5508B54EB07EFD8E871704D4): Research matching priorities
-
-## Matchmaker API Design Patterns
-
-### Pattern 1: Callback-Based (oTree)
-
-oTree uses a simple callback pattern where the matching function receives waiting players and returns a group or None.
-
-```python
-# oTree pattern
-def group_by_arrival_time_method(subsession, waiting_players):
-    """
-    Called when a player arrives at wait page.
-
-    Args:
-        subsession: Current subsession context
-        waiting_players: List of Player objects currently waiting
-
-    Returns:
-        List of players to form a group, or None to keep waiting
-    """
-    # Example: match 2 men + 2 women
-    men = [p for p in waiting_players if p.participant.category == 'male']
-    women = [p for p in waiting_players if p.participant.category == 'female']
-
-    if len(men) >= 2 and len(women) >= 2:
-        return men[:2] + women[:2]
-    return None  # Keep waiting
+  // Utility
+  PONG: 0xF0,              // Latency response
+  LOG: 0xF1,               // Console log relay
+  PROGRESS: 0xF2,          // Progress update (for loading)
+} as const;
 ```
 
-**Pros:** Simple, Pythonic, easy to understand
-**Cons:** Limited to synchronous matching, no explicit timeout handling
+### TypeScript Message Interfaces
 
-### Pattern 2: Ticket-Based (GameLift FlexMatch, PlayFab)
+```typescript
+// ========== Base Message Structure ==========
 
-Players submit "tickets" with attributes; a background service matches tickets.
+interface BaseMessage {
+  type: number;        // Message type constant
+  id: number;          // Unique request ID for response correlation
+  timestamp: number;   // performance.now() for latency tracking
+}
 
-```python
-# Ticket-based pattern (conceptual)
-class MatchTicket:
-    player_id: str
-    attributes: dict[str, Any]  # {"skill": 1500, "region": "us-west"}
-    latency: dict[str, int]  # {"us-west": 50, "us-east": 100}
-    created_at: float
+// ========== Main Thread -> Worker Messages ==========
 
-class MatchmakerService:
-    def submit_ticket(self, ticket: MatchTicket) -> str:
-        """Returns ticket_id, match found async via callback/polling"""
+interface InitMessage extends BaseMessage {
+  type: typeof WORKER_MSG.INIT;
+  pyodideUrl?: string;  // Optional CDN URL override
+}
 
-    def get_match_status(self, ticket_id: str) -> MatchStatus:
-        """Poll for match result"""
+interface InstallPackagesMessage extends BaseMessage {
+  type: typeof WORKER_MSG.INSTALL_PACKAGES;
+  packages: string[];   // Package names for micropip
+}
+
+interface SetGlobalsMessage extends BaseMessage {
+  type: typeof WORKER_MSG.SET_GLOBALS;
+  globals: Record<string, unknown>;  // interactive_gym_globals
+}
+
+interface RunInitCodeMessage extends BaseMessage {
+  type: typeof WORKER_MSG.RUN_INIT_CODE;
+  code: string;         // environment_initialization_code
+}
+
+interface ReinitializeMessage extends BaseMessage {
+  type: typeof WORKER_MSG.REINITIALIZE;
+  config: {
+    packages_to_install?: string[];
+    environment_initialization_code: string;
+    interactive_gym_globals: Record<string, unknown>;
+  };
+}
+
+interface ResetMessage extends BaseMessage {
+  type: typeof WORKER_MSG.RESET;
+}
+
+interface StepMessage extends BaseMessage {
+  type: typeof WORKER_MSG.STEP;
+  actions: Record<string | number, number>;  // {playerId: action}
+}
+
+interface PingMessage extends BaseMessage {
+  type: typeof WORKER_MSG.PING;
+}
+
+interface DestroyMessage extends BaseMessage {
+  type: typeof WORKER_MSG.DESTROY;
+}
+
+// ========== Worker -> Main Thread Messages ==========
+
+interface ReadyMessage extends BaseMessage {
+  type: typeof MAIN_MSG.READY;
+}
+
+interface ErrorMessage extends BaseMessage {
+  type: typeof MAIN_MSG.ERROR;
+  requestId: number;    // ID of failed request
+  error: string;        // Error message
+  stack?: string;       // Stack trace if available
+}
+
+interface InitCompleteMessage extends BaseMessage {
+  type: typeof MAIN_MSG.INIT_COMPLETE;
+  pyodideVersion: string;
+}
+
+interface PackagesInstalledMessage extends BaseMessage {
+  type: typeof MAIN_MSG.PACKAGES_INSTALLED;
+  installed: string[];  // Successfully installed packages
+}
+
+interface EnvReadyMessage extends BaseMessage {
+  type: typeof MAIN_MSG.ENV_READY;
+}
+
+interface ReinitCompleteMessage extends BaseMessage {
+  type: typeof MAIN_MSG.REINIT_COMPLETE;
+}
+
+interface ResetResultMessage extends BaseMessage {
+  type: typeof MAIN_MSG.RESET_RESULT;
+  observation: ObservationType;
+  infos: Record<string, unknown>;
+  renderState: RenderState;
+}
+
+interface StepResultMessage extends BaseMessage {
+  type: typeof MAIN_MSG.STEP_RESULT;
+  observation: ObservationType;
+  rewards: Record<string | number, number>;
+  terminateds: Record<string | number, boolean>;
+  truncateds: Record<string | number, boolean>;
+  infos: Record<string, unknown>;
+  renderState: RenderState;
+}
+
+interface PongMessage extends BaseMessage {
+  type: typeof MAIN_MSG.PONG;
+  originalTimestamp: number;  // Echo back for RTT calculation
+}
+
+interface ProgressMessage extends BaseMessage {
+  type: typeof MAIN_MSG.PROGRESS;
+  stage: 'pyodide' | 'micropip' | 'packages' | 'globals' | 'env';
+  progress: number;     // 0-100
+  detail?: string;      // Human-readable status
+}
+
+interface LogMessage extends BaseMessage {
+  type: typeof MAIN_MSG.LOG;
+  level: 'debug' | 'info' | 'warn' | 'error';
+  args: unknown[];
+}
+
+// ========== Data Types ==========
+
+type ObservationType =
+  | Float32Array                                    // Single observation
+  | Record<string, Float32Array>                   // Dict observations
+  | Record<string, Record<string, Float32Array>>; // Nested dict observations
+
+interface RenderState {
+  game_state_objects: RenderObject[] | null;  // For Phaser rendering
+  game_image_base64: string | null;           // For RGB array rendering
+  step: number;
+}
+
+interface RenderObject {
+  type: string;
+  x: number;
+  y: number;
+  [key: string]: unknown;  // Additional properties
+}
 ```
 
-**Pros:** Scales to millions of players, supports complex rules
-**Cons:** Over-engineered for research, async complexity
+---
 
-### Pattern 3: Base Class with Hooks (Recommended for v1.12)
+## Sequence Diagrams
 
-Combines simplicity of callback with extensibility of class inheritance.
-
-```python
-# Recommended pattern for Interactive Gym
-class Matchmaker(ABC):
-    """Base class for custom matchmaking logic."""
-
-    @abstractmethod
-    def find_match(
-        self,
-        arriving_participant: ParticipantData,
-        waiting_participants: list[ParticipantData],
-        group_size: int,
-    ) -> list[ParticipantData] | None:
-        """
-        Called when a participant enters the waiting room.
-
-        Args:
-            arriving_participant: The newly arrived participant
-            waiting_participants: Participants already waiting
-            group_size: Target number of participants for a match
-
-        Returns:
-            List of participants to match (including arriving), or None to wait
-        """
-        pass
-
-    def on_timeout(self, participant: ParticipantData) -> TimeoutAction:
-        """Called when participant exceeds max wait time."""
-        return TimeoutAction.REDIRECT
-
-    def on_dropout(
-        self,
-        dropped: ParticipantData,
-        remaining: list[ParticipantData]
-    ) -> DropoutAction:
-        """Called when a waiting participant disconnects."""
-        return DropoutAction.CONTINUE_WAITING
-
-
-class FIFOMatchmaker(Matchmaker):
-    """Default: first N participants paired together."""
-
-    def find_match(self, arriving, waiting, group_size):
-        all_participants = waiting + [arriving]
-        if len(all_participants) >= group_size:
-            return all_participants[:group_size]
-        return None
-```
-
-**Pros:**
-- Familiar Python pattern (researchers subclass)
-- Explicit hooks for edge cases (timeout, dropout)
-- Synchronous (no async complexity)
-- Type hints for IDE support
-
-**Cons:**
-- Less flexible than DSL-based rules
-- Researchers must write Python (acceptable for this audience)
-
-**Sources:**
-- [oTree wait pages](https://otree.readthedocs.io/en/latest/multiplayer/waitpages.html): Callback pattern
-- [GameLift Player API](https://docs.aws.amazon.com/gameliftservers/latest/apireference/API_Player.html): Ticket/attributes pattern
-- Current `callback.py` in codebase: Existing hook pattern for game events
-
-## Data Available to Matchmakers
-
-### Tier 1: Session Metadata (Always Available)
-
-| Field | Type | Description | Source |
-|-------|------|-------------|--------|
-| `subject_id` | `str` | Unique participant identifier | URL param or generated |
-| `session_start` | `float` | When participant joined experiment | Server timestamp |
-| `wait_start` | `float` | When participant entered waiting room | Server timestamp |
-| `current_scene_id` | `str` | Which scene they're waiting in | Stager state |
-| `socket_id` | `str` | Current WebSocket connection | Flask-SocketIO |
-
-### Tier 2: Network Metrics (If Measured)
-
-| Field | Type | Description | Source |
-|-------|------|-------------|--------|
-| `rtt_to_server` | `int` | Round-trip time to server (ms) | SocketIO ping |
-| `connection_type` | `str` | "direct" or "relay" for prior P2P | WebRTC stats |
-| `prior_p2p_latency` | `int` | Latency to previous partner | P2P measurement |
-
-### Tier 3: Custom Attributes (Researcher-Defined)
-
-| Field | Type | Description | Source |
-|-------|------|-------------|--------|
-| `custom_attributes` | `dict` | Arbitrary key-value pairs | URL params or prior scenes |
-| Examples: `{"condition": "treatment", "gender": "female", "age_group": "18-25"}` | | |
-
-### Tier 4: Historical Performance (If Available)
-
-| Field | Type | Description | Source |
-|-------|------|-------------|--------|
-| `prior_games` | `int` | Number of games completed | Data export history |
-| `prior_partners` | `list[str]` | Subject IDs of previous partners | `PlayerGroupManager` |
-| `prior_scores` | `list[float]` | Scores from previous games | Callback aggregation |
-| `cooperation_rate` | `float` | Fraction of cooperative actions | Computed metric |
-
-**Sources:**
-- [GameLift Player structure](https://docs.aws.amazon.com/gameliftservers/latest/apireference/API_Player.html): PlayerId, PlayerAttributes, LatencyInMs
-- [PlayFab ticket attributes](https://learn.microsoft.com/en-us/gaming/playfab/multiplayer/matchmaking/ticket-attributes): Player vs User attribute types
-- Current `player_pairing_manager.py`: `subject_id`, `group_id`, `source_scene_id`
-
-## Feature Dependencies
+### Initialization Sequence
 
 ```
-Timeout Handling
-      |
-      v
-FIFO Queue Matching  <----  Pluggable Matchmaker Base Class
-      |                              |
-      v                              v
-Group Persistence  ------>  Custom Attribute Matching
-      |                              |
-      v                              v
-Reproducible Logs  <-----  Historical Performance Access
-                                     |
-                                     v
-                           Constraint Satisfaction
-                                     |
-                                     v
-                           Wait Time Relaxation
+Main Thread                           Pyodide Worker
+    |                                      |
+    |-- new Worker('pyodide_worker.js') -->|
+    |                                      |
+    |<-------- READY (worker loaded) ------|
+    |                                      |
+    |-- INIT {pyodideUrl?} --------------->|
+    |                                      | loadPyodide()
+    |<------ PROGRESS {stage: pyodide} ----|
+    |                                      |
+    |<-------- INIT_COMPLETE --------------|
+    |                                      |
+    |-- INSTALL_PACKAGES {packages} ------>|
+    |                                      | micropip.install()
+    |<------ PROGRESS {stage: packages} ---|
+    |                                      |
+    |<------- PACKAGES_INSTALLED ----------|
+    |                                      |
+    |-- SET_GLOBALS {globals} ------------>|
+    |                                      |
+    |<---------- GLOBALS_SET --------------|
+    |                                      |
+    |-- RUN_INIT_CODE {code} ------------->|
+    |                                      | runPythonAsync(code)
+    |                                      |
+    |<----------- ENV_READY ---------------|
+    |                                      |
 ```
 
-**Dependency Notes:**
-- FIFO is the base case; Matchmaker base class abstracts it
-- Custom attributes require attributes to be passed through the system
-- Historical performance requires data pipeline integration with exports
-- Constraint satisfaction builds on attribute matching
-- Wait time relaxation is an enhancement to constraint satisfaction
+### Game Loop Sequence (Step)
 
-## Recommendations for v1.12
+```
+Main Thread                           Pyodide Worker
+    |                                      |
+    |-- STEP {id: 42, actions} ----------->|
+    |                                      | env.step(actions)
+    |                                      | env.render()
+    |                                      |
+    |<-- STEP_RESULT {id: 42, obs, ...} ---|
+    |                                      |
+    | [Phaser renders renderState]         |
+    |                                      |
+```
 
-### Must Have (Table Stakes)
+### Reset Sequence
 
-1. **Matchmaker Base Class** - Abstract class with `find_match()` method
-2. **FIFOMatchmaker Default** - Current behavior as the default implementation
-3. **ParticipantData Container** - Structured data passed to matchmaker
-4. **Timeout Hook** - `on_timeout()` method with configurable behavior
-5. **Dropout Hook** - `on_dropout()` method for waiting room disconnects
+```
+Main Thread                           Pyodide Worker
+    |                                      |
+    |-- RESET {id: 43} ------------------->|
+    |                                      | env.reset()
+    |                                      | env.render()
+    |                                      |
+    |<-- RESET_RESULT {id: 43, obs, ...} --|
+    |                                      |
+```
 
-### Should Have (Differentiators)
+### Error Handling Sequence
 
-1. **Custom Attributes** - Pass arbitrary key-value pairs to matchmaker
-2. **RTT Access** - Expose server RTT measurement to matchmaker
-3. **Prior Partners List** - Expose group history for blocking repeat matches
-4. **Assignment Logging** - Record match decisions for research export
+```
+Main Thread                           Pyodide Worker
+    |                                      |
+    |-- STEP {id: 44, actions} ----------->|
+    |                                      | env.step() throws
+    |                                      |
+    |<-- ERROR {requestId: 44, error} -----|
+    |                                      |
+    | [Handle error, possibly reinit]      |
+    |                                      |
+```
 
-### Could Have (Stretch)
+### Reinitialization Sequence (Scene Transition)
 
-1. **Wait Time Relaxation** - Progressive criteria relaxation
-2. **Priority Queuing** - Compensate participants who waited before dropout
-3. **Pre-Match Validation Hook** - Run P2P test before committing match
+```
+Main Thread                           Pyodide Worker
+    |                                      |
+    |-- REINITIALIZE {config} ------------>|
+    |                                      | install new packages
+    |                                      | set globals
+    |                                      | run init code
+    |                                      |
+    |<-------- REINIT_COMPLETE ------------|
+    |                                      |
+```
 
-### Won't Have (Anti-Features)
+---
 
-1. Skill-based MMR/Elo rating
-2. Global player pools
-3. Mid-game backfill
-4. Complex rule DSLs
+## Request/Response Correlation
 
-## Complexity Estimates
+### ID-Based Correlation Pattern
 
-| Feature | Complexity | Rationale |
-|---------|------------|-----------|
-| Matchmaker base class | Medium | New abstraction layer over existing code |
-| FIFOMatchmaker | Low | Refactor existing `_add_to_fifo_queue` |
-| ParticipantData | Low | Data class with existing fields |
-| Timeout hook | Low | Existing timeout handling, add hook |
-| Dropout hook | Low | Existing dropout handling, add hook |
-| Custom attributes | Medium | Need to propagate through URL/scenes |
-| RTT access | Low | Already measured, expose to matchmaker |
-| Prior partners | Low | Already in `PlayerGroupManager` |
-| Assignment logging | Low | Add logging to match decisions |
-| Wait time relaxation | Medium | Requires time-based state in matchmaker |
-| Priority queuing | Medium | Requires queue ordering changes |
-| Pre-match validation | High | Async P2P test integration |
+Every request includes a unique `id` field. Responses include the same `id` for correlation. This enables:
 
-## Confidence Assessment
+1. **Promise resolution:** Main thread stores pending promises by ID
+2. **Out-of-order handling:** Responses can arrive in any order
+3. **Timeout detection:** Requests without responses after timeout can be rejected
 
-| Area | Level | Reason |
-|------|-------|--------|
-| Table stakes features | HIGH | Well-documented patterns in oTree, verified in current codebase |
-| Differentiating features | MEDIUM | Based on game industry patterns adapted for research; oTree precedent |
-| Anti-features | HIGH | Clear distinction between game optimization and research validity |
-| API design pattern | MEDIUM | Recommended pattern synthesized from multiple sources; not directly from authoritative docs |
-| Data available | HIGH | Current codebase verified; GameLift/PlayFab patterns well-documented |
-| Complexity estimates | MEDIUM | Based on codebase familiarity; actual complexity depends on edge cases |
+```typescript
+// Main thread request manager
+class WorkerRequestManager {
+  private nextId = 1;
+  private pending = new Map<number, {
+    resolve: (result: any) => void;
+    reject: (error: Error) => void;
+    timeout: NodeJS.Timeout;
+  }>();
+
+  async request<T>(worker: Worker, message: Omit<BaseMessage, 'id' | 'timestamp'>): Promise<T> {
+    const id = this.nextId++;
+    const timestamp = performance.now();
+
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        this.pending.delete(id);
+        reject(new Error(`Request ${id} timed out`));
+      }, 30000);  // 30s timeout
+
+      this.pending.set(id, { resolve, reject, timeout });
+      worker.postMessage({ ...message, id, timestamp });
+    });
+  }
+
+  handleResponse(message: BaseMessage & { requestId?: number }) {
+    const id = message.id ?? message.requestId;
+    const pending = this.pending.get(id);
+    if (pending) {
+      clearTimeout(pending.timeout);
+      this.pending.delete(id);
+
+      if (message.type === MAIN_MSG.ERROR) {
+        pending.reject(new Error((message as ErrorMessage).error));
+      } else {
+        pending.resolve(message);
+      }
+    }
+  }
+}
+```
+
+---
+
+## Latency Considerations
+
+### Structured Cloning Overhead
+
+All data passed via `postMessage` is cloned using the structured clone algorithm. For game loops at 10-60 FPS:
+
+| Data Type | Typical Size | Clone Time | Recommendation |
+|-----------|--------------|------------|----------------|
+| Actions (object) | ~100 bytes | <0.1ms | Use as-is |
+| Observations (Float32Array) | 1-10KB | 0.1-0.5ms | Transfer if large |
+| RenderState (objects) | 5-50KB | 0.5-2ms | Optimize structure |
+| RGB Image (base64) | 100KB-1MB | 5-50ms | **Avoid in loop** |
+
+### Transferable Objects
+
+For large typed arrays, use Transferable transfer to avoid copying:
+
+```typescript
+// Main thread
+const observations = new Float32Array(1024);
+worker.postMessage(
+  { type: WORKER_MSG.STEP, actions, id, timestamp },
+  // Transfer list - these buffers are moved, not copied
+  [observations.buffer]
+);
+
+// Worker response (transfer back)
+const obsBuffer = new Float32Array(result.observation);
+self.postMessage(
+  { type: MAIN_MSG.STEP_RESULT, observation: obsBuffer, ... },
+  [obsBuffer.buffer]
+);
+```
+
+**Caveat:** After transfer, the original buffer is neutered (length becomes 0). Only use for one-shot data.
+
+### Batching Considerations
+
+For a 10 FPS game loop (100ms per frame):
+
+```
+Frame timeline:
+|-- Input capture (1ms) --|-- postMessage (0.1ms) --|-- Worker step (50ms) --|-- postMessage (1ms) --|-- Render (20ms) --|
+
+Total: ~72ms, leaving 28ms headroom
+```
+
+**DO NOT batch multiple steps.** Each step depends on the previous state. Pipeline optimization should focus on:
+
+1. **Overlapping render with next input:** Start capturing next frame's input while rendering
+2. **Minimizing render state size:** Only send what changed
+3. **Pre-serializing static data:** Cache serialized render objects
+
+### Latency Tracking
+
+Include timestamps in messages for pipeline monitoring:
+
+```typescript
+interface LatencyMetrics {
+  requestTimestamp: number;     // When main thread sent request
+  workerReceiveTimestamp: number; // When worker received request
+  workerSendTimestamp: number;  // When worker sent response
+  responseTimestamp: number;    // When main thread received response
+}
+
+// Calculated metrics:
+// - Request transit: workerReceiveTimestamp - requestTimestamp
+// - Worker execution: workerSendTimestamp - workerReceiveTimestamp
+// - Response transit: responseTimestamp - workerSendTimestamp
+// - Total RTT: responseTimestamp - requestTimestamp
+```
+
+---
+
+## Example Message Flows
+
+### Complete Initialization Flow
+
+```typescript
+// 1. Create worker
+const worker = new Worker('/static/js/pyodide_worker.js');
+
+// 2. Wait for worker ready
+await waitForMessage(worker, MAIN_MSG.READY);
+
+// 3. Initialize Pyodide
+const initResult = await requestManager.request(worker, {
+  type: WORKER_MSG.INIT,
+  pyodideUrl: 'https://cdn.jsdelivr.net/pyodide/v0.24.1/full/'
+});
+console.log(`Pyodide ${initResult.pyodideVersion} loaded`);
+
+// 4. Install packages
+if (config.packages_to_install?.length > 0) {
+  await requestManager.request(worker, {
+    type: WORKER_MSG.INSTALL_PACKAGES,
+    packages: config.packages_to_install
+  });
+}
+
+// 5. Set globals
+await requestManager.request(worker, {
+  type: WORKER_MSG.SET_GLOBALS,
+  globals: config.interactive_gym_globals
+});
+
+// 6. Initialize environment
+await requestManager.request(worker, {
+  type: WORKER_MSG.RUN_INIT_CODE,
+  code: config.environment_initialization_code
+});
+
+console.log('Environment ready');
+```
+
+### Game Loop Flow
+
+```typescript
+class PyodideWorkerGame {
+  private worker: Worker;
+  private requestManager: WorkerRequestManager;
+
+  async step(actions: Record<string, number>): Promise<StepResult> {
+    const result = await this.requestManager.request<StepResultMessage>(
+      this.worker,
+      { type: WORKER_MSG.STEP, actions }
+    );
+
+    return {
+      observation: result.observation,
+      rewards: result.rewards,
+      terminateds: result.terminateds,
+      truncateds: result.truncateds,
+      infos: result.infos,
+      renderState: result.renderState
+    };
+  }
+
+  async reset(): Promise<ResetResult> {
+    const result = await this.requestManager.request<ResetResultMessage>(
+      this.worker,
+      { type: WORKER_MSG.RESET }
+    );
+
+    return {
+      observation: result.observation,
+      infos: result.infos,
+      renderState: result.renderState
+    };
+  }
+}
+```
+
+### Worker Implementation Skeleton
+
+```javascript
+// pyodide_worker.js
+let pyodide = null;
+let micropip = null;
+
+self.onmessage = async (event) => {
+  const msg = event.data;
+  const startTime = performance.now();
+
+  try {
+    switch (msg.type) {
+      case WORKER_MSG.INIT:
+        pyodide = await loadPyodide({ indexURL: msg.pyodideUrl });
+        await pyodide.loadPackage('micropip');
+        micropip = pyodide.pyimport('micropip');
+
+        self.postMessage({
+          type: MAIN_MSG.INIT_COMPLETE,
+          id: msg.id,
+          timestamp: performance.now(),
+          pyodideVersion: pyodide.version
+        });
+        break;
+
+      case WORKER_MSG.STEP:
+        const stepResult = await executeStep(msg.actions);
+
+        self.postMessage({
+          type: MAIN_MSG.STEP_RESULT,
+          id: msg.id,
+          timestamp: performance.now(),
+          ...stepResult
+        });
+        break;
+
+      // ... other cases
+    }
+  } catch (error) {
+    self.postMessage({
+      type: MAIN_MSG.ERROR,
+      id: msg.id,
+      requestId: msg.id,
+      timestamp: performance.now(),
+      error: error.message,
+      stack: error.stack
+    });
+  }
+};
+
+// Signal ready
+self.postMessage({
+  type: MAIN_MSG.READY,
+  id: 0,
+  timestamp: performance.now()
+});
+```
+
+---
+
+## Anti-Features (What NOT to Build)
+
+### Synchronous Communication
+
+**DO NOT** use `Atomics.wait()` or `SharedArrayBuffer` for synchronous worker calls:
+- Blocks the main thread, defeating the purpose
+- Adds complexity without benefit for game loop use case
+- Most browsers restrict `SharedArrayBuffer` anyway
+
+### Message Compression
+
+**DO NOT** implement custom compression for messages:
+- Adds CPU overhead on both ends
+- Modern browsers optimize structured cloning
+- Game state is already reasonably sized
+
+### Multi-Step Batching
+
+**DO NOT** batch multiple `step()` calls into one message:
+- Each step depends on previous state
+- Breaks the Gymnasium API contract
+- Impossible to correctly implement
+
+### Shared Pyodide Instance
+
+**DO NOT** try to share Pyodide across multiple workers:
+- Pyodide is single-threaded by design
+- WASM memory is not shareable
+- Each worker needs its own instance
+
+---
 
 ## Sources
 
-**Authoritative (HIGH confidence):**
-- [oTree Groups documentation](https://otree.readthedocs.io/en/latest/multiplayer/groups.html)
-- [oTree Wait Pages documentation](https://otree.readthedocs.io/en/latest/multiplayer/waitpages.html)
-- [Amazon GameLift Player API](https://docs.aws.amazon.com/gameliftservers/latest/apireference/API_Player.html)
-- [Amazon FlexMatch Guide](https://docs.aws.amazon.com/gameliftservers/latest/flexmatchguide/gamelift-match.html)
-- [PlayFab Matchmaking Error Cases](https://learn.microsoft.com/en-us/gaming/playfab/features/multiplayer/matchmaking/error-cases)
-- [PlayFab Ticket Attributes](https://learn.microsoft.com/en-us/gaming/playfab/multiplayer/matchmaking/ticket-attributes)
-
-**Supporting (MEDIUM confidence):**
-- [AccelByte Matchmaking Introduction](https://docs.accelbyte.io/gaming-services/services/play/matchmaking/)
-- [Open Match Matchmaker Guide](https://open-match.dev/site/docs/guides/matchmaker/)
-- [PsychoPy Multiplayer Demo Discussion](https://discourse.psychopy.org/t/online-multiplayer-experiment-demo-using-pavlovia-shelf/43118)
-
-**Background (LOW confidence - context only):**
-- [TrueSkill Wikipedia](https://en.wikipedia.org/wiki/TrueSkill)
-- [Skill-based matchmaking Wikipedia](https://en.wikipedia.org/wiki/Skill-based_matchmaking)
-- [Elo rating system Wikipedia](https://en.wikipedia.org/wiki/Elo_rating_system)
+- MDN Web Workers API: https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Using_web_workers (HIGH confidence)
+- Existing codebase: `pyodide_multiplayer_game.js` binary protocol (HIGH confidence)
+- Existing codebase: `GameTimerWorker` pattern for inline workers (HIGH confidence)
+- Existing codebase: `RemoteGame` API for step/reset/initialize (HIGH confidence)
