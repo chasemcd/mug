@@ -4448,7 +4448,13 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
                 return false;
             }
 
-            p2pLog.debug(`Loaded snapshot ${snapshotFrame}, replaying ${currentFrame - snapshotFrame} frames`);
+            // Capture restored step_num for snapshot correction later.
+            // After loadStateSnapshot, this.step_num holds the value saved in the snapshot
+            // at snapshotFrame. We need this to compute correct per-frame step_num values
+            // for any snapshots saved during the replay loop.
+            const restoredStepNum = this.step_num;
+
+            p2pLog.debug(`Loaded snapshot ${snapshotFrame}, replaying ${currentFrame - snapshotFrame} frames, restoredStepNum=${restoredStepNum}`);
 
             // Build a map of recorded actions for quick lookup (these are actions that were USED, possibly predicted)
             const recordedActionsMap = new Map();
@@ -4661,12 +4667,20 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
                 p2pLog.debug(`REPLAY_DONE: ${replayLog.length} frames replayed, final_state captured`);
 
                 // Update snapshots with corrected state from replay
+                // CRITICAL: Each snapshot must store the correct step_num for its frame.
+                // step_num tracks how many env.step() calls have happened since episode start.
+                // During normal play, snapshot at frame F stores step_num = F (step_num starts at 0,
+                // incremented after each step, snapshot saved before stepping).
+                // After rollback, the restored step_num = restoredStepNum (from target snapshot).
+                // Each replayed frame advances step_num by 1, so snapshot at frame F should have:
+                //   step_num = restoredStepNum + (F - snapshotFrame)
+                // where snapshotFrame is the frame we loaded the snapshot from.
                 for (const [frameStr, snapshotData] of Object.entries(snapshotsToSave)) {
                     const frame = parseInt(frameStr);
                     snapshotData.cumulative_rewards = {...this.cumulative_rewards};
-                    snapshotData.step_num = this.step_num;
+                    snapshotData.step_num = restoredStepNum + (frame - snapshotFrame);
                     this.stateSnapshots.set(frame, JSON.stringify(snapshotData));
-                    p2pLog.debug(`SNAPSHOT_UPDATED: frame=${frame} (corrected after rollback)`);
+                    p2pLog.debug(`SNAPSHOT_UPDATED: frame=${frame} step_num=${snapshotData.step_num} (corrected after rollback)`);
                 }
 
                 // Add rewards accumulated during replay to cumulative_rewards
@@ -4682,8 +4696,10 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
                     ui_utils.updateHUDText(this.getHUDText());
                 }
 
-                // Update step_num
-                this.step_num += replayLog.length;
+                // Set step_num to match what it should be after replaying all frames.
+                // restoredStepNum is the step_num at snapshotFrame (before any replay steps).
+                // We replayed from snapshotFrame to currentFrame, so total steps = replayLog.length.
+                this.step_num = restoredStepNum + replayLog.length;
 
                 // Store corrected frame data in the rollback-safe buffer
                 for (const entry of replayLog) {
