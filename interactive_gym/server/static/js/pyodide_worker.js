@@ -211,6 +211,8 @@ import numpy as np
 ${onGameStepCode}
 
 agent_actions = json.loads('''${pyActions}''')
+# JSON keys are always strings; convert back to int if the env expects int keys
+agent_actions = {int(k) if isinstance(k, str) and k.isdigit() else k: v for k, v in agent_actions.items()}
 obs, rewards, terminateds, truncateds, infos = env.step(agent_actions)
 render_state = env.render()
 
