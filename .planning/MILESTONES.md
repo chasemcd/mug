@@ -1,26 +1,27 @@
 # Project Milestones: Interactive Gym P2P Multiplayer
 
-## v1.16 Pyodide Web Worker (In Progress)
+## v1.16 Pyodide Pre-loading (In Progress)
 
-**Goal:** Move Pyodide initialization and execution to a Web Worker to prevent main thread blocking and eliminate Socket.IO disconnection issues during game startup.
+**Goal:** Pre-load Pyodide during the compatibility check screen so game startup never blocks the main thread, eliminating Socket.IO disconnects at scale (50+ concurrent game pairs).
 
 **Status:** Planning
 
+**Approach:** Move Pyodide loading to the compatibility check screen (before matching). By the time a game starts, Pyodide is already compiled — game startup is instant and non-blocking. This is simpler than the originally planned Web Worker approach and preserves the synchronous rollback path.
+
 **Target features:**
 
-- PyodideWorker class with message protocol for main thread ↔ worker communication
-- Move loadPyodide() and package installation to dedicated Web Worker
-- Move pyodide.runPythonAsync() calls to worker
-- Proxy environment state (observations, render_state) back to main thread
-- Update RemoteGame and MultiplayerPyodideGame to use PyodideWorker
+- Early Pyodide init during compatibility check (detect Pyodide scenes from config)
+- Shared Pyodide instance reused by RemoteGame (skip loadPyodide if pre-loaded)
+- Loading progress indicator and gate before participant advancement
+- Server-side ping grace during Pyodide loading phase
 - Remove stagger delay from multi-participant tests
 
-**Root cause (from v1.15 investigation):**
+**Key insight:**
 
-- Pyodide `loadPyodide()` blocks main thread during WASM compilation (~5-15 seconds)
-- Socket.IO ping/pong requires main thread event loop access
-- With multiple games starting concurrently, blocking exceeds ping timeout (8s)
-- Result: False disconnects during game startup
+- Only `loadPyodide()` causes disconnects (5-15s main thread blocking)
+- Per-frame `runPythonAsync()` is fine (10-100ms, well within 8s ping timeout)
+- Pre-loading eliminates concurrent init at game start without rewriting the game loop
+- Web Worker for per-frame execution deferred to future milestone
 
 ---
 

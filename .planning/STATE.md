@@ -2,16 +2,16 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-02-04)
+See: .planning/PROJECT.md (updated 2026-02-06)
 
 **Core value:** Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
-**Current focus:** v1.16 Pyodide Web Worker - Planned
+**Current focus:** v1.16 Pyodide Pre-loading - Planned
 
 ## Current Position
 
-Milestone: v1.16 Pyodide Web Worker
-Status: Planning — Move Pyodide to Web Worker to prevent Socket.IO disconnects
-Last activity: 2026-02-04 — Created milestone after v1.15 root cause analysis
+Milestone: v1.16 Pyodide Pre-loading
+Status: Planning — Pre-load Pyodide during compat check to eliminate game startup disconnects at scale
+Last activity: 2026-02-06 — Replaced Web Worker approach with pre-loading strategy
 
 Progress: ░░░░░░░░░░ 0% (planning phase)
 
@@ -19,7 +19,7 @@ Progress: ░░░░░░░░░░ 0% (planning phase)
 
 | Milestone | Phases | Status | Shipped |
 |-----------|--------|--------|---------|
-| v1.16 Pyodide Web Worker | TBD | Planning | - |
+| v1.16 Pyodide Pre-loading | TBD | Planning | - |
 | v1.15 E2E Test Reliability | - | Root cause found | 2026-02-04 |
 | v1.14 Data Parity Fix | 61-65 | Complete | 2026-02-04 |
 | v1.13 Matchmaker Hardening | 57-60 | Complete | 2026-02-03 |
@@ -222,6 +222,12 @@ Progress: ░░░░░░░░░░ 0% (planning phase)
 
 See: .planning/PROJECT.md Key Decisions table
 
+**v1.16 approach decision:**
+- Pre-load over Web Worker: per-frame runPythonAsync (10-100ms) doesn't cause disconnects; only loadPyodide (5-15s) does
+- Pre-loading during compat check eliminates concurrent init at game start
+- Web Worker deferred until per-frame blocking becomes a problem
+- Preserves synchronous rollback path (no async Worker message overhead)
+
 **v1.13 Phase 60 decisions:**
 - Remove group reunion code entirely (not just disable) - dead code creates maintenance burden
 - Log warning when wait_for_known_group=True rather than error - avoids breaking existing configs
@@ -341,35 +347,35 @@ See: .planning/PROJECT.md Key Decisions table
 
 ## Session Continuity
 
-Last session: 2026-02-04
-Stopped at: Created v1.16 Pyodide Web Worker milestone
+Last session: 2026-02-06
+Stopped at: Replaced v1.16 Web Worker approach with Pyodide Pre-loading strategy
 Resume file: None
 
 ### Next Steps
 
-**v1.16 Pyodide Web Worker (Planned)**
-Goal: Move Pyodide to Web Worker to prevent Socket.IO disconnects during initialization
+**v1.16 Pyodide Pre-loading (Planned)**
+Goal: Pre-load Pyodide during compatibility check to eliminate game startup disconnects at scale
 
-**Root cause identified (v1.15 investigation):**
-- Pyodide `loadPyodide()` blocks main thread during WASM compilation
-- Socket.IO ping/pong requires main thread event loop
-- With multiple games starting concurrently, blocking exceeds ping timeout (8s)
-- Result: False disconnects during game startup
+**Key insight (from v1.15 investigation + analysis):**
+- Only `loadPyodide()` causes disconnects (5-15s blocking)
+- Per-frame `runPythonAsync()` is fine (10-100ms, well within 8s ping timeout)
+- Pre-loading eliminates concurrent init at game start, solving the problem without rewriting the game loop
 
 **Solution approach:**
-1. Create PyodideWorker class with message protocol
-2. Move all Pyodide operations to dedicated Web Worker
-3. Main thread stays responsive for Socket.IO
-4. Proxy game state back to main thread for rendering
+1. Detect Pyodide-requiring scenes from experiment config
+2. Start loadPyodide() during compatibility check screen
+3. Gate participant advancement until Pyodide is ready
+4. RemoteGame reuses pre-loaded instance (skip loadPyodide if already loaded)
+5. Server-side ping grace during loading phase for slow machines
 
 **Key files to modify:**
-- `interactive_gym/server/static/js/pyodide_remote_game.js` - RemoteGame class
-- `interactive_gym/server/static/js/pyodide_multiplayer_game.js` - MultiplayerPyodideGame class
-- New: `interactive_gym/server/static/js/pyodide_worker.js` - Web Worker implementation
+- `interactive_gym/server/static/js/index.js` - Early Pyodide init during compat check
+- `interactive_gym/server/static/js/pyodide_remote_game.js` - RemoteGame.initialize() reuses pre-loaded instance
+- `interactive_gym/server/app.py` - Server-side ping grace during loading
 
 **Testing plan:**
 - Remove 5s stagger delay from multi-participant tests
 - All STRESS tests should pass with 0.5s stagger
-- Socket.IO connections stable during Pyodide init
+- Socket.IO connections stable during concurrent game starts
 
-Next action: Create PyodideWorker class and message protocol design
+Next action: Run /gsd:create-roadmap or /gsd:define-requirements

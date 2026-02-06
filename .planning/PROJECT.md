@@ -8,44 +8,53 @@ A framework for running browser-based reinforcement learning experiments with hu
 
 Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
 
-## Current Milestone: v1.16 Pyodide Web Worker
+## Current Milestone: v1.16 Pyodide Pre-loading
 
-**Goal:** Move Pyodide initialization and execution to a Web Worker to prevent main thread blocking and eliminate Socket.IO disconnection issues during game startup.
+**Goal:** Pre-load Pyodide during the compatibility check screen so game startup never blocks the main thread, eliminating Socket.IO disconnects at scale (50+ concurrent game pairs).
 
-**Problem:** Pyodide initialization blocks the browser's main thread for several seconds during WASM compilation. This prevents Socket.IO from responding to ping messages, causing false disconnects when multiple games start concurrently. The 5-second stagger delay is a workaround, not a fix.
+**Problem:** Pyodide initialization blocks the browser's main thread for 5-15 seconds during WASM compilation. This prevents Socket.IO from responding to server pings, causing false disconnects when multiple games start concurrently. The 5-second stagger delay workaround doesn't scale beyond a handful of games.
 
 **Root cause:**
 - `loadPyodide()` downloads ~15MB of WASM/Python packages
 - WASM compilation blocks the main thread (synchronous)
 - Socket.IO ping/pong requires main thread event loop access
 - With ping_interval=8s, any >8s blocking causes disconnect
+- Per-frame `runPythonAsync()` is NOT the issue (10-100ms, well within timeout)
+
+**Approach:** Move Pyodide loading to the compatibility check screen (before matching). By the time a game starts, Pyodide is already compiled in memory — game startup is instant and non-blocking.
 
 **Target features:**
 
-*Web Worker architecture:*
-- [ ] Create PyodideWorker class that manages Pyodide in a dedicated Web Worker
-- [ ] Define message protocol for main thread ↔ worker communication
-- [ ] Move `loadPyodide()` and package installation to worker
-- [ ] Move `pyodide.runPythonAsync()` calls to worker
-- [ ] Proxy environment state (observations, render_state) back to main thread
+*Early Pyodide initialization:*
+- [ ] Detect Pyodide-requiring scenes from experiment config during compatibility check
+- [ ] Start `loadPyodide()` and package installation during compat screen
+- [ ] Show loading progress indicator to participant
+- [ ] Gate participant advancement until Pyodide is ready
 
-*Integration:*
-- [ ] Update RemoteGame to use PyodideWorker instead of direct Pyodide
-- [ ] Update MultiplayerPyodideGame to use PyodideWorker
-- [ ] Ensure game step() calls work asynchronously via worker
-- [ ] Maintain backward compatibility for single-player games
+*Shared Pyodide instance:*
+- [ ] `RemoteGame.initialize()` reuses pre-loaded Pyodide instance (skip `loadPyodide()` if already loaded)
+- [ ] `MultiplayerPyodideGame` uses same shared instance
+- [ ] Maintain backward compatibility (load on demand if pre-load didn't happen)
+
+*Server-side init grace:*
+- [ ] Server tolerates missed pings during Pyodide loading phase (slow machines)
+- [ ] Client signals loading state to server
+- [ ] Normal ping checking resumes after loading completes
 
 *Testing:*
 - [ ] Remove stagger delay from multi-participant tests
 - [ ] All E2E tests pass with 0.5s stagger (near-simultaneous)
-- [ ] Socket.IO connections remain stable during Pyodide init
+- [ ] Socket.IO connections remain stable during concurrent game starts
 - [ ] No performance regression for game loop execution
 
 **What done looks like:**
-- Pyodide runs entirely in a Web Worker (off main thread)
-- Socket.IO pings are always answered promptly
-- Multi-participant tests pass without timing hacks
-- Game responsiveness unchanged or improved
+- Pyodide is fully loaded before any game starts
+- 50+ game pairs can start simultaneously without disconnects
+- No stagger delay needed in tests or production
+- Game startup is near-instant (no WASM compilation at game time)
+
+**Deferred to future milestone:**
+- Moving per-frame `runPythonAsync()` to a Web Worker (full off-main-thread architecture)
 
 ## Previous Milestone: v1.15 E2E Test Reliability (In Progress)
 
@@ -293,11 +302,11 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 
 ### Active
 
-*v1.16 Pyodide Web Worker (Planned):*
-- [ ] PyodideWorker class with message protocol
-- [ ] Move loadPyodide() to Web Worker
-- [ ] Move runPythonAsync() to Web Worker
-- [ ] Update RemoteGame and MultiplayerPyodideGame
+*v1.16 Pyodide Pre-loading (Planned):*
+- [ ] Early Pyodide init during compatibility check (detect Pyodide scenes from config)
+- [ ] Shared Pyodide instance reused by RemoteGame (skip loadPyodide if pre-loaded)
+- [ ] Loading progress indicator and gate before participant advancement
+- [ ] Server-side ping grace during Pyodide loading phase
 - [ ] Remove stagger delay, tests pass with near-simultaneous starts
 
 *v1.15 E2E Test Reliability (In Progress):*
@@ -369,6 +378,7 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 
 ### Deferred
 
+- [ ] Pyodide Web Worker (move per-frame runPythonAsync off main thread) — pre-loading solves the disconnect issue; Web Worker deferred until per-frame blocking becomes a problem
 - [ ] Rollback visual smoothing (tween objects after corrections)
 - [ ] N-player support with hybrid topology (mesh for small N, relay for large N)
 - [ ] Adaptive input delay based on RTT
@@ -421,6 +431,7 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 | Playwright MCP for testing | Browser automation with network condition control | ✓ Good |
 | isFocused exclusion from parity | Focus state has notification latency, column consistency is sufficient | ✓ Good |
 | BOUND-02/03 guards | Defense-in-depth at episode boundaries in async paths | ✓ Good |
+| Pre-load over Web Worker for v1.16 | Per-frame Python (10-100ms) doesn't cause disconnects; only loadPyodide() does. Pre-loading is simpler and preserves synchronous rollback performance. Web Worker deferred. | — Pending |
 
 ---
-*Last updated: 2026-02-04 after v1.16 Pyodide Web Worker milestone started*
+*Last updated: 2026-02-06 after v1.16 Pyodide Pre-loading milestone started*
