@@ -72,25 +72,25 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| INFRA-01 | TBD | Pending |
-| INFRA-02 | TBD | Pending |
-| INFRA-03 | TBD | Pending |
-| PERF-01 | TBD | Pending |
-| PERF-02 | TBD | Pending |
-| NET-01 | TBD | Pending |
-| NET-02 | TBD | Pending |
-| REG-01 | TBD | Pending |
-| REG-02 | TBD | Pending |
-| REG-03 | TBD | Pending |
-| REG-04 | TBD | Pending |
-| STAB-01 | TBD | Pending |
-| STAB-02 | TBD | Pending |
+| INFRA-01 | Phase 71 | Pending |
+| INFRA-02 | Phase 71 | Pending |
+| INFRA-03 | Phase 71 | Pending |
+| PERF-01 | Phase 72 | Pending |
+| PERF-02 | Phase 72 | Pending |
+| NET-01 | Phase 73 | Pending |
+| NET-02 | Phase 73 | Pending |
+| REG-01 | Phase 73 | Pending |
+| REG-02 | Phase 73 | Pending |
+| REG-03 | Phase 73 | Pending |
+| REG-04 | Phase 73 | Pending |
+| STAB-01 | Phase 74 | Pending |
+| STAB-02 | Phase 74 | Pending |
 
 **Coverage:**
 - v1 requirements: 13 total
-- Mapped to phases: 0
-- Unmapped: 13 (awaiting roadmap)
+- Mapped to phases: 13
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-06*
-*Last updated: 2026-02-06 after v1.17 milestone started*
+*Last updated: 2026-02-06 after v1.17 roadmap created*

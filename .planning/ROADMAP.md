@@ -18,6 +18,7 @@
 - ✅ **v1.13 Matchmaker Hardening** - Phases 57-60 (shipped 2026-02-03)
 - 🚧 **v1.14 Data Parity Fix** - Phases 61-66 (in progress)
 - ✅ **v1.16 Pyodide Pre-loading** - Phases 67-70 (shipped 2026-02-06)
+- 🚧 **v1.17 E2E Test Reliability** - Phases 71-74 (in progress)
 
 ## Phases
 
@@ -217,6 +218,15 @@ See [milestones/v1.11-ROADMAP.md](milestones/v1.11-ROADMAP.md) for full details.
 - [x] **Phase 69: Server-Side Init Grace** - Server tolerates missed pings during Pyodide loading
 - [x] **Phase 70: Validation & Test Stabilization** - Remove stagger, prove concurrent starts work
 
+### 🚧 v1.17 E2E Test Reliability (In Progress)
+
+**Milestone Goal:** Achieve 100% pass rate for all E2E tests with zero flakiness -- every test passes 10+ consecutive runs.
+
+- [ ] **Phase 71: Test Infrastructure Fix** - Reliable server lifecycle and navigation between test suites
+- [ ] **Phase 72: Latency Test Diagnosis** - Root cause and fix for 200ms latency test timeout
+- [ ] **Phase 73: Network & Regression Validation** - All test suites pass (network disruption, data comparison, multiplayer, multi-participant, focus loss)
+- [ ] **Phase 74: Stability Certification** - 10 consecutive full-suite passes, zero xfail markers
+
 ## Phase Details
 
 ### Phase 61: Input Confirmation Protocol
@@ -367,6 +377,67 @@ Plans:
 Plans:
 - [x] 70-01-PLAN.md — Reduce stagger delay from 5.0s to 0.5s and verify full E2E test suite passes
 
+### Phase 71: Test Infrastructure Fix
+**Goal**: Server startup and teardown between test suites completes cleanly, eliminating Page.goto timeout failures
+**Depends on**: Phase 70 (v1.16 complete)
+**Requirements**: INFRA-01, INFRA-02, INFRA-03
+**Success Criteria** (what must be TRUE):
+  1. Running two test suites back-to-back (e.g., test_data_comparison then test_focus_loss) succeeds with no Page.goto timeouts
+  2. No stale server processes remain after a test suite completes (verified by port check)
+  3. Browser contexts, server processes, and temporary files are fully cleaned up between tests
+  4. `test_focus_loss_episode_boundary_parity` passes when run after other test suites (not just in isolation)
+**Research flag:** Likely -- need to diagnose why server teardown leaves stale state between suites
+**Plans:** TBD
+
+Plans:
+- [ ] 71-01: TBD
+
+### Phase 72: Latency Test Diagnosis
+**Goal**: Identify and fix the root cause of the 200ms latency test timeout so it completes reliably
+**Depends on**: Phase 71
+**Requirements**: PERF-01, PERF-02
+**Success Criteria** (what must be TRUE):
+  1. Root cause of `test_episode_completion_under_fixed_latency[chromium-200]` timeout is documented (in plan or summary)
+  2. The 200ms latency test completes within its timeout (currently 300s) on 5 consecutive runs
+  3. The 100ms latency variant continues to pass (no regression)
+**Research flag:** Definite -- root cause is unknown, need investigation before any fix
+**Plans:** TBD
+
+Plans:
+- [ ] 72-01: TBD
+
+### Phase 73: Network & Regression Validation
+**Goal**: Every test suite in the E2E suite passes -- network disruption, data comparison, multiplayer, multi-participant, and focus loss
+**Depends on**: Phase 72
+**Requirements**: NET-01, NET-02, REG-01, REG-02, REG-03, REG-04
+**Success Criteria** (what must be TRUE):
+  1. All latency injection tests pass in a single run (100ms, 200ms, asymmetric, jitter, active input)
+  2. All network disruption tests pass in a single run (packet loss, reconnection)
+  3. All 5 data comparison tests pass in a single run
+  4. All multiplayer basic tests pass in a single run
+  5. All multi-participant tests pass with 0.5s stagger in a single run
+  6. All focus loss tests pass in a single run
+**Research flag:** Unlikely -- validation of prior fixes; any new failures get diagnosed and fixed inline
+**Plans:** TBD
+
+Plans:
+- [ ] 73-01: TBD
+
+### Phase 74: Stability Certification
+**Goal**: The full E2E test suite is proven stable -- 10 consecutive passes, zero flaky markers
+**Depends on**: Phase 73
+**Requirements**: STAB-01, STAB-02
+**Success Criteria** (what must be TRUE):
+  1. Full E2E test suite passes 10 consecutive runs with zero failures
+  2. No xfail markers exist in any E2E test file
+  3. No tolerance hacks or known-flaky annotations exist in any E2E test file
+  4. Any failure during the 10-run sequence triggers root cause investigation (not retry-and-hope)
+**Research flag:** Unlikely -- pure execution and validation
+**Plans:** TBD
+
+Plans:
+- [ ] 74-01: TBD
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -396,7 +467,11 @@ Plans:
 | 68. Shared Instance Integration | v1.16 | 1/1 | Complete | 2026-02-06 |
 | 69. Server-Side Init Grace | v1.16 | 1/1 | Complete | 2026-02-06 |
 | 70. Validation & Test Stabilization | v1.16 | 1/1 | Complete | 2026-02-06 |
+| 71. Test Infrastructure Fix | v1.17 | 0/TBD | Not started | - |
+| 72. Latency Test Diagnosis | v1.17 | 0/TBD | Not started | - |
+| 73. Network & Regression Validation | v1.17 | 0/TBD | Not started | - |
+| 74. Stability Certification | v1.17 | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-06 after Phase 70 execution complete*
+*Last updated: 2026-02-06 after v1.17 roadmap created*

@@ -5,15 +5,15 @@
 See: .planning/PROJECT.md (updated 2026-02-06)
 
 **Core value:** Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
-**Current focus:** v1.17 E2E Test Reliability
+**Current focus:** v1.17 E2E Test Reliability — Phase 71 (Test Infrastructure Fix)
 
 ## Current Position
 
 Milestone: v1.17 E2E Test Reliability
-Phase: Not started (run /gsd:define-requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-02-06 — Milestone v1.17 started
+Phase: 71 of 74 (Test Infrastructure Fix)
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-02-06 — v1.17 roadmap created
 
 Progress: ░░░░░░░░░░ 0%
 
@@ -21,7 +21,7 @@ Progress: ░░░░░░░░░░ 0%
 
 | Milestone | Phases | Status | Shipped |
 |-----------|--------|--------|---------|
-| v1.17 E2E Test Reliability | TBD | In progress | - |
+| v1.17 E2E Test Reliability | 71-74 | In progress | - |
 | v1.16 Pyodide Pre-loading | 67-70 | Complete | 2026-02-06 |
 | v1.15 E2E Test Reliability | - | Root cause found | 2026-02-04 |
 | v1.14 Data Parity Fix | 61-65 | Complete | 2026-02-04 |
@@ -417,27 +417,21 @@ See: .planning/PROJECT.md Key Decisions table
 - Group reunion feature deferred to REUN-01/REUN-02 as future matchmaker variant
 - wait_for_known_group=True logs warning but uses FIFO matching
 
-**Pre-existing E2E test flakiness (identified during v1.16 Phase 70 validation):**
-- test_data_comparison: 1/5 failed with Page.goto timeout (not stagger-related)
-- test_latency_injection: 1/6 timed out at 300s on 200ms latency test (not stagger-related)
-- test_network_disruption: not validated (skipped by user)
-- These can be addressed in a future E2E reliability milestone
+**Known E2E test failures (v1.17 targets):**
+- test_focus_loss_episode_boundary_parity: Page.goto timeout (30s) -- server startup/teardown issue between suites
+- test_episode_completion_under_fixed_latency[chromium-200]: 300s timeout -- root cause unknown
+- test_network_disruption suite: not validated -- needs full run and any failures addressed
 
 ## Session Continuity
 
 Last session: 2026-02-06
-Stopped at: Started v1.17 E2E Test Reliability milestone
+Stopped at: v1.17 roadmap created, ready to plan Phase 71
 Resume file: None
 
 ### Next Steps
 
-**v1.17 E2E Test Reliability milestone started.**
+**v1.17 E2E Test Reliability roadmap created.**
 
-Goal: All E2E tests pass 10+ consecutive runs with zero flakiness.
+4 phases (71-74): Infrastructure Fix -> Latency Diagnosis -> Network & Regression Validation -> Stability Certification
 
-Known failing tests (from v1.16 Phase 70 validation):
-- test_focus_loss_episode_boundary_parity: Page.goto timeout
-- test_episode_completion_under_fixed_latency[chromium-200]: 300s timeout
-- test_network_disruption: not yet validated
-
-Next action: Run /gsd:define-requirements
+Next action: Run /gsd:plan-phase 71
