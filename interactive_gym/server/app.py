@@ -136,10 +136,28 @@ PARTICIPANT_TRACKER: ParticipantStateTracker = ParticipantStateTracker()
 # When both players submit, metrics are aggregated into a comparison file
 PENDING_MULTIPLAYER_METRICS: dict[tuple[str, str], dict] = utils.ThreadSafeDict()
 
+# Pyodide loading grace period tracking (Phase 69)
+# Maps subject_id -> loading start timestamp. Clients in this dict are currently
+# loading Pyodide WASM and should not be treated as truly disconnected.
+LOADING_CLIENTS: dict[str, float] = {}
+LOADING_TIMEOUT_S = 60  # Max loading time before considering client dead
+
 
 def get_subject_id_from_session_id(session_id: str) -> SubjectID:
     subject_id = SESSION_ID_TO_SUBJECT_ID.get(session_id, None)
     return subject_id
+
+
+def is_client_in_loading_grace(subject_id: str) -> bool:
+    """Check if client is in Pyodide loading grace period (not timed out)."""
+    start_time = LOADING_CLIENTS.get(subject_id)
+    if start_time is None:
+        return False
+    if time.time() - start_time > LOADING_TIMEOUT_S:
+        LOADING_CLIENTS.pop(subject_id, None)
+        logger.warning(f"[Grace] {subject_id} loading grace expired after {LOADING_TIMEOUT_S}s")
+        return False
+    return True
 
 
 def get_socket_for_subject(subject_id: str) -> str | None:
@@ -177,12 +195,13 @@ socketio = flask_socketio.SocketIO(
     cors_allowed_origins="*",
     logger=app.config["DEBUG"],
     # engineio_logger=False,
-    # Ping settings balanced for disconnect detection while allowing Pyodide initialization
-    # Pyodide can block the main thread for several seconds during startup,
-    # so we need enough buffer to avoid false disconnects during heavy initialization
-    # (especially when running multiple concurrent games)
+    # Ping settings: ping_timeout increased to accommodate Pyodide WASM compilation
+    # (5-15s) in the fallback path where preload didn't happen.
+    # Total grace before disconnect: 8 + 30 = 38 seconds, well beyond worst case.
+    # This weakens real disconnect detection from 16s to 38s, but multiplayer games
+    # already have P2P WebRTC disconnect detection at 500ms, so this is acceptable.
     ping_interval=8,   # Ping every 8 seconds (default: 25)
-    ping_timeout=8,    # Wait 8 seconds for pong before disconnect (default: 5)
+    ping_timeout=30,   # Wait 30 seconds for pong before disconnect (default: 5)
 )
 
 # Flask-Login setup for admin authentication
@@ -953,6 +972,26 @@ def pong(data):
         subject_id = get_subject_id_from_session_id(session_id)
         if subject_id and subject_id in PARTICIPANT_SESSIONS:
             PARTICIPANT_SESSIONS[subject_id].current_rtt = ping_ms
+
+
+@socketio.on("pyodide_loading_start")
+def on_pyodide_loading_start(data):
+    subject_id = get_subject_id_from_session_id(flask.request.sid)
+    if subject_id:
+        LOADING_CLIENTS[subject_id] = time.time()
+        logger.info(f"[Grace] {subject_id} starting Pyodide loading")
+
+
+@socketio.on("pyodide_loading_complete")
+def on_pyodide_loading_complete(data):
+    subject_id = get_subject_id_from_session_id(flask.request.sid)
+    if subject_id:
+        start_time = LOADING_CLIENTS.pop(subject_id, None)
+        if start_time:
+            duration = time.time() - start_time
+            logger.info(f"[Grace] {subject_id} completed Pyodide loading in {duration:.1f}s")
+        else:
+            logger.info(f"[Grace] {subject_id} completed Pyodide loading (no start tracked)")
 
 
 @socketio.on("unityEpisodeEnd")
@@ -2687,6 +2726,26 @@ def on_disconnect():
     if subject_id is None:
         logger.info("No subject_id found for disconnecting socket")
         return
+
+    # Grace check: if client is loading Pyodide, preserve session and skip cleanup (Phase 69)
+    if is_client_in_loading_grace(subject_id):
+        logger.warning(
+            f"[Grace] {subject_id} disconnected during Pyodide loading. "
+            f"Preserving session for reconnection."
+        )
+        session = PARTICIPANT_SESSIONS.get(subject_id)
+        if session is not None:
+            participant_stager = STAGERS.get(subject_id, None)
+            if participant_stager:
+                session.stager_state = participant_stager.get_state()
+                session.current_scene_id = (
+                    participant_stager.current_scene.scene_id
+                    if participant_stager.current_scene else None
+                )
+            session.socket_id = None
+            session.is_connected = False
+            session.last_updated_at = time.time()
+        return  # Skip game cleanup, partner notifications, etc.
 
     # Log activity for admin dashboard (before cleanup)
     session = PARTICIPANT_SESSIONS.get(subject_id)
