@@ -11,11 +11,11 @@ See: .planning/PROJECT.md (updated 2026-02-06)
 
 Milestone: v1.17 E2E Test Reliability
 Phase: 72 of 74 (Latency Test Diagnosis)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-02-06 — Phase 71 complete (verified 4/4 must-haves)
+Plan: 01 of 2 complete
+Status: In progress
+Last activity: 2026-02-06 — Completed 72-01-PLAN.md (root cause identified)
 
-Progress: ██▓░░░░░░░ 25%
+Progress: ███▓░░░░░░ 37%
 
 ## Milestone History
 
@@ -178,6 +178,7 @@ Progress: ██▓░░░░░░░ 25%
 **v1.17 Execution:**
 - `.planning/phases/71-test-infrastructure-fix/71-01-SUMMARY.md`
 - `.planning/phases/71-test-infrastructure-fix/71-02-SUMMARY.md`
+- `.planning/phases/72-latency-test-diagnosis/72-01-SUMMARY.md`
 
 **Robust Server Fixture Lifecycle (v1.17 Phase 71 - added):**
 - `tests/conftest.py` - _is_port_free(), _ensure_port_available(), _wait_for_port_free(), _teardown_server() shared helpers; all 5 server fixtures refactored to use them; start_new_session=True on all Popen; stdout=DEVNULL
@@ -269,6 +270,15 @@ Progress: ██▓░░░░░░░ 25%
 ### Decisions
 
 See: .planning/PROJECT.md Key Decisions table
+
+**v1.17 Phase 72-01 decisions:**
+- 200ms latency test timeout is intermittent, not deterministic (P2P ready gate race at 5000ms boundary)
+- P2P validation takes ~4-5s under 200ms symmetric CDP latency, right at the 5000ms gate timeout
+- When race is lost: p2p_validation_failed -> re-pool -> re-match -> infinite loop with 2 test players
+- CDP latency does NOT affect WebRTC DataChannel (Chromium issue 41215664) -- test validates setup/signaling, not gameplay
+- 95% of inputs route through SocketIO relay, 5% via P2P DataChannel; zero rollbacks despite relay mode
+- Fix direction: increase P2P ready gate timeout from 5000ms to 15000ms (Plan 02)
+- Diagnostic instrumentation left in place behind diagnostics= flag for future use
 
 **v1.17 Phase 71 decisions:**
 - socket.bind() for port checks (not connect-based, which can succeed during TIME_WAIT)
@@ -438,19 +448,19 @@ See: .planning/PROJECT.md Key Decisions table
 
 **Known E2E test failures (v1.17 targets):**
 - test_focus_loss_episode_boundary_parity: FIXED (71-02 extracted to own module; passes back-to-back with test_data_comparison.py)
-- test_episode_completion_under_fixed_latency[chromium-200]: 300s timeout -- root cause unknown
+- test_episode_completion_under_fixed_latency[chromium-200]: DIAGNOSED (72-01) -- intermittent P2P ready gate race at 5000ms boundary; fix: increase gate timeout to 15000ms (Plan 72-02)
 - test_network_disruption suite: not validated -- needs full run and any failures addressed
 
 ## Session Continuity
 
 Last session: 2026-02-06
-Stopped at: Phase 71 complete, verified 4/4
+Stopped at: Completed 72-01-PLAN.md (root cause identified)
 Resume file: None
 
 ### Next Steps
 
-**Phase 71 (Test Infrastructure Fix) complete and verified.**
+**Phase 72 Plan 01 (Latency Test Diagnosis) complete.**
 
-Next action: Run /gsd:plan-phase 72
+Root cause identified: intermittent P2P ready gate race at 5000ms boundary under 200ms CDP latency.
 
-Next action: Plan Phase 72 (Latency Diagnosis) - investigate test_episode_completion_under_fixed_latency[chromium-200] 300s timeout
+Next action: Execute Plan 72-02 (apply fix: increase P2P ready gate timeout)
