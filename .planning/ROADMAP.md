@@ -224,7 +224,7 @@ See [milestones/v1.11-ROADMAP.md](milestones/v1.11-ROADMAP.md) for full details.
 
 - [x] **Phase 71: Test Infrastructure Fix** - Reliable server lifecycle and navigation between test suites
 - [x] **Phase 72: Latency Test Diagnosis** - Root cause and fix for 200ms latency test timeout
-- [ ] **Phase 73: Network & Regression Validation** - All test suites pass (network disruption, data comparison, multiplayer, multi-participant, focus loss)
+- [x] **Phase 73: Network & Regression Validation** - All test suites pass (network disruption, data comparison, multiplayer, multi-participant, focus loss)
 - [ ] **Phase 74: Stability Certification** - 10 consecutive full-suite passes, zero xfail markers
 
 ## Phase Details
@@ -423,8 +423,8 @@ Plans:
 **Plans:** 2 plans
 
 Plans:
-- [ ] 73-01-PLAN.md — Run latency injection + network disruption tests, diagnose and fix any failures (NET-01, NET-02)
-- [ ] 73-02-PLAN.md — Run data comparison + multiplayer basic + multi-participant + focus loss tests (REG-01 through REG-04)
+- [x] 73-01-PLAN.md — Run latency injection + network disruption tests, diagnose and fix any failures (NET-01, NET-02)
+- [x] 73-02-PLAN.md — Run data comparison + multiplayer basic + multi-participant + focus loss tests (REG-01 through REG-04)
 
 ### Phase 74: Stability Certification
 **Goal**: The full E2E test suite is proven stable -- 10 consecutive passes, zero flaky markers
@@ -472,9 +472,9 @@ Plans:
 | 70. Validation & Test Stabilization | v1.16 | 1/1 | Complete | 2026-02-06 |
 | 71. Test Infrastructure Fix | v1.17 | 2/2 | Complete | 2026-02-06 |
 | 72. Latency Test Diagnosis | v1.17 | 2/2 | Complete | 2026-02-06 |
-| 73. Network & Regression Validation | v1.17 | 0/2 | Not started | - |
+| 73. Network & Regression Validation | v1.17 | 2/2 | Complete | 2026-02-06 |
 | 74. Stability Certification | v1.17 | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-06 after Phase 73 planned (2 plans in 2 waves)*
+*Last updated: 2026-02-06 after Phase 73 complete (18/18 E2E tests passing)*

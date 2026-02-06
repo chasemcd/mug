@@ -5,17 +5,17 @@
 See: .planning/PROJECT.md (updated 2026-02-06)
 
 **Core value:** Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
-**Current focus:** v1.17 E2E Test Reliability — Phase 73 complete, Phase 74 next
+**Current focus:** v1.17 E2E Test Reliability — Phase 74 (Stability Certification)
 
 ## Current Position
 
 Milestone: v1.17 E2E Test Reliability
-Phase: 73 of 74 (Network & Regression Validation)
-Plan: 02 of 02 complete
-Status: Phase complete
-Last activity: 2026-02-06 — Completed 73-02-PLAN.md (regression test validation)
+Phase: 74 of 74 (Stability Certification)
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-02-06 — Phase 73 complete, verified 6/6 must-haves, 18/18 E2E tests passing
 
-Progress: ████████░░ 80%
+Progress: ███████░░░ 75%
 
 ## Milestone History
 
@@ -490,14 +490,11 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-02-06
-Stopped at: Completed 73-02-PLAN.md
+Stopped at: Phase 73 complete, verified 6/6
 Resume file: None
 
 ### Next Steps
 
-**Phase 73 (Network & Regression Validation) complete.**
+**Phase 73 (Network & Regression Validation) complete and verified.**
 
-All 18 E2E tests pass: 9 network-condition tests (Plan 01) + 9 regression tests (Plan 02).
-NET-01, NET-02, REG-01, REG-02, REG-03, REG-04 requirements all satisfied.
-
-Next action: Phase 74 (final milestone validation) or milestone ship
+Next action: Run /gsd:plan-phase 74

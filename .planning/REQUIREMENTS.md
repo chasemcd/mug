@@ -20,15 +20,15 @@ Requirements for v1.17 E2E Test Reliability. Each maps to roadmap phases.
 
 ### Network Condition Tests
 
-- [ ] **NET-01**: All latency injection tests pass (100ms fixed, 200ms fixed, asymmetric, jitter, active input)
-- [ ] **NET-02**: All network disruption tests pass (packet loss, reconnection scenarios)
+- [x] **NET-01**: All latency injection tests pass (100ms fixed, 200ms fixed, asymmetric, jitter, active input)
+- [x] **NET-02**: All network disruption tests pass (packet loss, reconnection scenarios)
 
 ### Regression Suite
 
-- [ ] **REG-01**: All data comparison tests pass consistently (5/5)
-- [ ] **REG-02**: All multiplayer basic tests pass
-- [ ] **REG-03**: All multi-participant tests pass with 0.5s stagger
-- [ ] **REG-04**: All focus loss tests pass
+- [x] **REG-01**: All data comparison tests pass consistently (5/5)
+- [x] **REG-02**: All multiplayer basic tests pass
+- [x] **REG-03**: All multi-participant tests pass with 0.5s stagger
+- [x] **REG-04**: All focus loss tests pass
 
 ### Stability Validation
 
@@ -77,12 +77,12 @@ Which phases cover which requirements. Updated by create-roadmap.
 | INFRA-03 | Phase 71 | Complete |
 | PERF-01 | Phase 72 | Complete |
 | PERF-02 | Phase 72 | Complete |
-| NET-01 | Phase 73 | Pending |
-| NET-02 | Phase 73 | Pending |
-| REG-01 | Phase 73 | Pending |
-| REG-02 | Phase 73 | Pending |
-| REG-03 | Phase 73 | Pending |
-| REG-04 | Phase 73 | Pending |
+| NET-01 | Phase 73 | Complete |
+| NET-02 | Phase 73 | Complete |
+| REG-01 | Phase 73 | Complete |
+| REG-02 | Phase 73 | Complete |
+| REG-03 | Phase 73 | Complete |
+| REG-04 | Phase 73 | Complete |
 | STAB-01 | Phase 74 | Pending |
 | STAB-02 | Phase 74 | Pending |
 
@@ -93,4 +93,4 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 ---
 *Requirements defined: 2026-02-06*
-*Last updated: 2026-02-06 after Phase 72 complete*
+*Last updated: 2026-02-06 after Phase 73 complete*
