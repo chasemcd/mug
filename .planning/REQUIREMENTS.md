@@ -9,9 +9,9 @@ Requirements for v1.17 E2E Test Reliability. Each maps to roadmap phases.
 
 ### Test Infrastructure
 
-- [ ] **INFRA-01**: Server startup/teardown between test suites completes reliably (no stale processes or port conflicts)
-- [ ] **INFRA-02**: Page.goto navigation succeeds consistently (no 30s timeout failures between tests)
-- [ ] **INFRA-03**: Test fixtures properly clean up browser contexts, server processes, and temporary files
+- [x] **INFRA-01**: Server startup/teardown between test suites completes reliably (no stale processes or port conflicts)
+- [x] **INFRA-02**: Page.goto navigation succeeds consistently (no 30s timeout failures between tests)
+- [x] **INFRA-03**: Test fixtures properly clean up browser contexts, server processes, and temporary files
 
 ### Test Performance
 
@@ -72,9 +72,9 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| INFRA-01 | Phase 71 | Pending |
-| INFRA-02 | Phase 71 | Pending |
-| INFRA-03 | Phase 71 | Pending |
+| INFRA-01 | Phase 71 | Complete |
+| INFRA-02 | Phase 71 | Complete |
+| INFRA-03 | Phase 71 | Complete |
 | PERF-01 | Phase 72 | Pending |
 | PERF-02 | Phase 72 | Pending |
 | NET-01 | Phase 73 | Pending |
@@ -93,4 +93,4 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 ---
 *Requirements defined: 2026-02-06*
-*Last updated: 2026-02-06 after v1.17 roadmap created*
+*Last updated: 2026-02-06 after Phase 71 complete*

@@ -222,7 +222,7 @@ See [milestones/v1.11-ROADMAP.md](milestones/v1.11-ROADMAP.md) for full details.
 
 **Milestone Goal:** Achieve 100% pass rate for all E2E tests with zero flakiness -- every test passes 10+ consecutive runs.
 
-- [ ] **Phase 71: Test Infrastructure Fix** - Reliable server lifecycle and navigation between test suites
+- [x] **Phase 71: Test Infrastructure Fix** - Reliable server lifecycle and navigation between test suites
 - [ ] **Phase 72: Latency Test Diagnosis** - Root cause and fix for 200ms latency test timeout
 - [ ] **Phase 73: Network & Regression Validation** - All test suites pass (network disruption, data comparison, multiplayer, multi-participant, focus loss)
 - [ ] **Phase 74: Stability Certification** - 10 consecutive full-suite passes, zero xfail markers
@@ -391,7 +391,7 @@ Plans:
 
 Plans:
 - [x] 71-01-PLAN.md — Robust server teardown with port-availability polling, process group kill, and pre-startup cleanup
-- [ ] 71-02-PLAN.md — Move test_focus_loss_episode_boundary_parity to own module (gap closure for server state exhaustion)
+- [x] 71-02-PLAN.md — Move test_focus_loss_episode_boundary_parity to own module (gap closure for server state exhaustion)
 
 ### Phase 72: Latency Test Diagnosis
 **Goal**: Identify and fix the root cause of the 200ms latency test timeout so it completes reliably
@@ -468,11 +468,11 @@ Plans:
 | 68. Shared Instance Integration | v1.16 | 1/1 | Complete | 2026-02-06 |
 | 69. Server-Side Init Grace | v1.16 | 1/1 | Complete | 2026-02-06 |
 | 70. Validation & Test Stabilization | v1.16 | 1/1 | Complete | 2026-02-06 |
-| 71. Test Infrastructure Fix | v1.17 | 1/2 | In progress | - |
+| 71. Test Infrastructure Fix | v1.17 | 2/2 | Complete | 2026-02-06 |
 | 72. Latency Test Diagnosis | v1.17 | 0/TBD | Not started | - |
 | 73. Network & Regression Validation | v1.17 | 0/TBD | Not started | - |
 | 74. Stability Certification | v1.17 | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-06 after Phase 71 gap closure plan added*
+*Last updated: 2026-02-06 after Phase 71 complete (gap closure verified)*
