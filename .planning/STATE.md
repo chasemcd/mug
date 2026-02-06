@@ -10,12 +10,12 @@ See: .planning/PROJECT.md (updated 2026-02-06)
 ## Current Position
 
 Milestone: v1.16 Pyodide Pre-loading
-Phase: 67 of 70 (Pyodide Pre-load Infrastructure)
+Phase: 68 of 70 (Shared Instance Integration)
 Plan: 1 of 1 (complete)
-Status: Phase 67 complete
-Last activity: 2026-02-06 — Completed 67-01-PLAN.md
+Status: Phase 68 complete
+Last activity: 2026-02-06 — Completed 68-01-PLAN.md
 
-Progress: ██░░░░░░░░ 25%
+Progress: █████░░░░░ 50%
 
 ## Milestone History
 
@@ -170,6 +170,11 @@ Progress: ██░░░░░░░░ 25%
 
 **v1.16 Execution:**
 - `.planning/phases/67-pyodide-preload-infrastructure/67-01-SUMMARY.md`
+- `.planning/phases/68-shared-instance-integration/68-01-SUMMARY.md`
+
+**Shared Instance Integration (v1.16 Phase 68 - modified):**
+- `interactive_gym/server/static/js/pyodide_remote_game.js` - RemoteGame.initialize() checks window.pyodidePreloadStatus/pyodideInstance, reuses preloaded instance with package dedup fallback
+- `interactive_gym/server/static/js/pyodide_multiplayer_game.js` - MultiplayerPyodideGame.initialize() logs which init path will be used
 
 **Pyodide Pre-load Infrastructure (v1.16 Phase 67 - added):**
 - `interactive_gym/configurations/experiment_config.py` - get_pyodide_config() scans stager scenes for Pyodide requirements
@@ -332,6 +337,12 @@ See: .planning/PROJECT.md Key Decisions table
 - Reset participant state after P2P validation failure to allow re-pooling
 - STRESS-01 requirement satisfied (6 contexts, 3 concurrent games with data parity)
 
+**v1.16 Phase 68 decisions:**
+- Check both window.pyodidePreloadStatus === 'ready' AND window.pyodideInstance truthy before reuse
+- Fallback else branch runs original loadPyodide() path unchanged for backward compatibility
+- Package dedup: filter packages_to_install against installed_packages before micropip.install()
+- MultiplayerPyodideGame gets only a log line; inherits all changes via super.initialize()
+
 **v1.16 Phase 67 decisions:**
 - Scan GENERIC_STAGER scenes via unpack() to detect Pyodide need at experiment level
 - preloadPyodide() called without await (fire-and-forget, concurrent with entry screening)
@@ -367,27 +378,22 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-02-06
-Stopped at: Completed 67-01-PLAN.md (Pyodide Pre-load Infrastructure)
+Stopped at: Completed 68-01-PLAN.md (Shared Instance Integration)
 Resume file: None
 
 ### Next Steps
 
-**Phase 68: Shared Instance Integration**
-Goal: Game classes reuse pre-loaded Pyodide instance instead of loading their own
+**Phase 69: Server-side Init Grace**
+Goal: Tolerate missed pings during Pyodide loading (fallback path still takes 5-15s)
 
-**What Phase 67 delivered:**
-- `window.pyodideInstance` stores pre-loaded Pyodide during compat check
-- `window.pyodideMicropip` stores micropip reference
-- `window.pyodideInstalledPackages` stores installed packages list
-- `window.pyodidePreloadStatus` tracks loading state (idle/loading/ready/error)
-
-**Phase 68 needs to:**
-- Modify `RemoteGame.initialize()` to skip `loadPyodide()` when `window.pyodideInstance` exists
-- Modify `MultiplayerPyodideGame` similarly
-- Verify game startup time is near-instant when preloaded
+**What Phase 68 delivered:**
+- `RemoteGame.initialize()` reuses `window.pyodideInstance` when `pyodidePreloadStatus === 'ready'`
+- Package dedup prevents re-installing packages already loaded during preload
+- `MultiplayerPyodideGame` inherits shared instance via `super.initialize()`
+- Game startup is near-instant when Pyodide was pre-loaded
 
 **Remaining v1.16 phases:**
 - Phase 69: Server-side init grace (tolerate missed pings during loading)
 - Phase 70: Validation & test stabilization (remove stagger, prove concurrent starts)
 
-Next action: Run /gsd:plan-phase 68
+Next action: Run /gsd:plan-phase 69
