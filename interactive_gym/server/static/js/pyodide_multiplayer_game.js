@@ -7318,9 +7318,11 @@ json.dumps({'cumulative_rewards': {str(k): v for k, v in _cumulative_rewards.ite
         this.p2pEpisodeSync.syncTimeoutId = setTimeout(() => {
             if (this.p2pEpisodeSync.pendingReset && !this.p2pEpisodeSync.remoteEpisodeEndReceived) {
                 p2pLog.warn('Episode sync timeout - proceeding with reset');
-                this._clearEpisodeSyncState();
                 this.episodeComplete = true;
                 this.signalEpisodeComplete();
+                // Clear sync state AFTER export to preserve syncedTerminationFrame
+                // during exportEpisodeDataFromBuffer() (Phase 74 fix)
+                this._clearEpisodeSyncState();
             }
         }, 2000);
 
@@ -7358,12 +7360,16 @@ json.dumps({'cumulative_rewards': {str(k): v for k, v in _cumulative_rewards.ite
             // Proceed with export anyway (graceful degradation, same as current behavior)
         }
 
-        // Clear sync state for next episode
-        this._clearEpisodeSyncState();
-
-        // Now safe to signal episode complete (which triggers shouldReset)
+        // Signal episode complete BEFORE clearing sync state.
+        // signalEpisodeComplete() -> exportEpisodeDataFromBuffer() needs syncedTerminationFrame
+        // to correctly filter frames at the episode boundary. Clearing first causes the filter
+        // to be skipped, allowing extra frames from rollback replays to leak into the export
+        // (Phase 74 fix: root cause of row count mismatch under packet loss + active inputs).
         this.episodeComplete = true;
         this.signalEpisodeComplete();
+
+        // Clear sync state AFTER export to preserve syncedTerminationFrame
+        this._clearEpisodeSyncState();
     }
 
     _clearEpisodeSyncState() {
