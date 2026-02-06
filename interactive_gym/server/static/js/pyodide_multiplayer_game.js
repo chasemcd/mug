@@ -1127,19 +1127,25 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
 
         // P2P ready gate - prevents game loop from starting until P2P is established
         // This ensures the first frame can use P2P, not just SocketIO fallback
+        // Phase 72: Increased from 5000ms to 15000ms. Under 200ms symmetric latency,
+        // WebRTC signaling through SocketIO takes ~4-5s. The old 5000ms timeout was
+        // right at the boundary, causing intermittent p2p_validation_failed -> re-pool
+        // loops that consumed the test timeout.
         this.p2pReadyGate = {
             enabled: true,           // Set to false to skip waiting for P2P
             resolved: false,         // True when P2P is ready or timeout
-            timeoutMs: 5000,         // Max time to wait for P2P connection
+            timeoutMs: 15000,        // Max time to wait for P2P connection (Phase 72: was 5000)
             timeoutId: null          // Timeout handle
         };
 
         // P2P validation state machine (Phase 19)
         // States: 'idle' -> 'connecting' -> 'validating' -> 'validated' | 'failed'
+        // Phase 72: Increased from 10000ms to 15000ms to match ready gate timeout.
+        // Validation must complete within the ready gate window.
         this.p2pValidation = {
             enabled: true,                  // Can be disabled via config
             state: 'idle',
-            timeoutMs: 10000,               // Default 10 seconds for validation
+            timeoutMs: 15000,               // Default 15 seconds for validation (Phase 72: was 10000)
             timeoutId: null,
             pingSentAt: null,               // Timestamp when ping sent
             pongReceived: false,

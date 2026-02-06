@@ -48,20 +48,16 @@ Diagnostic runs (2 consecutive passes, ~30s each) revealed:
   - CDP latency does NOT affect WebRTC DataChannel (Chromium issue 41215664),
     so the test actually tests setup/signaling latency, not gameplay latency
 
-  Fix direction (for Plan 02):
-  - Option A: Increase P2P ready gate timeout from 5000ms to 15000ms for tests
-    under latency (makes race much less likely)
-  - Option B: Make the test latency-aware by applying CDP latency AFTER P2P
-    setup (avoids the race entirely, but changes what the test validates)
-  - Option C: Accept intermittent nature and add retry logic to the test
-  - Recommended: Option A (simplest, addresses root cause directly)
+  Fix applied (Phase 72 Plan 02):
+  - Increased P2P ready gate timeout from 5000ms to 15000ms in
+    pyodide_multiplayer_game.js (gives 3x margin over ~5s validation time)
+  - Increased P2P validation timeout from 10000ms to 15000ms to match
 
   Phase 71 infrastructure fixes (port cleanup, server lifecycle) may have
   reduced the environmental variability that previously triggered the race
   more frequently. The test now passes consistently in isolation but may
   still fail under CI load or when run alongside other tests.
 """
-import time
 import pytest
 from tests.fixtures.network_helpers import apply_latency, JitterEmulator, set_tab_visibility
 from tests.fixtures.game_helpers import (
@@ -92,7 +88,6 @@ def run_full_episode_flow(
     page1, page2, base_url: str,
     episode_timeout: int = 180000,
     setup_timeout: int = 120000,
-    diagnostics: bool = False,
 ) -> tuple:
     """
     Run the full game flow through one complete episode.
@@ -105,191 +100,49 @@ def run_full_episode_flow(
         base_url: Flask server URL
         episode_timeout: Timeout for episode completion in milliseconds
         setup_timeout: Timeout for game setup (tutorial, matchmaking) in milliseconds
-        diagnostics: If True, enable [DIAG] timing output, console capture,
-                     P2P state capture, and polling-based episode wait.
 
     Returns:
         tuple: (final_state1, final_state2) with game state dicts for both players
     """
-    # --- Diagnostic setup ---
-    console_logs = {"p1": [], "p2": []}
-    t0 = time.monotonic()
-
-    def _diag(msg):
-        if diagnostics:
-            elapsed = time.monotonic() - t0
-            print(f"[DIAG] [{elapsed:.1f}s] {msg}")
-
-    if diagnostics:
-        page1.on("console", lambda msg: console_logs["p1"].append(
-            f"[{time.monotonic()-t0:.1f}s] {msg.text}"
-        ))
-        page2.on("console", lambda msg: console_logs["p2"].append(
-            f"[{time.monotonic()-t0:.1f}s] {msg.text}"
-        ))
-        _diag("Diagnostic mode enabled, console handlers attached")
-
     # Navigate to game
     page1.goto(base_url)
     page2.goto(base_url)
-    _diag("Navigation complete")
 
     # Wait for socket connections (socket connect is fast even with latency)
     wait_for_socket_connected(page1, timeout=30000)
     wait_for_socket_connected(page2, timeout=30000)
-    _diag("Socket connected (both players)")
 
     # Pass instructions scene
     click_advance_button(page1, timeout=setup_timeout)
     click_advance_button(page2, timeout=setup_timeout)
-    _diag("Advance button clicked (both players)")
 
     # Click startButton for multiplayer scene
-    # (Tutorial scene removed in commit 607b60a)
     click_start_button(page1, timeout=setup_timeout)
     click_start_button(page2, timeout=setup_timeout)
-    _diag("Start button clicked (both players)")
 
     # Wait for game to start (matchmaking + P2P connection)
     # High latency significantly affects WebRTC signaling
     wait_for_game_canvas(page1, timeout=setup_timeout)
     wait_for_game_canvas(page2, timeout=setup_timeout)
-    _diag("Game canvas visible (both players)")
 
     # Verify game objects initialized
     wait_for_game_object(page1, timeout=setup_timeout)
     wait_for_game_object(page2, timeout=setup_timeout)
-    _diag("Game object ready (both players)")
-
-    # --- P2P state capture (diagnostics) ---
-    if diagnostics:
-        for label, page in [("P1", page1), ("P2", page2)]:
-            try:
-                p2p_state = page.evaluate("""() => {
-                    const g = window.game;
-                    if (!g) return {error: 'no game object'};
-                    return {
-                        p2pConnected: g.p2pConnected,
-                        validationState: g.p2pValidation ? g.p2pValidation.state : 'N/A',
-                        gateResolved: g.p2pReadyGate ? g.p2pReadyGate.resolved : 'N/A',
-                        fallbackTriggered: g.p2pMetrics ? g.p2pMetrics.p2pFallbackTriggered : 'N/A',
-                        timerWorkerActive: !!(g.timerWorker)
-                    };
-                }""")
-                _diag(f"{label} P2P state: {p2p_state}")
-            except Exception as e:
-                _diag(f"{label} P2P state capture failed: {e}")
 
     # Override visibility for Playwright automation
     # Without this, FocusManager thinks tab is backgrounded and skips frame processing
     set_tab_visibility(page1, visible=True)
     set_tab_visibility(page2, visible=True)
-    _diag("Tab visibility set (both players)")
 
     # Verify both players are in same game
     state1 = get_game_state(page1)
     state2 = get_game_state(page2)
     assert state1["gameId"] == state2["gameId"], "Players should be in same game"
     assert state1["playerId"] != state2["playerId"], "Players should have different IDs"
-    _diag(f"Game state verified: gameId={state1['gameId']}")
 
-    # --- Episode completion: polling loop (diagnostics) vs wait_for_function (normal) ---
-    if diagnostics:
-        _diag("Starting polling loop for episode completion (180s deadline)")
-        deadline = time.monotonic() + 180  # 180s episode timeout
-        poll_count = 0
-        while time.monotonic() < deadline:
-            poll_count += 1
-            try:
-                state_p1 = page1.evaluate("""() => {
-                    const g = window.game;
-                    if (!g) return {error: 'no game'};
-                    return {
-                        frame: g.frameNumber,
-                        step: g.step_num,
-                        episodes: g.num_episodes,
-                        maxSteps: g.max_steps,
-                        rollbacks: g.rollbackCount,
-                        confirmed: g.confirmedFrame,
-                        state: g.state,
-                        p2pConnected: g.p2pConnected,
-                        inputsSentP2P: g.p2pMetrics ? g.p2pMetrics.inputsSentViaP2P : 'N/A',
-                        inputsSentSIO: g.p2pMetrics ? g.p2pMetrics.inputsSentViaSocketIO : 'N/A',
-                        inputsRecvP2P: g.p2pMetrics ? g.p2pMetrics.inputsReceivedViaP2P : 'N/A',
-                        inputsRecvSIO: g.p2pMetrics ? g.p2pMetrics.inputsReceivedViaSocketIO : 'N/A'
-                    };
-                }""")
-                _diag(f"Poll #{poll_count} P1: {state_p1}")
-            except Exception as e:
-                _diag(f"Poll #{poll_count} P1 evaluate failed: {e}")
-                state_p1 = None
-
-            try:
-                state_p2 = page2.evaluate("""() => {
-                    const g = window.game;
-                    if (!g) return {error: 'no game'};
-                    return {
-                        frame: g.frameNumber,
-                        step: g.step_num,
-                        episodes: g.num_episodes,
-                        state: g.state
-                    };
-                }""")
-                _diag(f"Poll #{poll_count} P2: {state_p2}")
-            except Exception as e:
-                _diag(f"Poll #{poll_count} P2 evaluate failed: {e}")
-                state_p2 = None
-
-            # Check if episode completed on P1
-            if state_p1 and state_p1.get("episodes", 0) >= 1:
-                _diag(f"Episode complete on P1 after {poll_count} polls")
-                # Also check P2
-                if state_p2 and state_p2.get("episodes", 0) >= 1:
-                    _diag(f"Episode complete on P2 as well")
-                else:
-                    _diag("Waiting for P2 episode completion...")
-                    # Give P2 extra time
-                    p2_deadline = time.monotonic() + 30
-                    while time.monotonic() < p2_deadline:
-                        try:
-                            state_p2 = page2.evaluate(
-                                "() => window.game && window.game.num_episodes >= 1"
-                            )
-                            if state_p2:
-                                _diag("P2 episode also complete")
-                                break
-                        except Exception:
-                            pass
-                        time.sleep(2.0)
-                    else:
-                        _diag("WARNING: P2 episode did not complete within 30s of P1")
-                break
-            time.sleep(5.0)
-        else:
-            # Timeout path -- dump console logs
-            _diag("=== TIMEOUT: Episode did not complete within 180s ===")
-            print("\n[DIAG] === TIMEOUT - Console logs P1 (last 50) ===")
-            for log in console_logs["p1"][-50:]:
-                print(f"  {log}")
-            print("\n[DIAG] === TIMEOUT - Console logs P2 (last 50) ===")
-            for log in console_logs["p2"][-50:]:
-                print(f"  {log}")
-            pytest.fail("Episode did not complete within 180s (diagnostic polling)")
-
-        # Dump last 30 console logs on success too
-        _diag("=== Console logs P1 (last 30) ===")
-        for log in console_logs["p1"][-30:]:
-            print(f"  {log}")
-        _diag("=== Console logs P2 (last 30) ===")
-        for log in console_logs["p2"][-30:]:
-            print(f"  {log}")
-    else:
-        # Normal path (non-diagnostic)
-        # Wait for first episode to complete (players idle, episode ends via time limit)
-        wait_for_episode_complete(page1, episode_num=1, timeout=episode_timeout)
-        wait_for_episode_complete(page2, episode_num=1, timeout=episode_timeout)
-
-    _diag("Episode complete")
+    # Wait for first episode to complete (players idle, episode ends via time limit)
+    wait_for_episode_complete(page1, episode_num=1, timeout=episode_timeout)
+    wait_for_episode_complete(page2, episode_num=1, timeout=episode_timeout)
 
     # Return final states
     final_state1 = get_game_state(page1)
@@ -322,11 +175,8 @@ def test_episode_completion_under_fixed_latency(flask_server, player_contexts, l
     cdp2 = apply_latency(page2, latency_ms)
 
     try:
-        # Run full episode flow (enable diagnostics for 200ms case to identify stall point)
-        final_state1, final_state2 = run_full_episode_flow(
-            page1, page2, base_url,
-            diagnostics=(latency_ms == 200),
-        )
+        # Run full episode flow
+        final_state1, final_state2 = run_full_episode_flow(page1, page2, base_url)
 
         # Verify completion
         assert final_state1["numEpisodes"] >= 1, f"Player 1 should complete 1+ episodes under {latency_ms}ms latency"
