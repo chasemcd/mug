@@ -15,11 +15,142 @@ gathering limitations. Run E2E tests with:
 Or set PWHEADED=1 environment variable.
 """
 
+import os
+import signal
+import socket
 import subprocess
 import time
 from http.client import HTTPConnection
 
 import pytest
+
+
+# ---------------------------------------------------------------------------
+# Shared server lifecycle helpers
+# ---------------------------------------------------------------------------
+
+
+def _is_port_free(port):
+    """
+    Check if a TCP port is available for binding.
+
+    Uses socket.bind() with SO_REUSEADDR as the authoritative check.
+    A connect-based check can succeed during TCP TIME_WAIT, giving false
+    negatives. Binding is the definitive test.
+    """
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            s.bind(("localhost", port))
+            return True
+        except OSError:
+            return False
+
+
+def _ensure_port_available(port):
+    """
+    Ensure a port is available before starting a server.
+
+    If the port is already free, returns immediately (common case).
+    Otherwise, uses lsof to find stale PIDs and kills them.
+    Raises RuntimeError if the port cannot be freed.
+    """
+    if _is_port_free(port):
+        return
+
+    # Port is occupied -- find and kill stale processes
+    try:
+        result = subprocess.run(
+            ["lsof", "-ti", f":{port}"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if result.stdout.strip():
+            for pid_str in result.stdout.strip().split("\n"):
+                try:
+                    pid = int(pid_str.strip())
+                    os.kill(pid, signal.SIGKILL)
+                except (ValueError, OSError):
+                    pass
+            time.sleep(1)
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        pass
+
+    if not _is_port_free(port):
+        raise RuntimeError(f"Port {port} occupied by unkillable process")
+
+
+def _wait_for_port_free(port, timeout_sec=10):
+    """
+    Poll until a port is free, with last-resort stale process cleanup.
+
+    Polls _is_port_free every 0.2s until the deadline. If the port is still
+    occupied after timeout, calls _ensure_port_available as a last resort
+    to kill any stale processes.
+    """
+    deadline = time.monotonic() + timeout_sec
+    while time.monotonic() < deadline:
+        if _is_port_free(port):
+            return
+        time.sleep(0.2)
+
+    # Last resort: kill stale processes
+    _ensure_port_available(port)
+    time.sleep(0.5)
+
+    if not _is_port_free(port):
+        raise RuntimeError(
+            f"Port {port} still in use after {timeout_sec}s teardown"
+        )
+
+
+def _teardown_server(process, port, timeout_sec=10):
+    """
+    Reliably terminate a server subprocess and wait for its port to be released.
+
+    Steps:
+    1. If process already dead, just wait for port release
+    2. Send SIGTERM (graceful shutdown)
+    3. Wait up to 5s for process to exit
+    4. If still alive, send SIGKILL
+    5. Kill entire process group (catches eventlet child greenlets)
+    6. Poll port until free
+    """
+    if process.poll() is not None:
+        # Already dead -- just verify port is released
+        _wait_for_port_free(port, timeout_sec)
+        return
+
+    # Graceful terminate
+    try:
+        process.terminate()
+    except OSError:
+        pass
+
+    # Wait for exit
+    try:
+        process.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        # Force kill
+        process.kill()
+        try:
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            pass
+
+    # Kill process group (catches child processes started with start_new_session)
+    try:
+        os.killpg(os.getpgid(process.pid), signal.SIGKILL)
+    except (OSError, ProcessLookupError):
+        pass
+
+    _wait_for_port_free(port, timeout_sec)
+
+
+# ---------------------------------------------------------------------------
+# Browser launch configuration
+# ---------------------------------------------------------------------------
 
 
 @pytest.fixture(scope="session")
@@ -50,6 +181,11 @@ def browser_type_launch_args(browser_type_launch_args):
     }
 
 
+# ---------------------------------------------------------------------------
+# Server fixtures
+# ---------------------------------------------------------------------------
+
+
 @pytest.fixture(scope="module")
 def flask_server():
     """
@@ -57,9 +193,18 @@ def flask_server():
 
     Scope: module (starts once per test module, not per test)
     Yields: dict with 'url' and 'process' keys
+
+    Uses robust startup/teardown:
+    - Pre-startup port cleanup via _ensure_port_available
+    - Process group isolation via start_new_session=True
+    - stdout=DEVNULL to prevent pipe buffer deadlock
+    - Port-verified teardown via _teardown_server
     """
     port = 5702
     base_url = f"http://localhost:{port}"
+
+    # Pre-startup: ensure port is available (kill stale processes if needed)
+    _ensure_port_available(port)
 
     # Start the Flask server as a subprocess
     # Use test-specific config with relaxed constraints:
@@ -74,8 +219,9 @@ def flask_server():
             "--port",
             str(port),
         ],
-        stdout=subprocess.PIPE,
+        stdout=subprocess.DEVNULL,
         stderr=subprocess.PIPE,
+        start_new_session=True,
     )
 
     # Wait for server to be ready (poll health endpoint)
@@ -94,31 +240,24 @@ def flask_server():
 
         # Check if process crashed
         if process.poll() is not None:
-            stdout, stderr = process.communicate()
+            stderr = process.stderr.read() if process.stderr else b""
             raise RuntimeError(
                 f"Flask server exited unexpectedly (code {process.returncode}).\n"
-                f"stdout: {stdout.decode()}\n"
                 f"stderr: {stderr.decode()}"
             )
 
         time.sleep(1)
     else:
         # Max retries exceeded
-        process.terminate()
-        process.wait(timeout=5)
+        _teardown_server(process, port)
         raise RuntimeError(
             f"Flask server failed to start after {max_retries} retries"
         )
 
     yield {"url": base_url, "process": process}
 
-    # Teardown: stop the server
-    process.terminate()
-    try:
-        process.wait(timeout=5)
-    except subprocess.TimeoutExpired:
-        process.kill()
-        process.wait()
+    # Teardown: stop the server with port verification
+    _teardown_server(process, port)
 
 
 @pytest.fixture(scope="function")
@@ -132,9 +271,18 @@ def flask_server_fresh():
     Use this fixture for multi-participant stress tests that require
     clean server state between tests. The module-scoped flask_server
     can accumulate state that causes later tests to fail.
+
+    Uses robust startup/teardown:
+    - Pre-startup port cleanup via _ensure_port_available
+    - Process group isolation via start_new_session=True
+    - stdout=DEVNULL to prevent pipe buffer deadlock
+    - Port-verified teardown via _teardown_server (replaces sleep-based hack)
     """
     port = 5705  # Different port from other fixtures to avoid conflicts
     base_url = f"http://localhost:{port}"
+
+    # Pre-startup: ensure port is available
+    _ensure_port_available(port)
 
     # Start the Flask server as a subprocess
     process = subprocess.Popen(
@@ -145,8 +293,9 @@ def flask_server_fresh():
             "--port",
             str(port),
         ],
-        stdout=subprocess.PIPE,
+        stdout=subprocess.DEVNULL,
         stderr=subprocess.PIPE,
+        start_new_session=True,
     )
 
     # Wait for server to be ready (poll health endpoint)
@@ -163,33 +312,23 @@ def flask_server_fresh():
             pass
 
         if process.poll() is not None:
-            stdout, stderr = process.communicate()
+            stderr = process.stderr.read() if process.stderr else b""
             raise RuntimeError(
                 f"Flask server exited unexpectedly (code {process.returncode}).\n"
-                f"stdout: {stdout.decode()}\n"
                 f"stderr: {stderr.decode()}"
             )
 
         time.sleep(1)
     else:
-        process.terminate()
-        process.wait(timeout=5)
+        _teardown_server(process, port)
         raise RuntimeError(
             f"Flask server failed to start after {max_retries} retries"
         )
 
     yield {"url": base_url, "process": process}
 
-    # Teardown: stop the server and wait for port release
-    process.terminate()
-    try:
-        process.wait(timeout=5)
-    except subprocess.TimeoutExpired:
-        process.kill()
-        process.wait()
-
-    # Wait for port to be fully released (important for sequential test runs)
-    time.sleep(3)
+    # Teardown: stop the server with port verification (no more sleep-based hack)
+    _teardown_server(process, port)
 
 
 @pytest.fixture(scope="function")
@@ -239,9 +378,18 @@ def flask_server_multi_episode():
     - num_episodes=2 for back-to-back episode testing
     - No RTT limit, no focus timeout
     - Port 5703 (different from standard test port 5702)
+
+    Uses robust startup/teardown:
+    - Pre-startup port cleanup via _ensure_port_available
+    - Process group isolation via start_new_session=True
+    - stdout=DEVNULL to prevent pipe buffer deadlock
+    - Port-verified teardown via _teardown_server
     """
     port = 5703
     base_url = f"http://localhost:{port}"
+
+    # Pre-startup: ensure port is available
+    _ensure_port_available(port)
 
     process = subprocess.Popen(
         [
@@ -251,8 +399,9 @@ def flask_server_multi_episode():
             "--port",
             str(port),
         ],
-        stdout=subprocess.PIPE,
+        stdout=subprocess.DEVNULL,
         stderr=subprocess.PIPE,
+        start_new_session=True,
     )
 
     # Wait for server to be ready (poll health endpoint)
@@ -269,17 +418,15 @@ def flask_server_multi_episode():
             pass
 
         if process.poll() is not None:
-            stdout, stderr = process.communicate()
+            stderr = process.stderr.read() if process.stderr else b""
             raise RuntimeError(
                 f"Multi-episode Flask server exited unexpectedly (code {process.returncode}).\n"
-                f"stdout: {stdout.decode()}\n"
                 f"stderr: {stderr.decode()}"
             )
 
         time.sleep(1)
     else:
-        process.terminate()
-        process.wait(timeout=5)
+        _teardown_server(process, port)
         raise RuntimeError(
             f"Multi-episode Flask server failed to start after {max_retries} retries"
         )
@@ -291,17 +438,21 @@ def flask_server_multi_episode():
         "experiment_id": "overcooked_multiplayer_hh_multi_episode_test",
     }
 
-    process.terminate()
+    # Read stderr before teardown kills the process (for debug files)
+    stderr = b""
     try:
-        stdout, stderr = process.communicate(timeout=5)
-        # Save server output for debugging
-        with open("/tmp/server_multi_episode_stdout.txt", "wb") as f:
-            f.write(stdout)
-        with open("/tmp/server_multi_episode_stderr.txt", "wb") as f:
-            f.write(stderr)
-    except subprocess.TimeoutExpired:
-        process.kill()
-        process.wait()
+        stderr = process.stderr.read() if process.stderr else b""
+    except Exception:
+        pass
+
+    # Save server output for debugging
+    with open("/tmp/server_multi_episode_stdout.txt", "wb") as f:
+        f.write(b"")  # stdout is DEVNULL, write empty bytes
+    with open("/tmp/server_multi_episode_stderr.txt", "wb") as f:
+        f.write(stderr)
+
+    # Teardown with port verification
+    _teardown_server(process, port)
 
 
 @pytest.fixture(scope="function")
@@ -313,9 +464,18 @@ def flask_server_multi_episode_fresh():
     Yields: dict with 'url', 'process', 'num_episodes', 'experiment_id' keys
 
     Use this fixture for lifecycle stress tests that require clean server state.
+
+    Uses robust startup/teardown:
+    - Pre-startup port cleanup via _ensure_port_available
+    - Process group isolation via start_new_session=True
+    - stdout=DEVNULL to prevent pipe buffer deadlock
+    - Port-verified teardown via _teardown_server (replaces sleep-based hack)
     """
     port = 5706  # Different port for fresh multi-episode server
     base_url = f"http://localhost:{port}"
+
+    # Pre-startup: ensure port is available
+    _ensure_port_available(port)
 
     process = subprocess.Popen(
         [
@@ -325,8 +485,9 @@ def flask_server_multi_episode_fresh():
             "--port",
             str(port),
         ],
-        stdout=subprocess.PIPE,
+        stdout=subprocess.DEVNULL,
         stderr=subprocess.PIPE,
+        start_new_session=True,
     )
 
     # Wait for server to be ready
@@ -343,17 +504,15 @@ def flask_server_multi_episode_fresh():
             pass
 
         if process.poll() is not None:
-            stdout, stderr = process.communicate()
+            stderr = process.stderr.read() if process.stderr else b""
             raise RuntimeError(
                 f"Multi-episode Flask server exited unexpectedly (code {process.returncode}).\n"
-                f"stdout: {stdout.decode()}\n"
                 f"stderr: {stderr.decode()}"
             )
 
         time.sleep(1)
     else:
-        process.terminate()
-        process.wait(timeout=5)
+        _teardown_server(process, port)
         raise RuntimeError(
             f"Multi-episode Flask server failed to start after {max_retries} retries"
         )
@@ -365,15 +524,8 @@ def flask_server_multi_episode_fresh():
         "experiment_id": "overcooked_multiplayer_hh_multi_episode_test",
     }
 
-    process.terminate()
-    try:
-        process.wait(timeout=5)
-    except subprocess.TimeoutExpired:
-        process.kill()
-        process.wait()
-
-    # Wait for port to be fully released (important for sequential test runs)
-    time.sleep(3)
+    # Teardown with port verification (no more sleep-based hack)
+    _teardown_server(process, port)
 
 
 @pytest.fixture(scope="module")
@@ -388,9 +540,18 @@ def flask_server_focus_timeout():
     - focus_loss_config(timeout_ms=10000) for 10 second focus timeout
     - No RTT limit, single episode
     - Port 5704 (different from other test ports)
+
+    Uses robust startup/teardown:
+    - Pre-startup port cleanup via _ensure_port_available
+    - Process group isolation via start_new_session=True
+    - stdout=DEVNULL to prevent pipe buffer deadlock
+    - Port-verified teardown via _teardown_server
     """
     port = 5704
     base_url = f"http://localhost:{port}"
+
+    # Pre-startup: ensure port is available
+    _ensure_port_available(port)
 
     process = subprocess.Popen(
         [
@@ -400,8 +561,9 @@ def flask_server_focus_timeout():
             "--port",
             str(port),
         ],
-        stdout=subprocess.PIPE,
+        stdout=subprocess.DEVNULL,
         stderr=subprocess.PIPE,
+        start_new_session=True,
     )
 
     # Wait for server to be ready (poll health endpoint)
@@ -418,29 +580,28 @@ def flask_server_focus_timeout():
             pass
 
         if process.poll() is not None:
-            stdout, stderr = process.communicate()
+            stderr = process.stderr.read() if process.stderr else b""
             raise RuntimeError(
                 f"Focus timeout Flask server exited unexpectedly (code {process.returncode}).\n"
-                f"stdout: {stdout.decode()}\n"
                 f"stderr: {stderr.decode()}"
             )
 
         time.sleep(1)
     else:
-        process.terminate()
-        process.wait(timeout=5)
+        _teardown_server(process, port)
         raise RuntimeError(
             f"Focus timeout Flask server failed to start after {max_retries} retries"
         )
 
     yield {"url": base_url, "process": process, "focus_timeout_ms": 10000}
 
-    process.terminate()
-    try:
-        process.wait(timeout=5)
-    except subprocess.TimeoutExpired:
-        process.kill()
-        process.wait()
+    # Teardown with port verification
+    _teardown_server(process, port)
+
+
+# ---------------------------------------------------------------------------
+# Browser context fixtures
+# ---------------------------------------------------------------------------
 
 
 @pytest.fixture(scope="function")
