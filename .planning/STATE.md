@@ -5,17 +5,17 @@
 See: .planning/PROJECT.md (updated 2026-02-06)
 
 **Core value:** Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
-**Current focus:** v1.17 E2E Test Reliability — Phase 72 (Latency Test Diagnosis)
+**Current focus:** v1.17 E2E Test Reliability — Phase 72 complete, next: Phase 73-74
 
 ## Current Position
 
 Milestone: v1.17 E2E Test Reliability
-Phase: 72 of 74 (Latency Test Diagnosis)
-Plan: 01 of 2 complete
-Status: In progress
-Last activity: 2026-02-06 — Completed 72-01-PLAN.md (root cause identified)
+Phase: 72 of 74 (Latency Test Diagnosis) - COMPLETE
+Plan: 02 of 2 complete
+Status: Phase complete
+Last activity: 2026-02-06 — Completed 72-02-PLAN.md (fix applied and verified)
 
-Progress: ███▓░░░░░░ 37%
+Progress: ████░░░░░░ 40%
 
 ## Milestone History
 
@@ -179,6 +179,11 @@ Progress: ███▓░░░░░░ 37%
 - `.planning/phases/71-test-infrastructure-fix/71-01-SUMMARY.md`
 - `.planning/phases/71-test-infrastructure-fix/71-02-SUMMARY.md`
 - `.planning/phases/72-latency-test-diagnosis/72-01-SUMMARY.md`
+- `.planning/phases/72-latency-test-diagnosis/72-02-SUMMARY.md`
+
+**P2P Timeout Tuning (v1.17 Phase 72 - fixed):**
+- `interactive_gym/server/static/js/pyodide_multiplayer_game.js` - P2P ready gate timeout 5000ms->15000ms, P2P validation timeout 10000ms->15000ms
+- `tests/e2e/test_latency_injection.py` - Diagnostic instrumentation removed, ROOT CAUSE comment updated
 
 **Robust Server Fixture Lifecycle (v1.17 Phase 71 - added):**
 - `tests/conftest.py` - _is_port_free(), _ensure_port_available(), _wait_for_port_free(), _teardown_server() shared helpers; all 5 server fixtures refactored to use them; start_new_session=True on all Popen; stdout=DEVNULL
@@ -270,6 +275,13 @@ Progress: ███▓░░░░░░ 37%
 ### Decisions
 
 See: .planning/PROJECT.md Key Decisions table
+
+**v1.17 Phase 72-02 decisions:**
+- P2P ready gate timeout: 5000ms -> 15000ms (3x margin over ~5s validation under 200ms latency)
+- P2P validation timeout: 10000ms -> 15000ms (match ready gate window)
+- Diagnostic instrumentation removed (no longer needed after fix; clean run_full_episode_flow path restored)
+- ROOT CAUSE comment block kept in test file (documents finding for future maintainers)
+- 200ms test verified 5/5 consecutive passes (~29s each); 100ms test no regression
 
 **v1.17 Phase 72-01 decisions:**
 - 200ms latency test timeout is intermittent, not deterministic (P2P ready gate race at 5000ms boundary)
@@ -425,7 +437,7 @@ See: .planning/PROJECT.md Key Decisions table
 - Games must NOT be pre-created in waitroom - only created when matchmaker forms complete match (GAME-01 fix)
 - Socket.IO emits must occur outside threading.Lock() blocks to avoid eventlet deadlocks
 - waitroom_participants list tracks waiting subjects without pre-allocated games
-- P2P validation timeout (10s) may cause failures under concurrent load - known infrastructure limitation
+- P2P validation timeout (now 15s, Phase 72) may cause failures under concurrent load - known infrastructure limitation
 - STRESS-02 through STRESS-07 test implementations complete
 
 ### Pending Todos
@@ -448,19 +460,19 @@ See: .planning/PROJECT.md Key Decisions table
 
 **Known E2E test failures (v1.17 targets):**
 - test_focus_loss_episode_boundary_parity: FIXED (71-02 extracted to own module; passes back-to-back with test_data_comparison.py)
-- test_episode_completion_under_fixed_latency[chromium-200]: DIAGNOSED (72-01) -- intermittent P2P ready gate race at 5000ms boundary; fix: increase gate timeout to 15000ms (Plan 72-02)
+- test_episode_completion_under_fixed_latency[chromium-200]: FIXED (72-02) -- P2P ready gate timeout increased 5000->15000ms; 5/5 consecutive passes verified
 - test_network_disruption suite: not validated -- needs full run and any failures addressed
 
 ## Session Continuity
 
 Last session: 2026-02-06
-Stopped at: Completed 72-01-PLAN.md (root cause identified)
+Stopped at: Completed 72-02-PLAN.md (fix applied and verified)
 Resume file: None
 
 ### Next Steps
 
-**Phase 72 Plan 01 (Latency Test Diagnosis) complete.**
+**Phase 72 (Latency Test Diagnosis) complete.** Both plans executed:
+- Plan 01: Root cause identified (P2P ready gate race at 5000ms boundary)
+- Plan 02: Fix applied (timeouts increased to 15000ms), verified 5/5 consecutive passes
 
-Root cause identified: intermittent P2P ready gate race at 5000ms boundary under 200ms CDP latency.
-
-Next action: Execute Plan 72-02 (apply fix: increase P2P ready gate timeout)
+Next action: Phase 73-74 (remaining v1.17 targets: test_network_disruption suite validation)
