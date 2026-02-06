@@ -214,7 +214,7 @@ See [milestones/v1.11-ROADMAP.md](milestones/v1.11-ROADMAP.md) for full details.
 
 - [x] **Phase 67: Pyodide Pre-load Infrastructure** - Detect Pyodide scenes, load during compat check, progress UI, advancement gate
 - [x] **Phase 68: Shared Instance Integration** - Game classes reuse pre-loaded Pyodide instance
-- [ ] **Phase 69: Server-Side Init Grace** - Server tolerates missed pings during Pyodide loading
+- [x] **Phase 69: Server-Side Init Grace** - Server tolerates missed pings during Pyodide loading
 - [ ] **Phase 70: Validation & Test Stabilization** - Remove stagger, prove concurrent starts work
 
 ## Phase Details
@@ -346,10 +346,10 @@ Plans:
   2. Client signals loading state to server
   3. Normal ping checking resumes after loading completes
 **Research flag:** Complete (69-RESEARCH.md)
-**Plans:** 1 plan
+**Plans:** 1 plan (complete)
 
 Plans:
-- [ ] 69-01-PLAN.md — Increase ping_timeout, add LOADING_CLIENTS tracking, client loading signals, disconnect handler grace check
+- [x] 69-01-PLAN.md — Increase ping_timeout, add LOADING_CLIENTS tracking, client loading signals, disconnect handler grace check
 
 ### Phase 70: Validation & Test Stabilization
 **Goal**: Prove concurrent game starts work without stagger delays
@@ -394,9 +394,9 @@ Plans:
 | 66. Server Recovery Validation | v1.14 | 0/TBD | Not started | - |
 | 67. Pyodide Pre-load Infrastructure | v1.16 | 1/1 | Complete | 2026-02-06 |
 | 68. Shared Instance Integration | v1.16 | 1/1 | Complete | 2026-02-06 |
-| 69. Server-Side Init Grace | v1.16 | 0/1 | Not started | - |
+| 69. Server-Side Init Grace | v1.16 | 1/1 | Complete | 2026-02-06 |
 | 70. Validation & Test Stabilization | v1.16 | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-06 after Phase 69 planning complete*
+*Last updated: 2026-02-06 after Phase 69 execution complete*

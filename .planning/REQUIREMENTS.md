@@ -21,9 +21,9 @@ Requirements for v1.16 Pyodide Pre-loading. Each maps to roadmap phases.
 
 ### Server-Side Init Grace
 
-- [ ] **GRACE-01**: Server tolerates missed pings during Pyodide loading phase (does not disconnect client)
-- [ ] **GRACE-02**: Client signals loading state to server so server knows to extend grace
-- [ ] **GRACE-03**: Normal ping checking resumes after client signals loading complete
+- [x] **GRACE-01**: Server tolerates missed pings during Pyodide loading phase (does not disconnect client)
+- [x] **GRACE-02**: Client signals loading state to server so server knows to extend grace
+- [x] **GRACE-03**: Normal ping checking resumes after client signals loading complete
 
 ### Testing / Validation
 

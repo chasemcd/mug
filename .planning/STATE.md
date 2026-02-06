@@ -173,6 +173,12 @@ Progress: ███████░░░ 75%
 - `.planning/phases/68-shared-instance-integration/68-01-SUMMARY.md`
 - `.planning/phases/69-server-init-grace/69-01-SUMMARY.md`
 
+**Server-Side Init Grace (v1.16 Phase 69 - added):**
+- `interactive_gym/server/app.py` - ping_timeout increased 8→30, LOADING_CLIENTS dict, LOADING_TIMEOUT_S=60, is_client_in_loading_grace(), pyodide_loading_start/complete handlers, grace check early return in on_disconnect()
+- `interactive_gym/server/static/js/index.js` - preloadPyodide() emits loading_start before loadPyodide() with 50ms yield, loading_complete on success/error
+- `interactive_gym/server/static/js/pyodide_remote_game.js` - fallback path emits loading_start/complete with 50ms yield
+- `.planning/phases/69-server-init-grace/69-01-SUMMARY.md`
+
 **Server-side Init Grace (v1.16 Phase 69 - added):**
 - `interactive_gym/server/app.py` - LOADING_CLIENTS dict, LOADING_TIMEOUT_S=60, is_client_in_loading_grace(), pyodide_loading_start/complete handlers, grace check in on_disconnect(), ping_timeout=30
 - `interactive_gym/server/static/js/index.js` - preloadPyodide() emits pyodide_loading_start/complete with 50ms yield
@@ -349,6 +355,16 @@ See: .planning/PROJECT.md Key Decisions table
 - Grace check before admin logging -- early return preserves session but skips ALL destructive actions
 - 50ms yield before loadPyodide() ensures socket.emit is sent before main thread blocks
 - Error path sends loading_complete to prevent ghost entries in LOADING_CLIENTS
+
+**v1.16 Phase 69 decisions:**
+- ping_timeout increased from 8 to 30 (total grace: 8+30=38s, well beyond 15s worst-case Pyodide load)
+- P2P WebRTC disconnect detection at 500ms makes weakened server-level detection acceptable
+- LOADING_CLIENTS keyed by subject_id with time.time() timestamp for per-client tracking
+- 60s safety timeout prevents unbounded LOADING_CLIENTS growth from stuck clients
+- Grace check is an early return in on_disconnect() that preserves session state but skips all destructive actions
+- 50ms yield (setTimeout) before loadPyodide() ensures socket emit is sent before main thread blocks
+- Both paths (preload in index.js, fallback in RemoteGame) send loading signals
+- Error path in preload also sends loading_complete with { error: true } to clear server grace state
 
 **v1.16 Phase 68 decisions:**
 - Check both window.pyodidePreloadStatus === 'ready' AND window.pyodideInstance truthy before reuse
