@@ -54,10 +54,22 @@ export class RemoteGame {
             this.installed_packages = [...(window.pyodideInstalledPackages || [])];
         } else {
             console.log('[RemoteGame] Loading Pyodide fresh (no preload available)');
+            // Signal server BEFORE blocking the main thread (GRACE-02)
+            if (window.socket) {
+                window.socket.emit('pyodide_loading_start', {});
+                // Yield to event loop so the emit is sent before WASM compilation blocks
+                await new Promise(resolve => setTimeout(resolve, 50));
+            }
+
             this.pyodide = await loadPyodide();
 
             await this.pyodide.loadPackage("micropip");
             this.micropip = this.pyodide.pyimport("micropip");
+
+            // Signal server loading is done (GRACE-03)
+            if (window.socket) {
+                window.socket.emit('pyodide_loading_complete', {});
+            }
         }
 
         // Install only packages not already installed (dedup against preload)

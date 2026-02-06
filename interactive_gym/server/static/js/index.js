@@ -223,6 +223,11 @@ async function preloadPyodide(pyodideConfig) {
     window.pyodidePreloadStatus = 'loading';
     showPyodideProgress('Loading Python runtime...');
 
+    // Signal server BEFORE blocking the main thread (GRACE-02)
+    socket.emit('pyodide_loading_start', {});
+    // Yield to event loop so the emit is actually sent before WASM compilation blocks
+    await new Promise(resolve => setTimeout(resolve, 50));
+
     try {
         const pyodide = await loadPyodide();
         console.log('[PyodidePreload] Core loaded, installing micropip...');
@@ -244,11 +249,15 @@ async function preloadPyodide(pyodideConfig) {
         hidePyodideProgress();
         console.log('[PyodidePreload] Complete');
 
+        // Signal server loading is done (GRACE-03)
+        socket.emit('pyodide_loading_complete', {});
+
     } catch (error) {
         console.error('[PyodidePreload] Failed:', error);
         window.pyodidePreloadStatus = 'error';
         showPyodideProgress('Loading failed - will retry when game starts');
-        // Don't block advancement -- fallback to game-time loading (Phase 68 handles this)
+        // Signal server loading is done (even on error) to clear grace state
+        socket.emit('pyodide_loading_complete', { error: true });
     }
 }
 
