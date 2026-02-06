@@ -1,27 +1,41 @@
 # Project Milestones: Interactive Gym P2P Multiplayer
 
-## v1.16 Pyodide Pre-loading (In Progress)
+## v1.17 E2E Test Reliability (In Progress)
 
-**Goal:** Pre-load Pyodide during the compatibility check screen so game startup never blocks the main thread, eliminating Socket.IO disconnects at scale (50+ concurrent game pairs).
+**Goal:** Achieve 100% pass rate for all E2E tests with zero flakiness — every test passes 10+ consecutive runs.
 
-**Status:** Planning
+**Status:** Defining requirements
 
-**Approach:** Move Pyodide loading to the compatibility check screen (before matching). By the time a game starts, Pyodide is already compiled — game startup is instant and non-blocking. This is simpler than the originally planned Web Worker approach and preserves the synchronous rollback path.
+**Problem:** Several E2E tests have pre-existing flakiness unrelated to application logic:
+- Page.goto timeouts between test suites (server startup/teardown)
+- 200ms latency test exceeds 300s timeout
+- Network disruption tests not validated
 
 **Target features:**
 
-- Early Pyodide init during compatibility check (detect Pyodide scenes from config)
-- Shared Pyodide instance reused by RemoteGame (skip loadPyodide if pre-loaded)
-- Loading progress indicator and gate before participant advancement
-- Server-side ping grace during Pyodide loading phase
-- Remove stagger delay from multi-participant tests
+- All E2E tests pass 10+ consecutive runs with zero failures
+- Server startup/teardown reliable between test suites
+- Test timeouts appropriate for each scenario
+- Network disruption tests validated and passing
 
-**Key insight:**
+---
 
-- Only `loadPyodide()` causes disconnects (5-15s main thread blocking)
-- Per-frame `runPythonAsync()` is fine (10-100ms, well within 8s ping timeout)
-- Pre-loading eliminates concurrent init at game start without rewriting the game loop
-- Web Worker for per-frame execution deferred to future milestone
+## v1.16 Pyodide Pre-loading (Shipped: 2026-02-06)
+
+**Delivered:** Pyodide pre-loading during compat check, shared instance reuse, server-side grace period, concurrent game starts with 0.5s stagger.
+
+**Phases completed:** 67-70 (4 phases)
+
+**Key accomplishments:**
+
+- Server-side Pyodide config detection via get_pyodide_config()
+- Client preloadPyodide() during compatibility check with progress UI and advancement gating
+- RemoteGame.initialize() reuses pre-loaded Pyodide instance (package dedup)
+- MultiplayerPyodideGame inherits via super.initialize()
+- Server LOADING_CLIENTS grace period (ping_timeout=30, 60s safety timeout)
+- Client pyodide_loading_start/complete signals with 50ms yield before blocking
+- Stagger delay reduced from 5.0s to 0.5s across all E2E tests
+- 14/14 requirements satisfied, 3/3 E2E flows verified
 
 ---
 

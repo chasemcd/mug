@@ -8,77 +8,45 @@ A framework for running browser-based reinforcement learning experiments with hu
 
 Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
 
-## Current Milestone: v1.16 Pyodide Pre-loading
+## Current Milestone: v1.17 E2E Test Reliability
 
-**Goal:** Pre-load Pyodide during the compatibility check screen so game startup never blocks the main thread, eliminating Socket.IO disconnects at scale (50+ concurrent game pairs).
+**Goal:** Achieve 100% pass rate for all E2E tests with zero flakiness — every test passes 10+ consecutive runs.
 
-**Problem:** Pyodide initialization blocks the browser's main thread for 5-15 seconds during WASM compilation. This prevents Socket.IO from responding to server pings, causing false disconnects when multiple games start concurrently. The 5-second stagger delay workaround doesn't scale beyond a handful of games.
-
-**Root cause:**
-- `loadPyodide()` downloads ~15MB of WASM/Python packages
-- WASM compilation blocks the main thread (synchronous)
-- Socket.IO ping/pong requires main thread event loop access
-- With ping_interval=8s, any >8s blocking causes disconnect
-- Per-frame `runPythonAsync()` is NOT the issue (10-100ms, well within timeout)
-
-**Approach:** Move Pyodide loading to the compatibility check screen (before matching). By the time a game starts, Pyodide is already compiled in memory — game startup is instant and non-blocking.
+**Problem:** Several E2E tests have pre-existing flakiness unrelated to application logic:
+- `test_focus_loss_episode_boundary_parity` — Page.goto timeout (server navigation failure)
+- `test_episode_completion_under_fixed_latency[chromium-200]` — 300s test timeout under 200ms latency
+- `test_network_disruption` suite — not validated during v1.16, status unknown
 
 **Target features:**
 
-*Early Pyodide initialization:*
-- [ ] Detect Pyodide-requiring scenes from experiment config during compatibility check
-- [ ] Start `loadPyodide()` and package installation during compat screen
-- [ ] Show loading progress indicator to participant
-- [ ] Gate participant advancement until Pyodide is ready
+*Test stability:*
+- [ ] All E2E tests pass 10+ consecutive runs with zero failures
+- [ ] No xfail markers, no tolerance hacks, no known flaky tests
+- [ ] Root cause identified and fixed for each failing test
 
-*Shared Pyodide instance:*
-- [ ] `RemoteGame.initialize()` reuses pre-loaded Pyodide instance (skip `loadPyodide()` if already loaded)
-- [ ] `MultiplayerPyodideGame` uses same shared instance
-- [ ] Maintain backward compatibility (load on demand if pre-load didn't happen)
-
-*Server-side init grace:*
-- [ ] Server tolerates missed pings during Pyodide loading phase (slow machines)
-- [ ] Client signals loading state to server
-- [ ] Normal ping checking resumes after loading completes
-
-*Testing:*
-- [ ] Remove stagger delay from multi-participant tests
-- [ ] All E2E tests pass with 0.5s stagger (near-simultaneous)
-- [ ] Socket.IO connections remain stable during concurrent game starts
-- [ ] No performance regression for game loop execution
+*Test infrastructure:*
+- [ ] Server startup/teardown reliable between test suites (no Page.goto timeouts)
+- [ ] Test timeouts appropriate for each scenario (200ms latency needs longer than 300s?)
+- [ ] Network disruption tests validated and passing
 
 **What done looks like:**
-- Pyodide is fully loaded before any game starts
-- 50+ game pairs can start simultaneously without disconnects
-- No stagger delay needed in tests or production
-- Game startup is near-instant (no WASM compilation at game time)
+- Run full E2E suite 10 times in a row, all green every time
+- Zero "known flaky" tests in the codebase
+- CI-ready test suite (if CI were added, it would pass)
 
-**Deferred to future milestone:**
-- Moving per-frame `runPythonAsync()` to a Web Worker (full off-main-thread architecture)
+## Previous Milestone: v1.16 Pyodide Pre-loading (Shipped: 2026-02-06)
 
-## Previous Milestone: v1.15 E2E Test Reliability (In Progress)
+**Delivered:** Pyodide pre-loading during compat check, shared instance reuse, server-side grace period, concurrent game starts with 0.5s stagger.
 
-**Goal:** Achieve 100% pass rate for all E2E tests with zero flakiness.
+**Key accomplishments:**
+- Pyodide loads during compatibility check screen (before matching)
+- Game classes reuse pre-loaded instance (near-instant game startup)
+- Server tolerates missed pings during loading (ping_timeout=30, LOADING_CLIENTS grace)
+- Stagger delay reduced 5.0s → 0.5s, all multi-participant tests pass
 
-**Problem:** Multi-participant stress tests have intermittent failures due to Socket.IO disconnects during Pyodide initialization. The root cause is main thread blocking during WASM compilation.
+## Previous Milestone: v1.15 E2E Test Reliability (Complete: 2026-02-04)
 
-**Status:** Investigation complete. Root cause identified as Pyodide blocking main thread. Solution: Move to Web Worker (v1.16).
-
-**Workaround (current):** 5-second stagger delay between game pairs allows each pair to complete Pyodide init before the next starts.
-
-**Target features:**
-
-*Test reliability:*
-- [x] Investigate each failing test and identify root cause
-- [ ] Fix P2P concurrent load issues → Deferred to v1.16 (Pyodide Web Worker)
-- [ ] All multi-participant tests pass reliably (STRESS-01 through STRESS-07)
-- [ ] All lifecycle stress tests pass reliably
-- [ ] All single-participant tests continue passing
-
-**What done looks like:**
-- Root cause documented ✓
-- Workaround in place (5s stagger) ✓
-- Permanent fix planned (v1.16 Web Worker)
+**Delivered:** Root cause analysis — Pyodide main thread blocking identified as source of Socket.IO disconnects. Fix delivered in v1.16.
 
 ## Previous Milestone: v1.14 Data Parity Fix (Shipped: 2026-02-04)
 
@@ -302,17 +270,21 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 
 ### Active
 
-*v1.16 Pyodide Pre-loading (Planned):*
-- [ ] Early Pyodide init during compatibility check (detect Pyodide scenes from config)
-- [ ] Shared Pyodide instance reused by RemoteGame (skip loadPyodide if pre-loaded)
-- [ ] Loading progress indicator and gate before participant advancement
-- [ ] Server-side ping grace during Pyodide loading phase
-- [ ] Remove stagger delay, tests pass with near-simultaneous starts
+*v1.17 E2E Test Reliability:*
+- [ ] All E2E tests pass 10+ consecutive runs with zero failures
+- [ ] Server startup/teardown reliable between test suites
+- [ ] Test timeouts appropriate for each scenario
+- [ ] Network disruption tests validated and passing
 
-*v1.15 E2E Test Reliability (In Progress):*
-- [x] Investigate root cause (Pyodide blocks main thread → Socket.IO disconnect)
-- [ ] Workaround: 5s stagger delay between game pairs
-- [ ] Document permanent fix plan (v1.16)
+*Shipped in v1.16:*
+- ✓ Early Pyodide init during compatibility check — v1.16
+- ✓ Shared Pyodide instance reused by game classes — v1.16
+- ✓ Loading progress indicator and advancement gate — v1.16
+- ✓ Server-side ping grace during Pyodide loading — v1.16
+- ✓ Stagger delay reduced to 0.5s, concurrent starts work — v1.16
+
+*Shipped in v1.15:*
+- ✓ Root cause identified (Pyodide blocks main thread → Socket.IO disconnect) — v1.15
 
 *Shipped in v1.14:*
 - ✓ Wait for input confirmation before episode export — v1.14
@@ -431,7 +403,7 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 | Playwright MCP for testing | Browser automation with network condition control | ✓ Good |
 | isFocused exclusion from parity | Focus state has notification latency, column consistency is sufficient | ✓ Good |
 | BOUND-02/03 guards | Defense-in-depth at episode boundaries in async paths | ✓ Good |
-| Pre-load over Web Worker for v1.16 | Per-frame Python (10-100ms) doesn't cause disconnects; only loadPyodide() does. Pre-loading is simpler and preserves synchronous rollback performance. Web Worker deferred. | — Pending |
+| Pre-load over Web Worker for v1.16 | Per-frame Python (10-100ms) doesn't cause disconnects; only loadPyodide() does. Pre-loading is simpler and preserves synchronous rollback performance. Web Worker deferred. | ✓ Good |
 
 ---
-*Last updated: 2026-02-06 after v1.16 Pyodide Pre-loading milestone started*
+*Last updated: 2026-02-06 after v1.17 E2E Test Reliability milestone started*

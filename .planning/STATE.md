@@ -5,22 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-06)
 
 **Core value:** Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
-**Current focus:** v1.16 Pyodide Pre-loading - Complete
+**Current focus:** v1.17 E2E Test Reliability
 
 ## Current Position
 
-Milestone: v1.16 Pyodide Pre-loading
-Phase: 70 of 70 (Validation & Test Stabilization)
-Plan: 1 of 1 (complete)
-Status: v1.16 milestone complete - all phases (67-70) delivered
-Last activity: 2026-02-06 — Completed 70-01-PLAN.md (stagger reduction validated)
+Milestone: v1.17 E2E Test Reliability
+Phase: Not started (run /gsd:define-requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-02-06 — Milestone v1.17 started
 
-Progress: ██████████ 100%
+Progress: ░░░░░░░░░░ 0%
 
 ## Milestone History
 
 | Milestone | Phases | Status | Shipped |
 |-----------|--------|--------|---------|
+| v1.17 E2E Test Reliability | TBD | In progress | - |
 | v1.16 Pyodide Pre-loading | 67-70 | Complete | 2026-02-06 |
 | v1.15 E2E Test Reliability | - | Root cause found | 2026-02-04 |
 | v1.14 Data Parity Fix | 61-65 | Complete | 2026-02-04 |
@@ -425,20 +426,18 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-02-06
-Stopped at: Completed 70-01-PLAN.md -- v1.16 Pyodide Pre-loading milestone complete
+Stopped at: Started v1.17 E2E Test Reliability milestone
 Resume file: None
 
 ### Next Steps
 
-**v1.16 Pyodide Pre-loading milestone is complete.**
+**v1.17 E2E Test Reliability milestone started.**
 
-All phases delivered:
-- Phase 67: Pyodide pre-load infrastructure (fire-and-forget preload during compat check)
-- Phase 68: Shared instance integration (game classes reuse preloaded Pyodide)
-- Phase 69: Server-side init grace (loading grace period prevents false disconnects)
-- Phase 70: Validation & test stabilization (stagger reduced 5.0s to 0.5s, E2E validated)
+Goal: All E2E tests pass 10+ consecutive runs with zero flakiness.
 
-**Potential future work:**
-- Address pre-existing E2E test flakiness (Page.goto timeouts, latency test timeouts)
-- Move Pyodide to Web Worker if per-frame blocking becomes a problem (deferred from v1.16)
-- Group reunion matchmaker variant (deferred from v1.13)
+Known failing tests (from v1.16 Phase 70 validation):
+- test_focus_loss_episode_boundary_parity: Page.goto timeout
+- test_episode_completion_under_fixed_latency[chromium-200]: 300s timeout
+- test_network_disruption: not yet validated
+
+Next action: Run /gsd:define-requirements
