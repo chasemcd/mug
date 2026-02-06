@@ -5,6 +5,10 @@ These tests validate infrastructure and scenarios requiring 6 concurrent
 participants (3 simultaneous games). Builds on test infrastructure from
 Phase 64 (STRESS-01) to enable lifecycle stress tests in Phase 65.
 
+Stagger delay reduced from 5.0s to 0.5s in v1.16 (Phase 70) after Pyodide
+pre-loading (Phases 67-69) eliminated concurrent loadPyodide() main-thread
+blocking that previously caused Socket.IO ping timeouts and false disconnects.
+
 Tests:
 - test_three_simultaneous_games: STRESS-01 infrastructure validation
 - test_staggered_participant_arrival: Validates FIFO pairing under realistic timing
@@ -54,7 +58,7 @@ def test_three_simultaneous_games(multi_participant_contexts, flask_server_fresh
     orchestrator = GameOrchestrator(pages, base_url)
 
     # Start all 3 games with stagger for WebRTC stability
-    orchestrator.start_all_games(stagger_delay_sec=5.0)
+    orchestrator.start_all_games(stagger_delay_sec=0.5)
 
     # Wait for all episodes to complete WITH parity validation
     # This is the definitive test: both players must export identical data
@@ -98,7 +102,7 @@ def test_staggered_participant_arrival(multi_participant_contexts, flask_server_
     orchestrator = GameOrchestrator(pages, base_url)
 
     # Start all games - should work without timing hacks
-    orchestrator.start_all_games(stagger_delay_sec=5.0)
+    orchestrator.start_all_games(stagger_delay_sec=0.5)
 
     # Wait for all episodes to complete WITH parity validation
     # This confirms correct pairing AND correct game state synchronization

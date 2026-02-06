@@ -269,13 +269,18 @@ class GameOrchestrator:
         set_tab_visibility(page1, visible=True)
         set_tab_visibility(page2, visible=True)
 
-    def start_all_games(self, stagger_delay_sec: float = 5.0) -> None:
+    def start_all_games(self, stagger_delay_sec: float = 0.5) -> None:
         """
         Run all games through the full startup flow with per-pair orchestration.
 
         Each game pair completes its full startup sequence before the next pair
         begins. This prevents timing issues where early pairs timeout while
         waiting for later pairs to catch up.
+
+        The default stagger was reduced from 5.0s to 0.5s after v1.16 Pyodide
+        Pre-loading (Phases 67-69) eliminated concurrent loadPyodide() blocking.
+        Pre-loading during compat check means game starts no longer compete for
+        main-thread time, so near-simultaneous starts work reliably.
 
         Flow per game pair:
         1. Navigate both players
@@ -286,7 +291,8 @@ class GameOrchestrator:
         6. Verify pairing
 
         Args:
-            stagger_delay_sec: Delay between starting each game pair
+            stagger_delay_sec: Delay between starting each game pair (0.5s default
+                since v1.16; was 5.0s before Pyodide pre-loading)
         """
         print("Starting 3 games with 6 participants (per-pair orchestration)...")
 
