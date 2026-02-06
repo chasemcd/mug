@@ -20,6 +20,46 @@ Known limitations:
   effect of 500ms round-trip on BOTH players exceeds reasonable thresholds.
   However, asymmetric (one player at 500ms) works fine, which covers the
   realistic scenario of mismatched network conditions.
+
+ROOT CAUSE (Phase 72 diagnosis - 2026-02-06):
+The 200ms latency test [chromium-200] timeout is INTERMITTENT, not deterministic.
+Diagnostic runs (2 consecutive passes, ~30s each) revealed:
+
+  Root cause: P2P ready gate race condition at the 5000ms boundary.
+  - Under 200ms symmetric CDP latency, P2P validation takes ~4-5s (WebRTC
+    signaling through latency-delayed SocketIO). The 5000ms P2P ready gate
+    timeout is right at the boundary of this timing.
+  - When the gate times out BEFORE p2p_validation_complete arrives via SocketIO,
+    the client emits p2p_validation_failed -> server re-pools both players ->
+    they re-match -> same race repeats. With only 2 test players, this can
+    create an infinite re-pool loop (Hypothesis #3).
+  - Whether the race is won or lost depends on system load and network stack
+    scheduling, making the failure environmental/intermittent.
+
+  Evidence:
+  - At game object ready (t=10s), both players: validationState='connecting',
+    gateResolved=False, p2pConnected=False, timerWorkerActive=False
+  - P2P established by t=15s (p2pConnected=True), but game already fell back
+    to SocketIO relay at frame 24-36 (type=relay fallback@35)
+  - Input routing: ~95% SocketIO relay, ~5% P2P DataChannel
+  - Zero rollbacks despite heavy SocketIO relay (INPUT_DELAY=3 provides buffer)
+  - WebRTC RTT monitoring reports ~800ms (4x the 200ms CDP latency, as expected
+    for round-trip through both players' latency-delayed connections)
+  - CDP latency does NOT affect WebRTC DataChannel (Chromium issue 41215664),
+    so the test actually tests setup/signaling latency, not gameplay latency
+
+  Fix direction (for Plan 02):
+  - Option A: Increase P2P ready gate timeout from 5000ms to 15000ms for tests
+    under latency (makes race much less likely)
+  - Option B: Make the test latency-aware by applying CDP latency AFTER P2P
+    setup (avoids the race entirely, but changes what the test validates)
+  - Option C: Accept intermittent nature and add retry logic to the test
+  - Recommended: Option A (simplest, addresses root cause directly)
+
+  Phase 71 infrastructure fixes (port cleanup, server lifecycle) may have
+  reduced the environmental variability that previously triggered the race
+  more frequently. The test now passes consistently in isolation but may
+  still fail under CI load or when run alongside other tests.
 """
 import time
 import pytest
