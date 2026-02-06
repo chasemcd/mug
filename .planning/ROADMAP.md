@@ -436,10 +436,11 @@ Plans:
   3. No tolerance hacks or known-flaky annotations exist in any E2E test file
   4. Any failure during the 10-run sequence triggers root cause investigation (not retry-and-hope)
 **Research flag:** Unlikely -- pure execution and validation
-**Plans:** TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] 74-01: TBD
+- [ ] 74-01-PLAN.md — Audit E2E test suite for STAB-02 compliance (xfail, tolerance hacks, flaky markers)
+- [ ] 74-02-PLAN.md — Execute 10 consecutive full-suite runs for STAB-01 certification
 
 ## Progress
 
@@ -473,8 +474,8 @@ Plans:
 | 71. Test Infrastructure Fix | v1.17 | 2/2 | Complete | 2026-02-06 |
 | 72. Latency Test Diagnosis | v1.17 | 2/2 | Complete | 2026-02-06 |
 | 73. Network & Regression Validation | v1.17 | 2/2 | Complete | 2026-02-06 |
-| 74. Stability Certification | v1.17 | 0/TBD | Not started | - |
+| 74. Stability Certification | v1.17 | 0/2 | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-06 after Phase 73 complete (18/18 E2E tests passing)*
+*Last updated: 2026-02-06 after Phase 74 planned (2 plans in 2 waves)*
