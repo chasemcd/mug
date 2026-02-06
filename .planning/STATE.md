@@ -10,12 +10,12 @@ See: .planning/PROJECT.md (updated 2026-02-06)
 ## Current Position
 
 Milestone: v1.16 Pyodide Pre-loading
-Phase: 68 of 70 (Shared Instance Integration)
+Phase: 69 of 70 (Server-side Init Grace)
 Plan: 1 of 1 (complete)
-Status: Phase 68 complete
-Last activity: 2026-02-06 — Completed 68-01-PLAN.md
+Status: Phase 69 complete
+Last activity: 2026-02-06 — Completed 69-01-PLAN.md
 
-Progress: █████░░░░░ 50%
+Progress: ███████░░░ 75%
 
 ## Milestone History
 
@@ -171,6 +171,12 @@ Progress: █████░░░░░ 50%
 **v1.16 Execution:**
 - `.planning/phases/67-pyodide-preload-infrastructure/67-01-SUMMARY.md`
 - `.planning/phases/68-shared-instance-integration/68-01-SUMMARY.md`
+- `.planning/phases/69-server-init-grace/69-01-SUMMARY.md`
+
+**Server-side Init Grace (v1.16 Phase 69 - added):**
+- `interactive_gym/server/app.py` - LOADING_CLIENTS dict, LOADING_TIMEOUT_S=60, is_client_in_loading_grace(), pyodide_loading_start/complete handlers, grace check in on_disconnect(), ping_timeout=30
+- `interactive_gym/server/static/js/index.js` - preloadPyodide() emits pyodide_loading_start/complete with 50ms yield
+- `interactive_gym/server/static/js/pyodide_remote_game.js` - RemoteGame.initialize() fallback emits pyodide_loading_start/complete with 50ms yield
 
 **Shared Instance Integration (v1.16 Phase 68 - modified):**
 - `interactive_gym/server/static/js/pyodide_remote_game.js` - RemoteGame.initialize() checks window.pyodidePreloadStatus/pyodideInstance, reuses preloaded instance with package dedup fallback
@@ -337,6 +343,13 @@ See: .planning/PROJECT.md Key Decisions table
 - Reset participant state after P2P validation failure to allow re-pooling
 - STRESS-01 requirement satisfied (6 contexts, 3 concurrent games with data parity)
 
+**v1.16 Phase 69 decisions:**
+- ping_timeout=30 (not 20) for generous margin (38s total vs 15s worst-case Pyodide load)
+- Dict with timestamps (not set) enables 60s safety timeout preventing unbounded LOADING_CLIENTS growth
+- Grace check before admin logging -- early return preserves session but skips ALL destructive actions
+- 50ms yield before loadPyodide() ensures socket.emit is sent before main thread blocks
+- Error path sends loading_complete to prevent ghost entries in LOADING_CLIENTS
+
 **v1.16 Phase 68 decisions:**
 - Check both window.pyodidePreloadStatus === 'ready' AND window.pyodideInstance truthy before reuse
 - Fallback else branch runs original loadPyodide() path unchanged for backward compatibility
@@ -378,22 +391,23 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-02-06
-Stopped at: Completed 68-01-PLAN.md (Shared Instance Integration)
+Stopped at: Completed 69-01-PLAN.md (Server-side Init Grace)
 Resume file: None
 
 ### Next Steps
 
-**Phase 69: Server-side Init Grace**
-Goal: Tolerate missed pings during Pyodide loading (fallback path still takes 5-15s)
+**Phase 70: Validation & Test Stabilization**
+Goal: Remove stagger delays, prove concurrent game starts work with preloading
 
-**What Phase 68 delivered:**
-- `RemoteGame.initialize()` reuses `window.pyodideInstance` when `pyodidePreloadStatus === 'ready'`
-- Package dedup prevents re-installing packages already loaded during preload
-- `MultiplayerPyodideGame` inherits shared instance via `super.initialize()`
-- Game startup is near-instant when Pyodide was pre-loaded
+**What Phase 69 delivered:**
+- Server ping_timeout increased from 8s to 30s (total grace: 38s)
+- Client signals loading state via pyodide_loading_start/complete events
+- Server tracks per-client loading state with LOADING_CLIENTS dict
+- Disconnect handler skips destructive cleanup during loading grace period
+- 60s safety timeout prevents unbounded LOADING_CLIENTS growth
+- GRACE-01, GRACE-02, GRACE-03 requirements satisfied
 
 **Remaining v1.16 phases:**
-- Phase 69: Server-side init grace (tolerate missed pings during loading)
 - Phase 70: Validation & test stabilization (remove stagger, prove concurrent starts)
 
-Next action: Run /gsd:plan-phase 69
+Next action: Run /gsd:plan-phase 70
