@@ -332,10 +332,10 @@ Plans:
   2. MultiplayerPyodideGame skips loadPyodide() when Pyodide is pre-loaded
   3. Game startup time is near-instant (no WASM compilation at game time)
 **Research flag:** Unlikely — straightforward refactoring to check for existing Pyodide instance
-**Plans**: TBD
+**Plans:** 1 plan
 
 Plans:
-- [ ] 68-01: TBD
+- [ ] 68-01-PLAN.md — Modify RemoteGame.initialize() to reuse pre-loaded Pyodide and add multiplayer observability logging
 
 ### Phase 69: Server-Side Init Grace
 **Goal**: Server tolerates missed pings during Pyodide loading so no false disconnects
@@ -394,10 +394,10 @@ Plans:
 | 65. Multi-Episode Lifecycle Stress | v1.14 | 0/2 | Not started | - |
 | 66. Server Recovery Validation | v1.14 | 0/TBD | Not started | - |
 | 67. Pyodide Pre-load Infrastructure | v1.16 | 1/1 | Complete | 2026-02-06 |
-| 68. Shared Instance Integration | v1.16 | 0/TBD | Not started | - |
+| 68. Shared Instance Integration | v1.16 | 0/1 | Not started | - |
 | 69. Server-Side Init Grace | v1.16 | 0/TBD | Not started | - |
 | 70. Validation & Test Stabilization | v1.16 | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-06 after Phase 67 execution complete*
+*Last updated: 2026-02-06 after Phase 68 planning complete*
