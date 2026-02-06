@@ -208,11 +208,11 @@ See [milestones/v1.11-ROADMAP.md](milestones/v1.11-ROADMAP.md) for full details.
 - [ ] **Phase 65: Multi-Episode and Lifecycle Stress Tests** - Comprehensive lifecycle coverage
 - [ ] **Phase 66: Server Recovery Validation** - Prove server recovers from chaos correctly
 
-### 📋 v1.16 Pyodide Pre-loading (Planned)
+### 🚧 v1.16 Pyodide Pre-loading (In Progress)
 
 **Milestone Goal:** Pre-load Pyodide during the compatibility check screen so game startup never blocks the main thread, eliminating Socket.IO disconnects at scale (50+ concurrent game pairs).
 
-- [ ] **Phase 67: Pyodide Pre-load Infrastructure** - Detect Pyodide scenes, load during compat check, progress UI, advancement gate
+- [x] **Phase 67: Pyodide Pre-load Infrastructure** - Detect Pyodide scenes, load during compat check, progress UI, advancement gate
 - [ ] **Phase 68: Shared Instance Integration** - Game classes reuse pre-loaded Pyodide instance
 - [ ] **Phase 69: Server-Side Init Grace** - Server tolerates missed pings during Pyodide loading
 - [ ] **Phase 70: Validation & Test Stabilization** - Remove stagger, prove concurrent starts work
@@ -321,7 +321,7 @@ Plans:
 **Plans:** 1 plan
 
 Plans:
-- [ ] 67-01-PLAN.md — Server-side Pyodide config detection + client-side preload with progress UI and advancement gating
+- [x] 67-01-PLAN.md — Server-side Pyodide config detection + client-side preload with progress UI and advancement gating
 
 ### Phase 68: Shared Instance Integration
 **Goal**: Game classes reuse pre-loaded Pyodide instance instead of loading their own
@@ -393,11 +393,11 @@ Plans:
 | 64. Multi-Participant Test Infrastructure | v1.14 | 1/1 | Complete | 2026-02-03 |
 | 65. Multi-Episode Lifecycle Stress | v1.14 | 0/2 | Not started | - |
 | 66. Server Recovery Validation | v1.14 | 0/TBD | Not started | - |
-| 67. Pyodide Pre-load Infrastructure | v1.16 | 0/1 | Not started | - |
+| 67. Pyodide Pre-load Infrastructure | v1.16 | 1/1 | Complete | 2026-02-06 |
 | 68. Shared Instance Integration | v1.16 | 0/TBD | Not started | - |
 | 69. Server-Side Init Grace | v1.16 | 0/TBD | Not started | - |
 | 70. Validation & Test Stabilization | v1.16 | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-06 after Phase 67 plan creation*
+*Last updated: 2026-02-06 after Phase 67 execution complete*

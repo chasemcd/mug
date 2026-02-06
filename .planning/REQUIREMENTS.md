@@ -9,10 +9,10 @@ Requirements for v1.16 Pyodide Pre-loading. Each maps to roadmap phases.
 
 ### Early Pyodide Initialization
 
-- [ ] **INIT-01**: System detects Pyodide-requiring scenes from experiment config during compatibility check
-- [ ] **INIT-02**: System starts `loadPyodide()` and package installation during compatibility check screen
-- [ ] **INIT-03**: Participant sees loading progress indicator during Pyodide initialization
-- [ ] **INIT-04**: Participant cannot advance past compatibility check until Pyodide is fully loaded
+- [x] **INIT-01**: System detects Pyodide-requiring scenes from experiment config during compatibility check
+- [x] **INIT-02**: System starts `loadPyodide()` and package installation during compatibility check screen
+- [x] **INIT-03**: Participant sees loading progress indicator during Pyodide initialization
+- [x] **INIT-04**: Participant cannot advance past compatibility check until Pyodide is fully loaded
 
 ### Shared Pyodide Instance
 
@@ -69,10 +69,10 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| INIT-01 | Phase 67 | Pending |
-| INIT-02 | Phase 67 | Pending |
-| INIT-03 | Phase 67 | Pending |
-| INIT-04 | Phase 67 | Pending |
+| INIT-01 | Phase 67 | Complete |
+| INIT-02 | Phase 67 | Complete |
+| INIT-03 | Phase 67 | Complete |
+| INIT-04 | Phase 67 | Complete |
 | SHARED-01 | Phase 68 | Pending |
 | SHARED-02 | Phase 68 | Pending |
 | GRACE-01 | Phase 69 | Pending |
@@ -91,4 +91,4 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 ---
 *Requirements defined: 2026-02-06*
-*Last updated: 2026-02-06 after roadmap creation (phases 67-70)*
+*Last updated: 2026-02-06 after Phase 67 execution complete*
