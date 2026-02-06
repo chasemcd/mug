@@ -11,9 +11,9 @@ See: .planning/PROJECT.md (updated 2026-02-06)
 
 Milestone: v1.17 E2E Test Reliability
 Phase: 71 of 74 (Test Infrastructure Fix)
-Plan: 01 of 01 complete
+Plan: 02 of 02 complete
 Status: Phase complete
-Last activity: 2026-02-06 — Completed 71-01-PLAN.md
+Last activity: 2026-02-06 — Completed 71-02-PLAN.md (gap closure)
 
 Progress: ██░░░░░░░░ 25%
 
@@ -177,9 +177,14 @@ Progress: ██░░░░░░░░ 25%
 
 **v1.17 Execution:**
 - `.planning/phases/71-test-infrastructure-fix/71-01-SUMMARY.md`
+- `.planning/phases/71-test-infrastructure-fix/71-02-SUMMARY.md`
 
 **Robust Server Fixture Lifecycle (v1.17 Phase 71 - added):**
 - `tests/conftest.py` - _is_port_free(), _ensure_port_available(), _wait_for_port_free(), _teardown_server() shared helpers; all 5 server fixtures refactored to use them; start_new_session=True on all Popen; stdout=DEVNULL
+
+**Focus Loss Boundary Test Isolation (v1.17 Phase 71-02 - extracted):**
+- `tests/e2e/test_focus_loss_data_parity.py` - Extracted test_focus_loss_episode_boundary_parity from test_data_comparison.py into its own module for fresh flask_server instance
+- `tests/e2e/test_data_comparison.py` - Removed test_focus_loss_episode_boundary_parity (4 tests remain)
 
 **Validation & Test Stabilization (v1.16 Phase 70 - validated):**
 - `tests/fixtures/multi_participant.py` - GameOrchestrator.start_all_games() default stagger_delay_sec changed from 5.0 to 0.5
@@ -271,6 +276,7 @@ See: .planning/PROJECT.md Key Decisions table
 - stdout=DEVNULL for all fixtures (stderr kept as PIPE for crash diagnostics only)
 - flask_server_multi_episode: read stderr before teardown, write empty bytes for stdout debug file
 - test_focus_loss_episode_boundary_parity within-module failure is server state accumulation, not port teardown
+- Module isolation fix: extract test to own module for fresh flask_server rather than changing fixture scope or adding server state cleanup
 
 **v1.16 approach decision:**
 - Pre-load over Web Worker: per-frame runPythonAsync (10-100ms) doesn't cause disconnects; only loadPyodide (5-15s) does
@@ -431,20 +437,20 @@ See: .planning/PROJECT.md Key Decisions table
 - wait_for_known_group=True logs warning but uses FIFO matching
 
 **Known E2E test failures (v1.17 targets):**
-- test_focus_loss_episode_boundary_parity: Page.goto timeout (30s) -- PARTIALLY FIXED (between-module port handoff works; within-module failure persists due to server state accumulation after 4 tests)
+- test_focus_loss_episode_boundary_parity: FIXED (71-02 extracted to own module; passes back-to-back with test_data_comparison.py)
 - test_episode_completion_under_fixed_latency[chromium-200]: 300s timeout -- root cause unknown
 - test_network_disruption suite: not validated -- needs full run and any failures addressed
 
 ## Session Continuity
 
 Last session: 2026-02-06
-Stopped at: Completed 71-01-PLAN.md
+Stopped at: Completed 71-02-PLAN.md (gap closure)
 Resume file: None
 
 ### Next Steps
 
-**Phase 71 (Test Infrastructure Fix) complete.**
+**Phase 71 (Test Infrastructure Fix) fully complete including gap closure.**
 
-Between-module port handoff verified working. All 5 server fixtures use shared robust teardown helpers.
+All server fixture infrastructure issues resolved. test_focus_loss_episode_boundary_parity now passes reliably in its own module with a fresh flask_server instance.
 
 Next action: Plan Phase 72 (Latency Diagnosis) - investigate test_episode_completion_under_fixed_latency[chromium-200] 300s timeout
