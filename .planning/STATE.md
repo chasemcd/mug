@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-06)
 
 **Core value:** Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
-**Current focus:** v1.16 Pyodide Pre-loading - Planned
+**Current focus:** v1.16 Pyodide Pre-loading - In progress
 
 ## Current Position
 
 Milestone: v1.16 Pyodide Pre-loading
 Phase: 67 of 70 (Pyodide Pre-load Infrastructure)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-02-06 — Roadmap created (4 phases, 14 requirements)
+Plan: 1 of 1 (complete)
+Status: Phase 67 complete
+Last activity: 2026-02-06 — Completed 67-01-PLAN.md
 
-Progress: ░░░░░░░░░░ 0%
+Progress: ██░░░░░░░░ 25%
 
 ## Milestone History
 
 | Milestone | Phases | Status | Shipped |
 |-----------|--------|--------|---------|
-| v1.16 Pyodide Pre-loading | 67-70 | Ready to plan | - |
+| v1.16 Pyodide Pre-loading | 67-70 | In progress | - |
 | v1.15 E2E Test Reliability | - | Root cause found | 2026-02-04 |
 | v1.14 Data Parity Fix | 61-65 | Complete | 2026-02-04 |
 | v1.13 Matchmaker Hardening | 57-60 | Complete | 2026-02-03 |
@@ -167,6 +167,16 @@ Progress: ░░░░░░░░░░ 0%
 - `.planning/phases/64-multi-participant-test-infrastructure/64-01-SUMMARY.md`
 - `.planning/phases/65-multi-episode-lifecycle-stress-tests/65-01-SUMMARY.md`
 - `.planning/phases/65-multi-episode-lifecycle-stress-tests/65-02-SUMMARY.md`
+
+**v1.16 Execution:**
+- `.planning/phases/67-pyodide-preload-infrastructure/67-01-SUMMARY.md`
+
+**Pyodide Pre-load Infrastructure (v1.16 Phase 67 - added):**
+- `interactive_gym/configurations/experiment_config.py` - get_pyodide_config() scans stager scenes for Pyodide requirements
+- `interactive_gym/configurations/remote_config.py` - get_pyodide_config() returns own settings, get_entry_screening_config() safe defaults
+- `interactive_gym/server/app.py` - pyodide_config included in experiment_config socket event
+- `interactive_gym/server/static/templates/index.html` - #pyodideLoader element (spinner + status text)
+- `interactive_gym/server/static/js/index.js` - preloadPyodide(), window.pyodideInstance/pyodideMicropip/pyodidePreloadStatus, advancement gating
 
 **Multi-Participant Test Infrastructure (v1.14 Phase 64 - added):**
 - `tests/conftest.py` - multi_participant_contexts fixture for 6 browser contexts
@@ -322,6 +332,13 @@ See: .planning/PROJECT.md Key Decisions table
 - Reset participant state after P2P validation failure to allow re-pooling
 - STRESS-01 requirement satisfied (6 contexts, 3 concurrent games with data parity)
 
+**v1.16 Phase 67 decisions:**
+- Scan GENERIC_STAGER scenes via unpack() to detect Pyodide need at experiment level
+- preloadPyodide() called without await (fire-and-forget, concurrent with entry screening)
+- Preload failure sets status to 'error' but does NOT block advancement (graceful fallback)
+- Phase 67 intentionally does NOT modify RemoteGame/MultiplayerPyodideGame (that's Phase 68)
+- Double loadPyodide() is expected until Phase 68 wires game classes to reuse window.pyodideInstance
+
 **v1.14 Phase 65 decisions:**
 - Games must NOT be pre-created in waitroom - only created when matchmaker forms complete match (GAME-01 fix)
 - Socket.IO emits must occur outside threading.Lock() blocks to avoid eventlet deadlocks
@@ -350,34 +367,27 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-02-06
-Stopped at: Roadmap created for v1.16 Pyodide Pre-loading (4 phases, 14 requirements)
+Stopped at: Completed 67-01-PLAN.md (Pyodide Pre-load Infrastructure)
 Resume file: None
 
 ### Next Steps
 
-**v1.16 Pyodide Pre-loading (Planned)**
-Goal: Pre-load Pyodide during compatibility check to eliminate game startup disconnects at scale
+**Phase 68: Shared Instance Integration**
+Goal: Game classes reuse pre-loaded Pyodide instance instead of loading their own
 
-**Key insight (from v1.15 investigation + analysis):**
-- Only `loadPyodide()` causes disconnects (5-15s blocking)
-- Per-frame `runPythonAsync()` is fine (10-100ms, well within 8s ping timeout)
-- Pre-loading eliminates concurrent init at game start, solving the problem without rewriting the game loop
+**What Phase 67 delivered:**
+- `window.pyodideInstance` stores pre-loaded Pyodide during compat check
+- `window.pyodideMicropip` stores micropip reference
+- `window.pyodideInstalledPackages` stores installed packages list
+- `window.pyodidePreloadStatus` tracks loading state (idle/loading/ready/error)
 
-**Solution approach:**
-1. Detect Pyodide-requiring scenes from experiment config
-2. Start loadPyodide() during compatibility check screen
-3. Gate participant advancement until Pyodide is ready
-4. RemoteGame reuses pre-loaded instance (skip loadPyodide if already loaded)
-5. Server-side ping grace during loading phase for slow machines
+**Phase 68 needs to:**
+- Modify `RemoteGame.initialize()` to skip `loadPyodide()` when `window.pyodideInstance` exists
+- Modify `MultiplayerPyodideGame` similarly
+- Verify game startup time is near-instant when preloaded
 
-**Key files to modify:**
-- `interactive_gym/server/static/js/index.js` - Early Pyodide init during compat check
-- `interactive_gym/server/static/js/pyodide_remote_game.js` - RemoteGame.initialize() reuses pre-loaded instance
-- `interactive_gym/server/app.py` - Server-side ping grace during loading
+**Remaining v1.16 phases:**
+- Phase 69: Server-side init grace (tolerate missed pings during loading)
+- Phase 70: Validation & test stabilization (remove stagger, prove concurrent starts)
 
-**Testing plan:**
-- Remove 5s stagger delay from multi-participant tests
-- All STRESS tests should pass with 0.5s stagger
-- Socket.IO connections stable during concurrent game starts
-
-Next action: Run /gsd:plan-phase 67
+Next action: Run /gsd:plan-phase 68
