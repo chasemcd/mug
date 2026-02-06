@@ -200,6 +200,70 @@ var maxLatency;
 
 var pyodideRemoteGame = null;
 
+// Pyodide pre-loading state (Phase 67)
+window.pyodideInstance = null;
+window.pyodideMicropip = null;
+window.pyodideInstalledPackages = [];
+window.pyodidePreloadStatus = 'idle'; // 'idle' | 'loading' | 'ready' | 'error'
+
+/**
+ * Pre-load Pyodide during compatibility check screen (Phase 67).
+ * Starts loadPyodide() + micropip.install() immediately when experiment_config
+ * arrives, storing the result on window.pyodideInstance for Phase 68 to consume.
+ *
+ * @param {Object} pyodideConfig - {needs_pyodide: bool, packages_to_install: string[]}
+ */
+async function preloadPyodide(pyodideConfig) {
+    if (!pyodideConfig || !pyodideConfig.needs_pyodide) {
+        window.pyodidePreloadStatus = 'ready';
+        return;
+    }
+
+    console.log('[PyodidePreload] Starting preload...');
+    window.pyodidePreloadStatus = 'loading';
+    showPyodideProgress('Loading Python runtime...');
+
+    try {
+        const pyodide = await loadPyodide();
+        console.log('[PyodidePreload] Core loaded, installing micropip...');
+        showPyodideProgress('Installing packages...');
+
+        await pyodide.loadPackage("micropip");
+        const micropip = pyodide.pyimport("micropip");
+
+        const packages = pyodideConfig.packages_to_install || [];
+        if (packages.length > 0) {
+            console.log('[PyodidePreload] Installing:', packages);
+            await micropip.install(packages);
+        }
+
+        window.pyodideInstance = pyodide;
+        window.pyodideMicropip = micropip;
+        window.pyodideInstalledPackages = packages;
+        window.pyodidePreloadStatus = 'ready';
+        hidePyodideProgress();
+        console.log('[PyodidePreload] Complete');
+
+    } catch (error) {
+        console.error('[PyodidePreload] Failed:', error);
+        window.pyodidePreloadStatus = 'error';
+        showPyodideProgress('Loading failed - will retry when game starts');
+        // Don't block advancement -- fallback to game-time loading (Phase 68 handles this)
+    }
+}
+
+function showPyodideProgress(message) {
+    const loader = document.getElementById('pyodideLoader');
+    const status = document.getElementById('pyodideStatus');
+    if (loader) loader.style.display = 'flex';
+    if (status) status.textContent = message;
+}
+
+function hidePyodideProgress() {
+    const loader = document.getElementById('pyodideLoader');
+    if (loader) loader.style.display = 'none';
+}
+
 // Expose game instance for debugging (access via window.game)
 Object.defineProperty(window, 'game', {
     get: function() { return pyodideRemoteGame; }
@@ -511,6 +575,12 @@ socket.on('join_game_error', function(data) {
 // Experiment-level configuration (including entry screening)
 socket.on('experiment_config', async function(data) {
     console.log("[ExperimentConfig] Received experiment configuration");
+
+    // Start Pyodide preload concurrently with entry screening (Phase 67)
+    // Fire and forget -- don't await, let it run alongside screening
+    if (data.pyodide_config) {
+        preloadPyodide(data.pyodide_config);
+    }
 
     if (data.entry_screening) {
         experimentScreeningConfig = data.entry_screening;
@@ -1221,6 +1291,17 @@ function startStaticScene(data) {
     $("#sceneHeader").html(data.scene_header);
     $("#sceneSubHeader").html(data.scene_subheader);
     $("#sceneBody").html(data.scene_body);
+
+    // Gate advance button on Pyodide readiness (Phase 67)
+    if (window.pyodidePreloadStatus === 'loading') {
+        $("#advanceButton").attr("disabled", true);
+        const pyodideGateInterval = setInterval(() => {
+            if (window.pyodidePreloadStatus !== 'loading') {
+                $("#advanceButton").attr("disabled", false);
+                clearInterval(pyodideGateInterval);
+            }
+        }, 500);
+    }
 };
 
 function startEndScene(data) {
@@ -1400,6 +1481,11 @@ function terminateGymScene(data) {
 
 $(function() {
     $('#advanceButton').click( () => {
+        // Gate advancement on Pyodide readiness (Phase 67)
+        if (window.pyodidePreloadStatus === 'loading') {
+            console.log('[AdvanceScene] Blocked - Pyodide still loading');
+            return;
+        }
         $("#advanceButton").hide();
         $("#advanceButton").attr("disabled", true);
         console.log("[AdvanceScene] Continue button clicked. Subject:", window.subjectName || interactiveGymGlobals?.subjectName);
