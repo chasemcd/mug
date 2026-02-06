@@ -15,8 +15,8 @@ Requirements for v1.17 E2E Test Reliability. Each maps to roadmap phases.
 
 ### Test Performance
 
-- [ ] **PERF-01**: Root cause identified for `test_episode_completion_under_fixed_latency[chromium-200]` timeout
-- [ ] **PERF-02**: 200ms latency test completes within its timeout after root cause fix
+- [x] **PERF-01**: Root cause identified for `test_episode_completion_under_fixed_latency[chromium-200]` timeout
+- [x] **PERF-02**: 200ms latency test completes within its timeout after root cause fix
 
 ### Network Condition Tests
 
@@ -75,8 +75,8 @@ Which phases cover which requirements. Updated by create-roadmap.
 | INFRA-01 | Phase 71 | Complete |
 | INFRA-02 | Phase 71 | Complete |
 | INFRA-03 | Phase 71 | Complete |
-| PERF-01 | Phase 72 | Pending |
-| PERF-02 | Phase 72 | Pending |
+| PERF-01 | Phase 72 | Complete |
+| PERF-02 | Phase 72 | Complete |
 | NET-01 | Phase 73 | Pending |
 | NET-02 | Phase 73 | Pending |
 | REG-01 | Phase 73 | Pending |
@@ -93,4 +93,4 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 ---
 *Requirements defined: 2026-02-06*
-*Last updated: 2026-02-06 after Phase 71 complete*
+*Last updated: 2026-02-06 after Phase 72 complete*

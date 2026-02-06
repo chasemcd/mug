@@ -5,17 +5,17 @@
 See: .planning/PROJECT.md (updated 2026-02-06)
 
 **Core value:** Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
-**Current focus:** v1.17 E2E Test Reliability — Phase 72 complete, next: Phase 73-74
+**Current focus:** v1.17 E2E Test Reliability — Phase 73 (Network & Regression Validation)
 
 ## Current Position
 
 Milestone: v1.17 E2E Test Reliability
-Phase: 72 of 74 (Latency Test Diagnosis) - COMPLETE
-Plan: 02 of 2 complete
-Status: Phase complete
-Last activity: 2026-02-06 — Completed 72-02-PLAN.md (fix applied and verified)
+Phase: 73 of 74 (Network & Regression Validation)
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-02-06 — Phase 72 complete, verified 3/3 must-haves
 
-Progress: ████░░░░░░ 40%
+Progress: █████░░░░░ 50%
 
 ## Milestone History
 
@@ -466,13 +466,11 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-02-06
-Stopped at: Completed 72-02-PLAN.md (fix applied and verified)
+Stopped at: Phase 72 complete, verified 3/3
 Resume file: None
 
 ### Next Steps
 
-**Phase 72 (Latency Test Diagnosis) complete.** Both plans executed:
-- Plan 01: Root cause identified (P2P ready gate race at 5000ms boundary)
-- Plan 02: Fix applied (timeouts increased to 15000ms), verified 5/5 consecutive passes
+**Phase 72 (Latency Test Diagnosis) complete and verified.**
 
-Next action: Phase 73-74 (remaining v1.17 targets: test_network_disruption suite validation)
+Next action: Run /gsd:plan-phase 73
