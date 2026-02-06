@@ -213,7 +213,7 @@ See [milestones/v1.11-ROADMAP.md](milestones/v1.11-ROADMAP.md) for full details.
 **Milestone Goal:** Pre-load Pyodide during the compatibility check screen so game startup never blocks the main thread, eliminating Socket.IO disconnects at scale (50+ concurrent game pairs).
 
 - [x] **Phase 67: Pyodide Pre-load Infrastructure** - Detect Pyodide scenes, load during compat check, progress UI, advancement gate
-- [ ] **Phase 68: Shared Instance Integration** - Game classes reuse pre-loaded Pyodide instance
+- [x] **Phase 68: Shared Instance Integration** - Game classes reuse pre-loaded Pyodide instance
 - [ ] **Phase 69: Server-Side Init Grace** - Server tolerates missed pings during Pyodide loading
 - [ ] **Phase 70: Validation & Test Stabilization** - Remove stagger, prove concurrent starts work
 
@@ -335,7 +335,7 @@ Plans:
 **Plans:** 1 plan
 
 Plans:
-- [ ] 68-01-PLAN.md — Modify RemoteGame.initialize() to reuse pre-loaded Pyodide and add multiplayer observability logging
+- [x] 68-01-PLAN.md — Modify RemoteGame.initialize() to reuse pre-loaded Pyodide and add multiplayer observability logging
 
 ### Phase 69: Server-Side Init Grace
 **Goal**: Server tolerates missed pings during Pyodide loading so no false disconnects
@@ -394,10 +394,10 @@ Plans:
 | 65. Multi-Episode Lifecycle Stress | v1.14 | 0/2 | Not started | - |
 | 66. Server Recovery Validation | v1.14 | 0/TBD | Not started | - |
 | 67. Pyodide Pre-load Infrastructure | v1.16 | 1/1 | Complete | 2026-02-06 |
-| 68. Shared Instance Integration | v1.16 | 0/1 | Not started | - |
+| 68. Shared Instance Integration | v1.16 | 1/1 | Complete | 2026-02-06 |
 | 69. Server-Side Init Grace | v1.16 | 0/TBD | Not started | - |
 | 70. Validation & Test Stabilization | v1.16 | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-06 after Phase 68 planning complete*
+*Last updated: 2026-02-06 after Phase 68 execution complete*

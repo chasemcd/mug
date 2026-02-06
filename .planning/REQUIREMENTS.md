@@ -16,8 +16,8 @@ Requirements for v1.16 Pyodide Pre-loading. Each maps to roadmap phases.
 
 ### Shared Pyodide Instance
 
-- [ ] **SHARED-01**: `RemoteGame.initialize()` reuses pre-loaded Pyodide instance (skips `loadPyodide()` if already loaded)
-- [ ] **SHARED-02**: `MultiplayerPyodideGame` reuses pre-loaded Pyodide instance (skips `loadPyodide()` if already loaded)
+- [x] **SHARED-01**: `RemoteGame.initialize()` reuses pre-loaded Pyodide instance (skips `loadPyodide()` if already loaded)
+- [x] **SHARED-02**: `MultiplayerPyodideGame` reuses pre-loaded Pyodide instance (skips `loadPyodide()` if already loaded)
 
 ### Server-Side Init Grace
 
@@ -73,8 +73,8 @@ Which phases cover which requirements. Updated by create-roadmap.
 | INIT-02 | Phase 67 | Complete |
 | INIT-03 | Phase 67 | Complete |
 | INIT-04 | Phase 67 | Complete |
-| SHARED-01 | Phase 68 | Pending |
-| SHARED-02 | Phase 68 | Pending |
+| SHARED-01 | Phase 68 | Complete |
+| SHARED-02 | Phase 68 | Complete |
 | GRACE-01 | Phase 69 | Pending |
 | GRACE-02 | Phase 69 | Pending |
 | GRACE-03 | Phase 69 | Pending |
@@ -91,4 +91,4 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 ---
 *Requirements defined: 2026-02-06*
-*Last updated: 2026-02-06 after Phase 67 execution complete*
+*Last updated: 2026-02-06 after Phase 68 execution complete*
