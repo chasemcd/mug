@@ -402,10 +402,11 @@ Plans:
   2. The 200ms latency test completes within its timeout (currently 300s) on 5 consecutive runs
   3. The 100ms latency variant continues to pass (no regression)
 **Research flag:** Definite -- root cause is unknown, need investigation before any fix
-**Plans:** TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] 72-01: TBD
+- [ ] 72-01-PLAN.md — Instrument test with timing diagnostics and console capture to identify stall point and root cause
+- [ ] 72-02-PLAN.md — Apply root cause fix and verify 5 consecutive passes with no 100ms regression
 
 ### Phase 73: Network & Regression Validation
 **Goal**: Every test suite in the E2E suite passes -- network disruption, data comparison, multiplayer, multi-participant, and focus loss
@@ -469,10 +470,10 @@ Plans:
 | 69. Server-Side Init Grace | v1.16 | 1/1 | Complete | 2026-02-06 |
 | 70. Validation & Test Stabilization | v1.16 | 1/1 | Complete | 2026-02-06 |
 | 71. Test Infrastructure Fix | v1.17 | 2/2 | Complete | 2026-02-06 |
-| 72. Latency Test Diagnosis | v1.17 | 0/TBD | Not started | - |
+| 72. Latency Test Diagnosis | v1.17 | 0/2 | Not started | - |
 | 73. Network & Regression Validation | v1.17 | 0/TBD | Not started | - |
 | 74. Stability Certification | v1.17 | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-06 after Phase 71 complete (gap closure verified)*
+*Last updated: 2026-02-06 after Phase 72 planned (2 plans in 2 waves)*
