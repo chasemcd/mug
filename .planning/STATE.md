@@ -11,11 +11,11 @@ See: .planning/PROJECT.md (updated 2026-02-06)
 
 Milestone: v1.17 E2E Test Reliability
 Phase: 74 of 74 (Stability Certification)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-02-06 — Phase 73 complete, verified 6/6 must-haves, 18/18 E2E tests passing
+Plan: 01 of 02 complete
+Status: In progress
+Last activity: 2026-02-06 — Completed 74-01-PLAN.md (STAB-02 audit: zero violations, 24 tests confirmed)
 
-Progress: ███████░░░ 75%
+Progress: █████████░ 90%
 
 ## Milestone History
 
@@ -182,6 +182,13 @@ Progress: ███████░░░ 75%
 - `.planning/phases/72-latency-test-diagnosis/72-02-SUMMARY.md`
 - `.planning/phases/73-network-regression-validation/73-01-SUMMARY.md`
 - `.planning/phases/73-network-regression-validation/73-02-SUMMARY.md`
+- `.planning/phases/74-stability-certification/74-01-SUMMARY.md`
+
+**STAB-02 Audit (v1.17 Phase 74-01 - confirmed):**
+- All 8 E2E test modules audited for anti-patterns: zero violations
+- row_tolerance=15 in test_latency_injection.py confirmed JUSTIFIED (documented engineering tolerance)
+- Test inventory verified: 24 tests across 8 modules, all [chromium] parameterized
+- STAB-02 requirement satisfied: no xfail, skip, flaky, or tolerance hacks in test suite
 
 **Regression Test Validation (v1.17 Phase 73-02 - validated):**
 - All 9 regression tests pass across 4 suites (multiplayer basic, data comparison, focus loss, multi-participant)
@@ -286,6 +293,13 @@ Progress: ███████░░░ 75%
 ### Decisions
 
 See: .planning/PROJECT.md Key Decisions table
+
+**v1.17 Phase 74-01 decisions:**
+- STAB-02 audit confirms zero violations across all 8 E2E test modules
+- row_tolerance=15 classified as JUSTIFIED (documented engineering tolerance for input-confirmation timing at episode boundaries under latency)
+- "timing hacks" references are positive assertions ("should work WITHOUT timing hacks"), not hack annotations
+- "intermittent" reference is ROOT CAUSE documentation, not a flaky test annotation
+- Test inventory: exactly 24 tests across 8 modules, all parameterized with [chromium] only
 
 **v1.17 Phase 73-02 decisions:**
 - No code changes required -- all 9 regression tests pass on first run
@@ -490,11 +504,11 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-02-06
-Stopped at: Phase 73 complete, verified 6/6
+Stopped at: Completed 74-01-PLAN.md (STAB-02 audit)
 Resume file: None
 
 ### Next Steps
 
-**Phase 73 (Network & Regression Validation) complete and verified.**
+**Phase 74 Plan 01 (STAB-02 Audit) complete.**
 
-Next action: Run /gsd:plan-phase 74
+Next action: Execute 74-02-PLAN.md (10-run stability certification)
