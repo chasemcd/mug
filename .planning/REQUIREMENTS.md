@@ -27,11 +27,11 @@ Requirements for v1.16 Pyodide Pre-loading. Each maps to roadmap phases.
 
 ### Testing / Validation
 
-- [ ] **TEST-01**: Stagger delay removed from multi-participant E2E tests
-- [ ] **TEST-02**: All E2E tests pass with 0.5s stagger (near-simultaneous game starts)
-- [ ] **TEST-03**: Socket.IO connections remain stable during concurrent game starts (no false disconnects)
-- [ ] **TEST-04**: No performance regression for game loop execution (per-frame timing unchanged)
-- [ ] **TEST-05**: All existing E2E tests pass (no regressions from pre-loading changes)
+- [x] **TEST-01**: Stagger delay removed from multi-participant E2E tests
+- [x] **TEST-02**: All E2E tests pass with 0.5s stagger (near-simultaneous game starts)
+- [x] **TEST-03**: Socket.IO connections remain stable during concurrent game starts (no false disconnects)
+- [x] **TEST-04**: No performance regression for game loop execution (per-frame timing unchanged)
+- [x] **TEST-05**: All existing E2E tests pass (no regressions from pre-loading changes)
 
 ## v2 Requirements
 
@@ -78,11 +78,11 @@ Which phases cover which requirements. Updated by create-roadmap.
 | GRACE-01 | Phase 69 | Pending |
 | GRACE-02 | Phase 69 | Pending |
 | GRACE-03 | Phase 69 | Pending |
-| TEST-01 | Phase 70 | Pending |
-| TEST-02 | Phase 70 | Pending |
-| TEST-03 | Phase 70 | Pending |
-| TEST-04 | Phase 70 | Pending |
-| TEST-05 | Phase 70 | Pending |
+| TEST-01 | Phase 70 | Complete |
+| TEST-02 | Phase 70 | Complete |
+| TEST-03 | Phase 70 | Complete |
+| TEST-04 | Phase 70 | Complete |
+| TEST-05 | Phase 70 | Complete |
 
 **Coverage:**
 - v1 requirements: 14 total

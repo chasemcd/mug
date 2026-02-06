@@ -17,7 +17,7 @@
 - ✅ **v1.12 Waiting Room Overhaul** - Phases 51-56 (shipped 2026-02-03)
 - ✅ **v1.13 Matchmaker Hardening** - Phases 57-60 (shipped 2026-02-03)
 - 🚧 **v1.14 Data Parity Fix** - Phases 61-66 (in progress)
-- 📋 **v1.16 Pyodide Pre-loading** - Phases 67-70 (planned)
+- ✅ **v1.16 Pyodide Pre-loading** - Phases 67-70 (shipped 2026-02-06)
 
 ## Phases
 
@@ -208,14 +208,14 @@ See [milestones/v1.11-ROADMAP.md](milestones/v1.11-ROADMAP.md) for full details.
 - [ ] **Phase 65: Multi-Episode and Lifecycle Stress Tests** - Comprehensive lifecycle coverage
 - [ ] **Phase 66: Server Recovery Validation** - Prove server recovers from chaos correctly
 
-### 🚧 v1.16 Pyodide Pre-loading (In Progress)
+### ✅ v1.16 Pyodide Pre-loading (Shipped 2026-02-06)
 
 **Milestone Goal:** Pre-load Pyodide during the compatibility check screen so game startup never blocks the main thread, eliminating Socket.IO disconnects at scale (50+ concurrent game pairs).
 
 - [x] **Phase 67: Pyodide Pre-load Infrastructure** - Detect Pyodide scenes, load during compat check, progress UI, advancement gate
 - [x] **Phase 68: Shared Instance Integration** - Game classes reuse pre-loaded Pyodide instance
 - [x] **Phase 69: Server-Side Init Grace** - Server tolerates missed pings during Pyodide loading
-- [ ] **Phase 70: Validation & Test Stabilization** - Remove stagger, prove concurrent starts work
+- [x] **Phase 70: Validation & Test Stabilization** - Remove stagger, prove concurrent starts work
 
 ## Phase Details
 
@@ -365,7 +365,7 @@ Plans:
 **Plans:** 1 plan
 
 Plans:
-- [ ] 70-01-PLAN.md — Reduce stagger delay from 5.0s to 0.5s and verify full E2E test suite passes
+- [x] 70-01-PLAN.md — Reduce stagger delay from 5.0s to 0.5s and verify full E2E test suite passes
 
 ## Progress
 
@@ -395,8 +395,8 @@ Plans:
 | 67. Pyodide Pre-load Infrastructure | v1.16 | 1/1 | Complete | 2026-02-06 |
 | 68. Shared Instance Integration | v1.16 | 1/1 | Complete | 2026-02-06 |
 | 69. Server-Side Init Grace | v1.16 | 1/1 | Complete | 2026-02-06 |
-| 70. Validation & Test Stabilization | v1.16 | 0/1 | Not started | - |
+| 70. Validation & Test Stabilization | v1.16 | 1/1 | Complete | 2026-02-06 |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-06 after Phase 70 planning complete*
+*Last updated: 2026-02-06 after Phase 70 execution complete*
