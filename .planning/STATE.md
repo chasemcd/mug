@@ -5,17 +5,17 @@
 See: .planning/PROJECT.md (updated 2026-02-06)
 
 **Core value:** Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
-**Current focus:** v1.17 E2E Test Reliability — Phase 73 (Network & Regression Validation)
+**Current focus:** v1.17 E2E Test Reliability — Phase 73 complete, Phase 74 next
 
 ## Current Position
 
 Milestone: v1.17 E2E Test Reliability
 Phase: 73 of 74 (Network & Regression Validation)
-Plan: 01 of 02 complete
-Status: In progress
-Last activity: 2026-02-06 — Completed 73-01-PLAN.md (network test validation)
+Plan: 02 of 02 complete
+Status: Phase complete
+Last activity: 2026-02-06 — Completed 73-02-PLAN.md (regression test validation)
 
-Progress: ██████░░░░ 60%
+Progress: ████████░░ 80%
 
 ## Milestone History
 
@@ -181,6 +181,12 @@ Progress: ██████░░░░ 60%
 - `.planning/phases/72-latency-test-diagnosis/72-01-SUMMARY.md`
 - `.planning/phases/72-latency-test-diagnosis/72-02-SUMMARY.md`
 - `.planning/phases/73-network-regression-validation/73-01-SUMMARY.md`
+- `.planning/phases/73-network-regression-validation/73-02-SUMMARY.md`
+
+**Regression Test Validation (v1.17 Phase 73-02 - validated):**
+- All 9 regression tests pass across 4 suites (multiplayer basic, data comparison, focus loss, multi-participant)
+- Zero code changes required -- infrastructure from Phases 71-72 and fixes from Plan 01 fully stabilized tests
+- Combined 9-test verification run passes in 293s
 
 **Network Test Stabilization (v1.17 Phase 73-01 - fixed):**
 - `tests/e2e/test_latency_injection.py` - Parametrize order reversed to [200, 100] for cleaner server state; active input row_tolerance increased to 15
@@ -280,6 +286,11 @@ Progress: ██████░░░░ 60%
 ### Decisions
 
 See: .planning/PROJECT.md Key Decisions table
+
+**v1.17 Phase 73-02 decisions:**
+- No code changes required -- all 9 regression tests pass on first run
+- Combined verification run (293s) confirms no resource leaks between test modules
+- REG-01, REG-02, REG-03, REG-04 requirements all satisfied
 
 **v1.17 Phase 73-01 decisions:**
 - Parametrize order [200, 100] ensures 200ms tests run first on clean server state (sensitive to accumulated state from prior games)
@@ -470,19 +481,23 @@ See: .planning/PROJECT.md Key Decisions table
 - Group reunion feature deferred to REUN-01/REUN-02 as future matchmaker variant
 - wait_for_known_group=True logs warning but uses FIFO matching
 
-**Known E2E test failures (v1.17 targets):**
+**Known E2E test failures (v1.17 targets) -- ALL RESOLVED:**
 - test_focus_loss_episode_boundary_parity: FIXED (71-02 extracted to own module; passes back-to-back with test_data_comparison.py)
 - test_episode_completion_under_fixed_latency[chromium-200]: FIXED (72-02 + 73-01) -- P2P ready gate timeout increased 5000->15000ms; parametrize reordered to run 200ms first on clean server state
 - test_network_disruption suite: FIXED (73-01) -- rollback assertion aligned with 10x input redundancy; all 3 tests pass; all 9 combined tests pass in single run
+- Regression tests (73-02): All 9 tests pass on first run with zero code changes -- data comparison, multiplayer basic, multi-participant, focus loss all verified
 
 ## Session Continuity
 
 Last session: 2026-02-06
-Stopped at: Completed 73-01-PLAN.md
+Stopped at: Completed 73-02-PLAN.md
 Resume file: None
 
 ### Next Steps
 
-**Phase 73 Plan 01 (Network Test Validation) complete.**
+**Phase 73 (Network & Regression Validation) complete.**
 
-Next action: Execute 73-02-PLAN.md (full regression test suite)
+All 18 E2E tests pass: 9 network-condition tests (Plan 01) + 9 regression tests (Plan 02).
+NET-01, NET-02, REG-01, REG-02, REG-03, REG-04 requirements all satisfied.
+
+Next action: Phase 74 (final milestone validation) or milestone ship
