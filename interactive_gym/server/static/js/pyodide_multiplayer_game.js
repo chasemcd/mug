@@ -5357,7 +5357,11 @@ json.dumps({'cumulative_rewards': {str(k): v for k, v in _cumulative_rewards.ite
         const keysToDelete = [];
 
         for (const key of this.inputBuffer.keys()) {
-            if (key < pruneThreshold) {
+            // Only prune frames that are confirmed AND old enough
+            // Unconfirmed frames must be retained for rollback replay correctness
+            // and to prevent gaps in the confirmation chain (_updateConfirmedFrame
+            // scans consecutively and breaks at the first missing frame)
+            if (key < pruneThreshold && key <= this.confirmedFrame) {
                 keysToDelete.push(key);
             }
         }
@@ -5367,10 +5371,10 @@ json.dumps({'cumulative_rewards': {str(k): v for k, v in _cumulative_rewards.ite
             this.predictedFrames.delete(key);
         }
 
-        // Also enforce max size limit
+        // Also enforce max size limit - but still respect confirmedFrame
         if (this.inputBuffer.size > this.inputBufferMaxSize) {
             const sortedKeys = Array.from(this.inputBuffer.keys()).sort((a, b) => a - b);
-            const toRemove = sortedKeys.slice(0, this.inputBuffer.size - this.inputBufferMaxSize);
+            const toRemove = sortedKeys.filter(k => k <= this.confirmedFrame).slice(0, this.inputBuffer.size - this.inputBufferMaxSize);
             for (const key of toRemove) {
                 this.inputBuffer.delete(key);
                 this.predictedFrames.delete(key);
