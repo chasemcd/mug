@@ -317,12 +317,11 @@ Plans:
   2. Pyodide loads during compatibility check screen (not during game start)
   3. Participant sees progress indicator during Pyodide initialization
   4. Participant cannot proceed until Pyodide is ready
-**Research flag:** Likely — need to explore compat check flow, config detection, and progress UI integration
-**Research topics:** Compat check screen lifecycle, experiment config structure for Pyodide detection, progress UI patterns
-**Plans**: TBD
+**Research flag:** Complete (67-RESEARCH.md)
+**Plans:** 1 plan
 
 Plans:
-- [ ] 67-01: TBD
+- [ ] 67-01-PLAN.md — Server-side Pyodide config detection + client-side preload with progress UI and advancement gating
 
 ### Phase 68: Shared Instance Integration
 **Goal**: Game classes reuse pre-loaded Pyodide instance instead of loading their own
@@ -394,11 +393,11 @@ Plans:
 | 64. Multi-Participant Test Infrastructure | v1.14 | 1/1 | Complete | 2026-02-03 |
 | 65. Multi-Episode Lifecycle Stress | v1.14 | 0/2 | Not started | - |
 | 66. Server Recovery Validation | v1.14 | 0/TBD | Not started | - |
-| 67. Pyodide Pre-load Infrastructure | v1.16 | 0/TBD | Not started | - |
+| 67. Pyodide Pre-load Infrastructure | v1.16 | 0/1 | Not started | - |
 | 68. Shared Instance Integration | v1.16 | 0/TBD | Not started | - |
 | 69. Server-Side Init Grace | v1.16 | 0/TBD | Not started | - |
 | 70. Validation & Test Stabilization | v1.16 | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-06 after v1.16 Pyodide Pre-loading roadmap creation*
+*Last updated: 2026-02-06 after Phase 67 plan creation*
