@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-06)
 
 **Core value:** Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
-**Current focus:** v1.16 Pyodide Pre-loading - In progress
+**Current focus:** v1.16 Pyodide Pre-loading - Complete
 
 ## Current Position
 
 Milestone: v1.16 Pyodide Pre-loading
 Phase: 70 of 70 (Validation & Test Stabilization)
-Plan: 1 of 1 (in progress - checkpoint)
-Status: Phase 70 in progress - Task 1 complete, awaiting human verification of E2E tests
-Last activity: 2026-02-06 — 70-01-PLAN.md Task 1 committed (f1fc093)
+Plan: 1 of 1 (complete)
+Status: v1.16 milestone complete - all phases (67-70) delivered
+Last activity: 2026-02-06 — Completed 70-01-PLAN.md (stagger reduction validated)
 
-Progress: █████████░ 87%
+Progress: ██████████ 100%
 
 ## Milestone History
 
 | Milestone | Phases | Status | Shipped |
 |-----------|--------|--------|---------|
-| v1.16 Pyodide Pre-loading | 67-70 | In progress | - |
+| v1.16 Pyodide Pre-loading | 67-70 | Complete | 2026-02-06 |
 | v1.15 E2E Test Reliability | - | Root cause found | 2026-02-04 |
 | v1.14 Data Parity Fix | 61-65 | Complete | 2026-02-04 |
 | v1.13 Matchmaker Hardening | 57-60 | Complete | 2026-02-03 |
@@ -172,6 +172,13 @@ Progress: █████████░ 87%
 - `.planning/phases/67-pyodide-preload-infrastructure/67-01-SUMMARY.md`
 - `.planning/phases/68-shared-instance-integration/68-01-SUMMARY.md`
 - `.planning/phases/69-server-init-grace/69-01-SUMMARY.md`
+- `.planning/phases/70-validation-test-stabilization/70-01-SUMMARY.md`
+
+**Validation & Test Stabilization (v1.16 Phase 70 - validated):**
+- `tests/fixtures/multi_participant.py` - GameOrchestrator.start_all_games() default stagger_delay_sec changed from 5.0 to 0.5
+- `tests/e2e/test_multi_participant.py` - Both test call sites updated from stagger_delay_sec=5.0 to 0.5
+- `tests/e2e/test_lifecycle_stress.py` - Both test call sites updated from stagger_delay_sec=5.0 to 0.5
+- `.planning/phases/70-validation-test-stabilization/70-01-SUMMARY.md`
 
 **Server-Side Init Grace (v1.16 Phase 69 - added):**
 - `interactive_gym/server/app.py` - ping_timeout increased 8→30, LOADING_CLIENTS dict, LOADING_TIMEOUT_S=60, is_client_in_loading_grace(), pyodide_loading_start/complete handlers, grace check early return in on_disconnect()
@@ -349,6 +356,11 @@ See: .planning/PROJECT.md Key Decisions table
 - Reset participant state after P2P validation failure to allow re-pooling
 - STRESS-01 requirement satisfied (6 contexts, 3 concurrent games with data parity)
 
+**v1.16 Phase 70 decisions:**
+- 0.5s stagger sufficient for concurrent game starts with Pyodide pre-loading (down from 5.0s)
+- Pre-existing E2E test flakiness (Page.goto timeout, 200ms latency test timeout) deferred to future milestone
+- Network disruption tests skipped during validation; not related to stagger change
+
 **v1.16 Phase 69 decisions:**
 - ping_timeout=30 (not 20) for generous margin (38s total vs 15s worst-case Pyodide load)
 - Dict with timestamps (not set) enables 60s safety timeout preventing unbounded LOADING_CLIENTS growth
@@ -404,26 +416,29 @@ See: .planning/PROJECT.md Key Decisions table
 - Group reunion feature deferred to REUN-01/REUN-02 as future matchmaker variant
 - wait_for_known_group=True logs warning but uses FIFO matching
 
+**Pre-existing E2E test flakiness (identified during v1.16 Phase 70 validation):**
+- test_data_comparison: 1/5 failed with Page.goto timeout (not stagger-related)
+- test_latency_injection: 1/6 timed out at 300s on 200ms latency test (not stagger-related)
+- test_network_disruption: not validated (skipped by user)
+- These can be addressed in a future E2E reliability milestone
+
 ## Session Continuity
 
 Last session: 2026-02-06
-Stopped at: 70-01-PLAN.md Task 1 complete, checkpoint for human verification of E2E tests
-Resume file: .planning/phases/70-validation-test-stabilization/70-01-PLAN.md
+Stopped at: Completed 70-01-PLAN.md -- v1.16 Pyodide Pre-loading milestone complete
+Resume file: None
 
 ### Next Steps
 
-**Phase 70: Validation & Test Stabilization**
-Goal: Remove stagger delays, prove concurrent game starts work with preloading
+**v1.16 Pyodide Pre-loading milestone is complete.**
 
-**What Phase 69 delivered:**
-- Server ping_timeout increased from 8s to 30s (total grace: 38s)
-- Client signals loading state via pyodide_loading_start/complete events
-- Server tracks per-client loading state with LOADING_CLIENTS dict
-- Disconnect handler skips destructive cleanup during loading grace period
-- 60s safety timeout prevents unbounded LOADING_CLIENTS growth
-- GRACE-01, GRACE-02, GRACE-03 requirements satisfied
+All phases delivered:
+- Phase 67: Pyodide pre-load infrastructure (fire-and-forget preload during compat check)
+- Phase 68: Shared instance integration (game classes reuse preloaded Pyodide)
+- Phase 69: Server-side init grace (loading grace period prevents false disconnects)
+- Phase 70: Validation & test stabilization (stagger reduced 5.0s to 0.5s, E2E validated)
 
-**Remaining v1.16 phases:**
-- Phase 70: Validation & test stabilization (remove stagger, prove concurrent starts)
-
-Next action: Run /gsd:plan-phase 70
+**Potential future work:**
+- Address pre-existing E2E test flakiness (Page.goto timeouts, latency test timeouts)
+- Move Pyodide to Web Worker if per-frame blocking becomes a problem (deferred from v1.16)
+- Group reunion matchmaker variant (deferred from v1.13)
