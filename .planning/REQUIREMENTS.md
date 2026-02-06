@@ -69,26 +69,26 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| INIT-01 | — | Pending |
-| INIT-02 | — | Pending |
-| INIT-03 | — | Pending |
-| INIT-04 | — | Pending |
-| SHARED-01 | — | Pending |
-| SHARED-02 | — | Pending |
-| GRACE-01 | — | Pending |
-| GRACE-02 | — | Pending |
-| GRACE-03 | — | Pending |
-| TEST-01 | — | Pending |
-| TEST-02 | — | Pending |
-| TEST-03 | — | Pending |
-| TEST-04 | — | Pending |
-| TEST-05 | — | Pending |
+| INIT-01 | Phase 67 | Pending |
+| INIT-02 | Phase 67 | Pending |
+| INIT-03 | Phase 67 | Pending |
+| INIT-04 | Phase 67 | Pending |
+| SHARED-01 | Phase 68 | Pending |
+| SHARED-02 | Phase 68 | Pending |
+| GRACE-01 | Phase 69 | Pending |
+| GRACE-02 | Phase 69 | Pending |
+| GRACE-03 | Phase 69 | Pending |
+| TEST-01 | Phase 70 | Pending |
+| TEST-02 | Phase 70 | Pending |
+| TEST-03 | Phase 70 | Pending |
+| TEST-04 | Phase 70 | Pending |
+| TEST-05 | Phase 70 | Pending |
 
 **Coverage:**
 - v1 requirements: 14 total
-- Mapped to phases: 0
-- Unmapped: 14 (awaiting roadmap creation)
+- Mapped to phases: 14
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-02-06*
-*Last updated: 2026-02-06 after initial definition*
+*Last updated: 2026-02-06 after roadmap creation (phases 67-70)*

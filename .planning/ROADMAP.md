@@ -17,6 +17,7 @@
 - ✅ **v1.12 Waiting Room Overhaul** - Phases 51-56 (shipped 2026-02-03)
 - ✅ **v1.13 Matchmaker Hardening** - Phases 57-60 (shipped 2026-02-03)
 - 🚧 **v1.14 Data Parity Fix** - Phases 61-66 (in progress)
+- 📋 **v1.16 Pyodide Pre-loading** - Phases 67-70 (planned)
 
 ## Phases
 
@@ -207,6 +208,15 @@ See [milestones/v1.11-ROADMAP.md](milestones/v1.11-ROADMAP.md) for full details.
 - [ ] **Phase 65: Multi-Episode and Lifecycle Stress Tests** - Comprehensive lifecycle coverage
 - [ ] **Phase 66: Server Recovery Validation** - Prove server recovers from chaos correctly
 
+### 📋 v1.16 Pyodide Pre-loading (Planned)
+
+**Milestone Goal:** Pre-load Pyodide during the compatibility check screen so game startup never blocks the main thread, eliminating Socket.IO disconnects at scale (50+ concurrent game pairs).
+
+- [ ] **Phase 67: Pyodide Pre-load Infrastructure** - Detect Pyodide scenes, load during compat check, progress UI, advancement gate
+- [ ] **Phase 68: Shared Instance Integration** - Game classes reuse pre-loaded Pyodide instance
+- [ ] **Phase 69: Server-Side Init Grace** - Server tolerates missed pings during Pyodide loading
+- [ ] **Phase 70: Validation & Test Stabilization** - Remove stagger, prove concurrent starts work
+
 ## Phase Details
 
 ### Phase 61: Input Confirmation Protocol
@@ -298,6 +308,67 @@ Plans:
 Plans:
 - [ ] 66-01: TBD
 
+### Phase 67: Pyodide Pre-load Infrastructure
+**Goal**: Build the pre-loading mechanism that initializes Pyodide during the compatibility check screen
+**Depends on**: Phase 66 (v1.14 complete)
+**Requirements**: INIT-01, INIT-02, INIT-03, INIT-04
+**Success Criteria** (what must be TRUE):
+  1. System detects Pyodide-requiring scenes from experiment config before matching
+  2. Pyodide loads during compatibility check screen (not during game start)
+  3. Participant sees progress indicator during Pyodide initialization
+  4. Participant cannot proceed until Pyodide is ready
+**Research flag:** Likely — need to explore compat check flow, config detection, and progress UI integration
+**Research topics:** Compat check screen lifecycle, experiment config structure for Pyodide detection, progress UI patterns
+**Plans**: TBD
+
+Plans:
+- [ ] 67-01: TBD
+
+### Phase 68: Shared Instance Integration
+**Goal**: Game classes reuse pre-loaded Pyodide instance instead of loading their own
+**Depends on**: Phase 67
+**Requirements**: SHARED-01, SHARED-02
+**Success Criteria** (what must be TRUE):
+  1. RemoteGame.initialize() skips loadPyodide() when Pyodide is pre-loaded
+  2. MultiplayerPyodideGame skips loadPyodide() when Pyodide is pre-loaded
+  3. Game startup time is near-instant (no WASM compilation at game time)
+**Research flag:** Unlikely — straightforward refactoring to check for existing Pyodide instance
+**Plans**: TBD
+
+Plans:
+- [ ] 68-01: TBD
+
+### Phase 69: Server-Side Init Grace
+**Goal**: Server tolerates missed pings during Pyodide loading so no false disconnects
+**Depends on**: Phase 68
+**Requirements**: GRACE-01, GRACE-02, GRACE-03
+**Success Criteria** (what must be TRUE):
+  1. Server does not disconnect clients during Pyodide loading phase
+  2. Client signals loading state to server
+  3. Normal ping checking resumes after loading completes
+**Research flag:** Likely — need to explore Socket.IO ping/pong internals and server-side grace mechanisms
+**Research topics:** Socket.IO ping_interval/ping_timeout configuration, per-client grace period patterns, client loading state signaling
+**Plans**: TBD
+
+Plans:
+- [ ] 69-01: TBD
+
+### Phase 70: Validation & Test Stabilization
+**Goal**: Prove concurrent game starts work without stagger delays
+**Depends on**: Phase 69
+**Requirements**: TEST-01, TEST-02, TEST-03, TEST-04, TEST-05
+**Success Criteria** (what must be TRUE):
+  1. Stagger delay removed from multi-participant tests
+  2. All E2E tests pass with near-simultaneous game starts (0.5s stagger)
+  3. Socket.IO connections remain stable during concurrent starts
+  4. No performance regression for game loop execution
+  5. All existing E2E tests pass (no regressions)
+**Research flag:** Unlikely — integration test of previous phases
+**Plans**: TBD
+
+Plans:
+- [ ] 70-01: TBD
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -323,7 +394,11 @@ Plans:
 | 64. Multi-Participant Test Infrastructure | v1.14 | 1/1 | Complete | 2026-02-03 |
 | 65. Multi-Episode Lifecycle Stress | v1.14 | 0/2 | Not started | - |
 | 66. Server Recovery Validation | v1.14 | 0/TBD | Not started | - |
+| 67. Pyodide Pre-load Infrastructure | v1.16 | 0/TBD | Not started | - |
+| 68. Shared Instance Integration | v1.16 | 0/TBD | Not started | - |
+| 69. Server-Side Init Grace | v1.16 | 0/TBD | Not started | - |
+| 70. Validation & Test Stabilization | v1.16 | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-03 after Phase 65 planning*
+*Last updated: 2026-02-06 after v1.16 Pyodide Pre-loading roadmap creation*
