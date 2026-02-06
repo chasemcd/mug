@@ -348,13 +348,15 @@ def register_subject(data):
         room=sid,
     )
 
-    # Send experiment-level entry screening config to client
+    # Send experiment-level config to client (entry screening + pyodide config)
     if CONFIG is not None:
-        flask_socketio.emit(
-            "experiment_config",
-            {"entry_screening": CONFIG.get_entry_screening_config()},
-            room=sid,
-        )
+        experiment_config_data = {
+            "entry_screening": CONFIG.get_entry_screening_config(),
+        }
+        if hasattr(CONFIG, "get_pyodide_config"):
+            experiment_config_data["pyodide_config"] = CONFIG.get_pyodide_config()
+
+        flask_socketio.emit("experiment_config", experiment_config_data, room=sid)
 
     participant_stager = STAGERS.get(subject_id)
     if participant_stager is None:

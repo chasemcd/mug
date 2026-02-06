@@ -413,6 +413,36 @@ class RemoteConfig:
 
         return self
 
+    def get_entry_screening_config(self) -> dict:
+        """Get the entry screening configuration for sending to the client.
+
+        RemoteConfig does not support full entry screening, so this returns
+        safe defaults to prevent crashes when called from app.py.
+
+        :return: Dictionary with entry screening settings
+        :rtype: dict
+        """
+        return {
+            "device_exclusion": None,
+            "browser_requirements": None,
+            "browser_blocklist": None,
+            "max_ping": self.max_ping,
+            "min_ping_measurements": self.min_ping_measurements,
+            "exclusion_messages": {},
+            "has_entry_callback": False,
+        }
+
+    def get_pyodide_config(self) -> dict:
+        """Get Pyodide configuration from this RemoteConfig.
+
+        :return: Dictionary with needs_pyodide flag and packages list
+        :rtype: dict
+        """
+        return {
+            "needs_pyodide": self.run_through_pyodide,
+            "packages_to_install": self.packages_to_install,
+        }
+
     @property
     def simulate_waiting_room(self) -> bool:
         """
