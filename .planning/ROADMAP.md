@@ -387,10 +387,11 @@ Plans:
   3. Browser contexts, server processes, and temporary files are fully cleaned up between tests
   4. `test_focus_loss_episode_boundary_parity` passes when run after other test suites (not just in isolation)
 **Research flag:** Complete (71-RESEARCH.md)
-**Plans:** 1 plan
+**Plans:** 2 plans
 
 Plans:
-- [ ] 71-01-PLAN.md — Robust server teardown with port-availability polling, process group kill, and pre-startup cleanup
+- [x] 71-01-PLAN.md — Robust server teardown with port-availability polling, process group kill, and pre-startup cleanup
+- [ ] 71-02-PLAN.md — Move test_focus_loss_episode_boundary_parity to own module (gap closure for server state exhaustion)
 
 ### Phase 72: Latency Test Diagnosis
 **Goal**: Identify and fix the root cause of the 200ms latency test timeout so it completes reliably
@@ -467,11 +468,11 @@ Plans:
 | 68. Shared Instance Integration | v1.16 | 1/1 | Complete | 2026-02-06 |
 | 69. Server-Side Init Grace | v1.16 | 1/1 | Complete | 2026-02-06 |
 | 70. Validation & Test Stabilization | v1.16 | 1/1 | Complete | 2026-02-06 |
-| 71. Test Infrastructure Fix | v1.17 | 0/1 | Not started | - |
+| 71. Test Infrastructure Fix | v1.17 | 1/2 | In progress | - |
 | 72. Latency Test Diagnosis | v1.17 | 0/TBD | Not started | - |
 | 73. Network & Regression Validation | v1.17 | 0/TBD | Not started | - |
 | 74. Stability Certification | v1.17 | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-06 after Phase 71 planned*
+*Last updated: 2026-02-06 after Phase 71 gap closure plan added*
