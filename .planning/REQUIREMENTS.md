@@ -75,9 +75,9 @@ Which phases cover which requirements. Updated by create-roadmap.
 | INIT-04 | Phase 67 | Complete |
 | SHARED-01 | Phase 68 | Complete |
 | SHARED-02 | Phase 68 | Complete |
-| GRACE-01 | Phase 69 | Pending |
-| GRACE-02 | Phase 69 | Pending |
-| GRACE-03 | Phase 69 | Pending |
+| GRACE-01 | Phase 69 | Complete |
+| GRACE-02 | Phase 69 | Complete |
+| GRACE-03 | Phase 69 | Complete |
 | TEST-01 | Phase 70 | Complete |
 | TEST-02 | Phase 70 | Complete |
 | TEST-03 | Phase 70 | Complete |
