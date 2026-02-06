@@ -198,7 +198,7 @@ See [milestones/v1.11-ROADMAP.md](milestones/v1.11-ROADMAP.md) for full details.
 
 </details>
 
-### 🚧 v1.14 Data Parity Fix (In Progress)
+### v1.14 Data Parity Fix (In Progress)
 
 **Milestone Goal:** Fix the rare data parity divergence bug and add comprehensive multi-participant E2E stress tests. Data parity must be EXACT — both players export identical data for every frame under all network conditions.
 
@@ -209,7 +209,7 @@ See [milestones/v1.11-ROADMAP.md](milestones/v1.11-ROADMAP.md) for full details.
 - [ ] **Phase 65: Multi-Episode and Lifecycle Stress Tests** - Comprehensive lifecycle coverage
 - [ ] **Phase 66: Server Recovery Validation** - Prove server recovers from chaos correctly
 
-### ✅ v1.16 Pyodide Pre-loading (Shipped 2026-02-06)
+### v1.16 Pyodide Pre-loading (Shipped 2026-02-06)
 
 **Milestone Goal:** Pre-load Pyodide during the compatibility check screen so game startup never blocks the main thread, eliminating Socket.IO disconnects at scale (50+ concurrent game pairs).
 
@@ -218,7 +218,7 @@ See [milestones/v1.11-ROADMAP.md](milestones/v1.11-ROADMAP.md) for full details.
 - [x] **Phase 69: Server-Side Init Grace** - Server tolerates missed pings during Pyodide loading
 - [x] **Phase 70: Validation & Test Stabilization** - Remove stagger, prove concurrent starts work
 
-### 🚧 v1.17 E2E Test Reliability (In Progress)
+### v1.17 E2E Test Reliability (In Progress)
 
 **Milestone Goal:** Achieve 100% pass rate for all E2E tests with zero flakiness -- every test passes 10+ consecutive runs.
 
@@ -420,10 +420,11 @@ Plans:
   5. All multi-participant tests pass with 0.5s stagger in a single run
   6. All focus loss tests pass in a single run
 **Research flag:** Unlikely -- validation of prior fixes; any new failures get diagnosed and fixed inline
-**Plans:** TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] 73-01: TBD
+- [ ] 73-01-PLAN.md — Run latency injection + network disruption tests, diagnose and fix any failures (NET-01, NET-02)
+- [ ] 73-02-PLAN.md — Run data comparison + multiplayer basic + multi-participant + focus loss tests (REG-01 through REG-04)
 
 ### Phase 74: Stability Certification
 **Goal**: The full E2E test suite is proven stable -- 10 consecutive passes, zero flaky markers
@@ -471,9 +472,9 @@ Plans:
 | 70. Validation & Test Stabilization | v1.16 | 1/1 | Complete | 2026-02-06 |
 | 71. Test Infrastructure Fix | v1.17 | 2/2 | Complete | 2026-02-06 |
 | 72. Latency Test Diagnosis | v1.17 | 2/2 | Complete | 2026-02-06 |
-| 73. Network & Regression Validation | v1.17 | 0/TBD | Not started | - |
+| 73. Network & Regression Validation | v1.17 | 0/2 | Not started | - |
 | 74. Stability Certification | v1.17 | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-06 after Phase 72 complete (root cause: P2P ready gate race, fix: timeout 5s→15s)*
+*Last updated: 2026-02-06 after Phase 73 planned (2 plans in 2 waves)*
