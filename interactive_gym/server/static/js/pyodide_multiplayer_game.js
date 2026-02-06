@@ -1737,6 +1737,8 @@ env.get_state()
         /**
          * Initialize Pyodide and environment with seeded RNG
          */
+        console.log('[MultiplayerPyodideGame] Initializing...',
+            window.pyodidePreloadStatus === 'ready' ? '(will reuse pre-loaded Pyodide)' : '(will load Pyodide fresh)');
         await super.initialize();
 
         // Validate that environment supports multiplayer state synchronization
