@@ -15,7 +15,7 @@ from interactive_gym.examples.cogrid import (
 from interactive_gym.scenes import gym_scene
 from interactive_gym.scenes import static_scene
 from interactive_gym.scenes import scene
-from interactive_gym.server.matchmaker import LatencyFIFOMatchmaker
+from interactive_gym.server.matchmaker import FIFOMatchmaker
 
 
 # Constants for controls/actions/etc.
@@ -469,9 +469,8 @@ cramped_room_human_human = (
         waitroom_timeout_message="Sorry, we could not find enough players for this study. Please return the HIT now. You will be paid through a Compensation HIT.",
     )
     .matchmaking(
-        matchmaker=LatencyFIFOMatchmaker(
-            max_server_rtt_ms=200,   # Stage 1: skip if sum of server RTTs > 200ms
-            max_p2p_rtt_ms=150,      # Stage 2: reject if actual P2P RTT > 150ms
+        matchmaker=FIFOMatchmaker(
+            max_p2p_rtt_ms=100,      # only pair participants with <=100ms RTT
         ),
         hide_lobby_count=True,
     )
