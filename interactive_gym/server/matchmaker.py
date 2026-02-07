@@ -36,7 +36,25 @@ class MatchCandidate:
 
     subject_id: str
     rtt_ms: int | None = None
-    # Future: custom attributes from Phase 56
+    group_history: "GroupHistory | None" = None  # Phase 78: group history for re-pairing
+
+
+@dataclass
+class GroupHistory:
+    """Group membership history for a participant.
+
+    Provided to matchmakers via MatchCandidate.group_history to enable
+    re-pairing decisions. Contains the most recent group information.
+
+    Attributes:
+        previous_partners: Subject IDs of other members in the most recent group
+        source_scene_id: Scene where the group was last formed
+        group_id: Unique identifier for the group
+    """
+
+    previous_partners: list[str]
+    source_scene_id: str | None = None
+    group_id: str | None = None
 
 
 class Matchmaker(ABC):
@@ -175,3 +193,110 @@ class FIFOMatchmaker(Matchmaker):
             f"[FIFOMatchmaker] Match found! Returning: {[m.subject_id for m in matched]}"
         )
         return matched
+
+
+class GroupReunionMatchmaker(Matchmaker):
+    """Re-pairs previous partners when possible, falls back to FIFO.
+
+    When a participant arrives who was previously paired with someone
+    (group_history is populated), this matchmaker checks if any of their
+    previous partners are in the waiting list. If found, it reunites them.
+
+    If no previous partners are waiting (or if the arriving participant
+    has no group history), falls back to FIFO matching.
+
+    This is the recommended matchmaker for multi-GymScene experiments
+    where the same partners should play together across scenes.
+
+    Example:
+        from interactive_gym.server.matchmaker import GroupReunionMatchmaker
+
+        scene_2 = (
+            GymScene()
+            .scene(scene_id="game_2")
+            .matchmaking(matchmaker=GroupReunionMatchmaker())
+        )
+
+    Args:
+        max_p2p_rtt_ms: Maximum allowed P2P RTT in ms. None disables filtering.
+        fallback_to_fifo: If True (default), falls back to FIFO when no
+            reunion is possible. If False, waits until previous partners arrive.
+    """
+
+    def __init__(
+        self,
+        max_p2p_rtt_ms: int | None = None,
+        fallback_to_fifo: bool = True,
+    ):
+        super().__init__(max_p2p_rtt_ms=max_p2p_rtt_ms)
+        self.fallback_to_fifo = fallback_to_fifo
+
+    def find_match(
+        self,
+        arriving: MatchCandidate,
+        waiting: list[MatchCandidate],
+        group_size: int,
+    ) -> list[MatchCandidate] | None:
+        logger.info(
+            f"[GroupReunionMatchmaker] find_match called: "
+            f"arriving={arriving.subject_id}, "
+            f"waiting={[w.subject_id for w in waiting]}, "
+            f"group_size={group_size}, "
+            f"has_group_history={arriving.group_history is not None}"
+        )
+
+        # Try reunion: check if arriving has previous partners in the waiting list
+        if arriving.group_history and arriving.group_history.previous_partners:
+            previous_partner_ids = set(arriving.group_history.previous_partners)
+            reunited = [w for w in waiting if w.subject_id in previous_partner_ids]
+
+            if len(reunited) + 1 >= group_size:
+                matched = reunited[: group_size - 1] + [arriving]
+                logger.info(
+                    f"[GroupReunionMatchmaker] Reunion match! "
+                    f"Returning: {[m.subject_id for m in matched]}"
+                )
+                return matched
+            else:
+                logger.info(
+                    f"[GroupReunionMatchmaker] Previous partners "
+                    f"{previous_partner_ids} not all in waiting list "
+                    f"({[w.subject_id for w in reunited]} found). "
+                    f"{'Falling back to FIFO.' if self.fallback_to_fifo else 'Waiting.'}"
+                )
+
+        # Also check: is arriving participant a previous partner of someone waiting?
+        # This handles the case where the arriving participant has no group_history
+        # but a waiting participant does (e.g., arriving has None because they're new,
+        # but a waiting participant was previously paired with someone who dropped).
+        for w in waiting:
+            if (
+                w.group_history
+                and w.group_history.previous_partners
+                and arriving.subject_id in w.group_history.previous_partners
+            ):
+                # The waiting participant wants to reunite with the arriving one
+                if group_size == 2:
+                    matched = [w, arriving]
+                    logger.info(
+                        f"[GroupReunionMatchmaker] Reverse reunion match! "
+                        f"Waiting {w.subject_id} wanted {arriving.subject_id}. "
+                        f"Returning: {[m.subject_id for m in matched]}"
+                    )
+                    return matched
+
+        # Fallback to FIFO if enabled
+        if self.fallback_to_fifo:
+            if len(waiting) + 1 >= group_size:
+                matched = waiting[: group_size - 1] + [arriving]
+                logger.info(
+                    f"[GroupReunionMatchmaker] FIFO fallback match. "
+                    f"Returning: {[m.subject_id for m in matched]}"
+                )
+                return matched
+
+        logger.info(
+            f"[GroupReunionMatchmaker] No match possible. "
+            f"Returning None (wait)."
+        )
+        return None
