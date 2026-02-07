@@ -271,8 +271,8 @@
 </head>
 <body>
     <div class="text-container">
-        <h1 id="sceneHeader">{{ scene_header | safe }}</h1>
-        <h2 id="sceneSubHeader">{{ scene_subheader | safe }}</h2>
+        <h1 id="sceneHeader" style="display: none;">{{ scene_header | safe }}</h1>
+        <h2 id="sceneSubHeader" style="display: none;">{{ scene_subheader | safe }}</h2>
         <div id="sceneBody">
             {{ scene_body | safe }}
         </div>
@@ -284,9 +284,9 @@
         <div id="errorText"></div>
 
         <!-- Unified loading screen (Phase 75) - gates on both screening + Pyodide -->
-        <div id="loadingScreen" style="display: none;">
+        <div id="loadingScreen">
             <div class="screening-spinner"></div>
-            <div id="loadingStatus">Preparing experiment...</div>
+            <div id="loadingStatus">Loading...</div>
         </div>
         <div id="hudText"></div>
 
