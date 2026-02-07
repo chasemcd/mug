@@ -1,21 +1,31 @@
-# Requirements: Interactive Gym v1.20 Pre-Game Countdown
+# Requirements: Interactive Gym v1.21 Latency-Aware Matchmaking
 
 **Defined:** 2026-02-07
 **Core Value:** Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
 
 ## v1 Requirements
 
-Requirements for v1.20 Pre-Game Countdown. Each maps to roadmap phases.
+Requirements for v1.21 Latency-Aware Matchmaking. Each maps to roadmap phases.
 
-### Countdown
+### Matchmaking
 
-- [x] **CD-01**: 3-second countdown overlay on waiting room screen after match formed
-- [x] **CD-02**: "Players found!" message with 3-2-1 countdown visible to all matched players
-- [x] **CD-03**: Game start remains synced across all players after countdown completes
+- [ ] **MATCH-01**: LatencyFIFOMatchmaker class extends Matchmaker base with server RTT pre-filtering in `find_match()`
+- [ ] **MATCH-02**: Researcher can configure `max_server_rtt_ms` threshold for estimated P2P RTT filtering (estimated P2P RTT = sum of server RTTs)
+- [ ] **MATCH-03**: LatencyFIFOMatchmaker integrates with existing `max_p2p_rtt_ms` for post-match P2P probe verification
+- [ ] **MATCH-04**: LatencyFIFOMatchmaker falls back gracefully when server RTT data is unavailable for a candidate
+- [ ] **MATCH-05**: Researcher can configure LatencyFIFOMatchmaker via `scene.matchmaking(matchmaker=LatencyFIFOMatchmaker(...))`
 
 ## v2 Requirements
 
 Deferred to future release. Tracked but not in current roadmap.
+
+### Matchmaking Enhancements
+
+- **MATCH-D1**: Adaptive RTT thresholds that relax over wait time
+- **MATCH-D2**: Geographic region-based pre-filtering
+- **MATCH-D3**: Skill-based matchmaking with latency constraints
+- **MATCH-D4**: Priority queuing for dropout recovery
+- **MATCH-D5**: Pre-match validation hook (beyond RTT, e.g., custom compatibility checks)
 
 ### GGPO Parity
 
@@ -31,22 +41,16 @@ Deferred to future release. Tracked but not in current roadmap.
 - **WORKER-01**: Move per-frame `runPythonAsync()` to a Web Worker
 - **WORKER-02**: Batch rollback operations in single Worker round-trip
 
-### Enhanced Matching (from v1.13)
-
-- **MATCH-01**: Wait time relaxation (progressively relax criteria as wait time increases)
-- **MATCH-02**: Priority queuing for dropout recovery
-- **MATCH-03**: Pre-match validation hook (beyond RTT, e.g., custom compatibility checks)
-
 ## Out of Scope
 
 Explicitly excluded. Documented to prevent scope creep.
 
 | Feature | Reason |
 |---------|--------|
-| Configurable countdown duration | Hardcoded 3s for v1.20; configurability is future work |
-| Configurable countdown message | Hardcoded "Players found!" for v1.20 |
-| Countdown for single-player | Not needed; countdown is multiplayer-only |
-| Countdown skip option | Not needed for research experiments |
+| Custom matchmaking UI | Researcher-facing API only, no player-visible matchmaking UI changes |
+| Server-authoritative latency measurement | P2P probe already exists; server RTT is a heuristic pre-filter |
+| N-player latency-aware matchmaking | Current scope is 2-player pairs only |
+| Adaptive threshold relaxation | Deferred to v2 (MATCH-D1) |
 
 ## Traceability
 
@@ -54,15 +58,17 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CD-01 | Phase 80 | Complete |
-| CD-02 | Phase 80 | Complete |
-| CD-03 | Phase 80 | Complete |
+| MATCH-01 | - | Pending |
+| MATCH-02 | - | Pending |
+| MATCH-03 | - | Pending |
+| MATCH-04 | - | Pending |
+| MATCH-05 | - | Pending |
 
 **Coverage:**
-- v1 requirements: 3 total
-- Mapped to phases: 3
-- Unmapped: 0 ✓
+- v1 requirements: 5 total
+- Mapped to phases: 0
+- Unmapped: 5 ⚠️
 
 ---
 *Requirements defined: 2026-02-07*
-*Last updated: 2026-02-07 after Phase 80 completion*
+*Last updated: 2026-02-07 after v1.21 milestone requirements definition*
