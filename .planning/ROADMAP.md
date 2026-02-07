@@ -257,7 +257,7 @@ See [milestones/v1.11-ROADMAP.md](milestones/v1.11-ROADMAP.md) for full details.
 
 </details>
 
-### 🚧 v1.20 Pre-Game Countdown (In Progress)
+### v1.20 Pre-Game Countdown (In Progress)
 
 **Milestone Goal:** After matchmaking, show a brief countdown on the waiting room screen before transitioning to the gym scene, so players know a match was found and can prepare.
 
@@ -561,10 +561,10 @@ Plans:
   3. Game scene transition and gameplay start only after countdown completes, synced across all players
   4. Existing single-player and non-multiplayer flows are unaffected (no regression)
 **Research flag:** Unlikely — straightforward client/server event flow using existing waiting_room and start_game patterns
-**Plans:** TBD
+**Plans:** 1 plan
 
 Plans:
-- [ ] 80-01: TBD
+- [ ] 80-01-PLAN.md — Server-side countdown delay + client-side countdown display on waiting room screen
 
 ## Progress
 
@@ -608,4 +608,4 @@ Plans:
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-07 after v1.20 roadmap creation (1 phase, 3 requirements)*
+*Last updated: 2026-02-07 after Phase 80 plan creation (1 plan in 1 wave)*
