@@ -195,6 +195,115 @@ class FIFOMatchmaker(Matchmaker):
         return matched
 
 
+class LatencyFIFOMatchmaker(Matchmaker):
+    """Latency-aware FIFO matchmaker that pre-filters by estimated P2P RTT.
+
+    Before proposing a FIFO match, this matchmaker estimates the peer-to-peer
+    round-trip time between the arriving participant and each waiting candidate
+    using the sum of their server RTTs as a heuristic:
+
+        estimated_p2p_rtt = arriving.rtt_ms + candidate.rtt_ms
+
+    Candidates whose estimated P2P RTT exceeds ``max_server_rtt_ms`` are skipped.
+    Among the remaining candidates, standard FIFO ordering applies (earliest
+    arrival is matched first).
+
+    Missing RTT data (``rtt_ms is None``) does NOT exclude a candidate. When
+    either participant lacks RTT measurements, the pair is treated as compatible
+    to avoid penalizing participants for missing data.
+
+    If ``max_p2p_rtt_ms`` is also set, GameManager will additionally probe the
+    real P2P RTT after the match is proposed and reject matches exceeding that
+    threshold. ``max_server_rtt_ms`` is a cheap pre-filter; ``max_p2p_rtt_ms``
+    is a precise post-filter.
+
+    Example:
+        from interactive_gym.server.matchmaker import LatencyFIFOMatchmaker
+
+        matchmaker = LatencyFIFOMatchmaker(max_server_rtt_ms=200)
+
+    Args:
+        max_server_rtt_ms: Maximum allowed estimated P2P RTT in milliseconds,
+            computed as the sum of the two participants' server RTTs. Candidates
+            exceeding this threshold are skipped during match proposal.
+        max_p2p_rtt_ms: Maximum allowed measured P2P RTT in milliseconds for
+            post-match probe filtering. None disables post-match filtering.
+    """
+
+    def __init__(
+        self,
+        max_server_rtt_ms: int,
+        max_p2p_rtt_ms: int | None = None,
+    ):
+        super().__init__(max_p2p_rtt_ms=max_p2p_rtt_ms)
+        self.max_server_rtt_ms = max_server_rtt_ms
+
+    def find_match(
+        self,
+        arriving: MatchCandidate,
+        waiting: list[MatchCandidate],
+        group_size: int,
+    ) -> list[MatchCandidate] | None:
+        logger.info(
+            f"[LatencyFIFOMatchmaker] find_match called: "
+            f"arriving={arriving.subject_id} (rtt={arriving.rtt_ms}), "
+            f"waiting={[(w.subject_id, w.rtt_ms) for w in waiting]}, "
+            f"group_size={group_size}, "
+            f"max_server_rtt_ms={self.max_server_rtt_ms}"
+        )
+
+        # Need enough participants to form a group
+        if len(waiting) + 1 < group_size:
+            logger.info(
+                f"[LatencyFIFOMatchmaker] Not enough participants: "
+                f"{len(waiting) + 1} < {group_size}. Returning None (wait)."
+            )
+            return None
+
+        # Filter candidates by estimated P2P RTT (sum of server RTTs)
+        filtered = []
+        for candidate in waiting:
+            if arriving.rtt_ms is None or candidate.rtt_ms is None:
+                # Missing RTT data: do not exclude (graceful fallback)
+                logger.info(
+                    f"[LatencyFIFOMatchmaker] Candidate {candidate.subject_id} "
+                    f"has missing RTT data (arriving={arriving.rtt_ms}, "
+                    f"candidate={candidate.rtt_ms}). Not excluded."
+                )
+                filtered.append(candidate)
+            else:
+                estimated_rtt = arriving.rtt_ms + candidate.rtt_ms
+                if estimated_rtt <= self.max_server_rtt_ms:
+                    logger.info(
+                        f"[LatencyFIFOMatchmaker] Candidate {candidate.subject_id} "
+                        f"passes RTT filter: {estimated_rtt}ms <= "
+                        f"{self.max_server_rtt_ms}ms"
+                    )
+                    filtered.append(candidate)
+                else:
+                    logger.info(
+                        f"[LatencyFIFOMatchmaker] Candidate {candidate.subject_id} "
+                        f"SKIPPED: estimated RTT {estimated_rtt}ms > "
+                        f"{self.max_server_rtt_ms}ms"
+                    )
+
+        # Check if enough candidates passed the filter
+        if len(filtered) < group_size - 1:
+            logger.info(
+                f"[LatencyFIFOMatchmaker] Not enough candidates after RTT filter: "
+                f"{len(filtered)} < {group_size - 1}. Returning None (wait)."
+            )
+            return None
+
+        # FIFO order: take first (group_size - 1) from filtered list + arriving
+        matched = filtered[: group_size - 1] + [arriving]
+        logger.info(
+            f"[LatencyFIFOMatchmaker] Match found! "
+            f"Returning: {[m.subject_id for m in matched]}"
+        )
+        return matched
+
+
 class GroupReunionMatchmaker(Matchmaker):
     """Re-pairs previous partners when possible, falls back to FIFO.
 
