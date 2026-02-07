@@ -598,10 +598,10 @@ Plans:
   2. After RTT pre-filter match, P2P probe still runs if `max_p2p_rtt_ms` is set
   3. Rejected P2P probe returns participants to waitroom (existing behavior preserved)
 **Research flag:** Unlikely — existing scene.matchmaking() API and P2P probe flow already support custom matchmakers with max_p2p_rtt_ms
-**Plans:** TBD
+**Plans:** 1 plan
 
 Plans:
-- [ ] 82-01: TBD
+- [ ] 82-01-PLAN.md — Integration tests for scene API and P2P probe wiring + example config update
 
 ## Progress
 
@@ -647,4 +647,4 @@ Plans:
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-07 after Phase 81 execution*
+*Last updated: 2026-02-07 after Phase 82 planning*
