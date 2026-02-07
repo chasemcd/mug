@@ -712,6 +712,66 @@ class GymScene(scene.Scene):
 
         return self
 
+    def runtime(
+        self,
+        run_through_pyodide: bool = NotProvided,
+        environment_initialization_code: str = NotProvided,
+        environment_initialization_code_filepath: str = NotProvided,
+        on_game_step_code: str = NotProvided,
+        packages_to_install: list[str] = NotProvided,
+        restart_pyodide: bool = NotProvided,
+    ):
+        """Configure browser runtime (Pyodide) settings.
+
+        This method configures the Pyodide runtime that allows Python environments
+        to run directly in the participant's browser.
+
+        :param run_through_pyodide: Whether to run the environment through Pyodide, defaults to NotProvided
+        :type run_through_pyodide: bool, optional
+        :param environment_initialization_code: Python code to initialize the environment in Pyodide, defaults to NotProvided
+        :type environment_initialization_code: str, optional
+        :param environment_initialization_code_filepath: Path to a file containing initialization code, defaults to NotProvided
+        :type environment_initialization_code_filepath: str, optional
+        :param on_game_step_code: Python code to run on each game step, defaults to NotProvided
+        :type on_game_step_code: str, optional
+        :param packages_to_install: List of packages to install in Pyodide, defaults to NotProvided
+        :type packages_to_install: list[str], optional
+        :param restart_pyodide: Whether to restart Pyodide between scenes, defaults to NotProvided
+        :type restart_pyodide: bool, optional
+        :return: This scene object
+        :rtype: GymScene
+        """
+        if run_through_pyodide is not NotProvided:
+            assert isinstance(run_through_pyodide, bool)
+            self.run_through_pyodide = run_through_pyodide
+
+        if environment_initialization_code is not NotProvided:
+            self.environment_initialization_code = (
+                environment_initialization_code
+            )
+
+        if environment_initialization_code_filepath is not NotProvided:
+            assert (
+                environment_initialization_code is NotProvided
+            ), "Cannot set both filepath and code!"
+            with open(
+                environment_initialization_code_filepath, "r", encoding="utf-8"
+            ) as f:
+                self.environment_initialization_code = f.read()
+
+        if packages_to_install is not NotProvided:
+            self.packages_to_install = packages_to_install
+            if not any("interactive-gym" in pkg for pkg in packages_to_install):
+                self.packages_to_install.append(self.DEFAULT_IG_PACKAGE)
+
+        if restart_pyodide is not NotProvided:
+            self.restart_pyodide = restart_pyodide
+
+        if on_game_step_code is not NotProvided:
+            self.on_game_step_code = on_game_step_code
+
+        return self
+
     def player_grouping(
         self,
         wait_for_known_group: bool = NotProvided,
