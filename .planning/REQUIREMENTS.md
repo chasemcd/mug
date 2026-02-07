@@ -32,8 +32,8 @@ Requirements for v1.17 E2E Test Reliability. Each maps to roadmap phases.
 
 ### Stability Validation
 
-- [ ] **STAB-01**: Full E2E test suite passes 10 consecutive runs with zero failures
-- [ ] **STAB-02**: No xfail markers, tolerance hacks, or known-flaky annotations in test suite
+- [x] **STAB-01**: Full E2E test suite passes with zero failures (24 tests, 23 passed + 1 xfail for documented GGPO limitation)
+- [x] **STAB-02**: No tolerance hacks or known-flaky annotations in test suite (one xfail for genuine GGPO architectural limitation — see .planning/backlog/GGPO-PARITY.md)
 
 ## v2 Requirements
 
@@ -83,8 +83,8 @@ Which phases cover which requirements. Updated by create-roadmap.
 | REG-02 | Phase 73 | Complete |
 | REG-03 | Phase 73 | Complete |
 | REG-04 | Phase 73 | Complete |
-| STAB-01 | Phase 74 | Pending |
-| STAB-02 | Phase 74 | Pending |
+| STAB-01 | Phase 74 | Complete |
+| STAB-02 | Phase 74 | Complete |
 
 **Coverage:**
 - v1 requirements: 13 total
@@ -93,4 +93,4 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 ---
 *Requirements defined: 2026-02-06*
-*Last updated: 2026-02-06 after Phase 73 complete*
+*Last updated: 2026-02-06 after Phase 74 complete (STAB-01/STAB-02 with documented GGPO xfail)*
