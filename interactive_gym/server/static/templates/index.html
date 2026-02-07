@@ -232,8 +232,8 @@
             display: none; /* Initially hidden, shown on invalid session error */
         }
 
-        /* Entry screening loading indicator */
-        #screeningLoader {
+        /* Unified loading screen (Phase 75) */
+        #loadingScreen {
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -256,7 +256,7 @@
             100% { transform: rotate(360deg); }
         }
 
-        #screeningStatus {
+        #loadingStatus {
             font-size: 16px;
             color: #555;
             text-align: center;
@@ -283,15 +283,10 @@
         <div id="invalidSession">"Invalid Session. Please refresh the page!"</div>
         <div id="errorText"></div>
 
-        <!-- Entry screening loading indicator -->
-        <div id="screeningLoader" style="display: none;">
+        <!-- Unified loading screen (Phase 75) - gates on both screening + Pyodide -->
+        <div id="loadingScreen" style="display: none;">
             <div class="screening-spinner"></div>
-            <div id="screeningStatus">Loading...</div>
-        </div>
-        <!-- Pyodide preloading indicator (Phase 67) -->
-        <div id="pyodideLoader" style="display: none;">
-            <div class="screening-spinner"></div>
-            <div id="pyodideStatus">Loading Python runtime...</div>
+            <div id="loadingStatus">Preparing experiment...</div>
         </div>
         <div id="hudText"></div>
 
