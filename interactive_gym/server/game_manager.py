@@ -796,6 +796,17 @@ class GameManager:
                 self._remove_game(game.game_id)
                 return None
 
+        # Join each participant to the game's socket room.
+        # This runs outside a request context (from probe callback), so we
+        # must use the stored socket_id for each subject.
+        for candidate in matched:
+            socket_id = self._get_socket_id(candidate.subject_id)
+            if socket_id:
+                flask_socketio.join_room(game.game_id, sid=socket_id)
+                logger.info(f"[Probe:RoomJoin] {candidate.subject_id} joined room {game.game_id}")
+            else:
+                logger.warning(f"[Probe:RoomJoin] No socket for {candidate.subject_id}, cannot join room")
+
         # Validate game is ready
         if not game.is_ready_to_start():
             logger.error(
