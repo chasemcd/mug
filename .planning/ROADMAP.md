@@ -21,6 +21,7 @@
 - ✅ **v1.17 E2E Test Reliability** - Phases 71-74 (shipped 2026-02-06)
 - ✅ **v1.18 Loading UX & Cleanup** - Phases 75-76 (shipped 2026-02-07)
 - ✅ **v1.19 P2P Lifecycle Cleanup** - Phases 77-79 (shipped 2026-02-07)
+- 🚧 **v1.20 Pre-Game Countdown** - Phase 80 (in progress)
 
 ## Phases
 
@@ -245,13 +246,22 @@ See [milestones/v1.11-ROADMAP.md](milestones/v1.11-ROADMAP.md) for full details.
 
 </details>
 
-### v1.19 P2P Lifecycle Cleanup (Shipped 2026-02-07)
+<details>
+<summary>v1.19 P2P Lifecycle Cleanup (Phases 77-79) - SHIPPED 2026-02-07</summary>
 
 **Milestone Goal:** P2P connections are scoped to GymScenes — torn down on scene exit, with group history preserved for future re-pairing.
 
 - [x] **Phase 77: P2P Connection Scoping** - Close P2P/WebRTC on GymScene exit, suppress partner-disconnected overlay on non-game scenes
 - [x] **Phase 78: Group History Tracking** - Server tracks group membership across scenes, matchmakers can query for re-pairing
 - [x] **Phase 79: Post-Game Scene Isolation Test** - E2E test: two players complete Overcooked, proceed to survey, one exits; remaining player stays on survey without partner-disconnected overlay
+
+</details>
+
+### 🚧 v1.20 Pre-Game Countdown (In Progress)
+
+**Milestone Goal:** After matchmaking, show a brief countdown on the waiting room screen before transitioning to the gym scene, so players know a match was found and can prepare.
+
+- [ ] **Phase 80: Pre-Game Countdown** - 3-second "Players found! 3... 2... 1..." countdown on waiting room after match, synced game start
 
 ## Phase Details
 
@@ -541,6 +551,21 @@ Plans:
 Plans:
 - [x] 79-01-PLAN.md — Create multi-scene test server config, server fixture, and E2E test validating post-game scene isolation
 
+### Phase 80: Pre-Game Countdown
+**Goal**: After matchmaking forms a match, show a 3-second "Players found!" countdown on the waiting room screen before transitioning to the game
+**Depends on**: Phase 79 (v1.19 complete)
+**Requirements**: CD-01, CD-02, CD-03
+**Success Criteria** (what must be TRUE):
+  1. After matchmaker forms a match, all matched players see "Players found!" with a 3-2-1 countdown on the waiting room screen
+  2. Countdown is visible simultaneously to all matched players (server-triggered)
+  3. Game scene transition and gameplay start only after countdown completes, synced across all players
+  4. Existing single-player and non-multiplayer flows are unaffected (no regression)
+**Research flag:** Unlikely — straightforward client/server event flow using existing waiting_room and start_game patterns
+**Plans:** TBD
+
+Plans:
+- [ ] 80-01: TBD
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -579,7 +604,8 @@ Plans:
 | 77. P2P Connection Scoping | v1.19 | 1/1 | Complete | 2026-02-07 |
 | 78. Group History Tracking | v1.19 | 1/1 | Complete | 2026-02-07 |
 | 79. Post-Game Scene Isolation Test | v1.19 | 1/1 | Complete | 2026-02-07 |
+| 80. Pre-Game Countdown | v1.20 | 0/1 | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-07 after Phase 79 complete (Post-Game Scene Isolation Test)*
+*Last updated: 2026-02-07 after v1.20 roadmap creation (1 phase, 3 requirements)*

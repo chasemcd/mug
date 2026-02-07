@@ -1,18 +1,17 @@
-# Requirements: Interactive Gym v1.19 P2P Lifecycle Cleanup
+# Requirements: Interactive Gym v1.20 Pre-Game Countdown
 
 **Defined:** 2026-02-07
 **Core Value:** Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
 
 ## v1 Requirements
 
-Requirements for v1.19 P2P Lifecycle Cleanup. Each maps to roadmap phases.
+Requirements for v1.20 Pre-Game Countdown. Each maps to roadmap phases.
 
-### P2P Lifecycle
+### Countdown
 
-- [x] **P2P-01**: P2P/WebRTC connections are closed when a GymScene exits (via scene transition or advance_scene)
-- [x] **P2P-02**: Partner-disconnected overlay is not shown on non-GymScene scenes (surveys, instructions, end screens)
-- [x] **P2P-03**: Server tracks group membership (which participants were paired together) across scene transitions
-- [x] **P2P-04**: Custom matchmakers can query group history to re-pair previous partners in future GymScenes
+- [ ] **CD-01**: 3-second countdown overlay on waiting room screen after match formed
+- [ ] **CD-02**: "Players found!" message with 3-2-1 countdown visible to all matched players
+- [ ] **CD-03**: Game start remains synced across all players after countdown completes
 
 ## v2 Requirements
 
@@ -44,11 +43,10 @@ Explicitly excluded. Documented to prevent scope creep.
 
 | Feature | Reason |
 |---------|--------|
-| Pyodide Web Worker migration | Pre-loading solves disconnect issue; Worker deferred until per-frame blocking is a problem |
-| New E2E test coverage | Existing suite is stable; new tests are a separate milestone |
-| CI/CD pipeline setup | Test suite is CI-ready but pipeline configuration is separate work |
-| GGPO parity fix | Documented in backlog; requires dedicated milestone for snapshot/rollback changes |
-| P2P reconnection changes | Current reconnection logic stays as-is for this milestone |
+| Configurable countdown duration | Hardcoded 3s for v1.20; configurability is future work |
+| Configurable countdown message | Hardcoded "Players found!" for v1.20 |
+| Countdown for single-player | Not needed; countdown is multiplayer-only |
+| Countdown skip option | Not needed for research experiments |
 
 ## Traceability
 
@@ -56,16 +54,15 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| P2P-01 | Phase 77 | Complete |
-| P2P-02 | Phase 77 | Complete |
-| P2P-03 | Phase 78 | Complete |
-| P2P-04 | Phase 78 | Complete |
+| CD-01 | Phase 80 | Pending |
+| CD-02 | Phase 80 | Pending |
+| CD-03 | Phase 80 | Pending |
 
 **Coverage:**
-- v1 requirements: 4 total
-- Mapped to phases: 4
+- v1 requirements: 3 total
+- Mapped to phases: 3
 - Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-02-07*
-*Last updated: 2026-02-07 after Phase 78 complete*
+*Last updated: 2026-02-07 after roadmap creation*
