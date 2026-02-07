@@ -1,17 +1,34 @@
 # Project Milestones: Interactive Gym P2P Multiplayer
 
-## v1.18 Loading UX & Cleanup (In Progress)
+## v1.19 P2P Lifecycle Cleanup (In Progress)
 
-**Goal:** Fix the double-loading screen UX and clean up accumulated tech debt.
+**Goal:** P2P connections scoped to GymScenes — torn down on scene exit, with group history preserved for future re-pairing.
 
 **Status:** Defining requirements
 
 **Target features:**
 
-- Single merged loading screen (compatibility check + Pyodide loading)
-- Configurable Pyodide loading timeout with error page (default 60s)
-- Remove orphaned test fixtures and duplicate helpers
-- Close v1.14 roadmap loose ends
+- Close P2P/WebRTC connections when leaving a GymScene
+- No "partner disconnected" overlay on non-GymScene scenes
+- Track group membership across scene transitions
+- Group history available for custom matchmaker logic
+
+---
+
+## v1.18 Loading UX & Cleanup (Shipped: 2026-02-07)
+
+**Delivered:** Single merged loading screen gating on both compatibility check and Pyodide readiness. Configurable timeout with error page. Cleaned up orphaned test fixtures and duplicate helpers.
+
+**Phases completed:** 75-76 (3 plans total)
+
+**Key accomplishments:**
+
+- Unified loading screen replacing separate screening + Pyodide loaders
+- Loading gate requires both compatibility check AND Pyodide before advancing
+- Configurable pyodide_load_timeout_s (default 60s) with clear error page on failure
+- Full-page loading overlay visible from initial page load
+- Removed orphaned flask_server_multi_episode fixture
+- Consolidated duplicate run_full_episode_flow into single game_helpers.py source
 
 ---
 

@@ -8,29 +8,26 @@ A framework for running browser-based reinforcement learning experiments with hu
 
 Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
 
-## Current Milestone: v1.18 Loading UX & Cleanup
+## Current Milestone: v1.19 P2P Lifecycle Cleanup
 
-**Goal:** Fix the double-loading screen UX and clean up accumulated tech debt from rapid milestone delivery.
+**Goal:** P2P connections are scoped to GymScenes — torn down on scene exit, with group history preserved for future re-pairing.
 
 **Target features:**
 
-*Loading UX:*
-- [ ] Single merged loading screen (compatibility check + Pyodide loading combined)
-- [ ] No separate Pyodide loading spinner — compat check screen gates on both
-- [ ] Configurable timeout for Pyodide loading (default 60s)
-- [ ] Error page shown if Pyodide fails to load or times out
-
-*Cleanup:*
-- [ ] Remove orphaned `flask_server_multi_episode` fixture (never consumed)
-- [ ] Remove unused `run_full_episode_flow` import in `test_network_disruption.py`
-- [ ] Consolidate duplicate `run_full_episode_flow` into `game_helpers.py`
-- [ ] Close v1.14 Phases 65-66 in roadmap (work was done, roadmap not updated)
+- [ ] Close P2P/WebRTC connections when leaving a GymScene (scene transition or advance_scene)
+- [ ] No "partner disconnected" overlay on non-GymScene scenes (surveys, instructions, etc.)
+- [ ] Track group membership (who was paired with whom) across scene transitions
+- [ ] Group history available for custom matchmaker logic in future GymScenes
 
 **What done looks like:**
-- Participants see one loading screen, not two
-- Loading failure shows a clear error page, not a hang
-- Zero orphaned fixtures or duplicate helper functions in test suite
-- Roadmap accurately reflects completed work
+- Participants finish a GymScene, advance to a survey — no disruption if partner disconnects
+- P2P connections are cleanly closed on scene exit (no lingering WebRTC state)
+- Server knows which participants were grouped together for potential future re-pairing
+- Custom matchmakers can query group history to re-pair previous partners
+
+## Previous Milestone: v1.18 Loading UX & Cleanup (Shipped: 2026-02-07)
+
+**Delivered:** Single merged loading screen gating on both compatibility check and Pyodide readiness, with configurable timeout and error page. Cleaned up orphaned test fixtures and duplicate helpers.
 
 ## Previous Milestone: v1.17 E2E Test Reliability (Shipped: 2026-02-06)
 
@@ -279,11 +276,17 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 
 ### Active
 
-*v1.18 Loading UX & Cleanup:*
-- [ ] Single merged loading screen (compat check + Pyodide)
-- [ ] Configurable Pyodide loading timeout with error page
-- [ ] Orphaned test fixtures and duplicate helpers removed
-- [ ] Roadmap reflects actual v1.14 completion state
+*v1.19 P2P Lifecycle Cleanup:*
+- [ ] P2P connections closed on GymScene exit
+- [ ] No partner-disconnected overlay on non-GymScene scenes
+- [ ] Group membership tracked across scene transitions
+- [ ] Group history queryable by custom matchmakers
+
+*Shipped in v1.18:*
+- ✓ Single merged loading screen (compat check + Pyodide) — v1.18
+- ✓ Configurable Pyodide loading timeout with error page — v1.18
+- ✓ Orphaned test fixtures and duplicate helpers removed — v1.18
+- ✓ Roadmap reflects actual v1.14 completion state — v1.18
 
 *Shipped in v1.17:*
 - ✓ All E2E tests pass with zero failures (24 tests, 23 pass + 1 xfail) — v1.17
@@ -390,7 +393,8 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 - Episode start sync can timeout on slow connections (mitigated with retry mechanism)
 - Rollback visual corrections cause brief teleporting (smoothing not yet implemented)
 - **[CRITICAL]** Users report 1-2 second local input lag in Overcooked (investigating in v1.6)
-- **[UX]** Double loading spinner on page open — Pyodide loading wheel + compatibility check wheel shown simultaneously. Fixing in v1.18.
+- **[BUG]** Partner disconnected overlay shown on non-GymScene scenes (surveys, instructions) when former partner disconnects. Fixing in v1.19.
+- ~~**[RESOLVED]** Double loading spinner on page open — fixed in v1.18 with unified loading gate~~
 - **[KNOWN]** GGPO content parity divergence under packet loss + active inputs (~40-50% failure rate). Documented in `.planning/backlog/GGPO-PARITY.md`. xfail marker on `test_active_input_with_packet_loss`.
 - ~~**[RESOLVED]** Data parity divergence under packet loss — input confirmation protocol added in v1.14~~
 - ~~**[RESOLVED]** Data export parity issues — fixed in v1.8 with dual-buffer architecture~~
@@ -423,4 +427,4 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 | Pre-load over Web Worker for v1.16 | Per-frame Python (10-100ms) doesn't cause disconnects; only loadPyodide() does. Pre-loading is simpler and preserves synchronous rollback performance. Web Worker deferred. | ✓ Good |
 
 ---
-*Last updated: 2026-02-07 after v1.18 Loading UX & Cleanup milestone started*
+*Last updated: 2026-02-07 after v1.19 P2P Lifecycle Cleanup milestone started*

@@ -5,17 +5,17 @@
 See: .planning/PROJECT.md (updated 2026-02-07)
 
 **Core value:** Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
-**Current focus:** v1.18 Loading UX & Cleanup (Complete)
+**Current focus:** v1.19 P2P Lifecycle Cleanup
 
 ## Current Position
 
-Milestone: v1.18 Loading UX & Cleanup
-Phase: 76 of 76 (Test & Roadmap Cleanup)
-Plan: 1 of 1 complete
-Status: Milestone complete
-Last activity: 2026-02-07 — Completed 76-01-PLAN.md (remove orphaned fixtures, consolidate helpers, update roadmap)
+Milestone: v1.19 P2P Lifecycle Cleanup
+Phase: Not started (run /gsd:define-requirements or /gsd:create-roadmap)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-02-07 — Milestone v1.19 started
 
-Progress: ██████████ 100%
+Progress: ░░░░░░░░░░ 0%
 
 ## Milestone History
 
@@ -558,9 +558,9 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-02-07
-Stopped at: Completed 76-01-PLAN.md (remove orphaned fixtures, consolidate helpers, update roadmap)
+Stopped at: Started v1.19 P2P Lifecycle Cleanup milestone
 Resume file: None
 
 ### Next Steps
 
-v1.18 milestone complete. All phases shipped.
+Define requirements for v1.19, then create roadmap.
