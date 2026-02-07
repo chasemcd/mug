@@ -2986,26 +2986,14 @@ obs, rewards, terminateds, truncateds, infos, render_state
      * Promote confirmed frame data from speculative to canonical buffer.
      * Only frames where frame <= confirmedFrame are promoted.
      * This ensures only data with confirmed inputs is exported.
-     *
-     * IMPORTANT: Patches action data with confirmed inputs from the input buffer.
-     * Speculative frames may have been recorded with predicted (wrong) actions
-     * for the partner player. When promoting, we overwrite those predictions
-     * with the now-confirmed real actions to ensure data parity between players.
      */
     _promoteConfirmedFrames() {
         const promoted = [];
-        let patched = 0;
         for (const [frame, data] of this.speculativeFrameData.entries()) {
             if (frame <= this.confirmedFrame) {
-                // Patch actions with confirmed inputs from the input buffer
-                // This fixes the case where speculative data was recorded with predicted
-                // actions that were never corrected by a rollback (e.g., prediction happened
-                // to be close but not identical, or rollback was suppressed)
-                const patchedData = this._patchFrameDataWithConfirmedInputs(frame, data);
-                if (patchedData.wasPatched) patched++;
-
                 // Promote to canonical buffer with wasSpeculative flag (Phase 39: REC-04)
-                this.frameDataBuffer.set(frame, { ...patchedData, wasSpeculative: true });
+                // Frames promoted from speculative buffer were predicted before confirmation
+                this.frameDataBuffer.set(frame, { ...data, wasSpeculative: true });
                 promoted.push(frame);
             }
         }
@@ -3014,45 +3002,8 @@ obs, rewards, terminateds, truncateds, infos, render_state
             this.speculativeFrameData.delete(frame);
         }
         if (promoted.length > 0) {
-            p2pLog.debug(`Promoted ${promoted.length} frames to canonical buffer (up to frame ${this.confirmedFrame})${patched > 0 ? ` (${patched} action-patched)` : ''}`);
+            p2pLog.debug(`Promoted ${promoted.length} frames to canonical buffer (up to frame ${this.confirmedFrame})`);
         }
-    }
-
-    /**
-     * Patch frame data actions with confirmed inputs from the input buffer.
-     * When speculative data was recorded with predicted actions, this replaces
-     * those predictions with the real confirmed inputs so both players export
-     * identical action data.
-     *
-     * @param {number} frame - The frame number
-     * @param {Object} data - The speculative frame data
-     * @returns {Object} Patched frame data (with wasPatched flag if changed)
-     */
-    _patchFrameDataWithConfirmedInputs(frame, data) {
-        const frameInputs = this.inputBuffer.get(frame);
-        if (!frameInputs || !data.actions) {
-            return data;
-        }
-
-        let wasPatched = false;
-        const patchedActions = { ...data.actions };
-
-        for (const [playerId, confirmedAction] of frameInputs.entries()) {
-            const currentAction = patchedActions[playerId];
-            if (currentAction !== undefined && currentAction !== confirmedAction) {
-                p2pLog.debug(
-                    `ACTION_PATCH: frame=${frame} player=${playerId} ` +
-                    `predicted=${currentAction} confirmed=${confirmedAction}`
-                );
-                patchedActions[playerId] = confirmedAction;
-                wasPatched = true;
-            }
-        }
-
-        if (wasPatched) {
-            return { ...data, actions: patchedActions, wasPatched: true };
-        }
-        return data;
     }
 
     /**
@@ -3081,8 +3032,6 @@ obs, rewards, terminateds, truncateds, infos, render_state
         if (this._hasAllInputsForFrame(targetFrame, humanPlayerIds)) {
             await this._updateConfirmedFrame();
             p2pLog.debug(`[Input Confirmation] Already confirmed up to frame ${targetFrame}`);
-            // Check for and correct any mispredicted frames before export
-            await this._correctMispredictedFrames(humanPlayerIds, targetFrame);
             return true;
         }
 
@@ -3100,8 +3049,6 @@ obs, rewards, terminateds, truncateds, infos, render_state
                 await this._updateConfirmedFrame();
                 const elapsed = Math.round(performance.now() - startTime);
                 p2pLog.info(`[Input Confirmation] Confirmed after ${elapsed}ms`);
-                // Check for and correct any mispredicted frames before export
-                await this._correctMispredictedFrames(humanPlayerIds, targetFrame);
                 return true;
             }
 
@@ -3114,86 +3061,6 @@ obs, rewards, terminateds, truncateds, infos, render_state
             `confirmedFrame=${this.confirmedFrame}, target=${targetFrame}. ` +
             `Proceeding with episode export (data may diverge).`);
         return false;
-    }
-
-    /**
-     * Corrective rollback at episode end: detect and fix frames where
-     * predicted actions were used but no rollback occurred.
-     *
-     * This handles the rare case where:
-     * 1. A partner's input arrived late (prediction was used for a frame)
-     * 2. The real input eventually arrived and was stored in inputBuffer
-     * 3. But rollback detection was missed (prediction matched in some slots,
-     *    timing edge case, or prediction was marked correct by coincidence)
-     * 4. The speculative/canonical data still has the wrong predicted action
-     *
-     * At episode end, all inputs are confirmed. We compare each frame's
-     * recorded actions against the confirmed inputs. If any mismatch is found,
-     * we trigger a corrective rollback from the earliest mismatch point.
-     *
-     * @param {string[]} humanPlayerIds - Array of human player ID strings
-     * @param {number} targetFrame - Last frame to check
-     */
-    async _correctMispredictedFrames(humanPlayerIds, targetFrame) {
-        // Find earliest frame where recorded action != confirmed input
-        let earliestMismatch = null;
-        let mismatchCount = 0;
-
-        // Check both speculative and canonical buffers
-        const buffersToCheck = [
-            ['speculative', this.speculativeFrameData],
-            ['canonical', this.frameDataBuffer]
-        ];
-
-        for (const [bufferName, buffer] of buffersToCheck) {
-            for (const [frame, data] of buffer.entries()) {
-                if (frame > targetFrame) continue;
-                if (!data.actions) continue;
-
-                const frameInputs = this.inputBuffer.get(frame);
-                if (!frameInputs) continue;
-
-                for (const playerId of humanPlayerIds) {
-                    const recordedAction = data.actions[playerId];
-                    const confirmedAction = frameInputs.get(playerId);
-
-                    if (recordedAction !== undefined && confirmedAction !== undefined &&
-                        recordedAction !== confirmedAction) {
-                        mismatchCount++;
-                        if (earliestMismatch === null || frame < earliestMismatch) {
-                            earliestMismatch = frame;
-                            p2pLog.warn(
-                                `[Corrective] Mismatch in ${bufferName} buffer: ` +
-                                `frame=${frame} player=${playerId} ` +
-                                `recorded=${recordedAction} confirmed=${confirmedAction}`
-                            );
-                        }
-                    }
-                }
-            }
-        }
-
-        if (earliestMismatch === null) {
-            p2pLog.debug('[Corrective] No mispredicted frames found - data is consistent');
-            return;
-        }
-
-        p2pLog.warn(
-            `[Corrective] Found ${mismatchCount} action mismatches starting at frame ${earliestMismatch}. ` +
-            `Triggering corrective rollback to fix data before export.`
-        );
-
-        // Perform corrective rollback from earliest mismatch
-        // This replays from that point with all confirmed inputs, producing correct data
-        const rollbackSuccess = await this.performRollback(earliestMismatch, humanPlayerIds);
-
-        if (rollbackSuccess) {
-            // After rollback replay, update confirmed frame to promote corrected data
-            await this._updateConfirmedFrame();
-            p2pLog.info(`[Corrective] Rollback replay completed successfully from frame ${earliestMismatch}`);
-        } else {
-            p2pLog.warn(`[Corrective] Rollback replay failed from frame ${earliestMismatch} - data may diverge`);
-        }
     }
 
     /**
@@ -3218,11 +3085,9 @@ obs, rewards, terminateds, truncateds, infos, render_state
             `at episode end (confirmedFrame=${this.confirmedFrame}, frameNumber=${this.frameNumber})`);
 
         // Promote remaining frames with wasSpeculative flag (Phase 39: REC-04)
-        // Patch actions with confirmed inputs from input buffer to ensure data parity
-        // even when frames were recorded with predicted (wrong) actions
+        // These frames were predicted before confirmation, same as _promoteConfirmedFrames()
         let promoted = 0;
         let skipped = 0;
-        let patched = 0;
         for (const [frame, data] of this.speculativeFrameData.entries()) {
             // Skip frames at or beyond episode boundary
             if (terminationFrame !== null && terminationFrame !== undefined && frame >= terminationFrame) {
@@ -3230,16 +3095,13 @@ obs, rewards, terminateds, truncateds, infos, render_state
                 skipped++;
                 continue;
             }
-            // Patch actions with confirmed inputs before promoting
-            const patchedData = this._patchFrameDataWithConfirmedInputs(frame, data);
-            if (patchedData.wasPatched) patched++;
-            this.frameDataBuffer.set(frame, { ...patchedData, wasSpeculative: true });
+            this.frameDataBuffer.set(frame, { ...data, wasSpeculative: true });
             promoted++;
         }
         this.speculativeFrameData.clear();
 
-        if (skipped > 0 || patched > 0) {
-            p2pLog.info(`[Episode Boundary] Promoted ${promoted} frames, skipped ${skipped} post-boundary frames${patched > 0 ? `, ${patched} action-patched` : ''}`);
+        if (skipped > 0) {
+            p2pLog.info(`[Episode Boundary] Promoted ${promoted} frames, skipped ${skipped} post-boundary frames`);
         }
     }
 
