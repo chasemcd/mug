@@ -20,7 +20,7 @@
 - ✅ **v1.16 Pyodide Pre-loading** - Phases 67-70 (shipped 2026-02-06)
 - ✅ **v1.17 E2E Test Reliability** - Phases 71-74 (shipped 2026-02-06)
 - ✅ **v1.18 Loading UX & Cleanup** - Phases 75-76 (shipped 2026-02-07)
-- ✅ **v1.19 P2P Lifecycle Cleanup** - Phases 77-78 (shipped 2026-02-07)
+- 🚧 **v1.19 P2P Lifecycle Cleanup** - Phases 77-79 (in progress)
 
 ## Phases
 
@@ -245,12 +245,13 @@ See [milestones/v1.11-ROADMAP.md](milestones/v1.11-ROADMAP.md) for full details.
 
 </details>
 
-### v1.19 P2P Lifecycle Cleanup (Shipped 2026-02-07)
+### v1.19 P2P Lifecycle Cleanup (In Progress)
 
 **Milestone Goal:** P2P connections are scoped to GymScenes — torn down on scene exit, with group history preserved for future re-pairing.
 
 - [x] **Phase 77: P2P Connection Scoping** - Close P2P/WebRTC on GymScene exit, suppress partner-disconnected overlay on non-game scenes
 - [x] **Phase 78: Group History Tracking** - Server tracks group membership across scenes, matchmakers can query for re-pairing
+- [ ] **Phase 79: Post-Game Scene Isolation Test** - E2E test: two players complete Overcooked, proceed to survey, one exits; remaining player stays on survey without partner-disconnected overlay
 
 ## Phase Details
 
@@ -527,6 +528,19 @@ Plans:
 Plans:
 - [x] 78-01-PLAN.md — Add GroupHistory dataclass, extend MatchCandidate, implement GroupReunionMatchmaker, wire group history into GameManager
 
+### Phase 79: Post-Game Scene Isolation Test
+**Goal**: E2E test validates that after two players complete Overcooked and advance to the survey scene, one player exiting does not trigger a partner-disconnected overlay on the remaining player
+**Depends on**: Phase 78
+**Success Criteria** (what must be TRUE):
+  1. Two Playwright-controlled players complete an Overcooked game together and advance to the survey scene
+  2. When one player closes their browser/tab on the survey scene, the remaining player does NOT see a partner-disconnected overlay
+  3. The remaining player's survey scene remains functional (not interrupted)
+**Research flag:** Unlikely — builds on existing E2E infrastructure
+**Plans:** 1 plan
+
+Plans:
+- [ ] 79-01-PLAN.md — Create multi-scene test server config, server fixture, and E2E test validating post-game scene isolation
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -564,7 +578,8 @@ Plans:
 | 76. Test & Roadmap Cleanup | v1.18 | 1/1 | Complete | 2026-02-07 |
 | 77. P2P Connection Scoping | v1.19 | 1/1 | Complete | 2026-02-07 |
 | 78. Group History Tracking | v1.19 | 1/1 | Complete | 2026-02-07 |
+| 79. Post-Game Scene Isolation Test | v1.19 | 0/1 | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-07 after Phase 78 complete (Group History Tracking)*
+*Last updated: 2026-02-07 after Phase 79 planned (Post-Game Scene Isolation Test)*
