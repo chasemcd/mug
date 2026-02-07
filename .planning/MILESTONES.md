@@ -1,17 +1,30 @@
 # Project Milestones: Interactive Gym P2P Multiplayer
 
-## v1.19 P2P Lifecycle Cleanup (In Progress)
+## v1.20 Pre-Game Countdown (In Progress)
 
-**Goal:** P2P connections scoped to GymScenes — torn down on scene exit, with group history preserved for future re-pairing.
+**Goal:** After matchmaking, show a 3-second countdown on the waiting room screen before transitioning to the gym scene.
 
 **Status:** Defining requirements
 
 **Target features:**
 
-- Close P2P/WebRTC connections when leaving a GymScene
-- No "partner disconnected" overlay on non-GymScene scenes
-- Track group membership across scene transitions
-- Group history available for custom matchmaker logic
+- 3-second countdown overlay on waiting room screen after match formed
+- "Players found!" message with 3-2-1 countdown visible to all matched players
+- Game start remains synced after countdown completes
+
+---
+
+## v1.19 P2P Lifecycle Cleanup (Shipped: 2026-02-07)
+
+**Delivered:** P2P connections scoped to GymScenes — torn down on scene exit, with group history preserved for future re-pairing.
+
+**Phases completed:** 77-79 (3 plans total)
+
+**Key accomplishments:**
+
+- Client-side P2P connection scoping via cleanupForSceneExit() + sceneExited guards
+- GroupReunionMatchmaker for re-pairing previous partners
+- E2E scene isolation test validates no stale overlays on post-game scenes
 
 ---
 

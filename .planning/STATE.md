@@ -5,17 +5,17 @@
 See: .planning/PROJECT.md (updated 2026-02-07)
 
 **Core value:** Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
-**Current focus:** v1.19 P2P Lifecycle Cleanup
+**Current focus:** v1.20 Pre-Game Countdown
 
 ## Current Position
 
-Milestone: v1.19 P2P Lifecycle Cleanup
-Phase: 79 of 79 (Post-Game Scene Isolation Test) — COMPLETE
-Plan: 01 of 01
-Status: Phase 79 complete, v1.19 milestone complete
-Last activity: 2026-02-07 — Completed 79-01-PLAN.md (Post-Game Scene Isolation Test)
+Milestone: v1.20 Pre-Game Countdown
+Phase: Not started (run /gsd:create-roadmap)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-02-07 — Milestone v1.20 started
 
-Progress: ██████████ 100%
+Progress: ░░░░░░░░░░ 0%
 
 ## Milestone History
 
@@ -603,12 +603,9 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-02-07
-Stopped at: Completed 79-01-PLAN.md (Post-Game Scene Isolation Test)
+Stopped at: Milestone v1.20 Pre-Game Countdown initialized
 Resume file: None
 
 ### Next Steps
 
-v1.19 P2P Lifecycle Cleanup milestone complete. All phases (77-79) executed:
-- Phase 77: Client-side P2P connection scoping (cleanupForSceneExit + sceneExited guards)
-- Phase 78: Group history tracking (GroupReunionMatchmaker)
-- Phase 79: E2E validation (scene isolation test passes)
+Run `/gsd:define-requirements` or `/gsd:create-roadmap` to scope and plan the milestone.

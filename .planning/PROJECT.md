@@ -8,22 +8,24 @@ A framework for running browser-based reinforcement learning experiments with hu
 
 Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
 
-## Current Milestone: v1.19 P2P Lifecycle Cleanup
+## Current Milestone: v1.20 Pre-Game Countdown
 
-**Goal:** P2P connections are scoped to GymScenes — torn down on scene exit, with group history preserved for future re-pairing.
+**Goal:** After matchmaking, show a brief countdown on the waiting room screen before transitioning to the gym scene, so players know a match was found and can prepare.
 
 **Target features:**
 
-- [ ] Close P2P/WebRTC connections when leaving a GymScene (scene transition or advance_scene)
-- [ ] No "partner disconnected" overlay on non-GymScene scenes (surveys, instructions, etc.)
-- [ ] Track group membership (who was paired with whom) across scene transitions
-- [ ] Group history available for custom matchmaker logic in future GymScenes
+- [ ] 3-second countdown overlay on waiting room screen after match is formed
+- [ ] "Players found! Starting in 3... 2... 1..." message visible to all matched players
+- [ ] Game start remains synced across all players after countdown completes
 
 **What done looks like:**
-- Participants finish a GymScene, advance to a survey — no disruption if partner disconnects
-- P2P connections are cleanly closed on scene exit (no lingering WebRTC state)
-- Server knows which participants were grouped together for potential future re-pairing
-- Custom matchmakers can query group history to re-pair previous partners
+- Players are matched in waitroom, see "Players found!" with a 3-2-1 countdown
+- After countdown, scene transitions to GymScene and gameplay begins synced
+- Countdown is hardcoded (3s, fixed message, always on for multiplayer)
+
+## Previous Milestone: v1.19 P2P Lifecycle Cleanup (Shipped: 2026-02-07)
+
+**Delivered:** P2P connections scoped to GymScenes — torn down on scene exit, with group history preserved for future re-pairing.
 
 ## Previous Milestone: v1.18 Loading UX & Cleanup (Shipped: 2026-02-07)
 
@@ -276,11 +278,16 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 
 ### Active
 
-*v1.19 P2P Lifecycle Cleanup:*
-- [ ] P2P connections closed on GymScene exit
-- [ ] No partner-disconnected overlay on non-GymScene scenes
-- [ ] Group membership tracked across scene transitions
-- [ ] Group history queryable by custom matchmakers
+*v1.20 Pre-Game Countdown:*
+- [ ] 3-second countdown overlay on waiting room screen after match formed
+- [ ] "Players found!" message with 3-2-1 countdown visible to all matched players
+- [ ] Game start remains synced across all players after countdown completes
+
+*Shipped in v1.19:*
+- ✓ P2P connections closed on GymScene exit — v1.19
+- ✓ No partner-disconnected overlay on non-GymScene scenes — v1.19
+- ✓ Group membership tracked across scene transitions — v1.19
+- ✓ Group history queryable by custom matchmakers — v1.19
 
 *Shipped in v1.18:*
 - ✓ Single merged loading screen (compat check + Pyodide) — v1.18
@@ -427,4 +434,4 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 | Pre-load over Web Worker for v1.16 | Per-frame Python (10-100ms) doesn't cause disconnects; only loadPyodide() does. Pre-loading is simpler and preserves synchronous rollback performance. Web Worker deferred. | ✓ Good |
 
 ---
-*Last updated: 2026-02-07 after v1.19 P2P Lifecycle Cleanup milestone started*
+*Last updated: 2026-02-07 after v1.20 Pre-Game Countdown milestone started*
