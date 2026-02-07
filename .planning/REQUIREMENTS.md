@@ -61,28 +61,28 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| APIC-01 | — | Pending |
-| APIC-02 | — | Pending |
-| APIC-03 | — | Pending |
-| APIC-04 | — | Pending |
-| APIC-05 | — | Pending |
-| APIC-06 | — | Pending |
-| CLNB-01 | — | Pending |
-| CLNB-02 | — | Pending |
-| EXMP-01 | — | Pending |
-| EXMP-02 | — | Pending |
-| EXMP-03 | — | Pending |
-| EXMP-04 | — | Pending |
-| EXMP-05 | — | Pending |
-| VERF-01 | — | Pending |
-| VERF-02 | — | Pending |
-| VERF-03 | — | Pending |
+| APIC-01 | Phase 67 | Pending |
+| APIC-02 | Phase 67 | Pending |
+| APIC-03 | Phase 67 | Pending |
+| APIC-04 | Phase 67 | Pending |
+| APIC-05 | Phase 67 | Pending |
+| APIC-06 | Phase 67 | Pending |
+| CLNB-01 | Phase 68 | Pending |
+| CLNB-02 | Phase 68 | Pending |
+| EXMP-01 | Phase 69 | Pending |
+| EXMP-02 | Phase 69 | Pending |
+| EXMP-03 | Phase 69 | Pending |
+| EXMP-04 | Phase 69 | Pending |
+| EXMP-05 | Phase 69 | Pending |
+| VERF-01 | Phase 70 | Pending |
+| VERF-02 | Phase 70 | Pending |
+| VERF-03 | Phase 70 | Pending |
 
 **Coverage:**
 - v1 requirements: 16 total
-- Mapped to phases: 0
-- Unmapped: 16 ⚠️ (awaiting roadmap creation)
+- Mapped to phases: 16
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-02-07*
-*Last updated: 2026-02-07 after initial definition*
+*Last updated: 2026-02-07 after roadmap creation*
