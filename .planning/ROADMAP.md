@@ -19,7 +19,7 @@
 - ✅ **v1.14 Data Parity Fix** - Phases 61-66 (shipped 2026-02-04)
 - ✅ **v1.16 Pyodide Pre-loading** - Phases 67-70 (shipped 2026-02-06)
 - ✅ **v1.17 E2E Test Reliability** - Phases 71-74 (shipped 2026-02-06)
-- 🚧 **v1.18 Loading UX & Cleanup** - Phases 75-76 (in progress)
+- ✅ **v1.18 Loading UX & Cleanup** - Phases 75-76 (shipped 2026-02-07)
 
 ## Phases
 
@@ -234,12 +234,12 @@ See [milestones/v1.11-ROADMAP.md](milestones/v1.11-ROADMAP.md) for full details.
 
 </details>
 
-### 🚧 v1.18 Loading UX & Cleanup (In Progress)
+### v1.18 Loading UX & Cleanup (Shipped 2026-02-07)
 
 **Milestone Goal:** Fix the double-loading screen UX and clean up accumulated tech debt from rapid milestone delivery.
 
 - [x] **Phase 75: Merged Loading Screen** - Single loading screen gating on both compat check and Pyodide readiness
-- [ ] **Phase 76: Test & Roadmap Cleanup** - Remove orphaned fixtures, consolidate helpers, update roadmap
+- [x] **Phase 76: Test & Roadmap Cleanup** - Remove orphaned fixtures, consolidate helpers, update roadmap
 
 ## Phase Details
 
@@ -485,7 +485,7 @@ Plans:
 **Plans:** 1 plan
 
 Plans:
-- [ ] 76-01-PLAN.md — Remove orphaned fixtures, consolidate helpers, update roadmap
+- [x] 76-01-PLAN.md — Remove orphaned fixtures, consolidate helpers, update roadmap
 
 ## Progress
 
@@ -521,8 +521,8 @@ Plans:
 | 73. Network & Regression Validation | v1.17 | 2/2 | Complete | 2026-02-06 |
 | 74. Stability Certification | v1.17 | 2/2 | Complete | 2026-02-06 |
 | 75. Merged Loading Screen | v1.18 | 2/2 | Complete | 2026-02-06 |
-| 76. Test & Roadmap Cleanup | v1.18 | 0/1 | Not started | - |
+| 76. Test & Roadmap Cleanup | v1.18 | 1/1 | Complete | 2026-02-07 |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-06 after Phase 76 planned (1 plan created)*
+*Last updated: 2026-02-07 after Phase 76 completed (76-01 executed)*
