@@ -69,6 +69,7 @@ from tests.fixtures.game_helpers import (
     click_advance_button,
     click_start_button,
     get_scene_id,
+    run_full_episode_flow,
     run_full_episode_flow_until_gameplay,
 )
 from tests.fixtures.input_helpers import (
@@ -82,73 +83,6 @@ from tests.fixtures.export_helpers import (
     wait_for_export_files,
     run_comparison,
 )
-
-
-def run_full_episode_flow(
-    page1, page2, base_url: str,
-    episode_timeout: int = 180000,
-    setup_timeout: int = 120000,
-) -> tuple:
-    """
-    Run the full game flow through one complete episode.
-
-    This helper encapsulates the game progression flow shared by all latency tests.
-
-    Args:
-        page1: Player 1's Playwright page
-        page2: Player 2's Playwright page
-        base_url: Flask server URL
-        episode_timeout: Timeout for episode completion in milliseconds
-        setup_timeout: Timeout for game setup (tutorial, matchmaking) in milliseconds
-
-    Returns:
-        tuple: (final_state1, final_state2) with game state dicts for both players
-    """
-    # Navigate to game
-    page1.goto(base_url)
-    page2.goto(base_url)
-
-    # Wait for socket connections (socket connect is fast even with latency)
-    wait_for_socket_connected(page1, timeout=30000)
-    wait_for_socket_connected(page2, timeout=30000)
-
-    # Pass instructions scene
-    click_advance_button(page1, timeout=setup_timeout)
-    click_advance_button(page2, timeout=setup_timeout)
-
-    # Click startButton for multiplayer scene
-    click_start_button(page1, timeout=setup_timeout)
-    click_start_button(page2, timeout=setup_timeout)
-
-    # Wait for game to start (matchmaking + P2P connection)
-    # High latency significantly affects WebRTC signaling
-    wait_for_game_canvas(page1, timeout=setup_timeout)
-    wait_for_game_canvas(page2, timeout=setup_timeout)
-
-    # Verify game objects initialized
-    wait_for_game_object(page1, timeout=setup_timeout)
-    wait_for_game_object(page2, timeout=setup_timeout)
-
-    # Override visibility for Playwright automation
-    # Without this, FocusManager thinks tab is backgrounded and skips frame processing
-    set_tab_visibility(page1, visible=True)
-    set_tab_visibility(page2, visible=True)
-
-    # Verify both players are in same game
-    state1 = get_game_state(page1)
-    state2 = get_game_state(page2)
-    assert state1["gameId"] == state2["gameId"], "Players should be in same game"
-    assert state1["playerId"] != state2["playerId"], "Players should have different IDs"
-
-    # Wait for first episode to complete (players idle, episode ends via time limit)
-    wait_for_episode_complete(page1, episode_num=1, timeout=episode_timeout)
-    wait_for_episode_complete(page2, episode_num=1, timeout=episode_timeout)
-
-    # Return final states
-    final_state1 = get_game_state(page1)
-    final_state2 = get_game_state(page2)
-
-    return final_state1, final_state2
 
 
 # =============================================================================
