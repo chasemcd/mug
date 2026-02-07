@@ -249,7 +249,7 @@ See [milestones/v1.11-ROADMAP.md](milestones/v1.11-ROADMAP.md) for full details.
 
 **Milestone Goal:** P2P connections are scoped to GymScenes — torn down on scene exit, with group history preserved for future re-pairing.
 
-- [ ] **Phase 77: P2P Connection Scoping** - Close P2P/WebRTC on GymScene exit, suppress partner-disconnected overlay on non-game scenes
+- [x] **Phase 77: P2P Connection Scoping** - Close P2P/WebRTC on GymScene exit, suppress partner-disconnected overlay on non-game scenes
 - [ ] **Phase 78: Group History Tracking** - Server tracks group membership across scenes, matchmakers can query for re-pairing
 
 ## Phase Details
@@ -510,7 +510,7 @@ Plans:
 **Plans:** 1 plan
 
 Plans:
-- [ ] 77-01-PLAN.md — Add cleanupForSceneExit() and sceneExited guards to scope P2P connections to GymScene lifetime
+- [x] 77-01-PLAN.md — Add cleanupForSceneExit() and sceneExited guards to scope P2P connections to GymScene lifetime
 
 ### Phase 78: Group History Tracking
 **Goal**: Server tracks who was paired with whom across scene transitions, queryable by custom matchmakers for re-pairing
@@ -562,9 +562,9 @@ Plans:
 | 74. Stability Certification | v1.17 | 2/2 | Complete | 2026-02-06 |
 | 75. Merged Loading Screen | v1.18 | 2/2 | Complete | 2026-02-06 |
 | 76. Test & Roadmap Cleanup | v1.18 | 1/1 | Complete | 2026-02-07 |
-| 77. P2P Connection Scoping | v1.19 | 0/1 | Not started | - |
+| 77. P2P Connection Scoping | v1.19 | 1/1 | Complete | 2026-02-07 |
 | 78. Group History Tracking | v1.19 | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-07 after Phase 77 planned (1 plan, 1 wave)*
+*Last updated: 2026-02-07 after Phase 77 complete (P2P Connection Scoping)*

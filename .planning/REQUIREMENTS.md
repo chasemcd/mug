@@ -9,8 +9,8 @@ Requirements for v1.19 P2P Lifecycle Cleanup. Each maps to roadmap phases.
 
 ### P2P Lifecycle
 
-- [ ] **P2P-01**: P2P/WebRTC connections are closed when a GymScene exits (via scene transition or advance_scene)
-- [ ] **P2P-02**: Partner-disconnected overlay is not shown on non-GymScene scenes (surveys, instructions, end screens)
+- [x] **P2P-01**: P2P/WebRTC connections are closed when a GymScene exits (via scene transition or advance_scene)
+- [x] **P2P-02**: Partner-disconnected overlay is not shown on non-GymScene scenes (surveys, instructions, end screens)
 - [ ] **P2P-03**: Server tracks group membership (which participants were paired together) across scene transitions
 - [ ] **P2P-04**: Custom matchmakers can query group history to re-pair previous partners in future GymScenes
 
@@ -56,8 +56,8 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| P2P-01 | Phase 77 | Pending |
-| P2P-02 | Phase 77 | Pending |
+| P2P-01 | Phase 77 | Complete |
+| P2P-02 | Phase 77 | Complete |
 | P2P-03 | Phase 78 | Pending |
 | P2P-04 | Phase 78 | Pending |
 
@@ -68,4 +68,4 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 ---
 *Requirements defined: 2026-02-07*
-*Last updated: 2026-02-07 after roadmap created*
+*Last updated: 2026-02-07 after Phase 77 complete*
