@@ -16,10 +16,10 @@ Requirements for v1.18 Loading UX & Cleanup. Each maps to roadmap phases.
 
 ### Test Cleanup
 
-- [ ] **CLEAN-01**: Orphaned `flask_server_multi_episode` fixture removed from `tests/conftest.py`
-- [ ] **CLEAN-02**: Unused `run_full_episode_flow` import removed from `test_network_disruption.py`
-- [ ] **CLEAN-03**: Duplicate `run_full_episode_flow` consolidated into `tests/fixtures/game_helpers.py` (single source of truth)
-- [ ] **CLEAN-04**: v1.14 Phases 65-66 marked complete in ROADMAP.md (work was done, roadmap not updated)
+- [x] **CLEAN-01**: Orphaned `flask_server_multi_episode` fixture removed from `tests/conftest.py`
+- [x] **CLEAN-02**: Unused `run_full_episode_flow` import removed from `test_network_disruption.py`
+- [x] **CLEAN-03**: Duplicate `run_full_episode_flow` consolidated into `tests/fixtures/game_helpers.py` (single source of truth)
+- [x] **CLEAN-04**: v1.14 Phases 65-66 marked complete in ROADMAP.md (work was done, roadmap not updated)
 
 ## v2 Requirements
 
@@ -66,10 +66,10 @@ Which phases cover which requirements. Updated by create-roadmap.
 | LOAD-02 | Phase 75 | Complete |
 | LOAD-03 | Phase 75 | Complete |
 | LOAD-04 | Phase 75 | Complete |
-| CLEAN-01 | Phase 76 | Pending |
-| CLEAN-02 | Phase 76 | Pending |
-| CLEAN-03 | Phase 76 | Pending |
-| CLEAN-04 | Phase 76 | Pending |
+| CLEAN-01 | Phase 76 | Complete |
+| CLEAN-02 | Phase 76 | Complete |
+| CLEAN-03 | Phase 76 | Complete |
+| CLEAN-04 | Phase 76 | Complete |
 
 **Coverage:**
 - v1 requirements: 8 total
@@ -78,4 +78,4 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 ---
 *Requirements defined: 2026-02-07*
-*Last updated: 2026-02-06 after Phase 75 complete (LOAD-01 through LOAD-04 verified)*
+*Last updated: 2026-02-07 after Phase 76 complete (CLEAN-01 through CLEAN-04 verified)*
