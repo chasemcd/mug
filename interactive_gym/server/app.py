@@ -2975,7 +2975,8 @@ def run(config):
         game_managers=GAME_MANAGERS,
         pyodide_coordinator=PYODIDE_COORDINATOR,
         processed_subjects=PROCESSED_SUBJECT_NAMES,
-        save_console_logs=CONFIG.save_experiment_data
+        save_console_logs=CONFIG.save_experiment_data,
+        experiment_id=CONFIG.experiment_id
     )
     ADMIN_AGGREGATOR.start_broadcast_loop(interval_seconds=1.0)
     logger.info("Admin event aggregator initialized and broadcast loop started")

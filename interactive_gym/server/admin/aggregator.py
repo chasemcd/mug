@@ -47,10 +47,6 @@ class AdminEventAggregator:
     # Maximum number of console log entries to retain
     MAX_CONSOLE_LOG_SIZE = 1000
 
-    # Directory for persisted console logs
-    # TODO(chase): Use the experiment_id here. 
-    CONSOLE_LOGS_DIR = "data/console_logs"
-
     def __init__(
         self,
         sio: flask_socketio.SocketIO,
@@ -59,7 +55,8 @@ class AdminEventAggregator:
         game_managers: dict,         # GAME_MANAGERS
         pyodide_coordinator: PyodideGameCoordinator | None = None,
         processed_subjects: list | None = None,  # PROCESSED_SUBJECT_NAMES
-        save_console_logs: bool = True
+        save_console_logs: bool = True,
+        experiment_id: str | None = None
     ):
         """
         Initialize the aggregator with references to experiment state.
@@ -73,6 +70,12 @@ class AdminEventAggregator:
             processed_subjects: Optional list of completed subject IDs
             save_console_logs: Whether to persist console logs to disk
         """
+        # Set console logs directory using experiment_id
+        if experiment_id:
+            self.console_logs_dir = f"data/{experiment_id}/console_logs"
+        else:
+            self.console_logs_dir = "data/console_logs"
+
         # Store references (read-only access)
         # Do NOT modify these - observer pattern only
         self.sio = sio
@@ -94,8 +97,8 @@ class AdminEventAggregator:
 
         # Create console logs directory if saving enabled
         if self._save_console_logs:
-            os.makedirs(self.CONSOLE_LOGS_DIR, exist_ok=True)
-            logger.info(f"Console logs will be saved to {self.CONSOLE_LOGS_DIR}/")
+            os.makedirs(self.console_logs_dir, exist_ok=True)
+            logger.info(f"Console logs will be saved to {self.console_logs_dir}/")
 
         # Session completion tracking for duration calculation
         # Maps subject_id -> {started_at: float, completed_at: float}
@@ -1292,7 +1295,7 @@ class AdminEventAggregator:
             # Get or create file handle for this subject
             if subject_id not in self._console_log_files:
                 filepath = os.path.join(
-                    self.CONSOLE_LOGS_DIR,
+                    self.console_logs_dir,
                     f"{subject_id}_console.jsonl"
                 )
                 self._console_log_files[subject_id] = open(filepath, 'a', encoding='utf-8')
