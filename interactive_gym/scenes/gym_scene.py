@@ -113,6 +113,7 @@ class GymScene(scene.Scene):
         # user_experience
         self.scene_header: str = None
         self.scene_body: str = None
+        self.in_game_scene_body: str = None
         self.waitroom_timeout_redirect_url: str = None
         self.waitroom_timeout_scene_id: str = None  # Scene to jump to on waitroom timeout
         self.waitroom_timeout: int = 120000
@@ -534,6 +535,102 @@ class GymScene(scene.Scene):
                 in_game_scene_body_filepath is NotProvided
             ), "Cannot set both filepath and html_body."
             self.in_game_scene_body = in_game_scene_body
+
+        return self
+
+    def content(
+        self,
+        scene_header: str = NotProvided,
+        scene_body: str = NotProvided,
+        scene_body_filepath: str = NotProvided,
+        in_game_scene_body: str = NotProvided,
+        in_game_scene_body_filepath: str = NotProvided,
+        game_page_html_fn: Callable = NotProvided,
+    ):
+        """Configure scene content display.
+
+        :param scene_header: Header text for the scene, defaults to NotProvided
+        :type scene_header: str, optional
+        :param scene_body: HTML body content for the scene, defaults to NotProvided
+        :type scene_body: str, optional
+        :param scene_body_filepath: Path to a file containing HTML body content, defaults to NotProvided
+        :type scene_body_filepath: str, optional
+        :param in_game_scene_body: HTML body content displayed during gameplay, defaults to NotProvided
+        :type in_game_scene_body: str, optional
+        :param in_game_scene_body_filepath: Path to a file containing in-game HTML body, defaults to NotProvided
+        :type in_game_scene_body_filepath: str, optional
+        :param game_page_html_fn: Function to generate custom game page HTML, defaults to NotProvided
+        :type game_page_html_fn: Callable, optional
+        :return: This scene object
+        :rtype: GymScene
+        """
+        if scene_header is not NotProvided:
+            self.scene_header = scene_header
+
+        if game_page_html_fn is not NotProvided:
+            self.game_page_html_fn = game_page_html_fn
+
+        if scene_body_filepath is not NotProvided:
+            assert (
+                scene_body is NotProvided
+            ), "Cannot set both filepath and html_body."
+
+            with open(scene_body_filepath, "r", encoding="utf-8") as f:
+                self.scene_body = f.read()
+
+        if scene_body is not NotProvided:
+            assert (
+                scene_body_filepath is NotProvided
+            ), "Cannot set both filepath and html_body."
+            self.scene_body = scene_body
+
+        if in_game_scene_body_filepath is not NotProvided:
+            assert (
+                in_game_scene_body is NotProvided
+            ), "Cannot set both filepath and html_body."
+
+            with open(in_game_scene_body_filepath, "r", encoding="utf-8") as f:
+                self.in_game_scene_body = f.read()
+
+        if in_game_scene_body is not NotProvided:
+            assert (
+                in_game_scene_body_filepath is NotProvided
+            ), "Cannot set both filepath and html_body."
+            self.in_game_scene_body = in_game_scene_body
+
+        return self
+
+    def waitroom(
+        self,
+        timeout: int = NotProvided,
+        timeout_redirect_url: str = NotProvided,
+        timeout_scene_id: str = NotProvided,
+        timeout_message: str = NotProvided,
+    ):
+        """Configure waitroom behavior.
+
+        :param timeout: Timeout for waitroom in milliseconds, defaults to NotProvided
+        :type timeout: int, optional
+        :param timeout_redirect_url: URL to redirect to if waitroom times out, defaults to NotProvided
+        :type timeout_redirect_url: str, optional
+        :param timeout_scene_id: Scene ID to jump to if waitroom times out, defaults to NotProvided
+        :type timeout_scene_id: str, optional
+        :param timeout_message: Custom message when waitroom times out, defaults to NotProvided
+        :type timeout_message: str, optional
+        :return: This scene object
+        :rtype: GymScene
+        """
+        if timeout is not NotProvided:
+            self.waitroom_timeout = timeout
+
+        if timeout_redirect_url is not NotProvided:
+            self.waitroom_timeout_redirect_url = timeout_redirect_url
+
+        if timeout_scene_id is not NotProvided:
+            self.waitroom_timeout_scene_id = timeout_scene_id
+
+        if timeout_message is not NotProvided:
+            self.waitroom_timeout_message = timeout_message
 
         return self
 
