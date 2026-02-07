@@ -1334,9 +1334,10 @@ function activateScene(data) {
     console.log(data);
     currentSceneMetadata = data;
 
-    // If screening is still in progress, queue the scene for later
-    if (!experimentScreeningComplete) {
-        console.log("[Scene] Screening in progress, queueing scene:", data.scene_type);
+    // If loading gate hasn't resolved, queue the scene for later.
+    // The gate requires both screening AND Pyodide to complete before proceeding.
+    if (!loadingGate.gateResolved) {
+        console.log("[Scene] Loading gate not resolved, queueing scene:", data.scene_type);
         pendingSceneData = data;
         return;
     }
