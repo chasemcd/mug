@@ -22,7 +22,7 @@
 - ✅ **v1.18 Loading UX & Cleanup** - Phases 75-76 (shipped 2026-02-07)
 - ✅ **v1.19 P2P Lifecycle Cleanup** - Phases 77-79 (shipped 2026-02-07)
 - ✅ **v1.20 Pre-Game Countdown** - Phase 80 (shipped 2026-02-07)
-- 🚧 **v1.21 Latency-Aware Matchmaking** - Phases 81-82 (in progress)
+- ✅ **v1.21 Latency-Aware Matchmaking** - Phases 81-82 (shipped 2026-02-07)
 
 ## Phases
 
@@ -264,12 +264,12 @@ See [milestones/v1.11-ROADMAP.md](milestones/v1.11-ROADMAP.md) for full details.
 
 - [x] **Phase 80: Pre-Game Countdown** - 3-second "Players found! 3... 2... 1..." countdown on waiting room after match, synced game start
 
-### 🚧 v1.21 Latency-Aware Matchmaking (In Progress)
+### v1.21 Latency-Aware Matchmaking (Shipped 2026-02-07)
 
 **Milestone Goal:** A FIFO matchmaker that pre-filters candidates by server RTT heuristic before proposing matches, then verifies with P2P probe — so only low-latency pairs get matched.
 
 - [x] **Phase 81: LatencyFIFOMatchmaker Core** - Server RTT pre-filtering with configurable threshold and graceful fallback
-- [ ] **Phase 82: Scene API & P2P Probe Integration** - Wire into scene.matchmaking(), verify P2P probe coordination
+- [x] **Phase 82: Scene API & P2P Probe Integration** - Wire into scene.matchmaking(), verify P2P probe coordination
 
 ## Phase Details
 
@@ -601,7 +601,7 @@ Plans:
 **Plans:** 1 plan
 
 Plans:
-- [ ] 82-01-PLAN.md — Integration tests for scene API and P2P probe wiring + example config update
+- [x] 82-01-PLAN.md — Integration tests for scene API and P2P probe wiring + example config update
 
 ## Progress
 
@@ -643,8 +643,8 @@ Plans:
 | 79. Post-Game Scene Isolation Test | v1.19 | 1/1 | Complete | 2026-02-07 |
 | 80. Pre-Game Countdown | v1.20 | 1/1 | Complete | 2026-02-07 |
 | 81. LatencyFIFOMatchmaker Core | v1.21 | 1/1 | Complete | 2026-02-07 |
-| 82. Scene API & P2P Probe Integration | v1.21 | 0/1 | Not started | - |
+| 82. Scene API & P2P Probe Integration | v1.21 | 1/1 | Complete | 2026-02-07 |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-07 after Phase 82 planning*
+*Last updated: 2026-02-07 after Phase 82 execution*

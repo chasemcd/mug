@@ -11,9 +11,9 @@ Requirements for v1.21 Latency-Aware Matchmaking. Each maps to roadmap phases.
 
 - [ ] **MATCH-01**: LatencyFIFOMatchmaker class extends Matchmaker base with server RTT pre-filtering in `find_match()`
 - [ ] **MATCH-02**: Researcher can configure `max_server_rtt_ms` threshold for estimated P2P RTT filtering (estimated P2P RTT = sum of server RTTs)
-- [ ] **MATCH-03**: LatencyFIFOMatchmaker integrates with existing `max_p2p_rtt_ms` for post-match P2P probe verification
+- [x] **MATCH-03**: LatencyFIFOMatchmaker integrates with existing `max_p2p_rtt_ms` for post-match P2P probe verification
 - [ ] **MATCH-04**: LatencyFIFOMatchmaker falls back gracefully when server RTT data is unavailable for a candidate
-- [ ] **MATCH-05**: Researcher can configure LatencyFIFOMatchmaker via `scene.matchmaking(matchmaker=LatencyFIFOMatchmaker(...))`
+- [x] **MATCH-05**: Researcher can configure LatencyFIFOMatchmaker via `scene.matchmaking(matchmaker=LatencyFIFOMatchmaker(...))`
 
 ## v2 Requirements
 
@@ -60,9 +60,9 @@ Which phases cover which requirements. Updated by create-roadmap.
 |-------------|-------|--------|
 | MATCH-01 | Phase 81 | Complete |
 | MATCH-02 | Phase 81 | Complete |
-| MATCH-03 | Phase 82 | Pending |
+| MATCH-03 | Phase 82 | Complete |
 | MATCH-04 | Phase 81 | Complete |
-| MATCH-05 | Phase 82 | Pending |
+| MATCH-05 | Phase 82 | Complete |
 
 **Coverage:**
 - v1 requirements: 5 total
@@ -71,4 +71,4 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 ---
 *Requirements defined: 2026-02-07*
-*Last updated: 2026-02-07 after Phase 81 execution*
+*Last updated: 2026-02-07 after Phase 82 execution*
