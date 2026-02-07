@@ -20,7 +20,7 @@
 - ✅ **v1.16 Pyodide Pre-loading** - Phases 67-70 (shipped 2026-02-06)
 - ✅ **v1.17 E2E Test Reliability** - Phases 71-74 (shipped 2026-02-06)
 - ✅ **v1.18 Loading UX & Cleanup** - Phases 75-76 (shipped 2026-02-07)
-- 🚧 **v1.19 P2P Lifecycle Cleanup** - Phases 77-78 (in progress)
+- ✅ **v1.19 P2P Lifecycle Cleanup** - Phases 77-78 (shipped 2026-02-07)
 
 ## Phases
 
@@ -245,12 +245,12 @@ See [milestones/v1.11-ROADMAP.md](milestones/v1.11-ROADMAP.md) for full details.
 
 </details>
 
-### v1.19 P2P Lifecycle Cleanup (In Progress)
+### v1.19 P2P Lifecycle Cleanup (Shipped 2026-02-07)
 
 **Milestone Goal:** P2P connections are scoped to GymScenes — torn down on scene exit, with group history preserved for future re-pairing.
 
 - [x] **Phase 77: P2P Connection Scoping** - Close P2P/WebRTC on GymScene exit, suppress partner-disconnected overlay on non-game scenes
-- [ ] **Phase 78: Group History Tracking** - Server tracks group membership across scenes, matchmakers can query for re-pairing
+- [x] **Phase 78: Group History Tracking** - Server tracks group membership across scenes, matchmakers can query for re-pairing
 
 ## Phase Details
 
@@ -525,7 +525,7 @@ Plans:
 **Plans:** 1 plan
 
 Plans:
-- [ ] 78-01-PLAN.md — Add GroupHistory dataclass, extend MatchCandidate, implement GroupReunionMatchmaker, wire group history into GameManager
+- [x] 78-01-PLAN.md — Add GroupHistory dataclass, extend MatchCandidate, implement GroupReunionMatchmaker, wire group history into GameManager
 
 ## Progress
 
@@ -563,8 +563,8 @@ Plans:
 | 75. Merged Loading Screen | v1.18 | 2/2 | Complete | 2026-02-06 |
 | 76. Test & Roadmap Cleanup | v1.18 | 1/1 | Complete | 2026-02-07 |
 | 77. P2P Connection Scoping | v1.19 | 1/1 | Complete | 2026-02-07 |
-| 78. Group History Tracking | v1.19 | 0/1 | Not started | - |
+| 78. Group History Tracking | v1.19 | 1/1 | Complete | 2026-02-07 |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-07 after Phase 78 planned (Group History Tracking)*
+*Last updated: 2026-02-07 after Phase 78 complete (Group History Tracking)*
