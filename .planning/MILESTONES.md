@@ -1,16 +1,32 @@
 # Project Milestones: Interactive Gym P2P Multiplayer
 
-## v1.20 Pre-Game Countdown (In Progress)
+## v1.21 Latency-Aware Matchmaking (In Progress)
 
-**Goal:** After matchmaking, show a 3-second countdown on the waiting room screen before transitioning to the gym scene.
+**Goal:** A FIFO matchmaker that pre-filters candidates by server RTT heuristic before proposing matches, then verifies with P2P probe.
 
 **Status:** Defining requirements
 
 **Target features:**
 
-- 3-second countdown overlay on waiting room screen after match formed
-- "Players found!" message with 3-2-1 countdown visible to all matched players
-- Game start remains synced after countdown completes
+- LatencyFIFOMatchmaker class with server RTT pre-filtering in find_match()
+- Configurable max_server_rtt_ms threshold (estimated P2P RTT = sum of server RTTs)
+- Integration with existing max_p2p_rtt_ms for post-match P2P probe verification
+- Graceful fallback when server RTT data unavailable
+
+---
+
+## v1.20 Pre-Game Countdown (Shipped: 2026-02-07)
+
+**Delivered:** 3-second "Players found!" countdown on waiting room screen after matchmaking, synced game start.
+
+**Phases completed:** 80 (1 plan)
+
+**Key accomplishments:**
+
+- Server-side `_start_game_with_countdown()` method with background greenlet
+- Client-side `match_found_countdown` socket handler with 3-2-1 countdown display
+- Single-player guard skips countdown for non-multiplayer games
+- Uses `sio.start_background_task()` to avoid holding `waiting_games_lock` during 3s sleep
 
 ---
 

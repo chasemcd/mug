@@ -5,33 +5,33 @@
 See: .planning/PROJECT.md (updated 2026-02-07)
 
 **Core value:** Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
-**Current focus:** v1.20 Pre-Game Countdown — COMPLETE
+**Current focus:** v1.21 Latency-Aware Matchmaking — defining requirements
 
 ## Current Position
 
-Phase: 80 of 80 (Pre-Game Countdown)
-Plan: 1 of 1
-Status: Milestone complete — v1.20 shipped
-Last activity: 2026-02-07 — Phase 80 verified and complete
+Phase: Not started (run /gsd:define-requirements then /gsd:create-roadmap)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-02-07 — Milestone v1.21 started
 
-Progress: ██████████ 100%
+Progress: ░░░░░░░░░░ 0%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 1 (v1.20)
-- Average duration: 3m 28s
-- Total execution time: ~0.06 hours
+- Total plans completed: 0 (v1.21)
+- Average duration: —
+- Total execution time: 0 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 80 | 1/1 | 3m 28s | 3m 28s |
+| — | — | — | — |
 
 **Recent Trend:**
-- Last 5 plans: 80-01 (3m 28s)
-- Trend: N/A (first plan)
+- Last 5 plans: —
+- Trend: —
 
 ## Accumulated Context
 
@@ -41,29 +41,28 @@ Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
 - [v1.20 Phase 80]: Use sio.start_background_task() for countdown to avoid holding waiting_games_lock during 3s sleep
-- [v1.19 Phase 77]: sceneExited flag guards prevent P2P overlays on non-GymScene scenes
-- [v1.18 Phase 75]: loadingGate object coordinates compat check + Pyodide readiness
+- [v1.13 Phase 59]: max_p2p_rtt_ms threshold on Matchmaker base class for post-match P2P probe rejection
 
-### Key Files for v1.20
+### Key Files for v1.21
 
-**Waiting room flow (modified in 80-01):**
-- `interactive_gym/server/game_manager.py` — `_start_game_with_countdown()` method, `start_game()` emits `start_game` to game room
-- `interactive_gym/server/static/js/index.js` — `match_found_countdown` handler (line ~904), `waiting_room` handler (line ~932), `start_game` handler (line ~840)
-- `interactive_gym/server/static/js/ui_utils.js` — waitroom text display
+**Matchmaker classes (will be modified):**
+- `interactive_gym/server/matchmaker.py` — Matchmaker base, FIFOMatchmaker, GroupReunionMatchmaker, MatchCandidate
+- `interactive_gym/server/game_manager.py` — _try_match(), _probe_and_create_game(), _on_probe_complete()
+- `interactive_gym/server/probe_coordinator.py` — ProbeCoordinator for P2P RTT measurement
 
-**Scene configuration:**
-- `interactive_gym/scenes/gym_scene.py` — GymScene config properties
+**Configuration:**
+- `interactive_gym/scenes/gym_scene.py` — GymScene.matchmaking() config method
 
 ### Pending Todos
 
-None.
+None yet.
 
 ### Blockers/Concerns
 
-- Pre-existing E2E multiplayer_basic test failures (players matched to separate games). Unrelated to v1.20 changes -- confirmed by baseline test run.
+- Pre-existing E2E multiplayer_basic test failures (players matched to separate games). Unrelated to v1.21 changes.
 
 ## Session Continuity
 
 Last session: 2026-02-07
-Stopped at: v1.20 milestone complete — Phase 80 verified
+Stopped at: Milestone v1.21 started — ready for requirements definition
 Resume file: None

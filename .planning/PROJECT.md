@@ -8,20 +8,26 @@ A framework for running browser-based reinforcement learning experiments with hu
 
 Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
 
-## Current Milestone: v1.20 Pre-Game Countdown
+## Current Milestone: v1.21 Latency-Aware Matchmaking
 
-**Goal:** After matchmaking, show a brief countdown on the waiting room screen before transitioning to the gym scene, so players know a match was found and can prepare.
+**Goal:** A FIFO matchmaker that pre-filters candidates by server RTT heuristic before proposing matches, then verifies with P2P probe — so only low-latency pairs get matched.
 
 **Target features:**
 
-- [ ] 3-second countdown overlay on waiting room screen after match is formed
-- [ ] "Players found! Starting in 3... 2... 1..." message visible to all matched players
-- [ ] Game start remains synced across all players after countdown completes
+- [ ] `LatencyFIFOMatchmaker` class: FIFO ordering with server RTT pre-filtering in `find_match()`
+- [ ] Configurable `max_server_rtt_ms` threshold for pre-filtering (estimated P2P RTT = sum of server RTTs)
+- [ ] Works with existing `max_p2p_rtt_ms` for post-match P2P probe verification
+- [ ] Exposed via `scene.matchmaking(matchmaker=LatencyFIFOMatchmaker(...))`
 
 **What done looks like:**
-- Players are matched in waitroom, see "Players found!" with a 3-2-1 countdown
-- After countdown, scene transitions to GymScene and gameplay begins synced
-- Countdown is hardcoded (3s, fixed message, always on for multiplayer)
+- Researcher configures `LatencyFIFOMatchmaker(max_server_rtt_ms=200, max_p2p_rtt_ms=150)`
+- `find_match()` skips candidates where sum of server RTTs exceeds threshold
+- Post-match P2P probe verifies actual latency before game creation
+- Falls back gracefully when server RTT data is unavailable
+
+## Previous Milestone: v1.20 Pre-Game Countdown (Shipped: 2026-02-07)
+
+**Delivered:** 3-second "Players found!" countdown on waiting room screen after matchmaking, synced game start.
 
 ## Previous Milestone: v1.19 P2P Lifecycle Cleanup (Shipped: 2026-02-07)
 
@@ -278,10 +284,16 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 
 ### Active
 
-*v1.20 Pre-Game Countdown:*
-- [ ] 3-second countdown overlay on waiting room screen after match formed
-- [ ] "Players found!" message with 3-2-1 countdown visible to all matched players
-- [ ] Game start remains synced across all players after countdown completes
+*v1.21 Latency-Aware Matchmaking:*
+- [ ] LatencyFIFOMatchmaker class with server RTT pre-filtering in find_match()
+- [ ] Configurable max_server_rtt_ms threshold for estimated P2P RTT filtering
+- [ ] Integration with existing max_p2p_rtt_ms for post-match P2P probe verification
+- [ ] Graceful fallback when server RTT data unavailable
+
+*Shipped in v1.20:*
+- ✓ 3-second countdown overlay on waiting room screen after match formed — v1.20
+- ✓ "Players found!" message with 3-2-1 countdown visible to all matched players — v1.20
+- ✓ Game start remains synced across all players after countdown completes — v1.20
 
 *Shipped in v1.19:*
 - ✓ P2P connections closed on GymScene exit — v1.19
@@ -383,7 +395,7 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 
 ### Out of Scope
 
-- Ping-based matchmaking — deferred to future milestone
+- ~~Ping-based matchmaking — deferred to future milestone~~ → Delivering in v1.21
 - Server-authoritative mode removal — keeping as parallel option
 - Mobile/native clients — browser-only for now
 - Spectator mode — not needed for research use case
@@ -434,4 +446,4 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 | Pre-load over Web Worker for v1.16 | Per-frame Python (10-100ms) doesn't cause disconnects; only loadPyodide() does. Pre-loading is simpler and preserves synchronous rollback performance. Web Worker deferred. | ✓ Good |
 
 ---
-*Last updated: 2026-02-07 after v1.20 Pre-Game Countdown milestone started*
+*Last updated: 2026-02-07 after v1.21 Latency-Aware Matchmaking milestone started*
