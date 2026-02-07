@@ -16,9 +16,10 @@
 - ✅ **v1.11 Data Export Edge Cases** - Phases 48-50 (shipped 2026-02-02) → [archive](milestones/v1.11-ROADMAP.md)
 - ✅ **v1.12 Waiting Room Overhaul** - Phases 51-56 (shipped 2026-02-03)
 - ✅ **v1.13 Matchmaker Hardening** - Phases 57-60 (shipped 2026-02-03)
-- 🚧 **v1.14 Data Parity Fix** - Phases 61-66 (in progress)
+- ✅ **v1.14 Data Parity Fix** - Phases 61-66 (shipped 2026-02-04)
 - ✅ **v1.16 Pyodide Pre-loading** - Phases 67-70 (shipped 2026-02-06)
 - ✅ **v1.17 E2E Test Reliability** - Phases 71-74 (shipped 2026-02-06)
+- 🚧 **v1.18 Loading UX & Cleanup** - Phases 75-76 (in progress)
 
 ## Phases
 
@@ -198,7 +199,8 @@ See [milestones/v1.11-ROADMAP.md](milestones/v1.11-ROADMAP.md) for full details.
 
 </details>
 
-### v1.14 Data Parity Fix (In Progress)
+<details>
+<summary>v1.14 Data Parity Fix (Phases 61-66) - SHIPPED 2026-02-04</summary>
 
 **Milestone Goal:** Fix the rare data parity divergence bug and add comprehensive multi-participant E2E stress tests. Data parity must be EXACT — both players export identical data for every frame under all network conditions.
 
@@ -206,8 +208,10 @@ See [milestones/v1.11-ROADMAP.md](milestones/v1.11-ROADMAP.md) for full details.
 - [x] **Phase 62: Data Parity Validation** - Ensure identical exports for actions/rewards/infos
 - [x] **Phase 63: Parity Test Stabilization** - E2E tests pass consistently (10+ runs)
 - [x] **Phase 64: Multi-Participant Test Infrastructure** - Support 6 concurrent participants
-- [ ] **Phase 65: Multi-Episode and Lifecycle Stress Tests** - Comprehensive lifecycle coverage
-- [ ] **Phase 66: Server Recovery Validation** - Prove server recovers from chaos correctly
+- [x] **Phase 65: Multi-Episode and Lifecycle Stress Tests** - Comprehensive lifecycle coverage
+- [x] **Phase 66: Server Recovery Validation** - Prove server recovers from chaos correctly
+
+</details>
 
 ### v1.16 Pyodide Pre-loading (Shipped 2026-02-06)
 
@@ -218,7 +222,8 @@ See [milestones/v1.11-ROADMAP.md](milestones/v1.11-ROADMAP.md) for full details.
 - [x] **Phase 69: Server-Side Init Grace** - Server tolerates missed pings during Pyodide loading
 - [x] **Phase 70: Validation & Test Stabilization** - Remove stagger, prove concurrent starts work
 
-### v1.17 E2E Test Reliability (In Progress)
+<details>
+<summary>v1.17 E2E Test Reliability (Phases 71-74) - SHIPPED 2026-02-06</summary>
 
 **Milestone Goal:** Achieve 100% pass rate for all E2E tests with zero flakiness -- every test passes 10+ consecutive runs.
 
@@ -226,6 +231,15 @@ See [milestones/v1.11-ROADMAP.md](milestones/v1.11-ROADMAP.md) for full details.
 - [x] **Phase 72: Latency Test Diagnosis** - Root cause and fix for 200ms latency test timeout
 - [x] **Phase 73: Network & Regression Validation** - All test suites pass (network disruption, data comparison, multiplayer, multi-participant, focus loss)
 - [x] **Phase 74: Stability Certification** - Full suite stable, GGPO parity limitation documented
+
+</details>
+
+### 🚧 v1.18 Loading UX & Cleanup (In Progress)
+
+**Milestone Goal:** Fix the double-loading screen UX and clean up accumulated tech debt from rapid milestone delivery.
+
+- [ ] **Phase 75: Merged Loading Screen** - Single loading screen gating on both compat check and Pyodide readiness
+- [ ] **Phase 76: Test & Roadmap Cleanup** - Remove orphaned fixtures, consolidate helpers, update roadmap
 
 ## Phase Details
 
@@ -442,6 +456,36 @@ Plans:
 - [x] 74-01-PLAN.md — Audit E2E test suite for STAB-02 compliance (xfail, tolerance hacks, flaky markers)
 - [x] 74-02-PLAN.md — Execute full-suite stability certification with GGPO bug investigation
 
+### Phase 75: Merged Loading Screen
+**Goal**: Participants see a single loading screen that gates on both compatibility check and Pyodide readiness
+**Depends on**: Phase 74 (v1.17 complete)
+**Requirements**: LOAD-01, LOAD-02, LOAD-03, LOAD-04
+**Success Criteria** (what must be TRUE):
+  1. Participant sees exactly one loading screen during pre-game setup (no separate Pyodide spinner)
+  2. Loading screen does not advance until both compatibility check passes AND Pyodide is ready
+  3. Pyodide loading timeout is configurable via experiment config (defaults to 60s)
+  4. If Pyodide fails or times out, participant sees a clear error page instead of hanging
+**Research flag:** Unlikely — existing loading screen code is well-understood
+**Plans:** TBD
+
+Plans:
+- [ ] 75-01: TBD
+
+### Phase 76: Test & Roadmap Cleanup
+**Goal**: Remove dead test code and update roadmap to reflect actual completion state
+**Depends on**: Nothing (independent of Phase 75)
+**Requirements**: CLEAN-01, CLEAN-02, CLEAN-03, CLEAN-04
+**Success Criteria** (what must be TRUE):
+  1. `flask_server_multi_episode` fixture no longer exists in conftest.py
+  2. `test_network_disruption.py` has no unused imports
+  3. `run_full_episode_flow` exists in exactly one location (`game_helpers.py`) and all consumers import from there
+  4. ROADMAP.md shows v1.14 Phases 65-66 as complete
+**Research flag:** Unlikely — straightforward deletions and edits
+**Plans:** TBD
+
+Plans:
+- [ ] 76-01: TBD
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -465,8 +509,8 @@ Plans:
 | 62. Data Parity Validation | v1.14 | 1/1 | Complete | 2026-02-03 |
 | 63. Parity Test Stabilization | v1.14 | 1/1 | Complete | 2026-02-03 |
 | 64. Multi-Participant Test Infrastructure | v1.14 | 1/1 | Complete | 2026-02-03 |
-| 65. Multi-Episode Lifecycle Stress | v1.14 | 0/2 | Not started | - |
-| 66. Server Recovery Validation | v1.14 | 0/TBD | Not started | - |
+| 65. Multi-Episode Lifecycle Stress | v1.14 | 2/2 | Complete | 2026-02-04 |
+| 66. Server Recovery Validation | v1.14 | 1/1 | Complete | 2026-02-04 |
 | 67. Pyodide Pre-load Infrastructure | v1.16 | 1/1 | Complete | 2026-02-06 |
 | 68. Shared Instance Integration | v1.16 | 1/1 | Complete | 2026-02-06 |
 | 69. Server-Side Init Grace | v1.16 | 1/1 | Complete | 2026-02-06 |
@@ -475,7 +519,9 @@ Plans:
 | 72. Latency Test Diagnosis | v1.17 | 2/2 | Complete | 2026-02-06 |
 | 73. Network & Regression Validation | v1.17 | 2/2 | Complete | 2026-02-06 |
 | 74. Stability Certification | v1.17 | 2/2 | Complete | 2026-02-06 |
+| 75. Merged Loading Screen | v1.18 | 0/TBD | Not started | - |
+| 76. Test & Roadmap Cleanup | v1.18 | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-06 after Phase 74 complete (stability certified, GGPO parity limitation documented)*
+*Last updated: 2026-02-07 after v1.18 roadmap created (2 phases, 8 requirements)*

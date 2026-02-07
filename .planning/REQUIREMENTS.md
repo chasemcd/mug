@@ -62,20 +62,20 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| LOAD-01 | TBD | Pending |
-| LOAD-02 | TBD | Pending |
-| LOAD-03 | TBD | Pending |
-| LOAD-04 | TBD | Pending |
-| CLEAN-01 | TBD | Pending |
-| CLEAN-02 | TBD | Pending |
-| CLEAN-03 | TBD | Pending |
-| CLEAN-04 | TBD | Pending |
+| LOAD-01 | Phase 75 | Pending |
+| LOAD-02 | Phase 75 | Pending |
+| LOAD-03 | Phase 75 | Pending |
+| LOAD-04 | Phase 75 | Pending |
+| CLEAN-01 | Phase 76 | Pending |
+| CLEAN-02 | Phase 76 | Pending |
+| CLEAN-03 | Phase 76 | Pending |
+| CLEAN-04 | Phase 76 | Pending |
 
 **Coverage:**
 - v1 requirements: 8 total
-- Mapped to phases: 0
-- Unmapped: 8
+- Mapped to phases: 8
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-02-07*
-*Last updated: 2026-02-07 after initial definition*
+*Last updated: 2026-02-07 after roadmap creation (all requirements mapped to phases)*
