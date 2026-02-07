@@ -817,7 +817,7 @@ class GameManager:
                 matchmaker_class=type(self.matchmaker).__name__,
             )
 
-        self.sio.start_background_task(self._start_game_with_countdown, game)
+        self.start_game(game)
         return game
 
     def _create_game_for_match(
@@ -926,7 +926,7 @@ class GameManager:
             )
 
         logger.info(f"[CreateMatch] Starting game {game.game_id} with {len(matched)} players")
-        self.sio.start_background_task(self._start_game_with_countdown, game)
+        self.start_game(game)
 
         return game
 
@@ -1107,28 +1107,6 @@ class GameManager:
         # If the game is now empty, remove it
         if not game.cur_num_human_players():
             self._remove_game(game_id)
-
-    def _start_game_with_countdown(self, game):
-        """Emit countdown event, wait 3 seconds, then start the game.
-
-        Only applies to multiplayer games (group_size > 1). Single-player
-        games start immediately with no countdown.
-        """
-        group_size = self._get_group_size()
-        if group_size <= 1:
-            logger.info(f"[Countdown] Skipping countdown for single-player game {game.game_id}")
-            self.start_game(game)
-            return
-
-        logger.info(f"[Countdown] Starting 3s pre-game countdown for game {game.game_id}")
-        self.sio.emit(
-            "match_found_countdown",
-            {"countdown_seconds": 3, "message": "Players found!"},
-            room=game.game_id,
-        )
-        eventlet.sleep(3)
-        logger.info(f"[Countdown] Countdown complete, starting game {game.game_id}")
-        self.start_game(game)
 
     def start_game(self, game: remote_game.RemoteGameV2):
         """Start a game."""

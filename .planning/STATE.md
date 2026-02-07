@@ -10,28 +10,28 @@ See: .planning/PROJECT.md (updated 2026-02-07)
 ## Current Position
 
 Phase: 80 of 80 (Pre-Game Countdown)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-02-07 — Roadmap created for v1.20
+Plan: 1 of 1
+Status: Phase complete
+Last activity: 2026-02-07 — Completed 80-01-PLAN.md
 
-Progress: ░░░░░░░░░░ 0%
+Progress: ██████████ 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 0 (v1.20)
-- Average duration: —
-- Total execution time: 0 hours
+- Total plans completed: 1 (v1.20)
+- Average duration: 3m 28s
+- Total execution time: ~0.06 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| — | — | — | — |
+| 80 | 1/1 | 3m 28s | 3m 28s |
 
 **Recent Trend:**
-- Last 5 plans: —
-- Trend: —
+- Last 5 plans: 80-01 (3m 28s)
+- Trend: N/A (first plan)
 
 ## Accumulated Context
 
@@ -40,14 +40,15 @@ Progress: ░░░░░░░░░░ 0%
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
+- [v1.20 Phase 80]: Use sio.start_background_task() for countdown to avoid holding waiting_games_lock during 3s sleep
 - [v1.19 Phase 77]: sceneExited flag guards prevent P2P overlays on non-GymScene scenes
 - [v1.18 Phase 75]: loadingGate object coordinates compat check + Pyodide readiness
 
 ### Key Files for v1.20
 
-**Waiting room flow (will be modified):**
-- `interactive_gym/server/game_manager.py` — `start_game()` emits `start_game` to game room (line ~1111)
-- `interactive_gym/server/static/js/index.js` — `waiting_room` handler (line ~904), `start_game` handler (line ~840)
+**Waiting room flow (modified in 80-01):**
+- `interactive_gym/server/game_manager.py` — `_start_game_with_countdown()` method, `start_game()` emits `start_game` to game room
+- `interactive_gym/server/static/js/index.js` — `match_found_countdown` handler (line ~904), `waiting_room` handler (line ~932), `start_game` handler (line ~840)
 - `interactive_gym/server/static/js/ui_utils.js` — waitroom text display
 
 **Scene configuration:**
@@ -55,14 +56,14 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-None yet.
+None.
 
 ### Blockers/Concerns
 
-None yet.
+- Pre-existing E2E multiplayer_basic test failures (players matched to separate games). Unrelated to v1.20 changes -- confirmed by baseline test run.
 
 ## Session Continuity
 
 Last session: 2026-02-07
-Stopped at: Roadmap created for v1.20 (1 phase, 3 requirements)
+Stopped at: Completed 80-01-PLAN.md (Phase 80 complete)
 Resume file: None

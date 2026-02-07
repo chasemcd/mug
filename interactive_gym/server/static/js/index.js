@@ -901,33 +901,6 @@ socket.on('start_game', function(data) {
 var waitroomInterval;
 var waitroomTimeoutMessage = null;  // Store custom timeout message from server
 
-socket.on('match_found_countdown', function(data) {
-    console.log("[Countdown] Match found! Starting", data.countdown_seconds, "second countdown");
-
-    // Stop the waiting room timer
-    if (waitroomInterval) {
-        clearInterval(waitroomInterval);
-    }
-
-    var remaining = data.countdown_seconds;
-    var message = data.message || "Players found!";
-
-    // Show initial countdown state
-    $("#waitroomText").text(message + " Starting in " + remaining + "...");
-    $("#waitroomText").show();
-
-    // Countdown interval
-    var countdownInterval = setInterval(function() {
-        remaining--;
-        if (remaining > 0) {
-            $("#waitroomText").text(message + " Starting in " + remaining + "...");
-        } else {
-            clearInterval(countdownInterval);
-            $("#waitroomText").text(message + " Starting now!");
-        }
-    }, 1000);
-});
-
 socket.on("waiting_room", function(data) {
     console.log("[WaitingRoom] Added to waiting room. Subject:", window.subjectName || interactiveGymGlobals?.subjectName,
         "Players:", data.cur_num_players, "/", (data.cur_num_players + data.players_needed),
