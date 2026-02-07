@@ -90,6 +90,7 @@ class RemoteConfig:
         self.run_through_pyodide: bool = False
         self.environment_initialization_code: str = ""
         self.packages_to_install: list[str] = []
+        self.pyodide_load_timeout_s: int = 60
 
         # webrtc / turn server configuration
         self.turn_username: str | None = None
@@ -441,6 +442,7 @@ class RemoteConfig:
         return {
             "needs_pyodide": self.run_through_pyodide,
             "packages_to_install": self.packages_to_install,
+            "pyodide_load_timeout_s": self.pyodide_load_timeout_s,
         }
 
     @property

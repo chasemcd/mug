@@ -153,9 +153,10 @@ def is_client_in_loading_grace(subject_id: str) -> bool:
     start_time = LOADING_CLIENTS.get(subject_id)
     if start_time is None:
         return False
-    if time.time() - start_time > LOADING_TIMEOUT_S:
+    timeout = getattr(CONFIG, 'pyodide_load_timeout_s', LOADING_TIMEOUT_S)
+    if time.time() - start_time > timeout:
         LOADING_CLIENTS.pop(subject_id, None)
-        logger.warning(f"[Grace] {subject_id} loading grace expired after {LOADING_TIMEOUT_S}s")
+        logger.warning(f"[Grace] {subject_id} loading grace expired after {timeout}s")
         return False
     return True
 
