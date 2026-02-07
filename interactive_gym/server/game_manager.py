@@ -365,19 +365,6 @@ class GameManager:
                 del self.reset_events[game.game_id][subject_id]
                 return False
 
-            # If multiplayer Pyodide, add player to coordinator
-            if self.scene.pyodide_multiplayer and self.pyodide_coordinator:
-                socket_id = self._get_socket_id(subject_id)
-                self.pyodide_coordinator.add_player(
-                    game_id=game.game_id,
-                    player_id=player_id,
-                    socket_id=socket_id,
-                    subject_id=subject_id,
-                )
-                logger.info(
-                    f"Added player {player_id} (subject: {subject_id}) to Pyodide coordinator for game {game.game_id}"
-                )
-
             if self.scene.game_page_html_fn is not None:
                 self.sio.emit(
                     "update_game_page_text",
@@ -823,6 +810,24 @@ class GameManager:
 
         self.waiting_games.remove(game.game_id)
         game.transition_to(SessionState.MATCHED)
+
+        # Add players to Pyodide coordinator AFTER room joins and state transition.
+        # The coordinator emits pyodide_game_ready when all players are added,
+        # so clients must already be in the room to receive it.
+        if self.scene.pyodide_multiplayer and self.pyodide_coordinator:
+            for player_id, subject_id in game.human_players.items():
+                if subject_id and subject_id != utils.Available:
+                    socket_id = self._get_socket_id(subject_id)
+                    self.pyodide_coordinator.add_player(
+                        game_id=game.game_id,
+                        player_id=player_id,
+                        socket_id=socket_id,
+                        subject_id=subject_id,
+                    )
+                    logger.info(
+                        f"[Probe:Pyodide] Added player {player_id} (subject: {subject_id}) "
+                        f"to Pyodide coordinator for game {game.game_id}"
+                    )
 
         # Log match assignment (Phase 56)
         if self.match_logger:
