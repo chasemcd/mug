@@ -40,7 +40,7 @@ from interactive_gym.configurations import (
 from interactive_gym.server import remote_game, utils, pyodide_game_coordinator, player_pairing_manager
 from interactive_gym.server.remote_game import SessionState
 from interactive_gym.server.participant_state import ParticipantState
-from interactive_gym.server.matchmaker import Matchmaker, MatchCandidate, FIFOMatchmaker
+from interactive_gym.server.matchmaker import Matchmaker, MatchCandidate, FIFOMatchmaker, GroupHistory
 from interactive_gym.server.match_logger import MatchAssignmentLogger
 from interactive_gym.scenes import stager, gym_scene, scene
 
@@ -317,9 +317,10 @@ class GameManager:
         # Group reunion is deferred to future matchmaker variant (REUN-01/REUN-02)
         if self.scene.wait_for_known_group:
             logger.warning(
-                f"[GroupReunion] wait_for_known_group=True is currently deferred. "
-                f"Subject {subject_id} will use standard FIFO matching. "
-                f"See REUN-01/REUN-02 for future matchmaker variant."
+                f"[GroupReunion] wait_for_known_group=True for subject {subject_id}. "
+                f"Use GroupReunionMatchmaker instead: "
+                f"scene.matchmaking(matchmaker=GroupReunionMatchmaker()). "
+                f"Falling back to standard matching."
             )
 
         # All games go through standard matchmaker path
@@ -445,6 +446,30 @@ class GameManager:
             if p == configuration_constants.PolicyTypes.Human
         ])
 
+    def _build_match_candidate(self, subject_id: SubjectID) -> MatchCandidate:
+        """Build a MatchCandidate with group history if available.
+
+        Phase 78: Attaches group history from PlayerGroupManager so matchmakers
+        can make re-pairing decisions.
+        """
+        group_history = None
+        if self.pairing_manager:
+            partners = self.pairing_manager.get_group_members(subject_id)
+            if partners:
+                group_id = self.pairing_manager.get_group_id(subject_id)
+                group = self.pairing_manager.groups.get(group_id) if group_id else None
+                group_history = GroupHistory(
+                    previous_partners=partners,
+                    source_scene_id=group.source_scene_id if group else None,
+                    group_id=group_id,
+                )
+
+        return MatchCandidate(
+            subject_id=subject_id,
+            rtt_ms=self.get_subject_rtt(subject_id) if self.get_subject_rtt else None,
+            group_history=group_history,
+        )
+
     def _add_to_fifo_queue(
         self, subject_id: SubjectID
     ) -> remote_game.RemoteGameV2 | None:
@@ -462,10 +487,7 @@ class GameManager:
         # Use lock to prevent race conditions when multiple participants join simultaneously
         with self.waiting_games_lock:
             # Build MatchCandidate for arriving participant
-            arriving = MatchCandidate(
-                subject_id=subject_id,
-                rtt_ms=self.get_subject_rtt(subject_id) if self.get_subject_rtt else None,
-            )
+            arriving = self._build_match_candidate(subject_id)
 
             # Build waiting list from waitroom_participants (Phase 60+: no pre-allocated games)
             logger.info(
@@ -478,10 +500,7 @@ class GameManager:
                 logger.info(
                     f"[Matchmaker:Build] Found waiting participant: subject_id={waiting_sid}"
                 )
-                waiting.append(MatchCandidate(
-                    subject_id=waiting_sid,
-                    rtt_ms=self.get_subject_rtt(waiting_sid) if self.get_subject_rtt else None,
-                ))
+                waiting.append(self._build_match_candidate(waiting_sid))
 
             group_size = self._get_group_size()
 
