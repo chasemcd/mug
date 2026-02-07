@@ -367,6 +367,77 @@ def player_contexts(browser):
 
 
 @pytest.fixture(scope="function")
+def flask_server_scene_isolation():
+    """
+    Start Flask server for scene isolation testing.
+
+    Scope: function (fresh server per test for clean state)
+    Yields: dict with 'url' and 'process' keys
+
+    Uses overcooked_human_human_multiplayer_scene_isolation_test config with:
+    - Multi-scene flow: StartScene -> GymScene -> FeedbackScene -> EndScene
+    - No RTT limit, no focus timeout, single short episode
+    - Port 5707 (different from other test ports)
+
+    Uses robust startup/teardown:
+    - Pre-startup port cleanup via _ensure_port_available
+    - Process group isolation via start_new_session=True
+    - stdout=DEVNULL to prevent pipe buffer deadlock
+    - Port-verified teardown via _teardown_server
+    """
+    port = 5707
+    base_url = f"http://localhost:{port}"
+
+    # Pre-startup: ensure port is available
+    _ensure_port_available(port)
+
+    process = subprocess.Popen(
+        [
+            "python",
+            "-m",
+            "interactive_gym.examples.cogrid.overcooked_human_human_multiplayer_scene_isolation_test",
+            "--port",
+            str(port),
+        ],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        start_new_session=True,
+    )
+
+    # Wait for server to be ready (poll health endpoint)
+    max_retries = 30
+    for attempt in range(max_retries):
+        try:
+            conn = HTTPConnection("localhost", port, timeout=1)
+            conn.request("GET", "/")
+            response = conn.getresponse()
+            conn.close()
+            if response.status < 500:
+                break
+        except (ConnectionRefusedError, OSError, TimeoutError):
+            pass
+
+        if process.poll() is not None:
+            stderr = process.stderr.read() if process.stderr else b""
+            raise RuntimeError(
+                f"Scene isolation Flask server exited unexpectedly (code {process.returncode}).\n"
+                f"stderr: {stderr.decode()}"
+            )
+
+        time.sleep(1)
+    else:
+        _teardown_server(process, port)
+        raise RuntimeError(
+            f"Scene isolation Flask server failed to start after {max_retries} retries"
+        )
+
+    yield {"url": base_url, "process": process}
+
+    # Teardown with port verification
+    _teardown_server(process, port)
+
+
+@pytest.fixture(scope="function")
 def flask_server_multi_episode_fresh():
     """
     Start multi-episode Flask server as subprocess for each test function.
