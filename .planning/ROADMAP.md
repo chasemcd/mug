@@ -2,14 +2,18 @@
 
 ## Milestones
 
-- **v1.0 P2P Multiplayer** - Phases 1-10 (shipped 2026-01-19)
-- **v1.1 Sync Validation** - Phases 11-14 (shipped 2026-01-21)
-- **v1.2 Participant Exclusion** - Phases 15-18 (shipped 2026-01-22)
-- **v1.3 P2P Connection Validation** - Phases 19-22 (shipped 2026-01-22)
-- **v1.4 Partner Disconnection Handling** - Phase 23 (shipped 2026-01-22)
-- **v1.5 Focus Loss Handling** - Phases 24-27 (shipped 2026-01-23)
-- **v1.6 Input Latency Diagnosis** - Phases 28-31 (partial: 2026-01-24)
-- **v1.7 Admin Console Improvement** - Phases 32-35 (shipped 2026-01-25)
+- ✅ **v1.0 P2P Multiplayer** - Phases 1-10 (shipped 2026-01-19)
+- ✅ **v1.1 Sync Validation** - Phases 11-14 (shipped 2026-01-21)
+- ✅ **v1.2 Participant Exclusion** - Phases 15-18 (shipped 2026-01-22)
+- ✅ **v1.3 P2P Connection Validation** - Phases 19-22 (shipped 2026-01-22)
+- ✅ **v1.4 Partner Disconnection Handling** - Phase 23 (shipped 2026-01-22)
+- ✅ **v1.5 Focus Loss Handling** - Phases 24-27 (shipped 2026-01-23)
+- ⚠️ **v1.6 Input Latency Diagnosis** - Phases 28-31 (partial: 2026-01-24)
+- ✅ **v1.7 Admin Console Improvement** - Phases 32-35 (shipped 2026-01-25)
+- ✅ **v1.8 Data Export Parity** - Phases 36-39 (shipped 2026-01-30)
+- ✅ **v1.9 Data Parity Testing** - Phases 40-44 (shipped 2026-02-01)
+- ✅ **v1.10 E2E Test Fix** - Phases 45-47 (shipped 2026-02-02)
+- ✅ **v1.11 Data Export Edge Cases** - Phases 48-50 (shipped 2026-02-02) → [archive](milestones/v1.11-ROADMAP.md)
 
 ## Phases
 
@@ -110,6 +114,15 @@ Key deliverables:
 - [x] **Phase 33: Session List with P2P Health** - Session status and problem flagging
 - [x] **Phase 34: Session Detail View** - Detailed diagnostic info on click
 - [x] **Phase 35: Layout & Polish** - Clean visual hierarchy and prioritization
+
+### v1.8 Data Export Parity (Complete)
+
+**Milestone Goal:** Both players export identical game state data (actions, observations, rewards, infos) regardless of rollbacks, fast-forwards, or latency — ensuring research data validity.
+
+- [x] **Phase 36: Speculative/Canonical Buffer Split** - Core data recording architecture fix
+- [x] **Phase 37: Fast-Forward Data Recording Fix** - Tab refocus confirmation-gated recording
+- [x] **Phase 38: Episode Boundary Confirmation** - Ensure all frames confirmed before export
+- [x] **Phase 39: Verification & Metadata** - Per-frame metadata and validation tooling
 
 ## Phase Details
 
@@ -461,10 +474,212 @@ Plans:
 Plans:
 - [x] 35-01-PLAN.md — Layout restructure with active sessions primary, problems indicator
 
-## Progress
+### Phase 36: Speculative/Canonical Buffer Split
+**Goal:** Separate speculative frame data from confirmed frame data
+**Depends on:** v1.7 complete (existing data collection infrastructure)
+**Requirements:** REC-01, REC-02, REC-03
+**Success Criteria** (what must be TRUE):
+  1. Frame data written to speculativeFrameData buffer during step()
+  2. Data promoted to confirmed buffer only when all inputs for that frame are received
+  3. Export methods read from confirmed buffer, never speculative
+**Research flag:** Unlikely (well-documented pattern from GGPO/NetplayJS)
+**Plans:** 1 plan
+Plans:
+- [x] 36-01-PLAN.md — speculativeFrameData buffer, storeFrameData() modification, _promoteConfirmedFrames()
 
-**Execution Order:**
-Phases execute in numeric order: 32 → 33 → 34 → 35
+### Phase 37: Fast-Forward Data Recording Fix
+**Goal:** Fast-forward uses same confirmation-gated recording path as normal execution
+**Depends on:** Phase 36
+**Requirements:** EDGE-01
+**Success Criteria** (what must be TRUE):
+  1. Fast-forward (tab refocus) writes to speculative buffer like normal execution
+  2. _promoteConfirmedFrames() called after fast-forward completes
+  3. No frame gaps in export after tab refocus scenario
+**Research flag:** Complete (root cause identified in research phase)
+**Plans:** 1 plan
+Plans:
+- [x] 37-01-PLAN.md — Add _promoteConfirmedFrames() call in _performFastForward()
+
+### Phase 38: Episode Boundary Confirmation
+**Goal:** All frames confirmed before export triggered
+**Depends on:** Phase 37
+**Requirements:** EDGE-02
+**Success Criteria** (what must be TRUE):
+  1. Episode end waits for all frames to be confirmed before triggering export
+  2. Warning logged if promoting unconfirmed frames at episode boundary
+  3. Both players export identical frame counts
+**Research flag:** Unlikely (focused change at episode boundary)
+**Plans:** 1 plan
+Plans:
+- [x] 38-01-PLAN.md — Force-promote at episode end, warning logging
+
+### Phase 39: Verification & Metadata
+**Goal:** Per-frame metadata and offline validation tooling
+**Depends on:** Phase 38
+**Requirements:** REC-04, EDGE-03, VERIFY-01
+**Success Criteria** (what must be TRUE):
+  1. Each frame includes `wasSpeculative` metadata indicating if it was ever predicted
+  2. Export includes rollback event metadata (frame ranges, count per frame)
+  3. Offline validation script compares two player exports and reports divergences
+**Research flag:** Unlikely (additive metadata, no core logic changes)
+**Plans:** 1 plan
+Plans:
+- [x] 39-01-PLAN.md — wasSpeculative field, rollback metadata, export comparison script
+
+</details>
+
+<details>
+<summary>v1.9 Data Parity Testing (Phases 40-44) - SHIPPED 2026-02-01</summary>
+
+**Milestone Goal:** Validate v1.8 data export parity under controlled network conditions using Playwright automation against `overcooked_human_human_multiplayer`.
+
+### Phase 40: Test Infrastructure Foundation
+**Goal:** Playwright can automate multiplayer game sessions
+**Depends on:** v1.8 complete (existing data export infrastructure)
+**Requirements:** INFRA-01, INFRA-02
+**Success Criteria** (what must be TRUE):
+  1. Two browser contexts can connect to the same game session
+  2. Both contexts can progress through matchmaking to gameplay
+  3. Flask server starts/stops cleanly as part of test lifecycle
+  4. Test can capture game completion state
+**Research flag:** Likely (Playwright MCP integration, multiplayer automation patterns)
+**Plans:** 2 plans
+
+Plans:
+- [x] 40-01-PLAN.md — Test infrastructure setup (pytest, fixtures, server lifecycle)
+- [x] 40-02-PLAN.md — Game automation helpers and multiplayer test
+
+### Phase 41: Latency Injection Tests
+**Goal:** Test data parity under various latency conditions
+**Depends on:** Phase 40
+**Requirements:** NET-01, NET-04, NET-05
+**Success Criteria** (what must be TRUE):
+  1. Test can apply fixed latency (100ms, 200ms, 500ms) via CDP
+  2. Test can apply asymmetric latency (different for each player)
+  3. Test can apply jitter (variable latency) during gameplay
+  4. Tests run to episode completion under each latency condition
+**Research flag:** Likely (Chrome DevTools Protocol latency injection)
+**Plans:** 1 plan
+
+Plans:
+- [x] 41-01-PLAN.md — CDP latency injection, asymmetric/jitter scenarios
+
+### Phase 42: Network Disruption Tests
+**Goal:** Test data parity under packet loss and tab focus scenarios
+**Depends on:** Phase 41
+**Requirements:** NET-02, NET-03
+**Success Criteria** (what must be TRUE):
+  1. Test can simulate packet loss to trigger rollback scenarios
+  2. Test can trigger tab unfocus/refocus to exercise fast-forward path
+  3. Both tests complete full episode after disruption
+  4. Rollback and fast-forward events are observable in exports
+**Research flag:** Likely (WebRTC packet loss simulation, Playwright tab control)
+**Plans:** 1 plan
+
+Plans:
+- [x] 42-01-PLAN.md — Packet loss simulation, tab focus automation
+
+### Phase 43: Data Comparison Pipeline
+**Goal:** Automated validation of export parity between players
+**Depends on:** Phase 42
+**Requirements:** CMP-01, CMP-02, CMP-03
+**Success Criteria** (what must be TRUE):
+  1. Test collects export files from both players after episode
+  2. Test invokes `validate_action_sequences.py --compare` on exports
+  3. Test reports pass/fail based on validation script exit code
+  4. Failed comparisons produce actionable diagnostic output
+**Research flag:** Unlikely (file collection and script invocation)
+**Plans:** 1 plan
+
+Plans:
+- [x] 43-01-PLAN.md — Export collection, validation invocation, result reporting
+
+### Phase 44: Manual Test Protocol
+**Goal:** Researchers can manually verify data parity
+**Depends on:** Phase 43
+**Requirements:** DOC-01
+**Success Criteria** (what must be TRUE):
+  1. Step-by-step protocol document exists
+  2. Protocol covers each network condition scenario
+  3. Protocol includes how to compare exports manually
+  4. Protocol includes expected outcomes for each test
+**Research flag:** Unlikely (documentation)
+**Plans:** 1 plan
+
+Plans:
+- [x] 44-01-PLAN.md — Manual test protocol documentation
+
+</details>
+
+<details>
+<summary>v1.10 E2E Test Fix (Phases 45-47) - SHIPPED 2026-02-02</summary>
+
+### v1.10 E2E Test Fix
+
+**Milestone Goal:** Fix E2E test environment so all automated tests pass in headed mode, validating data parity under network stress conditions.
+
+### Phase 45: Episode Completion Diagnosis & Fix
+**Goal:** Games progress through frames to episode completion in E2E tests
+**Depends on:** v1.9 complete (existing test infrastructure)
+**Requirements:** EPFIX-01, EPFIX-02, EPFIX-03
+**Success Criteria** (what must be TRUE):
+  1. Root cause of frame advancement failure identified and documented
+  2. Games progress through frames (frame counter increments)
+  3. Episodes complete within 180s test timeout
+  4. At least one test completes a full episode without manual intervention
+**Research flag:** Complete (root cause: document.hidden=true in Playwright, FocusManager skips frames)
+**Plans:** 1 plan
+
+Plans:
+- [x] 45-01-PLAN.md — Add visibility override to test helpers, remove obsolete tutorial flow calls
+
+### Phase 46: Test Suite Verification
+**Goal:** All existing E2E tests pass in headed mode
+**Depends on:** Phase 45
+**Requirements:** TEST-01, TEST-02, TEST-03, TEST-04, TEST-05, SYNC-01, SYNC-02, SYNC-03, SYNC-04
+**Success Criteria** (what must be TRUE):
+  1. `test_infrastructure.py` smoke tests pass
+  2. `test_multiplayer_basic.py` matchmaking and episode tests pass
+  3. `test_latency_injection.py` all latency scenarios (100ms, 200ms, jitter) pass
+  4. `test_network_disruption.py` packet loss and focus tests pass
+  5. `test_data_comparison.py` parity validation tests pass
+**Research flag:** Unlikely (running existing tests)
+**Plans:** 1 plan
+
+Plans:
+- [x] 46-01-PLAN.md — Run full test suite and fix any remaining issues
+
+### Phase 47: Focus Loss Data Accuracy Testing
+**Goal:** Data parity maintained under focus loss scenarios
+**Depends on:** Phase 46
+**Requirements:** FOCUS-01, FOCUS-02
+**Success Criteria** (what must be TRUE):
+  1. Test exists that triggers mid-episode focus loss (new tab during gameplay)
+  2. Test verifies data parity after mid-episode focus loss
+  3. Test exists that triggers focus loss at episode boundary
+  4. Test verifies data parity after boundary focus loss
+**Research flag:** Unlikely (builds on existing test patterns)
+**Plans:** 1 plan
+
+Plans:
+- [x] 47-01-PLAN.md — Focus loss data parity tests (mid-episode, boundary)
+
+</details>
+
+<details>
+<summary>v1.11 Data Export Edge Cases (Phases 48-50) - SHIPPED 2026-02-02</summary>
+
+**Milestone Goal:** Fix dual-buffer data recording edge cases so all xfail tests pass and research data exports are identical between both players.
+
+- [x] **Phase 48: isFocused Column Consistency** (1/1 plans) — completed 2026-02-02
+- [x] **Phase 49: Episode Boundary Row Parity** (1/1 plans) — completed 2026-02-02
+- [x] **Phase 50: Stress Test Verification** (1/1 plans) — completed 2026-02-02
+
+See [milestones/v1.11-ROADMAP.md](milestones/v1.11-ROADMAP.md) for full details.
+
+</details>
+
+## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -491,7 +706,22 @@ Phases execute in numeric order: 32 → 33 → 34 → 35
 | 33. Session List | v1.7 | 1/1 | Complete | 2026-01-25 |
 | 34. Session Detail | v1.7 | 1/1 | Complete | 2026-01-25 |
 | 35. Layout & Polish | v1.7 | 1/1 | Complete | 2026-01-25 |
+| 36. Buffer Split | v1.8 | 1/1 | Complete | 2026-01-30 |
+| 37. Fast-Forward Fix | v1.8 | 1/1 | Complete | 2026-01-30 |
+| 38. Episode Boundary | v1.8 | 1/1 | Complete | 2026-01-30 |
+| 39. Verification & Metadata | v1.8 | 1/1 | Complete | 2026-01-30 |
+| 40. Test Infrastructure | v1.9 | 2/2 | Complete | 2026-01-31 |
+| 41. Latency Injection | v1.9 | 1/1 | Complete | 2026-01-31 |
+| 42. Network Disruption | v1.9 | 1/1 | Complete | 2026-01-31 |
+| 43. Data Comparison | v1.9 | 1/1 | Complete | 2026-01-31 |
+| 44. Manual Protocol | v1.9 | 1/1 | Complete | 2026-02-01 |
+| 45. Episode Completion Fix | v1.10 | 1/1 | Complete | 2026-02-02 |
+| 46. Test Suite Verification | v1.10 | 1/1 | Complete | 2026-02-02 |
+| 47. Focus Loss Testing | v1.10 | 1/1 | Complete | 2026-02-02 |
+| 48. isFocused Column | v1.11 | 1/1 | Complete | 2026-02-02 |
+| 49. Episode Boundary Row | v1.11 | 1/1 | Complete | 2026-02-02 |
+| 50. Stress Verification | v1.11 | 1/1 | Complete | 2026-02-02 |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-01-25 after Phase 35 complete*
+*Last updated: 2026-02-02 after v1.11 milestone complete*

@@ -1023,6 +1023,10 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         // This buffer is cleared/updated on rollback to ensure only correct data is exported
         this.frameDataBuffer = new Map();
 
+        // Speculative frame data buffer - holds unconfirmed frame data
+        // Data is promoted to frameDataBuffer when confirmedFrame advances
+        this.speculativeFrameData = new Map();
+
         // Cumulative validation data - persists across episodes for full session export
         // This data is NOT cleared on episode reset, only when scene ends
         this.cumulativeValidation = {
@@ -1095,6 +1099,7 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
             remoteEpisodeEndFrame: null,      // Frame where peer detected it
             pendingReset: false,              // Waiting for sync before reset
             syncTimeoutId: null,              // Timeout to prevent infinite waiting
+            syncedTerminationFrame: null,     // Agreed-upon termination frame (min of local/remote)
             // Episode START sync
             localResetComplete: false,        // We completed our reset
             remoteResetComplete: false,       // Peer completed their reset
@@ -1831,8 +1836,9 @@ print(f"[Python] Seeded RNG with {${seed}}")
         this.actionSequence = [];
         this.actionCounts = {};
 
-        // Clear frame data buffer for new episode
+        // Clear frame data buffers for new episode
         this.frameDataBuffer.clear();
+        this.speculativeFrameData.clear();
 
         // Reset per-episode diagnostics
         this.diagnostics.syncCount = 0;
@@ -2356,7 +2362,7 @@ hashlib.md5(json.dumps(_state, sort_keys=True).encode()).hexdigest()[:8]
         this.actionSequence.push({
             frame: this.frameNumber,
             actions: {...finalActions},  // Clone to avoid mutation
-            isFocused: this.focusManager ? !this.focusManager.isBackgrounded : true
+            isFocused: this.getFocusStatePerPlayer()
         });
 
         // Update action counts
@@ -2435,16 +2441,22 @@ hashlib.md5(json.dumps(_st, sort_keys=True).encode()).hexdigest()[:8]
         // Store frame data in the rollback-safe buffer BEFORE incrementing frameNumber
         // This ensures we use the correct frame number for data storage
         // Data will be cleared and re-stored on rollback via clearFrameDataFromRollback + replay
-        // IMPORTANT: Don't store data if we've already detected episode end locally
-        // (we may still be executing frames while waiting for peer sync)
-        if (!this.p2pEpisodeSync.localEpisodeEndDetected) {
+        // IMPORTANT: Don't store data if:
+        // 1. We've already detected episode end locally, OR
+        // 2. We've received peer's episode end and this frame exceeds the synced termination frame
+        // This ensures both clients export exactly the same number of frames
+        const sync = this.p2pEpisodeSync;
+        const shouldStoreFrame = !sync.localEpisodeEndDetected &&
+            (sync.syncedTerminationFrame === null || this.frameNumber < sync.syncedTerminationFrame);
+
+        if (shouldStoreFrame) {
             this.storeFrameData(this.frameNumber, {
                 actions: finalActions,
                 rewards: Object.fromEntries(rewards),
                 terminateds: Object.fromEntries(terminateds),
                 truncateds: Object.fromEntries(truncateds),
                 infos: infos instanceof Map ? Object.fromEntries(infos) : infos,
-                isFocused: this.focusManager ? !this.focusManager.isBackgrounded : true
+                isFocused: this.getFocusStatePerPlayer()
             });
         }
 
@@ -2947,6 +2959,75 @@ obs, rewards, terminateds, truncateds, infos, render_state
                 // Gap in confirmation - stop here
                 break;
             }
+        }
+
+        // Promote confirmed frames to canonical buffer (Phase 36)
+        this._promoteConfirmedFrames();
+    }
+
+    /**
+     * Promote confirmed frame data from speculative to canonical buffer.
+     * Only frames where frame <= confirmedFrame are promoted.
+     * This ensures only data with confirmed inputs is exported.
+     */
+    _promoteConfirmedFrames() {
+        const promoted = [];
+        for (const [frame, data] of this.speculativeFrameData.entries()) {
+            if (frame <= this.confirmedFrame) {
+                // Promote to canonical buffer with wasSpeculative flag (Phase 39: REC-04)
+                // Frames promoted from speculative buffer were predicted before confirmation
+                this.frameDataBuffer.set(frame, { ...data, wasSpeculative: true });
+                promoted.push(frame);
+            }
+        }
+        // Remove promoted entries from speculative buffer
+        for (const frame of promoted) {
+            this.speculativeFrameData.delete(frame);
+        }
+        if (promoted.length > 0) {
+            p2pLog.debug(`Promoted ${promoted.length} frames to canonical buffer (up to frame ${this.confirmedFrame})`);
+        }
+    }
+
+    /**
+     * Force-promote any remaining speculative frames at episode boundary.
+     * Called before export to ensure all frame data is captured.
+     *
+     * At episode end, both players have executed identical steps with real inputs.
+     * The data is correct - it just hasn't been "confirmed" because input
+     * confirmation packets are still in flight.
+     *
+     * Phase 38: EDGE-02
+     */
+    _promoteRemainingAtBoundary() {
+        const remaining = this.speculativeFrameData.size;
+        if (remaining === 0) return;
+
+        // Phase 49 (BOUND-03): Only promote frames within episode boundary
+        const terminationFrame = this.p2pEpisodeSync?.syncedTerminationFrame;
+
+        // Log warning - this indicates confirmedFrame was behind at episode end
+        console.warn(`[Episode Boundary] Promoting ${remaining} unconfirmed frames ` +
+            `at episode end (confirmedFrame=${this.confirmedFrame}, frameNumber=${this.frameNumber})`);
+
+        // Promote remaining frames with wasSpeculative flag (Phase 39: REC-04)
+        // These frames were predicted before confirmation, same as _promoteConfirmedFrames()
+        let promoted = 0;
+        let skipped = 0;
+        for (const [frame, data] of this.speculativeFrameData.entries()) {
+            // Skip frames at or beyond episode boundary
+            if (terminationFrame !== null && terminationFrame !== undefined && frame >= terminationFrame) {
+                p2pLog.debug(`[Episode Boundary] Skipping post-boundary frame ${frame}`);
+                skipped++;
+                continue;
+            }
+            this.frameDataBuffer.set(frame, { ...data, wasSpeculative: true });
+            promoted++;
+        }
+        this.speculativeFrameData.clear();
+
+        if (skipped > 0) {
+            p2pLog.info(`[Episode Boundary] Promoted ${promoted} frames, skipped ${skipped} post-boundary frames`);
         }
     }
 
@@ -3540,12 +3621,12 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
     }
 
     /**
-     * Store frame data in the rollback-safe buffer.
-     * Called after each step to record the frame's data.
-     * On rollback, frames >= target are deleted and re-recorded with correct data.
+     * Store frame data in the speculative buffer.
+     * Data will be promoted to canonical buffer (frameDataBuffer) when confirmedFrame advances.
+     * On rollback, speculative data is cleared and re-stored during replay.
      */
     storeFrameData(frameNumber, data) {
-        this.frameDataBuffer.set(frameNumber, {
+        this.speculativeFrameData.set(frameNumber, {
             actions: data.actions,
             rewards: data.rewards,
             terminateds: data.terminateds,
@@ -3558,15 +3639,23 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
 
     /**
      * Clear frame data buffer entries from rollback target onwards.
-     * Called at the start of rollback to remove predicted/incorrect data.
+     * Clears both speculative and canonical buffers to ensure
+     * replayed frames are stored with correct data.
      */
     clearFrameDataFromRollback(targetFrame) {
+        // Clear canonical buffer (safety valve - shouldn't have unconfirmed frames)
         for (const frame of this.frameDataBuffer.keys()) {
             if (frame >= targetFrame) {
                 this.frameDataBuffer.delete(frame);
             }
         }
-        p2pLog.debug(`Cleared frame data buffer from frame ${targetFrame} onwards`);
+        // Clear speculative buffer (primary target - unconfirmed frames)
+        for (const frame of this.speculativeFrameData.keys()) {
+            if (frame >= targetFrame) {
+                this.speculativeFrameData.delete(frame);
+            }
+        }
+        p2pLog.debug(`Cleared frame data buffers from frame ${targetFrame} onwards`);
     }
 
     /**
@@ -3582,14 +3671,24 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
             truncateds: {},
             infos: {},
             isFocused: {},
+            wasSpeculative: {},  // Phase 39: REC-04 - track which frames were speculative predictions
             episode_num: [],
             t: [],
             timestamp: [],
             player_subjects: this.playerSubjects
         };
 
-        // Get sorted frame numbers
-        const sortedFrames = Array.from(this.frameDataBuffer.keys()).sort((a, b) => a - b);
+        // Get sorted frame numbers, limited to synced termination frame if set
+        // This ensures both clients export exactly the same number of frames
+        let sortedFrames = Array.from(this.frameDataBuffer.keys()).sort((a, b) => a - b);
+
+        const terminationFrame = this.p2pEpisodeSync?.syncedTerminationFrame;
+        if (terminationFrame !== null && terminationFrame !== undefined) {
+            // Only export frames up to (but not including) the termination frame
+            // Frame numbers are 0-indexed, so max_steps=450 means frames 0-449
+            sortedFrames = sortedFrames.filter(frame => frame < terminationFrame);
+            p2pLog.debug(`Export limited to ${sortedFrames.length} frames (terminationFrame=${terminationFrame})`);
+        }
 
         for (const frame of sortedFrames) {
             const frameData = this.frameDataBuffer.get(frame);
@@ -3640,7 +3739,23 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
             addAgentData('truncateds', frameData.truncateds);
             addFlattenedInfos(frameData.infos);
             addAgentData('isFocused', frameData.isFocused);
+
+            // Phase 39: REC-04 - add wasSpeculative per agent
+            // If frame was promoted from speculative buffer, wasSpeculative is true
+            // If undefined/false, frame was never speculative (direct execution)
+            if (frameData.actions) {
+                for (const agentId of Object.keys(frameData.actions)) {
+                    if (!data.wasSpeculative[agentId]) {
+                        data.wasSpeculative[agentId] = [];
+                    }
+                    data.wasSpeculative[agentId].push(frameData.wasSpeculative || false);
+                }
+            }
         }
+
+        // Phase 39: EDGE-03 - include rollback events metadata
+        // Provides full rollback history with frame ranges for offline analysis
+        data.rollbackEvents = this.sessionMetrics?.rollbacks?.events || [];
 
         return data;
     }
@@ -3655,6 +3770,10 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
          * on the scene and emits terminate_scene with full metadata.
          * That in turn calls terminateGymScene() which saves data via emit_remote_game_data.
          */
+
+        // Phase 38 (EDGE-02): Promote any remaining unconfirmed frames before export
+        // At episode end, all frames have real inputs - just not yet confirmed via packets
+        this._promoteRemainingAtBoundary();
 
         // Export episode data from the rollback-safe buffer
         // This ensures only correct, validated data is emitted
@@ -3722,8 +3841,9 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
             interactiveGymGlobals: window.interactiveGymGlobals
         });
 
-        // Clear the buffer after emitting
+        // Clear the buffers after emitting
         this.frameDataBuffer.clear();
+        this.speculativeFrameData.clear();
     }
 
     /**
@@ -4612,7 +4732,7 @@ json.dumps({
                 this.actionSequence.push({
                     frame: frame,
                     actions: {...envActions},
-                    isFocused: this.focusManager ? !this.focusManager.isBackgrounded : true
+                    isFocused: this.getFocusStatePerPlayer()
                 });
 
                 // Update action counts with corrected actions
@@ -4751,7 +4871,7 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
                         terminateds: entry.terminateds,
                         truncateds: entry.truncateds,
                         infos: entry.infos,
-                        isFocused: this.focusManager ? !this.focusManager.isBackgrounded : true
+                        isFocused: this.getFocusStatePerPlayer()
                     });
                 }
                 p2pLog.debug(`Stored ${replayInfo.replay_log.length} corrected frames in data buffer`);
@@ -4803,6 +4923,15 @@ json.dumps({'t_before': _t_before_replay, 't_after': _t_after_replay, 'num_steps
             maxFrame = Math.max(maxFrame, packet.currentFrame);
             for (const input of packet.inputs) {
                 this.storeRemoteInput(packet.playerId, input.action, input.frame);
+            }
+        }
+
+        // Phase 49 (BOUND-02): Cap fast-forward at episode boundary
+        const sync = this.p2pEpisodeSync;
+        if (sync && sync.syncedTerminationFrame !== null && sync.syncedTerminationFrame !== undefined) {
+            if (maxFrame > sync.syncedTerminationFrame) {
+                p2pLog.debug(`Fast-forward capped at episode boundary: ${maxFrame} -> ${sync.syncedTerminationFrame}`);
+                maxFrame = sync.syncedTerminationFrame;
             }
         }
 
@@ -4961,7 +5090,17 @@ json.dumps({'cumulative_rewards': {str(k): v for k, v in _cumulative_rewards.ite
 
             // Store per-frame data in the rollback-safe buffer
             // Note: isFocused=false for local player during fast-forward
+            // Phase 49 (BOUND-03): Skip frames at or beyond episode boundary
+            const terminationFrame = this.p2pEpisodeSync?.syncedTerminationFrame;
+            let storedCount = 0;
             for (const frameData of ffResult.per_frame_data) {
+                // Skip frames at or beyond episode boundary
+                if (terminationFrame !== null && terminationFrame !== undefined) {
+                    if (frameData.frame >= terminationFrame) {
+                        p2pLog.debug(`Fast-forward: skipping post-boundary frame ${frameData.frame}`);
+                        continue;
+                    }
+                }
                 this.storeFrameData(frameData.frame, {
                     actions: frameData.actions,
                     rewards: frameData.rewards,
@@ -4970,8 +5109,9 @@ json.dumps({'cumulative_rewards': {str(k): v for k, v in _cumulative_rewards.ite
                     infos: frameData.infos,
                     isFocused: focusStateForFF
                 });
+                storedCount++;
             }
-            p2pLog.debug(`Stored ${ffResult.per_frame_data.length} fast-forward frames in data buffer`);
+            p2pLog.debug(`Stored ${storedCount} fast-forward frames in data buffer (${ffResult.per_frame_data.length - storedCount} skipped)`);
 
             framesProcessed = fastForwardFrames.length;
 
@@ -4983,6 +5123,10 @@ json.dumps({'cumulative_rewards': {str(k): v for k, v in _cumulative_rewards.ite
             // Update confirmedFrame to match - all fast-forwarded frames used real inputs
             // This prevents GGPO from thinking we have many unconfirmed frames
             this.confirmedFrame = this.frameNumber - 1;
+
+            // Promote fast-forward frames to canonical buffer (Phase 37: EDGE-01)
+            // Without this, data stays in speculativeFrameData and is missing from export
+            this._promoteConfirmedFrames();
 
             // Update HUD to reflect fast-forwarded state
             ui_utils.updateHUDText(this.getHUDText());
@@ -7061,6 +7205,10 @@ json.dumps({'cumulative_rewards': {str(k): v for k, v in _cumulative_rewards.ite
         this.p2pEpisodeSync.remoteEpisodeEndReceived = true;
         this.p2pEpisodeSync.remoteEpisodeEndFrame = packet.frameNumber;
 
+        // Calculate synced termination frame (minimum of local and remote)
+        // This ensures both clients export the same number of frames
+        this._updateSyncedTerminationFrame();
+
         // Check if we can now trigger the synchronized reset
         this._checkEpisodeSyncAndReset();
     }
@@ -7086,6 +7234,10 @@ json.dumps({'cumulative_rewards': {str(k): v for k, v in _cumulative_rewards.ite
         this.p2pEpisodeSync.localEpisodeEndDetected = true;
         this.p2pEpisodeSync.localEpisodeEndFrame = this.frameNumber;
         this.p2pEpisodeSync.pendingReset = true;
+
+        // Calculate synced termination frame (minimum of local and remote)
+        // This ensures both clients export the same number of frames
+        this._updateSyncedTerminationFrame();
 
         // Start timeout in case peer message is lost (2 seconds)
         // If we don't hear from peer, proceed with reset anyway
@@ -7149,6 +7301,7 @@ json.dumps({'cumulative_rewards': {str(k): v for k, v in _cumulative_rewards.ite
         this.p2pEpisodeSync.remoteEpisodeEndFrame = null;
         this.p2pEpisodeSync.pendingReset = false;
         this.p2pEpisodeSync.syncTimeoutId = null;
+        this.p2pEpisodeSync.syncedTerminationFrame = null;
         // Episode START sync state
         this.p2pEpisodeSync.localResetComplete = false;
         this.p2pEpisodeSync.remoteResetComplete = false;
@@ -7164,6 +7317,42 @@ json.dumps({'cumulative_rewards': {str(k): v for k, v in _cumulative_rewards.ite
         // Clear waiting for partner focus state (but keep partnerFocused as-is - it's tracked separately)
         this.p2pEpisodeSync.waitingForPartnerFocus = false;
         this._hideWaitingForPartnerOverlay();
+    }
+
+    _updateSyncedTerminationFrame() {
+        /**
+         * Calculate the synchronized termination frame from local and remote values.
+         *
+         * Uses the MINIMUM of the two frames where episode end was detected.
+         * This ensures both clients export exactly the same number of frames,
+         * preventing row count mismatches in data exports.
+         *
+         * Why minimum? Under network latency:
+         * - Client A (host) reaches max_steps at frame 450, broadcasts
+         * - Client B receives broadcast while at frame 455 (processed extra frames while packet was in-flight)
+         * - Both should export frames 0-449 (450 rows), not have B export extra frames
+         *
+         * For max_steps termination: Both clients should stop at the same step
+         * For event termination: The event is deterministic, both detect at same frame
+         */
+        const sync = this.p2pEpisodeSync;
+        const localFrame = sync.localEpisodeEndFrame;
+        const remoteFrame = sync.remoteEpisodeEndFrame;
+
+        if (localFrame !== null && remoteFrame !== null) {
+            // Both have detected - use minimum
+            sync.syncedTerminationFrame = Math.min(localFrame, remoteFrame);
+            p2pLog.debug(`Synced termination frame: ${sync.syncedTerminationFrame} (local=${localFrame}, remote=${remoteFrame})`);
+        } else if (localFrame !== null) {
+            // Only local detected - use local for now, will update when remote arrives
+            sync.syncedTerminationFrame = localFrame;
+        } else if (remoteFrame !== null) {
+            // Only remote detected - use remote for now
+            // This case means peer detected end before us, so we should stop at their frame
+            sync.syncedTerminationFrame = remoteFrame;
+            p2pLog.debug(`Using peer's termination frame: ${remoteFrame} (local not yet detected)`);
+        }
+        // If neither detected, syncedTerminationFrame stays null
     }
 
     _handleEpisodeReady(buffer) {

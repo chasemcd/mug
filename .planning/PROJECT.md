@@ -8,17 +8,59 @@ A framework for running browser-based reinforcement learning experiments with hu
 
 Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
 
-## Current Milestone: v1.7 Admin Console Improvement
+## Previous Milestone: v1.11 Data Export Edge Cases (Shipped: 2026-02-02)
 
-**Goal:** A clean, usable admin console that gives researchers effective experiment monitoring — see what's happening, catch problems, track progress.
+**Delivered:** Fixed dual-buffer data recording edge cases so all E2E stress tests pass and research data exports are identical between both players.
 
-**Target features:**
-- Dashboard overview with key experiment stats (completion rate, active sessions, issues)
-- Session list showing state, P2P/connection health, and problems
-- Live session state visibility (what's happening in active sessions)
-- P2P/connection metrics surfaced (latency, connection type, health indicators)
-- Error and exclusion details visible (why sessions failed or participants excluded)
-- Clean layout that prioritizes actionable information
+**Key accomplishments:**
+- Fixed isFocused column consistency (both players always export isFocused.0 and isFocused.1)
+- Fixed episode boundary row parity (both players export exactly max_steps rows)
+- All 17 E2E tests pass with no xfail markers
+- Validated data parity under latency (100ms, 200ms), packet loss (15%), and focus loss
+
+## Previous Milestone: v1.10 E2E Test Fix (Shipped: 2026-02-02)
+
+**Delivered:** All E2E tests pass in headed mode with data parity validation under network stress.
+
+**Key accomplishments:**
+- Fixed Playwright visibility override (FocusManager was blocking frames when document.hidden=true)
+- 15 tests passing (12 passed + 3 xpassed)
+- Identified 5 edge cases in dual-buffer data recording (marked xfail for v1.11)
+- Focus loss data parity tests in place (reveal edge cases for fixing)
+
+## Previous Milestone: v1.9 Data Parity Testing (Shipped: 2026-02-01)
+
+**Delivered:** Playwright E2E test infrastructure with network condition simulation and data comparison pipeline.
+
+**Key accomplishments:**
+- Playwright test fixtures (flask_server, player_contexts)
+- CDP-based latency injection tests (100ms, 200ms, jitter)
+- Packet loss and tab focus simulation tests
+- Export collection and comparison helpers
+- Manual test protocol documentation
+
+## Previous Milestone: v1.8 Data Export Parity (Shipped: 2026-01-31)
+
+**Delivered:** Both players export identical game state data regardless of rollbacks, fast-forwards, or latency.
+
+**Key accomplishments:**
+- Dual-buffer architecture (speculative → canonical frame data)
+- Fast-forward frames properly promoted to canonical buffer
+- Episode boundary confirmation ensures complete data export
+- `wasSpeculative` per-frame metadata for research analysis
+- `rollbackEvents` array in export for rollback history
+- Offline `--compare` mode in validation script
+
+## Previous Milestone: v1.7 Admin Console Improvement (Shipped: 2026-01-25)
+
+**Delivered:** A clean, usable admin console that gives researchers effective experiment monitoring — see what's happening, catch problems, track progress.
+
+**Key accomplishments:**
+- Dashboard overview with completion rate and average duration stats
+- Session list showing state, P2P health indicators, and connection type
+- Session detail panel with termination reasons and player health
+- Problems indicator for quick access to errors/warnings
+- Clean layout with sessions as the primary focus
 
 ## Previous Milestone: v1.6 Input Latency Diagnosis (Partial: 2026-01-24)
 
@@ -149,12 +191,32 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 
 ### Active
 
-- [ ] Dashboard overview with key experiment stats
-- [ ] Session list with state and P2P health indicators
-- [ ] Live session state visibility
-- [ ] P2P/connection metrics surfaced in UI
-- [ ] Error and exclusion details visible
-- [ ] Clean, prioritized layout
+(Planning next milestone)
+
+*Shipped in v1.11:*
+- ✓ isFocused column consistency (both players export isFocused.0/isFocused.1) — v1.11
+- ✓ Episode boundary row parity (both players export exactly max_steps rows) — v1.11
+- ✓ Dual-buffer stress handling (all stress tests pass without xfail) — v1.11
+- ✓ Research data exports identical between both players — v1.11
+
+*Shipped in v1.8:*
+- ✓ Identical frame counts between both players' exports — v1.8
+- ✓ Identical actions recorded per frame across both players — v1.8
+- ✓ Identical rewards and infos per frame — v1.8
+- ✓ Correct data collection during/after rollbacks — v1.8
+- ✓ Correct data collection during/after fast-forward — v1.8
+- ✓ Correct data collection under high latency — v1.8
+- ✓ `wasSpeculative` per-frame metadata — v1.8
+- ✓ `rollbackEvents` in export — v1.8
+- ✓ Offline `--compare` validation mode — v1.8
+
+*Shipped in v1.7:*
+- ✓ Dashboard overview with key experiment stats — v1.7
+- ✓ Session list with state and P2P health indicators — v1.7
+- ✓ Live session state visibility — v1.7
+- ✓ P2P/connection metrics surfaced in UI — v1.7
+- ✓ Error and exclusion details visible — v1.7
+- ✓ Clean, prioritized layout — v1.7
 
 *Shipped in v1.6 (partial):*
 - ✓ Diagnostic instrumentation for input→execute→render pipeline — v1.6
@@ -196,6 +258,7 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 - Episode start sync can timeout on slow connections (mitigated with retry mechanism)
 - Rollback visual corrections cause brief teleporting (smoothing not yet implemented)
 - **[CRITICAL]** Users report 1-2 second local input lag in Overcooked (investigating in v1.6)
+- ~~**[RESOLVED]** Data export parity issues — fixed in v1.8 with dual-buffer architecture~~
 
 ## Constraints
 
@@ -217,5 +280,10 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 | GGPO-style input queuing | Prevents race conditions during rollback replay | ✓ Good |
 | Open Relay Project for TURN | Free 20GB/month tier sufficient for research | ✓ Good |
 
+| Dual-buffer data recording | Separates speculative from confirmed frame data for export parity | ✓ Good |
+| Playwright MCP for testing | Browser automation with network condition control | ✓ Good |
+| isFocused exclusion from parity | Focus state has notification latency, column consistency is sufficient | ✓ Good |
+| BOUND-02/03 guards | Defense-in-depth at episode boundaries in async paths | ✓ Good |
+
 ---
-*Last updated: 2026-01-24 after v1.7 milestone start*
+*Last updated: 2026-02-02 after v1.11 milestone complete*

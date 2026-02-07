@@ -1,475 +1,288 @@
-# Stack Research: Participant Exclusion APIs
+# Stack Research: Rollback Netcode Data Consistency
 
-**Domain:** Browser-based experiment participant screening
-**Researched:** 2026-01-21
-**Confidence:** HIGH (APIs verified against MDN and official docs)
+**Domain:** GGPO-style rollback netcode data consistency for P2P multiplayer
+**Researched:** 2026-01-30
+**Confidence:** HIGH (verified against GGPO documentation, NetplayJS, and existing codebase)
 
 ## Executive Summary
 
-For participant exclusion in browser-based experiments, the JavaScript ecosystem provides robust native APIs for most needs. The project already implements Socket.IO latency measurement and WebRTC quality monitoring via `getStats()`. For browser/device detection and inactivity monitoring, native APIs cover the core use cases, though browser support varies significantly for newer APIs like Idle Detection (Chromium-only).
+The core problem is ensuring both players export **identical** game data (actions, observations, rewards, infos) when using rollback netcode. The existing codebase already implements the correct pattern but has a gap: the `frameDataBuffer` can contain data from **predicted frames that are later invalidated by rollback**.
 
-**Key insight:** The existing codebase already implements the hardest parts (WebRTC RTT via `RTCPeerConnection.getStats()` and Socket.IO ping/pong). Participant exclusion primarily requires adding threshold enforcement and device detection around these existing measurements.
+**Key insight from GGPO implementations:** Data should only be recorded/exported for **confirmed frames** where all players' inputs have been received and validated. The codebase tracks `confirmedFrame` but the data export mechanism doesn't strictly enforce this boundary.
 
----
+## Recommended Patterns for Canonical State
 
-## Ping/Latency Measurement
+### Core Concepts
 
-### Existing Implementation (HIGH Confidence)
+| Concept | Definition | Codebase Implementation |
+|---------|------------|------------------------|
+| **Confirmed Frame** | A frame where ALL players' inputs have been received and validated | `this.confirmedFrame` tracks the highest consecutive frame with all inputs |
+| **Speculative Frame** | A frame simulated using predicted inputs (may be wrong) | Frames > `confirmedFrame` that use `getPredictedAction()` |
+| **Rollback Window** | Frames between `confirmedFrame` and `this.frameNumber` | Dynamic; typically 0-15 frames depending on latency |
+| **Input Delay** | Intentional delay before inputs are applied to reduce rollback frequency | Not currently implemented; could reduce rollback frequency |
+| **Canonical State** | The authoritative state at a confirmed frame | State snapshots at frames <= `confirmedFrame` |
 
-The project already implements two latency measurement approaches:
+### Data Structures
 
-**1. Socket.IO Ping/Pong** (`index.js` lines 45-87)
+| Structure | Purpose | Implementation Notes |
+|-----------|---------|---------------------|
+| **Confirmed Frame Index** | Tracks highest frame where all inputs received | Already exists: `this.confirmedFrame`. Updated via `updateConfirmedFrame()` |
+| **Input Buffer (per player)** | Stores received inputs indexed by frame | Already exists: `this.inputBuffer` as `Map<frameNumber, Map<playerId, input>>` |
+| **State Snapshot Ring Buffer** | Enables rollback to any recent frame | Already exists: `this.stateSnapshots` with configurable interval |
+| **Frame Data Buffer** | Stores per-frame data (actions, rewards, obs) | Already exists: `this.frameDataBuffer`. **Gap: not strictly bounded by confirmedFrame** |
+| **Confirmed Hash History** | SHA-256 hashes of confirmed frames for desync detection | Already exists: `this.confirmedHashHistory` |
+
+### Current Codebase Analysis
+
+The existing implementation in `pyodide_multiplayer_game.js` has:
+
+**Correctly Implemented:**
+- Input buffering with frame indexing
+- Rollback detection via `misprediction` check in `processP2PInput()`
+- State snapshots with save/load for rollback
+- Confirmed frame tracking
+- Confirmed hash computation and exchange
+- Rollback replay that clears and rebuilds `frameDataBuffer`
+
+**Gap Identified (DATA-PARITY issue):**
 ```javascript
-// Already implemented - measures server RTT
-socket.on('pong', function(data) {
-    var latency = Date.now() - window.lastPingTime;
-    // ... median calculation, UI update
-});
+// Current: storeFrameData() is called in step() BEFORE confirmedFrame is updated
+// This means speculative frames are stored before confirmation
+this.storeFrameData(this.frameNumber, frameData);
+
+// The rollback DOES clear this via clearFrameDataFromRollback()
+// BUT: if no rollback happens (prediction was correct), the data
+// was recorded at the time of prediction, not confirmation
 ```
 
-**2. WebRTC RTT via getStats()** (`webrtc_manager.js` lines 66-154)
-```javascript
-// Already implemented - measures P2P RTT
-const stats = await this.pc.getStats();
-// Uses RTCIceCandidatePairStats.currentRoundTripTime
-```
+**The actual issue:** When both players' predictions are correct (common case), neither player rolls back. But if they recorded data at slightly different frames due to network timing, they could have different data. The data should only be finalized when `confirmedFrame` advances past that frame.
 
-### Recommended Approach: Use Existing + Add Thresholds
+## Data Collection Strategy
 
-| Method | Already Implemented | Use For | Accuracy |
-|--------|---------------------|---------|----------|
-| Socket.IO ping/pong | Yes | Server connection quality | ~10-50ms overhead |
-| WebRTC getStats() | Yes | P2P connection quality | STUN RTT, ~1ms precision |
-| DataChannel ping/pong | No (optional) | True P2P latency | Best for experiments |
+### When to Record Data (Correct Approach)
 
-**For participant exclusion, the existing implementations are sufficient.** Both provide:
-- Continuous monitoring (Socket.IO: 1s intervals, WebRTC: 2s intervals)
-- Threshold detection (WebRTC: 150ms warning, 300ms critical)
+**Pattern 1: Deferred Recording (Recommended)**
 
-### If More Precision Needed: DataChannel Ping/Pong
-
-For experiments requiring precise latency measurement:
+Only export data for frames that have been confirmed. This is the fighting game standard.
 
 ```javascript
-// Send timestamp, measure round-trip
-const start = performance.now();
-dataChannel.send(JSON.stringify({ type: 'ping', t: start }));
-
-// On receiving pong with echoed timestamp
-const rtt = performance.now() - data.t;
-const latency = rtt / 2;
-```
-
-**Advantages over getStats():**
-- Measures actual DataChannel latency, not STUN
-- Works even when ICE is routed through SFU
-- `performance.now()` provides sub-millisecond precision
-
-**Browser Support:** Universal (DataChannel supported everywhere WebRTC is)
-
-### API Reference: RTCIceCandidatePairStats
-
-```javascript
-// Key properties for latency monitoring
-{
-  currentRoundTripTime: 0.042,      // Seconds (most recent STUN RTT)
-  totalRoundTripTime: 1.234,        // Cumulative seconds
-  responsesReceived: 29,            // For calculating average
-  availableOutgoingBitrate: 2500000 // Bits/sec
+// In exportEpisodeData() or equivalent
+exportCanonicalData() {
+    const exportData = [];
+    for (const [frame, data] of this.frameDataBuffer.entries()) {
+        // Only export frames that are fully confirmed
+        if (frame <= this.confirmedFrame) {
+            exportData.push(data);
+        }
+    }
+    return exportData;
 }
 ```
 
-**Source:** [MDN RTCIceCandidatePairStats](https://developer.mozilla.org/en-US/docs/Web/API/RTCIceCandidatePairStats/currentRoundTripTime)
+**Pattern 2: Dual Buffer (Alternative)**
 
----
-
-## Browser Detection
-
-### Recommended: Feature Detection + ua-parser-js Fallback (HIGH Confidence)
-
-**Primary approach: Feature detection for capabilities**
-```javascript
-// Detect capabilities, not browsers
-const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-const hasWebGL = !!document.createElement('canvas').getContext('webgl');
-const hasWebRTC = !!window.RTCPeerConnection;
-```
-
-**Secondary approach: ua-parser-js for browser identification**
-```javascript
-import UAParser from 'ua-parser-js';
-const parser = new UAParser();
-const result = parser.getResult();
-// result.browser.name, result.browser.version
-// result.os.name, result.device.type
-```
-
-### API Options Comparison
-
-| API | Browser Support | Best For |
-|-----|-----------------|----------|
-| Feature detection | Universal | Capability checks |
-| `navigator.userAgentData` | Chrome/Edge only | Modern, privacy-aware detection |
-| `navigator.userAgent` + parsing | Universal | Fallback browser identification |
-| ua-parser-js library | Universal | Comprehensive device/browser info |
-
-### navigator.userAgentData (Experimental)
-
-**Status:** Not recommended as primary method due to limited support.
+Maintain separate buffers for speculative and confirmed data:
 
 ```javascript
-// Only works in Chromium-based browsers
-if (navigator.userAgentData) {
-  const { mobile, platform, brands } = navigator.userAgentData;
-  // brands: [{ brand: "Chromium", version: "120" }, ...]
+class CanonicalDataBuffer {
+    constructor() {
+        this.speculativeBuffer = new Map();  // Current predictions
+        this.canonicalBuffer = new Map();    // Confirmed data only
+    }
+
+    // Called during step() - stores speculatively
+    storeSpeculative(frame, data) {
+        this.speculativeBuffer.set(frame, data);
+    }
+
+    // Called when confirmedFrame advances - promotes to canonical
+    promoteToCanonical(confirmedFrame) {
+        for (const [frame, data] of this.speculativeBuffer.entries()) {
+            if (frame <= confirmedFrame) {
+                this.canonicalBuffer.set(frame, data);
+                this.speculativeBuffer.delete(frame);
+            }
+        }
+    }
+
+    // Called on rollback - clears invalidated speculative data
+    clearFromFrame(targetFrame) {
+        for (const frame of this.speculativeBuffer.keys()) {
+            if (frame >= targetFrame) {
+                this.speculativeBuffer.delete(frame);
+            }
+        }
+    }
+
+    // For export - only canonical data
+    getCanonicalData() {
+        return Array.from(this.canonicalBuffer.entries())
+            .sort((a, b) => a[0] - b[0])
+            .map(([frame, data]) => data);
+    }
 }
 ```
 
-**Browser Support:**
-- Chrome/Edge/Opera: Full support
-- Firefox: No support
-- Safari: No support
+**Pattern 3: Frame Confirmation Callback (NetplayJS approach)**
 
-**Source:** [MDN navigator.userAgentData](https://developer.mozilla.org/en-US/docs/Web/API/Navigator/userAgentData)
-
-### Recommendation for This Project
+The NetplayJS `RollbackHistory` class tracks `isPrediction: boolean` per input. When all inputs for a frame become confirmed, the frame is "synced."
 
 ```javascript
-// Participant screening browser check
-function checkBrowserCompatibility() {
-  const parser = new UAParser();
-  const browser = parser.getBrowser();
-  const device = parser.getDevice();
+// Track prediction status per frame
+allInputsSynced(frameNumber) {
+    const frameInputs = this.inputBuffer.get(frameNumber);
+    if (!frameInputs) return false;
 
-  return {
-    isSupported: ['Chrome', 'Firefox', 'Safari', 'Edge'].includes(browser.name),
-    isMobile: device.type === 'mobile' || device.type === 'tablet',
-    browserName: browser.name,
-    browserVersion: browser.version,
-    hasWebRTC: !!window.RTCPeerConnection,
-    hasPyodide: typeof loadPyodide !== 'undefined'
-  };
+    for (const [playerId, inputRecord] of frameInputs.entries()) {
+        if (inputRecord.isPrediction) return false;
+    }
+    return true;
 }
 ```
 
-**Library:** [ua-parser-js v2.0.8](https://www.npmjs.com/package/ua-parser-js) - MIT/AGPLv3 dual license
+### Recommended Implementation for Interactive-Gym
 
----
-
-## Inactivity Monitoring
-
-### Existing Implementation (HIGH Confidence)
-
-The project already implements Page Visibility API (`index.js` lines 25-43):
+Given the existing architecture, **Pattern 1 (Deferred Recording)** is the simplest fix:
 
 ```javascript
-// Already implemented
-document.addEventListener("visibilitychange", function() {
-  if (document.hidden) {
-    documentInFocus = false;
-  } else {
-    documentInFocus = true;
-  }
-});
-```
-
-### Recommended: Page Visibility + Custom Activity Tracking
-
-**Tier 1: Page Visibility API (Universal Support)**
-```javascript
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'hidden') {
-    // Tab is hidden - pause, warn, or exclude
-  }
-});
-```
-
-**Browser Support:** Universal (IE 10+, all modern browsers)
-
-**Tier 2: Custom Activity Tracking**
-```javascript
-class ActivityMonitor {
-  constructor(timeoutMs = 30000) {
-    this.lastActivity = Date.now();
-    this.timeout = timeoutMs;
-    this.events = ['mousemove', 'keydown', 'mousedown', 'touchstart'];
-
-    this.events.forEach(event => {
-      document.addEventListener(event, () => this.lastActivity = Date.now(),
-        { passive: true });
-    });
-  }
-
-  isIdle() {
-    return Date.now() - this.lastActivity > this.timeout;
-  }
-
-  getIdleTime() {
-    return Date.now() - this.lastActivity;
-  }
-}
-```
-
-### Idle Detection API (NOT Recommended)
-
-**Status:** Avoid for cross-browser experiments.
-
-```javascript
-// Chrome/Edge only - NOT recommended for this project
-const controller = new AbortController();
-const idleDetector = new IdleDetector();
-idleDetector.start({ threshold: 60000, signal: controller.signal });
-```
-
-**Browser Support:**
-- Chrome 94+: Supported (requires permission)
-- Edge 94+: Supported
-- Firefox: **Explicitly rejected** (privacy concerns)
-- Safari: **Explicitly rejected**
-
-**Why rejected:** Mozilla and Apple consider it a privacy risk and surveillance vector. It detects system-wide idle state (screensaver, lock screen), not just page inactivity.
-
-**Source:** [MDN Idle Detection API](https://developer.mozilla.org/en-US/docs/Web/API/Idle_Detection_API)
-
-### Recommendation for This Project
-
-Use the existing Page Visibility implementation plus custom activity tracking:
-
-```javascript
-// Participant screening inactivity check
-class ParticipantActivityMonitor {
-  constructor(warningMs = 15000, excludeMs = 60000) {
-    this.warningThreshold = warningMs;
-    this.excludeThreshold = excludeMs;
-    this.lastActivity = Date.now();
-    this.tabHiddenAt = null;
-
-    // Track user input
-    ['mousemove', 'keydown', 'mousedown', 'touchstart'].forEach(event => {
-      document.addEventListener(event, () => this.recordActivity(),
-        { passive: true });
-    });
-
-    // Track tab visibility
-    document.addEventListener('visibilitychange', () => {
-      if (document.hidden) {
-        this.tabHiddenAt = Date.now();
-      } else {
-        this.tabHiddenAt = null;
-        this.recordActivity();
-      }
-    });
-  }
-
-  recordActivity() {
-    this.lastActivity = Date.now();
-  }
-
-  getStatus() {
-    const idleTime = Date.now() - this.lastActivity;
-    const tabHiddenTime = this.tabHiddenAt ? Date.now() - this.tabHiddenAt : 0;
-
-    return {
-      idleTimeMs: idleTime,
-      tabHiddenTimeMs: tabHiddenTime,
-      isTabHidden: document.hidden,
-      shouldWarn: idleTime > this.warningThreshold || tabHiddenTime > this.warningThreshold,
-      shouldExclude: idleTime > this.excludeThreshold || tabHiddenTime > this.excludeThreshold
+// Modify exportEpisodeFromBuffer() in the existing codebase
+_exportEpisodeFromBuffer() {
+    const episodeData = {
+        // ... existing fields ...
+        frames: []
     };
-  }
+
+    // CRITICAL: Only export frames up to confirmedFrame
+    const exportableFrames = Array.from(this.frameDataBuffer.entries())
+        .filter(([frame, _]) => frame <= this.confirmedFrame)
+        .sort((a, b) => a[0] - b[0]);
+
+    for (const [frameNum, frameData] of exportableFrames) {
+        episodeData.frames.push({
+            frame: frameNum,
+            ...frameData
+        });
+    }
+
+    return episodeData;
 }
 ```
 
----
+## Key Patterns from GGPO/Fighting Games
 
-## Device Info Collection
+### How GGPO Handles Replay Data
 
-### Screen/Viewport Detection (HIGH Confidence)
+1. **Input-Only Recording:** GGPO records only inputs, not full game state. Given determinism, inputs are sufficient to replay.
 
-**Recommended APIs:**
+2. **Confirmed Input Marking:** Each input is either "confirmed" (received from peer) or "predicted" (guessed). The `ggpo_synchronize_inputs()` function returns inputs with their source.
 
-```javascript
-// Screen dimensions (physical display)
-const screenWidth = screen.width;
-const screenHeight = screen.height;
-const pixelRatio = window.devicePixelRatio;
+3. **Save State Timing:** `save_game_state` callback is called at confirmed frames, not speculative frames. This ensures snapshots are authoritative.
 
-// Viewport dimensions (browser window)
-const viewportWidth = window.innerWidth;
-const viewportHeight = window.innerHeight;
+4. **Replay Recording:** The Universal Fighting Engine (UFE) offers "Record Post-Rollback Frames" toggle to see what happened after corrections, separate from what player saw.
 
-// Responsive breakpoint detection
-const isMobileViewport = window.matchMedia('(max-width: 768px)').matches;
-const isLandscape = window.matchMedia('(orientation: landscape)').matches;
-```
+### Data Parity Guarantee
 
-**Browser Support:** Universal
+For research validity, both players MUST export identical data. This requires:
 
-### Touch Detection (MEDIUM Confidence)
+1. **Deterministic Frame Numbering:** Both players must agree on which frame is which.
+2. **Confirmed Data Only:** Only export data for frames where both players' inputs are known.
+3. **Hash Verification:** Compare hashes of confirmed frames to detect any divergence.
 
-**Recommended approach - combine multiple signals:**
+The codebase already has hash comparison via `confirmedHashHistory`. The gap is ensuring `frameDataBuffer` export respects the same boundary.
 
-```javascript
-function detectTouchCapability() {
-  // Primary: maxTouchPoints (most reliable)
-  const maxTouchPoints = navigator.maxTouchPoints || 0;
+## Existing Libraries/References
 
-  // Secondary: ontouchstart event
-  const hasTouch = 'ontouchstart' in window;
+| Library | Relevance | JS Applicability |
+|---------|-----------|------------------|
+| [GGPO](https://www.ggpo.net/) | Original rollback SDK; defines the canonical patterns | C/C++ only, but patterns transfer directly |
+| [NetplayJS](https://github.com/rameshvarun/netplayjs) | TypeScript GGPO implementation for browser games | **Directly applicable.** `RollbackHistory` class shows data structures. |
+| [Telegraph](https://github.com/thomasboyt/telegraph) | TypeScript port of GGPO using PeerJS/WebRTC | **Directly applicable.** Requires deterministic game + serializable state. |
+| [GGRS](https://github.com/gschup/ggrs) | Rust reimplementation of GGPO | Patterns transfer; has browser demos via WASM |
+| [Backroll](https://github.com/HouraiTeahouse/backroll-rs) | Pure Rust GGPO implementation | Patterns transfer |
+| [netcode-rollback](https://github.com/Corrade/netcode-rollback) | Unity P2P rollback implementation | Documents "confirmed tick" vs "speculative" concepts clearly |
 
-  // Tertiary: Media query for pointer type
-  const hasCoarsePointer = window.matchMedia('(pointer: coarse)').matches;
-  const hasNoHover = window.matchMedia('(hover: none)').matches;
+### Key Implementation References
 
-  return {
-    isTouchDevice: maxTouchPoints > 0 || hasTouch,
-    maxTouchPoints,
-    hasCoarsePointer,
-    hasNoHover,
-    // High confidence mobile if both touch AND coarse pointer
-    isLikelyMobile: (maxTouchPoints > 0 || hasTouch) && hasCoarsePointer
-  };
-}
-```
+- **NetplayJS RollbackHistory:** Shows how to track `isPrediction` flag per input
+- **GGPO DeveloperGuide:** Documents `save_game_state`/`load_game_state` callback contracts
+- **SnapNet Rollback Architecture:** Explains input delay configuration and rollback window sizing
 
-**Caveats:**
-- Chrome on non-touch laptops may report `maxTouchPoints: 1` (false positive)
-- 2-in-1 devices always report touch capability
-- Touch laptops exist
+## Specific Recommendations for Interactive-Gym
 
-**Source:** [MDN Touch events](https://developer.mozilla.org/en-US/docs/Web/API/Touch_events)
+### Immediate Fix (Low Effort)
 
-### Network Information API (LOW Confidence for Safari/Firefox)
-
-**Use sparingly - limited browser support:**
+Modify `_exportEpisodeFromBuffer()` to filter by `confirmedFrame`:
 
 ```javascript
-if ('connection' in navigator) {
-  const conn = navigator.connection;
-  // conn.effectiveType: '4g', '3g', '2g', 'slow-2g'
-  // conn.downlink: estimated bandwidth in Mbps
-  // conn.rtt: estimated RTT in ms (rounded to 25ms)
-}
+// Only export confirmed frames
+const exportableFrames = Array.from(this.frameDataBuffer.entries())
+    .filter(([frame, _]) => frame <= this.confirmedFrame);
 ```
 
-**Browser Support:**
-- Chrome/Edge/Opera: Full support (~48% global)
-- Safari: **No support**
-- Firefox: **No support**
+### Robust Solution (Medium Effort)
 
-**Global support:** ~80% (includes partial support)
+1. **Add confirmation callback:** When `updateConfirmedFrame()` advances, call a new method `promoteFrameDataToCanonical(frame)`.
 
-**Source:** [Can I Use - Network Information API](https://caniuse.com/netinfo)
+2. **Separate canonical buffer:** Store confirmed data separately from speculative data.
 
-**Recommendation:** Do not use as primary exclusion criteria. Use actual measured latency instead (Socket.IO ping, WebRTC getStats).
+3. **Final validation:** At episode end, verify `confirmedFrame` covers all frames before export. If not, wait or truncate.
 
-### Comprehensive Device Check
+### Edge Case: Episode Ends During Rollback
 
-```javascript
-function collectDeviceInfo() {
-  const parser = new UAParser();
-  const device = parser.getDevice();
-  const os = parser.getOS();
+If episode ends (terminal state reached) while frames are still unconfirmed:
+- Option A: Wait for inputs to arrive (may block)
+- Option B: Truncate data to `confirmedFrame` (loses some frames)
+- Option C: Mark final frames as "unconfirmed" in export metadata
 
-  return {
-    // Screen
-    screenWidth: screen.width,
-    screenHeight: screen.height,
-    viewportWidth: window.innerWidth,
-    viewportHeight: window.innerHeight,
-    pixelRatio: window.devicePixelRatio,
+Recommendation: **Option B** with logging. Research data should be authoritative; losing 1-2 frames at episode end is acceptable.
 
-    // Device type
-    deviceType: device.type || 'desktop', // mobile, tablet, desktop
-    os: os.name,
-    osVersion: os.version,
+## Alternatives Considered
 
-    // Capabilities
-    isTouchDevice: navigator.maxTouchPoints > 0 || 'ontouchstart' in window,
-    hasWebRTC: !!window.RTCPeerConnection,
-    hasWebGL: !!document.createElement('canvas').getContext('webgl'),
+### Server-Authoritative State
 
-    // Network (if available)
-    connectionType: navigator.connection?.effectiveType || 'unknown',
-    connectionRtt: navigator.connection?.rtt || null
-  };
-}
-```
+**Pattern:** One player acts as authoritative server; other player reconciles.
 
----
+**Why not:**
+- Breaks P2P symmetry
+- Adds latency for "client" player
+- More complex than fixing confirmed frame boundary
 
-## Recommendations
+### Lockstep Netcode
 
-### For Participant Screening Implementation
+**Pattern:** Wait for all inputs before simulating each frame.
 
-| Criterion | API/Method | Browser Support | Confidence |
-|-----------|------------|-----------------|------------|
-| Server latency | Socket.IO ping/pong (existing) | Universal | HIGH |
-| P2P latency | WebRTC getStats (existing) | Universal (WebRTC) | HIGH |
-| Browser type | ua-parser-js | Universal | HIGH |
-| Tab visibility | Page Visibility API (existing) | Universal | HIGH |
-| User inactivity | Custom event tracking | Universal | HIGH |
-| Screen size | screen.width/height, innerWidth/Height | Universal | HIGH |
-| Mobile detection | Touch + viewport + ua-parser-js | Universal | MEDIUM |
-| Network quality | Measured latency (not Network Info API) | Universal | HIGH |
+**Why not:**
+- Already using rollback for responsiveness
+- Would require architecture rewrite
+- Input delay is worse UX than rollback
 
-### Libraries to Add
+### Checksumming Every Frame
 
-| Library | Version | Purpose | Size |
-|---------|---------|---------|------|
-| ua-parser-js | 2.0.8 | Browser/device detection | ~15KB min |
+**Pattern:** Compare full state checksums every frame.
 
-**Note:** No other libraries required. All other functionality uses native APIs.
+**Why not:**
+- Already doing this for confirmed frames (`confirmedHashHistory`)
+- Every frame would be expensive
+- Desync detection doesn't prevent data divergence
 
-### Integration Points with Existing Code
+## Confidence Assessment
 
-1. **Latency exclusion:** Extend existing `maxLatency` check in `index.js` (line 849)
-2. **Tab focus tracking:** Extend existing `documentInFocus` in `index.js` (line 25)
-3. **WebRTC quality:** Use existing `ConnectionQualityMonitor` callbacks in `webrtc_manager.js`
-4. **Device checks:** Add at experiment join time (before `join_game` emit)
-
----
-
-## What to Avoid
-
-### Deprecated/Unreliable Approaches
-
-| Approach | Problem | Use Instead |
-|----------|---------|-------------|
-| `navigator.userAgent` string parsing | Unreliable, spoofable, being reduced | ua-parser-js library |
-| Network Information API for exclusion | Safari/Firefox unsupported | Measured latency |
-| Idle Detection API | Firefox/Safari rejected | Custom activity tracking |
-| `navigator.platform` | Deprecated | ua-parser-js |
-| `navigator.appVersion` | Deprecated | ua-parser-js |
-| Battery API | Restricted in most browsers | N/A |
-
-### Common Mistakes
-
-1. **Relying on Network Information API** - 20% of users (Safari/Firefox) won't have it
-2. **Using Idle Detection API** - Firefox and Safari explicitly rejected it
-3. **Touch detection alone for mobile** - Touch laptops exist, 2-in-1s always report touch
-4. **Single-check device detection** - Use multiple signals for confidence
-
----
+| Finding | Confidence | Basis |
+|---------|------------|-------|
+| Confirmed frame boundary is correct approach | HIGH | GGPO docs, NetplayJS, fighting game implementations |
+| Existing `confirmedFrame` tracking is correct | HIGH | Code review; matches GGPO pattern |
+| Data export needs to respect confirmedFrame | HIGH | Logical deduction from confirmed frame semantics |
+| Dual buffer pattern would work | MEDIUM | Common pattern but adds complexity |
+| Episode-end edge cases matter | MEDIUM | May not occur often in practice |
 
 ## Sources
 
-**Official Documentation:**
-- [MDN RTCPeerConnection.getStats()](https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/getStats)
-- [MDN RTCIceCandidatePairStats](https://developer.mozilla.org/en-US/docs/Web/API/RTCIceCandidatePairStats/currentRoundTripTime)
-- [MDN Page Visibility API](https://developer.mozilla.org/en-US/docs/Web/API/Page_Visibility_API)
-- [MDN Idle Detection API](https://developer.mozilla.org/en-US/docs/Web/API/Idle_Detection_API)
-- [MDN navigator.userAgentData](https://developer.mozilla.org/en-US/docs/Web/API/Navigator/userAgentData)
-- [MDN Touch events](https://developer.mozilla.org/en-US/docs/Web/API/Touch_events)
-
-**Browser Support:**
-- [Can I Use - Network Information API](https://caniuse.com/netinfo)
-- [Can I Use - Page Visibility API](https://caniuse.com/pagevisibility)
-
-**Libraries:**
-- [ua-parser-js npm](https://www.npmjs.com/package/ua-parser-js)
-- [Socket.IO Latency Documentation](https://socket.io/how-to/check-the-latency-of-the-connection)
-
-**WebRTC Resources:**
-- [W3C WebRTC Statistics Specification](https://www.w3.org/TR/webrtc-stats/)
-- [WebRTC Latency Measurement Techniques](https://webrtchacks.com/calculate-true-end-to-end-rtt/)
+- [GGPO Official Site](https://www.ggpo.net/) - Canonical rollback patterns
+- [GGPO GitHub Documentation](https://github.com/pond3r/ggpo/blob/master/doc/DeveloperGuide.md) - Save/load callback contracts
+- [NetplayJS GitHub](https://github.com/rameshvarun/netplayjs) - TypeScript rollback implementation
+- [Telegraph GitHub](https://github.com/thomasboyt/telegraph) - TypeScript GGPO port for browser
+- [SnapNet Rollback Architecture](https://www.snapnet.dev/blog/netcode-architectures-part-2-rollback/) - Input delay and rollback window explanation
+- [netcode-rollback GitHub](https://github.com/Corrade/netcode-rollback) - Confirmed vs speculative state documentation
+- [INVERSUS Rollback Networking](https://www.gamedeveloper.com/design/rollback-networking-in-inversus) - Deterministic replay recording
+- [Universal Fighting Engine Docs](http://www.ufe3d.com/doku.php/global:network) - Post-rollback frame recording option
+- Existing codebase: `/Users/chasemcd/Repositories/interactive-gym/interactive_gym/server/static/js/pyodide_multiplayer_game.js`

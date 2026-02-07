@@ -1,185 +1,190 @@
-# Research Summary: Participant Exclusion System
+# Project Research Summary
 
-**Project:** Interactive Gym v1.2
-**Researched:** 2026-01-21
-**Overall Confidence:** HIGH
+**Project:** Interactive Gym — P2P Multiplayer
+**Domain:** Rollback netcode data collection for research export parity
+**Researched:** 2026-01-30
+**Confidence:** HIGH
 
 ## Executive Summary
 
-The participant exclusion system for Interactive Gym can leverage significant existing infrastructure while adding a pluggable rule engine for configurable screening. Key findings:
+The data export parity problem has a clear root cause: **data is recorded speculatively during frame execution, before inputs are confirmed**. While the existing GGPO-style rollback system correctly clears and re-records data during rollbacks, two critical gaps remain:
 
-1. **Existing code covers the hard parts** — Ping measurement (Socket.IO + WebRTC getStats), focus detection (visibilitychange), and max latency checking already exist. This milestone extends rather than builds from scratch.
+1. **Fast-forward path**: When a tab is backgrounded and refocused, the fast-forward bulk processing may not follow the same confirmation-gated recording path
+2. **Export timing**: Episode end exports from `frameDataBuffer` without verifying that all frames are confirmed
 
-2. **No platform handles real-time multiplayer exclusion well** — oTree has dropout handling for turn-based games, jsPsych has browser-check, but nobody does "exclude one player mid-game, end for both." This is a differentiator.
+The fix is architecturally straightforward: **separate speculative data storage from canonical (confirmed) data storage**, and only export from the canonical buffer. The existing `confirmedFrame` tracking and `_hasAllInputsForFrame()` infrastructure already provides the confirmation mechanism — it just needs to gate data promotion.
 
-3. **Hybrid client-server architecture required** — Client-side checks for UX (instant feedback), server-side enforcement for security. Never trust client-only exclusion.
+## Key Findings
 
-4. **22 specific pitfalls identified** — Most critical: ping measurement inaccuracy (30-50ms overhead), power-saving mode breaking timers, and multiplayer cascade unfairness.
+### Recommended Stack/Patterns
 
-5. **Single dependency needed** — ua-parser-js (~15KB) for browser/device detection. All other functionality uses native APIs.
+The codebase already implements GGPO patterns correctly. The gap is at the export boundary.
 
-## Key Findings by Dimension
+**Core concepts already in place:**
+- `confirmedFrame` — highest consecutive frame with all inputs received
+- `inputBuffer` — stores received inputs indexed by frame
+- `stateSnapshots` — enables rollback to any recent frame
+- `clearFrameDataFromRollback()` — clears speculative data on rollback
 
-### Stack (APIs & Libraries)
+**Missing piece:**
+- `speculativeFrameData` buffer — temporary storage before confirmation
+- Promotion logic in `_updateConfirmedFrame()` — move data to canonical buffer only when confirmed
 
-| Need | Solution | Confidence |
-|------|----------|------------|
-| Ping measurement | Existing Socket.IO + WebRTC getStats() | HIGH |
-| Browser detection | ua-parser-js (add) + feature detection | HIGH |
-| Inactivity monitoring | Existing visibilitychange + custom activity tracking | HIGH |
-| Screen/device info | Native APIs (screen.width, innerWidth, devicePixelRatio) | HIGH |
+### Expected Features (Data Recording Rules)
 
-**What to avoid:** Network Information API (no Safari/Firefox), Idle Detection API (explicitly rejected by Firefox/Safari for privacy).
+**Must have (table stakes):**
+- Record only CONFIRMED frames — speculative frames may use wrong inputs
+- Clear speculative data on rollback — already implemented
+- Re-record during replay — already implemented
+- Buffer until confirmation — NEW: separate speculative from confirmed buffer
+- Export from confirmed buffer only — NEW: modify export logic
 
-### Features (What to Build)
+**Should have (research value-add):**
+- Track `wasSpeculative` per frame — understand prediction accuracy
+- Include `rollbackCount` metadata — correlate with network conditions
+- Hash verification status — know which frames were cryptographically verified
 
-**Table stakes (must have):**
-- Device type detection (mobile/desktop)
-- Browser type/version check
-- Screen size minimum
-- Configurable rejection messages per rule
+### Architecture Approach
 
-**Differentiators (competitive advantage):**
-- Connection quality monitoring (ping, jitter, packet loss)
-- Continuous real-time exclusion during gameplay
-- Multiplayer dropout coordination ("end for both")
-- Custom callback support for arbitrary logic
+**Two-buffer pattern:**
 
-**Anti-features (explicitly avoid):**
-- Duplicating Prolific/MTurk prescreeners
-- Auto-rejection on first attention check failure
-- Complex rule engine with AND/OR/NOT operators
-- Browser fingerprinting for repeat detection
+```
+Frame executed → speculativeFrameData[N]
+                        ↓
+        _updateConfirmedFrame() promotes
+                        ↓
+              frameDataBuffer[N] (canonical)
+                        ↓
+               Episode end export
+```
 
-### Architecture (How to Build)
+**Key changes needed:**
+1. `storeFrameData()` writes to `speculativeFrameData` instead of `frameDataBuffer`
+2. `_updateConfirmedFrame()` promotes confirmed frames to `frameDataBuffer`
+3. `_performFastForward()` uses same confirmation-gated storage
+4. Episode end force-confirms remaining frames before export
 
-**Pattern:** Strategy + Chain of Responsibility
-- Each rule is a self-contained strategy with `ExclusionRule` interface
-- Rules evaluated sequentially, short-circuiting on first exclusion
-- `ExclusionManager` orchestrates pre-game and continuous evaluation
+### Critical Pitfalls
 
-**Client-server split:**
-- Client: Collect metrics, show feedback (instant UX)
-- Server: Define rules, evaluate, enforce (security)
+1. **Recording speculative data as ground truth** — data recorded before confirmation may use predicted (wrong) inputs
+   - *Prevention:* Only promote to export buffer after confirmation
 
-**Integration points:**
-- `GymScene.exclusion()` — new configuration method
-- `GameCallback.on_exclusion()` — new hook for researchers
-- New SocketIO events: `pre_game_screening`, `exclusion_metrics`, `excluded`
+2. **Fast-forward bulk processing without re-recording** — fast-forward may skip data recording or bypass confirmation
+   - *Prevention:* Fast-forward path must mirror normal step() data recording
 
-### Pitfalls (What Can Go Wrong)
+3. **Episode boundary masking** — desync happens late, episode ends before detection
+   - *Prevention:* Final hash validation before clearing buffers
 
-**Critical (address early):**
-1. **P10: Power-saving mode** — Backgrounded tabs throttle timers to 1/minute. Use Web Workers or visibilitychange handling.
-2. **P1: Ping measurement overhead** — TCP/HTTP adds 30-50ms. Use WebRTC DataChannel for true latency.
-3. **P13: Partner stranded** — Clear messaging for non-excluded player is essential.
-4. **P16: Reconnect vs exclude conflict** — Need clear state machine distinguishing temporary disconnects from exclusions.
+4. **Input delay temporal mismatch** — with INPUT_DELAY > 0, actions paired with wrong observations
+   - *Prevention:* Record action at execution frame, not input frame
 
-**Medium priority:**
-- P4: Browser UA unreliable — Use feature detection over browser detection
-- P6: Opaque messages — Per-rule messaging explaining what failed and why
-- P8: No warning before exclusion — Grace period system
+5. **Cumulative reward divergence** — rewards incremented speculatively, not restored on rollback
+   - *Prevention:* Include cumulative_rewards in state snapshot (verify this)
 
 ## Implications for Roadmap
 
-Based on research, recommended phase structure:
+Based on research, suggested phase structure:
 
-### Phase 15: Core Exclusion Infrastructure
-- `ExclusionRule` base class and `ExclusionResult` dataclass
-- `ExclusionManager` with pre_game and continuous evaluation
-- `GymScene.exclusion()` configuration method
-- **Addresses:** Foundation for all rules
-- **Pitfalls:** P10 (power-saving) — use Web Workers for critical timers
+### Phase 36: Speculative/Canonical Buffer Split
 
-### Phase 16: Pre-Game Screening
-- `pre_game_screening` SocketIO event flow
-- Client-side metrics collection (browser, ping, screen)
-- Exclusion UI with per-rule messaging
-- Check ordering (fast checks first, parallel where possible)
-- **Addresses:** Table stakes entry screening
-- **Pitfalls:** P7 (slow screening), P12 (check order)
+**Rationale:** This is the core architectural fix that enables all other changes
+**Delivers:** Separate `speculativeFrameData` buffer, promotion logic in `_updateConfirmedFrame()`
+**Addresses:** Pitfall #1 (speculative as ground truth)
+**Risk:** LOW — additive change, doesn't break existing logic
 
-### Phase 17: Built-in Rules
-- `PingThreshold` with consecutive violation requirement
-- `BrowserExclusion` with ua-parser-js
-- `ScreenSizeMinimum` with viewport detection
-- `MobileExclusion` with touch + device type detection
-- **Addresses:** Common exclusion scenarios
-- **Pitfalls:** P1 (ping overhead), P4 (UA unreliable), P5 (screen size confusion)
+**Tasks:**
+1. Add `speculativeFrameData` Map
+2. Modify `storeFrameData()` to write to speculative buffer
+3. Add `_promoteConfirmedFrames()` method
+4. Call promotion in `_updateConfirmedFrame()`
 
-### Phase 18: Continuous Monitoring
-- `exclusion_metrics` periodic reporting from client
-- Grace period warning system before exclusion
-- `InactivityDetection` rule with context-aware timeouts
-- Mid-game exclusion handling
-- **Addresses:** Real-time monitoring differentiator
-- **Pitfalls:** P2 (latency spikes), P8 (no warning), P9 (false positive inactivity)
+### Phase 37: Fast-Forward Data Recording Fix
 
-### Phase 19: Multiplayer Exclusion Handling
-- Partner notification on exclusion ("Your partner experienced a technical issue")
-- Coordinated game termination via SocketIO room events
-- WebRTC disconnect coordination
-- Partial data preservation before exclusion
-- **Addresses:** Critical multiplayer differentiator
-- **Pitfalls:** P13 (partner stranded), P15 (state sync), P16 (reconnect conflict)
+**Rationale:** Fast-forward is the main divergence source identified in research
+**Delivers:** Confirmation-gated recording in `_performFastForward()`
+**Addresses:** Pitfall #2 (fast-forward bulk processing)
+**Uses:** Buffer split from Phase 36
+**Risk:** MEDIUM — must audit fast-forward code path carefully
 
-### Phase 20: Custom Callbacks & Logging
-- `CustomCallback` wrapper for user-provided functions
-- `GameCallback.on_exclusion()` hook
-- Exclusion event logging with full context
-- Analytics export (exclusion rate by rule, by time, by browser)
-- **Addresses:** Researcher extensibility
-- **Pitfalls:** P19 (untestable callbacks), P20 (no visibility)
+**Tasks:**
+1. Audit `_performFastForward()` data recording
+2. Ensure fast-forward writes to speculative buffer
+3. Call `_updateConfirmedFrame()` after fast-forward completes
+4. Verify no frame gaps in export after tab refocus
 
-**Phase ordering rationale:**
-1. Core infrastructure first (no dependencies, foundation for everything)
-2. Pre-game screening second (high value, blocks bad participants immediately)
-3. Built-in rules third (adds utility quickly, most common scenarios)
-4. Continuous monitoring fourth (builds on pre-game foundation)
-5. Multiplayer handling fifth (requires deeper understanding of game state)
-6. Callbacks/logging sixth (polish and extensibility)
+### Phase 38: Episode Boundary Confirmation
 
-## Research Flags for Phases
+**Rationale:** Episode end is the export trigger — must ensure all data confirmed
+**Delivers:** Force-confirm logic at episode end, export only from canonical buffer
+**Addresses:** Pitfall #3 (episode boundary masking)
+**Risk:** LOW — focused change at episode boundary
 
-| Phase | Research Status |
-|-------|-----------------|
-| 15 (Core) | Standard patterns, minimal research needed |
-| 16 (Pre-game) | Standard patterns, jsPsych browser-check as reference |
-| 17 (Rules) | ua-parser-js well-documented; ping measurement details researched |
-| 18 (Continuous) | Power-saving pitfall well-documented; needs careful implementation |
-| 19 (Multiplayer) | **Likely needs deeper research** — no existing patterns for real-time games |
-| 20 (Callbacks) | Standard patterns |
+**Tasks:**
+1. Add force-confirm at episode end (promote remaining speculative)
+2. Wait for peer sync before exporting
+3. Log warning if promoting unconfirmed frames
+4. Verify both players export identical frame counts
+
+### Phase 39: Verification & Metadata (Optional)
+
+**Rationale:** Research value-add for understanding data quality
+**Delivers:** Per-frame metadata (`wasSpeculative`, `rollbackCount`), offline validation tool
+**Addresses:** "Looks synchronized but isn't" scenarios
+**Risk:** LOW — additive metadata, no core logic changes
+
+**Tasks:**
+1. Add `wasSpeculative` field to frame data
+2. Track rollback count per frame
+3. Include hash verification status from Phase 11-14
+4. Create export comparison script for validation
+
+### Phase Ordering Rationale
+
+- **Phase 36 first:** Buffer split is prerequisite for all other changes
+- **Phase 37 second:** Fast-forward fix depends on buffer split
+- **Phase 38 third:** Episode boundary depends on both being correct
+- **Phase 39 optional:** Metadata adds value but not required for parity
+
+### Research Flags
+
+**Phases with standard patterns (minimal research needed):**
+- Phase 36: Well-documented pattern from GGPO/NetplayJS
+- Phase 38: Standard boundary handling
+
+**Phases likely needing deeper review during planning:**
+- Phase 37: Fast-forward code path is complex, needs careful audit
 
 ## Confidence Assessment
 
-| Area | Confidence | Reason |
-|------|------------|--------|
-| Stack/APIs | HIGH | Verified against MDN, existing codebase |
-| Architecture | HIGH | Based on existing codebase patterns + standard design patterns |
-| Features | HIGH | Cross-referenced jsPsych, oTree, Prolific, Gorilla |
-| Pitfalls | MEDIUM | WebSearch-based, verified against multiple sources |
-| Multiplayer handling | MEDIUM | oTree patterns verified; real-time game scenarios less documented |
+| Area | Confidence | Notes |
+|------|------------|-------|
+| Stack | HIGH | Patterns directly from GGPO, NetplayJS, existing codebase |
+| Features | HIGH | Frame state lifecycle clearly defined |
+| Architecture | HIGH | Two-buffer pattern is standard, codebase analysis confirms gaps |
+| Pitfalls | HIGH | All pitfalls verified against codebase implementation |
 
-## Open Questions
+**Overall confidence:** HIGH
 
-1. **What ping threshold makes research data invalid?** Gaming suggests >100ms problematic, but research experiments may differ. May need experiment-specific tuning.
+### Gaps to Address
 
-2. **Should inactivity warning precede exclusion?** Prolific policy implications. Recommend yes with configurable grace period.
+- **Fast-forward code audit:** Need to trace exact data recording in `_performFastForward()` during planning
+- **Episode-end sync timing:** Verify `p2pEpisodeSync` waits for confirmation, not just peer agreement
 
-3. **Reconnection vs exclusion policy?** Need clear state machine. Recommend: disconnect = temporary (allow reconnect), exclusion = permanent (invalidate session).
+## Sources
 
-4. **Partial data retention on mid-game exclusion?** Recommend: save all data up to exclusion frame, mark session as partial.
+### Primary (HIGH confidence)
+- `pyodide_multiplayer_game.js` — existing GGPO implementation analysis
+- [GGPO Developer Guide](https://github.com/pond3r/ggpo/blob/master/doc/DeveloperGuide.md) — canonical patterns
+- [NetplayJS](https://github.com/rameshvarun/netplayjs) — TypeScript rollback reference
 
-## Files Created
+### Secondary (HIGH confidence)
+- [SnapNet: Rollback Netcode](https://www.snapnet.dev/blog/netcode-architectures-part-2-rollback/) — confirmed vs speculative frames
+- [INVERSUS Rollback Networking](https://www.gamedeveloper.com/design/rollback-networking-in-inversus) — symmetric P2P patterns
 
-| File | Purpose |
-|------|---------|
-| [STACK.md](STACK.md) | API recommendations with browser support and code examples |
-| [FEATURES.md](FEATURES.md) | Feature landscape with platform comparison |
-| [ARCHITECTURE.md](ARCHITECTURE.md) | System design with rule engine patterns and data flows |
-| [PITFALLS.md](PITFALLS.md) | 22 specific pitfalls with prevention strategies |
+### Tertiary (MEDIUM confidence)
+- [Jimmy's Blog: GGPO-style rollback](https://outof.pizza/posts/rollback/) — fixed-point arithmetic
+- [Gaffer on Games: Deterministic Lockstep](https://gafferongames.com/post/deterministic_lockstep/) — input confirmation protocol
 
 ---
-
-*Research complete: 2026-01-21*
-*Ready for: `/gsd:define-requirements` or `/gsd:create-roadmap`*
+*Research completed: 2026-01-30*
+*Ready for roadmap: yes*

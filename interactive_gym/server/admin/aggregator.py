@@ -48,6 +48,7 @@ class AdminEventAggregator:
     MAX_CONSOLE_LOG_SIZE = 1000
 
     # Directory for persisted console logs
+    # TODO(chase): Use the experiment_id here. 
     CONSOLE_LOGS_DIR = "data/console_logs"
 
     def __init__(

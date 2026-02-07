@@ -1,690 +1,519 @@
-# Pitfalls Research: Participant Exclusion
+# Pitfalls Research
 
-**Domain:** Browser-based RL experiments with participant screening
-**Researched:** 2026-01-21
-**Confidence:** MEDIUM (WebSearch-based research, verified against documented patterns)
+**Domain:** Rollback netcode data collection for P2P multiplayer research
+**Researched:** 2026-01-30
+**Confidence:** HIGH (verified against GGPO docs, project implementation, and established netcode literature)
 
 ## Executive Summary
 
-The top 5 critical pitfalls for participant exclusion systems in interactive experiments:
+Data divergence in P2P rollback systems stems from a fundamental tension: **speculative execution optimizes player experience but corrupts research data**. The core issue is that each client runs its own simulation, making predictions that may be wrong, and correcting them via rollback. If data collection doesn't account for this, the exported data contains a mix of speculative (wrong) and corrected (right) outcomes.
 
-1. **Ping measurement inaccuracy** — Browser TCP-based ping measurements include HTTP/TLS overhead, reporting 30-50ms higher than actual network latency. A 200ms threshold may exclude participants with 150ms true latency.
-
-2. **Browser detection unreliability** — User agent strings are spoofable, outdated, and inconsistent across browsers. Firefox exclusion rules could incorrectly block legitimate Chromium browsers or miss Firefox users spoofing Chrome.
-
-3. **Power-saving mode WebSocket disconnects** — Backgrounded browser tabs throttle timers to 1/minute, causing false-positive inactivity detection and heartbeat failures even when participants are actively engaged.
-
-4. **Multiplayer cascade exclusion unfairness** — When one player is excluded mid-game, the other player loses their session through no fault of their own. Without clear messaging and compensation, this damages participant trust.
-
-5. **Demographic sampling bias** — Strict technical requirements (modern browser, screen size, low ping) systematically exclude participants with older hardware, rural connections, or mobile devices, reducing sample representativeness.
-
-## Measurement Pitfalls
-
-### P1: TCP/HTTP Ping Overhead vs. True Network Latency
-
-**What goes wrong:** Browser-based ping measurements use HTTP/HTTPS requests over TCP, which includes TLS handshake, HTTP headers, and application layer overhead. This reports latency 30-50ms higher than ICMP ping or raw TCP.
-
-**Why it happens:** Browsers cannot access ICMP (layer 3) directly. Even WebSocket ping/pong operates at layer 4+ with application overhead. WebRTC DataChannels can get closer to true UDP latency but still include protocol overhead.
-
-**Consequences:** A participant with 150ms true network latency may measure 180-200ms via HTTP ping, crossing a 200ms exclusion threshold. You exclude participants who would actually perform acceptably.
-
-**Warning signs:**
-- Participants who report their connection is fast but are excluded
-- Exclusion rates higher than expected for geographic regions
-- Mismatch between pre-experiment ping and in-game RTT measurements
-
-**Prevention:**
-- Measure RTT using WebRTC DataChannel once P2P connection is established (closer to game-relevant latency)
-- Use percentile thresholds (e.g., 95th percentile over N samples) rather than single measurements
-- Add 30-50ms buffer to account for measurement overhead
-- Measure multiple times and average, discarding outliers
-
-**Phase mapping:** Address during initial screening implementation (core infrastructure)
-
-**Sources:**
-- [Azure Speed Test Documentation](https://www.azurespeed.com/Azure/Latency) - explains TCP vs ICMP differences
-- [websockets library documentation](https://websockets.readthedocs.io/en/stable/topics/keepalive.html)
+The project's current `frameDataBuffer` architecture addresses this by clearing and re-recording on rollback, but several edge cases and pitfalls remain.
 
 ---
 
-### P2: Temporary Latency Spikes Causing False Positive Exclusions
+## Critical Pitfalls
 
-**What goes wrong:** A single latency spike (due to WiFi interference, background process, or network congestion) triggers exclusion even though the participant's connection is generally stable.
+### Pitfall 1: Recording Speculative Data as Ground Truth
 
-**Why it happens:** Instantaneous measurements capture point-in-time conditions. Wireless networks experience transient issues from channel congestion, signal noise, or even microwave interference. These spikes are typically seconds long, not minutes.
-
-**Consequences:** Participant is excluded mid-experiment for a 2-second network hiccup that doesn't affect gameplay meaningfully.
-
-**Warning signs:**
-- Mid-experiment exclusions that don't correlate with observable gameplay issues
-- Exclusion logs showing single spike followed by normal values
-- Higher exclusion rates during certain times of day (network congestion patterns)
-
-**Prevention:**
-- Require N consecutive violations before exclusion (e.g., 3 consecutive ping measurements > threshold)
-- Use rolling average or sliding window (e.g., 5-second moving average)
-- Distinguish between sustained degradation and transient spikes
-- Log spike events without immediate exclusion, analyze patterns
-
-**Phase mapping:** Address in continuous monitoring logic
-
----
-
-### P3: Jitter Ignored in Quality Assessment
-
-**What goes wrong:** Focus only on mean latency while ignoring jitter (variance in latency). A participant with 100ms mean but 50ms jitter experiences worse gameplay than one with 150ms mean and 5ms jitter.
-
-**Why it happens:** Ping thresholds are intuitive; jitter measurement requires tracking multiple samples and calculating variance.
-
-**Consequences:** Participants with stable-but-slow connections are excluded while participants with unstable-but-average connections are admitted. The unstable connections cause more gameplay issues.
-
-**Warning signs:**
-- Admitted participants experience more rollbacks/corrections than excluded ones
-- Post-experiment surveys report lag despite passing screening
-- Game data shows high rollback rates for nominally-qualifying participants
-
-**Prevention:**
-- Track both mean RTT and jitter (standard deviation of RTT)
-- Consider composite scoring: `quality_score = mean_rtt + (2 * jitter)`
-- Set thresholds for both metrics independently
-
-**Phase mapping:** Enhancement after basic ping threshold works
-
----
-
-### P4: Browser Detection via User Agent Is Unreliable
-
-**What goes wrong:** User agent string parsing incorrectly identifies browser, leading to false exclusions or false admissions.
+**What goes wrong:**
+Data collection records outcomes from frames simulated with *predicted* inputs. When a rollback occurs, the game state is corrected, but previously recorded data for those frames persists. The final export contains a mix of speculated and corrected data that never represented the actual game.
 
 **Why it happens:**
-- User agent strings are user-configurable and frequently spoofed
-- Browsers lie about their identity (Vivaldi reports as Chrome, iPad Safari reports as desktop Safari)
-- Detection libraries become outdated as new browser versions release
-- Modern browsers are converging on similar UA patterns
+GGPO-style rollback predicts remote player inputs when packets haven't arrived. If prediction is wrong, the game rolls back and replays with correct inputs. If data recording doesn't clear and re-record during rollback, the speculative data remains.
 
-**Consequences:**
-- Block legitimate Chrome users because UA contains "Firefox" compatibility token
-- Admit Firefox users who spoofed their UA to Chrome
-- Exclude all iPad users because they report desktop Safari UA
+**How to avoid:**
+```javascript
+// On rollback to targetFrame:
+// 1. Clear all frame data from targetFrame onwards
+clearFrameDataFromRollback(targetFrame) {
+    for (const frame of this.frameDataBuffer.keys()) {
+        if (frame >= targetFrame) {
+            this.frameDataBuffer.delete(frame);
+        }
+    }
+}
+
+// 2. Re-record data during replay (not just during initial simulation)
+// The current implementation does this in executeGGPORollback()
+```
 
 **Warning signs:**
-- Exclusion/admission doesn't match reported browser in post-experiment survey
-- Inconsistent behavior between "same browser" participants
-- Sudden spike in exclusions after browser update releases
+- Frame counts differ between players' exports
+- Actions for a frame differ between players
+- Reward totals don't match between players
+- Infos contain physically impossible states (e.g., player at two positions)
 
-**Prevention:**
-- Use feature detection over browser detection where possible
-- If browser-specific, use multiple signals: `navigator.userAgent`, `navigator.userAgentData` (Client Hints API), and feature probes
-- Consider why you're excluding a browser — if it's a feature concern, test for the feature directly
-- Accept that 100% accuracy is impossible; design for graceful degradation
-
-**Phase mapping:** Address during browser exclusion rule implementation
-
-**Sources:**
-- [MDN Browser Detection Guide](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Browser_detection_using_the_user_agent)
-- [Niels Leenheer article on browser detection](https://nielsleenheer.com/articles/2024/should-we-rely-on-browser-detection/)
+**Phase to address:**
+Phase 1 (Isolation) - Verify rollback clears frame data buffer before replay
 
 ---
 
-### P5: Screen Size Detection Pitfalls
+### Pitfall 2: Fast-Forward Bulk Processing Without Re-Recording
 
-**What goes wrong:** Screen size checks fail due to device pixel ratio, browser chrome, or resize events.
+**What goes wrong:**
+When a tab is backgrounded and refocused, the system fast-forwards through missed frames using buffered partner inputs. If this bulk processing uses a different code path than normal step processing, data may not be recorded for fast-forwarded frames, creating gaps in the export.
 
 **Why it happens:**
-- `screen.width` vs `screen.availWidth` vs `window.innerWidth` measure different things
-- Retina/HiDPI displays have device pixel ratio > 1, meaning 1 CSS pixel != 1 device pixel
-- Browser chrome (toolbar, bookmarks bar) reduces available viewport
-- Window resize events fire hundreds of times per second
+Fast-forward is an optimization to catch up quickly. It may skip certain callbacks or use simplified logic that doesn't include data recording. The project's `FocusManager.drainBufferedInputs()` returns buffered packets, but the fast-forward loop must explicitly call `storeFrameData()` for each frame.
 
-**Consequences:**
-- Exclude participants on high-resolution devices (e.g., 4K monitor at 200% scaling shows as 960px logical width)
-- Admit participants who then resize window below minimum during experiment
-- Performance issues from unthrottled resize event handlers
+**How to avoid:**
+```javascript
+// Fast-forward loop MUST mirror normal step() data recording:
+for (const packet of bufferedInputs) {
+    // 1. Apply the input
+    storeRemoteInput(packet.playerId, packet.action, packet.frame);
 
-**Warning signs:**
-- Participants with large monitors being excluded for screen size
-- Game elements clipped or unusable despite passing initial check
-- Client-side performance issues during window manipulation
+    // 2. Step the environment (same as normal loop)
+    const result = await stepEnvironment(inputs);
 
-**Prevention:**
-- Use `window.innerWidth`/`window.innerHeight` for viewport (what's usable)
-- Account for device pixel ratio in threshold calculations
-- Throttle/debounce resize event handlers
-- Re-check screen size on resize and warn/exclude if it drops below minimum
-- Consider CSS media queries for responsive adjustments vs hard exclusion
-
-**Phase mapping:** Address during device requirement rule implementation
-
-**Sources:**
-- [OpenReplay article on resize pitfalls](https://blog.openreplay.com/avoiding-resize-event-pitfalls-js/)
-- [MDN Screen.width](https://developer.mozilla.org/en-US/docs/Web/API/Screen/width)
-
-## UX Pitfalls
-
-### P6: Opaque Exclusion Messages Frustrate Participants
-
-**What goes wrong:** Participant sees "You cannot participate" without understanding why or what they could do differently.
-
-**Why it happens:** System designed from researcher perspective (need to filter), not participant perspective (want to participate).
-
-**Consequences:**
-- Frustrated participants leave negative reviews on Prolific/MTurk
-- Participants retry repeatedly, wasting their time and creating support burden
-- Lower completion rates as word spreads that the experiment is "broken"
+    // 3. Record frame data (CRITICAL - don't skip this)
+    storeFrameData(frameNumber, {
+        actions: inputs,
+        rewards: result.rewards,
+        terminateds: result.terminateds,
+        truncateds: result.truncateds,
+        infos: result.infos
+    });
+}
+```
 
 **Warning signs:**
-- Support tickets asking "why was I excluded?"
-- Low ratings despite experiment content being fine
-- Participants attempting to circumvent screening (VPN, browser changes)
+- Frame numbers have gaps in export (e.g., 1, 2, 3, 57, 58, 59)
+- Total frame count is less than expected episode length
+- Focus loss events correlate with missing data ranges
+- `focusManager.getTelemetry().backgroundPeriods` non-empty but corresponding frames missing
 
-**Prevention:**
-- Per-rule messaging that explains: (1) what failed, (2) why it matters, (3) what they could try
-- Example: "Your network latency is 250ms (our limit is 200ms). This experiment requires fast connections for real-time gameplay. You might try a wired connection or closing other applications."
-- Distinguish between "try again later" issues (ping) and "cannot participate" issues (browser requirement)
-- Provide estimated compensation for time spent in screening if excluded
-
-**Phase mapping:** Address in messaging system design (early)
+**Phase to address:**
+Phase 2 (Fast-Forward) - Audit fast-forward code path for data recording parity
 
 ---
 
-### P7: Screening Takes Too Long, Causing Abandonment
+### Pitfall 3: RNG State Not Included in Snapshots
 
-**What goes wrong:** Pre-experiment screening runs multiple tests sequentially, taking 30+ seconds. Participants abandon before completing.
+**What goes wrong:**
+Rollback restores environment state but not random number generator state. If the environment uses RNG during simulation, replayed frames produce different random outcomes than the original, causing state divergence even with identical inputs.
 
-**Why it happens:** Conservative approach runs all checks thoroughly. Each check (ping, browser, screen, etc.) runs independently.
+**Why it happens:**
+Developers focus on obvious game state (positions, inventories) and forget that RNG is hidden state that affects determinism. Python's `random` module and NumPy's RNG have global state that must be captured.
 
-**Consequences:**
-- High pre-experiment dropout rate
-- Wasted participant pool — they saw the experiment, can't re-recruit them
-- Selection bias toward patient participants
+**How to avoid:**
+```javascript
+// The project correctly captures RNG state:
+async saveStateSnapshot(frameNumber) {
+    const stateJson = await this.pyodide.runPythonAsync(`
+        import numpy as np
+        import random
+
+        _np_rng_state = np.random.get_state()
+        _py_rng_state = random.getstate()
+
+        _snapshot = {
+            'env_state': env.get_state(),
+            'np_rng_state': _np_rng_serializable,
+            'py_rng_state': _py_rng_state
+        }
+    `);
+}
+```
 
 **Warning signs:**
-- Analytics show high dropout during "loading" phase
-- Time-to-game-start metrics are high
-- Participants report experiment is "slow to start"
+- Determinism test fails (same inputs produce different outputs)
+- GGPO `ggpo_start_synctest` equivalent detects divergence
+- Hash comparison between clients fails despite identical input sequences
+- Random events (drops, spawns) differ between players
 
-**Prevention:**
-- Run checks in parallel where possible (browser check while ping is measured)
-- Fail fast: check cheapest/most-likely-to-fail criteria first
-- Show progress indicator: "Checking your connection... Checking your browser..."
-- Set timeout on screening phase (if screening takes > 10s, something is wrong)
-- Cache browser/screen checks — they don't change during session
-
-**Phase mapping:** Address in screening flow implementation
+**Phase to address:**
+Phase 1 (Isolation) - Verify RNG state is captured and restored correctly
 
 ---
 
-### P8: Mid-Experiment Exclusion Without Warning
+### Pitfall 4: Frame Number Disagreement Between Clients
 
-**What goes wrong:** Participant is playing, everything seems fine, then suddenly excluded without warning.
+**What goes wrong:**
+Each client maintains its own frame counter. If they start on different frames or one client skips/repeats frames due to timing, their exports will have different frame numbers for the same game events, making correlation impossible.
 
-**Why it happens:** Continuous monitoring detects violation, system immediately excludes per design.
+**Why it happens:**
+- Episode reset doesn't synchronize frame counters
+- One client counts from 1, another from 0
+- Network latency causes one client to run faster
+- Pause/unpause handling differs
 
-**Consequences:**
-- Participant loses progress, feels cheated
-- No opportunity to correct issue (close background apps, etc.)
-- Higher complaint rate than pre-experiment exclusion
+**How to avoid:**
+```javascript
+// Ensure deterministic frame numbering:
+// 1. Both clients start episode at frame 0
+this.frameNumber = 0;
+
+// 2. Frame advances exactly once per step
+this.frameNumber++;  // Only in step(), never in render
+
+// 3. Rollback resets frame to snapshot frame, then replays
+async loadStateSnapshot(frameNumber) {
+    this.frameNumber = frameNumber;  // Restore frame counter
+}
+```
 
 **Warning signs:**
-- Spike in complaints specifically about mid-game exclusions
-- Participants reporting they were excluded "for no reason"
-- Data shows brief threshold violations before exclusion
+- Export from Player A has 100 frames, Player B has 98 frames
+- Same action appears at frame 50 for Player A, frame 52 for Player B
+- Episode rewards match but frame-by-frame rewards don't align
 
-**Prevention:**
-- Implement warning system before exclusion: "Your connection is unstable. Please close other applications."
-- Allow grace period after warning before actual exclusion
-- Distinguish between immediate exclusion criteria (inactivity = cheating concern) vs warning-first criteria (ping spike = technical issue)
-- Log warning events for post-experiment analysis
-
-**Phase mapping:** Address in continuous monitoring design
+**Phase to address:**
+Phase 1 (Isolation) - Add frame counter validation to hash comparison
 
 ---
 
-### P9: False Positive Inactivity Detection
+### Pitfall 5: Desync Detection Without Data Correction
 
-**What goes wrong:** Participant is watching/thinking (valid in many games) but gets flagged as inactive because no input events fire.
+**What goes wrong:**
+System detects desync (via hash comparison) but only logs it without correcting exported data. The desync is known but the export still contains diverged data from different game realities.
 
-**Why it happens:** Inactivity detection monitors keyboard/mouse events. Some game states don't require input (watching replay, waiting for other player, planning phase).
+**Why it happens:**
+Desync detection is implemented for debugging visibility, but the remediation (state resync, data clearing) is either incomplete or not triggered.
 
-**Consequences:**
-- Exclude participants who are legitimately engaged but not pressing keys
-- Particularly problematic in turn-based or observation-heavy experiments
+**How to avoid:**
+```javascript
+// Desync detection MUST trigger data remediation:
+async onDesyncDetected(frame, localHash, remoteHash) {
+    // 1. Log for debugging
+    this.desyncEvents.push({frame, localHash, remoteHash, timestamp: Date.now()});
 
-**Warning signs:**
-- Inactivity exclusions cluster during specific game phases
-- Excluded participants report they were paying attention
-- Game logs show exclusion during non-interactive portions
+    // 2. Trigger state resync (one client defers to other)
+    if (this._shouldRequestStateResync(peerId)) {
+        await this.requestStateFromPeer(peerId);
+    }
 
-**Prevention:**
-- Reset inactivity timer on any user interaction (mouse movement, not just clicks)
-- Context-aware inactivity: longer timeout during known low-input phases
-- Combine with attention signals: tab visibility, mouse position (on game vs away)
-- Consider eye-tracking if available, or periodic low-friction attention checks
+    // 3. Clear frame data buffer from desync point
+    this.clearFrameDataFromRollback(frame);
 
-**Phase mapping:** Address during inactivity detection implementation
-
-**Sources:**
-- [MDN Idle Detection API](https://developer.mozilla.org/en-US/docs/Web/API/Idle_Detection_API)
-- [Kirupa article on idle detection](https://www.kirupa.com/html5/detecting_if_the_user_is_idle_or_inactive.htm)
-
-## Timing Pitfalls
-
-### P10: Power-Saving Mode Breaks Heartbeat/Inactivity Detection
-
-**What goes wrong:** When browser tab is backgrounded, timers are throttled to 1/minute. Heartbeat fails, inactivity timer fires incorrectly.
-
-**Why it happens:** Browser power-saving mechanisms throttle `setTimeout`/`setInterval` in background tabs to reduce CPU/battery usage. A 5-second heartbeat becomes 60-second.
-
-**Consequences:**
-- Participant switches tabs briefly (check email), returns to find they've been excluded
-- Heartbeat-based disconnect detection fails or triggers false positive
-- WebSocket connection drops due to missed pongs
+    // 4. Mark data after desync as UNVERIFIED in export
+    this.verifiedFrame = Math.min(this.verifiedFrame, frame - 1);
+}
+```
 
 **Warning signs:**
-- Exclusions correlate with tab switch events (can detect via `visibilitychange`)
-- Heartbeat logs show 60s gaps
-- Participants report being excluded when they "just switched tabs for a second"
+- `desyncEvents` array is non-empty in export
+- `verifiedFrame` is less than `currentFrame`
+- Hash comparison shows divergence but exports still differ
 
-**Prevention:**
-- Use Web Workers for critical timers (not affected by tab throttling)
-- Listen for `visibilitychange` event — pause inactivity timer when hidden, resume when visible
-- Don't treat backgrounded tab as inactivity if it returns within reasonable window
-- For WebSocket heartbeat, increase `pingTimeout` to account for throttling, or use Web Worker
-
-**Phase mapping:** Critical — address in heartbeat/inactivity infrastructure
-
-**Sources:**
-- [PixelsTech article on WebSocket power-saving pitfalls](https://www.pixelstech.net/article/1719122489-the-pitfall-of-websocket-disconnections-caused-by-browser-power-saving-mechanisms)
-- [Socket.IO heartbeat discussion](https://github.com/socketio/socket.io/discussions/4161)
+**Phase to address:**
+Phase 3 (Verification) - Ensure desync detection triggers data correction
 
 ---
 
-### P11: Race Condition Between Screening and Game Start
+### Pitfall 6: Input Delay Creates Observation/Action Temporal Mismatch
 
-**What goes wrong:** Participant passes screening, but by the time game actually starts, their conditions have changed (ping spiked, window resized).
+**What goes wrong:**
+With input delay (e.g., 2 frames), a player's input at frame N executes at frame N+2. If data recording associates the input with frame N (when pressed) instead of frame N+2 (when executed), the observation-action pairs are misaligned.
 
-**Why it happens:** Screening happens before game initialization. Multiplayer requires waiting for other player. Gap between screen and start can be seconds to minutes.
+**Why it happens:**
+Input delay is a UX optimization to reduce rollbacks by giving time for inputs to arrive. But it creates temporal displacement that data recording must account for.
 
-**Consequences:**
-- Participant admitted but then has poor experience due to degraded conditions
-- Or: participant meets criteria at start, fails continuous monitoring immediately
-- State mismatch between what was checked and current reality
+**How to avoid:**
+```javascript
+// Record actions at EXECUTION frame, not INPUT frame:
+storeLocalInput(action, currentFrame) {
+    const targetFrame = currentFrame + this.INPUT_DELAY;
+    // Input is stored for targetFrame, not currentFrame
+    this.inputBuffer.get(targetFrame).set(myPlayerId, action);
+    return targetFrame;
+}
+
+// When recording frame data, use the actual action executed at that frame:
+storeFrameData(frameNumber, {
+    actions: this.getInputsForFrame(frameNumber),  // Gets action FOR this frame
+    // ...
+});
+```
 
 **Warning signs:**
-- Continuous monitoring exclusions cluster immediately after game start
-- Large gap between screening timestamp and game start timestamp
-- Participants report passing screening but being excluded at start
+- Observation at frame N paired with action that makes no sense for that observation
+- "Impossible" action sequences (e.g., moving into wall that wasn't there 2 frames ago)
+- Behavioral cloning agent learns delayed/incorrect associations
 
-**Prevention:**
-- Re-validate critical criteria immediately before game start
-- Keep screening criteria "fresh" — re-measure ping if waitroom time exceeds threshold
-- Design continuous monitoring to expect initial fluctuation (grace period at start)
-
-**Phase mapping:** Address in screening-to-game transition logic
+**Phase to address:**
+Phase 2 (Fast-Forward) - Verify input delay handling in data recording
 
 ---
 
-### P12: Screening Check Order Creates Bad UX
+### Pitfall 7: Cumulative Reward Divergence After Rollback
 
-**What goes wrong:** Slow check runs first (10-second ping sampling), then fast check fails (wrong browser). Participant waited 10 seconds only to be immediately rejected.
+**What goes wrong:**
+Cumulative rewards are incremented speculatively during prediction, then not corrected when rollback occurs. Export shows different total rewards between players, or reward totals that don't match the sum of per-frame rewards.
 
-**Why it happens:** Checks run in code order, not optimized order.
+**Why it happens:**
+Cumulative rewards are often stored in a simple counter that gets incremented in step(). If rollback restores environment state but not the reward counter, the counter retains speculative values.
 
-**Consequences:**
-- Wasted participant time
-- Higher dropout during screening
-- Poor perceived performance
+**How to avoid:**
+```javascript
+// Include cumulative_rewards in state snapshot:
+saveStateSnapshot(frameNumber) {
+    snapshotData.cumulative_rewards = {...this.cumulative_rewards};
+    snapshotData.step_num = this.step_num;
+}
 
-**Warning signs:**
-- Screening takes longer than necessary before rejection
-- Analytics show most rejections happen after slow checks
-
-**Prevention:**
-- Order checks: fastest first, then most-likely-to-fail first
-- Run independent checks in parallel
-- Fail fast: browser/device checks are instant, run before ping sampling
-
-**Phase mapping:** Address in screening orchestration
-
-## Multiplayer Pitfalls
-
-### P13: One Player Excluded, Other Player Stranded
-
-**What goes wrong:** Player A gets excluded mid-game. Player B's game ends abruptly with no explanation.
-
-**Why it happens:** System designed for exclusion mechanics, not for partner communication.
-
-**Consequences:**
-- Player B confused and frustrated
-- Player B may think they were excluded
-- Both players rate experiment poorly
+// Restore cumulative_rewards on snapshot load:
+loadStateSnapshot(frameNumber) {
+    this.cumulative_rewards = {...snapshotData.cumulative_rewards};
+    this.step_num = snapshotData.step_num;
+}
+```
 
 **Warning signs:**
-- Complaints from players who "didn't do anything wrong"
-- Confusion in post-experiment surveys about why game ended
-- Lower ratings from multiplayer sessions than single-player
+- `cumulative_rewards` in export doesn't match sum of per-frame rewards
+- Episode end rewards differ between players
+- Reward totals diverge increasingly over episode length
 
-**Prevention:**
-- Explicit messaging for non-excluded player: "The game has ended because your partner experienced a technical issue. This is not your fault."
-- Compensate non-excluded player appropriately
-- Log reason in research data (distinguish partner-exclusion from self-exclusion)
-- Consider allowing non-excluded player to re-queue for new partner
-
-**Phase mapping:** Address in multiplayer exclusion handling (critical for multiplayer experiments)
+**Phase to address:**
+Phase 1 (Isolation) - Verify cumulative rewards are included in snapshot
 
 ---
 
-### P14: Asymmetric Exclusion Criteria Cause Unfairness
+### Pitfall 8: Floating-Point Non-Determinism in Browser
 
-**What goes wrong:** Player A has stricter hardware, Player B has lenient hardware. A gets excluded, B doesn't. Or vice versa — A's criteria should have excluded them earlier.
+**What goes wrong:**
+JavaScript floating-point operations can produce slightly different results between browsers, machines, or even runs. In a P2P system, tiny differences compound over time into complete state divergence.
 
-**Why it happens:** Screening criteria evaluated independently per player. Criteria designed for individual participation, not pairs.
+**Why it happens:**
+Floating-point arithmetic is not associative: `(a + b) + c` may differ from `a + (b + c)` by small epsilon. Different JavaScript engines may optimize differently, and FPU state can affect results.
 
-**Consequences:**
-- Player B paired with Player A who should have been excluded earlier
-- Game experience poor due to A's issues before exclusion triggers
-- Perception of unfairness
+**How to avoid:**
+```javascript
+// Use fixed-point arithmetic for deterministic simulation:
+// From Jimmy's Blog rollback tutorial:
+const FIXED_SCALE = 1000;
+
+function toFixed(float) {
+    return Math.round(float * FIXED_SCALE);
+}
+
+function fromFixed(fixed) {
+    return fixed / FIXED_SCALE;
+}
+
+function mulFixed(a, b) {
+    return Math.round((a * b) / FIXED_SCALE);
+}
+```
+
+Alternatively, ensure all physics/math happens in Python (Pyodide) where NumPy provides consistent behavior.
 
 **Warning signs:**
-- Multiplayer games with high variance in partner quality
-- Complaints about being paired with "laggy" partners
-- Post-game data shows one player consistently experiencing issues
+- Hash divergence after many frames despite identical inputs
+- Slow drift that accelerates over time
+- Desync happens more in long episodes
+- Different browsers produce different results
 
-**Prevention:**
-- Consider screening pairs, not just individuals — if pair has high RTT delta, warn or re-match
-- Set minimum criteria for all multiplayer participants (higher bar than single-player)
-- Monitor game-level metrics (P2P latency between specific pair) not just individual metrics
-
-**Phase mapping:** Enhancement after basic exclusion works
+**Phase to address:**
+Phase 1 (Isolation) - Verify all deterministic logic uses consistent arithmetic
 
 ---
 
-### P15: State Synchronization Issues During Exclusion
+## Data Divergence Causes
 
-**What goes wrong:** Player A is excluded, but exclusion message races with game state updates. Player B sees inconsistent state — game appears to continue for a frame, then ends.
-
-**Why it happens:** P2P systems have state synchronization challenges. Exclusion is server-initiated but game state is peer-maintained.
-
-**Consequences:**
-- Visual glitches during exclusion
-- Potential for game logic issues if one peer processes inputs after other has stopped
-- Data integrity concerns — which state is canonical at exclusion time?
-
-**Warning signs:**
-- Visual "flash" or "jump" during partner exclusion
-- Data logs show continued game steps after exclusion timestamp
-- State mismatch between exported game data
-
-**Prevention:**
-- Exclusion should be coordinated: server sends exclusion to both peers simultaneously
-- Implement clean shutdown sequence: stop input processing, finalize state, then display message
-- Log exclusion timestamp and frame number for data alignment
-- Test exclusion at various game states and frame timings
-
-**Phase mapping:** Address in exclusion implementation, test thoroughly
-
-**Sources:**
-- [Game state synchronization patterns](https://canbayar91.medium.com/game-mechanics-1-multiplayer-network-synchronization-46cbe21be16a)
-- [Hacker News discussion on multiplayer sync](https://news.ycombinator.com/item?id=31512257)
+| Cause | Symptom | Fix |
+|-------|---------|-----|
+| Speculative data not cleared on rollback | Actions differ for same frame between players | Clear `frameDataBuffer` from rollback target frame |
+| Fast-forward skips data recording | Gaps in frame numbers in export | Mirror normal step() recording in fast-forward loop |
+| RNG state not in snapshot | Different random events between players | Include numpy/Python RNG state in snapshot |
+| Frame counter mismatch | Different frame counts in exports | Synchronize frame counter on episode reset, include in hash |
+| Desync without data correction | Hash divergence but exports still differ | Desync detection must trigger data clearing/resync |
+| Input delay temporal mismatch | Observation/action pairs misaligned | Record action at execution frame, not input frame |
+| Cumulative rewards not in snapshot | Reward totals diverge | Include cumulative_rewards in state snapshot |
+| Floating-point non-determinism | Slow drift, eventual divergence | Use fixed-point or consistent math library |
+| Web Worker timing drift | One client runs faster | Use deterministic tick timing, not wall clock |
+| Tab backgrounding | requestAnimationFrame paused | Use Web Worker for timing, buffer inputs |
 
 ---
 
-### P16: Reconnection vs. Exclusion Conflict
+## Fast-Forward Specific Issues
 
-**What goes wrong:** System has reconnection support (player drops, reconnects within window). But exclusion system treats disconnect as exclusion. Player can't reconnect because they're "excluded."
+### Issue 1: requestAnimationFrame Throttling
 
-**Why it happens:** Two systems (reconnection, exclusion) with overlapping triggers but different logic.
+**Problem:** Browsers throttle `requestAnimationFrame` to 1/second (or stop entirely) when tab is backgrounded. This pauses the game loop, causing massive frame drift.
 
-**Consequences:**
-- Legitimate disconnects treated as exclusions when they should allow reconnection
-- Or: excluded players attempting to reconnect and re-entering experiment
+**Solution:** Use Web Worker for timing (not affected by throttling) and buffer partner inputs during background period.
 
-**Warning signs:**
-- Players report being able to reconnect after exclusion (security issue)
-- Players report not being able to reconnect after brief disconnect (UX issue)
-- Inconsistent behavior between disconnect types
+```javascript
+// Web Worker keeps timing alive:
+// worker.js
+setInterval(() => {
+    postMessage({ type: 'tick' });
+}, 1000 / 60);
 
-**Prevention:**
-- Clear distinction: exclusion = permanent removal with reason recorded, disconnect = temporary with reconnection window
-- Exclusion should invalidate reconnection token
-- Disconnect handling should not create exclusion record unless it exceeds reconnection window
-- State machine: Connected -> Disconnected -> (Reconnected | Excluded by Timeout)
+// Main thread:
+worker.onmessage = (e) => {
+    if (e.data.type === 'tick' && !document.hidden) {
+        gameLoop();
+    }
+};
+```
 
-**Phase mapping:** Address in exclusion architecture, coordinate with existing reconnection logic
+### Issue 2: Bulk Input Application Order
 
-## Configuration Pitfalls
+**Problem:** When refocusing, many buffered inputs must be applied. If applied in wrong order (e.g., sorted by arrival time instead of frame number), simulation diverges.
 
-### P17: Overly Strict Defaults Cause Unacceptable Exclusion Rates
+**Solution:** Always sort buffered inputs by frame number before applying:
 
-**What goes wrong:** Default configuration sets strict thresholds (100ms ping, latest Chrome only, 1920x1080 minimum). Exclusion rate is 40%+, depleting participant pool.
+```javascript
+const bufferedInputs = focusManager.drainBufferedInputs();
+bufferedInputs.sort((a, b) => a.frame - b.frame);
+for (const input of bufferedInputs) {
+    // Apply in frame order
+}
+```
 
-**Why it happens:** Developers test on good hardware/connections. Defaults reflect developer environment, not participant reality.
+### Issue 3: Rendering During Fast-Forward
 
-**Consequences:**
-- Study cannot recruit enough participants
-- Demographic skew toward high-resource participants
-- Wasted recruitment budget
+**Problem:** Rendering every fast-forward frame is slow and unnecessary. But if render callback records data, skipping render skips data.
 
-**Warning signs:**
-- Exclusion rates in pilot significantly higher than expected
-- Exclusion rates vary dramatically by geographic region or time of day
-- Post-exclusion surveys show participants have "normal" setups
+**Solution:** Decouple data recording from rendering:
 
-**Prevention:**
-- Research typical participant conditions before setting defaults
-- Provide conservative (lenient) defaults, document how to make stricter
-- Include exclusion rate estimation in pilot phase
-- A/B test thresholds during pilot to find balance
+```javascript
+// During fast-forward:
+while (currentFrame < targetFrame) {
+    stepEnvironment();           // MUST run
+    storeFrameData();            // MUST run
+    // Skip rendering - only visual
+}
+// Render only final frame
+renderFrame();
+```
 
-**Phase mapping:** Address in default configuration design
+### Issue 4: Partner Input Request Timeout
 
----
+**Problem:** After refocus, we may need to request missed inputs from partner. If partner doesn't respond, we're stuck.
 
-### P18: Rule Interaction/Conflict Creates Unexpected Behavior
+**Solution:** Request with timeout and fallback to prediction:
 
-**What goes wrong:** Multiple rules interact unexpectedly. Rule A says "exclude if ping > 200ms", Rule B says "warn if ping > 150ms". What happens at 175ms?
+```javascript
+async requestMissingInputs(startFrame, endFrame) {
+    const response = await this.sendWithTimeout(
+        { type: 'input_request', startFrame, endFrame },
+        TIMEOUT_MS
+    );
 
-**Why it happens:** Rules designed independently, interactions not considered.
-
-**Consequences:**
-- Participant sees warning, then is excluded (expected warn, got exclude)
-- Or: participant should be warned but isn't due to rule ordering
-- Researcher intent not reflected in actual behavior
-
-**Warning signs:**
-- Unexpected exclusion/warning patterns
-- Difficulty explaining system behavior to collaborators
-- Bug reports about "inconsistent" screening
-
-**Prevention:**
-- Define rule precedence explicitly: exclusion rules > warning rules
-- Validate configuration at startup: flag conflicting thresholds
-- Provide rule simulation/preview: "with this config, here's what happens to a participant with these conditions"
-- Document rule interaction model clearly
-
-**Phase mapping:** Address in rule configuration system design
-
----
-
-### P19: Custom Callbacks Are Difficult to Test
-
-**What goes wrong:** Researcher writes custom exclusion callback. It has bugs that only manifest in production.
-
-**Why it happens:** Custom callbacks run in production context, which is hard to replicate in testing. Edge cases not considered.
-
-**Consequences:**
-- Callback throws exception, breaking screening flow
-- Callback has false positives/negatives due to untested edge cases
-- Debugging is difficult because callback runs in participant's browser
-
-**Warning signs:**
-- Errors in production not reproducible locally
-- Custom rule behavior differs from researcher expectation
-- Increased screening failures after custom rule deployed
-
-**Prevention:**
-- Provide callback testing harness with mock participant conditions
-- Wrap callbacks in try/catch with fallback behavior (fail open or fail closed, configurable)
-- Log callback execution details for debugging
-- Validate callback returns expected type (boolean or object with reason)
-- Example callbacks for common custom scenarios
-
-**Phase mapping:** Address in custom callback system design
+    if (!response) {
+        // Fallback: use predictions and mark as unverified
+        this.verifiedFrame = Math.min(this.verifiedFrame, startFrame - 1);
+    }
+}
+```
 
 ---
 
-### P20: No Visibility Into Exclusion Patterns
+## "Looks Synchronized But Isn't" Scenarios
 
-**What goes wrong:** Researcher knows exclusion is happening but not why, when, or to whom.
+### Scenario 1: Symmetric Divergence
 
-**Why it happens:** System logs exclusion events but doesn't surface analytics.
+**Description:** Both players have identical frame counts and similar-looking data, but the actions/states are for different game realities that happened to have similar structures.
 
-**Consequences:**
-- Cannot diagnose high exclusion rates
-- Cannot identify if specific criteria are too strict
-- Cannot detect systematic biases
+**Detection:** Compare per-frame hashes between exports. Identical frame counts but different hashes = diverged.
 
-**Warning signs:**
-- Researcher asks "why is my exclusion rate so high?"
-- No way to answer "which rule excludes the most participants?"
-- Cannot segment exclusions by demographic/condition
-
-**Prevention:**
-- Log every exclusion with: timestamp, participant ID, rule that triggered, measured value, threshold value
-- Provide dashboard or export for exclusion analytics
-- Aggregate metrics: exclusion rate by rule, by time of day, by browser
-- Alert if exclusion rate exceeds expected threshold
-
-**Phase mapping:** Address in monitoring/logging infrastructure
-
-## Bias and Fairness Pitfalls
-
-### P21: Technical Requirements Create Demographic Sampling Bias
-
-**What goes wrong:** Strict technical requirements systematically exclude certain populations, biasing sample.
-
-**Why it happens:** Technical requirements designed for experiment validity (need low latency) but have demographic correlates (rural areas have worse internet, older participants have older hardware).
-
-**Consequences:**
-- Sample is not representative of target population
-- Results may not generalize
-- Ethical concerns about excluding disadvantaged groups
-
-**Warning signs:**
-- Post-exclusion demographic analysis shows skew
-- Exclusion rates higher for certain geographic regions, age groups
-- Sample demographics don't match recruitment platform demographics
-
-**Prevention:**
-- Analyze exclusion impact on sample demographics during pilot
-- Consider looser technical requirements with post-hoc data quality filtering
-- Report exclusion demographics in research publications
-- Design experiments that tolerate broader range of technical conditions where possible
-- Provide alternative participation pathways (lower-fidelity version) where appropriate
-
-**Phase mapping:** Address in research design phase, before implementation
-
-**Sources:**
-- [Cognitive Research Journal - Shadow biases in participant exclusion](https://cognitiveresearchjournal.springeropen.com/articles/10.1186/s41235-023-00520-y)
-- [Nature - Demographic recruitment bias in clinical trials](https://www.nature.com/articles/s41598-022-23664-1)
+**Prevention:** Continuous hash exchange and comparison (already implemented via `confirmedHashHistory`).
 
 ---
 
-### P22: Self-Selection Bias from Screening Friction
+### Scenario 2: Delayed Desync Manifestation
 
-**What goes wrong:** Screening process itself causes differential dropout. Participants who experience screening issues (even if eventually passing) are more likely to abandon.
+**Description:** A desync at frame 50 doesn't produce visible effects until frame 200 when the diverged state paths finally manifest differently. By then, 150 frames of diverged data have been recorded.
 
-**Why it happens:** Screening adds friction. Participants with lower motivation or patience disproportionately drop out.
+**Detection:** Full hash comparison on every frame, not just when "something looks wrong."
 
-**Consequences:**
-- Sample biased toward high-motivation participants
-- May affect research validity if motivation correlates with study outcomes
+**Prevention:** Early, frequent hash comparison. Don't wait for visible divergence.
 
-**Warning signs:**
-- High dropout during screening phase
-- Dropout rate varies by technical conditions (e.g., those with borderline ping drop out more)
-- Screened-in participants have different characteristics than general population
+---
+
+### Scenario 3: Episode Boundary Masking
+
+**Description:** Desync happens late in episode, but episode ends before it's detected. New episode resets state, so desync appears resolved. But the previous episode's exported data is corrupted.
+
+**Detection:** Final episode validation hash comparison before clearing buffers.
 
 **Prevention:**
-- Minimize screening friction (fast, clear, helpful)
-- Track dropout at each screening stage
-- Compare demographics of dropouts vs completers
-- Consider paying for screening time even if excluded
+```javascript
+// On episode end, before clearing:
+await validateEpisodeData();
+if (desyncDetected) {
+    // Mark episode as unverified in export
+    this.cumulativeValidation.episodes[this.num_episodes].verified = false;
+}
+```
 
-**Phase mapping:** Address in UX design of screening flow
+---
 
-## Prevention Strategies Summary
+### Scenario 4: Prediction Always Correct (By Chance)
 
-| Pitfall | Category | Prevention Strategy | Phase |
-|---------|----------|---------------------|-------|
-| P1: TCP/HTTP ping overhead | Measurement | Measure via DataChannel, add buffer, multiple samples | Core infrastructure |
-| P2: Temporary latency spikes | Measurement | Require consecutive violations, rolling average | Continuous monitoring |
-| P3: Jitter ignored | Measurement | Track mean + jitter, composite score | Enhancement |
-| P4: Browser UA unreliable | Measurement | Feature detection, multiple signals, graceful degradation | Browser rule implementation |
-| P5: Screen size confusion | Measurement | Use innerWidth, account for DPR, throttle events | Device rule implementation |
-| P6: Opaque messages | UX | Per-rule messaging explaining what, why, what to try | Messaging system |
-| P7: Slow screening | UX | Parallel checks, fail fast, progress indicator | Screening flow |
-| P8: No warning before exclusion | UX | Warning system with grace period | Continuous monitoring |
-| P9: False positive inactivity | UX | Mouse movement, context-aware timeouts | Inactivity rule |
-| P10: Power-saving breaks timers | Timing | Web Workers, visibilitychange handling | Core infrastructure |
-| P11: Screen-to-start race | Timing | Re-validate before start, grace period | Transition logic |
-| P12: Check order suboptimal | Timing | Fast checks first, parallel where possible | Screening orchestration |
-| P13: Partner stranded | Multiplayer | Clear messaging, compensation, re-queue option | Multiplayer handling |
-| P14: Asymmetric criteria | Multiplayer | Pair-level screening, minimum bar for multiplayer | Enhancement |
-| P15: State sync during exclusion | Multiplayer | Coordinated shutdown, test thoroughly | Exclusion implementation |
-| P16: Reconnect vs exclude conflict | Multiplayer | Clear state machine, invalidate tokens | Architecture |
-| P17: Overly strict defaults | Configuration | Research-based defaults, pilot testing | Default design |
-| P18: Rule conflicts | Configuration | Explicit precedence, validation, simulation | Config system |
-| P19: Untestable callbacks | Configuration | Test harness, try/catch, logging | Callback system |
-| P20: No visibility | Configuration | Detailed logging, dashboard, alerts | Monitoring |
-| P21: Demographic bias | Bias | Pilot analysis, report demographics, looser requirements | Research design |
-| P22: Self-selection from friction | Bias | Minimize friction, track dropout, pay for screening | UX design |
+**Description:** Predictions happen to be correct (e.g., player held same button for 50 frames), so no rollback occurs. But the data recording system was never exercised through rollback, and latent bugs exist.
 
-## Phase-Specific Warnings
+**Detection:** Force synthetic rollbacks in testing (artificial input delay).
 
-| Phase/Component | Likely Pitfalls | Mitigation Priority |
-|-----------------|-----------------|---------------------|
-| Core exclusion infrastructure | P10 (power-saving), P16 (reconnect conflict) | HIGH - foundational |
-| Pre-experiment screening | P7 (slow), P12 (order), P17 (strict defaults) | HIGH - first impression |
-| Continuous monitoring | P2 (spikes), P8 (no warning), P11 (race) | HIGH - mid-game experience |
-| Ping threshold rule | P1 (overhead), P2 (spikes), P3 (jitter) | HIGH - most complex measurement |
-| Browser exclusion rule | P4 (UA unreliable) | MEDIUM - consider if really needed |
-| Screen size rule | P5 (confusion) | MEDIUM - well-documented solutions |
-| Inactivity detection | P9 (false positive), P10 (power-saving) | HIGH - easy to get wrong |
-| Multiplayer handling | P13 (stranded), P15 (state sync) | HIGH - poor UX if wrong |
-| Configuration system | P17 (defaults), P18 (conflicts), P19 (callbacks) | MEDIUM - affects researcher experience |
-| Monitoring/logging | P20 (no visibility) | MEDIUM - needed for iteration |
+**Prevention:** Use `debugRemoteInputDelay` to simulate latency and verify rollback data correction.
+
+---
+
+### Scenario 5: One-Sided Rollback
+
+**Description:** Only one player experiences rollbacks (asymmetric latency). Their data is corrected, but the other player's data (which never rolled back) may differ due to timing differences in when inputs were applied.
+
+**Detection:** Compare rollback counts between players. Asymmetric rollbacks = higher desync risk.
+
+**Prevention:** Ensure both clients apply identical input-to-frame mappings regardless of when inputs arrived.
+
+---
+
+## Pitfall-to-Phase Mapping
+
+| Pitfall | Prevention Phase | Verification |
+|---------|------------------|--------------|
+| Speculative data as ground truth | Phase 1 (Isolation) | Force rollback, verify data buffer cleared and re-recorded |
+| Fast-forward bulk processing | Phase 2 (Fast-Forward) | Background tab, refocus, verify no frame gaps in export |
+| RNG state not in snapshot | Phase 1 (Isolation) | Rollback, verify RNG produces same sequence |
+| Frame number disagreement | Phase 1 (Isolation) | Compare frame counts in exports, must match exactly |
+| Desync without data correction | Phase 3 (Verification) | Inject artificial desync, verify data corrected |
+| Input delay temporal mismatch | Phase 2 (Fast-Forward) | With INPUT_DELAY > 0, verify observation/action alignment |
+| Cumulative reward divergence | Phase 1 (Isolation) | Rollback after reward, verify cumulative resets |
+| Floating-point non-determinism | Phase 1 (Isolation) | Run identical inputs, compare state hashes |
+| Tab backgrounding issues | Phase 2 (Fast-Forward) | 10s background, verify continuity on refocus |
+| Symmetric divergence | Phase 3 (Verification) | Export both players, compare per-frame hashes |
+
+---
+
+## Testing Checklist
+
+### Phase 1: Isolation Tests
+- [ ] Single-client determinism: Same inputs always produce same state hash
+- [ ] Forced rollback: Clear and re-record frame data correctly
+- [ ] RNG snapshot: Random sequence identical after rollback
+- [ ] Cumulative rewards: Restored correctly on snapshot load
+- [ ] Frame counter: Both clients agree on frame numbers
+
+### Phase 2: Fast-Forward Tests
+- [ ] Tab background: No frame gaps after refocus
+- [ ] Buffered input ordering: Applied in frame order
+- [ ] Input delay: Actions paired with correct observations
+- [ ] Web Worker timing: Game progresses during background
+
+### Phase 3: Verification Tests
+- [ ] Hash comparison: Both clients agree on every frame's hash
+- [ ] Desync recovery: Data corrected after desync detection
+- [ ] Episode boundary: Final hash verified before clearing
+- [ ] Export parity: Both players' exports have identical data (modulo player ID perspective)
+
+---
 
 ## Sources
 
-**Measurement and Technical:**
-- [Azure Speed Test - TCP vs ICMP](https://www.azurespeed.com/Azure/Latency)
-- [websockets library - Keepalive documentation](https://websockets.readthedocs.io/en/stable/topics/keepalive.html)
-- [MDN - Browser detection using user agent](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Browser_detection_using_the_user_agent)
-- [MDN - Screen.width property](https://developer.mozilla.org/en-US/docs/Web/API/Screen/width)
-- [OpenReplay - Avoiding resize event pitfalls](https://blog.openreplay.com/avoiding-resize-event-pitfalls-js/)
-
-**Inactivity and Idle Detection:**
-- [MDN - Idle Detection API](https://developer.mozilla.org/en-US/docs/Web/API/Idle_Detection_API)
-- [Kirupa - Detecting user inactivity](https://www.kirupa.com/html5/detecting_if_the_user_is_idle_or_inactive.htm)
-- [PixelsTech - WebSocket power-saving disconnections](https://www.pixelstech.net/article/1719122489-the-pitfall-of-websocket-disconnections-caused-by-browser-power-saving-mechanisms)
-
-**WebSocket and Heartbeat:**
-- [Socket.IO - Ping/pong sensitivity discussion](https://github.com/socketio/socket.io/discussions/4161)
-- [VideoSDK - Ping pong frame WebSocket](https://www.videosdk.live/developer-hub/websocket/ping-pong-frame-websocket)
-
-**Multiplayer Synchronization:**
-- [Can Bayar - Multiplayer network synchronization](https://canbayar91.medium.com/game-mechanics-1-multiplayer-network-synchronization-46cbe21be16a)
-- [Hacker News - How video games stay in sync](https://news.ycombinator.com/item?id=31512257)
-
-**Online Research and Bias:**
-- [Springer - Conducting interactive experiments online](https://link.springer.com/article/10.1007/s10683-017-9527-2)
-- [PMC - What 1M participants tell us about protocols](https://pmc.ncbi.nlm.nih.gov/articles/PMC10357382/)
-- [Cognitive Research Journal - Shadow biases](https://cognitiveresearchjournal.springeropen.com/articles/10.1186/s41235-023-00520-y)
-- [PMC - Realistic precision in online experiments](https://pmc.ncbi.nlm.nih.gov/articles/PMC8367876/)
-- [Nature - Attention check comparison Prolific vs MTurk](https://www.nature.com/articles/s41598-023-46048-5)
-
----
-
-*Pitfalls research: 2026-01-21*
-*Confidence: MEDIUM — WebSearch-based with verification against documented patterns*
+- [GGPO Official Documentation](https://www.ggpo.net/) - Rollback netcode fundamentals
+- [GGPO Developer Guide](https://github.com/pond3r/ggpo/blob/master/doc/DeveloperGuide.md) - Save/load state, sync testing, determinism requirements
+- [SnapNet: Netcode Architectures Part 2 - Rollback](https://www.snapnet.dev/blog/netcode-architectures-part-2-rollback/) - Performance constraints, spiral of death
+- [Jimmy's Blog: Making a GGPO-style rollback game](https://outof.pizza/posts/rollback/) - Fixed-point arithmetic for JavaScript
+- [Gaffer on Games: Floating Point Determinism](https://gafferongames.com/post/floating_point_determinism/) - Cross-platform floating point issues
+- [coherence Documentation: Determinism, Prediction and Rollback](https://docs.coherence.io/manual/advanced-topics/competitive-games/determinism-prediction-rollback) - Common determinism pitfalls
+- [NetplayJS](https://github.com/rameshvarun/netplayjs) - WebRTC P2P rollback implementation
+- [MDN: Page Visibility API](https://developer.mozilla.org/en-US/docs/Web/API/Page_Visibility_API) - Browser tab backgrounding behavior
+- [MDN: requestAnimationFrame](https://developer.mozilla.org/en-US/docs/Web/API/Window/requestAnimationFrame) - Throttling in background tabs
+- [GameDev.net: Rollbacks and Simulation Replay](https://www.gamedev.net/forums/topic/713082-rollbacks-and-simulation-replay-performance/) - Performance optimization for rollback
+- [GameMaker: rollback_confirmed_frame](https://manual.gamemaker.io/beta/en/GameMaker_Language/GML_Reference/Rollback/Rollback_Variables/rollback_confirmed_frame.htm) - Confirmed vs predicted frames
+- [Understanding Fighting Game Networking](https://supercombo.gg/2021/10/13/archive-understanding-fighting-game-networking-by-mauve/) - GGPO frame delay and timing
