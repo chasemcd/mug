@@ -11,11 +11,11 @@ See: .planning/PROJECT.md (updated 2026-02-07)
 
 Milestone: v1.19 P2P Lifecycle Cleanup
 Phase: 77 of 78 (P2P Connection Scoping)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-02-07 — Roadmap created (2 phases, 4 requirements)
+Plan: 1 of 1 (complete)
+Status: Phase 77 complete, Phase 78 not started
+Last activity: 2026-02-07 — Completed 77-01-PLAN.md (P2P Connection Scoping)
 
-Progress: ░░░░░░░░░░ 0%
+Progress: █████░░░░░ 50%
 
 ## Milestone History
 
@@ -246,6 +246,13 @@ Progress: ░░░░░░░░░░ 0%
 - `interactive_gym/server/static/js/pyodide_remote_game.js` - RemoteGame.initialize() checks window.pyodidePreloadStatus/pyodideInstance, reuses preloaded instance with package dedup fallback
 - `interactive_gym/server/static/js/pyodide_multiplayer_game.js` - MultiplayerPyodideGame.initialize() logs which init path will be used
 
+**v1.19 Execution:**
+- `.planning/phases/77-p2p-connection-scoping/77-01-SUMMARY.md`
+
+**P2P Connection Scoping (v1.19 Phase 77 - added):**
+- `interactive_gym/server/static/js/pyodide_multiplayer_game.js` - sceneExited flag, cleanupForSceneExit() method, guards in _handleReconnectionGameEnd/_onP2PConnectionLost/_handleFocusLossTimeout, reset in _initP2PConnection
+- `interactive_gym/server/static/js/index.js` - terminateGymScene() calls cleanupForSceneExit() with typeof guard
+
 **v1.18 Execution:**
 - `.planning/phases/75-merged-loading-screen/75-01-SUMMARY.md`
 - `.planning/phases/75-merged-loading-screen/75-02-SUMMARY.md`
@@ -323,6 +330,14 @@ Progress: ░░░░░░░░░░ 0%
 ### Decisions
 
 See: .planning/PROJECT.md Key Decisions table
+
+**v1.19 Phase 77-01 decisions:**
+- Set sceneExited flag FIRST (synchronous) before closing WebRTC to handle race window between scene exit and partner disconnect events
+- typeof guard on cleanupForSceneExit call ensures backward compat with single-player RemoteGame
+- Do NOT null pyodideRemoteGame -- instance may be reused for next GymScene (reinitialize_environment path)
+- Do NOT remove socket listeners -- anonymous arrow functions have no stored reference; game_id filter + sceneExited guard is sufficient
+- Reset sceneExited=false in _initP2PConnection (not constructor) for reuse scenario
+- Server-side PYODIDE_COORDINATOR cleanup deferred -- client guards handle correctness for P2P-01 and P2P-02
 
 **v1.18 Phase 75-02 decisions:**
 - loadingGate object with gateResolved boolean prevents re-entry on socket reconnect
@@ -558,9 +573,9 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-02-07
-Stopped at: Roadmap created for v1.19 (2 phases, 4 requirements)
+Stopped at: Completed 77-01-PLAN.md (P2P Connection Scoping)
 Resume file: None
 
 ### Next Steps
 
-Plan Phase 77 (P2P Connection Scoping) — `/gsd:plan-phase 77`
+Plan Phase 78 (Group History Tracking) — `/gsd:plan-phase 78`
