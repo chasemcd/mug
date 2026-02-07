@@ -342,6 +342,46 @@ class GymScene(scene.Scene):
 
         return self
 
+    def assets(
+        self,
+        preload_specs: list[dict[str, str | float | int]] = NotProvided,
+        assets_dir: str = NotProvided,
+        assets_to_preload: list[str] = NotProvided,
+        animation_configs: list = NotProvided,
+        state_init: list = NotProvided,
+    ):
+        """Configure asset loading and initialization.
+
+        :param preload_specs: Specifications for preloading assets, defaults to NotProvided
+        :type preload_specs: list[dict[str, str | float | int]], optional
+        :param assets_dir: Directory containing game assets, defaults to NotProvided
+        :type assets_dir: str, optional
+        :param assets_to_preload: List of asset filenames to preload, defaults to NotProvided
+        :type assets_to_preload: list[str], optional
+        :param animation_configs: Configurations for game animations, defaults to NotProvided
+        :type animation_configs: list, optional
+        :param state_init: Initial state of the game, defaults to NotProvided
+        :type state_init: list, optional
+        :return: This scene object
+        :rtype: GymScene
+        """
+        if preload_specs is not NotProvided:
+            self.preload_specs = preload_specs
+
+        if assets_dir is not NotProvided:
+            self.assets_dir = assets_dir
+
+        if assets_to_preload is not NotProvided:
+            self.assets_to_preload = assets_to_preload
+
+        if animation_configs is not NotProvided:
+            self.animation_configs = animation_configs
+
+        if state_init is not NotProvided:
+            self.state_init = state_init
+
+        return self
+
     def policies(
         self,
         policy_mapping: dict = NotProvided,
