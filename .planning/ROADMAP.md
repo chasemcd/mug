@@ -414,7 +414,7 @@ Plans:
   2. All E2E tests pass with near-simultaneous game starts (0.5s stagger)
   3. Socket.IO connections remain stable during concurrent starts
   4. No performance regression for game loop execution
-  5. All existing E2E tests pass (no regressions)
+  5. All existing E2E pass (no regressions)
 **Research flag:** Unlikely — integration test of previous phases
 **Plans:** 1 plan
 
@@ -584,10 +584,10 @@ Plans:
   3. When no candidate passes the RTT filter, arriving participant waits (returns None)
   4. When a candidate's RTT data is unavailable (None), they are NOT excluded (graceful fallback)
 **Research flag:** Unlikely — straightforward subclass of existing Matchmaker, server RTT already available on MatchCandidate
-**Plans:** TBD
+**Plans:** 1 plan
 
 Plans:
-- [ ] 81-01: TBD
+- [ ] 81-01-PLAN.md — Implement LatencyFIFOMatchmaker class with server RTT pre-filtering and unit tests
 
 ### Phase 82: Scene API & P2P Probe Integration
 **Goal**: Researcher can use LatencyFIFOMatchmaker via scene config, with post-match P2P probe verification
@@ -647,4 +647,4 @@ Plans:
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-07 after v1.21 roadmap creation*
+*Last updated: 2026-02-07 after Phase 81 planning*
