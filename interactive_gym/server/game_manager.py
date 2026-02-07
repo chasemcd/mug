@@ -367,10 +367,15 @@ class GameManager:
 
             # If multiplayer Pyodide, add player to coordinator
             if self.scene.pyodide_multiplayer and self.pyodide_coordinator:
-                # Get the socket_id for this subject from the pairing manager
-                # For now, we'll need to handle this separately
+                socket_id = self._get_socket_id(subject_id)
+                self.pyodide_coordinator.add_player(
+                    game_id=game.game_id,
+                    player_id=player_id,
+                    socket_id=socket_id,
+                    subject_id=subject_id,
+                )
                 logger.info(
-                    f"Added player {player_id} (subject: {subject_id}) to game {game.game_id}"
+                    f"Added player {player_id} (subject: {subject_id}) to Pyodide coordinator for game {game.game_id}"
                 )
 
             if self.scene.game_page_html_fn is not None:
