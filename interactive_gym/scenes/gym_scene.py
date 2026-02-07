@@ -772,6 +772,288 @@ class GymScene(scene.Scene):
 
         return self
 
+    def multiplayer(
+        self,
+        # Sync/rollback params (from pyodide)
+        multiplayer: bool = NotProvided,
+        server_authoritative: bool = NotProvided,
+        state_broadcast_interval: int = NotProvided,
+        realtime_mode: bool = NotProvided,
+        input_buffer_size: int = NotProvided,
+        input_delay: int = NotProvided,
+        input_confirmation_timeout_ms: int = NotProvided,
+        # Matchmaking params (from matchmaking)
+        hide_lobby_count: bool = NotProvided,
+        max_rtt: int = NotProvided,
+        matchmaker: "Matchmaker" = NotProvided,
+        # Player grouping params (from player_grouping)
+        wait_for_known_group: bool = NotProvided,
+        group_wait_timeout: int = NotProvided,
+        # Continuous monitoring params (from continuous_monitoring)
+        continuous_monitoring_enabled: bool = NotProvided,
+        continuous_max_ping: int = NotProvided,
+        continuous_ping_violation_window: int = NotProvided,
+        continuous_ping_required_violations: int = NotProvided,
+        continuous_tab_warning_ms: int = NotProvided,
+        continuous_tab_exclude_ms: int = NotProvided,
+        continuous_exclusion_messages: dict[str, str] = NotProvided,
+        # Exclusion callback params (from exclusion_callbacks)
+        continuous_callback: Callable = NotProvided,
+        continuous_callback_interval_frames: int = NotProvided,
+        # Reconnection params (from reconnection_config)
+        reconnection_timeout_ms: int = NotProvided,
+        # Partner disconnect params (from partner_disconnect_message_config)
+        partner_disconnect_message: str = NotProvided,
+        partner_disconnect_show_completion_code: bool = NotProvided,
+        # Focus loss params (from focus_loss_config)
+        focus_loss_timeout_ms: int = NotProvided,
+        focus_loss_message: str = NotProvided,
+        pause_on_partner_background: bool = NotProvided,
+    ):
+        """Configure multiplayer settings for the GymScene.
+
+        This method consolidates all multiplayer-related configuration into a single
+        builder method. It accepts parameters from sync/rollback, matchmaking, player
+        grouping, continuous monitoring, exclusion callbacks, reconnection, partner
+        disconnect, and focus loss configuration.
+
+        **Sync/Rollback Configuration:**
+
+        :param multiplayer: Enable multiplayer Pyodide coordination, defaults to NotProvided
+        :type multiplayer: bool, optional
+        :param server_authoritative: If True, server runs a parallel environment that
+            broadcasts authoritative state periodically, defaults to NotProvided
+        :type server_authoritative: bool, optional
+        :param state_broadcast_interval: Frames between state broadcasts/syncs, defaults to NotProvided
+        :type state_broadcast_interval: int, optional
+        :param realtime_mode: If True, server steps on a timer rather than waiting for
+            all player actions, defaults to NotProvided
+        :type realtime_mode: bool, optional
+        :param input_buffer_size: Number of frames of input history to keep for
+            rollback/replay, defaults to NotProvided
+        :type input_buffer_size: int, optional
+        :param input_delay: GGPO input delay in frames, defaults to NotProvided
+        :type input_delay: int, optional
+        :param input_confirmation_timeout_ms: Time in ms to wait for partner input
+            confirmation at episode boundaries, defaults to NotProvided
+        :type input_confirmation_timeout_ms: int, optional
+
+        **Matchmaking:**
+
+        :param hide_lobby_count: If True, hide participant count in waitroom, defaults to NotProvided
+        :type hide_lobby_count: bool, optional
+        :param max_rtt: Maximum RTT difference (ms) between paired participants, defaults to NotProvided
+        :type max_rtt: int, optional
+        :param matchmaker: Custom Matchmaker instance for participant grouping logic, defaults to NotProvided
+        :type matchmaker: Matchmaker, optional
+
+        **Player Grouping:**
+
+        :param wait_for_known_group: If True, wait for existing group members, defaults to NotProvided
+        :type wait_for_known_group: bool, optional
+        :param group_wait_timeout: Max time (ms) to wait for known group members, defaults to NotProvided
+        :type group_wait_timeout: int, optional
+
+        **Continuous Monitoring:**
+
+        :param continuous_monitoring_enabled: Master enable flag for continuous monitoring.
+            Auto-enabled if any monitoring param is set, defaults to NotProvided
+        :type continuous_monitoring_enabled: bool, optional
+        :param continuous_max_ping: Maximum allowed latency (ms) during gameplay, defaults to NotProvided
+        :type continuous_max_ping: int, optional
+        :param continuous_ping_violation_window: Number of measurements to track for
+            violation detection, defaults to NotProvided
+        :type continuous_ping_violation_window: int, optional
+        :param continuous_ping_required_violations: Consecutive violations required
+            before exclusion, defaults to NotProvided
+        :type continuous_ping_required_violations: int, optional
+        :param continuous_tab_warning_ms: Milliseconds hidden before showing warning, defaults to NotProvided
+        :type continuous_tab_warning_ms: int, optional
+        :param continuous_tab_exclude_ms: Milliseconds hidden before exclusion, defaults to NotProvided
+        :type continuous_tab_exclude_ms: int, optional
+        :param continuous_exclusion_messages: Custom messages for warnings and exclusions, defaults to NotProvided
+        :type continuous_exclusion_messages: dict[str, str], optional
+
+        **Exclusion Callbacks:**
+
+        :param continuous_callback: Function called periodically during gameplay, defaults to NotProvided
+        :type continuous_callback: Callable, optional
+        :param continuous_callback_interval_frames: Frames between continuous callback
+            checks, defaults to NotProvided
+        :type continuous_callback_interval_frames: int, optional
+
+        **Reconnection:**
+
+        :param reconnection_timeout_ms: Time in ms to wait for reconnection before
+            ending the game, defaults to NotProvided
+        :type reconnection_timeout_ms: int, optional
+
+        **Partner Disconnect:**
+
+        :param partner_disconnect_message: Custom message when partner disconnects, defaults to NotProvided
+        :type partner_disconnect_message: str, optional
+        :param partner_disconnect_show_completion_code: Whether to show completion code
+            on partner disconnect, defaults to NotProvided
+        :type partner_disconnect_show_completion_code: bool, optional
+
+        **Focus Loss:**
+
+        :param focus_loss_timeout_ms: Time in ms before focus loss ends the game, defaults to NotProvided
+        :type focus_loss_timeout_ms: int, optional
+        :param focus_loss_message: Custom message when game ends due to focus loss, defaults to NotProvided
+        :type focus_loss_message: str, optional
+        :param pause_on_partner_background: If True, pause game when partner tabs away, defaults to NotProvided
+        :type pause_on_partner_background: bool, optional
+
+        :return: This scene object
+        :rtype: GymScene
+        """
+        # --- Sync/rollback params ---
+        if multiplayer is not NotProvided:
+            assert isinstance(multiplayer, bool)
+            self.pyodide_multiplayer = multiplayer
+
+        if server_authoritative is not NotProvided:
+            assert isinstance(server_authoritative, bool)
+            self.server_authoritative = server_authoritative
+
+        if state_broadcast_interval is not NotProvided:
+            assert isinstance(state_broadcast_interval, int) and state_broadcast_interval > 0
+            self.state_broadcast_interval = state_broadcast_interval
+
+        if realtime_mode is not NotProvided:
+            assert isinstance(realtime_mode, bool)
+            self.realtime_mode = realtime_mode
+
+        if input_buffer_size is not NotProvided:
+            assert isinstance(input_buffer_size, int) and input_buffer_size > 0
+            self.input_buffer_size = input_buffer_size
+
+        if input_delay is not NotProvided:
+            assert isinstance(input_delay, int) and input_delay >= 0
+            self.input_delay = input_delay
+
+        if input_confirmation_timeout_ms is not NotProvided:
+            if not isinstance(input_confirmation_timeout_ms, int) or input_confirmation_timeout_ms < 0:
+                raise ValueError("input_confirmation_timeout_ms must be a non-negative integer")
+            self.input_confirmation_timeout_ms = input_confirmation_timeout_ms
+
+        # --- Matchmaking params ---
+        if hide_lobby_count is not NotProvided:
+            self.hide_lobby_count = hide_lobby_count
+
+        if max_rtt is not NotProvided:
+            if max_rtt is not None and max_rtt <= 0:
+                raise ValueError("max_rtt must be a positive integer or None")
+            self.matchmaking_max_rtt = max_rtt
+
+        if matchmaker is not NotProvided:
+            # Runtime import to avoid circular dependency
+            from interactive_gym.server.matchmaker import Matchmaker as MatchmakerABC
+            if not isinstance(matchmaker, MatchmakerABC):
+                raise TypeError("matchmaker must be a Matchmaker subclass instance")
+            self._matchmaker = matchmaker
+
+        # --- Player grouping params ---
+        if wait_for_known_group is not NotProvided:
+            assert isinstance(wait_for_known_group, bool)
+            self.wait_for_known_group = wait_for_known_group
+
+        if group_wait_timeout is not NotProvided:
+            assert isinstance(group_wait_timeout, int) and group_wait_timeout > 0
+            self.group_wait_timeout = group_wait_timeout
+
+        # --- Continuous monitoring params ---
+        # Track whether any monitoring param was explicitly provided
+        _monitoring_param_provided = False
+
+        if continuous_max_ping is not NotProvided:
+            assert continuous_max_ping is None or (isinstance(continuous_max_ping, int) and continuous_max_ping > 0), \
+                "continuous_max_ping must be None or a positive integer"
+            self.continuous_max_ping = continuous_max_ping
+            _monitoring_param_provided = True
+
+        if continuous_ping_violation_window is not NotProvided:
+            assert isinstance(continuous_ping_violation_window, int) and continuous_ping_violation_window >= 1, \
+                "continuous_ping_violation_window must be a positive integer"
+            self.continuous_ping_violation_window = continuous_ping_violation_window
+            _monitoring_param_provided = True
+
+        if continuous_ping_required_violations is not NotProvided:
+            assert isinstance(continuous_ping_required_violations, int) and continuous_ping_required_violations >= 1, \
+                "continuous_ping_required_violations must be a positive integer"
+            self.continuous_ping_required_violations = continuous_ping_required_violations
+            _monitoring_param_provided = True
+
+        if continuous_tab_warning_ms is not NotProvided:
+            assert continuous_tab_warning_ms is None or (isinstance(continuous_tab_warning_ms, int) and continuous_tab_warning_ms >= 0), \
+                "continuous_tab_warning_ms must be None or a non-negative integer"
+            self.continuous_tab_warning_ms = continuous_tab_warning_ms
+            _monitoring_param_provided = True
+
+        if continuous_tab_exclude_ms is not NotProvided:
+            assert continuous_tab_exclude_ms is None or (isinstance(continuous_tab_exclude_ms, int) and continuous_tab_exclude_ms >= 0), \
+                "continuous_tab_exclude_ms must be None or a non-negative integer"
+            self.continuous_tab_exclude_ms = continuous_tab_exclude_ms
+            _monitoring_param_provided = True
+
+        if continuous_exclusion_messages is not NotProvided:
+            assert isinstance(continuous_exclusion_messages, dict), \
+                "continuous_exclusion_messages must be a dictionary"
+            self.continuous_exclusion_messages = {**self.continuous_exclusion_messages, **continuous_exclusion_messages}
+            _monitoring_param_provided = True
+
+        # Handle continuous_monitoring_enabled: explicit setting or auto-enable
+        if continuous_monitoring_enabled is not NotProvided:
+            self.continuous_monitoring_enabled = continuous_monitoring_enabled
+        elif _monitoring_param_provided:
+            self.continuous_monitoring_enabled = True
+
+        # Cross-validation: required_violations must not exceed window
+        if self.continuous_ping_required_violations > self.continuous_ping_violation_window:
+            raise ValueError(
+                f"ping_required_violations ({self.continuous_ping_required_violations}) "
+                f"cannot exceed ping_violation_window ({self.continuous_ping_violation_window})"
+            )
+
+        # --- Exclusion callback params ---
+        if continuous_callback is not NotProvided:
+            if continuous_callback is not None and not callable(continuous_callback):
+                raise ValueError("continuous_callback must be callable or None")
+            self.continuous_exclusion_callback = continuous_callback
+
+        if continuous_callback_interval_frames is not NotProvided:
+            if not isinstance(continuous_callback_interval_frames, int) or continuous_callback_interval_frames < 1:
+                raise ValueError("continuous_callback_interval_frames must be a positive integer")
+            self.continuous_callback_interval_frames = continuous_callback_interval_frames
+
+        # --- Reconnection params ---
+        if reconnection_timeout_ms is not NotProvided:
+            if not isinstance(reconnection_timeout_ms, int) or reconnection_timeout_ms <= 0:
+                raise ValueError("timeout_ms must be a positive integer")
+            self.reconnection_timeout_ms = reconnection_timeout_ms
+
+        # --- Partner disconnect params ---
+        if partner_disconnect_message is not NotProvided:
+            self.partner_disconnect_message = partner_disconnect_message
+
+        if partner_disconnect_show_completion_code is not NotProvided:
+            self.partner_disconnect_show_completion_code = partner_disconnect_show_completion_code
+
+        # --- Focus loss params ---
+        if focus_loss_timeout_ms is not NotProvided:
+            if not isinstance(focus_loss_timeout_ms, int) or focus_loss_timeout_ms < 0:
+                raise ValueError("timeout_ms must be a non-negative integer")
+            self.focus_loss_timeout_ms = focus_loss_timeout_ms
+
+        if focus_loss_message is not NotProvided:
+            self.focus_loss_message = focus_loss_message
+
+        if pause_on_partner_background is not NotProvided:
+            self.pause_on_partner_background = pause_on_partner_background
+
+        return self
+
     def player_grouping(
         self,
         wait_for_known_group: bool = NotProvided,
