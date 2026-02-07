@@ -20,6 +20,12 @@ Usage:
 Then open two browser windows to http://localhost:5702 and play together!
 """
 
+# Latency-aware matchmaking: The cramped_room_human_human scene in scenes.py
+# uses LatencyFIFOMatchmaker for two-stage latency filtering:
+#   Stage 1 (pre-filter): Skips candidates where sum of server RTTs > max_server_rtt_ms
+#   Stage 2 (post-filter): Rejects matches where actual P2P RTT > max_p2p_rtt_ms
+# To disable latency filtering, use the default FIFOMatchmaker (no matchmaker= argument).
+
 from __future__ import annotations
 
 import eventlet
@@ -58,8 +64,8 @@ hh_start_scene = (
 stager = stager.Stager(
     scenes=[
         hh_start_scene,
-        # oc_scenes.tutorial_gym_scene,
-        oc_scenes.cramped_room_human_human.gameplay(num_episodes=20).focus_loss_config(pause_on_partner_background=False),
+        oc_scenes.tutorial_gym_scene,
+        oc_scenes.cramped_room_human_human.gameplay(num_episodes=1, max_steps=450).focus_loss_config(pause_on_partner_background=False),
         oc_scenes.multiplayer_feedback_scene,
         oc_scenes.end_scene,
     ]
@@ -73,11 +79,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "--port", type=int, default=5702, help="Port number to listen on"
     )
+    parser.add_argument(
+        "--experiment-id", type=str, help="Experiment ID", required=True
+    )
     args = parser.parse_args()
 
     experiment_config = (
         experiment_config.ExperimentConfig()
-        .experiment(stager=stager, experiment_id="overcooked_multiplayer_hh")
+        .experiment(stager=stager, experiment_id=args.experiment_id)
         .hosting(port=args.port, host="0.0.0.0")
         .entry_screening(browser_requirements=["Chrome", "Safari"], browser_blocklist=["Firefox"], max_ping=200)
         # For TURN server fallback, use:
