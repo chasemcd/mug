@@ -1,25 +1,18 @@
-# Requirements: Interactive Gym v1.18 Loading UX & Cleanup
+# Requirements: Interactive Gym v1.19 P2P Lifecycle Cleanup
 
 **Defined:** 2026-02-07
 **Core Value:** Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
 
 ## v1 Requirements
 
-Requirements for v1.18 Loading UX & Cleanup. Each maps to roadmap phases.
+Requirements for v1.19 P2P Lifecycle Cleanup. Each maps to roadmap phases.
 
-### Loading UX
+### P2P Lifecycle
 
-- [x] **LOAD-01**: Participant sees a single loading screen during pre-game setup (no separate Pyodide spinner)
-- [x] **LOAD-02**: Loading screen gates advancement on both compatibility check AND Pyodide being ready
-- [x] **LOAD-03**: Pyodide loading timeout is configurable via experiment config (default 60s)
-- [x] **LOAD-04**: If Pyodide fails to load or times out, participant sees a clear error page (not a hang or blank screen)
-
-### Test Cleanup
-
-- [x] **CLEAN-01**: Orphaned `flask_server_multi_episode` fixture removed from `tests/conftest.py`
-- [x] **CLEAN-02**: Unused `run_full_episode_flow` import removed from `test_network_disruption.py`
-- [x] **CLEAN-03**: Duplicate `run_full_episode_flow` consolidated into `tests/fixtures/game_helpers.py` (single source of truth)
-- [x] **CLEAN-04**: v1.14 Phases 65-66 marked complete in ROADMAP.md (work was done, roadmap not updated)
+- [ ] **P2P-01**: P2P/WebRTC connections are closed when a GymScene exits (via scene transition or advance_scene)
+- [ ] **P2P-02**: Partner-disconnected overlay is not shown on non-GymScene scenes (surveys, instructions, end screens)
+- [ ] **P2P-03**: Server tracks group membership (which participants were paired together) across scene transitions
+- [ ] **P2P-04**: Custom matchmakers can query group history to re-pair previous partners in future GymScenes
 
 ## v2 Requirements
 
@@ -55,6 +48,7 @@ Explicitly excluded. Documented to prevent scope creep.
 | New E2E test coverage | Existing suite is stable; new tests are a separate milestone |
 | CI/CD pipeline setup | Test suite is CI-ready but pipeline configuration is separate work |
 | GGPO parity fix | Documented in backlog; requires dedicated milestone for snapshot/rollback changes |
+| P2P reconnection changes | Current reconnection logic stays as-is for this milestone |
 
 ## Traceability
 
@@ -62,20 +56,16 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| LOAD-01 | Phase 75 | Complete |
-| LOAD-02 | Phase 75 | Complete |
-| LOAD-03 | Phase 75 | Complete |
-| LOAD-04 | Phase 75 | Complete |
-| CLEAN-01 | Phase 76 | Complete |
-| CLEAN-02 | Phase 76 | Complete |
-| CLEAN-03 | Phase 76 | Complete |
-| CLEAN-04 | Phase 76 | Complete |
+| P2P-01 | TBD | Pending |
+| P2P-02 | TBD | Pending |
+| P2P-03 | TBD | Pending |
+| P2P-04 | TBD | Pending |
 
 **Coverage:**
-- v1 requirements: 8 total
-- Mapped to phases: 8
-- Unmapped: 0 ✓
+- v1 requirements: 4 total
+- Mapped to phases: 0
+- Unmapped: 4 (awaiting roadmap creation)
 
 ---
 *Requirements defined: 2026-02-07*
-*Last updated: 2026-02-07 after Phase 76 complete (CLEAN-01 through CLEAN-04 verified)*
+*Last updated: 2026-02-07 after initial definition*
