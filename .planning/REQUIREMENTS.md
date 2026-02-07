@@ -56,16 +56,16 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| P2P-01 | TBD | Pending |
-| P2P-02 | TBD | Pending |
-| P2P-03 | TBD | Pending |
-| P2P-04 | TBD | Pending |
+| P2P-01 | Phase 77 | Pending |
+| P2P-02 | Phase 77 | Pending |
+| P2P-03 | Phase 78 | Pending |
+| P2P-04 | Phase 78 | Pending |
 
 **Coverage:**
 - v1 requirements: 4 total
-- Mapped to phases: 0
-- Unmapped: 4 (awaiting roadmap creation)
+- Mapped to phases: 4
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-02-07*
-*Last updated: 2026-02-07 after initial definition*
+*Last updated: 2026-02-07 after roadmap created*

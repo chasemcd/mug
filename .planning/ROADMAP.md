@@ -20,6 +20,7 @@
 - ✅ **v1.16 Pyodide Pre-loading** - Phases 67-70 (shipped 2026-02-06)
 - ✅ **v1.17 E2E Test Reliability** - Phases 71-74 (shipped 2026-02-06)
 - ✅ **v1.18 Loading UX & Cleanup** - Phases 75-76 (shipped 2026-02-07)
+- 🚧 **v1.19 P2P Lifecycle Cleanup** - Phases 77-78 (in progress)
 
 ## Phases
 
@@ -234,12 +235,22 @@ See [milestones/v1.11-ROADMAP.md](milestones/v1.11-ROADMAP.md) for full details.
 
 </details>
 
-### v1.18 Loading UX & Cleanup (Shipped 2026-02-07)
+<details>
+<summary>v1.18 Loading UX & Cleanup (Phases 75-76) - SHIPPED 2026-02-07</summary>
 
 **Milestone Goal:** Fix the double-loading screen UX and clean up accumulated tech debt from rapid milestone delivery.
 
 - [x] **Phase 75: Merged Loading Screen** - Single loading screen gating on both compat check and Pyodide readiness
 - [x] **Phase 76: Test & Roadmap Cleanup** - Remove orphaned fixtures, consolidate helpers, update roadmap
+
+</details>
+
+### v1.19 P2P Lifecycle Cleanup (In Progress)
+
+**Milestone Goal:** P2P connections are scoped to GymScenes — torn down on scene exit, with group history preserved for future re-pairing.
+
+- [ ] **Phase 77: P2P Connection Scoping** - Close P2P/WebRTC on GymScene exit, suppress partner-disconnected overlay on non-game scenes
+- [ ] **Phase 78: Group History Tracking** - Server tracks group membership across scenes, matchmakers can query for re-pairing
 
 ## Phase Details
 
@@ -487,6 +498,35 @@ Plans:
 Plans:
 - [x] 76-01-PLAN.md — Remove orphaned fixtures, consolidate helpers, update roadmap
 
+### Phase 77: P2P Connection Scoping
+**Goal**: P2P/WebRTC connections are scoped to GymScenes — torn down on exit, no stale overlays on other scenes
+**Depends on**: Phase 76 (v1.18 complete)
+**Requirements**: P2P-01, P2P-02
+**Success Criteria** (what must be TRUE):
+  1. When a participant advances past a GymScene, all WebRTC connections are closed (no lingering DataChannels or PeerConnections)
+  2. When a participant is on a non-GymScene scene (survey, instructions, end screen), no "partner disconnected" overlay appears even if their former partner disconnects
+  3. Existing GymScene gameplay is unaffected (P2P connections still work during active game)
+**Research flag:** Likely — need to trace connection teardown paths and overlay trigger logic
+**Plans:** TBD
+
+Plans:
+- [ ] 77-01: TBD
+
+### Phase 78: Group History Tracking
+**Goal**: Server tracks who was paired with whom across scene transitions, queryable by custom matchmakers for re-pairing
+**Depends on**: Phase 77
+**Requirements**: P2P-03, P2P-04
+**Success Criteria** (what must be TRUE):
+  1. Server records which participants were paired together after each GymScene completes
+  2. Group history persists across scene transitions (available in later scenes)
+  3. A custom matchmaker can query group history and use it to re-pair previous partners in future GymScenes
+  4. Group history does not interfere with fresh matching (new participants unaffected)
+**Research flag:** Likely — need to understand matchmaker API and where to persist group state
+**Plans:** TBD
+
+Plans:
+- [ ] 78-01: TBD
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -522,7 +562,9 @@ Plans:
 | 74. Stability Certification | v1.17 | 2/2 | Complete | 2026-02-06 |
 | 75. Merged Loading Screen | v1.18 | 2/2 | Complete | 2026-02-06 |
 | 76. Test & Roadmap Cleanup | v1.18 | 1/1 | Complete | 2026-02-07 |
+| 77. P2P Connection Scoping | v1.19 | 0/TBD | Not started | - |
+| 78. Group History Tracking | v1.19 | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-07 after Phase 76 completed (76-01 executed)*
+*Last updated: 2026-02-07 after v1.19 roadmap created (2 phases, 4 requirements)*
