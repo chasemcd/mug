@@ -14,6 +14,15 @@
 - ✅ **v1.9 Data Parity Testing** - Phases 40-44 (shipped 2026-02-01)
 - ✅ **v1.10 E2E Test Fix** - Phases 45-47 (shipped 2026-02-02)
 - ✅ **v1.11 Data Export Edge Cases** - Phases 48-50 (shipped 2026-02-02) → [archive](milestones/v1.11-ROADMAP.md)
+- ✅ **v1.12 Waiting Room Overhaul** - Phases 51-56 (shipped 2026-02-03)
+- ✅ **v1.13 Matchmaker Hardening** - Phases 57-60 (shipped 2026-02-03)
+- ✅ **v1.14 Data Parity Fix** - Phases 61-66 (shipped 2026-02-04)
+- ✅ **v1.16 Pyodide Pre-loading** - Phases 67-70 (shipped 2026-02-06)
+- ✅ **v1.17 E2E Test Reliability** - Phases 71-74 (shipped 2026-02-06)
+- ✅ **v1.18 Loading UX & Cleanup** - Phases 75-76 (shipped 2026-02-07)
+- ✅ **v1.19 P2P Lifecycle Cleanup** - Phases 77-79 (shipped 2026-02-07)
+- ✅ **v1.20 Pre-Game Countdown** - Phase 80 (shipped 2026-02-07)
+- ✅ **v1.21 Latency-Aware Matchmaking** - Phases 81-82 (shipped 2026-02-07)
 
 ## Phases
 
@@ -106,7 +115,8 @@ Key deliverables:
 
 </details>
 
-### v1.7 Admin Console Improvement (Complete)
+<details>
+<summary>v1.7 Admin Console Improvement (Phases 32-35) - SHIPPED 2026-01-25</summary>
 
 **Milestone Goal:** A clean, usable admin console that gives researchers effective experiment monitoring — see what's happening, catch problems, track progress.
 
@@ -115,7 +125,10 @@ Key deliverables:
 - [x] **Phase 34: Session Detail View** - Detailed diagnostic info on click
 - [x] **Phase 35: Layout & Polish** - Clean visual hierarchy and prioritization
 
-### v1.8 Data Export Parity (Complete)
+</details>
+
+<details>
+<summary>v1.8 Data Export Parity (Phases 36-39) - SHIPPED 2026-01-30</summary>
 
 **Milestone Goal:** Both players export identical game state data (actions, observations, rewards, infos) regardless of rollbacks, fast-forwards, or latency — ensuring research data validity.
 
@@ -124,408 +137,6 @@ Key deliverables:
 - [x] **Phase 38: Episode Boundary Confirmation** - Ensure all frames confirmed before export
 - [x] **Phase 39: Verification & Metadata** - Per-frame metadata and validation tooling
 
-## Phase Details
-
-### Phase 11: Hash Infrastructure
-**Goal:** Deterministic state hashing with float normalization, confirmed frame tracking
-**Depends on:** v1.0 complete (existing P2P infrastructure)
-**Requirements:** HASH-01, HASH-02, HASH-03, HASH-04
-**Success Criteria** (what must be TRUE):
-  1. State hash computed only after all inputs confirmed for a frame
-  2. Floats normalized to 10 decimal places before serialization
-  3. SHA-256 hash produces identical results across browsers
-  4. confirmedHashHistory tracks frame-to-hash mapping
-**Research flag:** Unlikely (standard patterns)
-**Plans:** 1 plan
-Plans:
-- [x] 11-01-PLAN.md - SHA-256 hashing, float normalization, confirmedHashHistory, rollback invalidation
-
-### Phase 12: P2P Hash Exchange
-**Goal:** Binary hash message protocol over DataChannel
-**Depends on:** Phase 11
-**Requirements:** EXCH-01, EXCH-02, EXCH-03, EXCH-04
-**Success Criteria** (what must be TRUE):
-  1. Hashes exchanged via P2P DataChannel (not SocketIO)
-  2. Hash exchange doesn't block frame advancement
-  3. Hash history cleared when rollback invalidates frames
-  4. Binary message format (13 bytes) works correctly
-**Research flag:** Unlikely (extension of existing protocol)
-**Plans:** 1 plan
-Plans:
-- [x] 12-01-PLAN.md - P2P_MSG_STATE_HASH protocol, encode/decode, exchange queue, rollback invalidation
-
-### Phase 13: Mismatch Detection
-**Goal:** Comparison logic, peer buffering, desync event logging
-**Depends on:** Phase 12
-**Requirements:** DETECT-01, DETECT-02, DETECT-03, DETECT-04, DETECT-05
-**Success Criteria** (what must be TRUE):
-  1. Exact frame number identified when mismatch occurs
-  2. Peer hashes buffered until local confirmation catches up
-  3. Desync events logged with frame, both hashes, timestamp
-  4. verifiedFrame tracks highest mutually-verified frame
-  5. Full state dump captured on mismatch
-**Research flag:** Unlikely (architecture documented, patterns from prior phases)
-**Plans:** 1 plan
-Plans:
-- [x] 13-01-PLAN.md - verifiedFrame tracking, desyncEvents logging, comparison logic, rollback integration
-
-### Phase 14: Validation Export
-**Goal:** Post-game JSON export with frame-by-frame validation data
-**Depends on:** Phase 13
-**Requirements:** EXPORT-01, EXPORT-02, EXPORT-03, EXPORT-04
-**Success Criteria** (what must be TRUE):
-  1. JSON export available after game ends
-  2. Export contains only confirmed-frame data (no predictions)
-  3. Desync events included in export
-  4. Verified action sequences exported per player
-**Research flag:** Unlikely (straightforward JSON export)
-**Plans:** 1 plan
-Plans:
-- [x] 14-01-PLAN.md - exportValidationData method, confirmed hash export, verified actions, desync events
-
-### Phase 15: Entry Screening Rules
-**Goal:** Pre-game screening with device, browser, and ping checks
-**Depends on:** v1.1 complete (existing P2P infrastructure)
-**Requirements:** ENTRY-01, ENTRY-02, ENTRY-03, ENTRY-04
-**Success Criteria** (what must be TRUE):
-  1. Researcher can configure device type exclusion (mobile/desktop/both) in Python config
-  2. Researcher can configure browser requirements (require/block specific browsers)
-  3. Participant blocked at entry if ping exceeds configured threshold
-  4. Participant sees rule-specific message explaining why excluded
-**Research flag:** Unlikely (jsPsych browser-check as reference, ua-parser-js documented)
-**Plans:** 1 plan
-Plans:
-- [x] 15-01-PLAN.md - GymScene.entry_screening() config, ua-parser-js detection, exclusion UI
-
-### Phase 16: Continuous Monitoring
-**Goal:** Real-time ping and tab visibility monitoring during gameplay
-**Depends on:** Phase 15
-**Requirements:** MONITOR-01, MONITOR-02, MONITOR-03, MONITOR-04
-**Success Criteria** (what must be TRUE):
-  1. Participant ping monitored continuously during gameplay
-  2. Participant excluded mid-game if ping exceeds threshold for sustained period
-  3. Tab switch detected when participant leaves experiment window
-  4. Tab visibility triggers configurable warning or exclusion
-**Research flag:** Likely (power-saving mode pitfall P10 needs careful handling)
-**Plans:** 1 plan
-Plans:
-- [x] 16-01-PLAN.md - GymScene.continuous_monitoring() config, ContinuousMonitor class, game loop integration
-
-### Phase 17: Multiplayer Exclusion Handling
-**Goal:** Coordinated game termination when one player excluded
-**Depends on:** Phase 16
-**Requirements:** MULTI-01, MULTI-02, MULTI-03
-**Success Criteria** (what must be TRUE):
-  1. Non-excluded player sees clear partner notification message
-  2. Game terminates cleanly for both players when one is excluded
-  3. Valid game data up to exclusion point is preserved and marked as partial session
-**Research flag:** Likely (no existing patterns for real-time multiplayer exclusion)
-**Plans:** 1 plan
-Plans:
-- [x] 17-01-PLAN.md - Server handler, partner notification, partial session marking
-
-### Phase 18: Custom Exclusion Callbacks
-**Goal:** Researcher-defined arbitrary exclusion logic via Python callbacks
-**Depends on:** Phase 17
-**Requirements:** EXT-01, EXT-02, EXT-03
-**Success Criteria** (what must be TRUE):
-  1. Researcher can define custom exclusion rules via Python callback functions
-  2. Callbacks receive full participant context (ping, browser, focus state, etc.)
-  3. Callbacks return exclusion decision with optional message
-**Research flag:** Unlikely (standard callback patterns)
-**Plans:** 1 plan
-Plans:
-- [x] 18-01-PLAN.md - GymScene.exclusion_callbacks() config, server-side callback execution, client-server integration
-
-### Phase 19: Waiting Room Validation
-**Goal:** P2P connection validated before experiment starts
-**Depends on:** v1.2 complete (existing exclusion infrastructure)
-**Requirements:** WAIT-01, WAIT-02, WAIT-03
-**Success Criteria** (what must be TRUE):
-  1. P2P connection established and validated before proceeding to experiment
-  2. Failed P2P pairs automatically returned to matchmaking pool
-  3. Participants see clear status messaging during P2P validation attempt
-**Research flag:** Unlikely (WebRTC connection state APIs well-documented)
-**Plans:** 1 plan
-Plans:
-- [x] 19-01-PLAN.md - P2P validation protocol, server coordination, re-pool on failure, status UI
-
-### Phase 20: Mid-Game Reconnection
-**Goal:** Handle P2P drops with pause, overlay, and configurable recovery
-**Depends on:** Phase 19
-**Requirements:** RECON-01, RECON-02, RECON-03, RECON-04, RECON-05, RECON-06, LOG-01, LOG-02, LOG-03
-**Success Criteria** (what must be TRUE):
-  1. DataChannel drop detected immediately by both clients
-  2. Gameplay pauses for both players when connection drops
-  3. Both players see reconnecting overlay during recovery attempts
-  4. Gameplay resumes seamlessly if reconnection succeeds
-  5. Game ends cleanly if reconnection times out (configurable)
-  6. Disconnection and reconnection events logged with timestamps
-**Research flag:** Likely (WebRTC reconnection patterns vary, state machine complexity)
-**Plans:** 2 plans
-Plans:
-- [x] 20-01-PLAN.md - Connection drop detection, bilateral pause coordination, server-side state tracking
-- [x] 20-02-PLAN.md - Reconnecting overlay UI, ICE restart recovery, resume handling, config API, data export
-
-### Phase 21: Per-Round Health Check
-**Goal:** Verify DataChannel before each round
-**Depends on:** Phase 20
-**Requirements:** ROUND-01, ROUND-02
-**Success Criteria** (what must be TRUE):
-  1. DataChannel connection verified before each round begins
-  2. Round start blocked until P2P connection confirmed healthy
-**Research flag:** Unlikely (builds on Phase 20 infrastructure)
-**Plans:** 1 plan
-Plans:
-- [x] 21-01-PLAN.md — Per-round health check with connection blocking before episode sync
-
-### Phase 22: Latency Telemetry
-**Goal:** Async latency monitoring and stats export
-**Depends on:** Phase 21
-**Requirements:** LAT-01, LAT-02
-**Success Criteria** (what must be TRUE):
-  1. P2P latency measured periodically during gameplay (non-blocking)
-  2. Latency stats (min, median, mean, max) exported in session data
-**Research flag:** Unlikely (WebRTC getStats() well-documented)
-**Plans:** 1 plan
-Plans:
-- [x] 22-01-PLAN.md — LatencyTelemetry class, async RTT sampling, stats export integration
-
-### Phase 23: Partner Disconnection Handling
-**Goal:** When a partner disconnects mid-game, stay on the same page (no redirect), hide game UI, show a configurable message, export all collected data with disconnection metadata including the disconnected player's ID.
-**Depends on:** v1.3 complete (existing reconnection infrastructure)
-**Requirements:** UI-01, UI-02, UI-03, UI-04, DATA-01, DATA-02, DATA-03, DATA-04, CFG-01, CFG-02
-**Success Criteria** (what must be TRUE):
-  1. Partner disconnect triggers in-page overlay instead of redirect to `/partner-disconnected`
-  2. Game container and HUD are hidden when overlay appears
-  3. Default message shown when no custom message configured
-  4. Custom message from `GymScene.partner_disconnect_message()` displayed when configured
-  5. Page stays displayed indefinitely (no auto-redirect, no Continue button)
-  6. `emitMultiplayerMetrics()` called before overlay display to export collected data
-  7. `sessionPartialInfo` populated with `isPartial: true` and `terminationReason: 'partner_disconnected'`
-  8. `sessionPartialInfo` includes `disconnectedPlayerId` with the partner's player ID
-**Research flag:** Unlikely (builds on existing overlay patterns from Phases 17, 20)
-**Plans:** 1 plan
-Plans:
-- [x] 23-01-PLAN.md — In-page overlay, config API, data export with disconnectedPlayerId
-
-### Phase 24: Web Worker Timer Infrastructure
-**Goal:** Move timing-critical code to Web Worker for throttle-resistant operation
-**Depends on:** v1.4 complete (existing P2P infrastructure)
-**Requirements:** WORK-01, WORK-02
-**Success Criteria** (what must be TRUE):
-  1. Game timing runs in a Web Worker, not main thread
-  2. When tab is backgrounded, Worker timer continues at accurate intervals (not throttled)
-  3. Main thread communicates with Worker via postMessage for game state updates
-**Research flag:** Likely (Web Worker timing patterns, main thread/Worker communication)
-**Plans:** 1 plan
-Plans:
-- [x] 24-01-PLAN.md — GameTimerWorker class, Worker-driven game loop, decoupled rendering
-
-### Phase 25: Focus Detection & Background State
-**Goal:** Detect when participant tabs away and track background duration
-**Depends on:** Phase 24
-**Requirements:** FOCUS-01, FOCUS-02, BG-01, BG-02
-**Success Criteria** (what must be TRUE):
-  1. Tab visibility changes are detected immediately via Page Visibility API
-  2. Duration of each background period is tracked with start/end timestamps
-  3. When backgrounded, player's actions default to idle/no-op (no random inputs)
-  4. Partner inputs received via WebRTC are buffered while player is backgrounded
-**Research flag:** Unlikely (Page Visibility API well-documented, builds on existing exclusion patterns)
-**Plans:** 1 plan
-Plans:
-- [x] 25-01-PLAN.md — FocusManager class with visibility detection, background tracking, input buffering
-
-### Phase 26: Resync & Partner Experience
-**Goal:** Fast-forward on refocus while keeping focused partner uninterrupted
-**Depends on:** Phase 25
-**Requirements:** BG-03, PARTNER-01, PARTNER-02
-**Success Criteria** (what must be TRUE):
-  1. When backgrounded player refocuses, simulation fast-forwards using queued inputs
-  2. Focused partner's game loop never pauses or stutters when other player tabs away
-  3. Focused partner sees backgrounded player go idle (their inputs stop affecting game)
-**Research flag:** Likely (fast-forward resync patterns, GGPO integration with background state)
-**Plans:** 1 plan
-Plans:
-- [x] 26-01-PLAN.md — Fast-forward resync on refocus, partner experience verification
-
-### Phase 27: Timeout, Messaging & Telemetry
-**Goal:** Configurable timeout with graceful game ending and research data capture
-**Depends on:** Phase 26
-**Requirements:** TIMEOUT-01, TIMEOUT-02, TIMEOUT-03, TELEM-01, TELEM-02
-**Success Criteria** (what must be TRUE):
-  1. Focus loss timeout is configurable (default 30s)
-  2. When timeout exceeded, game ends for both players
-  3. Custom message displayed when game ends due to focus loss timeout
-  4. Focus loss events recorded in session metadata
-  5. Duration of each focus loss period included in exported data
-**Research flag:** Unlikely (builds on existing timeout/messaging patterns from v1.3/v1.4)
-**Plans:** 1 plan
-Plans:
-- [x] 27-01-PLAN.md — Config API, timeout enforcement, telemetry export
-
-### Phase 28: Pipeline Instrumentation
-**Goal:** Add timestamps at each stage of the input→execute→render pipeline
-**Depends on:** v1.5 complete (existing timing infrastructure)
-**Requirements:** DIAG-01, DIAG-02, DIAG-03, DIAG-04, DIAG-05, DIAG-06, DIAG-07
-**Success Criteria** (what must be TRUE):
-  1. Keypress events record timestamp via performance.now()
-  2. Input queue entry/exit timestamps captured
-  3. Pyodide env.step() call and return timestamps captured
-  4. Render begin/complete timestamps captured
-  5. Per-input latency breakdown computed and logged to console
-**Research flag:** Unlikely (performance.now() API well-documented)
-**Plans:** 1 plan
-Plans:
-- [x] 28-01-PLAN.md — Pipeline instrumentation with per-stage timestamps
-
-### Phase 29: Root Cause Diagnosis
-**Goal:** Use instrumentation data to identify where the 1-2 second delay occurs
-**Depends on:** Phase 28
-**Requirements:** (diagnostic work — uses DIAG-* outputs to inform FIX-*)
-**Success Criteria** (what must be TRUE):
-  1. Latency data collected from Overcooked gameplay sessions
-  2. Pipeline stage causing delay identified with supporting data
-  3. Root cause documented with evidence and proposed fix
-**Research flag:** Likely (may need to investigate Pyodide performance, browser quirks)
-**Plans:** TBD
-Plans:
-- [ ] 29-01-PLAN.md — Data collection, analysis, root cause identification
-
-### Phase 30: Latency Fix
-**Goal:** Implement fix for identified root cause to achieve <100ms local input response
-**Depends on:** Phase 29
-**Requirements:** FIX-01, FIX-02, FIX-03
-**Success Criteria** (what must be TRUE):
-  1. Local input latency consistently under 100ms (keypress to render)
-  2. Fix verified working in single-player mode
-  3. Fix verified working in multiplayer mode
-  4. Fix verified specifically in Overcooked environment
-**Research flag:** Unknown (depends on what root cause is found)
-**Plans:** TBD
-Plans:
-- [ ] 30-01-PLAN.md — Implement fix for identified root cause
-
-### Phase 31: Telemetry Export
-**Goal:** Export latency metrics for research analysis
-**Depends on:** Phase 30
-**Requirements:** TELEM-01, TELEM-02, TELEM-03, TELEM-04
-**Success Criteria** (what must be TRUE):
-  1. Session data export includes input latency metrics
-  2. Min/max/mean/median latency stats computed per session
-  3. Latency outliers (>100ms) flagged and counted in export
-  4. Per-stage latency breakdown available in exported data
-**Research flag:** Unlikely (extends existing telemetry patterns from v1.3/v1.5)
-**Plans:** TBD
-Plans:
-- [ ] 31-01-PLAN.md — Latency stats computation and export integration
-
-### Phase 32: Dashboard Summary Stats
-**Goal:** Researchers see key experiment metrics at a glance
-**Depends on:** v1.6 complete (existing admin infrastructure)
-**Requirements:** DASH-01, DASH-02, DASH-03
-**Success Criteria** (what must be TRUE):
-  1. Dashboard displays "X of Y participants completed successfully" (completion rate)
-  2. Dashboard displays average session duration
-  3. Summary stats appear prominently at top of admin page
-**Research flag:** Unlikely (standard dashboard patterns)
-**Plans:** 1 plan
-Plans:
-- [x] 32-01-PLAN.md — Completion rate aggregation, avg duration computation, summary stat cards
-
-### Phase 33: Session List with P2P Health
-**Goal:** Session list shows what's happening and flags problems
-**Depends on:** Phase 32
-**Requirements:** LIST-01, LIST-02, LIST-03, LIST-04, LIST-05
-**Success Criteria** (what must be TRUE):
-  1. Each active session shows current episode/round number
-  2. Each session shows connection type (P2P direct / TURN relay / SocketIO fallback)
-  3. Each session shows current peer latency
-  4. Sessions display health indicator (healthy / degraded / reconnecting)
-  5. Problem sessions are visually distinguished from healthy ones
-**Research flag:** Unlikely (extends existing session list)
-**Plans:** 1 plan
-Plans:
-- [x] 33-01-PLAN.md — P2P health reporting, aggregator storage, session list UI with health indicators
-
-### Phase 34: Session Detail View
-**Goal:** Clicking a session reveals detailed diagnostic info
-**Depends on:** Phase 33
-**Requirements:** DETAIL-01, DETAIL-02, DETAIL-03, DETAIL-04
-**Success Criteria** (what must be TRUE):
-  1. Clicking a session opens detailed view
-  2. Detail view shows exclusion reason (if participant was excluded)
-  3. Detail view shows disconnection reason (if session ended abnormally)
-  4. Detail view surfaces console errors from that session
-**Research flag:** Unlikely (builds on existing session data)
-**Plans:** 1 plan
-Plans:
-- [x] 34-01-PLAN.md — Session detail panel with termination reason and console error filtering
-
-### Phase 35: Layout & Polish
-**Goal:** Clean, prioritized information hierarchy
-**Depends on:** Phase 34
-**Requirements:** LAYOUT-01, LAYOUT-02
-**Success Criteria** (what must be TRUE):
-  1. Clear visual hierarchy: summary at top → session list in middle → details on click
-  2. Information prioritized by importance (stats > active sessions > history)
-**Research flag:** Unlikely (UI polish)
-**Plans:** 1 plan
-Plans:
-- [x] 35-01-PLAN.md — Layout restructure with active sessions primary, problems indicator
-
-### Phase 36: Speculative/Canonical Buffer Split
-**Goal:** Separate speculative frame data from confirmed frame data
-**Depends on:** v1.7 complete (existing data collection infrastructure)
-**Requirements:** REC-01, REC-02, REC-03
-**Success Criteria** (what must be TRUE):
-  1. Frame data written to speculativeFrameData buffer during step()
-  2. Data promoted to confirmed buffer only when all inputs for that frame are received
-  3. Export methods read from confirmed buffer, never speculative
-**Research flag:** Unlikely (well-documented pattern from GGPO/NetplayJS)
-**Plans:** 1 plan
-Plans:
-- [x] 36-01-PLAN.md — speculativeFrameData buffer, storeFrameData() modification, _promoteConfirmedFrames()
-
-### Phase 37: Fast-Forward Data Recording Fix
-**Goal:** Fast-forward uses same confirmation-gated recording path as normal execution
-**Depends on:** Phase 36
-**Requirements:** EDGE-01
-**Success Criteria** (what must be TRUE):
-  1. Fast-forward (tab refocus) writes to speculative buffer like normal execution
-  2. _promoteConfirmedFrames() called after fast-forward completes
-  3. No frame gaps in export after tab refocus scenario
-**Research flag:** Complete (root cause identified in research phase)
-**Plans:** 1 plan
-Plans:
-- [x] 37-01-PLAN.md — Add _promoteConfirmedFrames() call in _performFastForward()
-
-### Phase 38: Episode Boundary Confirmation
-**Goal:** All frames confirmed before export triggered
-**Depends on:** Phase 37
-**Requirements:** EDGE-02
-**Success Criteria** (what must be TRUE):
-  1. Episode end waits for all frames to be confirmed before triggering export
-  2. Warning logged if promoting unconfirmed frames at episode boundary
-  3. Both players export identical frame counts
-**Research flag:** Unlikely (focused change at episode boundary)
-**Plans:** 1 plan
-Plans:
-- [x] 38-01-PLAN.md — Force-promote at episode end, warning logging
-
-### Phase 39: Verification & Metadata
-**Goal:** Per-frame metadata and offline validation tooling
-**Depends on:** Phase 38
-**Requirements:** REC-04, EDGE-03, VERIFY-01
-**Success Criteria** (what must be TRUE):
-  1. Each frame includes `wasSpeculative` metadata indicating if it was ever predicted
-  2. Export includes rollback event metadata (frame ranges, count per frame)
-  3. Offline validation script compares two player exports and reports divergences
-**Research flag:** Unlikely (additive metadata, no core logic changes)
-**Plans:** 1 plan
-Plans:
-- [x] 39-01-PLAN.md — wasSpeculative field, rollback metadata, export comparison script
-
 </details>
 
 <details>
@@ -533,136 +144,22 @@ Plans:
 
 **Milestone Goal:** Validate v1.8 data export parity under controlled network conditions using Playwright automation against `overcooked_human_human_multiplayer`.
 
-### Phase 40: Test Infrastructure Foundation
-**Goal:** Playwright can automate multiplayer game sessions
-**Depends on:** v1.8 complete (existing data export infrastructure)
-**Requirements:** INFRA-01, INFRA-02
-**Success Criteria** (what must be TRUE):
-  1. Two browser contexts can connect to the same game session
-  2. Both contexts can progress through matchmaking to gameplay
-  3. Flask server starts/stops cleanly as part of test lifecycle
-  4. Test can capture game completion state
-**Research flag:** Likely (Playwright MCP integration, multiplayer automation patterns)
-**Plans:** 2 plans
-
-Plans:
-- [x] 40-01-PLAN.md — Test infrastructure setup (pytest, fixtures, server lifecycle)
-- [x] 40-02-PLAN.md — Game automation helpers and multiplayer test
-
-### Phase 41: Latency Injection Tests
-**Goal:** Test data parity under various latency conditions
-**Depends on:** Phase 40
-**Requirements:** NET-01, NET-04, NET-05
-**Success Criteria** (what must be TRUE):
-  1. Test can apply fixed latency (100ms, 200ms, 500ms) via CDP
-  2. Test can apply asymmetric latency (different for each player)
-  3. Test can apply jitter (variable latency) during gameplay
-  4. Tests run to episode completion under each latency condition
-**Research flag:** Likely (Chrome DevTools Protocol latency injection)
-**Plans:** 1 plan
-
-Plans:
-- [x] 41-01-PLAN.md — CDP latency injection, asymmetric/jitter scenarios
-
-### Phase 42: Network Disruption Tests
-**Goal:** Test data parity under packet loss and tab focus scenarios
-**Depends on:** Phase 41
-**Requirements:** NET-02, NET-03
-**Success Criteria** (what must be TRUE):
-  1. Test can simulate packet loss to trigger rollback scenarios
-  2. Test can trigger tab unfocus/refocus to exercise fast-forward path
-  3. Both tests complete full episode after disruption
-  4. Rollback and fast-forward events are observable in exports
-**Research flag:** Likely (WebRTC packet loss simulation, Playwright tab control)
-**Plans:** 1 plan
-
-Plans:
-- [x] 42-01-PLAN.md — Packet loss simulation, tab focus automation
-
-### Phase 43: Data Comparison Pipeline
-**Goal:** Automated validation of export parity between players
-**Depends on:** Phase 42
-**Requirements:** CMP-01, CMP-02, CMP-03
-**Success Criteria** (what must be TRUE):
-  1. Test collects export files from both players after episode
-  2. Test invokes `validate_action_sequences.py --compare` on exports
-  3. Test reports pass/fail based on validation script exit code
-  4. Failed comparisons produce actionable diagnostic output
-**Research flag:** Unlikely (file collection and script invocation)
-**Plans:** 1 plan
-
-Plans:
-- [x] 43-01-PLAN.md — Export collection, validation invocation, result reporting
-
-### Phase 44: Manual Test Protocol
-**Goal:** Researchers can manually verify data parity
-**Depends on:** Phase 43
-**Requirements:** DOC-01
-**Success Criteria** (what must be TRUE):
-  1. Step-by-step protocol document exists
-  2. Protocol covers each network condition scenario
-  3. Protocol includes how to compare exports manually
-  4. Protocol includes expected outcomes for each test
-**Research flag:** Unlikely (documentation)
-**Plans:** 1 plan
-
-Plans:
-- [x] 44-01-PLAN.md — Manual test protocol documentation
+- [x] **Phase 40: Test Infrastructure Foundation** - Playwright fixtures, server lifecycle
+- [x] **Phase 41: Latency Injection Tests** - CDP-based latency (100ms, 200ms, jitter)
+- [x] **Phase 42: Network Disruption Tests** - Packet loss, tab focus simulation
+- [x] **Phase 43: Data Comparison Pipeline** - Export collection and validation
+- [x] **Phase 44: Manual Test Protocol** - Documentation for manual verification
 
 </details>
 
 <details>
 <summary>v1.10 E2E Test Fix (Phases 45-47) - SHIPPED 2026-02-02</summary>
 
-### v1.10 E2E Test Fix
-
 **Milestone Goal:** Fix E2E test environment so all automated tests pass in headed mode, validating data parity under network stress conditions.
 
-### Phase 45: Episode Completion Diagnosis & Fix
-**Goal:** Games progress through frames to episode completion in E2E tests
-**Depends on:** v1.9 complete (existing test infrastructure)
-**Requirements:** EPFIX-01, EPFIX-02, EPFIX-03
-**Success Criteria** (what must be TRUE):
-  1. Root cause of frame advancement failure identified and documented
-  2. Games progress through frames (frame counter increments)
-  3. Episodes complete within 180s test timeout
-  4. At least one test completes a full episode without manual intervention
-**Research flag:** Complete (root cause: document.hidden=true in Playwright, FocusManager skips frames)
-**Plans:** 1 plan
-
-Plans:
-- [x] 45-01-PLAN.md — Add visibility override to test helpers, remove obsolete tutorial flow calls
-
-### Phase 46: Test Suite Verification
-**Goal:** All existing E2E tests pass in headed mode
-**Depends on:** Phase 45
-**Requirements:** TEST-01, TEST-02, TEST-03, TEST-04, TEST-05, SYNC-01, SYNC-02, SYNC-03, SYNC-04
-**Success Criteria** (what must be TRUE):
-  1. `test_infrastructure.py` smoke tests pass
-  2. `test_multiplayer_basic.py` matchmaking and episode tests pass
-  3. `test_latency_injection.py` all latency scenarios (100ms, 200ms, jitter) pass
-  4. `test_network_disruption.py` packet loss and focus tests pass
-  5. `test_data_comparison.py` parity validation tests pass
-**Research flag:** Unlikely (running existing tests)
-**Plans:** 1 plan
-
-Plans:
-- [x] 46-01-PLAN.md — Run full test suite and fix any remaining issues
-
-### Phase 47: Focus Loss Data Accuracy Testing
-**Goal:** Data parity maintained under focus loss scenarios
-**Depends on:** Phase 46
-**Requirements:** FOCUS-01, FOCUS-02
-**Success Criteria** (what must be TRUE):
-  1. Test exists that triggers mid-episode focus loss (new tab during gameplay)
-  2. Test verifies data parity after mid-episode focus loss
-  3. Test exists that triggers focus loss at episode boundary
-  4. Test verifies data parity after boundary focus loss
-**Research flag:** Unlikely (builds on existing test patterns)
-**Plans:** 1 plan
-
-Plans:
-- [x] 47-01-PLAN.md — Focus loss data parity tests (mid-episode, boundary)
+- [x] **Phase 45: Episode Completion Diagnosis & Fix** - Visibility override for Playwright
+- [x] **Phase 46: Test Suite Verification** - All test suites passing
+- [x] **Phase 47: Focus Loss Data Accuracy Testing** - Focus loss parity tests
 
 </details>
 
@@ -671,57 +168,483 @@ Plans:
 
 **Milestone Goal:** Fix dual-buffer data recording edge cases so all xfail tests pass and research data exports are identical between both players.
 
-- [x] **Phase 48: isFocused Column Consistency** (1/1 plans) — completed 2026-02-02
-- [x] **Phase 49: Episode Boundary Row Parity** (1/1 plans) — completed 2026-02-02
-- [x] **Phase 50: Stress Test Verification** (1/1 plans) — completed 2026-02-02
+- [x] **Phase 48: isFocused Column Consistency** - Both players export isFocused.0/isFocused.1
+- [x] **Phase 49: Episode Boundary Row Parity** - Both players export exactly max_steps rows
+- [x] **Phase 50: Stress Test Verification** - All 17 E2E tests pass
 
 See [milestones/v1.11-ROADMAP.md](milestones/v1.11-ROADMAP.md) for full details.
 
 </details>
 
+<details>
+<summary>v1.12 Waiting Room Overhaul (Phases 51-56) - SHIPPED 2026-02-03</summary>
+
+**Milestone Goal:** Fix waiting room bugs and build a pluggable Matchmaker abstraction for custom participant pairing logic.
+
+- [x] **Phase 51: Diagnostic Logging & State Validation** - Logging and state validation
+- [x] **Phase 52: Comprehensive Cleanup** - Idempotent cleanup on all exit paths
+- [x] **Phase 53: Session Lifecycle** - Session state machine (WAITING → MATCHED → VALIDATING → PLAYING → ENDED)
+- [x] **Phase 54: ParticipantStateTracker** - Single source of truth for participant state
+- [x] **Phase 55: Matchmaker Base Class** - FIFOMatchmaker with pluggable API
+- [x] **Phase 56: Custom Attributes & Assignment Logging** - JSONL logging, RTT exposure
+
+</details>
+
+<details>
+<summary>v1.13 Matchmaker Hardening (Phases 57-60) - SHIPPED 2026-02-03</summary>
+
+**Milestone Goal:** Make matchmaking safer and smarter with P2P RTT probing and a single game creation path.
+
+- [x] **Phase 57: P2P Probe Infrastructure** - ProbeCoordinator, ProbeConnection, ProbeManager
+- [x] **Phase 58: RTT Measurement** - Ping-pong protocol over DataChannel
+- [x] **Phase 59: Matchmaker RTT Integration** - max_p2p_rtt_ms threshold, rejection handling
+- [x] **Phase 60: Single Game Creation Path** - Remove group reunion, single entry point
+
+</details>
+
+<details>
+<summary>v1.14 Data Parity Fix (Phases 61-66) - SHIPPED 2026-02-04</summary>
+
+**Milestone Goal:** Fix the rare data parity divergence bug and add comprehensive multi-participant E2E stress tests. Data parity must be EXACT — both players export identical data for every frame under all network conditions.
+
+- [x] **Phase 61: Input Confirmation Protocol** - Wait for partner input confirmation before export
+- [x] **Phase 62: Data Parity Validation** - Ensure identical exports for actions/rewards/infos
+- [x] **Phase 63: Parity Test Stabilization** - E2E tests pass consistently (10+ runs)
+- [x] **Phase 64: Multi-Participant Test Infrastructure** - Support 6 concurrent participants
+- [x] **Phase 65: Multi-Episode and Lifecycle Stress Tests** - Comprehensive lifecycle coverage
+- [x] **Phase 66: Server Recovery Validation** - Prove server recovers from chaos correctly
+
+</details>
+
+### v1.16 Pyodide Pre-loading (Shipped 2026-02-06)
+
+**Milestone Goal:** Pre-load Pyodide during the compatibility check screen so game startup never blocks the main thread, eliminating Socket.IO disconnects at scale (50+ concurrent game pairs).
+
+- [x] **Phase 67: Pyodide Pre-load Infrastructure** - Detect Pyodide scenes, load during compat check, progress UI, advancement gate
+- [x] **Phase 68: Shared Instance Integration** - Game classes reuse pre-loaded Pyodide instance
+- [x] **Phase 69: Server-Side Init Grace** - Server tolerates missed pings during Pyodide loading
+- [x] **Phase 70: Validation & Test Stabilization** - Remove stagger, prove concurrent starts work
+
+<details>
+<summary>v1.17 E2E Test Reliability (Phases 71-74) - SHIPPED 2026-02-06</summary>
+
+**Milestone Goal:** Achieve 100% pass rate for all E2E tests with zero flakiness -- every test passes 10+ consecutive runs.
+
+- [x] **Phase 71: Test Infrastructure Fix** - Reliable server lifecycle and navigation between test suites
+- [x] **Phase 72: Latency Test Diagnosis** - Root cause and fix for 200ms latency test timeout
+- [x] **Phase 73: Network & Regression Validation** - All test suites pass (network disruption, data comparison, multiplayer, multi-participant, focus loss)
+- [x] **Phase 74: Stability Certification** - Full suite stable, GGPO parity limitation documented
+
+</details>
+
+<details>
+<summary>v1.18 Loading UX & Cleanup (Phases 75-76) - SHIPPED 2026-02-07</summary>
+
+**Milestone Goal:** Fix the double-loading screen UX and clean up accumulated tech debt from rapid milestone delivery.
+
+- [x] **Phase 75: Merged Loading Screen** - Single loading screen gating on both compat check and Pyodide readiness
+- [x] **Phase 76: Test & Roadmap Cleanup** - Remove orphaned fixtures, consolidate helpers, update roadmap
+
+</details>
+
+<details>
+<summary>v1.19 P2P Lifecycle Cleanup (Phases 77-79) - SHIPPED 2026-02-07</summary>
+
+**Milestone Goal:** P2P connections are scoped to GymScenes — torn down on scene exit, with group history preserved for future re-pairing.
+
+- [x] **Phase 77: P2P Connection Scoping** - Close P2P/WebRTC on GymScene exit, suppress partner-disconnected overlay on non-game scenes
+- [x] **Phase 78: Group History Tracking** - Server tracks group membership across scenes, matchmakers can query for re-pairing
+- [x] **Phase 79: Post-Game Scene Isolation Test** - E2E test: two players complete Overcooked, proceed to survey, one exits; remaining player stays on survey without partner-disconnected overlay
+
+</details>
+
+### v1.20 Pre-Game Countdown (Shipped 2026-02-07)
+
+**Milestone Goal:** After matchmaking, show a brief countdown on the waiting room screen before transitioning to the gym scene, so players know a match was found and can prepare.
+
+- [x] **Phase 80: Pre-Game Countdown** - 3-second "Players found! 3... 2... 1..." countdown on waiting room after match, synced game start
+
+### v1.21 Latency-Aware Matchmaking (Shipped 2026-02-07)
+
+**Milestone Goal:** A FIFO matchmaker that pre-filters candidates by server RTT heuristic before proposing matches, then verifies with P2P probe — so only low-latency pairs get matched.
+
+- [x] **Phase 81: LatencyFIFOMatchmaker Core** - Server RTT pre-filtering with configurable threshold and graceful fallback
+- [x] **Phase 82: Scene API & P2P Probe Integration** - Wire into scene.matchmaking(), verify P2P probe coordination
+
+## Phase Details
+
+### Phase 61: Input Confirmation Protocol
+**Goal**: Implement protocol to wait for partner input confirmation before episode export
+**Depends on**: Phase 60 (v1.13 complete)
+**Requirements**: PARITY-01, PARITY-02
+**Success Criteria** (what must be TRUE):
+  1. Episode export does not begin until partner inputs are confirmed for final frame
+  2. Confirmation timeout is configurable (default handles 200ms+ latency)
+  3. Timeout triggers graceful handling (not crash or data loss)
+**Research flag:** Complete (61-RESEARCH.md)
+**Plans:** 1 plan
+
+Plans:
+- [x] 61-01-PLAN.md — Add confirmation timeout config and wait logic before episode export
+
+### Phase 62: Data Parity Validation
+**Goal**: Ensure both players export identical data for every frame
+**Depends on**: Phase 61
+**Requirements**: PARITY-03, PARITY-04, PARITY-05
+**Success Criteria** (what must be TRUE):
+  1. Both players' exports contain identical action columns for every frame
+  2. Both players' exports contain identical reward columns for every frame
+  3. Both players' exports contain identical info columns for every frame
+**Research flag:** Unlikely (verification of Phase 61 fix)
+**Plans:** 1 plan
+
+Plans:
+- [x] 62-01-PLAN.md — Run parity tests to validate Phase 61 fix
+
+### Phase 63: Parity Test Stabilization
+**Goal**: E2E parity tests pass consistently with no tolerance or xfail markers
+**Depends on**: Phase 62
+**Requirements**: PARITY-06, PARITY-07
+**Success Criteria** (what must be TRUE):
+  1. `test_active_input_with_latency[chromium-100]` passes 10 consecutive runs
+  2. `test_active_input_with_packet_loss` passes 10 consecutive runs
+  3. No tolerance or xfail markers needed for parity tests
+**Research flag:** Complete (63-RESEARCH.md)
+**Plans:** 1 plan
+
+Plans:
+- [x] 63-01-PLAN.md — Increase timeout, clean up test docstrings, increase redundancy, verify 10 consecutive passes
+
+### Phase 64: Multi-Participant Test Infrastructure
+**Goal**: Build test infrastructure supporting 6 concurrent participants (3 simultaneous games)
+**Depends on**: Phase 63
+**Requirements**: STRESS-01
+**Success Criteria** (what must be TRUE):
+  1. Test fixture can launch 6 browser contexts simultaneously
+  2. Test fixture can orchestrate 3 concurrent games
+  3. Infrastructure handles staggered participant arrival
+**Research flag:** Complete (64-RESEARCH.md)
+**Plans:** 1 plan
+
+Plans:
+- [x] 64-01-PLAN.md — Add multi_participant_contexts fixture, GameOrchestrator class, and validation tests
+
+### Phase 65: Multi-Episode and Lifecycle Stress Tests
+**Goal**: Comprehensive stress test coverage for all participant lifecycle scenarios
+**Depends on**: Phase 64
+**Requirements**: STRESS-02, STRESS-03, STRESS-04, STRESS-05, STRESS-06, STRESS-07
+**Success Criteria** (what must be TRUE):
+  1. Participant can complete 2+ episodes back-to-back without state corruption
+  2. Mid-game disconnect test passes (partner sees message, data exported)
+  3. Waiting room disconnect test passes (other participants not affected)
+  4. Focus loss test passes (game ends gracefully after timeout)
+  5. Mixed lifecycle test passes (combinations of above scenarios)
+  6. All completed games pass exact parity validation
+**Research flag:** Complete (65-RESEARCH.md)
+**Plans:** 2 plans
+
+Plans:
+- [x] 65-01-PLAN.md — Create test server configs (multi-episode + focus-timeout) and pytest fixtures
+- [x] 65-02-PLAN.md — Create lifecycle stress tests (STRESS-02 through STRESS-07)
+
+### Phase 66: Server Recovery Validation
+**Goal**: Prove server handles chaos gracefully and recovers correctly for new participants
+**Depends on**: Phase 65
+**Requirements**: RECOVERY-01, RECOVERY-02, RECOVERY-03, RECOVERY-04, RECOVERY-05, RECOVERY-06
+**Success Criteria** (what must be TRUE):
+  1. After concurrent completions, disconnections, and focus loss events, server state is clean
+  2. New participant pair entering after chaos completes experiment successfully
+  3. New pair's exported data passes exact parity validation
+  4. No stale state affects new participants
+**Research flag:** Unlikely (integration test of previous phases)
+**Plans:** 1 plan
+
+Plans:
+- [x] 66-01-PLAN.md — Server recovery validation after chaos scenarios
+
+### Phase 67: Pyodide Pre-load Infrastructure
+**Goal**: Build the pre-loading mechanism that initializes Pyodide during the compatibility check screen
+**Depends on**: Phase 66 (v1.14 complete)
+**Requirements**: INIT-01, INIT-02, INIT-03, INIT-04
+**Success Criteria** (what must be TRUE):
+  1. System detects Pyodide-requiring scenes from experiment config before matching
+  2. Pyodide loads during compatibility check screen (not during game start)
+  3. Participant sees progress indicator during Pyodide initialization
+  4. Participant cannot proceed until Pyodide is ready
+**Research flag:** Complete (67-RESEARCH.md)
+**Plans:** 1 plan
+
+Plans:
+- [x] 67-01-PLAN.md — Server-side Pyodide config detection + client-side preload with progress UI and advancement gating
+
+### Phase 68: Shared Instance Integration
+**Goal**: Game classes reuse pre-loaded Pyodide instance instead of loading their own
+**Depends on**: Phase 67
+**Requirements**: SHARED-01, SHARED-02
+**Success Criteria** (what must be TRUE):
+  1. RemoteGame.initialize() skips loadPyodide() when Pyodide is pre-loaded
+  2. MultiplayerPyodideGame skips loadPyodide() when Pyodide is pre-loaded
+  3. Game startup time is near-instant (no WASM compilation at game time)
+**Research flag:** Unlikely — straightforward refactoring to check for existing Pyodide instance
+**Plans:** 1 plan
+
+Plans:
+- [x] 68-01-PLAN.md — Modify RemoteGame.initialize() to reuse pre-loaded Pyodide and add multiplayer observability logging
+
+### Phase 69: Server-Side Init Grace
+**Goal**: Server tolerates missed pings during Pyodide loading so no false disconnects
+**Depends on**: Phase 68
+**Requirements**: GRACE-01, GRACE-02, GRACE-03
+**Success Criteria** (what must be TRUE):
+  1. Server does not disconnect clients during Pyodide loading phase
+  2. Client signals loading state to server
+  3. Normal ping checking resumes after loading completes
+**Research flag:** Complete (69-RESEARCH.md)
+**Plans:** 1 plan (complete)
+
+Plans:
+- [x] 69-01-PLAN.md — Increase ping_timeout, add LOADING_CLIENTS tracking, client loading signals, disconnect handler grace check
+
+### Phase 70: Validation & Test Stabilization
+**Goal**: Prove concurrent game starts work without stagger delays
+**Depends on**: Phase 69
+**Requirements**: TEST-01, TEST-02, TEST-03, TEST-04, TEST-05
+**Success Criteria** (what must be TRUE):
+  1. Stagger delay removed from multi-participant tests
+  2. All E2E tests pass with near-simultaneous game starts (0.5s stagger)
+  3. Socket.IO connections remain stable during concurrent starts
+  4. No performance regression for game loop execution
+  5. All existing E2E pass (no regressions)
+**Research flag:** Unlikely — integration test of previous phases
+**Plans:** 1 plan
+
+Plans:
+- [x] 70-01-PLAN.md — Reduce stagger delay from 5.0s to 0.5s and verify full E2E test suite passes
+
+### Phase 71: Test Infrastructure Fix
+**Goal**: Server startup and teardown between test suites completes cleanly, eliminating Page.goto timeout failures
+**Depends on**: Phase 70 (v1.16 complete)
+**Requirements**: INFRA-01, INFRA-02, INFRA-03
+**Success Criteria** (what must be TRUE):
+  1. Running two test suites back-to-back (e.g., test_data_comparison then test_focus_loss) succeeds with no Page.goto timeouts
+  2. No stale server processes remain after a test suite completes (verified by port check)
+  3. Browser contexts, server processes, and temporary files are fully cleaned up between tests
+  4. `test_focus_loss_episode_boundary_parity` passes when run after other test suites (not just in isolation)
+**Research flag:** Complete (71-RESEARCH.md)
+**Plans:** 2 plans
+
+Plans:
+- [x] 71-01-PLAN.md — Robust server teardown with port-availability polling, process group kill, and pre-startup cleanup
+- [x] 71-02-PLAN.md — Move test_focus_loss_episode_boundary_parity to own module (gap closure for server state exhaustion)
+
+### Phase 72: Latency Test Diagnosis
+**Goal**: Identify and fix the root cause of the 200ms latency test timeout so it completes reliably
+**Depends on**: Phase 71
+**Requirements**: PERF-01, PERF-02
+**Success Criteria** (what must be TRUE):
+  1. Root cause of `test_episode_completion_under_fixed_latency[chromium-200]` timeout is documented (in plan or summary)
+  2. The 200ms latency test completes within its timeout (currently 300s) on 5 consecutive runs
+  3. The 100ms latency variant continues to pass (no regression)
+**Research flag:** Definite -- root cause is unknown, need investigation before any fix
+**Plans:** 2 plans
+
+Plans:
+- [x] 72-01-PLAN.md — Instrument test with timing diagnostics and console capture to identify stall point and root cause
+- [x] 72-02-PLAN.md — Apply root cause fix and verify 5 consecutive passes with no 100ms regression
+
+### Phase 73: Network & Regression Validation
+**Goal**: Every test suite in the E2E suite passes -- network disruption, data comparison, multiplayer, multi-participant, and focus loss
+**Depends on**: Phase 72
+**Requirements**: NET-01, NET-02, REG-01, REG-02, REG-03, REG-04
+**Success Criteria** (what must be TRUE):
+  1. All latency injection tests pass in a single run (100ms, 200ms, asymmetric, jitter, active input)
+  2. All network disruption tests pass in a single run (packet loss, reconnection)
+  3. All 5 data comparison tests pass in a single run
+  4. All multiplayer basic tests pass in a single run
+  5. All multi-participant tests pass with 0.5s stagger in a single run
+  6. All focus loss tests pass in a single run
+**Research flag:** Unlikely -- validation of prior fixes; any new failures get diagnosed and fixed inline
+**Plans:** 2 plans
+
+Plans:
+- [x] 73-01-PLAN.md — Run latency injection + network disruption tests, diagnose and fix any failures (NET-01, NET-02)
+- [x] 73-02-PLAN.md — Run data comparison + multiplayer basic + multi-participant + focus loss tests (REG-01 through REG-04)
+
+### Phase 74: Stability Certification
+**Goal**: The full E2E test suite is proven stable -- 10 consecutive passes, zero flaky markers
+**Depends on**: Phase 73
+**Requirements**: STAB-01, STAB-02
+**Success Criteria** (what must be TRUE):
+  1. Full E2E test suite passes 10 consecutive runs with zero failures
+  2. No xfail markers exist in any E2E test file
+  3. No tolerance hacks or known-flaky annotations exist in any E2E test file
+  4. Any failure during the 10-run sequence triggers root cause investigation (not retry-and-hope)
+**Research flag:** Unlikely -- pure execution and validation
+**Plans:** 2 plans
+
+Plans:
+- [x] 74-01-PLAN.md — Audit E2E test suite for STAB-02 compliance (xfail, tolerance hacks, flaky markers)
+- [x] 74-02-PLAN.md — Execute full-suite stability certification with GGPO bug investigation
+
+### Phase 75: Merged Loading Screen
+**Goal**: Participants see a single loading screen that gates on both compatibility check and Pyodide readiness
+**Depends on**: Phase 74 (v1.17 complete)
+**Requirements**: LOAD-01, LOAD-02, LOAD-03, LOAD-04
+**Success Criteria** (what must be TRUE):
+  1. Participant sees exactly one loading screen during pre-game setup (no separate Pyodide spinner)
+  2. Loading screen does not advance until both compatibility check passes AND Pyodide is ready
+  3. Pyodide loading timeout is configurable via experiment config (defaults to 60s)
+  4. If Pyodide fails or times out, participant sees a clear error page instead of hanging
+**Research flag:** Complete (75-RESEARCH.md)
+**Plans:** 2 plans
+
+Plans:
+- [x] 75-01-PLAN.md — Add pyodide_load_timeout_s to config classes, dynamic server timeout, unified HTML loading element
+- [x] 75-02-PLAN.md — Refactor client-side JS with loadingGate, timeout, error handling, and unified loading screen
+
+### Phase 76: Test & Roadmap Cleanup
+**Goal**: Remove dead test code and update roadmap to reflect actual completion state
+**Depends on**: Nothing (independent of Phase 75)
+**Requirements**: CLEAN-01, CLEAN-02, CLEAN-03, CLEAN-04
+**Success Criteria** (what must be TRUE):
+  1. `flask_server_multi_episode` fixture no longer exists in conftest.py
+  2. `test_network_disruption.py` has no unused imports
+  3. `run_full_episode_flow` exists in exactly one location (`game_helpers.py`) and all consumers import from there
+  4. ROADMAP.md shows v1.14 Phases 65-66 as complete
+**Research flag:** Unlikely — straightforward deletions and edits
+**Plans:** 1 plan
+
+Plans:
+- [x] 76-01-PLAN.md — Remove orphaned fixtures, consolidate helpers, update roadmap
+
+### Phase 77: P2P Connection Scoping
+**Goal**: P2P/WebRTC connections are scoped to GymScenes — torn down on exit, no stale overlays on other scenes
+**Depends on**: Phase 76 (v1.18 complete)
+**Requirements**: P2P-01, P2P-02
+**Success Criteria** (what must be TRUE):
+  1. When a participant advances past a GymScene, all WebRTC connections are closed (no lingering DataChannels or PeerConnections)
+  2. When a participant is on a non-GymScene scene (survey, instructions, end screen), no "partner disconnected" overlay appears even if their former partner disconnects
+  3. Existing GymScene gameplay is unaffected (P2P connections still work during active game)
+**Research flag:** Complete (77-RESEARCH.md)
+**Plans:** 1 plan
+
+Plans:
+- [x] 77-01-PLAN.md — Add cleanupForSceneExit() and sceneExited guards to scope P2P connections to GymScene lifetime
+
+### Phase 78: Group History Tracking
+**Goal**: Matchmakers can query group history to re-pair previous partners across GymScenes
+**Depends on**: Phase 77
+**Requirements**: P2P-03, P2P-04
+**Success Criteria** (what must be TRUE):
+  1. Server records which participants were paired together after each GymScene completes
+  2. Group history persists across scene transitions (available in later scenes)
+  3. A custom matchmaker can query group history and use it to re-pair previous partners in future GymScenes
+  4. Group history does not interfere with fresh matching (new participants unaffected)
+**Research flag:** Complete (78-RESEARCH.md)
+**Plans:** 1 plan
+
+Plans:
+- [x] 78-01-PLAN.md — Add GroupHistory dataclass, extend MatchCandidate, implement GroupReunionMatchmaker, wire group history into GameManager
+
+### Phase 79: Post-Game Scene Isolation Test
+**Goal**: E2E test validates that after two players complete Overcooked and advance to the survey scene, one player exiting does not trigger a partner-disconnected overlay on the remaining player
+**Depends on**: Phase 78
+**Success Criteria** (what must be TRUE):
+  1. Two Playwright-controlled players complete an Overcooked game together and advance to the survey scene
+  2. When one player closes their browser/tab on the survey scene, the remaining player does NOT see a partner-disconnected overlay
+  3. The remaining player's survey scene remains functional (not interrupted)
+**Research flag:** Unlikely — builds on existing E2E infrastructure
+**Plans:** 1 plan
+
+Plans:
+- [x] 79-01-PLAN.md — Create multi-scene test server config, server fixture, and E2E test validating post-game scene isolation
+
+### Phase 80: Pre-Game Countdown
+**Goal**: After matchmaking forms a match, show a 3-second "Players found!" countdown on the waiting room screen before transitioning to the game
+**Depends on**: Phase 79 (v1.19 complete)
+**Requirements**: CD-01, CD-02, CD-03
+**Success Criteria** (what must be TRUE):
+  1. After matchmaker forms a match, all matched players see "Players found!" with a 3-2-1 countdown on the waiting room screen
+  2. Countdown is visible simultaneously to all matched players (server-triggered)
+  3. Game scene transition and gameplay start only after countdown completes, synced across all players
+  4. Existing single-player and non-multiplayer flows are unaffected (no regression)
+**Research flag:** Unlikely — straightforward client/server event flow using existing waiting_room and start_game patterns
+**Plans:** 1 plan
+
+Plans:
+- [x] 80-01-PLAN.md — Server-side countdown delay + client-side countdown display on waiting room screen
+
+### Phase 81: LatencyFIFOMatchmaker Core
+**Goal**: A matchmaker class that skips candidates whose estimated P2P RTT (sum of server RTTs) exceeds a configurable threshold
+**Depends on**: Phase 80 (v1.20 complete)
+**Requirements**: MATCH-01, MATCH-02, MATCH-04
+**Success Criteria** (what must be TRUE):
+  1. `LatencyFIFOMatchmaker(max_server_rtt_ms=200)` can be instantiated with a configurable threshold
+  2. `find_match()` skips waiting candidates where sum of server RTTs exceeds `max_server_rtt_ms`
+  3. When no candidate passes the RTT filter, arriving participant waits (returns None)
+  4. When a candidate's RTT data is unavailable (None), they are NOT excluded (graceful fallback)
+**Research flag:** Unlikely — straightforward subclass of existing Matchmaker, server RTT already available on MatchCandidate
+**Plans:** 1 plan
+
+Plans:
+- [x] 81-01-PLAN.md — Implement LatencyFIFOMatchmaker class with server RTT pre-filtering and unit tests
+
+### Phase 82: Scene API & P2P Probe Integration
+**Goal**: Researcher can use LatencyFIFOMatchmaker via scene config, with post-match P2P probe verification
+**Depends on**: Phase 81
+**Requirements**: MATCH-03, MATCH-05
+**Success Criteria** (what must be TRUE):
+  1. `scene.matchmaking(matchmaker=LatencyFIFOMatchmaker(max_server_rtt_ms=200, max_p2p_rtt_ms=150))` works
+  2. After RTT pre-filter match, P2P probe still runs if `max_p2p_rtt_ms` is set
+  3. Rejected P2P probe returns participants to waitroom (existing behavior preserved)
+**Research flag:** Unlikely — existing scene.matchmaking() API and P2P probe flow already support custom matchmakers with max_p2p_rtt_ms
+**Plans:** 1 plan
+
+Plans:
+- [x] 82-01-PLAN.md — Integration tests for scene API and P2P probe wiring + example config update
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 11. Hash Infrastructure | v1.1 | 1/1 | Complete | 2026-01-21 |
-| 12. P2P Hash Exchange | v1.1 | 1/1 | Complete | 2026-01-21 |
-| 13. Mismatch Detection | v1.1 | 1/1 | Complete | 2026-01-21 |
-| 14. Validation Export | v1.1 | 1/1 | Complete | 2026-01-21 |
-| 15. Entry Screening Rules | v1.2 | 1/1 | Complete | 2026-01-21 |
-| 16. Continuous Monitoring | v1.2 | 1/1 | Complete | 2026-01-21 |
-| 17. Multiplayer Exclusion | v1.2 | 1/1 | Complete | 2026-01-21 |
-| 18. Custom Callbacks | v1.2 | 1/1 | Complete | 2026-01-22 |
-| 19. Waiting Room Validation | v1.3 | 1/1 | Complete | 2026-01-22 |
-| 20. Mid-Game Reconnection | v1.3 | 2/2 | Complete | 2026-01-22 |
-| 21. Per-Round Health Check | v1.3 | 1/1 | Complete | 2026-01-22 |
-| 22. Latency Telemetry | v1.3 | 1/1 | Complete | 2026-01-22 |
-| 23. Partner Disconnection | v1.4 | 1/1 | Complete | 2026-01-22 |
-| 24. Web Worker Timer | v1.5 | 1/1 | Complete | 2026-01-23 |
-| 25. Focus Detection | v1.5 | 1/1 | Complete | 2026-01-23 |
-| 26. Resync & Partner UX | v1.5 | 1/1 | Complete | 2026-01-23 |
-| 27. Timeout & Telemetry | v1.5 | 1/1 | Complete | 2026-01-23 |
-| 28. Pipeline Instrumentation | v1.6 | 1/1 | Complete | 2026-01-24 |
-| 29-31. Deferred | v1.6 | — | Deferred | — |
-| 32. Dashboard Summary | v1.7 | 1/1 | Complete | 2026-01-25 |
-| 33. Session List | v1.7 | 1/1 | Complete | 2026-01-25 |
-| 34. Session Detail | v1.7 | 1/1 | Complete | 2026-01-25 |
-| 35. Layout & Polish | v1.7 | 1/1 | Complete | 2026-01-25 |
-| 36. Buffer Split | v1.8 | 1/1 | Complete | 2026-01-30 |
-| 37. Fast-Forward Fix | v1.8 | 1/1 | Complete | 2026-01-30 |
-| 38. Episode Boundary | v1.8 | 1/1 | Complete | 2026-01-30 |
-| 39. Verification & Metadata | v1.8 | 1/1 | Complete | 2026-01-30 |
-| 40. Test Infrastructure | v1.9 | 2/2 | Complete | 2026-01-31 |
-| 41. Latency Injection | v1.9 | 1/1 | Complete | 2026-01-31 |
-| 42. Network Disruption | v1.9 | 1/1 | Complete | 2026-01-31 |
-| 43. Data Comparison | v1.9 | 1/1 | Complete | 2026-01-31 |
-| 44. Manual Protocol | v1.9 | 1/1 | Complete | 2026-02-01 |
-| 45. Episode Completion Fix | v1.10 | 1/1 | Complete | 2026-02-02 |
-| 46. Test Suite Verification | v1.10 | 1/1 | Complete | 2026-02-02 |
-| 47. Focus Loss Testing | v1.10 | 1/1 | Complete | 2026-02-02 |
-| 48. isFocused Column | v1.11 | 1/1 | Complete | 2026-02-02 |
-| 49. Episode Boundary Row | v1.11 | 1/1 | Complete | 2026-02-02 |
-| 50. Stress Verification | v1.11 | 1/1 | Complete | 2026-02-02 |
+| 1-10 | v1.0 | — | Complete | 2026-01-19 |
+| 11-14 | v1.1 | — | Complete | 2026-01-21 |
+| 15-18 | v1.2 | — | Complete | 2026-01-22 |
+| 19-22 | v1.3 | — | Complete | 2026-01-22 |
+| 23 | v1.4 | — | Complete | 2026-01-22 |
+| 24-27 | v1.5 | — | Complete | 2026-01-23 |
+| 28 | v1.6 | — | Complete | 2026-01-24 |
+| 29-31 | v1.6 | — | Deferred | — |
+| 32-35 | v1.7 | — | Complete | 2026-01-25 |
+| 36-39 | v1.8 | — | Complete | 2026-01-30 |
+| 40-44 | v1.9 | — | Complete | 2026-02-01 |
+| 45-47 | v1.10 | — | Complete | 2026-02-02 |
+| 48-50 | v1.11 | — | Complete | 2026-02-02 |
+| 51-56 | v1.12 | — | Complete | 2026-02-03 |
+| 57-60 | v1.13 | — | Complete | 2026-02-03 |
+| 61. Input Confirmation Protocol | v1.14 | 1/1 | Complete | 2026-02-03 |
+| 62. Data Parity Validation | v1.14 | 1/1 | Complete | 2026-02-03 |
+| 63. Parity Test Stabilization | v1.14 | 1/1 | Complete | 2026-02-03 |
+| 64. Multi-Participant Test Infrastructure | v1.14 | 1/1 | Complete | 2026-02-03 |
+| 65. Multi-Episode Lifecycle Stress | v1.14 | 2/2 | Complete | 2026-02-04 |
+| 66. Server Recovery Validation | v1.14 | 1/1 | Complete | 2026-02-04 |
+| 67. Pyodide Pre-load Infrastructure | v1.16 | 1/1 | Complete | 2026-02-06 |
+| 68. Shared Instance Integration | v1.16 | 1/1 | Complete | 2026-02-06 |
+| 69. Server-Side Init Grace | v1.16 | 1/1 | Complete | 2026-02-06 |
+| 70. Validation & Test Stabilization | v1.16 | 1/1 | Complete | 2026-02-06 |
+| 71. Test Infrastructure Fix | v1.17 | 2/2 | Complete | 2026-02-06 |
+| 72. Latency Test Diagnosis | v1.17 | 2/2 | Complete | 2026-02-06 |
+| 73. Network & Regression Validation | v1.17 | 2/2 | Complete | 2026-02-06 |
+| 74. Stability Certification | v1.17 | 2/2 | Complete | 2026-02-06 |
+| 75. Merged Loading Screen | v1.18 | 2/2 | Complete | 2026-02-06 |
+| 76. Test & Roadmap Cleanup | v1.18 | 1/1 | Complete | 2026-02-07 |
+| 77. P2P Connection Scoping | v1.19 | 1/1 | Complete | 2026-02-07 |
+| 78. Group History Tracking | v1.19 | 1/1 | Complete | 2026-02-07 |
+| 79. Post-Game Scene Isolation Test | v1.19 | 1/1 | Complete | 2026-02-07 |
+| 80. Pre-Game Countdown | v1.20 | 1/1 | Complete | 2026-02-07 |
+| 81. LatencyFIFOMatchmaker Core | v1.21 | 1/1 | Complete | 2026-02-07 |
+| 82. Scene API & P2P Probe Integration | v1.21 | 1/1 | Complete | 2026-02-07 |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-02 after v1.11 milestone complete*
+*Last updated: 2026-02-07 after Phase 82 execution*

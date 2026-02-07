@@ -15,6 +15,7 @@ from interactive_gym.examples.cogrid import (
 from interactive_gym.scenes import gym_scene
 from interactive_gym.scenes import static_scene
 from interactive_gym.scenes import scene
+from interactive_gym.server.matchmaker import FIFOMatchmaker
 
 
 # Constants for controls/actions/etc.
@@ -154,7 +155,7 @@ tutorial_gym_scene = (
     .pyodide(
         run_through_pyodide=True,
         environment_initialization_code_filepath="interactive_gym/examples/cogrid/environments/tutorial_cramped_room_environment_initialization.py",
-        packages_to_install=["numpy", "cogrid==0.0.15", "opencv-python"],
+        packages_to_install=["numpy", "cogrid==0.1.2", "opencv-python"],
     )
 )
 
@@ -467,7 +468,12 @@ cramped_room_human_human = (
         waitroom_timeout=300000,  # 5 minutes
         waitroom_timeout_message="Sorry, we could not find enough players for this study. Please return the HIT now. You will be paid through a Compensation HIT.",
     )
-    .matchmaking(hide_lobby_count=True, max_rtt=100)
+    .matchmaking(
+        matchmaker=FIFOMatchmaker(
+            max_p2p_rtt_ms=100,      # only pair participants with <=100ms RTT
+        ),
+        hide_lobby_count=True,
+    )
     .pyodide(
         run_through_pyodide=True,
         multiplayer=True,  # Enable multiplayer Pyodide coordination

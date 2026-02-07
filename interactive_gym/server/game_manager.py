@@ -15,6 +15,12 @@ import flask_socketio
 from interactive_gym.utils.typing import SubjectID, GameID, RoomID
 
 logger = logging.getLogger(__name__)
+# Add console handler to see game_manager logs
+if not logger.handlers:
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+    logger.addHandler(_handler)
+    logger.setLevel(logging.INFO)
 
 
 try:
@@ -32,7 +38,15 @@ from interactive_gym.configurations import (
     remote_config,
 )
 from interactive_gym.server import remote_game, utils, pyodide_game_coordinator, player_pairing_manager
+from interactive_gym.server.remote_game import SessionState
+from interactive_gym.server.participant_state import ParticipantState
+from interactive_gym.server.matchmaker import Matchmaker, MatchCandidate, FIFOMatchmaker, GroupHistory
+from interactive_gym.server.match_logger import MatchAssignmentLogger
 from interactive_gym.scenes import stager, gym_scene, scene
+
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from interactive_gym.server.probe_coordinator import ProbeCoordinator
 import flask_socketio
 
 
@@ -50,6 +64,11 @@ class GameManager:
         pyodide_coordinator: pyodide_game_coordinator.PyodideGameCoordinator | None = None,
         pairing_manager: player_pairing_manager.PlayerPairingManager | None = None,
         get_subject_rtt: callable | None = None,
+        participant_state_tracker=None,  # Optional for backward compatibility
+        matchmaker: Matchmaker | None = None,  # Phase 55: pluggable matchmaking
+        match_logger: MatchAssignmentLogger | None = None,  # Phase 56: assignment logging
+        probe_coordinator: "ProbeCoordinator | None" = None,  # Phase 59: P2P RTT probing
+        get_socket_for_subject: callable | None = None,  # Phase 60+: for waitroom->match flow
     ):
         assert isinstance(scene, gym_scene.GymScene)
         self.scene = scene
@@ -58,6 +77,15 @@ class GameManager:
         self.pyodide_coordinator = pyodide_coordinator
         self.pairing_manager = pairing_manager
         self.get_subject_rtt = get_subject_rtt  # Callback to get RTT for a subject
+        self.participant_state_tracker = participant_state_tracker  # Phase 54
+        self.matchmaker = matchmaker or FIFOMatchmaker()  # Phase 55: defaults to FIFO
+        self.match_logger = match_logger  # Phase 56: assignment logging
+        self.probe_coordinator = probe_coordinator  # Phase 59: P2P RTT probing
+        self.get_socket_for_subject = get_socket_for_subject  # Phase 60+: socket lookup
+
+        # Pending matches waiting for P2P RTT probe results (Phase 59)
+        # probe_session_id -> match context dict
+        self._pending_matches: dict[str, dict] = {}
 
         # Data structure to save subjects by their socket id
         self.subject = utils.ThreadSafeDict()
@@ -77,22 +105,79 @@ class GameManager:
         self.active_games = utils.ThreadSafeSet()
 
         # Queue of games IDs that are waiting for additional players to join.
+        # NOTE: In the new flow (Phase 60+), waiting_games should typically be empty
+        # since games are only created when matches are formed. This is kept for
+        # backward compatibility and edge cases.
         self.waiting_games = []
         self.waiting_games_lock = eventlet.semaphore.Semaphore()  # Protect waiting_games access
         self.waitroom_timeouts = utils.ThreadSafeDict()
+
+        # Participants waiting in the waitroom for a match (no game allocated yet)
+        # This is the primary waitroom in the new flow - participants wait here
+        # until the matchmaker forms a complete match, then a game is created.
+        self.waitroom_participants: list[SubjectID] = []
 
         # holds reset events so we only continue in game loop when triggered
         # this is not used when running with Pyodide
         self.reset_events = utils.ThreadSafeDict()
 
-        # Group waitrooms: group_id -> list of subject_ids waiting together
-        # Used when wait_for_known_group=True to reunite players from previous games
-        self.group_waitrooms: dict[str, list[SubjectID]] = utils.ThreadSafeDict()
-        # Track when each subject started waiting for their group members
-        self.group_wait_start_times: dict[SubjectID, float] = utils.ThreadSafeDict()
-
     def subject_in_game(self, subject_id: SubjectID) -> bool:
         return subject_id in self.subject_games
+
+    def _get_socket_id(self, subject_id: SubjectID) -> str | None:
+        """Get socket ID for a subject using the get_socket_for_subject callback."""
+        if self.get_socket_for_subject:
+            return self.get_socket_for_subject(subject_id)
+        return None
+
+    def validate_subject_state(self, subject_id: SubjectID) -> tuple[bool, str | None]:
+        """Validate subject state before adding to a game.
+
+        Checks for invalid states that could cause routing issues:
+        - Subject already in subject_games but game doesn't exist
+        - Subject in subject_rooms but not in subject_games
+        - Subject in a game that's already ended
+
+        Returns:
+            (is_valid, error_message) - True if state is valid, False with error message if not
+        """
+        # Check for orphaned subject_games entry
+        if subject_id in self.subject_games:
+            game_id = self.subject_games[subject_id]
+            if game_id not in self.games:
+                logger.warning(
+                    f"[StateValidation] Subject {subject_id} has orphaned subject_games entry. "
+                    f"game_id={game_id} not in games. Cleaning up."
+                )
+                # Clean up orphaned entry
+                del self.subject_games[subject_id]
+                if subject_id in self.subject_rooms:
+                    del self.subject_rooms[subject_id]
+                return (True, None)  # Cleaned up, can proceed
+
+            game = self.games[game_id]
+            # Check if game is in a terminal state
+            if game.status == remote_game.GameStatus.Done or game.status == remote_game.GameStatus.Inactive:
+                logger.warning(
+                    f"[StateValidation] Subject {subject_id} mapped to finished game. "
+                    f"game_id={game_id}, status={game.status}. Cleaning up."
+                )
+                # Clean up stale entry
+                game.remove_human_player(subject_id)
+                del self.subject_games[subject_id]
+                if subject_id in self.subject_rooms:
+                    del self.subject_rooms[subject_id]
+                return (True, None)  # Cleaned up, can proceed
+
+        # Check for orphaned subject_rooms entry (should not exist without subject_games)
+        if subject_id in self.subject_rooms and subject_id not in self.subject_games:
+            logger.warning(
+                f"[StateValidation] Subject {subject_id} has orphaned subject_rooms entry. Cleaning up."
+            )
+            del self.subject_rooms[subject_id]
+            return (True, None)  # Cleaned up, can proceed
+
+        return (True, None)  # All checks passed
 
     def _create_game(self) -> remote_game.RemoteGameV2:
         """Create a Game object corresponding to the specified Scene."""
@@ -102,6 +187,7 @@ class GameManager:
             # Even if we're using Pyodide, we'll still instantiate a RemoteGame, since
             # it'll track the players within a game.
             # TODO(chase): check if we actually do need this for Pyodide-based games...
+            # Game starts in SessionState.WAITING (set in RemoteGameV2.__init__)
             game = remote_game.RemoteGameV2(
                 self.scene,
                 experiment_config=self.experiment_config,
@@ -219,165 +305,26 @@ class GameManager:
     ) -> remote_game.RemoteGameV2 | None:
         """Add a subject to a game and return it.
 
-        If wait_for_known_group is enabled and the subject has known group members,
-        they will be added to a group-specific waitroom. Returns None if waiting
-        for group members.
+        All games are created through the matchmaker path (FIFO queue by default).
+        The matchmaker decides when to form groups based on waiting participants.
 
-        Supports groups of any size (2 or more players).
+        Note: Group reunion (wait_for_known_group) is deferred to a future matchmaker
+        variant (see REUN-01/REUN-02 in REQUIREMENTS.md). The wait_for_known_group
+        config is accepted but currently behaves as FIFO matching.
         """
         logger.info(f"add_subject_to_game called for {subject_id}. Current waiting_games: {self.waiting_games}")
 
-        # Check if we should wait for known group members
-        if self.scene.wait_for_known_group and self.pairing_manager:
-            group_members = self.pairing_manager.get_group_members(subject_id)
-            if group_members:
-                logger.info(f"Subject {subject_id} has known group members: {group_members}. Using group waitroom.")
-                return self._join_or_wait_for_group(subject_id, group_members)
+        # Group reunion is deferred to future matchmaker variant (REUN-01/REUN-02)
+        if self.scene.wait_for_known_group:
+            logger.warning(
+                f"[GroupReunion] wait_for_known_group=True for subject {subject_id}. "
+                f"Use GroupReunionMatchmaker instead: "
+                f"scene.matchmaking(matchmaker=GroupReunionMatchmaker()). "
+                f"Falling back to standard matching."
+            )
 
-        # Standard FIFO matching
+        # All games go through standard matchmaker path
         return self._add_to_fifo_queue(subject_id)
-
-    def _join_or_wait_for_group(
-        self,
-        subject_id: SubjectID,
-        group_members: list[SubjectID]
-    ) -> remote_game.RemoteGameV2 | None:
-        """Handle matching with known group members.
-
-        Supports groups of any size (2 or more players).
-        Returns the game if all group members have arrived, None if still waiting.
-        """
-        group_id = self.pairing_manager.get_group_id(subject_id)
-        if not group_id:
-            logger.warning(f"Subject {subject_id} has group members but no group_id. Falling back to FIFO.")
-            return self._add_to_fifo_queue(subject_id)
-
-        # Get all members of this group
-        all_group_members = self.pairing_manager.get_all_group_members(subject_id)
-        num_players_needed = len([
-            policy for policy in self.scene.policy_mapping.values()
-            if policy == configuration_constants.PolicyTypes.Human
-        ])
-
-        # Check if group member(s) are already waiting
-        if group_id in self.group_waitrooms:
-            waiting_subjects = self.group_waitrooms[group_id]
-
-            # Add this subject to the waitroom
-            if subject_id not in waiting_subjects:
-                waiting_subjects.append(subject_id)
-                self.group_wait_start_times[subject_id] = time.time()
-                logger.info(f"Subject {subject_id} joined group waitroom {group_id}. "
-                           f"Now {len(waiting_subjects)}/{num_players_needed} players waiting.")
-
-            # Check if all group members have arrived
-            if len(waiting_subjects) >= num_players_needed:
-                logger.info(f"All group members arrived for group {group_id}. Creating game.")
-                # Clear the group waitroom
-                del self.group_waitrooms[group_id]
-                for sid in waiting_subjects:
-                    if sid in self.group_wait_start_times:
-                        del self.group_wait_start_times[sid]
-                # Create game for these specific group members
-                return self._create_game_for_group(waiting_subjects)
-            else:
-                # Still waiting for more group members
-                self._broadcast_group_waiting_status(subject_id, group_id, waiting_subjects, num_players_needed)
-                return None
-        else:
-            # Start a new group waitroom
-            self.group_waitrooms[group_id] = [subject_id]
-            self.group_wait_start_times[subject_id] = time.time()
-            logger.info(f"Subject {subject_id} started group waitroom {group_id}. "
-                       f"Waiting for {num_players_needed - 1} more group member(s).")
-            self._broadcast_group_waiting_status(subject_id, group_id, [subject_id], num_players_needed)
-            return None
-
-    def _broadcast_group_waiting_status(
-        self,
-        subject_id: SubjectID,
-        group_id: str,
-        waiting_subjects: list[SubjectID],
-        num_players_needed: int
-    ):
-        """Broadcast waiting status to subjects waiting for their group members."""
-        group_wait_timeout = self.scene.group_wait_timeout
-        start_time = self.group_wait_start_times.get(subject_id, time.time())
-        elapsed_ms = (time.time() - start_time) * 1000
-        remaining_ms = max(0, group_wait_timeout - elapsed_ms)
-
-        self.sio.emit(
-            "waiting_for_group",
-            {
-                "message": "Waiting for your group members from the previous game...",
-                "cur_num_players": len(waiting_subjects),
-                "players_needed": num_players_needed - len(waiting_subjects),
-                "ms_remaining": remaining_ms,
-            },
-            room=flask.request.sid,
-        )
-
-    def _create_game_for_group(
-        self,
-        subject_ids: list[SubjectID]
-    ) -> remote_game.RemoteGameV2 | None:
-        """Create a game for a specific group of players.
-
-        Returns the game if successfully created and started, None if there was an error.
-        """
-        # Safety validation: check group size matches expected player count
-        expected_human_players = len([
-            p for p in self.scene.policy_mapping.values()
-            if p == configuration_constants.PolicyTypes.Human
-        ])
-
-        if len(subject_ids) != expected_human_players:
-            logger.error(
-                f"Group size mismatch! Expected {expected_human_players} players, "
-                f"got {len(subject_ids)}: {subject_ids}. Aborting group game creation."
-            )
-            return None
-
-        # Check for duplicates in the group
-        if len(subject_ids) != len(set(subject_ids)):
-            logger.error(
-                f"Duplicate subjects in group! Subject IDs: {subject_ids}. "
-                f"Aborting group game creation."
-            )
-            return None
-
-        with self.waiting_games_lock:
-            # Create a new game
-            self._create_game()
-            game: remote_game.RemoteGameV2 = self.games[self.waiting_games[-1]]
-
-            # Add each partner to the game, tracking success
-            added_subjects = []
-            for subject_id in subject_ids:
-                if self._add_subject_to_specific_game(subject_id, game):
-                    added_subjects.append(subject_id)
-                else:
-                    logger.error(
-                        f"Failed to add subject {subject_id} to group game {game.game_id}. "
-                        f"Successfully added: {added_subjects}. Cleaning up."
-                    )
-                    # Clean up the game since we can't complete the group
-                    self._remove_game(game.game_id)
-                    return None
-
-            # Final validation: ensure game is ready with correct player count
-            if not game.is_ready_to_start():
-                logger.error(
-                    f"Group game {game.game_id} is not ready after adding all players! "
-                    f"Added: {added_subjects}, Available slots: {game.get_available_human_agent_ids()}"
-                )
-                self._remove_game(game.game_id)
-                return None
-
-            self.waiting_games.remove(game.game_id)
-            self.start_game(game)
-
-        return game
 
     def _add_subject_to_specific_game(
         self,
@@ -478,131 +425,508 @@ class GameManager:
         logger.debug(f"RTT compatible: {subject_id} (RTT={subject_rtt}ms)")
         return True
 
+    def _get_waiting_subject_ids(self) -> list[SubjectID]:
+        """Get list of subject IDs currently waiting in the waitroom.
+
+        Collects subjects from all games in the waiting_games queue.
+        """
+        waiting_subjects = []
+        for game_id in self.waiting_games:
+            game = self.games.get(game_id)
+            if game:
+                for player_id, subject_id in game.human_players.items():
+                    if subject_id and subject_id != utils.Available:
+                        waiting_subjects.append(subject_id)
+        return waiting_subjects
+
+    def _get_group_size(self) -> int:
+        """Get the number of human players needed for a full game."""
+        return len([
+            p for p in self.scene.policy_mapping.values()
+            if p == configuration_constants.PolicyTypes.Human
+        ])
+
+    def _build_match_candidate(self, subject_id: SubjectID) -> MatchCandidate:
+        """Build a MatchCandidate with group history if available.
+
+        Phase 78: Attaches group history from PlayerGroupManager so matchmakers
+        can make re-pairing decisions.
+        """
+        group_history = None
+        if self.pairing_manager:
+            partners = self.pairing_manager.get_group_members(subject_id)
+            if partners:
+                group_id = self.pairing_manager.get_group_id(subject_id)
+                group = self.pairing_manager.groups.get(group_id) if group_id else None
+                group_history = GroupHistory(
+                    previous_partners=partners,
+                    source_scene_id=group.source_scene_id if group else None,
+                    group_id=group_id,
+                )
+
+        return MatchCandidate(
+            subject_id=subject_id,
+            rtt_ms=self.get_subject_rtt(subject_id) if self.get_subject_rtt else None,
+            group_history=group_history,
+        )
+
     def _add_to_fifo_queue(
         self, subject_id: SubjectID
-    ) -> remote_game.RemoteGameV2:
+    ) -> remote_game.RemoteGameV2 | None:
         """Add a subject to the standard FIFO matching queue.
 
-        If matchmaking_max_rtt is configured, will only pair with games where
-        all existing players have RTT within the allowed difference.
+        Uses the matchmaker to decide when to form groups. If matchmaking_max_rtt
+        is configured, RTT filtering is applied before the matchmaker decision.
+
+        Phase 55: Delegates matching decision to self.matchmaker.find_match()
+        Phase 59: If P2P RTT probing enabled, defers game creation until probe completes.
+
+        Returns:
+            The game if created immediately, or None if waiting for probe/waitroom.
         """
         # Use lock to prevent race conditions when multiple participants join simultaneously
         with self.waiting_games_lock:
-            # Find a compatible game based on RTT
-            compatible_game = None
-            for game_id in self.waiting_games:
-                candidate_game = self.games.get(game_id)
-                if candidate_game and self._is_rtt_compatible(subject_id, candidate_game):
-                    compatible_game = candidate_game
-                    break
+            # Build MatchCandidate for arriving participant
+            arriving = self._build_match_candidate(subject_id)
 
-            if compatible_game is None:
-                # No compatible game found, create a new one
-                logger.info(f"No RTT-compatible game found for {subject_id}. Creating a new game.")
-                self._create_game()
-                logger.info(f"Created game. waiting_games now: {self.waiting_games}")
-                # The newly created game will be at the end of waiting_games
-                compatible_game = self.games[self.waiting_games[-1]]
-
-            game = compatible_game
-            current_players = game.cur_num_human_players()
-            expected_players = len([
-                p for p in self.scene.policy_mapping.values()
-                if p == configuration_constants.PolicyTypes.Human
-            ])
+            # Build waiting list from waitroom_participants (Phase 60+: no pre-allocated games)
             logger.info(
-                f"Adding subject {subject_id} to game {game.game_id}. "
-                f"Current players: {current_players}/{expected_players}"
+                f"[Matchmaker:Build] Building waiting list for {subject_id}. "
+                f"waitroom_participants={self.waitroom_participants}"
+            )
+            waiting = []
+            for waiting_sid in self.waitroom_participants:
+                # TODO: Add RTT filtering here if needed in future
+                logger.info(
+                    f"[Matchmaker:Build] Found waiting participant: subject_id={waiting_sid}"
+                )
+                waiting.append(self._build_match_candidate(waiting_sid))
+
+            group_size = self._get_group_size()
+
+            logger.info(
+                f"[FIFO:Pre-Match] subject={subject_id}, "
+                f"waiting_list_size={len(waiting)}, "
+                f"waiting_subjects={[w.subject_id for w in waiting]}, "
+                f"group_size={group_size}"
             )
 
-            # Safety check: verify game isn't already at capacity before proceeding
-            if game.is_at_player_capacity():
-                logger.error(
-                    f"Race condition detected: Game {game.game_id} is already at capacity "
-                    f"({current_players}/{expected_players} players). "
-                    f"Subject {subject_id} will be added to a new game instead."
-                )
-                # Create a new game for this subject
-                self._create_game()
-                game = self.games[self.waiting_games[-1]]
-                logger.info(f"Created new game {game.game_id} for subject {subject_id}")
+            # Delegate matching decision to matchmaker (Phase 55)
+            matched = self.matchmaker.find_match(arriving, waiting, group_size)
 
-            with game.lock:
-                # Double-check availability inside the lock
-                available_human_agent_ids = game.get_available_human_agent_ids()
-                if not available_human_agent_ids:
-                    logger.error(
-                        f"No available slots in game {game.game_id} after acquiring lock. "
-                        f"This indicates a race condition. Creating new game for {subject_id}."
-                    )
-                    # Release lock and create new game
-                    # Note: We need to exit this lock context first
-                    game = None
+            if matched is None:
+                # No match yet - add arriving participant to waitroom
+                logger.info(f"Matchmaker returned None for {subject_id}. Adding to waitroom. "
+                           f"Waiting: {len(waiting)}, Group size: {group_size}")
+                return self._add_to_waitroom(subject_id)
 
-            # Handle the case where we need to create a new game due to race condition
-            if game is None:
-                self._create_game()
-                game = self.games[self.waiting_games[-1]]
-                logger.info(f"Created new game {game.game_id} for subject {subject_id} after race condition")
+            # Match found - check if P2P RTT probing is needed (Phase 59)
+            logger.info(f"Matchmaker matched {len(matched)} participants: "
+                       f"{[c.subject_id for c in matched]}")
 
-            with game.lock:
-                self.subject_games[subject_id] = game.game_id
-                self.subject_rooms[subject_id] = game.game_id
-                self.reset_events[game.game_id][subject_id] = eventlet.event.Event()
-                flask_socketio.join_room(game.game_id)
+            needs_probe = (
+                self.probe_coordinator is not None
+                and self.matchmaker.max_p2p_rtt_ms is not None
+            )
 
-                available_human_agent_ids = game.get_available_human_agent_ids()
-                player_id = None
-                player_added = False
-                if not available_human_agent_ids:
+            if needs_probe:
+                # Defer game creation until probe completes
+                return self._probe_and_create_game(matched, subject_id)
+            else:
+                # Create game immediately (no P2P RTT filtering)
+                return self._create_game_for_match(matched, subject_id)
+
+    def _add_to_waitroom(self, subject_id: SubjectID) -> None:
+        """Add a participant to the waitroom when no match is available yet.
+
+        Phase 60+: No game is created here. The participant is added to the
+        waitroom_participants list and waits until the matchmaker forms a
+        complete match. A game is only created when the match is formed.
+
+        The participant receives waitroom status updates via their subject room.
+        """
+        logger.info(
+            f"[Waitroom:Enter] subject={subject_id}, "
+            f"waitroom_participants={self.waitroom_participants}"
+        )
+
+        # Add to waitroom list (no game created yet)
+        if subject_id not in self.waitroom_participants:
+            self.waitroom_participants.append(subject_id)
+
+        # Emit waiting_room event to the participant
+        # They're waiting for a match, not in a game yet
+        waitroom_count = len(self.waitroom_participants)
+        group_size = self._get_group_size()
+        needed = max(0, group_size - waitroom_count)
+
+        # Use the waitroom_timeout value (scene.waitroom_timeout is in ms, default 60000ms = 60s)
+        # Since no game exists yet, we use this reasonable default for the countdown
+        default_timeout_ms = self.scene.waitroom_timeout or 60000
+
+        # Get the socket ID for emitting - this is called during join_game request context
+        # so flask.request.sid is available. Using socket ID directly because the subject
+        # hasn't joined a room named after their subject_id yet.
+        socket_id = flask.request.sid
+
+        self.sio.emit(
+            "waiting_room",
+            {
+                "cur_num_players": waitroom_count,
+                "players_needed": needed,
+                "ms_remaining": default_timeout_ms,
+                "waitroom_timeout_message": self.scene.waitroom_timeout_message,
+                "hide_lobby_count": self.scene.hide_lobby_count,
+            },
+            room=socket_id,
+        )
+
+        logger.info(
+            f"[Waitroom:Exit] subject={subject_id} added to waitroom. "
+            f"waitroom_participants={self.waitroom_participants}, "
+            f"count={waitroom_count}/{group_size}"
+        )
+
+        # Return None - no game created yet
+        return None
+
+    def _probe_and_create_game(
+        self,
+        matched: list[MatchCandidate],
+        arriving_subject_id: SubjectID,
+    ) -> None:
+        """Initiate P2P RTT probe before creating game for matched participants.
+
+        Adds all matched participants to the waitroom immediately, then triggers
+        a WebRTC probe between the first two. If probe succeeds and RTT is acceptable,
+        game is created. Otherwise, candidates stay in waitroom for future matching.
+
+        Phase 59: P2P RTT filtering integration.
+
+        Args:
+            matched: List of matched MatchCandidates (from matchmaker.find_match)
+            arriving_subject_id: The subject that triggered this match
+
+        Returns:
+            None - game creation is deferred until probe completes
+        """
+        # Add arriving participant to waitroom while probe runs
+        # (waiting participants are already in the waitroom)
+        self._add_to_waitroom(arriving_subject_id)
+
+        # For 2-player games, probe between the two candidates
+        if len(matched) >= 2:
+            subject_a = matched[0].subject_id
+            subject_b = matched[1].subject_id
+
+            logger.info(
+                f"Starting P2P RTT probe for match: {subject_a} <-> {subject_b}. "
+                f"Threshold: {self.matchmaker.max_p2p_rtt_ms}ms"
+            )
+
+            # Create probe with callback
+            probe_session_id = self.probe_coordinator.create_probe(
+                subject_a=subject_a,
+                subject_b=subject_b,
+                on_complete=self._on_probe_complete,
+            )
+
+            # Store match context for callback
+            self._pending_matches[probe_session_id] = {
+                'matched': matched,
+                'arriving_subject_id': arriving_subject_id,
+                'created_at': time.time(),
+            }
+
+        return None
+
+    def _on_probe_complete(
+        self,
+        subject_a: str,
+        subject_b: str,
+        rtt_ms: float | None,
+    ) -> None:
+        """Handle P2P RTT probe completion.
+
+        Called by ProbeCoordinator when RTT measurement finishes (or fails/times out).
+
+        Args:
+            subject_a: First subject in the probe
+            subject_b: Second subject in the probe
+            rtt_ms: Measured RTT in milliseconds, or None if failed/timed out
+        """
+        # Find the pending match for this probe
+        probe_session_id = None
+        match_context = None
+        for pid, ctx in list(self._pending_matches.items()):
+            matched_subjects = [c.subject_id for c in ctx['matched']]
+            if subject_a in matched_subjects and subject_b in matched_subjects:
+                probe_session_id = pid
+                match_context = ctx
+                break
+
+        if not match_context:
+            logger.warning(
+                f"Probe complete for {subject_a} <-> {subject_b} but no pending match found"
+            )
+            return
+
+        # Clean up pending match entry
+        del self._pending_matches[probe_session_id]
+
+        matched = match_context['matched']
+        arriving_subject_id = match_context['arriving_subject_id']
+
+        # Check if match should be rejected based on RTT
+        should_reject = self.matchmaker.should_reject_for_rtt(rtt_ms)
+
+        if should_reject:
+            threshold = self.matchmaker.max_p2p_rtt_ms
+            logger.info(
+                f"RTT rejection: {rtt_ms}ms {'> ' + str(threshold) + 'ms' if rtt_ms else '(failed)'} "
+                f"for {subject_a} <-> {subject_b}. Candidates remain in waitroom."
+            )
+            # Candidates stay in waitroom, no action needed - they were already added
+            # Future matches will try different pairings
+            return
+
+        logger.info(
+            f"RTT accepted: {rtt_ms}ms <= {self.matchmaker.max_p2p_rtt_ms}ms "
+            f"for {subject_a} <-> {subject_b}. Creating game."
+        )
+
+        # RTT acceptable - create game for matched participants
+        # Need to acquire lock since we're modifying game state
+        with self.waiting_games_lock:
+            # Verify all candidates are still in waitroom (they might have disconnected)
+            # Phase 60+: Check waitroom_participants, not old game-based tracking
+            all_still_waiting = True
+            for candidate in matched:
+                if candidate.subject_id not in self.waitroom_participants:
                     logger.warning(
-                        f"No available human agent IDs for game {game.game_id}. Adding as a spectator."
+                        f"Candidate {candidate.subject_id} no longer in waitroom_participants. "
+                        f"Aborting match creation. "
+                        f"Current waitroom: {self.waitroom_participants}"
                     )
-                else:
-                    player_id = random.choice(available_human_agent_ids)
-                    player_added = game.add_player(player_id, subject_id)
-                    if not player_added:
-                        logger.error(
-                            f"Failed to add player {subject_id} to slot {player_id} in game {game.game_id}. "
-                            f"This should not happen if locks are working correctly."
-                        )
+                    all_still_waiting = False
+                    break
 
-                # If multiplayer Pyodide, add player to coordinator
-                if self.scene.pyodide_multiplayer and self.pyodide_coordinator and player_id is not None:
-                    self.pyodide_coordinator.add_player(
-                        game_id=game.game_id,
-                        player_id=player_id,
-                        socket_id=flask.request.sid,
-                        subject_id=subject_id  # Pass subject_id for data logging
-                    )
-                    logger.info(
-                        f"Added player {player_id} (subject: {subject_id}) to Pyodide coordinator for game {game.game_id}"
-                    )
+            if not all_still_waiting:
+                # Candidates left during probe - nothing to do
+                return
 
-                if self.scene.game_page_html_fn is not None:
-                    self.sio.emit(
-                        "update_game_page_text",
-                        {
-                            "game_page_text": self.scene.game_page_html_fn(
-                                game, subject_id
-                            )
-                        },
-                        room=subject_id,
-                    )
+            # Remove matched candidates from waitroom_participants before creating new game
+            for candidate in matched:
+                if candidate.subject_id in self.waitroom_participants:
+                    self.waitroom_participants.remove(candidate.subject_id)
+                    logger.info(f"[Probe:Complete] Removed {candidate.subject_id} from waitroom_participants")
 
-                # If the game is ready to start, we'll remove it from WAITING_GAMES.
-                is_ready = game.is_ready_to_start()
-                logger.info(f"Game {game.game_id} ready to start: {is_ready}. Available slots: {game.get_available_human_agent_ids()}")
-                if is_ready:
-                    logger.info(f"Removing game {game.game_id} from waiting_games")
-                    self.waiting_games.remove(game.game_id)
-                    assert game.game_id not in self.waiting_games
+            # Create and start the game
+            self._create_game_for_match_internal(matched)
 
-                if is_ready:
-                    self.start_game(game)
-                else:
-                    # Broadcast to all players in the room so everyone sees updated count
-                    self.broadcast_waiting_room_status(game.game_id)
+    def _remove_from_waitroom(self, candidates: list[MatchCandidate]) -> None:
+        """Remove candidates from their waitroom games before creating new match.
+
+        Called when P2P RTT probe succeeds and we're ready to create the real game.
+        """
+        for candidate in candidates:
+            subject_id = candidate.subject_id
+            game_id = self.subject_games.get(subject_id)
+            if not game_id:
+                continue
+
+            game = self.games.get(game_id)
+            if not game:
+                continue
+
+            with game.lock:
+                # Remove player from waitroom game
+                game.remove_human_player(subject_id)
+
+                # Clean up tracking
+                if subject_id in self.subject_games:
+                    del self.subject_games[subject_id]
+                if subject_id in self.subject_rooms:
+                    del self.subject_rooms[subject_id]
+                if game_id in self.reset_events and subject_id in self.reset_events[game_id]:
+                    del self.reset_events[game_id][subject_id]
+
+                # Leave the room
+                try:
+                    flask_socketio.leave_room(game_id)
+                except RuntimeError:
+                    # May not be in request context
+                    pass
+
+                # If game is now empty, clean it up
+                if game.cur_num_human_players() == 0:
+                    if game_id in self.waiting_games:
+                        self.waiting_games.remove(game_id)
+                    if game_id in self.games:
+                        del self.games[game_id]
+                    if game_id in self.reset_events:
+                        del self.reset_events[game_id]
+                    if game_id in self.waitroom_timeouts:
+                        del self.waitroom_timeouts[game_id]
+                    logger.debug(f"Cleaned up empty waitroom game {game_id}")
+
+    def _create_game_for_match_internal(
+        self,
+        matched: list[MatchCandidate],
+    ) -> remote_game.RemoteGameV2 | None:
+        """Create game for matched candidates after probe success.
+
+        Similar to _create_game_for_match but without handling arriving participant
+        separately (all candidates are in equivalent state after probe).
+        """
+        # Create a new game
+        self._create_game()
+        game: remote_game.RemoteGameV2 = self.games[self.waiting_games[-1]]
+
+        # Add each participant to the game
+        added_subjects = []
+        for candidate in matched:
+            if self._add_subject_to_specific_game(candidate.subject_id, game):
+                added_subjects.append(candidate.subject_id)
+            else:
+                logger.error(
+                    f"Failed to add subject {candidate.subject_id} to matched game {game.game_id}. "
+                    f"Successfully added: {added_subjects}. Cleaning up."
+                )
+                self._remove_game(game.game_id)
+                return None
+
+        # Validate game is ready
+        if not game.is_ready_to_start():
+            logger.error(
+                f"Matched game {game.game_id} is not ready after adding all players! "
+                f"Added: {added_subjects}, Available slots: {game.get_available_human_agent_ids()}"
+            )
+            self._remove_game(game.game_id)
+            return None
+
+        self.waiting_games.remove(game.game_id)
+        game.transition_to(SessionState.MATCHED)
+
+        # Log match assignment (Phase 56)
+        if self.match_logger:
+            self.match_logger.log_match(
+                scene_id=self.scene.scene_id,
+                game_id=game.game_id,
+                matched_candidates=matched,
+                matchmaker_class=type(self.matchmaker).__name__,
+            )
+
+        self.sio.start_background_task(self._start_game_with_countdown, game)
+        return game
+
+    def _create_game_for_match(
+        self,
+        matched: list[MatchCandidate],
+        arriving_subject_id: SubjectID
+    ) -> remote_game.RemoteGameV2:
+        """Create and start a game for matched participants.
+
+        Phase 60+: All matched participants are in waitroom_participants (no pre-allocated games).
+        This function:
+        1. Creates a new game
+        2. Adds ALL matched participants to the game
+        3. Removes them from waitroom_participants
+        4. Starts the game
+        """
+        logger.info(
+            f"[CreateMatch:Enter] arriving={arriving_subject_id}, "
+            f"matched={[c.subject_id for c in matched]}"
+        )
+
+        # Create a new game for the match
+        self._create_game()
+        game = self.games[self.waiting_games[-1]]
+        logger.info(f"[CreateMatch] Created game {game.game_id} for match")
+
+        # Get available player slots
+        available_slots = list(game.get_available_human_agent_ids())
+        if len(available_slots) < len(matched):
+            logger.error(
+                f"Not enough slots in game {game.game_id}. "
+                f"Available: {len(available_slots)}, Needed: {len(matched)}"
+            )
+            # Clean up and fail
+            self._remove_game(game.game_id)
+            return None
+
+        # Add ALL matched participants to the game
+        for i, candidate in enumerate(matched):
+            subject_id = candidate.subject_id
+            player_id = available_slots[i]
+
+            # Remove from waitroom if present
+            if subject_id in self.waitroom_participants:
+                self.waitroom_participants.remove(subject_id)
+                logger.info(f"[CreateMatch] Removed {subject_id} from waitroom_participants")
+
+            # Add to game tracking
+            self.subject_games[subject_id] = game.game_id
+            self.subject_rooms[subject_id] = game.game_id
+            self.reset_events[game.game_id][subject_id] = eventlet.event.Event()
+
+            # Join the game room
+            # Note: For the arriving participant, we use flask.request.sid
+            # For waiting participants, we need to get their socket from session
+            if subject_id == arriving_subject_id:
+                flask_socketio.join_room(game.game_id)
+            else:
+                # Waiting participants need to join the room via their socket
+                # They should already have a socket connection
+                flask_socketio.join_room(game.game_id, sid=self._get_socket_id(subject_id))
+
+            # Add player to game
+            player_added = game.add_player(player_id, subject_id)
+            if not player_added:
+                logger.error(
+                    f"Failed to add player {subject_id} to slot {player_id} in game {game.game_id}"
+                )
+
+            # If multiplayer Pyodide, add player to coordinator
+            if self.scene.pyodide_multiplayer and self.pyodide_coordinator:
+                socket_id = flask.request.sid if subject_id == arriving_subject_id else self._get_socket_id(subject_id)
+                self.pyodide_coordinator.add_player(
+                    game_id=game.game_id,
+                    player_id=player_id,
+                    socket_id=socket_id,
+                    subject_id=subject_id
+                )
+                logger.info(
+                    f"[CreateMatch] Added player {player_id} (subject: {subject_id}) to Pyodide coordinator"
+                )
+
+        # Verify game is ready
+        if not game.is_ready_to_start():
+            logger.error(
+                f"Game {game.game_id} not ready after adding all players. "
+                f"Available slots: {game.get_available_human_agent_ids()}"
+            )
+            self._remove_game(game.game_id)
+            return None
+
+        # Remove from waiting_games (it was added by _create_game)
+        if game.game_id in self.waiting_games:
+            self.waiting_games.remove(game.game_id)
+
+        # Transition and start the game
+        game.transition_to(SessionState.MATCHED)
+
+        # Log match assignment (Phase 56)
+        if self.match_logger:
+            self.match_logger.log_match(
+                scene_id=self.scene.scene_id,
+                game_id=game.game_id,
+                matched_candidates=matched,
+                matchmaker_class=type(self.matchmaker).__name__,
+            )
+
+        logger.info(f"[CreateMatch] Starting game {game.game_id} with {len(matched)} players")
+        self.sio.start_background_task(self._start_game_with_countdown, game)
 
         return game
 
@@ -680,6 +1004,10 @@ class GameManager:
 
         with game.lock:
             self.remove_subject(subject_id)
+
+            # Reset participant state (Phase 54)
+            if self.participant_state_tracker:
+                self.participant_state_tracker.reset(subject_id)
 
             game_was_active = (
                 game.game_id in self.active_games
@@ -780,6 +1108,28 @@ class GameManager:
         if not game.cur_num_human_players():
             self._remove_game(game_id)
 
+    def _start_game_with_countdown(self, game):
+        """Emit countdown event, wait 3 seconds, then start the game.
+
+        Only applies to multiplayer games (group_size > 1). Single-player
+        games start immediately with no countdown.
+        """
+        group_size = self._get_group_size()
+        if group_size <= 1:
+            logger.info(f"[Countdown] Skipping countdown for single-player game {game.game_id}")
+            self.start_game(game)
+            return
+
+        logger.info(f"[Countdown] Starting 3s pre-game countdown for game {game.game_id}")
+        self.sio.emit(
+            "match_found_countdown",
+            {"countdown_seconds": 3, "message": "Players found!"},
+            room=game.game_id,
+        )
+        eventlet.sleep(3)
+        logger.info(f"[Countdown] Countdown complete, starting game {game.game_id}")
+        self.start_game(game)
+
     def start_game(self, game: remote_game.RemoteGameV2):
         """Start a game."""
         # Safety validation: ensure correct number of players before starting
@@ -813,6 +1163,14 @@ class GameManager:
             f"Starting game {game.game_id} with {actual_human_players} subjects: "
             f"{[sid for sid in game.human_players.values()]}"
         )
+
+        # Transition all players to IN_GAME (Phase 54)
+        if self.participant_state_tracker:
+            for subject_id in game.human_players.values():
+                if subject_id and subject_id != utils.Available:
+                    logger.info(f"[StartGame] Transitioning {subject_id} to IN_GAME for game {game.game_id}")
+                    self.participant_state_tracker.transition_to(subject_id, ParticipantState.IN_GAME)
+
         self.active_games.add(game.game_id)
 
         self.sio.emit(
@@ -826,7 +1184,11 @@ class GameManager:
         )
 
         if not self.scene.run_through_pyodide:
+            # Non-pyodide games go straight to PLAYING (no validation phase)
+            game.transition_to(SessionState.PLAYING)
             self.sio.start_background_task(self.run_server_game, game)
+        # Note: For pyodide_multiplayer games, transition to VALIDATING/PLAYING
+        # happens in PyodideGameCoordinator (see Task 3)
 
     def run_server_game(self, game: remote_game.RemoteGameV2):
         """Run a remote game on the server."""
@@ -1065,8 +1427,34 @@ class GameManager:
         )
 
     def cleanup_game(self, game_id: GameID):
-        """End a game and persist player groups."""
+        """End a game and clean up ALL associated state.
+
+        Idempotent: safe to call multiple times for the same game_id.
+        """
+        # Guard: make idempotent
+        if game_id not in self.games:
+            logger.debug(f"cleanup_game called for already-cleaned game {game_id}")
+            return
+
         game = self.games[game_id]
+
+        # Transition to ENDED before cleanup (SESS-02: session destroyed after ENDED)
+        game.transition_to(SessionState.ENDED)
+
+        # Transition all players to GAME_ENDED (Phase 54)
+        if self.participant_state_tracker:
+            for subject_id in list(game.human_players.values()):
+                if subject_id and subject_id != utils.Available:
+                    self.participant_state_tracker.transition_to(subject_id, ParticipantState.GAME_ENDED)
+
+        # Clean up subject tracking for ALL players in this game
+        for subject_id in list(game.human_players.values()):
+            if subject_id and subject_id != utils.Available:
+                if subject_id in self.subject_games:
+                    del self.subject_games[subject_id]
+                if subject_id in self.subject_rooms:
+                    del self.subject_rooms[subject_id]
+                logger.debug(f"Cleaned subject mappings for {subject_id}")
 
         # Always record player groups when a game ends
         # This allows future scenes to either require the same group or allow new matches
@@ -1099,24 +1487,51 @@ class GameManager:
             self.cleanup_game(game.game_id)
 
     def remove_subject_quietly(self, subject_id: SubjectID) -> bool:
-        """Remove a subject from their game without notifying other players.
+        """Remove a subject from their game or waitroom without notifying other players.
 
         Used when a player disconnects from a non-active scene (e.g., during a survey)
-        so their group members don't receive a disconnect notification.
+        or from the waitroom before being matched.
 
         Returns True if subject was removed, False if not found.
         """
+        # Phase 60+: Check if subject is in waitroom_participants (no game yet)
+        if subject_id in self.waitroom_participants:
+            self.waitroom_participants.remove(subject_id)
+            logger.info(
+                f"[RemoveQuietly] Removed {subject_id} from waitroom_participants. "
+                f"Remaining: {self.waitroom_participants}"
+            )
+            return True
+
         game_id = self.subject_games.get(subject_id)
+        logger.info(
+            f"[RemoveQuietly] Called for {subject_id}. "
+            f"game_id={game_id}, "
+            f"subject_games keys={list(self.subject_games.keys())}"
+        )
         if game_id is None:
+            logger.warning(f"[RemoveQuietly] {subject_id} not found in subject_games")
             return False
 
         game = self.games.get(game_id)
         if game is None:
+            logger.warning(f"[RemoveQuietly] Game {game_id} not found in games dict")
             return False
+
+        logger.info(
+            f"[RemoveQuietly] Before removal: game {game_id} "
+            f"human_players={game.human_players}, "
+            f"in_waiting_games={game_id in self.waiting_games}"
+        )
 
         with game.lock:
             # Just remove the subject without any notifications
             game.remove_human_player(subject_id)
+
+            logger.info(
+                f"[RemoveQuietly] After remove_human_player: "
+                f"human_players={game.human_players}"
+            )
 
             if subject_id in self.subject_games:
                 del self.subject_games[subject_id]
@@ -1126,81 +1541,24 @@ class GameManager:
             flask_socketio.leave_room(game_id)
 
             # If game is now empty, clean it up quietly
-            if game.cur_num_human_players() == 0:
+            num_players = game.cur_num_human_players()
+            logger.info(
+                f"[RemoveQuietly] cur_num_human_players={num_players}"
+            )
+            if num_players == 0:
+                logger.info(
+                    f"[RemoveQuietly] Game {game_id} is empty, cleaning up. "
+                    f"waiting_games before={self.waiting_games}"
+                )
                 game.tear_down()
                 self._remove_game(game_id)
+                logger.info(
+                    f"[RemoveQuietly] After cleanup: "
+                    f"waiting_games={self.waiting_games}"
+                )
 
-        logger.info(f"Quietly removed subject {subject_id} from game {game_id}")
+        logger.info(f"[RemoveQuietly] Successfully removed {subject_id} from game {game_id}")
         return True
-
-    def remove_from_group_waitroom(self, subject_id: SubjectID) -> bool:
-        """Remove a subject from a group waitroom if they're waiting.
-
-        Returns True if subject was in a group waitroom, False otherwise.
-        """
-        # Find if subject is in any group waitroom
-        for group_id, waiting_subjects in list(self.group_waitrooms.items()):
-            if subject_id in waiting_subjects:
-                waiting_subjects.remove(subject_id)
-                if subject_id in self.group_wait_start_times:
-                    del self.group_wait_start_times[subject_id]
-
-                # If waitroom is now empty, remove it
-                if not waiting_subjects:
-                    del self.group_waitrooms[group_id]
-                else:
-                    # Notify remaining subjects that a group member left
-                    for remaining_sid in waiting_subjects:
-                        self.sio.emit(
-                            "waiting_room_player_left",
-                            {
-                                "message": "A group member disconnected. You will be redirected shortly..."
-                            },
-                            room=remaining_sid,
-                        )
-
-                logger.info(f"Removed subject {subject_id} from group waitroom {group_id}")
-                return True
-
-        return False
-
-    def check_group_wait_timeouts(self) -> list[SubjectID]:
-        """Check for subjects who have exceeded their group wait timeout.
-
-        Returns list of subject IDs that timed out.
-        """
-        timed_out = []
-        current_time = time.time()
-        timeout_seconds = self.scene.group_wait_timeout / 1000
-
-        for subject_id, start_time in list(self.group_wait_start_times.items()):
-            if current_time - start_time > timeout_seconds:
-                timed_out.append(subject_id)
-
-        return timed_out
-
-    def handle_group_wait_timeout(self, subject_id: SubjectID):
-        """Handle a group wait timeout by removing from waitroom and redirecting."""
-        # Remove from group waitroom
-        self.remove_from_group_waitroom(subject_id)
-
-        # Redirect to timeout URL
-        redirect_url = self.scene.waitroom_timeout_redirect_url
-        if redirect_url:
-            self.sio.emit(
-                "request_redirect",
-                {"redirect_url": redirect_url},
-                room=subject_id,
-            )
-            logger.info(f"Redirecting timed-out subject {subject_id} to {redirect_url}")
-        else:
-            # No redirect URL configured, emit error
-            self.sio.emit(
-                "end_game",
-                {"message": "Group members did not arrive in time. Please try again later."},
-                room=subject_id,
-            )
-            logger.info(f"Subject {subject_id} timed out waiting for group members, no redirect URL configured")
 
     def is_subject_in_active_game(self, subject_id: SubjectID) -> bool:
         """Check if a subject is currently in an active game.

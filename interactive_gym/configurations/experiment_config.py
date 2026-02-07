@@ -42,6 +42,9 @@ class ExperimentConfig:
         }
         self.entry_exclusion_callback: Callable | None = None
 
+        # Pyodide loading timeout (configurable, used by server-side grace period)
+        self.pyodide_load_timeout_s: int = 60
+
     def experiment(
         self,
         experiment_id: str = NotProvided,
@@ -218,6 +221,36 @@ class ExperimentConfig:
             "min_ping_measurements": self.entry_min_ping_measurements,
             "exclusion_messages": self.exclusion_messages,
             "has_entry_callback": self.entry_exclusion_callback is not None,
+        }
+
+    def get_pyodide_config(self) -> dict:
+        """Scan stager scenes for Pyodide requirements.
+
+        Iterates through all scenes (including wrapped scenes via unpack())
+        to find any GymScene with run_through_pyodide=True, and collects the
+        union of all packages_to_install across those scenes.
+
+        :return: Dictionary with needs_pyodide flag and packages list
+        :rtype: dict
+        """
+        if self.stager is None:
+            return {"needs_pyodide": False, "packages_to_install": [], "pyodide_load_timeout_s": self.pyodide_load_timeout_s}
+
+        needs_pyodide = False
+        all_packages = set()
+
+        for scene_or_wrapper in self.stager.scenes:
+            unpacked = scene_or_wrapper.unpack()
+            for s in unpacked:
+                if hasattr(s, "run_through_pyodide") and s.run_through_pyodide:
+                    needs_pyodide = True
+                    if hasattr(s, "packages_to_install") and s.packages_to_install:
+                        all_packages.update(s.packages_to_install)
+
+        return {
+            "needs_pyodide": needs_pyodide,
+            "packages_to_install": list(all_packages),
+            "pyodide_load_timeout_s": self.pyodide_load_timeout_s,
         }
 
     def to_dict(self, serializable=False):

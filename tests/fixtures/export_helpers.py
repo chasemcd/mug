@@ -21,17 +21,23 @@ from pathlib import Path
 from playwright.sync_api import Page
 
 
-def get_experiment_id() -> str:
+def get_experiment_id(override: str | None = None) -> str:
     """
     Get the experiment ID for the current test environment.
 
     Returns the experiment ID used by the server, which determines the
     directory structure for export files.
 
+    Args:
+        override: Optional experiment ID to use instead of default.
+                  Use this for non-standard test server configs.
+
     Returns:
         str: The experiment ID (e.g., "overcooked_multiplayer_hh_test")
     """
-    # Experiment ID from the test server config (overcooked_human_human_multiplayer_test.py)
+    if override:
+        return override
+    # Default experiment ID from the test server config (overcooked_human_human_multiplayer_test.py)
     return "overcooked_multiplayer_hh_test"
 
 
@@ -203,3 +209,112 @@ def run_comparison(
         output += "\n" + result.stderr
 
     return (result.returncode, output.strip())
+
+
+def wait_for_episode_with_parity(
+    page1,
+    page2,
+    experiment_id: str,
+    scene_id: str,
+    episode_num: int = 0,
+    episode_timeout_sec: int = 180,
+    export_timeout_sec: int = 30,
+    parity_row_tolerance: int = 10,
+    verbose: bool = True,
+) -> tuple:
+    """
+    Wait for episode completion AND validate data export parity.
+
+    This is the primary method for validating episode completion in multi-participant
+    tests. It combines two validations:
+    1. Wait for both players' game objects to report episode completion (num_episodes >= N)
+    2. Wait for both export files to exist and verify they are identical
+
+    Using data export parity as the source of truth ensures that both players
+    processed the same game state, which is the definitive test for correct
+    P2P synchronization.
+
+    Args:
+        page1: Playwright Page for player 1
+        page2: Playwright Page for player 2
+        experiment_id: The experiment identifier (e.g., "overcooked_multiplayer_hh_test")
+        scene_id: The scene identifier (e.g., "cramped_room")
+        episode_num: Episode number to validate (0-indexed: first episode = 0)
+        episode_timeout_sec: Max seconds to wait for num_episodes increment
+        export_timeout_sec: Max seconds to wait for export files
+        parity_row_tolerance: Allow up to N row count differences (default 10)
+        verbose: If True, print progress and comparison details
+
+    Returns:
+        tuple: (success, message)
+            success: True if episode completed with valid parity, False otherwise
+            message: Description of result or error
+
+    Raises:
+        TimeoutError: If episode doesn't complete or export files don't appear
+        AssertionError: If data parity validation fails
+    """
+    from playwright.sync_api import Page
+
+    # The num_episodes counter we wait for (1-indexed: first episode complete = 1)
+    target_episode_count = episode_num + 1
+
+    if verbose:
+        print(f"[Parity] Waiting for episode {episode_num + 1} to complete...")
+
+    # Step 1: Wait for both players to complete episode (num_episodes >= target)
+    try:
+        page1.wait_for_function(
+            f"() => window.game && window.game.num_episodes >= {target_episode_count}",
+            timeout=episode_timeout_sec * 1000
+        )
+        if verbose:
+            print(f"[Parity] Player 1: Episode {episode_num + 1} complete")
+    except Exception as e:
+        return (False, f"Player 1 episode completion timeout: {e}")
+
+    try:
+        page2.wait_for_function(
+            f"() => window.game && window.game.num_episodes >= {target_episode_count}",
+            timeout=episode_timeout_sec * 1000
+        )
+        if verbose:
+            print(f"[Parity] Player 2: Episode {episode_num + 1} complete")
+    except Exception as e:
+        return (False, f"Player 2 episode completion timeout: {e}")
+
+    # Step 2: Get subject IDs for export file lookup
+    try:
+        subject_ids = get_subject_ids_from_pages(page1, page2)
+        if verbose:
+            print(f"[Parity] Subject IDs: {subject_ids}")
+    except ValueError as e:
+        return (False, f"Failed to get subject IDs: {e}")
+
+    # Step 3: Wait for export files to exist
+    try:
+        file1, file2 = wait_for_export_files(
+            experiment_id=experiment_id,
+            scene_id=scene_id,
+            subject_ids=subject_ids,
+            episode_num=episode_num,
+            timeout_sec=export_timeout_sec
+        )
+        if verbose:
+            print(f"[Parity] Export files found: {file1.name}, {file2.name}")
+    except TimeoutError as e:
+        return (False, f"Export files not found: {e}")
+
+    # Step 4: Validate data parity
+    exit_code, output = run_comparison(
+        file1, file2, verbose=verbose, row_tolerance=parity_row_tolerance
+    )
+
+    if exit_code == 0:
+        if verbose:
+            print(f"[Parity] ✓ Episode {episode_num + 1} PARITY VERIFIED")
+        return (True, f"Episode {episode_num + 1} complete with verified parity")
+    else:
+        if verbose:
+            print(f"[Parity] ✗ Episode {episode_num + 1} PARITY FAILED:\n{output}")
+        return (False, f"Data parity failed: {output}")

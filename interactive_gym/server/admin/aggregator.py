@@ -47,10 +47,6 @@ class AdminEventAggregator:
     # Maximum number of console log entries to retain
     MAX_CONSOLE_LOG_SIZE = 1000
 
-    # Directory for persisted console logs
-    # TODO(chase): Use the experiment_id here. 
-    CONSOLE_LOGS_DIR = "data/console_logs"
-
     def __init__(
         self,
         sio: flask_socketio.SocketIO,
@@ -59,7 +55,8 @@ class AdminEventAggregator:
         game_managers: dict,         # GAME_MANAGERS
         pyodide_coordinator: PyodideGameCoordinator | None = None,
         processed_subjects: list | None = None,  # PROCESSED_SUBJECT_NAMES
-        save_console_logs: bool = True
+        save_console_logs: bool = True,
+        experiment_id: str | None = None
     ):
         """
         Initialize the aggregator with references to experiment state.
@@ -73,6 +70,12 @@ class AdminEventAggregator:
             processed_subjects: Optional list of completed subject IDs
             save_console_logs: Whether to persist console logs to disk
         """
+        # Set console logs directory using experiment_id
+        if experiment_id:
+            self.console_logs_dir = f"data/{experiment_id}/console_logs"
+        else:
+            self.console_logs_dir = "data/console_logs"
+
         # Store references (read-only access)
         # Do NOT modify these - observer pattern only
         self.sio = sio
@@ -94,8 +97,8 @@ class AdminEventAggregator:
 
         # Create console logs directory if saving enabled
         if self._save_console_logs:
-            os.makedirs(self.CONSOLE_LOGS_DIR, exist_ok=True)
-            logger.info(f"Console logs will be saved to {self.CONSOLE_LOGS_DIR}/")
+            os.makedirs(self.console_logs_dir, exist_ok=True)
+            logger.info(f"Console logs will be saved to {self.console_logs_dir}/")
 
         # Session completion tracking for duration calculation
         # Maps subject_id -> {started_at: float, completed_at: float}
@@ -902,29 +905,7 @@ class AdminEventAggregator:
                     return None
 
         for scene_id, game_manager in list(self.game_managers.items()):
-            # Check group waitrooms
-            if hasattr(game_manager, 'group_waitrooms'):
-                wait_times = getattr(game_manager, 'group_wait_start_times', {})
-                for group_id, waitroom in game_manager.group_waitrooms.items():
-                    if waitroom:
-                        waiting_subjects = list(waitroom) if isinstance(waitroom, list) else list(waitroom.keys())
-                        if subject_id in waiting_subjects:
-                            wait_start = wait_times.get(subject_id, now)
-                            wait_duration_ms = int((now - wait_start) * 1000)
-
-                            # Get target size
-                            target_size = 2
-                            if hasattr(game_manager, 'scene') and game_manager.scene:
-                                target_size = getattr(game_manager.scene, 'num_players', 2)
-
-                            return {
-                                'scene_id': scene_id,
-                                'group_id': group_id,
-                                'wait_duration_ms': wait_duration_ms,
-                                'waiting_count': len(waiting_subjects),
-                                'target_size': target_size
-                            }
-
+            # Note: Group reunion waitrooms removed (deferred to REUN-01/REUN-02)
             # Check individual waiting games
             if hasattr(game_manager, 'waiting_games') and game_manager.waiting_games:
                 for game_id in game_manager.waiting_games:
@@ -1023,38 +1004,9 @@ class AdminEventAggregator:
                 if hasattr(scene, 'num_players'):
                     target_size = scene.num_players
 
-            # Check for group waitrooms if they exist
-            import time
-            now = time.time()
-            total_wait_ms = 0
-            wait_count = 0
-
-            if hasattr(game_manager, 'group_waitrooms'):
-                # Get wait start times dict if available
-                wait_times = getattr(game_manager, 'group_wait_start_times', {})
-
-                for group_id, waitroom in game_manager.group_waitrooms.items():
-                    if waitroom:
-                        waiting_subjects = list(waitroom) if isinstance(waitroom, list) else list(waitroom.keys())
-
-                        # Calculate wait duration from earliest member
-                        group_wait_ms = 0
-                        for sid in waiting_subjects:
-                            if sid in wait_times:
-                                wait_ms = int((now - wait_times[sid]) * 1000)
-                                group_wait_ms = max(group_wait_ms, wait_ms)
-                                total_wait_ms += wait_ms
-                                wait_count += 1
-
-                        groups.append({
-                            'group_id': group_id,
-                            'waiting_subjects': waiting_subjects,
-                            'waiting_count': len(waiting_subjects),
-                            'wait_duration_ms': group_wait_ms
-                        })
-
-            # Calculate average wait duration
-            avg_wait_ms = int(total_wait_ms / wait_count) if wait_count > 0 else 0
+            # Note: Group reunion waitrooms removed (deferred to REUN-01/REUN-02)
+            # Average wait time tracked through _wait_time_samples
+            avg_wait_ms = 0
 
             return {
                 'scene_id': scene_id,
@@ -1343,7 +1295,7 @@ class AdminEventAggregator:
             # Get or create file handle for this subject
             if subject_id not in self._console_log_files:
                 filepath = os.path.join(
-                    self.CONSOLE_LOGS_DIR,
+                    self.console_logs_dir,
                     f"{subject_id}_console.jsonl"
                 )
                 self._console_log_files[subject_id] = open(filepath, 'a', encoding='utf-8')

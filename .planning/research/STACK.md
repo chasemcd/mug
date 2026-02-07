@@ -1,288 +1,680 @@
-# Stack Research: Rollback Netcode Data Consistency
+# Technology Stack: Pyodide Web Worker Architecture
 
-**Domain:** GGPO-style rollback netcode data consistency for P2P multiplayer
-**Researched:** 2026-01-30
-**Confidence:** HIGH (verified against GGPO documentation, NetplayJS, and existing codebase)
+**Project:** Interactive Gym v1.16 - Pyodide Web Worker
+**Researched:** 2026-02-04
+**Overall confidence:** MEDIUM (based on training data, web verification unavailable)
 
 ## Executive Summary
 
-The core problem is ensuring both players export **identical** game data (actions, observations, rewards, infos) when using rollback netcode. The existing codebase already implements the correct pattern but has a gap: the `frameDataBuffer` can contain data from **predicted frames that are later invalidated by rollback**.
+Moving Pyodide to a Web Worker is a well-documented, officially supported pattern. The key decision is communication approach: raw postMessage is simpler and sufficient for this use case; Comlink adds abstraction overhead without significant benefit for the structured message protocol needed here.
 
-**Key insight from GGPO implementations:** Data should only be recorded/exported for **confirmed frames** where all players' inputs have been received and validated. The codebase tracks `confirmedFrame` but the data export mechanism doesn't strictly enforce this boundary.
+**Recommendation:** Use raw postMessage with a typed message protocol. Comlink's RPC abstraction doesn't fit well with Pyodide's async nature and the need for progress events during initialization.
 
-## Recommended Patterns for Canonical State
+---
 
-### Core Concepts
+## Recommended Stack
 
-| Concept | Definition | Codebase Implementation |
-|---------|------------|------------------------|
-| **Confirmed Frame** | A frame where ALL players' inputs have been received and validated | `this.confirmedFrame` tracks the highest consecutive frame with all inputs |
-| **Speculative Frame** | A frame simulated using predicted inputs (may be wrong) | Frames > `confirmedFrame` that use `getPredictedAction()` |
-| **Rollback Window** | Frames between `confirmedFrame` and `this.frameNumber` | Dynamic; typically 0-15 frames depending on latency |
-| **Input Delay** | Intentional delay before inputs are applied to reduce rollback frequency | Not currently implemented; could reduce rollback frequency |
-| **Canonical State** | The authoritative state at a confirmed frame | State snapshots at frames <= `confirmedFrame` |
+### Core Technologies
 
-### Data Structures
+| Technology | Version | Purpose | Confidence |
+|------------|---------|---------|------------|
+| Web Worker (native) | N/A | Isolate Pyodide from main thread | HIGH |
+| Pyodide | 0.26.x | Python in WASM | HIGH |
+| postMessage API | N/A | Main ↔ Worker communication | HIGH |
+| Transferable Objects | N/A | Efficient array buffer transfer | HIGH |
 
-| Structure | Purpose | Implementation Notes |
-|-----------|---------|---------------------|
-| **Confirmed Frame Index** | Tracks highest frame where all inputs received | Already exists: `this.confirmedFrame`. Updated via `updateConfirmedFrame()` |
-| **Input Buffer (per player)** | Stores received inputs indexed by frame | Already exists: `this.inputBuffer` as `Map<frameNumber, Map<playerId, input>>` |
-| **State Snapshot Ring Buffer** | Enables rollback to any recent frame | Already exists: `this.stateSnapshots` with configurable interval |
-| **Frame Data Buffer** | Stores per-frame data (actions, rewards, obs) | Already exists: `this.frameDataBuffer`. **Gap: not strictly bounded by confirmedFrame** |
-| **Confirmed Hash History** | SHA-256 hashes of confirmed frames for desync detection | Already exists: `this.confirmedHashHistory` |
+### Communication Approach
 
-### Current Codebase Analysis
+| Approach | Recommendation | Rationale |
+|----------|---------------|-----------|
+| Raw postMessage | **RECOMMENDED** | Full control, progress events, no dependencies |
+| Comlink | NOT RECOMMENDED | Abstraction mismatch with async WASM operations |
+| SharedArrayBuffer | OPTIONAL | Only if sub-ms latency required (not our case) |
 
-The existing implementation in `pyodide_multiplayer_game.js` has:
+---
 
-**Correctly Implemented:**
-- Input buffering with frame indexing
-- Rollback detection via `misprediction` check in `processP2PInput()`
-- State snapshots with save/load for rollback
-- Confirmed frame tracking
-- Confirmed hash computation and exchange
-- Rollback replay that clears and rebuilds `frameDataBuffer`
+## Loading Pyodide in a Web Worker
 
-**Gap Identified (DATA-PARITY issue):**
-```javascript
-// Current: storeFrameData() is called in step() BEFORE confirmedFrame is updated
-// This means speculative frames are stored before confirmation
-this.storeFrameData(this.frameNumber, frameData);
+### Official Pattern (HIGH confidence)
 
-// The rollback DOES clear this via clearFrameDataFromRollback()
-// BUT: if no rollback happens (prediction was correct), the data
-// was recorded at the time of prediction, not confirmation
-```
+Pyodide officially supports Web Worker usage. The pattern is to import Pyodide inside the worker and call `loadPyodide()` there.
 
-**The actual issue:** When both players' predictions are correct (common case), neither player rolls back. But if they recorded data at slightly different frames due to network timing, they could have different data. The data should only be finalized when `confirmedFrame` advances past that frame.
-
-## Data Collection Strategy
-
-### When to Record Data (Correct Approach)
-
-**Pattern 1: Deferred Recording (Recommended)**
-
-Only export data for frames that have been confirmed. This is the fighting game standard.
+**Worker file (pyodide_worker.js):**
 
 ```javascript
-// In exportEpisodeData() or equivalent
-exportCanonicalData() {
-    const exportData = [];
-    for (const [frame, data] of this.frameDataBuffer.entries()) {
-        // Only export frames that are fully confirmed
-        if (frame <= this.confirmedFrame) {
-            exportData.push(data);
+// Import Pyodide in the worker context
+importScripts('https://cdn.jsdelivr.net/pyodide/v0.26.0/full/pyodide.js');
+
+let pyodide = null;
+
+self.onmessage = async function(event) {
+    const { type, id, payload } = event.data;
+
+    try {
+        switch (type) {
+            case 'init':
+                await handleInit(id, payload);
+                break;
+            case 'runPython':
+                await handleRunPython(id, payload);
+                break;
+            case 'installPackages':
+                await handleInstallPackages(id, payload);
+                break;
         }
+    } catch (error) {
+        self.postMessage({
+            type: 'error',
+            id,
+            error: { message: error.message, stack: error.stack }
+        });
     }
-    return exportData;
+};
+
+async function handleInit(id, payload) {
+    // Send progress updates during initialization
+    self.postMessage({ type: 'progress', id, stage: 'loading', message: 'Loading Pyodide...' });
+
+    pyodide = await loadPyodide({
+        indexURL: payload.indexURL || 'https://cdn.jsdelivr.net/pyodide/v0.26.0/full/'
+    });
+
+    self.postMessage({ type: 'progress', id, stage: 'micropip', message: 'Loading micropip...' });
+    await pyodide.loadPackage('micropip');
+
+    self.postMessage({ type: 'ready', id });
+}
+
+async function handleRunPython(id, payload) {
+    const result = await pyodide.runPythonAsync(payload.code);
+
+    // Convert Python objects to JS for transfer
+    const jsResult = result?.toJs ? result.toJs() : result;
+
+    self.postMessage({ type: 'result', id, result: jsResult });
+}
+
+async function handleInstallPackages(id, payload) {
+    const micropip = pyodide.pyimport('micropip');
+
+    for (const pkg of payload.packages) {
+        self.postMessage({ type: 'progress', id, stage: 'install', message: `Installing ${pkg}...` });
+        await micropip.install(pkg);
+    }
+
+    self.postMessage({ type: 'installed', id });
 }
 ```
 
-**Pattern 2: Dual Buffer (Alternative)**
-
-Maintain separate buffers for speculative and confirmed data:
+### Main Thread Wrapper Class
 
 ```javascript
-class CanonicalDataBuffer {
-    constructor() {
-        this.speculativeBuffer = new Map();  // Current predictions
-        this.canonicalBuffer = new Map();    // Confirmed data only
+/**
+ * PyodideWorker - Manages Pyodide execution in a dedicated Web Worker.
+ *
+ * Prevents main thread blocking during WASM compilation, allowing
+ * Socket.IO ping/pong to continue uninterrupted.
+ */
+class PyodideWorker {
+    constructor(options = {}) {
+        this.worker = null;
+        this.workerUrl = null;
+        this.pendingRequests = new Map(); // id -> {resolve, reject}
+        this.requestCounter = 0;
+        this.onProgress = options.onProgress || null;
+        this.ready = false;
     }
 
-    // Called during step() - stores speculatively
-    storeSpeculative(frame, data) {
-        this.speculativeBuffer.set(frame, data);
-    }
+    /**
+     * Initialize the worker and load Pyodide.
+     * @param {Object} options - {indexURL, packages}
+     * @returns {Promise<void>} Resolves when Pyodide is ready
+     */
+    async init(options = {}) {
+        return new Promise((resolve, reject) => {
+            // Create worker from separate file or inline blob
+            this.worker = new Worker('/static/js/pyodide_worker.js');
 
-    // Called when confirmedFrame advances - promotes to canonical
-    promoteToCanonical(confirmedFrame) {
-        for (const [frame, data] of this.speculativeBuffer.entries()) {
-            if (frame <= confirmedFrame) {
-                this.canonicalBuffer.set(frame, data);
-                this.speculativeBuffer.delete(frame);
-            }
-        }
-    }
+            const initId = this._nextId();
+            this.pendingRequests.set(initId, { resolve, reject });
 
-    // Called on rollback - clears invalidated speculative data
-    clearFromFrame(targetFrame) {
-        for (const frame of this.speculativeBuffer.keys()) {
-            if (frame >= targetFrame) {
-                this.speculativeBuffer.delete(frame);
-            }
-        }
-    }
+            this.worker.onmessage = (event) => this._handleMessage(event);
+            this.worker.onerror = (error) => this._handleError(error);
 
-    // For export - only canonical data
-    getCanonicalData() {
-        return Array.from(this.canonicalBuffer.entries())
-            .sort((a, b) => a[0] - b[0])
-            .map(([frame, data]) => data);
-    }
-}
-```
-
-**Pattern 3: Frame Confirmation Callback (NetplayJS approach)**
-
-The NetplayJS `RollbackHistory` class tracks `isPrediction: boolean` per input. When all inputs for a frame become confirmed, the frame is "synced."
-
-```javascript
-// Track prediction status per frame
-allInputsSynced(frameNumber) {
-    const frameInputs = this.inputBuffer.get(frameNumber);
-    if (!frameInputs) return false;
-
-    for (const [playerId, inputRecord] of frameInputs.entries()) {
-        if (inputRecord.isPrediction) return false;
-    }
-    return true;
-}
-```
-
-### Recommended Implementation for Interactive-Gym
-
-Given the existing architecture, **Pattern 1 (Deferred Recording)** is the simplest fix:
-
-```javascript
-// Modify exportEpisodeFromBuffer() in the existing codebase
-_exportEpisodeFromBuffer() {
-    const episodeData = {
-        // ... existing fields ...
-        frames: []
-    };
-
-    // CRITICAL: Only export frames up to confirmedFrame
-    const exportableFrames = Array.from(this.frameDataBuffer.entries())
-        .filter(([frame, _]) => frame <= this.confirmedFrame)
-        .sort((a, b) => a[0] - b[0]);
-
-    for (const [frameNum, frameData] of exportableFrames) {
-        episodeData.frames.push({
-            frame: frameNum,
-            ...frameData
+            this.worker.postMessage({
+                type: 'init',
+                id: initId,
+                payload: { indexURL: options.indexURL }
+            });
         });
     }
 
-    return episodeData;
+    /**
+     * Run Python code asynchronously in the worker.
+     * @param {string} code - Python code to execute
+     * @returns {Promise<any>} Result of Python execution
+     */
+    async runPython(code) {
+        return this._sendRequest('runPython', { code });
+    }
+
+    /**
+     * Install packages via micropip.
+     * @param {string[]} packages - Package names to install
+     * @returns {Promise<void>}
+     */
+    async installPackages(packages) {
+        return this._sendRequest('installPackages', { packages });
+    }
+
+    /**
+     * Clean up worker resources.
+     */
+    destroy() {
+        if (this.worker) {
+            this.worker.terminate();
+            this.worker = null;
+        }
+        if (this.workerUrl) {
+            URL.revokeObjectURL(this.workerUrl);
+            this.workerUrl = null;
+        }
+    }
+
+    _nextId() {
+        return ++this.requestCounter;
+    }
+
+    _sendRequest(type, payload) {
+        return new Promise((resolve, reject) => {
+            const id = this._nextId();
+            this.pendingRequests.set(id, { resolve, reject });
+            this.worker.postMessage({ type, id, payload });
+        });
+    }
+
+    _handleMessage(event) {
+        const { type, id, result, error, stage, message } = event.data;
+
+        if (type === 'progress') {
+            if (this.onProgress) {
+                this.onProgress(stage, message);
+            }
+            return;
+        }
+
+        const pending = this.pendingRequests.get(id);
+        if (!pending) return;
+
+        this.pendingRequests.delete(id);
+
+        switch (type) {
+            case 'ready':
+                this.ready = true;
+                pending.resolve();
+                break;
+            case 'result':
+            case 'installed':
+                pending.resolve(result);
+                break;
+            case 'error':
+                pending.reject(new Error(error.message));
+                break;
+        }
+    }
+
+    _handleError(error) {
+        console.error('[PyodideWorker] Worker error:', error);
+        // Reject all pending requests
+        for (const [id, { reject }] of this.pendingRequests) {
+            reject(new Error(`Worker error: ${error.message}`));
+        }
+        this.pendingRequests.clear();
+    }
 }
 ```
 
-## Key Patterns from GGPO/Fighting Games
+---
 
-### How GGPO Handles Replay Data
+## Communication Patterns: postMessage vs Comlink
 
-1. **Input-Only Recording:** GGPO records only inputs, not full game state. Given determinism, inputs are sufficient to replay.
+### Raw postMessage (RECOMMENDED)
 
-2. **Confirmed Input Marking:** Each input is either "confirmed" (received from peer) or "predicted" (guessed). The `ggpo_synchronize_inputs()` function returns inputs with their source.
+**Pros:**
+- No external dependencies
+- Full control over message protocol
+- Native progress events during long operations
+- Matches existing GameTimerWorker pattern in codebase
+- Simpler debugging (messages visible in DevTools)
 
-3. **Save State Timing:** `save_game_state` callback is called at confirmed frames, not speculative frames. This ensures snapshots are authoritative.
+**Cons:**
+- More boilerplate for request/response tracking
+- Manual serialization handling
 
-4. **Replay Recording:** The Universal Fighting Engine (UFE) offers "Record Post-Rollback Frames" toggle to see what happened after corrections, separate from what player saw.
-
-### Data Parity Guarantee
-
-For research validity, both players MUST export identical data. This requires:
-
-1. **Deterministic Frame Numbering:** Both players must agree on which frame is which.
-2. **Confirmed Data Only:** Only export data for frames where both players' inputs are known.
-3. **Hash Verification:** Compare hashes of confirmed frames to detect any divergence.
-
-The codebase already has hash comparison via `confirmedHashHistory`. The gap is ensuring `frameDataBuffer` export respects the same boundary.
-
-## Existing Libraries/References
-
-| Library | Relevance | JS Applicability |
-|---------|-----------|------------------|
-| [GGPO](https://www.ggpo.net/) | Original rollback SDK; defines the canonical patterns | C/C++ only, but patterns transfer directly |
-| [NetplayJS](https://github.com/rameshvarun/netplayjs) | TypeScript GGPO implementation for browser games | **Directly applicable.** `RollbackHistory` class shows data structures. |
-| [Telegraph](https://github.com/thomasboyt/telegraph) | TypeScript port of GGPO using PeerJS/WebRTC | **Directly applicable.** Requires deterministic game + serializable state. |
-| [GGRS](https://github.com/gschup/ggrs) | Rust reimplementation of GGPO | Patterns transfer; has browser demos via WASM |
-| [Backroll](https://github.com/HouraiTeahouse/backroll-rs) | Pure Rust GGPO implementation | Patterns transfer |
-| [netcode-rollback](https://github.com/Corrade/netcode-rollback) | Unity P2P rollback implementation | Documents "confirmed tick" vs "speculative" concepts clearly |
-
-### Key Implementation References
-
-- **NetplayJS RollbackHistory:** Shows how to track `isPrediction` flag per input
-- **GGPO DeveloperGuide:** Documents `save_game_state`/`load_game_state` callback contracts
-- **SnapNet Rollback Architecture:** Explains input delay configuration and rollback window sizing
-
-## Specific Recommendations for Interactive-Gym
-
-### Immediate Fix (Low Effort)
-
-Modify `_exportEpisodeFromBuffer()` to filter by `confirmedFrame`:
+**Example message protocol:**
 
 ```javascript
-// Only export confirmed frames
-const exportableFrames = Array.from(this.frameDataBuffer.entries())
-    .filter(([frame, _]) => frame <= this.confirmedFrame);
+// Main → Worker
+{ type: 'init', id: 1, payload: { indexURL: '...' } }
+{ type: 'runPython', id: 2, payload: { code: '...' } }
+{ type: 'step', id: 3, payload: { actions: {...} } }
+
+// Worker → Main
+{ type: 'progress', id: 1, stage: 'loading', message: '...' }
+{ type: 'ready', id: 1 }
+{ type: 'result', id: 2, result: {...} }
+{ type: 'error', id: 3, error: { message: '...', stack: '...' } }
 ```
 
-### Robust Solution (Medium Effort)
+### Comlink (NOT RECOMMENDED for this use case)
 
-1. **Add confirmation callback:** When `updateConfirmedFrame()` advances, call a new method `promoteFrameDataToCanonical(frame)`.
+**What it is:** Google's library that makes Web Worker functions appear as async functions on the main thread via Proxy/postMessage.
 
-2. **Separate canonical buffer:** Store confirmed data separately from speculative data.
+**Why not recommended:**
 
-3. **Final validation:** At episode end, verify `confirmedFrame` covers all frames before export. If not, wait or truncate.
+1. **Progress events don't fit RPC model**: Comlink excels at simple request/response, but Pyodide init needs progress callbacks during the operation
+2. **Transferable object handling**: Requires manual `Comlink.transfer()` calls anyway
+3. **Extra dependency**: Adds 4KB to bundle for marginal benefit
+4. **Existing pattern**: Codebase already uses raw postMessage for GameTimerWorker
 
-### Edge Case: Episode Ends During Rollback
+**When Comlink would make sense:**
+- Many different functions being called from worker
+- Pure request/response pattern without progress events
+- Team unfamiliar with postMessage patterns
 
-If episode ends (terminal state reached) while frames are still unconfirmed:
-- Option A: Wait for inputs to arrive (may block)
-- Option B: Truncate data to `confirmedFrame` (loses some frames)
-- Option C: Mark final frames as "unconfirmed" in export metadata
+---
 
-Recommendation: **Option B** with logging. Research data should be authoritative; losing 1-2 frames at episode end is acceptable.
+## Transferable Objects for Efficient Data Passing
 
-## Alternatives Considered
+### What Are Transferable Objects (HIGH confidence)
 
-### Server-Authoritative State
+Transferable objects move memory ownership between threads instead of copying. This is zero-copy for ArrayBuffers, critical for large data like observations or images.
 
-**Pattern:** One player acts as authoritative server; other player reconciles.
+**Transferable types:**
+- `ArrayBuffer`
+- `MessagePort`
+- `ImageBitmap`
+- `OffscreenCanvas`
 
-**Why not:**
-- Breaks P2P symmetry
-- Adds latency for "client" player
-- More complex than fixing confirmed frame boundary
+**NOT transferable (must be copied):**
+- Plain objects/arrays (structured clone)
+- TypedArrays without detaching underlying buffer
+- Python proxy objects (must convert to JS first)
 
-### Lockstep Netcode
+### Pattern for Observations (MEDIUM confidence)
 
-**Pattern:** Wait for all inputs before simulating each frame.
+```javascript
+// In worker: Convert numpy array to transferable ArrayBuffer
+async function handleStep(id, payload) {
+    const result = await pyodide.runPythonAsync(`
+        obs, rewards, terminateds, truncateds, infos = env.step(actions)
+        render_state = env.render()
+        obs, rewards, terminateds, truncateds, infos, render_state
+    `);
 
-**Why not:**
-- Already using rollback for responsiveness
-- Would require architecture rewrite
-- Input delay is worse UX than rollback
+    let [obs, rewards, terminateds, truncateds, infos, render_state] = result.toJs();
 
-### Checksumming Every Frame
+    // If obs is a numpy array, get the underlying buffer
+    let obsBuffer = null;
+    let obsTransferable = [];
 
-**Pattern:** Compare full state checksums every frame.
+    if (obs.buffer instanceof ArrayBuffer) {
+        obsBuffer = obs.buffer;
+        obsTransferable = [obsBuffer];
+    }
 
-**Why not:**
-- Already doing this for confirmed frames (`confirmedHashHistory`)
-- Every frame would be expensive
-- Desync detection doesn't prevent data divergence
+    self.postMessage(
+        {
+            type: 'stepResult',
+            id,
+            result: { obs, rewards, terminateds, truncateds, infos, render_state },
+            obsBuffer  // Reference to transferable
+        },
+        obsTransferable  // Second argument: list of transferables
+    );
+}
+```
 
-## Confidence Assessment
+### Render State Transfer (MEDIUM confidence)
 
-| Finding | Confidence | Basis |
-|---------|------------|-------|
-| Confirmed frame boundary is correct approach | HIGH | GGPO docs, NetplayJS, fighting game implementations |
-| Existing `confirmedFrame` tracking is correct | HIGH | Code review; matches GGPO pattern |
-| Data export needs to respect confirmedFrame | HIGH | Logical deduction from confirmed frame semantics |
-| Dual buffer pattern would work | MEDIUM | Common pattern but adds complexity |
-| Episode-end edge cases matter | MEDIUM | May not occur often in practice |
+For RGB array render states, convert to ImageData or transfer raw buffer:
 
-## Sources
+```javascript
+// In worker: Transfer render state efficiently
+function transferRenderState(renderState) {
+    if (Array.isArray(renderState) && Array.isArray(renderState[0])) {
+        // Convert to flat Uint8Array for transfer
+        const height = renderState.length;
+        const width = renderState[0].length;
+        const buffer = new Uint8Array(height * width * 4);
 
-- [GGPO Official Site](https://www.ggpo.net/) - Canonical rollback patterns
-- [GGPO GitHub Documentation](https://github.com/pond3r/ggpo/blob/master/doc/DeveloperGuide.md) - Save/load callback contracts
-- [NetplayJS GitHub](https://github.com/rameshvarun/netplayjs) - TypeScript rollback implementation
-- [Telegraph GitHub](https://github.com/thomasboyt/telegraph) - TypeScript GGPO port for browser
-- [SnapNet Rollback Architecture](https://www.snapnet.dev/blog/netcode-architectures-part-2-rollback/) - Input delay and rollback window explanation
-- [netcode-rollback GitHub](https://github.com/Corrade/netcode-rollback) - Confirmed vs speculative state documentation
-- [INVERSUS Rollback Networking](https://www.gamedeveloper.com/design/rollback-networking-in-inversus) - Deterministic replay recording
-- [Universal Fighting Engine Docs](http://www.ufe3d.com/doku.php/global:network) - Post-rollback frame recording option
-- Existing codebase: `/Users/chasemcd/Repositories/interactive-gym/interactive_gym/server/static/js/pyodide_multiplayer_game.js`
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const idx = (y * width + x) * 4;
+                const [r, g, b] = renderState[y][x];
+                buffer[idx] = r;
+                buffer[idx + 1] = g;
+                buffer[idx + 2] = b;
+                buffer[idx + 3] = 255;
+            }
+        }
+
+        return {
+            type: 'rgba',
+            width,
+            height,
+            buffer: buffer.buffer  // ArrayBuffer is transferable
+        };
+    }
+    return { type: 'objects', data: renderState };
+}
+```
+
+---
+
+## Memory and Performance Considerations
+
+### WASM Memory in Workers (MEDIUM confidence)
+
+1. **Memory is isolated**: Worker's WASM memory is separate from main thread
+2. **No shared memory by default**: Each postMessage clones data (except transferables)
+3. **Pyodide memory usage**: ~50-100MB baseline, increases with packages
+
+### Performance Characteristics
+
+| Operation | Main Thread Impact | Typical Duration |
+|-----------|-------------------|------------------|
+| `loadPyodide()` | NONE (in worker) | 3-8 seconds |
+| `loadPackage('micropip')` | NONE (in worker) | 0.5-2 seconds |
+| `micropip.install()` | NONE (in worker) | 1-5 seconds per package |
+| `runPythonAsync()` | NONE (in worker) | Varies |
+| `postMessage` (small) | ~0.1ms | Negligible |
+| `postMessage` (1MB buffer) | ~1-5ms | Structured clone |
+| `postMessage` (transferable) | ~0.1ms | Zero-copy |
+
+### Memory Leak Prevention
+
+```javascript
+// CRITICAL: Destroy Python objects after converting to JS
+async function handleStep(id, payload) {
+    const result = await pyodide.runPythonAsync(`...`);
+
+    // Convert to JS FIRST
+    const jsResult = result.toJs();
+
+    // THEN destroy Python reference to prevent memory leak
+    result.destroy();
+
+    self.postMessage({ type: 'result', id, result: jsResult });
+}
+```
+
+---
+
+## Error Handling Patterns
+
+### Worker Initialization Errors
+
+```javascript
+// In main thread wrapper
+async init(options = {}) {
+    return new Promise((resolve, reject) => {
+        // Timeout for worker creation failures
+        const timeout = setTimeout(() => {
+            reject(new Error('PyodideWorker init timeout (30s)'));
+        }, 30000);
+
+        this.worker = new Worker('/static/js/pyodide_worker.js');
+
+        this.worker.onerror = (error) => {
+            clearTimeout(timeout);
+            reject(new Error(`Worker creation failed: ${error.message}`));
+        };
+
+        // ... rest of init
+    });
+}
+```
+
+### Python Execution Errors
+
+```javascript
+// In worker
+async function handleRunPython(id, payload) {
+    try {
+        const result = await pyodide.runPythonAsync(payload.code);
+        const jsResult = result?.toJs ? result.toJs() : result;
+        result?.destroy?.();
+        self.postMessage({ type: 'result', id, result: jsResult });
+    } catch (error) {
+        // Pyodide wraps Python exceptions
+        self.postMessage({
+            type: 'error',
+            id,
+            error: {
+                message: error.message,
+                stack: error.stack,
+                // Include Python traceback if available
+                pythonTraceback: error.message.includes('Traceback')
+                    ? error.message
+                    : null
+            }
+        });
+    }
+}
+```
+
+### Worker Crash Recovery
+
+```javascript
+// In main thread wrapper
+class PyodideWorker {
+    _handleError(error) {
+        console.error('[PyodideWorker] Worker crashed:', error);
+
+        // Reject all pending requests
+        for (const [id, { reject }] of this.pendingRequests) {
+            reject(new Error('Worker crashed'));
+        }
+        this.pendingRequests.clear();
+
+        // Clean up
+        this.worker = null;
+        this.ready = false;
+
+        // Emit event for game to handle (show error overlay, etc.)
+        if (this.onCrash) {
+            this.onCrash(error);
+        }
+    }
+}
+```
+
+---
+
+## Worker Lifecycle Management
+
+### Recommended Lifecycle
+
+```
+1. Page Load
+   └── DO NOT create worker yet
+
+2. Scene Activation (GymScene starts)
+   └── Create PyodideWorker
+   └── Begin init() (non-blocking)
+   └── Show loading overlay with progress
+
+3. Pyodide Ready
+   └── Run environment_initialization_code
+   └── Hide loading overlay
+   └── Start game loop
+
+4. Game Loop
+   └── Main thread: collect inputs, send to worker
+   └── Worker: step(actions), return result
+   └── Main thread: render result
+
+5. Scene End / Episode Complete
+   └── Export data from main thread
+   └── Worker state persists for next episode
+
+6. All Episodes Complete / Navigation Away
+   └── worker.destroy()
+   └── Clean up Blob URL
+```
+
+### Singleton vs Per-Scene Worker
+
+**Recommendation:** Singleton worker per page, re-used across scenes.
+
+**Rationale:**
+- Pyodide init is expensive (3-8 seconds)
+- Packages stay loaded across `runPythonAsync` calls
+- Only re-initialize environment code, not Pyodide itself
+
+```javascript
+// Singleton pattern
+let globalPyodideWorker = null;
+
+async function getPyodideWorker(options) {
+    if (!globalPyodideWorker) {
+        globalPyodideWorker = new PyodideWorker(options);
+        await globalPyodideWorker.init();
+    }
+    return globalPyodideWorker;
+}
+```
+
+---
+
+## Integration with Existing Code
+
+### Changes to RemoteGame
+
+```javascript
+// BEFORE (main thread Pyodide)
+async initialize() {
+    this.pyodide = await loadPyodide();  // BLOCKS MAIN THREAD
+    await this.pyodide.loadPackage("micropip");
+    // ...
+}
+
+// AFTER (worker Pyodide)
+async initialize() {
+    this.pyodideWorker = await getPyodideWorker({
+        onProgress: (stage, message) => {
+            ui_utils.updateLoadingProgress(message);
+        }
+    });
+
+    await this.pyodideWorker.installPackages(this.config.packages_to_install);
+    await this.pyodideWorker.runPython(this.config.environment_initialization_code);
+    // ...
+}
+```
+
+### Changes to step()
+
+```javascript
+// BEFORE
+async step(actions) {
+    const result = await this.pyodide.runPythonAsync(`
+        obs, rewards, terminateds, truncateds, infos = env.step(${pyActions})
+        render_state = env.render()
+        obs, rewards, terminateds, truncateds, infos, render_state
+    `);
+    // ...
+}
+
+// AFTER
+async step(actions) {
+    const result = await this.pyodideWorker.step(actions);
+    // result already converted to JS in worker
+    // ...
+}
+```
+
+---
+
+## Gotchas and Limitations
+
+### 1. No DOM Access in Worker (HIGH confidence)
+
+Workers cannot access:
+- `document`
+- `window` (except `self`)
+- Canvas/WebGL
+- LocalStorage
+
+**Implication:** Image conversion (render_state to base64) must happen in main thread OR use OffscreenCanvas in worker.
+
+### 2. Pyodide Globals Not Shared (HIGH confidence)
+
+`pyodide.globals` in worker is separate from main thread. Cannot directly share `interactiveGymGlobals`.
+
+**Solution:** Pass globals via postMessage during init.
+
+```javascript
+// Worker
+async function handleInit(id, payload) {
+    pyodide = await loadPyodide();
+
+    // Set globals from main thread
+    if (payload.globals) {
+        for (const [key, value] of Object.entries(payload.globals)) {
+            pyodide.globals.set(key, pyodide.toPy(value));
+        }
+    }
+}
+```
+
+### 3. Proxy Objects Not Transferable (HIGH confidence)
+
+Pyodide proxy objects (Python objects wrapped for JS) cannot be postMessage'd.
+
+**Solution:** Always call `.toJs()` before sending, then `.destroy()` the proxy.
+
+### 4. Error Serialization (MEDIUM confidence)
+
+Python exceptions with complex tracebacks may not serialize cleanly.
+
+**Solution:** Extract string representations in worker before sending.
+
+### 5. Worker File Path (HIGH confidence)
+
+Worker script must be served from same origin (or use Blob URL).
+
+**For Interactive Gym:** Place worker file at `/static/js/pyodide_worker.js`.
+
+---
+
+## Sources and Confidence
+
+| Topic | Confidence | Basis |
+|-------|------------|-------|
+| Web Worker basic patterns | HIGH | Fundamental browser API, stable for years |
+| Pyodide in Web Worker | MEDIUM | Based on training data (May 2025), official docs likely unchanged |
+| Transferable objects | HIGH | Fundamental browser API |
+| Comlink comparison | MEDIUM | Based on training data, library may have updated |
+| Memory management | MEDIUM | Based on training data, Pyodide may have updates |
+| Error handling | MEDIUM | Common patterns, may need testing |
+
+**Note:** Web access was unavailable during this research. Recommend verifying Pyodide version and any API changes at https://pyodide.org/en/stable/usage/webworker.html before implementation.
+
+---
+
+## Recommended Next Steps
+
+1. **Verify Pyodide Web Worker docs** - Check current official documentation
+2. **Create minimal PoC** - Test loadPyodide in worker with progress events
+3. **Measure actual timings** - Confirm WASM compile time unblocks main thread
+4. **Design message protocol** - Finalize message types for step/reset/init
+5. **Implement PyodideWorker class** - Start with init and runPython
+6. **Update RemoteGame** - Migrate to use PyodideWorker
+7. **Test Socket.IO stability** - Verify no disconnects during Pyodide init
+
+---
+
+*Stack research: 2026-02-04*
+*Confidence: MEDIUM (training data only, web verification unavailable)*

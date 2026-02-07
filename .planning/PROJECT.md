@@ -8,6 +8,99 @@ A framework for running browser-based reinforcement learning experiments with hu
 
 Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
 
+## Current Milestone: v1.21 Latency-Aware Matchmaking
+
+**Goal:** A FIFO matchmaker that pre-filters candidates by server RTT heuristic before proposing matches, then verifies with P2P probe — so only low-latency pairs get matched.
+
+**Target features:**
+
+- [ ] `LatencyFIFOMatchmaker` class: FIFO ordering with server RTT pre-filtering in `find_match()`
+- [ ] Configurable `max_server_rtt_ms` threshold for pre-filtering (estimated P2P RTT = sum of server RTTs)
+- [ ] Works with existing `max_p2p_rtt_ms` for post-match P2P probe verification
+- [ ] Exposed via `scene.matchmaking(matchmaker=LatencyFIFOMatchmaker(...))`
+
+**What done looks like:**
+- Researcher configures `LatencyFIFOMatchmaker(max_server_rtt_ms=200, max_p2p_rtt_ms=150)`
+- `find_match()` skips candidates where sum of server RTTs exceeds threshold
+- Post-match P2P probe verifies actual latency before game creation
+- Falls back gracefully when server RTT data is unavailable
+
+## Previous Milestone: v1.20 Pre-Game Countdown (Shipped: 2026-02-07)
+
+**Delivered:** 3-second "Players found!" countdown on waiting room screen after matchmaking, synced game start.
+
+## Previous Milestone: v1.19 P2P Lifecycle Cleanup (Shipped: 2026-02-07)
+
+**Delivered:** P2P connections scoped to GymScenes — torn down on scene exit, with group history preserved for future re-pairing.
+
+## Previous Milestone: v1.18 Loading UX & Cleanup (Shipped: 2026-02-07)
+
+**Delivered:** Single merged loading screen gating on both compatibility check and Pyodide readiness, with configurable timeout and error page. Cleaned up orphaned test fixtures and duplicate helpers.
+
+## Previous Milestone: v1.17 E2E Test Reliability (Shipped: 2026-02-06)
+
+**Delivered:** 100% E2E test pass rate — 24 tests across 8 modules, zero failures. Robust server fixture lifecycle, P2P timeout tuning, GGPO fixes, and documented content parity limitation.
+
+**Key accomplishments:**
+- Robust server fixture lifecycle with port-verified teardown (shared helpers)
+- P2P ready gate timeout fix (5000ms → 15000ms) for 200ms latency tests
+- All 24 E2E tests pass (23 passed + 1 xfail for GGPO architectural limitation)
+- Two GGPO fixes: prune guard + boundary ordering
+- GGPO content parity limitation documented in backlog with recommended fix approach
+
+## Previous Milestone: v1.16 Pyodide Pre-loading (Shipped: 2026-02-06)
+
+**Delivered:** Pyodide pre-loading during compat check, shared instance reuse, server-side grace period, concurrent game starts with 0.5s stagger.
+
+**Key accomplishments:**
+- Pyodide loads during compatibility check screen (before matching)
+- Game classes reuse pre-loaded instance (near-instant game startup)
+- Server tolerates missed pings during loading (ping_timeout=30, LOADING_CLIENTS grace)
+- Stagger delay reduced 5.0s → 0.5s, all multi-participant tests pass
+
+## Previous Milestone: v1.15 E2E Test Reliability (Complete: 2026-02-04)
+
+**Delivered:** Root cause analysis — Pyodide main thread blocking identified as source of Socket.IO disconnects. Fix delivered in v1.16.
+
+## Previous Milestone: v1.14 Data Parity Fix (Shipped: 2026-02-04)
+
+**Delivered:** Fixed data parity divergence bug, added multi-participant test infrastructure, and comprehensive lifecycle stress tests.
+
+**Key accomplishments:**
+- Input confirmation protocol before episode export
+- Increased P2P input redundancy (3→10 inputs per packet)
+- Multi-participant test infrastructure (6 contexts, 3 concurrent games)
+- GameOrchestrator class for test orchestration
+- Data export parity validation helpers
+- Fixed GAME-01 violation (games pre-created in waitroom)
+- Fixed PyodideGameCoordinator eventlet deadlock
+- 5 lifecycle stress test functions (STRESS-02 through STRESS-07)
+
+**Known limitation:** P2P validation timeouts under concurrent load (deferred to v1.15)
+
+## Previous Milestone: v1.13 Matchmaker Hardening (Shipped: 2026-02-03)
+
+**Delivered:** P2P RTT probing for latency-based match filtering and a single game creation path.
+
+**Key accomplishments:**
+- P2P probe infrastructure (ProbeCoordinator, ProbeConnection, ProbeManager)
+- RTT ping-pong measurement protocol via WebRTC DataChannel
+- Matchmaker RTT integration with configurable max_p2p_rtt_ms threshold
+- Removed group reunion flow (~230 lines), single game creation path
+- Game only exists when all matched participants are assigned
+
+## Previous Milestone: v1.12 Waiting Room Overhaul (Shipped: 2026-02-03)
+
+**Delivered:** Fixed waiting room bugs and built pluggable Matchmaker abstraction for custom participant pairing logic.
+
+**Key accomplishments:**
+- Diagnostic logging and state validation for stale game routing
+- Comprehensive cleanup on all exit paths (idempotent)
+- Session lifecycle state machine (WAITING → MATCHED → VALIDATING → PLAYING → ENDED)
+- Participant state tracker (single source of truth for routing)
+- Matchmaker base class with FIFOMatchmaker default
+- Match assignment logging (JSONL + admin dashboard)
+
 ## Previous Milestone: v1.11 Data Export Edge Cases (Shipped: 2026-02-02)
 
 **Delivered:** Fixed dual-buffer data recording edge cases so all E2E stress tests pass and research data exports are identical between both players.
@@ -191,7 +284,67 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 
 ### Active
 
-(Planning next milestone)
+*v1.21 Latency-Aware Matchmaking:*
+- [ ] LatencyFIFOMatchmaker class with server RTT pre-filtering in find_match()
+- [ ] Configurable max_server_rtt_ms threshold for estimated P2P RTT filtering
+- [ ] Integration with existing max_p2p_rtt_ms for post-match P2P probe verification
+- [ ] Graceful fallback when server RTT data unavailable
+
+*Shipped in v1.20:*
+- ✓ 3-second countdown overlay on waiting room screen after match formed — v1.20
+- ✓ "Players found!" message with 3-2-1 countdown visible to all matched players — v1.20
+- ✓ Game start remains synced across all players after countdown completes — v1.20
+
+*Shipped in v1.19:*
+- ✓ P2P connections closed on GymScene exit — v1.19
+- ✓ No partner-disconnected overlay on non-GymScene scenes — v1.19
+- ✓ Group membership tracked across scene transitions — v1.19
+- ✓ Group history queryable by custom matchmakers — v1.19
+
+*Shipped in v1.18:*
+- ✓ Single merged loading screen (compat check + Pyodide) — v1.18
+- ✓ Configurable Pyodide loading timeout with error page — v1.18
+- ✓ Orphaned test fixtures and duplicate helpers removed — v1.18
+- ✓ Roadmap reflects actual v1.14 completion state — v1.18
+
+*Shipped in v1.17:*
+- ✓ All E2E tests pass with zero failures (24 tests, 23 pass + 1 xfail) — v1.17
+- ✓ Server startup/teardown reliable between test suites — v1.17
+- ✓ Test timeouts appropriate for each scenario — v1.17
+- ✓ Network disruption tests validated and passing — v1.17
+
+*Shipped in v1.16:*
+- ✓ Early Pyodide init during compatibility check — v1.16
+- ✓ Shared Pyodide instance reused by game classes — v1.16
+- ✓ Loading progress indicator and advancement gate — v1.16
+- ✓ Server-side ping grace during Pyodide loading — v1.16
+- ✓ Stagger delay reduced to 0.5s, concurrent starts work — v1.16
+
+*Shipped in v1.15:*
+- ✓ Root cause identified (Pyodide blocks main thread → Socket.IO disconnect) — v1.15
+
+*Shipped in v1.14:*
+- ✓ Wait for input confirmation before episode export — v1.14
+- ✓ Ensure both players export identical action sequences — v1.14
+- ✓ Multi-participant test infrastructure (6 contexts, 3 concurrent games) — v1.14
+- ✓ Data export parity validation helpers — v1.14
+- ✓ GameOrchestrator for multi-participant test orchestration — v1.14
+
+*Shipped in v1.13:*
+- ✓ P2P RTT probe helper for measuring actual latency between candidates — v1.13
+- ✓ WebRTC probe connection during matchmaking consideration — v1.13
+- ✓ Configurable max_p2p_rtt_ms threshold for match decisions — v1.13
+- ✓ Single game creation path (matchmaker → match → game) — v1.13
+- ✓ Remove group reunion flow (documented as future matchmaker variant) — v1.13
+
+*Shipped in v1.12:*
+- ✓ Diagnostic logging for stale game routing — v1.12
+- ✓ State validation before GameManager routing — v1.12
+- ✓ Idempotent cleanup on all exit paths — v1.12
+- ✓ Session lifecycle state machine — v1.12
+- ✓ Participant state tracker — v1.12
+- ✓ Matchmaker base class with FIFOMatchmaker — v1.12
+- ✓ Match assignment logging (JSONL + admin) — v1.12
 
 *Shipped in v1.11:*
 - ✓ isFocused column consistency (both players export isFocused.0/isFocused.1) — v1.11
@@ -234,6 +387,7 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 
 ### Deferred
 
+- [ ] Pyodide Web Worker (move per-frame runPythonAsync off main thread) — pre-loading solves the disconnect issue; Web Worker deferred until per-frame blocking becomes a problem
 - [ ] Rollback visual smoothing (tween objects after corrections)
 - [ ] N-player support with hybrid topology (mesh for small N, relay for large N)
 - [ ] Adaptive input delay based on RTT
@@ -241,7 +395,7 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 
 ### Out of Scope
 
-- Ping-based matchmaking — deferred to future milestone
+- ~~Ping-based matchmaking — deferred to future milestone~~ → Delivering in v1.21
 - Server-authoritative mode removal — keeping as parallel option
 - Mobile/native clients — browser-only for now
 - Spectator mode — not needed for research use case
@@ -258,7 +412,12 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 - Episode start sync can timeout on slow connections (mitigated with retry mechanism)
 - Rollback visual corrections cause brief teleporting (smoothing not yet implemented)
 - **[CRITICAL]** Users report 1-2 second local input lag in Overcooked (investigating in v1.6)
+- **[BUG]** Partner disconnected overlay shown on non-GymScene scenes (surveys, instructions) when former partner disconnects. Fixing in v1.19.
+- ~~**[RESOLVED]** Double loading spinner on page open — fixed in v1.18 with unified loading gate~~
+- **[KNOWN]** GGPO content parity divergence under packet loss + active inputs (~40-50% failure rate). Documented in `.planning/backlog/GGPO-PARITY.md`. xfail marker on `test_active_input_with_packet_loss`.
+- ~~**[RESOLVED]** Data parity divergence under packet loss — input confirmation protocol added in v1.14~~
 - ~~**[RESOLVED]** Data export parity issues — fixed in v1.8 with dual-buffer architecture~~
+- ~~**[RESOLVED]** New participants sometimes routed to stale games — fixed in v1.12 with state validation and comprehensive cleanup~~
 
 ## Constraints
 
@@ -284,6 +443,7 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 | Playwright MCP for testing | Browser automation with network condition control | ✓ Good |
 | isFocused exclusion from parity | Focus state has notification latency, column consistency is sufficient | ✓ Good |
 | BOUND-02/03 guards | Defense-in-depth at episode boundaries in async paths | ✓ Good |
+| Pre-load over Web Worker for v1.16 | Per-frame Python (10-100ms) doesn't cause disconnects; only loadPyodide() does. Pre-loading is simpler and preserves synchronous rollback performance. Web Worker deferred. | ✓ Good |
 
 ---
-*Last updated: 2026-02-02 after v1.11 milestone complete*
+*Last updated: 2026-02-07 after v1.21 Latency-Aware Matchmaking milestone started*

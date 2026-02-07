@@ -30,11 +30,14 @@ from interactive_gym.server import game_manager as gm
 from interactive_gym.scenes import unity_scene
 from interactive_gym.server import pyodide_game_coordinator
 from interactive_gym.server import player_pairing_manager
+from interactive_gym.server.participant_state import ParticipantState, ParticipantStateTracker
 
 from flask_login import LoginManager
 from interactive_gym.server.admin import admin_bp, AdminUser
 from interactive_gym.server.admin.namespace import AdminNamespace
 from interactive_gym.server.admin.aggregator import AdminEventAggregator
+from interactive_gym.server.match_logger import MatchAssignmentLogger
+from interactive_gym.server.probe_coordinator import ProbeCoordinator
 
 
 @dataclasses.dataclass
@@ -107,6 +110,12 @@ GROUP_MANAGER: player_pairing_manager.PlayerGroupManager | None = None
 # Admin event aggregator for dashboard state collection
 ADMIN_AGGREGATOR: AdminEventAggregator | None = None
 
+# Match assignment logger for research data collection (Phase 56)
+MATCH_LOGGER: MatchAssignmentLogger | None = None
+
+# Probe coordinator for P2P RTT measurement (Phase 57)
+PROBE_COORDINATOR: ProbeCoordinator | None = None
+
 # Mapping of users to locks associated with the ID. Enforces user-level serialization
 USER_LOCKS = utils.ThreadSafeDict()
 
@@ -118,15 +127,49 @@ SESSION_ID_TO_SUBJECT_ID = utils.ThreadSafeDict()
 # Maps subject_id -> ParticipantSession
 PARTICIPANT_SESSIONS: dict[SubjectID, ParticipantSession] = utils.ThreadSafeDict()
 
+# Participant state tracker - single source of truth for participant lifecycle states
+# Prevents routing to wrong games by tracking IDLE/IN_WAITROOM/IN_GAME/GAME_ENDED
+PARTICIPANT_TRACKER: ParticipantStateTracker = ParticipantStateTracker()
+
 # Pending multiplayer metrics for aggregation
 # Maps (scene_id, game_id) -> {player_id: metrics, ...}
 # When both players submit, metrics are aggregated into a comparison file
 PENDING_MULTIPLAYER_METRICS: dict[tuple[str, str], dict] = utils.ThreadSafeDict()
 
+# Pyodide loading grace period tracking (Phase 69)
+# Maps subject_id -> loading start timestamp. Clients in this dict are currently
+# loading Pyodide WASM and should not be treated as truly disconnected.
+LOADING_CLIENTS: dict[str, float] = {}
+LOADING_TIMEOUT_S = 60  # Max loading time before considering client dead
+
 
 def get_subject_id_from_session_id(session_id: str) -> SubjectID:
     subject_id = SESSION_ID_TO_SUBJECT_ID.get(session_id, None)
     return subject_id
+
+
+def is_client_in_loading_grace(subject_id: str) -> bool:
+    """Check if client is in Pyodide loading grace period (not timed out)."""
+    start_time = LOADING_CLIENTS.get(subject_id)
+    if start_time is None:
+        return False
+    timeout = getattr(CONFIG, 'pyodide_load_timeout_s', LOADING_TIMEOUT_S)
+    if time.time() - start_time > timeout:
+        LOADING_CLIENTS.pop(subject_id, None)
+        logger.warning(f"[Grace] {subject_id} loading grace expired after {timeout}s")
+        return False
+    return True
+
+
+def get_socket_for_subject(subject_id: str) -> str | None:
+    """Get current socket_id for a subject_id from PARTICIPANT_SESSIONS.
+
+    Used by ProbeCoordinator to look up socket IDs fresh (not cached).
+    """
+    session = PARTICIPANT_SESSIONS.get(subject_id)
+    if session and session.is_connected:
+        return session.socket_id
+    return None
 
 
 # List of subject names that have entered a game (collected on end_game)
@@ -153,9 +196,13 @@ socketio = flask_socketio.SocketIO(
     cors_allowed_origins="*",
     logger=app.config["DEBUG"],
     # engineio_logger=False,
-    # More aggressive ping settings for faster disconnect detection
-    ping_interval=2,  # Ping every 2 seconds (default: 25)
-    ping_timeout=2,   # Wait 2 seconds for pong before disconnect (default: 5)
+    # Ping settings: ping_timeout increased to accommodate Pyodide WASM compilation
+    # (5-15s) in the fallback path where preload didn't happen.
+    # Total grace before disconnect: 8 + 30 = 38 seconds, well beyond worst case.
+    # This weakens real disconnect detection from 16s to 38s, but multiplayer games
+    # already have P2P WebRTC disconnect detection at 500ms, so this is acceptable.
+    ping_interval=8,   # Ping every 8 seconds (default: 25)
+    ping_timeout=30,   # Wait 30 seconds for pong before disconnect (default: 5)
 )
 
 # Flask-Login setup for admin authentication
@@ -282,6 +329,31 @@ def register_subject(data):
     SESSION_ID_TO_SUBJECT_ID[sid] = subject_id
     logger.info(f"Registered session ID {sid} with subject {subject_id}")
 
+    # Clean up stale participant state on fresh connection
+    # If participant is IN_GAME/IN_WAITROOM but no game exists, reset to IDLE
+    # If participant is GAME_ENDED, also reset (allows new game in same session)
+    current_participant_state = PARTICIPANT_TRACKER.get_state(subject_id)
+    if current_participant_state == ParticipantState.GAME_ENDED:
+        # Game ended - reset for potential new game (e.g., multi-episode experiments, tests)
+        logger.info(
+            f"[RegisterSession] Participant {subject_id} reconnecting after GAME_ENDED. "
+            f"Resetting to IDLE for fresh start."
+        )
+        PARTICIPANT_TRACKER.reset(subject_id)
+    elif current_participant_state in (ParticipantState.IN_GAME, ParticipantState.IN_WAITROOM):
+        # Check if they're actually in a game
+        in_any_game = False
+        for game_manager in GAME_MANAGERS.values():
+            if game_manager.subject_in_game(subject_id):
+                in_any_game = True
+                break
+        if not in_any_game:
+            logger.warning(
+                f"[RegisterSession] Participant {subject_id} has stale state {current_participant_state.name} "
+                f"but is not in any game. Resetting to IDLE."
+            )
+            PARTICIPANT_TRACKER.reset(subject_id)
+
     # Log activity for admin dashboard
     if ADMIN_AGGREGATOR:
         ADMIN_AGGREGATOR.log_activity("join", subject_id, {"socket_id": sid})
@@ -296,13 +368,15 @@ def register_subject(data):
         room=sid,
     )
 
-    # Send experiment-level entry screening config to client
+    # Send experiment-level config to client (entry screening + pyodide config)
     if CONFIG is not None:
-        flask_socketio.emit(
-            "experiment_config",
-            {"entry_screening": CONFIG.get_entry_screening_config()},
-            room=sid,
-        )
+        experiment_config_data = {
+            "entry_screening": CONFIG.get_entry_screening_config(),
+        }
+        if hasattr(CONFIG, "get_pyodide_config"):
+            experiment_config_data["pyodide_config"] = CONFIG.get_pyodide_config()
+
+        flask_socketio.emit("experiment_config", experiment_config_data, room=sid)
 
     participant_stager = STAGERS.get(subject_id)
     if participant_stager is None:
@@ -446,6 +520,17 @@ def advance_scene(data):
     participant_stager: stager.Stager | None = STAGERS.get(subject_id, None)
     if participant_stager is None:
         raise ValueError(f"No stager found for subject {subject_id}")
+
+    # Reset participant state when advancing to a new scene
+    # This ensures participants can join new games after completing previous scenes
+    current_state = PARTICIPANT_TRACKER.get_state(subject_id)
+    if current_state != ParticipantState.IDLE:
+        logger.info(
+            f"[AdvanceScene] Resetting participant {subject_id} from {current_state.name} to IDLE "
+            f"for new scene"
+        )
+        PARTICIPANT_TRACKER.reset(subject_id)
+
     participant_stager.advance(socketio, room=flask.request.sid)
 
     # If the current scene is a GymScene, we'll instantiate a
@@ -493,6 +578,12 @@ def advance_scene(data):
             logger.info(
                 f"Instantiating game manager for scene {current_scene.scene_id}"
             )
+
+            # Initialize match logger if not already done (Phase 56)
+            global MATCH_LOGGER
+            if MATCH_LOGGER is None:
+                MATCH_LOGGER = MatchAssignmentLogger(admin_aggregator=ADMIN_AGGREGATOR)
+
             game_manager = gm.GameManager(
                 scene=current_scene,
                 experiment_config=CONFIG,
@@ -500,6 +591,11 @@ def advance_scene(data):
                 pyodide_coordinator=PYODIDE_COORDINATOR,
                 pairing_manager=GROUP_MANAGER,
                 get_subject_rtt=_get_subject_rtt,
+                participant_state_tracker=PARTICIPANT_TRACKER,
+                matchmaker=current_scene.matchmaker,
+                match_logger=MATCH_LOGGER,  # Phase 56
+                probe_coordinator=PROBE_COORDINATOR,  # Phase 59: P2P RTT probing
+                get_socket_for_subject=get_socket_for_subject,  # Phase 60+: waitroom->match
             )
             GAME_MANAGERS[current_scene.scene_id] = game_manager
         else:
@@ -563,9 +659,69 @@ def join_game(data):
             )
             return
 
+        # Check participant state before routing (Phase 54)
+        current_state = PARTICIPANT_TRACKER.get_state(subject_id)
+        logger.info(
+            f"[JoinGame:StateCheck] Subject {subject_id} current state: {current_state.name}, "
+            f"tracked_subjects={list(PARTICIPANT_TRACKER._states.keys())}"
+        )
+        if not PARTICIPANT_TRACKER.can_join_waitroom(subject_id):
+            logger.warning(
+                f"[JoinGame] Subject {subject_id} cannot join waitroom, current state: {current_state.name}"
+            )
+            socketio.emit(
+                "waiting_room_error",
+                {
+                    "message": f"Cannot join game while in state: {current_state.name}",
+                    "error_code": "INVALID_PARTICIPANT_STATE",
+                    "details": f"Current state: {current_state.name}"
+                },
+                room=flask.request.sid,
+            )
+            return
+
+        # Transition to IN_WAITROOM (Phase 54)
+        PARTICIPANT_TRACKER.transition_to(subject_id, ParticipantState.IN_WAITROOM)
+
+        # Diagnostic logging for stale game routing bug (BUG-04)
+        logger.info(
+            f"[JoinGame:Diag] subject_id={subject_id}, "
+            f"in_subject_games={subject_id in game_manager.subject_games}, "
+            f"subject_games_keys={list(game_manager.subject_games.keys())}, "
+            f"active_games={list(game_manager.active_games)}, "
+            f"waiting_games={game_manager.waiting_games}"
+        )
+
+        # State validation before routing (BUG-04)
+        is_valid, error_message = game_manager.validate_subject_state(subject_id)
+        if not is_valid:
+            logger.error(
+                f"[JoinGame] State validation failed for {subject_id}: {error_message}"
+            )
+            socketio.emit(
+                "waiting_room_error",
+                {
+                    "message": "Unable to join game due to invalid state. Please refresh the page.",
+                    "error_code": "INVALID_STATE",
+                    "details": error_message
+                },
+                room=flask.request.sid,
+            )
+            return
+
         # Check if the participant is already in a game in this scene.
         # This can happen if a previous session didn't clean up properly (browser crash, network issue, etc.)
         if game_manager.subject_in_game(subject_id):
+            # Diagnostic logging for stale game entry (BUG-04)
+            stale_game_id = game_manager.subject_games.get(subject_id)
+            stale_game = game_manager.games.get(stale_game_id)
+            logger.warning(
+                f"[JoinGame:Diag] Subject {subject_id} has stale game entry. "
+                f"game_id={stale_game_id}, "
+                f"game_exists={stale_game is not None}, "
+                f"game_status={stale_game.status if stale_game else 'N/A'}, "
+                f"game_active={stale_game_id in game_manager.active_games if stale_game_id else False}"
+            )
             logger.warning(
                 f"Subject {subject_id} already has a game entry in scene {current_scene.scene_id}. "
                 f"Cleaning up stale entry before rejoining."
@@ -583,13 +739,13 @@ def join_game(data):
             if game is not None:
                 logger.info(
                     f"[JoinGame] Subject {subject_id} successfully added to game {game.game_id}. "
-                    f"Game starting."
+                    f"Game starting. Post-add state: subject_games has {len(game_manager.subject_games)} entries."
                 )
             else:
                 # game is None when waiting for group members or in waiting room
                 logger.info(
                     f"[JoinGame] Subject {subject_id} added to waiting room for scene {current_scene.scene_id}. "
-                    f"Waiting for more players."
+                    f"Waiting for more players. Post-add state: subject_games has {len(game_manager.subject_games)} entries."
                 )
         except Exception as e:
             logger.exception(
@@ -684,6 +840,9 @@ def leave_game(data):
                             )
                         PYODIDE_COORDINATOR.remove_player(game_id, player_id, notify_others=True)
                     break
+
+        # Reset participant state (Phase 54)
+        PARTICIPANT_TRACKER.reset(subject_id)
 
         PROCESSED_SUBJECT_NAMES.append(subject_id)
 
@@ -814,6 +973,26 @@ def pong(data):
         subject_id = get_subject_id_from_session_id(session_id)
         if subject_id and subject_id in PARTICIPANT_SESSIONS:
             PARTICIPANT_SESSIONS[subject_id].current_rtt = ping_ms
+
+
+@socketio.on("pyodide_loading_start")
+def on_pyodide_loading_start(data):
+    subject_id = get_subject_id_from_session_id(flask.request.sid)
+    if subject_id:
+        LOADING_CLIENTS[subject_id] = time.time()
+        logger.info(f"[Grace] {subject_id} starting Pyodide loading")
+
+
+@socketio.on("pyodide_loading_complete")
+def on_pyodide_loading_complete(data):
+    subject_id = get_subject_id_from_session_id(flask.request.sid)
+    if subject_id:
+        start_time = LOADING_CLIENTS.pop(subject_id, None)
+        if start_time:
+            duration = time.time() - start_time
+            logger.info(f"[Grace] {subject_id} completed Pyodide loading in {duration:.1f}s")
+        else:
+            logger.info(f"[Grace] {subject_id} completed Pyodide loading (no start tracked)")
 
 
 @socketio.on("unityEpisodeEnd")
@@ -1594,6 +1773,69 @@ def handle_webrtc_signal(data):
     )
 
 
+#####################################
+# P2P Probe Event Handlers (Phase 57)
+#####################################
+
+
+@socketio.on('probe_ready')
+def handle_probe_ready(data):
+    """Handle client reporting ready for probe connection.
+
+    After receiving probe_prepare, clients initialize their ProbeConnection
+    and emit probe_ready. Once both clients report ready, the coordinator
+    emits probe_start to trigger WebRTC connection establishment.
+    """
+    if PROBE_COORDINATOR is None:
+        logger.warning("Probe ready received but no coordinator")
+        return
+
+    probe_session_id = data.get('probe_session_id')
+    subject_id = get_subject_id_from_session_id(flask.request.sid)
+
+    logger.debug(f"[Probe] Ready: session={probe_session_id}, subject={subject_id}")
+    PROBE_COORDINATOR.handle_ready(probe_session_id, subject_id)
+
+
+@socketio.on('probe_signal')
+def handle_probe_signal(data):
+    """Relay WebRTC signaling for probe connections.
+
+    Routes SDP offers/answers and ICE candidates between probe peers.
+    Uses separate event name from game signaling to avoid collision.
+    """
+    if PROBE_COORDINATOR is None:
+        logger.warning("Probe signal received but no coordinator")
+        return
+
+    PROBE_COORDINATOR.handle_signal(
+        probe_session_id=data.get('probe_session_id'),
+        target_subject_id=data.get('target_subject_id'),
+        signal_type=data.get('type'),
+        payload=data.get('payload'),
+        sender_socket_id=flask.request.sid
+    )
+
+
+@socketio.on('probe_result')
+def handle_probe_result(data):
+    """Handle probe measurement result from client.
+
+    Called when a client reports the RTT measurement result.
+    The coordinator invokes the on_complete callback and cleans up.
+    """
+    if PROBE_COORDINATOR is None:
+        logger.warning("Probe result received but no coordinator")
+        return
+
+    probe_session_id = data.get('probe_session_id')
+    rtt_ms = data.get('rtt_ms')
+    success = data.get('success', False)
+
+    logger.info(f"[Probe] Result: session={probe_session_id}, rtt={rtt_ms}ms, success={success}")
+    PROBE_COORDINATOR.handle_result(probe_session_id, rtt_ms, success)
+
+
 @socketio.on("pyodide_player_action")
 def on_pyodide_player_action(data):
     """
@@ -1712,6 +1954,13 @@ def on_mid_game_exclusion(data):
         frame_number=frame_number
     )
 
+    # Clean up GameManager state (Phase 52)
+    for scene_id, game_manager in GAME_MANAGERS.items():
+        if game_id in game_manager.games:
+            game_manager.cleanup_game(game_id)
+            logger.info(f"Cleaned up GameManager state for mid-game exclusion in game {game_id}")
+            break
+
 
 @socketio.on("p2p_validation_status")
 def handle_p2p_validation_status(data):
@@ -1812,6 +2061,10 @@ def handle_multiplayer_game_complete(data):
             )
             logger.info(f"[GameComplete] Archived session {game_id} with {len(subject_ids)} players")
 
+            # Transition all players to GAME_ENDED (Phase 54)
+            for sid in subject_ids:
+                PARTICIPANT_TRACKER.transition_to(sid, ParticipantState.GAME_ENDED)
+
 
 @socketio.on("participant_terminal_state")
 def handle_participant_terminal_state(data):
@@ -1843,6 +2096,9 @@ def handle_participant_terminal_state(data):
         f"[TerminalState] Subject {subject_id} entered terminal state: {reason} "
         f"(game: {game_id}, scene: {scene_id})"
     )
+
+    # Transition to GAME_ENDED (Phase 54)
+    PARTICIPANT_TRACKER.transition_to(subject_id, ParticipantState.GAME_ENDED)
 
     # Add to processed subjects so aggregator shows them as 'completed'
     if subject_id not in PROCESSED_SUBJECT_NAMES:
@@ -1901,6 +2157,17 @@ def handle_p2p_validation_failed(data):
 
     logger.warning(f"P2P validation failed for game {game_id}: {reason}")
 
+    # Collect subject IDs before cleanup for state reset
+    subject_ids_to_reset = []
+    for scene_id, game_manager in GAME_MANAGERS.items():
+        game = game_manager.games.get(game_id)
+        if game:
+            subject_ids_to_reset = [
+                sid for sid in game.human_players.values()
+                if sid and sid != utils.Available
+            ]
+            break
+
     # Get socket IDs before cleanup
     socket_ids = PYODIDE_COORDINATOR.handle_validation_failure(game_id, player_id, reason)
 
@@ -1918,21 +2185,26 @@ def handle_p2p_validation_failed(data):
     # Clean up game from coordinator
     PYODIDE_COORDINATOR.remove_game(game_id)
 
-    # Clean up game from game manager
-    # Find the scene's game manager and remove the game
+    # Clean up GameManager state - use _remove_game to avoid GAME_ENDED transition
+    # which would block re-pooling (need IDLE state to rejoin waitroom)
     for scene_id, game_manager in GAME_MANAGERS.items():
         if game_id in game_manager.games:
-            # Remove subjects from game tracking
-            game = game_manager.games.get(game_id)
-            if game:
-                for subject_id in list(game.human_players.values()):
+            # Manual cleanup without transitioning to GAME_ENDED
+            game = game_manager.games[game_id]
+            for subject_id in list(game.human_players.values()):
+                if subject_id and subject_id != utils.Available:
                     if subject_id in game_manager.subject_games:
                         del game_manager.subject_games[subject_id]
                     if subject_id in game_manager.subject_rooms:
                         del game_manager.subject_rooms[subject_id]
             game_manager._remove_game(game_id)
-            logger.info(f"Cleaned up game {game_id} from GameManager for scene {scene_id}")
+            logger.info(f"Cleaned up GameManager state for failed P2P validation game {game_id}")
             break
+
+    # Reset participant state to IDLE so they can re-pool (not GAME_ENDED)
+    for subject_id in subject_ids_to_reset:
+        PARTICIPANT_TRACKER.reset(subject_id)
+        logger.info(f"Reset participant {subject_id} to IDLE after P2P validation failure")
 
 
 # ========== Mid-Game Reconnection Handlers (Phase 20) ==========
@@ -2059,8 +2331,15 @@ def handle_p2p_reconnection_timeout(data):
         room=game_id
     )
 
-    # Clean up game
+    # Clean up game from Pyodide coordinator
     PYODIDE_COORDINATOR.remove_game(game_id)
+
+    # Clean up GameManager state for both players (Phase 52)
+    for scene_id, game_manager in GAME_MANAGERS.items():
+        if game_id in game_manager.games:
+            game_manager.cleanup_game(game_id)
+            logger.info(f"Cleaned up GameManager state for reconnection timeout game {game_id}")
+            break
 
 
 @socketio.on('execute_entry_callback')
@@ -2449,6 +2728,26 @@ def on_disconnect():
         logger.info("No subject_id found for disconnecting socket")
         return
 
+    # Grace check: if client is loading Pyodide, preserve session and skip cleanup (Phase 69)
+    if is_client_in_loading_grace(subject_id):
+        logger.warning(
+            f"[Grace] {subject_id} disconnected during Pyodide loading. "
+            f"Preserving session for reconnection."
+        )
+        session = PARTICIPANT_SESSIONS.get(subject_id)
+        if session is not None:
+            participant_stager = STAGERS.get(subject_id, None)
+            if participant_stager:
+                session.stager_state = participant_stager.get_state()
+                session.current_scene_id = (
+                    participant_stager.current_scene.scene_id
+                    if participant_stager.current_scene else None
+                )
+            session.socket_id = None
+            session.is_connected = False
+            session.last_updated_at = time.time()
+        return  # Skip game cleanup, partner notifications, etc.
+
     # Log activity for admin dashboard (before cleanup)
     session = PARTICIPANT_SESSIONS.get(subject_id)
     if ADMIN_AGGREGATOR:
@@ -2489,9 +2788,7 @@ def on_disconnect():
         game_manager = GAME_MANAGERS.get(current_scene.scene_id, None)
         if game_manager and game_manager.is_subject_in_active_game(subject_id):
             is_in_active_gym_scene = True
-        # Also check if player is in a group waitroom
-        if game_manager:
-            game_manager.remove_from_group_waitroom(subject_id)
+        # Note: Group reunion deferred to future matchmaker variant (REUN-01/REUN-02)
 
     # Handle Pyodide multiplayer games
     if PYODIDE_COORDINATOR is not None:
@@ -2539,6 +2836,37 @@ def on_disconnect():
                         player_id=player_id,
                         notify_others=is_in_active_pyodide_game
                     )
+
+                    # CRITICAL: Also clean up GameManager state
+                    # The player may be in GameManager's waitroom (subject_games, waiting_games)
+                    # even though they're also registered in PYODIDE_COORDINATOR
+                    logger.info(
+                        f"[Disconnect:Pyodide] Checking GameManager cleanup for {subject_id}. "
+                        f"current_scene={current_scene.scene_id if current_scene else None}"
+                    )
+                    game_manager = GAME_MANAGERS.get(current_scene.scene_id, None) if current_scene else None
+                    if game_manager:
+                        in_game = game_manager.subject_in_game(subject_id)
+                        logger.info(
+                            f"[Disconnect:Pyodide] game_manager found, subject_in_game={in_game}, "
+                            f"subject_games={list(game_manager.subject_games.keys())}, "
+                            f"waiting_games={game_manager.waiting_games}"
+                        )
+                        if in_game:
+                            logger.info(
+                                f"[Disconnect:Pyodide] Calling remove_subject_quietly for {subject_id}"
+                            )
+                            game_manager.remove_subject_quietly(subject_id)
+                            logger.info(
+                                f"[Disconnect:Pyodide] After cleanup: "
+                                f"subject_games={list(game_manager.subject_games.keys())}, "
+                                f"waiting_games={game_manager.waiting_games}"
+                            )
+                    else:
+                        logger.warning(
+                            f"[Disconnect:Pyodide] No game_manager found for scene {current_scene.scene_id if current_scene else 'None'}"
+                        )
+
                     # Clean up group manager
                     if GROUP_MANAGER:
                         GROUP_MANAGER.cleanup_subject(subject_id)
@@ -2577,18 +2905,29 @@ def on_disconnect():
         return
 
     # Determine whether to notify group members or remove quietly
+    logger.info(
+        f"[Disconnect:Route] subject={subject_id}, "
+        f"is_in_active_gym_scene={is_in_active_gym_scene}, "
+        f"subject_in_game={game_manager.subject_in_game(subject_id)}, "
+        f"waiting_games={game_manager.waiting_games}"
+    )
     if is_in_active_gym_scene:
         logger.info(
             f"Subject {subject_id} disconnected from active game, triggering leave_game."
         )
         game_manager.leave_game(subject_id=subject_id)
     else:
-        # Subject is not in an active game scene (e.g., in a survey)
+        # Subject is not in an active game scene (e.g., in waitroom or survey)
         # Remove quietly without notifying group members
         logger.info(
-            f"Subject {subject_id} disconnected from non-active scene, removing quietly."
+            f"Subject {subject_id} disconnected from waitroom/non-active scene, "
+            f"calling remove_subject_quietly."
         )
-        game_manager.remove_subject_quietly(subject_id)
+        result = game_manager.remove_subject_quietly(subject_id)
+        logger.info(
+            f"[Disconnect:Route] remove_subject_quietly returned {result}, "
+            f"waiting_games after={game_manager.waiting_games}"
+        )
 
     # Clean up group manager
     if GROUP_MANAGER:
@@ -2596,17 +2935,37 @@ def on_disconnect():
 
 
 def run(config):
-    global app, CONFIG, logger, GENERIC_STAGER, PYODIDE_COORDINATOR, GROUP_MANAGER, ADMIN_AGGREGATOR
+    global app, CONFIG, logger, GENERIC_STAGER, PYODIDE_COORDINATOR, GROUP_MANAGER, ADMIN_AGGREGATOR, PROBE_COORDINATOR
     CONFIG = config
     GENERIC_STAGER = config.stager
 
-    # Initialize Pyodide coordinator
-    PYODIDE_COORDINATOR = pyodide_game_coordinator.PyodideGameCoordinator(socketio)
+    # Helper to look up GameManager by game_id for session state transitions
+    def get_game_manager_for_game(game_id):
+        """Look up which GameManager owns a specific game_id."""
+        for scene_id, gm_instance in GAME_MANAGERS.items():
+            if game_id in gm_instance.games:
+                return gm_instance
+        return None
+
+    # Initialize Pyodide coordinator with game_manager_getter for session state transitions
+    PYODIDE_COORDINATOR = pyodide_game_coordinator.PyodideGameCoordinator(
+        socketio,
+        game_manager_getter=get_game_manager_for_game
+    )
     logger.info("Initialized Pyodide multiplayer coordinator")
 
     # Initialize player group manager
     GROUP_MANAGER = player_pairing_manager.PlayerGroupManager()
     logger.info("Initialized player group manager")
+
+    # Initialize probe coordinator for P2P RTT measurement (Phase 57)
+    PROBE_COORDINATOR = ProbeCoordinator(
+        sio=socketio,
+        get_socket_for_subject=get_socket_for_subject,
+        turn_username=CONFIG.turn_username,
+        turn_credential=CONFIG.turn_credential,
+    )
+    logger.info("Initialized probe coordinator for P2P RTT measurement")
 
     # Initialize admin event aggregator
     ADMIN_AGGREGATOR = AdminEventAggregator(
@@ -2616,7 +2975,8 @@ def run(config):
         game_managers=GAME_MANAGERS,
         pyodide_coordinator=PYODIDE_COORDINATOR,
         processed_subjects=PROCESSED_SUBJECT_NAMES,
-        save_console_logs=CONFIG.save_experiment_data
+        save_console_logs=CONFIG.save_experiment_data,
+        experiment_id=CONFIG.experiment_id
     )
     ADMIN_AGGREGATOR.start_broadcast_loop(interval_seconds=1.0)
     logger.info("Admin event aggregator initialized and broadcast loop started")

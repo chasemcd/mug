@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 
-from typing import Any, Callable
+from typing import Any, Callable, TYPE_CHECKING
 import copy
 import json
+
+if TYPE_CHECKING:
+    from interactive_gym.server.matchmaker import Matchmaker
 
 from interactive_gym.scenes import scene
 from interactive_gym.configurations import remote_config
@@ -153,11 +156,17 @@ class GymScene(scene.Scene):
         # Set to 0 for no input delay (not recommended for multiplayer)
         self.input_delay: int = 0  # frames of input delay
 
+        # Input confirmation timeout for episode boundaries (Phase 61: PARITY-01, PARITY-02)
+        # Waits for partner input confirmation before episode export
+        # Default 500ms handles 200ms+ RTT with margin for packet retransmission
+        self.input_confirmation_timeout_ms: int = 500
+
         # Lobby/waitroom display settings
         self.hide_lobby_count: bool = False  # If True, hide participant count in waitroom
 
         # Matchmaking settings
         self.matchmaking_max_rtt: int | None = None  # Max RTT difference (ms) between paired participants
+        self._matchmaker: "Matchmaker | None" = None  # Custom matchmaker, None uses default FIFO
 
         # Player group settings (for multiplayer games)
         # Groups are always tracked automatically after each game completes.
@@ -532,6 +541,7 @@ class GymScene(scene.Scene):
         self,
         hide_lobby_count: bool = NotProvided,
         max_rtt: int = NotProvided,
+        matchmaker: "Matchmaker" = NotProvided,
     ):
         """Configure matchmaking and lobby settings for the GymScene.
 
@@ -544,13 +554,20 @@ class GymScene(scene.Scene):
             they will not be paired together. Set to None to disable RTT-based pairing.
             Defaults to NotProvided (None).
         :type max_rtt: int, optional
+        :param matchmaker: Custom Matchmaker instance for participant grouping logic.
+            Must be a subclass of Matchmaker with find_match() implemented.
+            Defaults to NotProvided (uses FIFOMatchmaker).
+        :type matchmaker: Matchmaker, optional
         :return: The GymScene instance
         :rtype: GymScene
 
         Example:
+            from interactive_gym.server.matchmaker import FIFOMatchmaker
+
             scene.matchmaking(
                 hide_lobby_count=True,  # Don't show "2/4 players in lobby"
                 max_rtt=50,  # Only pair participants within 50ms RTT of each other
+                matchmaker=FIFOMatchmaker(),  # or custom subclass
             )
         """
         if hide_lobby_count is not NotProvided:
@@ -561,7 +578,19 @@ class GymScene(scene.Scene):
                 raise ValueError("max_rtt must be a positive integer or None")
             self.matchmaking_max_rtt = max_rtt
 
+        if matchmaker is not NotProvided:
+            # Runtime import to avoid circular dependency
+            from interactive_gym.server.matchmaker import Matchmaker as MatchmakerABC
+            if not isinstance(matchmaker, MatchmakerABC):
+                raise TypeError("matchmaker must be a Matchmaker subclass instance")
+            self._matchmaker = matchmaker
+
         return self
+
+    @property
+    def matchmaker(self) -> "Matchmaker | None":
+        """Return configured matchmaker, or None for default FIFO."""
+        return self._matchmaker
 
     def pyodide(
         self,
@@ -577,6 +606,7 @@ class GymScene(scene.Scene):
         realtime_mode: bool = NotProvided,
         input_buffer_size: int = NotProvided,
         input_delay: int = NotProvided,
+        input_confirmation_timeout_ms: int = NotProvided,
     ):
         """Configure Pyodide-related settings for the GymScene.
 
@@ -615,6 +645,10 @@ class GymScene(scene.Scene):
             many frames, ensuring both clients execute the same actions on the same frame. Default is 2.
             Set to 0 for no delay (not recommended for multiplayer). defaults to NotProvided
         :type input_delay: int, optional
+        :param input_confirmation_timeout_ms: Time in milliseconds to wait for partner input confirmation
+            at episode boundaries before proceeding with export. Default is 500ms which handles 200ms+ RTT.
+            Set to 0 to disable waiting (not recommended). defaults to NotProvided
+        :type input_confirmation_timeout_ms: int, optional
         :return: The GymScene instance (self)
         :rtype: GymScene
         """
@@ -670,6 +704,11 @@ class GymScene(scene.Scene):
         if input_delay is not NotProvided:
             assert isinstance(input_delay, int) and input_delay >= 0
             self.input_delay = input_delay
+
+        if input_confirmation_timeout_ms is not NotProvided:
+            if not isinstance(input_confirmation_timeout_ms, int) or input_confirmation_timeout_ms < 0:
+                raise ValueError("input_confirmation_timeout_ms must be a non-negative integer")
+            self.input_confirmation_timeout_ms = input_confirmation_timeout_ms
 
         return self
 

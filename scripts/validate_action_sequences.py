@@ -64,12 +64,16 @@ def compare_files(file1: Path, file2: Path, verbose: bool = False, row_tolerance
 
     Phase 39: VERIFY-01 - Offline validation for post-experiment analysis.
 
+    IMPORTANT: Data parity must be EXACT. Both players must export identical game state
+    data (actions, rewards, infos, etc.) for research validity. Any divergence indicates
+    a bug in the rollback correction or data recording system.
+
     Args:
         file1: Path to first CSV file
         file2: Path to second CSV file
         verbose: Show detailed divergence info
         row_tolerance: Allow up to this many row count differences (for episode boundary timing)
-                      Set to 0 for strict matching, 5 for E2E test tolerance
+                      Set to 0 for strict matching, 10 for E2E test tolerance
 
     Returns exit code: 0 if identical (within tolerance), 1 if different.
     """

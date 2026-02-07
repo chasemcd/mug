@@ -6,6 +6,7 @@ constraints suitable for E2E testing:
 - No max_rtt limit (allows latency injection testing)
 - No focus loss timeout (prevents disconnection during test automation)
 - Shorter episodes for faster test completion
+- Higher input confirmation timeout (2000ms) for packet loss resilience
 
 Usage:
     python -m interactive_gym.examples.cogrid.overcooked_human_human_multiplayer_test
@@ -60,6 +61,7 @@ stager = stager.Stager(
             .gameplay(num_episodes=1, max_steps=450)  # ~15 seconds per episode
             .matchmaking(max_rtt=None)  # No RTT limit for latency tests
             .focus_loss_config(timeout_ms=0, pause_on_partner_background=False)  # Disable focus timeout
+            .pyodide(input_confirmation_timeout_ms=2000)  # Higher timeout for packet loss tests
         ),
         oc_scenes.multiplayer_feedback_scene,
         oc_scenes.end_scene,

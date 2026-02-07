@@ -1,5 +1,166 @@
 # Project Milestones: Interactive Gym P2P Multiplayer
 
+## v1.21 Latency-Aware Matchmaking (In Progress)
+
+**Goal:** A FIFO matchmaker that pre-filters candidates by server RTT heuristic before proposing matches, then verifies with P2P probe.
+
+**Status:** Defining requirements
+
+**Target features:**
+
+- LatencyFIFOMatchmaker class with server RTT pre-filtering in find_match()
+- Configurable max_server_rtt_ms threshold (estimated P2P RTT = sum of server RTTs)
+- Integration with existing max_p2p_rtt_ms for post-match P2P probe verification
+- Graceful fallback when server RTT data unavailable
+
+---
+
+## v1.20 Pre-Game Countdown (Shipped: 2026-02-07)
+
+**Delivered:** 3-second "Players found!" countdown on waiting room screen after matchmaking, synced game start.
+
+**Phases completed:** 80 (1 plan)
+
+**Key accomplishments:**
+
+- Server-side `_start_game_with_countdown()` method with background greenlet
+- Client-side `match_found_countdown` socket handler with 3-2-1 countdown display
+- Single-player guard skips countdown for non-multiplayer games
+- Uses `sio.start_background_task()` to avoid holding `waiting_games_lock` during 3s sleep
+
+---
+
+## v1.19 P2P Lifecycle Cleanup (Shipped: 2026-02-07)
+
+**Delivered:** P2P connections scoped to GymScenes — torn down on scene exit, with group history preserved for future re-pairing.
+
+**Phases completed:** 77-79 (3 plans total)
+
+**Key accomplishments:**
+
+- Client-side P2P connection scoping via cleanupForSceneExit() + sceneExited guards
+- GroupReunionMatchmaker for re-pairing previous partners
+- E2E scene isolation test validates no stale overlays on post-game scenes
+
+---
+
+## v1.18 Loading UX & Cleanup (Shipped: 2026-02-07)
+
+**Delivered:** Single merged loading screen gating on both compatibility check and Pyodide readiness. Configurable timeout with error page. Cleaned up orphaned test fixtures and duplicate helpers.
+
+**Phases completed:** 75-76 (3 plans total)
+
+**Key accomplishments:**
+
+- Unified loading screen replacing separate screening + Pyodide loaders
+- Loading gate requires both compatibility check AND Pyodide before advancing
+- Configurable pyodide_load_timeout_s (default 60s) with clear error page on failure
+- Full-page loading overlay visible from initial page load
+- Removed orphaned flask_server_multi_episode fixture
+- Consolidated duplicate run_full_episode_flow into single game_helpers.py source
+
+---
+
+## v1.17 E2E Test Reliability (Shipped: 2026-02-06)
+
+**Delivered:** 100% E2E test pass rate — 24 tests across 8 modules, zero failures. Robust server fixture lifecycle, P2P timeout tuning, GGPO fixes.
+
+**Phases completed:** 71-74 (8 plans total)
+
+**Key accomplishments:**
+
+- Robust server fixture lifecycle with port-verified teardown (shared helpers)
+- P2P ready gate timeout fix (5000ms → 15000ms) for 200ms latency tests
+- All 24 E2E tests pass (23 passed + 1 xfail for GGPO architectural limitation)
+- Two GGPO fixes: prune guard + episode boundary ordering
+- GGPO content parity limitation documented in .planning/backlog/GGPO-PARITY.md
+
+---
+
+## v1.16 Pyodide Pre-loading (Shipped: 2026-02-06)
+
+**Delivered:** Pyodide pre-loading during compat check, shared instance reuse, server-side grace period, concurrent game starts with 0.5s stagger.
+
+**Phases completed:** 67-70 (4 phases)
+
+**Key accomplishments:**
+
+- Server-side Pyodide config detection via get_pyodide_config()
+- Client preloadPyodide() during compatibility check with progress UI and advancement gating
+- RemoteGame.initialize() reuses pre-loaded Pyodide instance (package dedup)
+- MultiplayerPyodideGame inherits via super.initialize()
+- Server LOADING_CLIENTS grace period (ping_timeout=30, 60s safety timeout)
+- Client pyodide_loading_start/complete signals with 50ms yield before blocking
+- Stagger delay reduced from 5.0s to 0.5s across all E2E tests
+- 14/14 requirements satisfied, 3/3 E2E flows verified
+
+---
+
+## v1.15 E2E Test Reliability (Complete: 2026-02-04)
+
+**Delivered:** Root cause analysis of multi-participant test failures. Identified Pyodide main thread blocking as the source of Socket.IO disconnects.
+
+**Key findings:**
+
+- Pyodide initialization blocks browser main thread during WASM compilation
+- Socket.IO ping timeout (8s) exceeded when multiple games start concurrently
+- 5-second stagger delay workaround allows sequential Pyodide init
+- Permanent fix requires Web Worker architecture (deferred to v1.16)
+
+---
+
+## v1.14 Data Parity Fix (Shipped: 2026-02-04)
+
+**Delivered:** Fixed data parity divergence bug, added multi-participant test infrastructure, and comprehensive lifecycle stress tests.
+
+**Phases completed:** 61-65 (5 phases)
+
+**Key accomplishments:**
+
+- Input confirmation protocol before episode export
+- Increased P2P input redundancy (3→10 inputs per packet)
+- Multi-participant test infrastructure (6 contexts, 3 concurrent games)
+- GameOrchestrator class for test orchestration
+- Data export parity validation helpers
+- Fixed GAME-01 violation (games pre-created in waitroom)
+- Fixed PyodideGameCoordinator eventlet deadlock
+- 5 lifecycle stress test functions (STRESS-02 through STRESS-07)
+
+---
+
+## v1.13 Matchmaker Hardening (Shipped: 2026-02-03)
+
+**Delivered:** P2P RTT probing for latency-based match filtering and a single game creation path.
+
+**Phases completed:** 57-60 (4 phases)
+
+**Key accomplishments:**
+
+- P2P probe infrastructure (ProbeCoordinator, ProbeConnection, ProbeManager)
+- RTT ping-pong measurement protocol via WebRTC DataChannel
+- Matchmaker RTT integration with configurable max_p2p_rtt_ms threshold
+- Removed group reunion flow (~230 lines), single game creation path
+- Game only exists when all matched participants are assigned
+
+---
+
+## v1.12 Waiting Room Overhaul (Shipped: 2026-02-03)
+
+**Delivered:** Fixed waiting room bugs and built pluggable Matchmaker abstraction for custom participant pairing logic.
+
+**Phases completed:** 51-56 (6 phases)
+
+**Key accomplishments:**
+
+- Diagnostic logging and state validation for stale game routing
+- Comprehensive cleanup on all exit paths (idempotent)
+- Session lifecycle state machine (WAITING → MATCHED → VALIDATING → PLAYING → ENDED)
+- Participant state tracker (single source of truth for routing)
+- Matchmaker base class with FIFOMatchmaker default
+- Match assignment logging (JSONL + admin dashboard)
+
+---
+
 ## v1.11 Data Export Edge Cases (Shipped: 2026-02-02)
 
 **Delivered:** Fixed dual-buffer data recording edge cases so all E2E stress tests pass and research data exports are identical between both players.

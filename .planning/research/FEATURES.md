@@ -1,359 +1,613 @@
-# Feature Research: Rollback Netcode Data Consistency
+# Feature Landscape: Pyodide Web Worker Message Protocol
 
-**Domain:** Rollback netcode authoritative history and data recording for P2P multiplayer
-**Researched:** 2026-01-30
-**Confidence:** HIGH (codebase analysis + established rollback netcode patterns)
+**Domain:** Web Worker message protocol for Pyodide game execution
+**Researched:** 2026-02-04
+**Confidence:** HIGH (based on MDN documentation and existing codebase patterns)
 
 ## Executive Summary
 
-This research addresses data divergence in P2P rollback netcode systems where both players must export IDENTICAL game data (actions, rewards, infos) for research purposes. The core challenge: rollbacks and fast-forwards cause each peer to execute frames multiple times with potentially different inputs, creating divergent local histories.
+This document defines a message protocol for moving Pyodide game execution from the main thread to a dedicated Web Worker. The protocol must handle:
+- Initialization (loading Pyodide, installing packages, running setup code)
+- Game operations (step, reset)
+- Render state proxy (passing game state back to main thread for Phaser rendering)
+- Error handling and lifecycle management
 
-**Key insight:** In GGPO-style rollback netcode, there is no single "authoritative" peer in true P2P. Instead, **authoritative history emerges from input confirmation** - a frame becomes "confirmed" when ALL players' inputs for that frame have been received by ALL peers. Only confirmed frames should be recorded for export.
+The design leverages existing patterns from `pyodide_multiplayer_game.js` (binary protocol, typed messages) and MDN Web Worker best practices (transferable objects, structured cloning).
 
-## Frame State Lifecycle
+---
 
-### States
+## Message Type Definitions
 
-| State | Definition | When Reached |
-|-------|------------|--------------|
-| **FUTURE** | Frame not yet simulated | Default state for frames > currentFrame |
-| **SPECULATIVE** | Frame executed but using at least one predicted input | When `getInputsForFrame()` returns any prediction |
-| **CONFIRMED** | All players' inputs received for this frame by this peer | When `inputBuffer.get(frame)` contains entries for ALL human players |
-| **VERIFIED** | Confirmed AND peer hash matches (optional) | When local and remote hashes for frame agree (Phase 11-14 infrastructure) |
-| **RECORDED** | Frame data exported to final dataset | When frame transitions to CONFIRMED and data is moved from speculative buffer to export buffer |
+### Type Constants
 
-### State Transitions
+```typescript
+// Worker Message Types (Main Thread -> Worker)
+const WORKER_MSG = {
+  // Lifecycle
+  INIT: 0x01,              // Initialize Pyodide runtime
+  DESTROY: 0x02,           // Terminate worker cleanly
+
+  // Environment Setup
+  INSTALL_PACKAGES: 0x10,  // Install micropip packages
+  SET_GLOBALS: 0x11,       // Set interactive_gym_globals
+  RUN_INIT_CODE: 0x12,     // Run environment_initialization_code
+  REINITIALIZE: 0x13,      // Reinitialize environment (new scene)
+
+  // Game Operations
+  RESET: 0x20,             // Reset environment
+  STEP: 0x21,              // Execute env.step(actions)
+
+  // Utility
+  PING: 0xF0,              // Latency measurement
+} as const;
+
+// Main Thread Message Types (Worker -> Main Thread)
+const MAIN_MSG = {
+  // Status
+  READY: 0x01,             // Worker initialized, ready for commands
+  ERROR: 0x02,             // Error occurred
+
+  // Lifecycle Responses
+  INIT_COMPLETE: 0x10,     // Pyodide loaded successfully
+  PACKAGES_INSTALLED: 0x11,// Packages installed
+  GLOBALS_SET: 0x12,       // Globals configured
+  ENV_READY: 0x13,         // Environment initialized
+  REINIT_COMPLETE: 0x14,   // Reinitialization complete
+
+  // Game Operation Responses
+  RESET_RESULT: 0x20,      // Reset completed
+  STEP_RESULT: 0x21,       // Step completed
+
+  // Utility
+  PONG: 0xF0,              // Latency response
+  LOG: 0xF1,               // Console log relay
+  PROGRESS: 0xF2,          // Progress update (for loading)
+} as const;
+```
+
+### TypeScript Message Interfaces
+
+```typescript
+// ========== Base Message Structure ==========
+
+interface BaseMessage {
+  type: number;        // Message type constant
+  id: number;          // Unique request ID for response correlation
+  timestamp: number;   // performance.now() for latency tracking
+}
+
+// ========== Main Thread -> Worker Messages ==========
+
+interface InitMessage extends BaseMessage {
+  type: typeof WORKER_MSG.INIT;
+  pyodideUrl?: string;  // Optional CDN URL override
+}
+
+interface InstallPackagesMessage extends BaseMessage {
+  type: typeof WORKER_MSG.INSTALL_PACKAGES;
+  packages: string[];   // Package names for micropip
+}
+
+interface SetGlobalsMessage extends BaseMessage {
+  type: typeof WORKER_MSG.SET_GLOBALS;
+  globals: Record<string, unknown>;  // interactive_gym_globals
+}
+
+interface RunInitCodeMessage extends BaseMessage {
+  type: typeof WORKER_MSG.RUN_INIT_CODE;
+  code: string;         // environment_initialization_code
+}
+
+interface ReinitializeMessage extends BaseMessage {
+  type: typeof WORKER_MSG.REINITIALIZE;
+  config: {
+    packages_to_install?: string[];
+    environment_initialization_code: string;
+    interactive_gym_globals: Record<string, unknown>;
+  };
+}
+
+interface ResetMessage extends BaseMessage {
+  type: typeof WORKER_MSG.RESET;
+}
+
+interface StepMessage extends BaseMessage {
+  type: typeof WORKER_MSG.STEP;
+  actions: Record<string | number, number>;  // {playerId: action}
+}
+
+interface PingMessage extends BaseMessage {
+  type: typeof WORKER_MSG.PING;
+}
+
+interface DestroyMessage extends BaseMessage {
+  type: typeof WORKER_MSG.DESTROY;
+}
+
+// ========== Worker -> Main Thread Messages ==========
+
+interface ReadyMessage extends BaseMessage {
+  type: typeof MAIN_MSG.READY;
+}
+
+interface ErrorMessage extends BaseMessage {
+  type: typeof MAIN_MSG.ERROR;
+  requestId: number;    // ID of failed request
+  error: string;        // Error message
+  stack?: string;       // Stack trace if available
+}
+
+interface InitCompleteMessage extends BaseMessage {
+  type: typeof MAIN_MSG.INIT_COMPLETE;
+  pyodideVersion: string;
+}
+
+interface PackagesInstalledMessage extends BaseMessage {
+  type: typeof MAIN_MSG.PACKAGES_INSTALLED;
+  installed: string[];  // Successfully installed packages
+}
+
+interface EnvReadyMessage extends BaseMessage {
+  type: typeof MAIN_MSG.ENV_READY;
+}
+
+interface ReinitCompleteMessage extends BaseMessage {
+  type: typeof MAIN_MSG.REINIT_COMPLETE;
+}
+
+interface ResetResultMessage extends BaseMessage {
+  type: typeof MAIN_MSG.RESET_RESULT;
+  observation: ObservationType;
+  infos: Record<string, unknown>;
+  renderState: RenderState;
+}
+
+interface StepResultMessage extends BaseMessage {
+  type: typeof MAIN_MSG.STEP_RESULT;
+  observation: ObservationType;
+  rewards: Record<string | number, number>;
+  terminateds: Record<string | number, boolean>;
+  truncateds: Record<string | number, boolean>;
+  infos: Record<string, unknown>;
+  renderState: RenderState;
+}
+
+interface PongMessage extends BaseMessage {
+  type: typeof MAIN_MSG.PONG;
+  originalTimestamp: number;  // Echo back for RTT calculation
+}
+
+interface ProgressMessage extends BaseMessage {
+  type: typeof MAIN_MSG.PROGRESS;
+  stage: 'pyodide' | 'micropip' | 'packages' | 'globals' | 'env';
+  progress: number;     // 0-100
+  detail?: string;      // Human-readable status
+}
+
+interface LogMessage extends BaseMessage {
+  type: typeof MAIN_MSG.LOG;
+  level: 'debug' | 'info' | 'warn' | 'error';
+  args: unknown[];
+}
+
+// ========== Data Types ==========
+
+type ObservationType =
+  | Float32Array                                    // Single observation
+  | Record<string, Float32Array>                   // Dict observations
+  | Record<string, Record<string, Float32Array>>; // Nested dict observations
+
+interface RenderState {
+  game_state_objects: RenderObject[] | null;  // For Phaser rendering
+  game_image_base64: string | null;           // For RGB array rendering
+  step: number;
+}
+
+interface RenderObject {
+  type: string;
+  x: number;
+  y: number;
+  [key: string]: unknown;  // Additional properties
+}
+```
+
+---
+
+## Sequence Diagrams
+
+### Initialization Sequence
 
 ```
-                              +------------------+
-                              |      FUTURE      |
-                              +--------+---------+
-                                       |
-                     (frame simulated) | step() executes
-                                       v
-                    +------------------+-----------------+
-                    |                                    |
-        (missing inputs)                      (all inputs present)
-                    v                                    v
-           +--------+--------+                +---------+---------+
-           |   SPECULATIVE   |                |     CONFIRMED     |
-           +--------+--------+                +---------+---------+
-                    |                                    |
-                    |  (late input arrives)              |  (peer hash received)
-                    |  storeRemoteInput()                |  _compareFrameHashes()
-                    |                                    v
-                    |                         +---------+---------+
-                    |                         |     VERIFIED      |
-                    |                         +---------+---------+
-                    |                                    |
-                    +---------->-----------<-------------+
-                                       |
-                    (ready for export) | _updateConfirmedFrame()
-                                       v
-                              +--------+---------+
-                              |     RECORDED     |
-                              +------------------+
-
-    ROLLBACK EVENT:
-    If late input differs from prediction:
-    SPECULATIVE -> (rollback) -> clear frames >= targetFrame -> replay with confirmed inputs
+Main Thread                           Pyodide Worker
+    |                                      |
+    |-- new Worker('pyodide_worker.js') -->|
+    |                                      |
+    |<-------- READY (worker loaded) ------|
+    |                                      |
+    |-- INIT {pyodideUrl?} --------------->|
+    |                                      | loadPyodide()
+    |<------ PROGRESS {stage: pyodide} ----|
+    |                                      |
+    |<-------- INIT_COMPLETE --------------|
+    |                                      |
+    |-- INSTALL_PACKAGES {packages} ------>|
+    |                                      | micropip.install()
+    |<------ PROGRESS {stage: packages} ---|
+    |                                      |
+    |<------- PACKAGES_INSTALLED ----------|
+    |                                      |
+    |-- SET_GLOBALS {globals} ------------>|
+    |                                      |
+    |<---------- GLOBALS_SET --------------|
+    |                                      |
+    |-- RUN_INIT_CODE {code} ------------->|
+    |                                      | runPythonAsync(code)
+    |                                      |
+    |<----------- ENV_READY ---------------|
+    |                                      |
 ```
 
-### Rollback Impact on State
+### Game Loop Sequence (Step)
 
-When rollback occurs:
-1. Frames from `targetFrame` to `currentFrame` transition back to FUTURE
-2. `frameDataBuffer` entries for those frames are CLEARED (`clearFrameDataFromRollback()`)
-3. Frames are re-executed with correct inputs
-4. Re-executed frames may be SPECULATIVE (if still missing other player's inputs) or CONFIRMED
+```
+Main Thread                           Pyodide Worker
+    |                                      |
+    |-- STEP {id: 42, actions} ----------->|
+    |                                      | env.step(actions)
+    |                                      | env.render()
+    |                                      |
+    |<-- STEP_RESULT {id: 42, obs, ...} ---|
+    |                                      |
+    | [Phaser renders renderState]         |
+    |                                      |
+```
 
-**Critical:** A frame may be rolled back and re-executed multiple times before becoming CONFIRMED. Only the final confirmed execution should be recorded.
+### Reset Sequence
 
-## Confirmation Protocol
+```
+Main Thread                           Pyodide Worker
+    |                                      |
+    |-- RESET {id: 43} ------------------->|
+    |                                      | env.reset()
+    |                                      | env.render()
+    |                                      |
+    |<-- RESET_RESULT {id: 43, obs, ...} --|
+    |                                      |
+```
 
-### Input Confirmation in P2P (Two Players)
+### Error Handling Sequence
 
-In true P2P with GGPO-style rollback, input confirmation happens independently on each peer:
+```
+Main Thread                           Pyodide Worker
+    |                                      |
+    |-- STEP {id: 44, actions} ----------->|
+    |                                      | env.step() throws
+    |                                      |
+    |<-- ERROR {requestId: 44, error} -----|
+    |                                      |
+    | [Handle error, possibly reinit]      |
+    |                                      |
+```
 
-**Peer A's view:**
-- Frame N is CONFIRMED when:
-  - Peer A has stored their own input for frame N (`storeLocalInput`)
-  - Peer A has received Peer B's input for frame N (`storeRemoteInput`)
+### Reinitialization Sequence (Scene Transition)
 
-**Peer B's view:**
-- Frame N is CONFIRMED when:
-  - Peer B has stored their own input for frame N (`storeLocalInput`)
-  - Peer B has received Peer A's input for frame N (`storeRemoteInput`)
+```
+Main Thread                           Pyodide Worker
+    |                                      |
+    |-- REINITIALIZE {config} ------------>|
+    |                                      | install new packages
+    |                                      | set globals
+    |                                      | run init code
+    |                                      |
+    |<-------- REINIT_COMPLETE ------------|
+    |                                      |
+```
 
-**Key insight:** Both peers will eventually reach the same CONFIRMED state for frame N because:
-1. Each peer's local input is sent to the other via P2P DataChannel
-2. Each peer stores both their local input and received remote inputs in `inputBuffer`
-3. When both inputs exist in `inputBuffer.get(N)`, frame N is CONFIRMED
+---
 
-### Current Implementation Analysis
+## Request/Response Correlation
 
-The existing codebase (`pyodide_multiplayer_game.js`) has the infrastructure:
+### ID-Based Correlation Pattern
+
+Every request includes a unique `id` field. Responses include the same `id` for correlation. This enables:
+
+1. **Promise resolution:** Main thread stores pending promises by ID
+2. **Out-of-order handling:** Responses can arrive in any order
+3. **Timeout detection:** Requests without responses after timeout can be rejected
+
+```typescript
+// Main thread request manager
+class WorkerRequestManager {
+  private nextId = 1;
+  private pending = new Map<number, {
+    resolve: (result: any) => void;
+    reject: (error: Error) => void;
+    timeout: NodeJS.Timeout;
+  }>();
+
+  async request<T>(worker: Worker, message: Omit<BaseMessage, 'id' | 'timestamp'>): Promise<T> {
+    const id = this.nextId++;
+    const timestamp = performance.now();
+
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        this.pending.delete(id);
+        reject(new Error(`Request ${id} timed out`));
+      }, 30000);  // 30s timeout
+
+      this.pending.set(id, { resolve, reject, timeout });
+      worker.postMessage({ ...message, id, timestamp });
+    });
+  }
+
+  handleResponse(message: BaseMessage & { requestId?: number }) {
+    const id = message.id ?? message.requestId;
+    const pending = this.pending.get(id);
+    if (pending) {
+      clearTimeout(pending.timeout);
+      this.pending.delete(id);
+
+      if (message.type === MAIN_MSG.ERROR) {
+        pending.reject(new Error((message as ErrorMessage).error));
+      } else {
+        pending.resolve(message);
+      }
+    }
+  }
+}
+```
+
+---
+
+## Latency Considerations
+
+### Structured Cloning Overhead
+
+All data passed via `postMessage` is cloned using the structured clone algorithm. For game loops at 10-60 FPS:
+
+| Data Type | Typical Size | Clone Time | Recommendation |
+|-----------|--------------|------------|----------------|
+| Actions (object) | ~100 bytes | <0.1ms | Use as-is |
+| Observations (Float32Array) | 1-10KB | 0.1-0.5ms | Transfer if large |
+| RenderState (objects) | 5-50KB | 0.5-2ms | Optimize structure |
+| RGB Image (base64) | 100KB-1MB | 5-50ms | **Avoid in loop** |
+
+### Transferable Objects
+
+For large typed arrays, use Transferable transfer to avoid copying:
+
+```typescript
+// Main thread
+const observations = new Float32Array(1024);
+worker.postMessage(
+  { type: WORKER_MSG.STEP, actions, id, timestamp },
+  // Transfer list - these buffers are moved, not copied
+  [observations.buffer]
+);
+
+// Worker response (transfer back)
+const obsBuffer = new Float32Array(result.observation);
+self.postMessage(
+  { type: MAIN_MSG.STEP_RESULT, observation: obsBuffer, ... },
+  [obsBuffer.buffer]
+);
+```
+
+**Caveat:** After transfer, the original buffer is neutered (length becomes 0). Only use for one-shot data.
+
+### Batching Considerations
+
+For a 10 FPS game loop (100ms per frame):
+
+```
+Frame timeline:
+|-- Input capture (1ms) --|-- postMessage (0.1ms) --|-- Worker step (50ms) --|-- postMessage (1ms) --|-- Render (20ms) --|
+
+Total: ~72ms, leaving 28ms headroom
+```
+
+**DO NOT batch multiple steps.** Each step depends on the previous state. Pipeline optimization should focus on:
+
+1. **Overlapping render with next input:** Start capturing next frame's input while rendering
+2. **Minimizing render state size:** Only send what changed
+3. **Pre-serializing static data:** Cache serialized render objects
+
+### Latency Tracking
+
+Include timestamps in messages for pipeline monitoring:
+
+```typescript
+interface LatencyMetrics {
+  requestTimestamp: number;     // When main thread sent request
+  workerReceiveTimestamp: number; // When worker received request
+  workerSendTimestamp: number;  // When worker sent response
+  responseTimestamp: number;    // When main thread received response
+}
+
+// Calculated metrics:
+// - Request transit: workerReceiveTimestamp - requestTimestamp
+// - Worker execution: workerSendTimestamp - workerReceiveTimestamp
+// - Response transit: responseTimestamp - workerSendTimestamp
+// - Total RTT: responseTimestamp - requestTimestamp
+```
+
+---
+
+## Example Message Flows
+
+### Complete Initialization Flow
+
+```typescript
+// 1. Create worker
+const worker = new Worker('/static/js/pyodide_worker.js');
+
+// 2. Wait for worker ready
+await waitForMessage(worker, MAIN_MSG.READY);
+
+// 3. Initialize Pyodide
+const initResult = await requestManager.request(worker, {
+  type: WORKER_MSG.INIT,
+  pyodideUrl: 'https://cdn.jsdelivr.net/pyodide/v0.24.1/full/'
+});
+console.log(`Pyodide ${initResult.pyodideVersion} loaded`);
+
+// 4. Install packages
+if (config.packages_to_install?.length > 0) {
+  await requestManager.request(worker, {
+    type: WORKER_MSG.INSTALL_PACKAGES,
+    packages: config.packages_to_install
+  });
+}
+
+// 5. Set globals
+await requestManager.request(worker, {
+  type: WORKER_MSG.SET_GLOBALS,
+  globals: config.interactive_gym_globals
+});
+
+// 6. Initialize environment
+await requestManager.request(worker, {
+  type: WORKER_MSG.RUN_INIT_CODE,
+  code: config.environment_initialization_code
+});
+
+console.log('Environment ready');
+```
+
+### Game Loop Flow
+
+```typescript
+class PyodideWorkerGame {
+  private worker: Worker;
+  private requestManager: WorkerRequestManager;
+
+  async step(actions: Record<string, number>): Promise<StepResult> {
+    const result = await this.requestManager.request<StepResultMessage>(
+      this.worker,
+      { type: WORKER_MSG.STEP, actions }
+    );
+
+    return {
+      observation: result.observation,
+      rewards: result.rewards,
+      terminateds: result.terminateds,
+      truncateds: result.truncateds,
+      infos: result.infos,
+      renderState: result.renderState
+    };
+  }
+
+  async reset(): Promise<ResetResult> {
+    const result = await this.requestManager.request<ResetResultMessage>(
+      this.worker,
+      { type: WORKER_MSG.RESET }
+    );
+
+    return {
+      observation: result.observation,
+      infos: result.infos,
+      renderState: result.renderState
+    };
+  }
+}
+```
+
+### Worker Implementation Skeleton
 
 ```javascript
-// Lines 2901-2911: Check if all players have inputs for a frame
-_hasAllInputsForFrame(frameNumber, playerIds) {
-    const frameInputs = this.inputBuffer.get(frameNumber);
-    if (!frameInputs) return false;
+// pyodide_worker.js
+let pyodide = null;
+let micropip = null;
 
-    for (const playerId of playerIds) {
-        if (!frameInputs.has(String(playerId))) {
-            return false;
-        }
-    }
-    return true;
-}
+self.onmessage = async (event) => {
+  const msg = event.data;
+  const startTime = performance.now();
 
-// Lines 2918-2951: Update confirmedFrame tracking
-async _updateConfirmedFrame() {
-    const humanPlayerIds = this._getHumanPlayerIds();
-    // Find highest consecutive confirmed frame
-    for (let frame = startFrame; frame < this.frameNumber; frame++) {
-        if (this._hasAllInputsForFrame(frame, humanPlayerIds)) {
-            this.confirmedFrame = frame;
-            // ... compute and store hash
-        } else {
-            break;  // Gap in confirmation
-        }
+  try {
+    switch (msg.type) {
+      case WORKER_MSG.INIT:
+        pyodide = await loadPyodide({ indexURL: msg.pyodideUrl });
+        await pyodide.loadPackage('micropip');
+        micropip = pyodide.pyimport('micropip');
+
+        self.postMessage({
+          type: MAIN_MSG.INIT_COMPLETE,
+          id: msg.id,
+          timestamp: performance.now(),
+          pyodideVersion: pyodide.version
+        });
+        break;
+
+      case WORKER_MSG.STEP:
+        const stepResult = await executeStep(msg.actions);
+
+        self.postMessage({
+          type: MAIN_MSG.STEP_RESULT,
+          id: msg.id,
+          timestamp: performance.now(),
+          ...stepResult
+        });
+        break;
+
+      // ... other cases
     }
-}
+  } catch (error) {
+    self.postMessage({
+      type: MAIN_MSG.ERROR,
+      id: msg.id,
+      requestId: msg.id,
+      timestamp: performance.now(),
+      error: error.message,
+      stack: error.stack
+    });
+  }
+};
+
+// Signal ready
+self.postMessage({
+  type: MAIN_MSG.READY,
+  id: 0,
+  timestamp: performance.now()
+});
 ```
 
-**Current gap:** Frame data is stored in `frameDataBuffer` immediately on step completion (line 2441-2449), regardless of confirmation status. Export (`exportEpisodeDataFromBuffer`) doesn't filter by confirmation state.
+---
 
-## Data Recording Rules
+## Anti-Features (What NOT to Build)
 
-### Table Stakes (Must Have)
+### Synchronous Communication
 
-| Rule | Why Required | Implementation Notes |
-|------|--------------|---------------------|
-| **Record only CONFIRMED frames** | Speculative frames may use wrong inputs; will be corrected on rollback | Check `confirmedFrame >= frameNumber` before writing to export buffer |
-| **Clear speculative data on rollback** | Rollback invalidates all data from targetFrame onward | Existing: `clearFrameDataFromRollback(targetFrame)` - already implemented |
-| **Re-record during replay** | Replay produces correct data after rollback | Existing: `storeFrameData()` called during replay (lines 4747-4756) |
-| **Buffer until confirmation** | Can't export speculative data as final | New: separate `speculativeDataBuffer` from `confirmedDataBuffer` |
-| **Export from confirmed buffer only** | Ensures both peers export identical data | Modify `exportEpisodeDataFromBuffer()` to read from confirmed buffer |
-| **Include confirmation metadata** | Research needs to know which frames were speculative | Add `wasSpeculative: bool` and `rollbackCount: number` per frame |
+**DO NOT** use `Atomics.wait()` or `SharedArrayBuffer` for synchronous worker calls:
+- Blocks the main thread, defeating the purpose
+- Adds complexity without benefit for game loop use case
+- Most browsers restrict `SharedArrayBuffer` anyway
 
-### Differentiator Rules (Research Value-Add)
+### Message Compression
 
-| Rule | Why Valuable | Implementation Notes |
-|------|--------------|---------------------|
-| **Track rollback events per frame** | Understand prediction accuracy | Existing: `sessionMetrics.rollbacks.events` |
-| **Include input delay metrics** | Correlate delay with rollback frequency | Add `inputDelayAtRecord` field |
-| **Mark focus state per frame** | Filter out backgrounded frames if needed | Existing: `isFocused` field per frame |
-| **Hash verification status** | Know which frames were cryptographically verified | Add `peerHashMatch: bool` from Phase 11-14 |
+**DO NOT** implement custom compression for messages:
+- Adds CPU overhead on both ends
+- Modern browsers optimize structured cloning
+- Game state is already reasonably sized
 
-## Edge Cases
+### Multi-Step Batching
 
-### Scenario: Rollback
+**DO NOT** batch multiple `step()` calls into one message:
+- Each step depends on previous state
+- Breaks the Gymnasium API contract
+- Impossible to correctly implement
 
-| Step | Correct Behavior | Common Mistake |
-|------|------------------|----------------|
-| 1. Late input arrives | Trigger `pendingRollbackFrame` | Recording data before checking for rollback |
-| 2. Clear speculative data | `clearFrameDataFromRollback(targetFrame)` | Only clearing some data structures |
-| 3. Load snapshot | `loadStateSnapshot(snapshotFrame)` | Forgetting to restore RNG state |
-| 4. Replay frames | Execute with confirmed inputs, re-store frame data | Not re-storing data during replay |
-| 5. Resume normal execution | Continue from `currentFrame` | Leaving `rollbackInProgress` flag set |
+### Shared Pyodide Instance
 
-### Scenario: Fast-Forward (Tab Refocus)
+**DO NOT** try to share Pyodide across multiple workers:
+- Pyodide is single-threaded by design
+- WASM memory is not shareable
+- Each worker needs its own instance
 
-| Step | Correct Behavior | Common Mistake |
-|------|------------------|----------------|
-| 1. Detect refocus | `FocusManager._onForegrounded()` | Not detecting visibility change |
-| 2. Request missing inputs | `_requestMissingInputs()` if gaps exist | Processing immediately without inputs |
-| 3. Fast-forward execution | Execute batched frames without rendering | Rendering each frame (slow, causes freeze) |
-| 4. Mark focus state | `isFocused: false` for backgrounded frames | Recording all frames as focused |
-| 5. Data recording | Same as rollback - store with correct inputs | Using predicted inputs without verification |
-
-### Scenario: Packet Loss (Missing Inputs)
-
-| Step | Correct Behavior | Common Mistake |
-|------|------------------|----------------|
-| 1. Input not received | Use prediction (`getPredictedAction`) | Blocking/waiting for input |
-| 2. Mark as speculative | Add frame to `predictedFrames` set | Treating predicted frame as confirmed |
-| 3. Continue simulation | Execute with prediction, don't record as final | Recording speculative data as final |
-| 4. Input arrives late | Trigger rollback if prediction was wrong | Ignoring late input |
-| 5. After correction | Frame becomes CONFIRMED, record correct data | Keeping wrong data in export buffer |
-
-### Scenario: Episode End During Speculation
-
-| Step | Correct Behavior | Common Mistake |
-|------|------------------|----------------|
-| 1. Terminal state detected | Set `episodeComplete = true` | Immediately exporting data |
-| 2. Wait for peer sync | Exchange `p2p_episode_ready` messages | Exporting before peer reaches same state |
-| 3. Confirm final frames | Wait for all inputs up to terminal frame | Exporting with predicted final frames |
-| 4. Export confirmed data | Only export frames where `frame <= confirmedFrame` | Exporting all frames including speculative |
-
-## Feature Dependencies
-
-For data parity to work correctly, these must be true:
-
-1. **Deterministic simulation**: Given same inputs, both peers produce identical state
-   - Verified via state hash comparison (Phase 11-14)
-   - Requires seeded RNG, deterministic environment
-
-2. **Reliable input delivery**: All inputs eventually reach both peers
-   - P2P DataChannel with redundant sending (3 inputs per packet)
-   - SocketIO fallback path
-   - Input request mechanism for missing inputs
-
-3. **Synchronized episode boundaries**: Both peers agree when episode ends
-   - `p2pEpisodeSync` mechanism
-   - Wait for peer before exporting
-
-4. **Consistent frame numbering**: Both peers use same frame counter
-   - Shared `syncEpoch` prevents stale frame matching
-   - Frame counter resets together on episode start
-
-5. **Rollback capability**: Environment supports `get_state()` / `set_state()`
-   - Required for snapshot/restore
-   - `stateSyncSupported` flag gates rollback features
-
-## Recommended Data Structure
-
-### Dual-Buffer Approach
-
-```javascript
-// Speculative buffer - data from current execution (may be wrong)
-this.speculativeDataBuffer = new Map();  // frameNumber -> frameData
-
-// Confirmed buffer - data promoted after confirmation (correct)
-this.confirmedDataBuffer = new Map();    // frameNumber -> frameData
-
-// On step completion:
-storeFrameData(frameNumber, data) {
-    this.speculativeDataBuffer.set(frameNumber, data);
-    this._promoteConfirmedFrames();
-}
-
-// On rollback:
-clearFrameDataFromRollback(targetFrame) {
-    for (const frame of this.speculativeDataBuffer.keys()) {
-        if (frame >= targetFrame) {
-            this.speculativeDataBuffer.delete(frame);
-        }
-    }
-    // Note: DO NOT clear confirmedDataBuffer - those frames are already confirmed
-    // But in rare cases (server correction), we may need to invalidate confirmed data too
-}
-
-// Promote confirmed frames:
-_promoteConfirmedFrames() {
-    const humanPlayerIds = this._getHumanPlayerIds();
-    for (const [frame, data] of this.speculativeDataBuffer) {
-        if (frame <= this.confirmedFrame && this._hasAllInputsForFrame(frame, humanPlayerIds)) {
-            // Frame is confirmed - move to confirmed buffer
-            this.confirmedDataBuffer.set(frame, {
-                ...data,
-                wasSpeculative: this.predictedFrames.has(frame),
-                confirmedAt: Date.now()
-            });
-            this.speculativeDataBuffer.delete(frame);
-        }
-    }
-}
-
-// Export only confirmed data:
-exportEpisodeDataFromBuffer() {
-    // Only read from confirmedDataBuffer
-    const sortedFrames = Array.from(this.confirmedDataBuffer.keys()).sort((a, b) => a - b);
-    // ... build export format from confirmed frames only
-}
-```
-
-### Frame Data Schema (Extended)
-
-```javascript
-{
-    // Core data (existing)
-    actions: { playerId: action },
-    rewards: { playerId: reward },
-    terminateds: { playerId: bool },
-    truncateds: { playerId: bool },
-    infos: { playerId: info },
-    isFocused: bool,
-    timestamp: number,
-
-    // Confirmation metadata (new)
-    wasSpeculative: bool,           // Was this frame ever predicted?
-    confirmedAt: number,            // Timestamp when frame became confirmed
-    rollbacksBeforeConfirm: number, // How many times was this frame rolled back?
-    inputDelayFrames: number,       // INPUT_DELAY setting when recorded
-
-    // Verification metadata (from Phase 11-14)
-    localHash: string,              // State hash after this frame
-    peerHashMatch: bool,            // Did peer's hash match?
-    hashVerifiedAt: number          // Timestamp of hash verification
-}
-```
-
-## Anti-Features (Do NOT Build)
-
-| Anti-Feature | Why Avoid | What to Do Instead |
-|--------------|-----------|-------------------|
-| **Server-authoritative data source** | P2P architecture has no server running the game; adds complexity | Each peer exports from own confirmed buffer; verify with hash comparison |
-| **Waiting for confirmation before stepping** | Transforms rollback into lockstep; kills responsiveness | Predict and continue; rollback on mismatch |
-| **Real-time data streaming to server** | Network overhead; doesn't solve divergence | Batch export at episode end |
-| **Discarding all rollback data** | Loses research value of understanding rollback patterns | Record rollback metadata, discard wrong values |
-| **Single global "authoritative" export** | No single authority in P2P | Both peers export; verify equivalence offline |
-
-## Implementation Priority
-
-### Phase 1: Core Confirmation Tracking (Required)
-
-1. Add `confirmedFrame` tracking (already exists)
-2. Add `_hasAllInputsForFrame()` check (already exists)
-3. Split data buffers: speculative vs confirmed
-4. Modify export to read from confirmed buffer only
-
-### Phase 2: Rollback-Safe Data Recording (Required)
-
-1. Clear speculative buffer on rollback (partially exists)
-2. Re-store data during replay (exists)
-3. Promote to confirmed buffer after replay completes
-4. Ensure episode-end waits for final frame confirmation
-
-### Phase 3: Research Metadata (Recommended)
-
-1. Track `wasSpeculative` per frame
-2. Record rollback events with frame ranges
-3. Add hash verification status (leverages Phase 11-14)
-4. Export confirmation timing metrics
-
-### Phase 4: Verification (Optional)
-
-1. Cross-peer hash comparison at export time
-2. Offline validation tool to compare two exports
-3. Alert on divergence detection
+---
 
 ## Sources
 
-### Primary (HIGH Confidence - Codebase Analysis)
-- `/Users/chasemcd/Repositories/interactive-gym/interactive_gym/server/static/js/pyodide_multiplayer_game.js` - Current GGPO implementation (7000+ lines)
-- `/Users/chasemcd/Repositories/interactive-gym/.planning/phases/03-ggpo-p2p-integration/03-RESEARCH.md` - Phase 3 research on GGPO integration
-
-### Secondary (HIGH Confidence - Established Patterns)
-- [GGPO Developer Guide](https://github.com/pond3r/ggpo/blob/master/doc/DeveloperGuide.md) - Rollback netcode reference
-- [Rollback Networking in INVERSUS](https://www.gamedeveloper.com/design/rollback-networking-in-inversus) - Symmetric P2P patterns, deterministic replay
-- [SnapNet: Netcode Architectures Part 2: Rollback](https://www.snapnet.dev/blog/netcode-architectures-part-2-rollback/) - Confirmed vs speculative frames
-
-### Tertiary (MEDIUM Confidence - Community Patterns)
-- [Gaffer on Games: Deterministic Lockstep](https://gafferongames.com/post/deterministic_lockstep/) - Input acknowledgment protocol
-- [2XKO Netcode Article](https://2xko.riotgames.com/en-us/news/dev/how-2xko-handles-online-play/) - Spectator data from confirmed frames
-- [BestoNet](https://github.com/BestoGames/BestoNet) - Confirmed frame input buffer for spectators
-
-## Confidence Assessment
-
-| Area | Confidence | Rationale |
-|------|------------|-----------|
-| Frame state definitions | HIGH | Based on established GGPO patterns + existing codebase |
-| Confirmation protocol | HIGH | Directly analyzed from `pyodide_multiplayer_game.js` |
-| Dual-buffer approach | HIGH | Standard pattern from INVERSUS and other rollback implementations |
-| Rollback edge cases | HIGH | Already implemented in codebase, just needs data recording fix |
-| Fast-forward edge cases | HIGH | Implementation exists in codebase (Phase 26) |
-| Verification/hash comparison | MEDIUM | Phase 11-14 infrastructure exists but export integration untested |
-| Research metadata schema | MEDIUM | Custom requirements; standard patterns provide guidance |
+- MDN Web Workers API: https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Using_web_workers (HIGH confidence)
+- Existing codebase: `pyodide_multiplayer_game.js` binary protocol (HIGH confidence)
+- Existing codebase: `GameTimerWorker` pattern for inline workers (HIGH confidence)
+- Existing codebase: `RemoteGame` API for step/reset/initialize (HIGH confidence)

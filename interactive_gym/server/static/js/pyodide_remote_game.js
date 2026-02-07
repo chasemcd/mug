@@ -46,17 +46,42 @@ export class RemoteGame {
     }
 
     async initialize() {
-        this.pyodide = await loadPyodide();
+        // Check for pre-loaded Pyodide instance from Phase 67 preload
+        if (window.pyodidePreloadStatus === 'ready' && window.pyodideInstance) {
+            console.log('[RemoteGame] Reusing pre-loaded Pyodide instance');
+            this.pyodide = window.pyodideInstance;
+            this.micropip = window.pyodideMicropip;
+            this.installed_packages = [...(window.pyodideInstalledPackages || [])];
+        } else {
+            console.log('[RemoteGame] Loading Pyodide fresh (no preload available)');
+            // Signal server BEFORE blocking the main thread (GRACE-02)
+            if (window.socket) {
+                window.socket.emit('pyodide_loading_start', {});
+                // Yield to event loop so the emit is sent before WASM compilation blocks
+                await new Promise(resolve => setTimeout(resolve, 50));
+            }
 
-        await this.pyodide.loadPackage("micropip");
-        this.micropip = this.pyodide.pyimport("micropip");
+            this.pyodide = await loadPyodide();
 
+            await this.pyodide.loadPackage("micropip");
+            this.micropip = this.pyodide.pyimport("micropip");
+
+            // Signal server loading is done (GRACE-03)
+            if (window.socket) {
+                window.socket.emit('pyodide_loading_complete', {});
+            }
+        }
+
+        // Install only packages not already installed (dedup against preload)
         if (this.config.packages_to_install !== undefined) {
-            console.log("Installing packages via micropip: ", this.config.packages_to_install);
-            await this.micropip.install(this.config.packages_to_install);
-
-            // Append the installed packages to the list of installed packages
-            this.installed_packages.push(...this.config.packages_to_install);
+            const newPackages = this.config.packages_to_install.filter(
+                pkg => !this.installed_packages.includes(pkg)
+            );
+            if (newPackages.length > 0) {
+                console.log("Installing new packages via micropip: ", newPackages);
+                await this.micropip.install(newPackages);
+                this.installed_packages.push(...newPackages);
+            }
         }
 
         this.pyodide.globals.set("interactive_gym_globals", this.interactive_gym_globals);

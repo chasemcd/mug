@@ -1,403 +1,585 @@
-# Architecture Research: Rollback Netcode Data Collection
+# Architecture Research: PyodideWorker Integration
 
-**Domain:** P2P rollback netcode data collection for research export
-**Researched:** 2026-01-30
-**Confidence:** HIGH (based on codebase analysis + GGPO principles)
+**Project:** Interactive Gym - Pyodide Web Worker Integration
+**Researched:** 2026-02-04
+**Focus:** How to integrate a PyodideWorker into existing game classes
+
+---
 
 ## Executive Summary
 
-The current implementation has a well-structured `frameDataBuffer` mechanism that correctly handles rollback data correction. However, analysis reveals the **fast-forward path bypasses the confirmation check**, and data is recorded based on **frame execution** rather than **frame confirmation**. This creates the divergence problem: both peers record the same frames but potentially with different speculative values before correction propagates.
+The existing codebase has two game classes with distinct Pyodide usage patterns:
 
-The key architectural insight: **Data should only be exported for confirmed frames** - frames where ALL players' inputs have been received and the state is deterministically identical on both peers.
+1. **RemoteGame** - Single-player, simple async step/reset flow
+2. **MultiplayerPyodideGame** - Extends RemoteGame, adds GGPO rollback netcode
 
-## Data Collection Architecture
+Moving Pyodide to a Web Worker requires careful architectural decisions because:
+- The multiplayer game uses **synchronous rollback** (restore state, replay N frames rapidly)
+- Worker communication is inherently **async** (postMessage)
+- Both classes share substantial code via inheritance
 
-### Current Flow (Problematic)
+**Recommended approach:** Composition with a PyodideWorker facade class that both game classes use, with special handling for rollback batching.
 
-```
-                         PEER A                                    PEER B
-                           |                                          |
-  Frame N tick  ------>  step()                                    step()  <------ Frame N tick
-                           |                                          |
-                     [speculative]                               [speculative]
-                      local input                                 local input
-                      predicted partner                           predicted partner
-                           |                                          |
-                     storeFrameData(N)  <--- PROBLEM --->   storeFrameData(N)
-                     (may use prediction)                   (may use prediction)
-                           |                                          |
-                       frameNumber++                              frameNumber++
-                           |                                          |
-               [late input arrives]                       [late input arrives]
-                           |                                          |
-                     performRollback()                          performRollback()
-                           |                                          |
-                     clearFrameData(N)                          clearFrameData(N)
-                     replay + re-store                          replay + re-store
-                           |                                          |
-                    Episode ends -----> EXPORT <--------- Episode ends
-                                        (both export corrected data)
+---
 
-  PROBLEM: Fast-forward path does NOT use confirmation check
-           Background player exports frames with isFocused=false
-           but data may still diverge due to timing
-```
+## Current Architecture
 
-### The Core Issue
-
-1. **Speculative Storage**: `storeFrameData()` is called in `step()` BEFORE confirmation is verified
-2. **Rollback Corrects It**: `performRollback()` properly clears and re-stores data
-3. **Fast-Forward Gap**: `_performFastForward()` stores data without rollback-style correction
-4. **Export Timing**: Episode ends export from `frameDataBuffer` - but timing determines what's "final"
-
-### Recommended Flow
+### Class Hierarchy
 
 ```
-                         PEER A                                    PEER B
-                           |                                          |
-  Frame N tick  ------>  step()                                    step()  <------ Frame N tick
-                           |                                          |
-                     [speculative step]                         [speculative step]
-                           |                                          |
-                     speculativeBuffer[N]                       speculativeBuffer[N]
-                     (temporary storage)                        (temporary storage)
-                           |                                          |
-               [inputs exchange + confirm]               [inputs exchange + confirm]
-                           |                                          |
-                     _updateConfirmedFrame()                    _updateConfirmedFrame()
-                           |                                          |
-              confirmedFrame >= N?  ----------------------> confirmedFrame >= N?
-                     YES                                           YES
-                           |                                          |
-                     promoteToCanonical(N)                     promoteToCanonical(N)
-                     frameDataBuffer[N] =                      frameDataBuffer[N] =
-                       speculativeBuffer[N]                      speculativeBuffer[N]
-                           |                                          |
-                    Episode ends -----> EXPORT <--------- Episode ends
-                         (only confirmed data)              (only confirmed data)
-                         GUARANTEED PARITY                  GUARANTEED PARITY
+RemoteGame
+    |
+    +-- constructor(config)
+    +-- initialize()              # Creates Pyodide instance, loads env
+    +-- reinitialize_environment()
+    +-- reset()                   # Calls pyodide.runPythonAsync
+    +-- step(actions)             # Calls pyodide.runPythonAsync
+    |
+    v
+MultiplayerPyodideGame extends RemoteGame
+    |
+    +-- constructor(config)       # Adds GGPO state
+    +-- initialize()              # super() + validateStateSync()
+    +-- reset()                   # super() + P2P sync
+    +-- step(allActionsDict)      # GGPO logic, calls stepWithActions()
+    +-- stepWithActions(actions)  # Actual pyodide.runPythonAsync
+    +-- performRollback()         # loadStateSnapshot + replay loop
+    +-- saveStateSnapshot()       # env.get_state() via Pyodide
+    +-- loadStateSnapshot()       # env.set_state() via Pyodide
 ```
 
-### Key Insight
+### Pyodide Touchpoint Inventory
 
-**The architectural change needed:** Separate "speculative recording" from "canonical history."
+| Method | Class | Pyodide Calls | Sync Requirement |
+|--------|-------|---------------|------------------|
+| `initialize()` | RemoteGame | `loadPyodide()`, `micropip.install()`, `runPythonAsync()` | Async OK |
+| `reinitialize_environment()` | RemoteGame | `micropip.install()`, `runPythonAsync()` | Async OK |
+| `reset()` | RemoteGame | `runPythonAsync()` (reset + render) | Async OK |
+| `step()` | RemoteGame | `runPythonAsync()` (step + render) | Async OK |
+| `reset()` | Multiplayer | super() + additional `runPythonAsync()` for P2P | Async OK |
+| `stepWithActions()` | Multiplayer | `runPythonAsync()` (step + render) | Async OK |
+| `saveStateSnapshot()` | Multiplayer | `runPythonAsync()` (get_state + RNG) | Async OK |
+| `loadStateSnapshot()` | Multiplayer | `runPythonAsync()` (set_state + RNG) | **RAPID** |
+| `performRollback()` | Multiplayer | load + N x step via Python batch | **BATCHED** |
+| `computeQuickStateHash()` | Multiplayer | `runPythonAsync()` (get_state + hash) | Async OK |
+| `validateStateSync()` | Multiplayer | `runPythonAsync()` (capability check) | Async OK |
+| `seedPythonEnvironment()` | Multiplayer | `runPythonAsync()` (seed RNG) | Async OK |
 
-Current code conflates these - `frameDataBuffer` holds both speculative and confirmed data, relying on rollback to correct errors. This works for rollback scenarios but fails for:
+### Critical Path: Rollback
 
-1. Fast-forward (bulk processing without rollback correction)
-2. Episode boundaries (export happens at arbitrary confirmation points)
-3. Focus divergence (one peer backgrounds, their data differs until sync)
-
-## Component Responsibilities
-
-| Component | Current Responsibility | Recommended Change |
-|-----------|------------------------|-------------------|
-| `frameDataBuffer` | Stores all frame data, corrected on rollback | Store ONLY confirmed frames |
-| `storeFrameData()` | Called after every step | Call only when frame confirmed |
-| `clearFrameDataFromRollback()` | Clears frames >= target | Keep as safety valve |
-| `_updateConfirmedFrame()` | Tracks confirmation, triggers hash | ALSO trigger data promotion |
-| `exportEpisodeDataFromBuffer()` | Exports frameDataBuffer contents | No change (buffer now clean) |
-| NEW: `speculativeData` | N/A | Temporary storage for unconfirmed frames |
-
-### Component Ownership
-
-```
-                    +------------------+
-                    |  Game Loop       |
-                    |  (step())        |
-                    +--------+---------+
-                             |
-             +---------------+---------------+
-             |                               |
-    +--------v---------+          +----------v----------+
-    | Speculative      |          | Confirmation        |
-    | Layer            |          | Layer               |
-    +------------------+          +---------------------+
-    | - speculativeData|          | - confirmedFrame    |
-    | - predictions    |          | - inputBuffer       |
-    | - temp rewards   |          | - hashHistory       |
-    +--------+---------+          +----------+----------+
-             |                               |
-             |    Frame confirmed?           |
-             +----------+--------------------+
-                        |
-               +--------v--------+
-               | Canonical       |
-               | History         |
-               +-----------------+
-               | - frameDataBuffer|  <-- Only confirmed
-               | - actionSequence|
-               | - cumulativeValid|
-               +-----------------+
-                        |
-               +--------v--------+
-               | Export Layer    |
-               +-----------------+
-               | - emitEpisodeData|
-               | - validation data|
-               +-----------------+
-```
-
-## Recording Points
-
-### When to Record
-
-| Event | Record to Speculative? | Promote to Canonical? | Rationale |
-|-------|------------------------|----------------------|-----------|
-| Speculative step | YES | NO | Need data for potential rollback replay |
-| Post-rollback step | YES (replaces) | NO | Corrected data, but may rollback again |
-| Frame confirmed | N/A | YES | All inputs received, state is final |
-| Fast-forward step | YES | NO | Bulk processing, needs confirmation check |
-| Episode end | N/A | Promote remaining | Force-confirm at boundary |
-
-### Frame Confirmation Logic
-
-A frame N is "confirmed" when:
-1. ALL human players have inputs in `inputBuffer.get(N)`
-2. Frame N <= `confirmedFrame` (monotonically increasing)
-3. No rollback is in progress (`!rollbackInProgress`)
-
-Current code in `_hasAllInputsForFrame()` and `_updateConfirmedFrame()` correctly implements this.
-
-### Canonical History Buffer Structure
+The `performRollback()` method is the most demanding:
 
 ```javascript
-// NEW: Speculative buffer (temporary, may be overwritten)
-this.speculativeFrameData = new Map();  // frameNumber -> {actions, rewards, ...}
+// Current implementation (lines 4629-4800 approx)
+async performRollback(targetFrame, playerIds) {
+    // 1. Load snapshot
+    await this.loadStateSnapshot(snapshotFrame);
 
-// EXISTING: Canonical buffer (only confirmed, exported)
-this.frameDataBuffer = new Map();  // frameNumber -> {actions, rewards, ...}
+    // 2. Build all replay actions in JS first
+    const replayFrames = [];  // Collects {frame, actions} tuples
 
-// Promotion happens in _updateConfirmedFrame():
-async _updateConfirmedFrame() {
-    // ... existing confirmation logic ...
+    // 3. Execute ALL steps in a single Python batch
+    // This is done to prevent event loop yields during replay
+    await this.pyodide.runPythonAsync(`
+        for _replay_frame, _replay_actions in _replay_sequence:
+            env.step(_replay_actions)
+    `);
+}
+```
 
-    for (let frame = startFrame; frame < this.frameNumber; frame++) {
-        if (this._hasAllInputsForFrame(frame, humanPlayerIds)) {
-            this.confirmedFrame = frame;
+The existing code already batches Python calls to avoid event loop yields. A worker-based approach must preserve this characteristic.
 
-            // NEW: Promote speculative data to canonical
-            if (this.speculativeFrameData.has(frame)) {
-                this.frameDataBuffer.set(frame, this.speculativeFrameData.get(frame));
-                this.speculativeFrameData.delete(frame);
-            }
+---
 
-            // Existing: hash computation
-            await this._computeAndStoreConfirmedHash(frame);
+## Integration Approaches
+
+### Option 1: Composition (Recommended)
+
+**Pattern:** Create a `PyodideWorker` class that both game classes use via composition.
+
+```
+                     +-------------------+
+                     |   PyodideWorker   |
+                     | (Web Worker mgmt) |
+                     +--------+----------+
+                              |
+          +-------------------+-------------------+
+          |                                       |
++---------v---------+               +-------------v-----------+
+|    RemoteGame     |               | MultiplayerPyodideGame  |
+| this.pyodideWorker|               | this.pyodideWorker      |
++-------------------+               +-------------------------+
+```
+
+**Implementation:**
+
+```javascript
+class PyodideWorker {
+    constructor() {
+        this.worker = new Worker('pyodide_worker.js');
+        this.pendingPromises = new Map();  // id -> {resolve, reject}
+        this.nextId = 0;
+    }
+
+    // Core methods that mirror Pyodide interface
+    async runPythonAsync(code) { ... }
+    async loadPackage(pkg) { ... }
+
+    // Batch execution for rollback
+    async runBatch(operations) {
+        // Single postMessage, single response
+        // Worker executes all ops synchronously, returns all results
+    }
+
+    // State operations
+    async getState() { ... }
+    async setState(state) { ... }
+    async step(actions) { ... }
+    async reset(seed) { ... }
+}
+```
+
+**Pros:**
+- Clean separation of concerns
+- Worker lifecycle managed in one place
+- Both game classes get worker benefits
+- Easy to add new operations
+
+**Cons:**
+- Requires changes to both game classes
+- Need to design batch API carefully
+
+### Option 2: Inheritance (Worker as Base Class)
+
+**Pattern:** Create a `WorkerRemoteGame` that extends or replaces `RemoteGame`.
+
+```
+RemoteGame (keeps sync Pyodide)
+    |
+    v
+WorkerRemoteGame (worker-based)
+    |
+    v
+MultiplayerPyodideGame extends WorkerRemoteGame
+```
+
+**Pros:**
+- Preserves inheritance structure
+- Could keep RemoteGame for fallback
+
+**Cons:**
+- Tighter coupling
+- Harder to share worker between instances
+- More complex class hierarchy
+
+### Option 3: Adapter/Facade
+
+**Pattern:** Create a facade that wraps Pyodide with same interface, but uses worker internally.
+
+```javascript
+class PyodideFacade {
+    // Same interface as raw Pyodide
+    async runPythonAsync(code) { ... }
+    toPy(obj) { ... }
+
+    // But internally uses worker
+    constructor(useWorker = true) {
+        if (useWorker) {
+            this.impl = new PyodideWorkerImpl();
         } else {
-            break;
+            this.impl = new PyodideDirectImpl();
         }
     }
 }
 ```
 
-## Data Flow Patterns
+**Pros:**
+- Minimal changes to game classes (just change Pyodide reference)
+- Easy fallback to direct Pyodide
 
-### Pattern 1: Speculative-Then-Confirm
+**Cons:**
+- May hide worker-specific optimizations (batching)
+- Complex to implement full Pyodide interface
 
-**What:** Store data speculatively on step, promote to canonical on confirmation.
+---
 
-**When to use:** Normal gameplay flow where inputs arrive within a few frames.
+## Recommended Architecture: Composition with Batched Operations
 
-**Trade-offs:**
-- (+) Simple mental model
-- (+) Works with existing rollback flow
-- (-) Requires two buffers
-- (-) Must handle promotion timing carefully
+### Class Diagram
+
+```
++------------------+
+| PyodideWorker.js |  (Worker script - runs Pyodide in worker thread)
+| - pyodide        |
+| - env            |
+| - onmessage()    |
++------------------+
+        ^
+        | postMessage/onmessage
+        |
++------------------+
+| PyodideWorker    |  (Main thread manager)
+| - worker         |
+| - messageId      |
+| - pendingCalls   |
+|                  |
+| + init()         |
+| + runAsync(code) |
+| + step(actions)  |
+| + reset(seed)    |
+| + getState()     |
+| + setState()     |
+| + batch([ops])   |  <-- Key for rollback
+| + terminate()    |
++------------------+
+        ^
+        | composition
+        |
++------------------+     +---------------------------+
+| RemoteGame       |     | MultiplayerPyodideGame    |
+| - pyodideWorker  |     | extends RemoteGame        |
+|                  |     | - pyodideWorker (shared)  |
+| + initialize()   |     |                           |
+| + reset()        |     | + performRollback()       |
+| + step()         |     |   uses batch() for speed  |
++------------------+     +---------------------------+
+```
+
+### Message Protocol
 
 ```javascript
-// In step():
-this.speculativeFrameData.set(this.frameNumber, {
-    actions: finalActions,
-    rewards: Object.fromEntries(rewards),
-    // ...
-});
+// Main thread -> Worker
+{
+    type: 'init',
+    id: 1,
+    config: { packages: [...], envCode: '...' }
+}
 
-// In _updateConfirmedFrame():
-if (this._hasAllInputsForFrame(frame, humanPlayerIds)) {
-    // Promote to canonical
-    this.frameDataBuffer.set(frame, this.speculativeFrameData.get(frame));
+{
+    type: 'step',
+    id: 2,
+    actions: { agent_left: 0, agent_right: 1 }
+}
+
+{
+    type: 'batch',
+    id: 3,
+    operations: [
+        { type: 'setState', state: {...} },
+        { type: 'step', actions: {...} },
+        { type: 'step', actions: {...} },
+        { type: 'step', actions: {...} },
+        { type: 'getState' }  // Get final state after replay
+    ]
+}
+
+// Worker -> Main thread
+{
+    type: 'result',
+    id: 2,
+    success: true,
+    data: { obs, rewards, terminateds, truncateds, render_state }
+}
+
+{
+    type: 'batch_result',
+    id: 3,
+    success: true,
+    results: [null, stepResult1, stepResult2, stepResult3, finalState]
 }
 ```
 
-### Pattern 2: Delayed Recording
-
-**What:** Don't record at step time. Record only when confirmed.
-
-**When to use:** When memory is tight and most frames confirm quickly.
-
-**Trade-offs:**
-- (+) Single buffer, simpler
-- (-) Must re-extract data from actionSequence/rewards on confirmation
-- (-) Loses per-frame timing information
+### Rollback with Worker
 
 ```javascript
-// In step(): Don't store to frameDataBuffer
+// MultiplayerPyodideGame.performRollback()
+async performRollback(targetFrame, playerIds) {
+    // 1. Build all operations in JS
+    const ops = [];
 
-// In _updateConfirmedFrame():
-if (this._hasAllInputsForFrame(frame, humanPlayerIds)) {
-    // Reconstruct data from actionSequence
-    const record = this.actionSequence.find(r => r.frame === frame);
-    this.frameDataBuffer.set(frame, {
-        actions: record.actions,
-        // Must track rewards separately...
-    });
+    // Load snapshot
+    ops.push({ type: 'setState', state: snapshot.env_state });
+    ops.push({ type: 'setRngState', npState: snapshot.np_rng_state, pyState: snapshot.py_rng_state });
+
+    // Build replay sequence
+    for (let frame = snapshotFrame; frame < currentFrame; frame++) {
+        const actions = this.getInputsForFrame(frame, playerIds);
+        ops.push({ type: 'step', actions });
+    }
+
+    // Get final state
+    ops.push({ type: 'getState' });
+    ops.push({ type: 'render' });
+
+    // 2. Execute all in single worker call (no event loop yields!)
+    const results = await this.pyodideWorker.batch(ops);
+
+    // 3. Process results
+    const finalState = results[results.length - 2];
+    const renderState = results[results.length - 1];
+
+    return { state: finalState, render: renderState };
 }
 ```
 
-### Pattern 3: Force-Confirm at Boundaries
+---
 
-**What:** At episode end, force all remaining speculative frames to confirmed.
+## Worker Module Loading
 
-**When to use:** Episode boundaries where determinism is guaranteed by sync.
+### Option A: Inline Worker (Current Timer Pattern)
 
-**Trade-offs:**
-- (+) Ensures complete data export
-- (+) Handles edge cases at boundaries
-- (-) May include frames with prediction (though rare at boundary)
+The codebase already uses inline workers via Blob URL (see `GameTimerWorker` in multiplayer game):
 
 ```javascript
-// In signalEpisodeComplete():
-// Force-promote any remaining speculative data
-for (const [frame, data] of this.speculativeFrameData) {
-    if (!this.frameDataBuffer.has(frame)) {
-        this.frameDataBuffer.set(frame, data);
+// From pyodide_multiplayer_game.js lines 95-135
+const workerCode = `
+    self.onmessage = function(e) { ... }
+`;
+const blob = new Blob([workerCode], { type: 'application/javascript' });
+this.workerUrl = URL.createObjectURL(blob);
+this.worker = new Worker(this.workerUrl);
+```
+
+**Pros:**
+- Already proven pattern in codebase
+- No module bundling concerns
+- Works in all environments
+
+**Cons:**
+- Pyodide code is large - inline blob would be unwieldy
+- Can't use ES6 imports in worker
+
+### Option B: ES6 Module Worker
+
+```javascript
+const worker = new Worker('pyodide_worker.js', { type: 'module' });
+```
+
+**Pros:**
+- Clean file separation
+- Can use imports
+- Easier to maintain
+
+**Cons:**
+- Requires browser support (modern browsers OK)
+- Need to handle Pyodide CDN loading in worker
+
+### Option C: Separate Worker File (Recommended)
+
+Create a standalone worker file that loads Pyodide:
+
+```javascript
+// pyodide_worker.js
+importScripts('https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js');
+
+let pyodide = null;
+let env = null;
+
+self.onmessage = async function(e) {
+    const { type, id, ...data } = e.data;
+
+    try {
+        let result;
+        switch(type) {
+            case 'init':
+                pyodide = await loadPyodide();
+                await pyodide.loadPackage('micropip');
+                // ... setup env
+                result = { ready: true };
+                break;
+            case 'step':
+                result = await stepEnv(data.actions);
+                break;
+            // ... other cases
+        }
+        self.postMessage({ type: 'result', id, success: true, data: result });
+    } catch (error) {
+        self.postMessage({ type: 'result', id, success: false, error: error.message });
+    }
+};
+```
+
+---
+
+## Backward Compatibility
+
+### Strategy: Feature Detection + Fallback
+
+```javascript
+class RemoteGame {
+    constructor(config) {
+        // Feature detection
+        this.useWorker = config.use_worker !== false && typeof Worker !== 'undefined';
+
+        if (this.useWorker) {
+            this.pyodideWorker = new PyodideWorker();
+        } else {
+            // Direct Pyodide (fallback)
+            this.pyodide = null;  // Loaded in initialize()
+        }
+    }
+
+    async step(actions) {
+        if (this.useWorker) {
+            return await this.pyodideWorker.step(actions);
+        } else {
+            return await this._stepDirect(actions);
+        }
     }
 }
-this.speculativeFrameData.clear();
-
-// Then export
-this._emitEpisodeDataFromBuffer();
 ```
 
-### Recommended Pattern: Hybrid
+### Configuration Flag
 
-Use Pattern 1 (Speculative-Then-Confirm) for normal flow, with Pattern 3 (Force-Confirm at Boundaries) for episode endings:
+Add to scene metadata:
 
+```python
+scene = GymScene(
+    use_pyodide_worker=True,  # New option
+    # ... existing config
+)
 ```
-Normal tick: step() -> speculativeFrameData -> _updateConfirmedFrame() -> frameDataBuffer
-Episode end: force promote remaining -> export -> clear
-```
 
-## Anti-Patterns
+---
 
-### Anti-Pattern 1: Recording Before Inputs Are Known
+## Migration Path
 
-**What it does:** Stores data immediately after `step()` without checking confirmation.
+### Phase 1: PyodideWorker Core (No Changes to Game Classes)
 
-**Why it causes divergence:**
-- Peer A may have all inputs (confirmed)
-- Peer B may be using prediction (speculative)
-- Both store to `frameDataBuffer`
-- If no rollback occurs before export, data differs
+1. Create `pyodide_worker.js` (worker script)
+2. Create `PyodideWorker` class (main thread manager)
+3. Test in isolation with unit tests
+4. Operations: init, step, reset, getState, setState
 
-**Current code doing this:**
+### Phase 2: RemoteGame Integration
+
+1. Add `useWorker` config option
+2. Modify `initialize()` to create worker
+3. Modify `step()` and `reset()` to use worker
+4. Keep direct Pyodide as fallback
+5. Test single-player games
+
+### Phase 3: Multiplayer + Batch Operations
+
+1. Add `batch()` operation to worker
+2. Modify `performRollback()` to use batch
+3. Modify `saveStateSnapshot()` and `loadStateSnapshot()`
+4. Test rollback scenarios extensively
+5. Measure performance improvement
+
+### Phase 4: Cleanup
+
+1. Remove fallback code if worker is stable
+2. Update documentation
+3. Consider deprecating direct Pyodide mode
+
+---
+
+## Performance Considerations
+
+### Worker Thread Benefits
+
+| Scenario | Direct Pyodide | Worker Pyodide | Benefit |
+|----------|---------------|----------------|---------|
+| Heavy step() | Blocks main thread 10-50ms | Main thread free | UI remains responsive |
+| Rollback (10 frames) | 100-500ms blocking | Same total time, non-blocking | No frame drops |
+| Background tab | Throttled timer | Worker timers unthrottled | Consistent game loop |
+
+### Worker Overhead
+
+| Operation | Overhead |
+|-----------|----------|
+| postMessage (small) | ~0.1ms |
+| postMessage (state JSON) | 1-5ms depending on size |
+| Structured clone (arrays) | Can be significant |
+
+### Mitigation: Transferables
+
+For render state (potentially large):
+
 ```javascript
-// In step(), line ~2441:
-this.storeFrameData(this.frameNumber, {
-    actions: finalActions,  // May include predictions!
-    rewards: Object.fromEntries(rewards),
+// In worker
+const renderBuffer = new Uint8Array(renderData);
+self.postMessage({ type: 'step_result', render: renderBuffer }, [renderBuffer.buffer]);
+
+// Main thread receives without copy
+```
+
+---
+
+## Async/Sync Considerations for Rollback
+
+### The Challenge
+
+Rollback currently works because:
+1. All operations are in one async function
+2. No `await` between steps in the Python batch
+3. Event loop doesn't yield during replay
+
+With worker:
+1. Each `postMessage` could yield the event loop
+2. New inputs could arrive between replay steps
+3. Race conditions possible
+
+### Solution: Batch API
+
+The `batch()` operation sends ALL replay steps in one message:
+
+```javascript
+// ONE postMessage, ONE response
+const results = await this.pyodideWorker.batch([
+    { type: 'setState', state },
+    { type: 'step', actions: frame1Actions },
+    { type: 'step', actions: frame2Actions },
     // ...
-});
+]);
 ```
 
-### Anti-Pattern 2: Fast-Forward Without Confirmation Check
+Worker executes all synchronously, returns all results in one message.
 
-**What it does:** Bulk-processes frames and stores data without verifying confirmation.
+### Guard During Replay
 
-**Why it causes divergence:**
-- Fast-forward happens when one peer backgrounds
-- That peer bulk-processes frames using buffered inputs
-- No rollback correction happens (it's not a rollback, it's catch-up)
-- Data may include prediction if inputs were lost
-
-**Current code doing this:**
 ```javascript
-// In _performFastForward(), line ~4965:
-for (const frameData of ffResult.per_frame_data) {
-    this.storeFrameData(frameData.frame, {
-        actions: frameData.actions,
-        // No confirmation check!
-    });
+// In step() method
+if (this.rollbackInProgress) {
+    // Queue incoming inputs, don't process
+    this.pendingInputsDuringReplay.push(input);
+    return;
 }
 ```
 
-### Anti-Pattern 3: Exporting at Episode End Without Confirmation Sync
+This pattern already exists in the codebase (`rollbackInProgress` flag).
 
-**What it does:** Exports `frameDataBuffer` at episode end without ensuring both peers are at same confirmation point.
+---
 
-**Why it causes divergence:**
-- Episode end is detected locally
-- P2P sync ensures both peers agree on END frame
-- But confirmation may lag behind current frame
-- Peer A: confirmed=N-5, Peer B: confirmed=N-2
-- Both export, but with different "final" data
+## Open Questions
 
-**Mitigation in current code:** Episode sync waits for peer agreement. But this doesn't wait for confirmation to catch up.
+1. **Shared Worker?** Could multiple game instances share one PyodideWorker? Probably not worth the complexity for typical usage.
 
-### Anti-Pattern 4: Clearing Buffer Before Export
+2. **Memory Management:** Pyodide in worker has separate memory. How to handle large env states efficiently? Consider Transferables or SharedArrayBuffer.
 
-**What it does:** Clears `frameDataBuffer` immediately after emit, before confirmation of receipt.
+3. **Error Handling:** Worker crashes need graceful handling. Consider heartbeat/watchdog.
 
-**Why it causes issues:**
-- If emit fails, data is lost
-- No retry mechanism
-- Current code does this (line ~3726)
+4. **Hot Reload:** Can we update env code without destroying worker? Would need careful state preservation.
 
-**Better:** Mark as "pending export" and clear only after server ACK.
+---
 
-## Implementation Recommendations
+## Recommendations Summary
 
-### Phase 1: Add Speculative Buffer (Low Risk)
+1. **Use Composition pattern** - PyodideWorker class used by both game classes
+2. **Separate worker file** - Not inline blob, for maintainability
+3. **Batch API is critical** - For rollback performance and correctness
+4. **Keep fallback** - Direct Pyodide for debugging/compatibility
+5. **Incremental migration** - Start with RemoteGame, then multiplayer
 
-1. Add `speculativeFrameData` Map
-2. Change `storeFrameData()` to write to speculative buffer
-3. Add `promoteToCanonical()` call in `_updateConfirmedFrame()`
-4. No changes to export logic (it reads from frameDataBuffer which now only has confirmed)
-
-### Phase 2: Fix Fast-Forward Path (Medium Risk)
-
-1. After fast-forward batch processing, call `_updateConfirmedFrame()`
-2. Only promote frames that are actually confirmed
-3. Handle remaining speculative frames appropriately
-
-### Phase 3: Add Force-Confirm at Boundaries (Low Risk)
-
-1. Before `_emitEpisodeDataFromBuffer()`, promote remaining speculative
-2. Log warning if promoting unconfirmed frames (indicates sync issue)
-
-### Phase 4: Add Export Confirmation (Optional)
-
-1. Don't clear buffer immediately on emit
-2. Wait for server ACK before clearing
-3. Retry on failure
-
-## Verification
-
-To verify the fix works:
-
-1. **Action Parity Test:**
-   - Run two peers through episode with artificial rollbacks
-   - Export data from both
-   - Run `validate_action_sequences.py`
-   - Should show 0 mismatches
-
-2. **Fast-Forward Test:**
-   - One peer backgrounds for 5+ seconds
-   - Refocuses and fast-forwards
-   - Compare exported data
-   - Should show identical actions/rewards for all frames
-
-3. **Boundary Test:**
-   - Episode ends while frames still unconfirmed
-   - Both peers should export identical data
-   - Verify no prediction-based differences
+---
 
 ## Sources
 
-- [GGPO Official Documentation](https://www.ggpo.net/) - Rollback networking fundamentals
-- [SnapNet: Netcode Architectures Part 2 - Rollback](https://www.snapnet.dev/blog/netcode-architectures-part-2-rollback/) - Confirmed vs speculative frames
-- [Gaffer On Games: Deterministic Lockstep](https://gafferongames.com/post/deterministic_lockstep/) - Frame confirmation concepts
-- [GitHub: WillKirkmanM/rollback-netcode](https://github.com/WillKirkmanM/rollback-netcode) - Confirmed frame cleanup patterns
-- [GitHub: Corrade/netcode-lockstep](https://github.com/Corrade/netcode-lockstep) - P2P lockstep reference implementation
-- Codebase analysis: `/Users/chasemcd/Repositories/interactive-gym/interactive_gym/server/static/js/pyodide_multiplayer_game.js`
+- Codebase analysis:
+  - `/interactive_gym/server/static/js/pyodide_remote_game.js` - RemoteGame class
+  - `/interactive_gym/server/static/js/pyodide_multiplayer_game.js` - MultiplayerPyodideGame class (7000+ lines)
+  - `/interactive_gym/server/static/js/index.js` - Initialization flow
+- Existing patterns:
+  - `GameTimerWorker` class (lines 78-172) - Inline worker example
+  - `performRollback()` method (lines 4629+) - Batch Python execution pattern

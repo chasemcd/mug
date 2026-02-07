@@ -351,7 +351,7 @@ const P2P_MSG_FOCUS_STATE = 0x14;  // Focus state notification (focused/backgrou
  * @returns {ArrayBuffer} Encoded packet
  */
 function encodeInputPacket(playerId, currentFrame, inputs) {
-    const inputCount = Math.min(inputs.length, 5);
+    const inputCount = Math.min(inputs.length, 15);  // Support up to 15 inputs for redundancy
     const buffer = new ArrayBuffer(9 + inputCount * 5);
     const view = new DataView(buffer);
 
@@ -844,7 +844,7 @@ class P2PInputSender {
         // Track recent inputs for redundant sending
         // [{frame, action}, ...] - most recent at end
         this.recentInputs = [];
-        this.maxRecentInputs = 10;  // Keep larger buffer than redundancy needs
+        this.maxRecentInputs = 20;  // Keep larger buffer than redundancy needs
 
         // Buffer congestion threshold (bytes)
         this.bufferThreshold = 16384;
@@ -1127,19 +1127,25 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
 
         // P2P ready gate - prevents game loop from starting until P2P is established
         // This ensures the first frame can use P2P, not just SocketIO fallback
+        // Phase 72: Increased from 5000ms to 15000ms. Under 200ms symmetric latency,
+        // WebRTC signaling through SocketIO takes ~4-5s. The old 5000ms timeout was
+        // right at the boundary, causing intermittent p2p_validation_failed -> re-pool
+        // loops that consumed the test timeout.
         this.p2pReadyGate = {
             enabled: true,           // Set to false to skip waiting for P2P
             resolved: false,         // True when P2P is ready or timeout
-            timeoutMs: 5000,         // Max time to wait for P2P connection
+            timeoutMs: 15000,        // Max time to wait for P2P connection (Phase 72: was 5000)
             timeoutId: null          // Timeout handle
         };
 
         // P2P validation state machine (Phase 19)
         // States: 'idle' -> 'connecting' -> 'validating' -> 'validated' | 'failed'
+        // Phase 72: Increased from 10000ms to 15000ms to match ready gate timeout.
+        // Validation must complete within the ready gate window.
         this.p2pValidation = {
             enabled: true,                  // Can be disabled via config
             state: 'idle',
-            timeoutMs: 10000,               // Default 10 seconds for validation
+            timeoutMs: 15000,               // Default 15 seconds for validation (Phase 72: was 10000)
             timeoutId: null,
             pingSentAt: null,               // Timestamp when ping sent
             pongReceived: false,
@@ -1161,6 +1167,9 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
             reconnectionAttempts: [],        // [{timestamp, duration, outcome, attempts}]
             totalPauseDuration: 0            // Cumulative ms paused (LOG-03)
         };
+
+        // Phase 77: Set true when scene exits to guard stale event handlers
+        this.sceneExited = false;
 
         // GGPO-style input queuing: inputs are queued during network reception
         // and processed synchronously at frame start to prevent race conditions
@@ -1313,6 +1322,15 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
             // Configure whether to pause game when partner backgrounds
             if (data.scene_metadata?.pause_on_partner_background !== undefined) {
                 this.config.pause_on_partner_background = data.scene_metadata.pause_on_partner_background;
+            }
+
+            // Configure input confirmation timeout from scene config (Phase 61: PARITY-01, PARITY-02)
+            // Waits for partner input confirmation at episode boundaries before export
+            if (data.scene_metadata?.input_confirmation_timeout_ms !== undefined) {
+                this.inputConfirmationTimeoutMs = data.scene_metadata.input_confirmation_timeout_ms;
+                p2pLog.info(`Input confirmation timeout: ${this.inputConfirmationTimeoutMs}ms`);
+            } else {
+                this.inputConfirmationTimeoutMs = 500;  // Default 500ms
             }
 
             // Initialize action queues for other players
@@ -1728,6 +1746,8 @@ env.get_state()
         /**
          * Initialize Pyodide and environment with seeded RNG
          */
+        console.log('[MultiplayerPyodideGame] Initializing...',
+            window.pyodidePreloadStatus === 'ready' ? '(will reuse pre-loaded Pyodide)' : '(will load Pyodide fresh)');
         await super.initialize();
 
         // Validate that environment supports multiplayer state synchronization
@@ -2987,6 +3007,63 @@ obs, rewards, terminateds, truncateds, infos, render_state
         if (promoted.length > 0) {
             p2pLog.debug(`Promoted ${promoted.length} frames to canonical buffer (up to frame ${this.confirmedFrame})`);
         }
+    }
+
+    /**
+     * Wait for input confirmation before episode export (Phase 61: PARITY-01).
+     * Called at episode end to ensure all partner inputs are confirmed before exporting.
+     * This prevents data divergence under packet loss - both players wait for confirmation
+     * or timeout before promoting speculative data.
+     *
+     * @param {number} timeoutMs - Maximum time to wait for confirmation
+     * @returns {Promise<boolean>} True if all inputs confirmed, false if timeout
+     */
+    async _waitForInputConfirmation(timeoutMs) {
+        // Skip if not P2P mode or no timeout configured
+        if (this.serverAuthoritative || timeoutMs <= 0) {
+            return true;
+        }
+
+        const targetFrame = (this.p2pEpisodeSync.syncedTerminationFrame ?? this.frameNumber) - 1;
+        const humanPlayerIds = this._getHumanPlayerIds();
+
+        if (humanPlayerIds.length === 0) {
+            return true;  // No human players to wait for
+        }
+
+        // Check if already confirmed
+        if (this._hasAllInputsForFrame(targetFrame, humanPlayerIds)) {
+            await this._updateConfirmedFrame();
+            p2pLog.debug(`[Input Confirmation] Already confirmed up to frame ${targetFrame}`);
+            return true;
+        }
+
+        p2pLog.info(`[Input Confirmation] Waiting for inputs on frame ${targetFrame} ` +
+            `(confirmedFrame=${this.confirmedFrame}, timeout=${timeoutMs}ms)`);
+
+        const startTime = performance.now();
+
+        while (performance.now() - startTime < timeoutMs) {
+            // Process any pending inputs that may have arrived
+            this._processQueuedInputs();
+
+            // Check if target frame is now confirmed
+            if (this._hasAllInputsForFrame(targetFrame, humanPlayerIds)) {
+                await this._updateConfirmedFrame();
+                const elapsed = Math.round(performance.now() - startTime);
+                p2pLog.info(`[Input Confirmation] Confirmed after ${elapsed}ms`);
+                return true;
+            }
+
+            // Small delay to allow event loop to process incoming packets
+            await new Promise(resolve => setTimeout(resolve, 10));
+        }
+
+        // Timeout - log warning but proceed
+        console.warn(`[Input Confirmation] Timeout after ${timeoutMs}ms. ` +
+            `confirmedFrame=${this.confirmedFrame}, target=${targetFrame}. ` +
+            `Proceeding with episode export (data may diverge).`);
+        return false;
     }
 
     /**
@@ -5283,7 +5360,11 @@ json.dumps({'cumulative_rewards': {str(k): v for k, v in _cumulative_rewards.ite
         const keysToDelete = [];
 
         for (const key of this.inputBuffer.keys()) {
-            if (key < pruneThreshold) {
+            // Only prune frames that are confirmed AND old enough
+            // Unconfirmed frames must be retained for rollback replay correctness
+            // and to prevent gaps in the confirmation chain (_updateConfirmedFrame
+            // scans consecutively and breaks at the first missing frame)
+            if (key < pruneThreshold && key <= this.confirmedFrame) {
                 keysToDelete.push(key);
             }
         }
@@ -5293,10 +5374,10 @@ json.dumps({'cumulative_rewards': {str(k): v for k, v in _cumulative_rewards.ite
             this.predictedFrames.delete(key);
         }
 
-        // Also enforce max size limit
+        // Also enforce max size limit - but still respect confirmedFrame
         if (this.inputBuffer.size > this.inputBufferMaxSize) {
             const sortedKeys = Array.from(this.inputBuffer.keys()).sort((a, b) => a - b);
-            const toRemove = sortedKeys.slice(0, this.inputBuffer.size - this.inputBufferMaxSize);
+            const toRemove = sortedKeys.filter(k => k <= this.confirmedFrame).slice(0, this.inputBuffer.size - this.inputBufferMaxSize);
             for (const key of toRemove) {
                 this.inputBuffer.delete(key);
                 this.predictedFrames.delete(key);
@@ -5494,6 +5575,9 @@ json.dumps({'cumulative_rewards': {str(k): v for k, v in _cumulative_rewards.ite
          * Initialize WebRTC P2P connection to peer.
          * Called after pyodide_game_ready when we know the other player's ID.
          */
+        // Reset scene exit flag for new game (Phase 77 - Pitfall 3: reuse scenario)
+        this.sceneExited = false;
+
         this.p2pValidation.state = 'connecting';
         p2pLog.debug(`Initiating connection to peer ${this.p2pPeerId}`);
 
@@ -5525,7 +5609,7 @@ json.dumps({'cumulative_rewards': {str(k): v for k, v in _cumulative_rewards.ite
                 this.p2pInputSender = new P2PInputSender(
                     this.webrtcManager,
                     myPlayerIndex,
-                    3  // redundancy count
+                    10  // redundancy count - higher for packet loss resilience
                 );
             }
 
@@ -5721,6 +5805,41 @@ json.dumps({'cumulative_rewards': {str(k): v for k, v in _cumulative_rewards.ite
             this._p2pHealthReportIntervalId = null;
             p2pLog.debug('P2P health reporting stopped');
         }
+    }
+
+    /**
+     * Clean up P2P resources when exiting a GymScene (Phase 77 - P2P-01, P2P-02).
+     * Called from terminateGymScene() in index.js.
+     * Sets sceneExited flag FIRST (synchronous) to guard all stale event handlers,
+     * then tears down WebRTC, telemetry, health reporting, and timer worker.
+     *
+     * IMPORTANT: Do NOT null out `this` or remove socket listeners.
+     * - Socket listeners are anonymous arrow functions with no stored reference (can't socket.off).
+     * - The game_id filter in each listener + sceneExited guard prevents stale event processing.
+     * - The game instance may be reused if the next scene is also a GymScene (reinitialize_environment path).
+     */
+    cleanupForSceneExit() {
+        // Set flag FIRST (synchronous) to guard all handlers immediately
+        this.sceneExited = true;
+        p2pLog.info('Scene exit cleanup initiated');
+
+        // Close WebRTC connection (P2P-01)
+        // WebRTCManager.close() is idempotent - handles null peerConnection/dataChannel
+        if (this.webrtcManager) {
+            this.webrtcManager.close();
+            this.webrtcManager = null;
+        }
+
+        // Stop latency telemetry polling (Phase 22)
+        if (this.latencyTelemetry) {
+            this.latencyTelemetry.stop();
+        }
+
+        // Stop P2P health reporting interval
+        this._stopP2PHealthReporting();
+
+        // Destroy Web Worker timer (Phase 24)
+        this._destroyTimerWorker();
     }
 
     /**
@@ -6182,8 +6301,8 @@ json.dumps({'cumulative_rewards': {str(k): v for k, v in _cumulative_rewards.ite
      * Called from WebRTCManager callback when connection drop detected.
      */
     _onP2PConnectionLost(info) {
-        // Skip if already paused or game is done
-        if (this.reconnectionState.isPaused || this.state === 'done') {
+        // Skip if already paused, game is done, or scene already exited
+        if (this.sceneExited || this.reconnectionState.isPaused || this.state === 'done') {
             return;
         }
 
@@ -6335,6 +6454,12 @@ json.dumps({'cumulative_rewards': {str(k): v for k, v in _cumulative_rewards.ite
      * @param {string|number} data.disconnected_player_id - ID of player who disconnected
      */
     _handleReconnectionGameEnd(data) {
+        // P2P-02: Don't show overlay if scene already exited
+        if (this.sceneExited) {
+            p2pLog.info('Ignoring p2p_game_ended - scene already exited');
+            return;
+        }
+
         // If we already ended due to focus loss timeout, don't overwrite the message
         // The player who timed out should keep seeing "you left too long", not "partner disconnected"
         if (this.focusLossTimeoutTerminal) {
@@ -6495,6 +6620,9 @@ json.dumps({'cumulative_rewards': {str(k): v for k, v in _cumulative_rewards.ite
      * Ends game for both players when focus loss exceeds configured timeout.
      */
     _handleFocusLossTimeout() {
+        // P2P-02: Don't show overlay if scene already exited
+        if (this.sceneExited) return;
+
         const timeoutMs = this.focusManager.timeoutMs;
         const actualMs = this.focusManager.getCurrentBackgroundDuration();
         // Always log for admin console visibility
@@ -7244,9 +7372,11 @@ json.dumps({'cumulative_rewards': {str(k): v for k, v in _cumulative_rewards.ite
         this.p2pEpisodeSync.syncTimeoutId = setTimeout(() => {
             if (this.p2pEpisodeSync.pendingReset && !this.p2pEpisodeSync.remoteEpisodeEndReceived) {
                 p2pLog.warn('Episode sync timeout - proceeding with reset');
-                this._clearEpisodeSyncState();
                 this.episodeComplete = true;
                 this.signalEpisodeComplete();
+                // Clear sync state AFTER export to preserve syncedTerminationFrame
+                // during exportEpisodeDataFromBuffer() (Phase 74 fix)
+                this._clearEpisodeSyncState();
             }
         }, 2000);
 
@@ -7254,12 +7384,14 @@ json.dumps({'cumulative_rewards': {str(k): v for k, v in _cumulative_rewards.ite
         this._checkEpisodeSyncAndReset();
     }
 
-    _checkEpisodeSyncAndReset() {
+    async _checkEpisodeSyncAndReset() {
         /**
          * Check if both peers have detected episode end and trigger synchronized reset.
          * This is called:
          * 1. When we detect episode end locally (after broadcasting)
          * 2. When we receive episode end from peer
+         *
+         * Phase 61 (PARITY-01): Waits for input confirmation before signaling episode complete.
          */
         const sync = this.p2pEpisodeSync;
 
@@ -7274,12 +7406,24 @@ json.dumps({'cumulative_rewards': {str(k): v for k, v in _cumulative_rewards.ite
             p2pLog.warn(`Large frame difference at episode end: ${frameDiff} frames`);
         }
 
-        // Clear sync state for next episode
-        this._clearEpisodeSyncState();
+        // Phase 61 (PARITY-01): Wait for input confirmation before completing episode
+        // This ensures both players have confirmed inputs before promoting speculative data
+        const confirmed = await this._waitForInputConfirmation(this.inputConfirmationTimeoutMs);
+        if (!confirmed) {
+            // Timeout occurred - _waitForInputConfirmation already logged warning
+            // Proceed with export anyway (graceful degradation, same as current behavior)
+        }
 
-        // Now safe to signal episode complete (which triggers shouldReset)
+        // Signal episode complete BEFORE clearing sync state.
+        // signalEpisodeComplete() -> exportEpisodeDataFromBuffer() needs syncedTerminationFrame
+        // to correctly filter frames at the episode boundary. Clearing first causes the filter
+        // to be skipped, allowing extra frames from rollback replays to leak into the export
+        // (Phase 74 fix: root cause of row count mismatch under packet loss + active inputs).
         this.episodeComplete = true;
         this.signalEpisodeComplete();
+
+        // Clear sync state AFTER export to preserve syncedTerminationFrame
+        this._clearEpisodeSyncState();
     }
 
     _clearEpisodeSyncState() {

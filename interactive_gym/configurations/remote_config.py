@@ -90,6 +90,7 @@ class RemoteConfig:
         self.run_through_pyodide: bool = False
         self.environment_initialization_code: str = ""
         self.packages_to_install: list[str] = []
+        self.pyodide_load_timeout_s: int = 60
 
         # webrtc / turn server configuration
         self.turn_username: str | None = None
@@ -412,6 +413,37 @@ class RemoteConfig:
             logger.info("TURN force_relay enabled - all connections will use TURN")
 
         return self
+
+    def get_entry_screening_config(self) -> dict:
+        """Get the entry screening configuration for sending to the client.
+
+        RemoteConfig does not support full entry screening, so this returns
+        safe defaults to prevent crashes when called from app.py.
+
+        :return: Dictionary with entry screening settings
+        :rtype: dict
+        """
+        return {
+            "device_exclusion": None,
+            "browser_requirements": None,
+            "browser_blocklist": None,
+            "max_ping": self.max_ping,
+            "min_ping_measurements": self.min_ping_measurements,
+            "exclusion_messages": {},
+            "has_entry_callback": False,
+        }
+
+    def get_pyodide_config(self) -> dict:
+        """Get Pyodide configuration from this RemoteConfig.
+
+        :return: Dictionary with needs_pyodide flag and packages list
+        :rtype: dict
+        """
+        return {
+            "needs_pyodide": self.run_through_pyodide,
+            "packages_to_install": self.packages_to_install,
+            "pyodide_load_timeout_s": self.pyodide_load_timeout_s,
+        }
 
     @property
     def simulate_waiting_room(self) -> bool:

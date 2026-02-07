@@ -1,190 +1,170 @@
 # Project Research Summary
 
-**Project:** Interactive Gym — P2P Multiplayer
-**Domain:** Rollback netcode data collection for research export parity
-**Researched:** 2026-01-30
-**Confidence:** HIGH
+**Project:** Interactive Gym v1.16 - Pyodide Web Worker
+**Domain:** WebAssembly Worker Architecture for Browser-Based Python Game Execution
+**Researched:** 2026-02-04
+**Confidence:** MEDIUM
 
 ## Executive Summary
 
-The data export parity problem has a clear root cause: **data is recorded speculatively during frame execution, before inputs are confirmed**. While the existing GGPO-style rollback system correctly clears and re-records data during rollbacks, two critical gaps remain:
+Moving Pyodide to a Web Worker is the correct solution for preventing Socket.IO disconnects during concurrent game initialization. The research confirms this is an officially supported pattern with well-documented implementation paths. The key architectural decision is to use **raw postMessage with a typed message protocol** rather than abstractions like Comlink, which aligns with existing codebase patterns (GameTimerWorker) and provides the progress event support needed during lengthy Pyodide initialization.
 
-1. **Fast-forward path**: When a tab is backgrounded and refocused, the fast-forward bulk processing may not follow the same confirmation-gated recording path
-2. **Export timing**: Episode end exports from `frameDataBuffer` without verifying that all frames are confirmed
+The recommended approach uses **composition over inheritance**: create a `PyodideWorker` class that both `RemoteGame` and `MultiplayerPyodideGame` use. This cleanly separates Worker lifecycle management from game logic. The critical technical challenge is the multiplayer rollback system, which currently executes batched Python operations to avoid event loop yields. The solution is a **batch API** that sends all rollback operations in a single postMessage, with the Worker executing them synchronously and returning all results together.
 
-The fix is architecturally straightforward: **separate speculative data storage from canonical (confirmed) data storage**, and only export from the canonical buffer. The existing `confirmedFrame` tracking and `_hasAllInputsForFrame()` infrastructure already provides the confirmation mechanism — it just needs to gate data promotion.
+Key risks are (1) **memory boundary serialization** - PyProxy objects cannot cross the Worker boundary and must be converted to JavaScript first, (2) **initialization race conditions** - the Worker must signal readiness before accepting commands, and (3) **error propagation** - Worker errors must be explicitly forwarded to the main thread. All three have straightforward prevention patterns documented in the research.
 
 ## Key Findings
 
-### Recommended Stack/Patterns
+### Recommended Stack
 
-The codebase already implements GGPO patterns correctly. The gap is at the export boundary.
+The stack is minimal - native Web Worker APIs without external dependencies. This matches the existing codebase philosophy.
 
-**Core concepts already in place:**
-- `confirmedFrame` — highest consecutive frame with all inputs received
-- `inputBuffer` — stores received inputs indexed by frame
-- `stateSnapshots` — enables rollback to any recent frame
-- `clearFrameDataFromRollback()` — clears speculative data on rollback
+**Core technologies:**
+- **Web Worker (native)**: Isolates Pyodide from main thread - fundamental browser API, HIGH confidence
+- **postMessage API**: Main-Worker communication - chosen over Comlink for progress event support and codebase consistency
+- **Transferable Objects**: Zero-copy transfer for large ArrayBuffers (render state, observations) - optional optimization
+- **Separate Worker File**: `/static/js/pyodide_worker.js` - cleaner than inline Blob for Pyodide's complexity
 
-**Missing piece:**
-- `speculativeFrameData` buffer — temporary storage before confirmation
-- Promotion logic in `_updateConfirmedFrame()` — move data to canonical buffer only when confirmed
+**Rejected alternatives:**
+- Comlink: RPC abstraction doesn't fit async WASM with progress events
+- SharedArrayBuffer: Requires COOP/COEP headers, overkill for this use case
+- Inline Blob Worker: Works for small workers (GameTimerWorker) but unwieldy for Pyodide
 
-### Expected Features (Data Recording Rules)
+### Expected Features
 
 **Must have (table stakes):**
-- Record only CONFIRMED frames — speculative frames may use wrong inputs
-- Clear speculative data on rollback — already implemented
-- Re-record during replay — already implemented
-- Buffer until confirmation — NEW: separate speculative from confirmed buffer
-- Export from confirmed buffer only — NEW: modify export logic
+- Non-blocking Pyodide initialization - main thread stays responsive for Socket.IO
+- Progress events during loading - user sees "Loading Pyodide...", "Installing packages..."
+- Error propagation to main thread - failures surface as UI errors, not silent hangs
+- Request/response correlation with IDs - enables timeouts and proper promise resolution
 
-**Should have (research value-add):**
-- Track `wasSpeculative` per frame — understand prediction accuracy
-- Include `rollbackCount` metadata — correlate with network conditions
-- Hash verification status — know which frames were cryptographically verified
+**Should have (competitive):**
+- Batch operations for rollback - single round-trip for state restore + N replay steps
+- Latency tracking via timestamps - performance monitoring built-in
+- Graceful Worker termination with cleanup - prevents memory leaks
+
+**Defer (v2+):**
+- SharedArrayBuffer for sub-ms latency (not needed at current frame rates)
+- Hot reload of environment code without Worker restart
+- Multi-Worker support for parallel environments
 
 ### Architecture Approach
 
-**Two-buffer pattern:**
+The composition pattern keeps Worker management separate from game logic. Both `RemoteGame` (single-player) and `MultiplayerPyodideGame` use a shared `PyodideWorker` instance. The Worker is a singleton per page - Pyodide initialization is expensive (3-8 seconds) and packages stay loaded across scenes.
 
-```
-Frame executed → speculativeFrameData[N]
-                        ↓
-        _updateConfirmedFrame() promotes
-                        ↓
-              frameDataBuffer[N] (canonical)
-                        ↓
-               Episode end export
-```
+**Major components:**
+1. **pyodide_worker.js** (Worker script) - owns Pyodide instance, handles all Python execution
+2. **PyodideWorker** (main thread class) - manages Worker lifecycle, request/response correlation, progress callbacks
+3. **Message Protocol** - typed messages with numeric IDs: INIT, STEP, RESET, BATCH, PROGRESS, ERROR
 
-**Key changes needed:**
-1. `storeFrameData()` writes to `speculativeFrameData` instead of `frameDataBuffer`
-2. `_updateConfirmedFrame()` promotes confirmed frames to `frameDataBuffer`
-3. `_performFastForward()` uses same confirmation-gated storage
-4. Episode end force-confirms remaining frames before export
+**Key message types:**
+```
+Main -> Worker: INIT, INSTALL_PACKAGES, SET_GLOBALS, RUN_INIT_CODE, STEP, RESET, BATCH
+Worker -> Main: READY, INIT_COMPLETE, STEP_RESULT, RESET_RESULT, BATCH_RESULT, PROGRESS, ERROR
+```
 
 ### Critical Pitfalls
 
-1. **Recording speculative data as ground truth** — data recorded before confirmation may use predicted (wrong) inputs
-   - *Prevention:* Only promote to export buffer after confirmation
+1. **Worker-Main Thread Memory Boundary** - PyProxy objects CANNOT be sent via postMessage. Always call `.toJs()` before sending, then `.destroy()` to prevent leaks. Test serialization with `JSON.parse(JSON.stringify(data))` before implementation.
 
-2. **Fast-forward bulk processing without re-recording** — fast-forward may skip data recording or bypass confirmation
-   - *Prevention:* Fast-forward path must mirror normal step() data recording
+2. **Race Conditions During Initialization** - Worker script loads before Pyodide is ready. Must queue messages until `pyodideReady` flag, then send explicit `READY` event to main thread. Main thread must await `READY` before sending commands.
 
-3. **Episode boundary masking** — desync happens late, episode ends before detection
-   - *Prevention:* Final hash validation before clearing buffers
+3. **Worker Error Propagation** - Uncaught Worker errors don't bubble to main thread. Wrap all Worker handlers in try/catch, send structured ERROR messages. Add timeouts to all pending requests to detect Worker crashes.
 
-4. **Input delay temporal mismatch** — with INPUT_DELAY > 0, actions paired with wrong observations
-   - *Prevention:* Record action at execution frame, not input frame
+4. **Package Installation Timing** - `micropip.install()` takes 5-30 seconds. Send PROGRESS events during installation. Don't show game UI until ENV_READY received.
 
-5. **Cumulative reward divergence** — rewards incremented speculatively, not restored on rollback
-   - *Prevention:* Include cumulative_rewards in state snapshot (verify this)
+5. **NumPy Array Conversion** - NumPy dtypes don't always map cleanly to JS TypedArrays. Use Python-side `safe_serialize()` function to convert all NumPy types to plain Python lists/floats before returning.
 
 ## Implications for Roadmap
 
 Based on research, suggested phase structure:
 
-### Phase 36: Speculative/Canonical Buffer Split
+### Phase 1: Core Worker Infrastructure
+**Rationale:** Foundation must exist before any game integration. Isolated, testable.
+**Delivers:** `pyodide_worker.js` and `PyodideWorker` class with init, runPython, step, reset operations
+**Addresses:** Non-blocking initialization, progress events, error propagation
+**Avoids:** Pitfalls 2 (race conditions) and 3 (error propagation) by implementing ready-check and error forwarding from the start
+**Estimated complexity:** Medium - new file, established patterns
 
-**Rationale:** This is the core architectural fix that enables all other changes
-**Delivers:** Separate `speculativeFrameData` buffer, promotion logic in `_updateConfirmedFrame()`
-**Addresses:** Pitfall #1 (speculative as ground truth)
-**Risk:** LOW — additive change, doesn't break existing logic
+### Phase 2: RemoteGame Integration
+**Rationale:** Single-player is simpler - no GGPO/batch concerns. Validates Worker correctness before multiplayer.
+**Delivers:** Updated `RemoteGame` using `PyodideWorker`, fallback mode for debugging
+**Uses:** All stack elements, full message protocol
+**Implements:** Main thread manager with request correlation
+**Avoids:** Pitfall 1 (memory boundary) by ensuring all state serialization works
+**Estimated complexity:** Medium - refactoring existing code
 
-**Tasks:**
-1. Add `speculativeFrameData` Map
-2. Modify `storeFrameData()` to write to speculative buffer
-3. Add `_promoteConfirmedFrames()` method
-4. Call promotion in `_updateConfirmedFrame()`
+### Phase 3: Multiplayer Batch Operations
+**Rationale:** GGPO rollback is the complex case. Requires batch API that doesn't exist yet.
+**Delivers:** `batch()` operation, `MultiplayerPyodideGame` integration, rollback working with Worker
+**Uses:** Batch message type, atomicity guarantees
+**Implements:** Rollback as single round-trip: setState + N steps + getState
+**Avoids:** Race conditions during replay by ensuring no event loop yields in Worker execution
+**Estimated complexity:** High - new batch API, complex state management
 
-### Phase 37: Fast-Forward Data Recording Fix
-
-**Rationale:** Fast-forward is the main divergence source identified in research
-**Delivers:** Confirmation-gated recording in `_performFastForward()`
-**Addresses:** Pitfall #2 (fast-forward bulk processing)
-**Uses:** Buffer split from Phase 36
-**Risk:** MEDIUM — must audit fast-forward code path carefully
-
-**Tasks:**
-1. Audit `_performFastForward()` data recording
-2. Ensure fast-forward writes to speculative buffer
-3. Call `_updateConfirmedFrame()` after fast-forward completes
-4. Verify no frame gaps in export after tab refocus
-
-### Phase 38: Episode Boundary Confirmation
-
-**Rationale:** Episode end is the export trigger — must ensure all data confirmed
-**Delivers:** Force-confirm logic at episode end, export only from canonical buffer
-**Addresses:** Pitfall #3 (episode boundary masking)
-**Risk:** LOW — focused change at episode boundary
-
-**Tasks:**
-1. Add force-confirm at episode end (promote remaining speculative)
-2. Wait for peer sync before exporting
-3. Log warning if promoting unconfirmed frames
-4. Verify both players export identical frame counts
-
-### Phase 39: Verification & Metadata (Optional)
-
-**Rationale:** Research value-add for understanding data quality
-**Delivers:** Per-frame metadata (`wasSpeculative`, `rollbackCount`), offline validation tool
-**Addresses:** "Looks synchronized but isn't" scenarios
-**Risk:** LOW — additive metadata, no core logic changes
-
-**Tasks:**
-1. Add `wasSpeculative` field to frame data
-2. Track rollback count per frame
-3. Include hash verification status from Phase 11-14
-4. Create export comparison script for validation
+### Phase 4: Validation and Cleanup
+**Rationale:** Full system test, then remove scaffolding
+**Delivers:** Verified zero-stagger concurrent initialization, performance validation, documentation
+**Tests:** 3 concurrent games without Socket.IO disconnects, rollback parity, memory leak checks
+**Cleanup:** Remove fallback code if stable, update deployment docs
 
 ### Phase Ordering Rationale
 
-- **Phase 36 first:** Buffer split is prerequisite for all other changes
-- **Phase 37 second:** Fast-forward fix depends on buffer split
-- **Phase 38 third:** Episode boundary depends on both being correct
-- **Phase 39 optional:** Metadata adds value but not required for parity
+- **Phase 1 before 2**: Worker must exist before game classes can use it
+- **Phase 2 before 3**: Single-player validates Worker correctness without GGPO complexity
+- **Phase 3 needs batch API**: Rollback performance depends on single round-trip pattern
+- **Phase 4 last**: Integration testing requires all components working together
+
+The research identified that multiplayer's `performRollback()` already batches Python execution to avoid event loop yields - this pattern must be preserved in the Worker architecture via the batch API.
 
 ### Research Flags
 
-**Phases with standard patterns (minimal research needed):**
-- Phase 36: Well-documented pattern from GGPO/NetplayJS
-- Phase 38: Standard boundary handling
+Phases likely needing deeper research during planning:
+- **Phase 3 (Batch Operations):** GGPO state buffer location needs decision - research recommends Worker-authoritative but needs implementation exploration
+- **Phase 4 (Validation):** Playwright Worker testing capabilities are documented but not hands-on verified
 
-**Phases likely needing deeper review during planning:**
-- Phase 37: Fast-forward code path is complex, needs careful audit
+Phases with standard patterns (skip research-phase):
+- **Phase 1 (Core Infrastructure):** Web Worker patterns well-documented, existing GameTimerWorker provides template
+- **Phase 2 (RemoteGame):** Straightforward refactoring, no novel patterns
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | Patterns directly from GGPO, NetplayJS, existing codebase |
-| Features | HIGH | Frame state lifecycle clearly defined |
-| Architecture | HIGH | Two-buffer pattern is standard, codebase analysis confirms gaps |
-| Pitfalls | HIGH | All pitfalls verified against codebase implementation |
+| Stack | HIGH | Native Web Worker APIs, no exotic dependencies, matches existing codebase |
+| Features | HIGH | Based on MDN docs and existing pyodide_multiplayer_game.js patterns |
+| Architecture | MEDIUM | Composition pattern is sound; batch API needs implementation validation |
+| Pitfalls | MEDIUM-HIGH | Memory boundary and error propagation well-documented; GGPO integration needs testing |
 
-**Overall confidence:** HIGH
+**Overall confidence:** MEDIUM
+
+The core Web Worker patterns are solid, but MEDIUM overall because:
+1. Web search was unavailable - Pyodide version/API may have changed since training data
+2. Batch API for rollback is architecturally sound but unproven
+3. Playwright Worker testing capabilities inferred from docs, not validated
 
 ### Gaps to Address
 
-- **Fast-forward code audit:** Need to trace exact data recording in `_performFastForward()` during planning
-- **Episode-end sync timing:** Verify `p2pEpisodeSync` waits for confirmation, not just peer agreement
+- **Pyodide Version Verification**: Research assumed v0.26.x based on training data. Verify current version and any API changes at https://pyodide.org/en/stable/usage/webworker.html before Phase 1
+- **Batch API Design**: The batch operation needs detailed specification during Phase 3 planning. Current research provides concept but not full protocol
+- **GGPO State Authority**: Research recommends Worker-authoritative state, but this changes the current architecture significantly. Validate during Phase 3
+- **Performance Baselines**: Capture current timing metrics (Pyodide init time, step latency) before Worker migration to measure improvement
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- `pyodide_multiplayer_game.js` — existing GGPO implementation analysis
-- [GGPO Developer Guide](https://github.com/pond3r/ggpo/blob/master/doc/DeveloperGuide.md) — canonical patterns
-- [NetplayJS](https://github.com/rameshvarun/netplayjs) — TypeScript rollback reference
+- Existing codebase: `pyodide_multiplayer_game.js` - GameTimerWorker pattern, rollback implementation
+- Existing codebase: `pyodide_remote_game.js` - RemoteGame API contract
+- MDN Web Workers API - postMessage, Transferable objects, Worker lifecycle
 
-### Secondary (HIGH confidence)
-- [SnapNet: Rollback Netcode](https://www.snapnet.dev/blog/netcode-architectures-part-2-rollback/) — confirmed vs speculative frames
-- [INVERSUS Rollback Networking](https://www.gamedeveloper.com/design/rollback-networking-in-inversus) — symmetric P2P patterns
+### Secondary (MEDIUM confidence)
+- Pyodide documentation (training data) - Web Worker usage patterns
+- Phase 24 Research - Web Worker timer infrastructure patterns
 
-### Tertiary (MEDIUM confidence)
-- [Jimmy's Blog: GGPO-style rollback](https://outof.pizza/posts/rollback/) — fixed-point arithmetic
-- [Gaffer on Games: Deterministic Lockstep](https://gafferongames.com/post/deterministic_lockstep/) — input confirmation protocol
+### Tertiary (LOW confidence)
+- Comlink comparison - library may have updated since training data
+- Playwright Worker testing - capabilities inferred, not hands-on tested
 
 ---
-*Research completed: 2026-01-30*
+*Research completed: 2026-02-04*
 *Ready for roadmap: yes*
