@@ -1539,6 +1539,13 @@ function terminateGymScene(data) {
         refreshStartButton = null;
     }
 
+    // Phase 77 (P2P-01, P2P-02): Clean up P2P resources when exiting GymScene
+    // Must happen before data emission so sceneExited flag is set before any
+    // race-window p2p_game_ended events can trigger stale overlays
+    if (pyodideRemoteGame && typeof pyodideRemoteGame.cleanupForSceneExit === 'function') {
+        pyodideRemoteGame.cleanupForSceneExit();
+    }
+
     // Sync globals to server before emitting game data
     socket.emit("sync_globals", {interactiveGymGlobals: window.interactiveGymGlobals});
 
