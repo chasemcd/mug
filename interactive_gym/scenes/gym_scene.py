@@ -243,27 +243,20 @@ class GymScene(scene.Scene):
         self,
         fps: int = NotProvided,
         env_to_state_fn: Callable = NotProvided,
-        preload_specs: list[dict[str, str | float | int]] = NotProvided,
         hud_text_fn: Callable = NotProvided,
         hud_score_carry_over: bool = NotProvided,
         location_representation: str = NotProvided,
         game_width: int = NotProvided,
         game_height: int = NotProvided,
         background: str = NotProvided,
-        state_init: list = NotProvided,
-        assets_dir: str = NotProvided,
-        assets_to_preload: list[str] = NotProvided,
-        animation_configs: list = NotProvided,
         rollback_smoothing_duration: int | None = NotProvided,
     ):
-        """_summary_
+        """Configure display and rendering settings for the GymScene.
 
         :param fps: Frames per second for rendering the game, defaults to NotProvided
         :type fps: int, optional
         :param env_to_state_fn: Function to convert environment state to renderable state, defaults to NotProvided
         :type env_to_state_fn: Callable, optional
-        :param preload_specs: Specifications for preloading assets, defaults to NotProvided
-        :type preload_specs: list[dict[str, str  |  float  |  int]], optional
         :param hud_text_fn: Function to generate HUD text, defaults to NotProvided
         :type hud_text_fn: Callable, optional
         :param hud_score_carry_over: If True, cumulative rewards carry over between episodes, defaults to NotProvided
@@ -276,14 +269,6 @@ class GymScene(scene.Scene):
         :type game_height: int, optional
         :param background: Background color or image for the game, defaults to NotProvided
         :type background: str, optional
-        :param state_init: Initial state of the game, defaults to NotProvided
-        :type state_init: list, optional
-        :param assets_dir: Directory containing game assets, defaults to NotProvided
-        :type assets_dir: str, optional
-        :param assets_to_preload: List of asset filenames to preload, defaults to NotProvided
-        :type assets_to_preload: list[str], optional
-        :param animation_configs: Configurations for game animations, defaults to NotProvided
-        :type animation_configs: list, optional
         :param rollback_smoothing_duration: Duration of position smoothing tween in milliseconds after
             rollback corrections. Set to None to disable smoothing, or a positive integer to enable.
             Defaults to NotProvided (uses class default of 100ms).
@@ -300,9 +285,6 @@ class GymScene(scene.Scene):
 
         if hud_score_carry_over is not NotProvided:
             self.hud_score_carry_over = hud_score_carry_over
-
-        if preload_specs is not NotProvided:
-            self.preload_specs = preload_specs
 
         if location_representation is not NotProvided:
             assert location_representation in [
@@ -322,18 +304,6 @@ class GymScene(scene.Scene):
 
         if background is not NotProvided:
             self.background = background
-
-        if state_init is not NotProvided:
-            self.state_init = state_init
-
-        if assets_dir is not NotProvided:
-            self.assets_dir = assets_dir
-
-        if assets_to_preload is not NotProvided:
-            self.assets_to_preload = assets_to_preload
-
-        if animation_configs is not NotProvided:
-            self.animation_configs = animation_configs
 
         if rollback_smoothing_duration is not NotProvided:
             if rollback_smoothing_duration is not None and rollback_smoothing_duration < 0:
@@ -492,92 +462,6 @@ class GymScene(scene.Scene):
 
         return self
 
-    def user_experience(
-        self,
-        scene_header: str = NotProvided,
-        scene_body: str = NotProvided,
-        scene_body_filepath: str = NotProvided,
-        in_game_scene_body: str = NotProvided,
-        in_game_scene_body_filepath: str = NotProvided,
-        waitroom_timeout: int = NotProvided,
-        waitroom_timeout_redirect_url: str = NotProvided,
-        waitroom_timeout_scene_id: str = NotProvided,
-        waitroom_timeout_message: str = NotProvided,
-        game_page_html_fn: Callable = NotProvided,
-    ):
-        """Configure the user experience for the GymScene.
-
-        :param scene_header: Header text for the scene, defaults to NotProvided
-        :type scene_header: str, optional
-        :param scene_body: HTML body content for the scene, defaults to NotProvided
-        :type scene_body: str, optional
-        :param scene_body_filepath: Path to a file containing HTML body content, defaults to NotProvided
-        :type scene_body_filepath: str, optional
-        :param in_game_scene_body: HTML body content displayed during gameplay, defaults to NotProvided
-        :type in_game_scene_body: str, optional
-        :param in_game_scene_body_filepath: Path to a file containing in-game HTML body content, defaults to NotProvided
-        :type in_game_scene_body_filepath: str, optional
-        :param waitroom_timeout: Timeout for waitroom in milliseconds, defaults to NotProvided
-        :type waitroom_timeout: int, optional
-        :param waitroom_timeout_redirect_url: URL to redirect to if waitroom times out, defaults to NotProvided
-        :type waitroom_timeout_redirect_url: str, optional
-        :param waitroom_timeout_scene_id: Scene ID to jump to if waitroom times out (alternative to redirect), defaults to NotProvided
-        :type waitroom_timeout_scene_id: str, optional
-        :param waitroom_timeout_message: Custom message to display when waitroom times out, defaults to NotProvided
-        :type waitroom_timeout_message: str, optional
-        :param game_page_html_fn: Function to generate custom game page HTML, defaults to NotProvided
-        :type game_page_html_fn: Callable, optional
-        :return: The GymScene instance
-        :rtype: GymScene
-        """
-        if scene_header is not NotProvided:
-            self.scene_header = scene_header
-
-        if waitroom_timeout_redirect_url is not NotProvided:
-            self.waitroom_timeout_redirect_url = waitroom_timeout_redirect_url
-
-        if waitroom_timeout_scene_id is not NotProvided:
-            self.waitroom_timeout_scene_id = waitroom_timeout_scene_id
-
-        if waitroom_timeout is not NotProvided:
-            self.waitroom_timeout = waitroom_timeout
-
-        if waitroom_timeout_message is not NotProvided:
-            self.waitroom_timeout_message = waitroom_timeout_message
-
-        if game_page_html_fn is not NotProvided:
-            self.game_page_html_fn = game_page_html_fn
-
-        if scene_body_filepath is not NotProvided:
-            assert (
-                scene_body is NotProvided
-            ), "Cannot set both filepath and html_body."
-
-            with open(scene_body_filepath, "r", encoding="utf-8") as f:
-                self.scene_body = f.read()
-
-        if scene_body is not NotProvided:
-            assert (
-                scene_body_filepath is NotProvided
-            ), "Cannot set both filepath and html_body."
-            self.scene_body = scene_body
-
-        if in_game_scene_body_filepath is not NotProvided:
-            assert (
-                in_game_scene_body is NotProvided
-            ), "Cannot set both filepath and html_body."
-
-            with open(in_game_scene_body_filepath, "r", encoding="utf-8") as f:
-                self.in_game_scene_body = f.read()
-
-        if in_game_scene_body is not NotProvided:
-            assert (
-                in_game_scene_body_filepath is NotProvided
-            ), "Cannot set both filepath and html_body."
-            self.in_game_scene_body = in_game_scene_body
-
-        return self
-
     def content(
         self,
         scene_header: str = NotProvided,
@@ -728,126 +612,6 @@ class GymScene(scene.Scene):
     def matchmaker(self) -> "Matchmaker | None":
         """Return configured matchmaker, or None for default FIFO."""
         return self._matchmaker
-
-    def pyodide(
-        self,
-        run_through_pyodide: bool = NotProvided,
-        multiplayer: bool = NotProvided,
-        environment_initialization_code: str = NotProvided,
-        environment_initialization_code_filepath: str = NotProvided,
-        on_game_step_code: str = NotProvided,
-        packages_to_install: list[str] = NotProvided,
-        restart_pyodide: bool = NotProvided,
-        server_authoritative: bool = NotProvided,
-        state_broadcast_interval: int = NotProvided,
-        realtime_mode: bool = NotProvided,
-        input_buffer_size: int = NotProvided,
-        input_delay: int = NotProvided,
-        input_confirmation_timeout_ms: int = NotProvided,
-    ):
-        """Configure Pyodide-related settings for the GymScene.
-
-        This method sets up parameters related to running the environment through Pyodide,
-        which allows Python code to run in the browser.
-
-        :param run_through_pyodide: Whether to run the environment through Pyodide, defaults to NotProvided
-        :type run_through_pyodide: bool, optional
-        :param multiplayer: Enable multiplayer Pyodide coordination (requires run_through_pyodide=True), defaults to NotProvided
-        :type multiplayer: bool, optional
-        :param environment_initialization_code: Python code to initialize the environment in Pyodide, defaults to NotProvided
-        :type environment_initialization_code: str, optional
-        :param environment_initialization_code_filepath: Path to a file containing Python code to initialize the environment, defaults to NotProvided
-        :type environment_initialization_code_filepath: str, optional
-        :param packages_to_install: List of Python packages to install in the Pyodide environment, defaults to NotProvided
-        :type packages_to_install: list[str], optional
-        :param restart_pyodide: Whether to restart the Pyodide environment, defaults to NotProvided
-        :type restart_pyodide: bool, optional
-        :param server_authoritative: If True, server runs a parallel Python environment that steps
-            in sync with clients and broadcasts authoritative state periodically. This eliminates
-            host dependency and provides faster resyncs. Requires multiplayer=True. defaults to NotProvided
-        :type server_authoritative: bool, optional
-        :param state_broadcast_interval: Frames between state broadcasts/syncs. In server-authoritative
-            mode, server broadcasts authoritative state at this interval. In host-based mode, clients
-            verify state hashes at this interval. Default is 30 (~1 sec at 30fps). defaults to NotProvided
-        :type state_broadcast_interval: int, optional
-        :param realtime_mode: If True (default), server steps on a timer at target FPS rather than
-            waiting for all player actions. Enables smooth gameplay with client prediction + rollback.
-            If False, server waits for all actions before stepping (legacy frame-aligned mode).
-            Only applies when server_authoritative=True. defaults to NotProvided
-        :type realtime_mode: bool, optional
-        :param input_buffer_size: Number of frames of input history to keep for potential rollback/replay.
-            Default is 300 (~10 sec at 30fps). Only used in real-time mode. defaults to NotProvided
-        :type input_buffer_size: int, optional
-        :param input_delay: GGPO input delay in frames. Both local and remote actions are delayed by this
-            many frames, ensuring both clients execute the same actions on the same frame. Default is 2.
-            Set to 0 for no delay (not recommended for multiplayer). defaults to NotProvided
-        :type input_delay: int, optional
-        :param input_confirmation_timeout_ms: Time in milliseconds to wait for partner input confirmation
-            at episode boundaries before proceeding with export. Default is 500ms which handles 200ms+ RTT.
-            Set to 0 to disable waiting (not recommended). defaults to NotProvided
-        :type input_confirmation_timeout_ms: int, optional
-        :return: The GymScene instance (self)
-        :rtype: GymScene
-        """
-        if run_through_pyodide is not NotProvided:
-            assert isinstance(run_through_pyodide, bool)
-            self.run_through_pyodide = run_through_pyodide
-
-        if multiplayer is not NotProvided:
-            assert isinstance(multiplayer, bool)
-            self.pyodide_multiplayer = multiplayer
-
-        if environment_initialization_code is not NotProvided:
-            self.environment_initialization_code = (
-                environment_initialization_code
-            )
-
-        if environment_initialization_code_filepath is not NotProvided:
-            assert (
-                environment_initialization_code is NotProvided
-            ), "Cannot set both filepath and code!"
-            with open(
-                environment_initialization_code_filepath, "r", encoding="utf-8"
-            ) as f:
-                self.environment_initialization_code = f.read()
-
-        if packages_to_install is not NotProvided:
-            self.packages_to_install = packages_to_install
-            if not any("interactive-gym" in pkg for pkg in packages_to_install):
-                self.packages_to_install.append(self.DEFAULT_IG_PACKAGE)
-
-        if restart_pyodide is not NotProvided:
-            self.restart_pyodide = restart_pyodide
-
-        if on_game_step_code is not NotProvided:
-            self.on_game_step_code = on_game_step_code
-
-        if server_authoritative is not NotProvided:
-            assert isinstance(server_authoritative, bool)
-            self.server_authoritative = server_authoritative
-
-        if state_broadcast_interval is not NotProvided:
-            assert isinstance(state_broadcast_interval, int) and state_broadcast_interval > 0
-            self.state_broadcast_interval = state_broadcast_interval
-
-        if realtime_mode is not NotProvided:
-            assert isinstance(realtime_mode, bool)
-            self.realtime_mode = realtime_mode
-
-        if input_buffer_size is not NotProvided:
-            assert isinstance(input_buffer_size, int) and input_buffer_size > 0
-            self.input_buffer_size = input_buffer_size
-
-        if input_delay is not NotProvided:
-            assert isinstance(input_delay, int) and input_delay >= 0
-            self.input_delay = input_delay
-
-        if input_confirmation_timeout_ms is not NotProvided:
-            if not isinstance(input_confirmation_timeout_ms, int) or input_confirmation_timeout_ms < 0:
-                raise ValueError("input_confirmation_timeout_ms must be a non-negative integer")
-            self.input_confirmation_timeout_ms = input_confirmation_timeout_ms
-
-        return self
 
     def runtime(
         self,
@@ -1190,266 +954,6 @@ class GymScene(scene.Scene):
             self.pause_on_partner_background = pause_on_partner_background
 
         return self
-
-    def player_grouping(
-        self,
-        wait_for_known_group: bool = NotProvided,
-        group_wait_timeout: int = NotProvided,
-    ):
-        """Configure player grouping behavior for multiplayer games.
-
-        Player groups are always tracked automatically after each game completes.
-        This method controls whether this scene requires the same group members or
-        allows new matches. Supports groups of any size (2 or more players).
-
-        :param wait_for_known_group: If True, players with existing groups will wait
-            for all their known group members. If False, players enter the FIFO queue
-            and may be matched with new players (which updates their stored group).
-            Defaults to NotProvided
-        :type wait_for_known_group: bool, optional
-        :param group_wait_timeout: Maximum time (ms) to wait for known group members.
-            After timeout, player is redirected to waitroom_timeout_redirect_url.
-            Defaults to NotProvided
-        :type group_wait_timeout: int, optional
-        :return: The GymScene instance (self)
-        :rtype: GymScene
-        """
-        if wait_for_known_group is not NotProvided:
-            assert isinstance(wait_for_known_group, bool)
-            self.wait_for_known_group = wait_for_known_group
-
-        if group_wait_timeout is not NotProvided:
-            assert isinstance(group_wait_timeout, int) and group_wait_timeout > 0
-            self.group_wait_timeout = group_wait_timeout
-
-        return self
-
-    def continuous_monitoring(
-        self,
-        max_ping: int = NotProvided,
-        ping_violation_window: int = NotProvided,
-        ping_required_violations: int = NotProvided,
-        tab_warning_ms: int = NotProvided,
-        tab_exclude_ms: int = NotProvided,
-        exclusion_messages: dict[str, str] = NotProvided,
-    ):
-        """Configure continuous monitoring during gameplay.
-
-        This monitoring runs DURING the game, after entry screening passes.
-        It detects sustained connection issues or tab switching and can
-        warn or exclude participants mid-game.
-
-        :param max_ping: Maximum allowed latency in milliseconds during gameplay.
-            Participants are warned/excluded if ping exceeds this for sustained period.
-            None disables ping monitoring. defaults to NotProvided
-        :type max_ping: int, optional
-        :param ping_violation_window: Number of measurements to track for violation
-            detection. defaults to NotProvided (uses 5)
-        :type ping_violation_window: int, optional
-        :param ping_required_violations: Consecutive violations required before
-            exclusion. Must be <= ping_violation_window. defaults to NotProvided (uses 3)
-        :type ping_required_violations: int, optional
-        :param tab_warning_ms: Milliseconds hidden before showing warning.
-            None disables tab warning. defaults to NotProvided (uses 3000)
-        :type tab_warning_ms: int, optional
-        :param tab_exclude_ms: Milliseconds hidden before exclusion.
-            None disables tab exclusion. defaults to NotProvided (uses 10000)
-        :type tab_exclude_ms: int, optional
-        :param exclusion_messages: Custom messages for warnings and exclusions.
-            Keys: "ping_warning", "ping_exclude", "tab_warning", "tab_exclude".
-            defaults to NotProvided
-        :type exclusion_messages: dict[str, str], optional
-        :return: The GymScene instance (self)
-        :rtype: GymScene
-        """
-        # Enable continuous monitoring if any parameter is set
-        self.continuous_monitoring_enabled = True
-
-        if max_ping is not NotProvided:
-            assert max_ping is None or (isinstance(max_ping, int) and max_ping > 0), \
-                "max_ping must be None or a positive integer"
-            self.continuous_max_ping = max_ping
-
-        if ping_violation_window is not NotProvided:
-            assert isinstance(ping_violation_window, int) and ping_violation_window >= 1, \
-                "ping_violation_window must be a positive integer"
-            self.continuous_ping_violation_window = ping_violation_window
-
-        if ping_required_violations is not NotProvided:
-            assert isinstance(ping_required_violations, int) and ping_required_violations >= 1, \
-                "ping_required_violations must be a positive integer"
-            self.continuous_ping_required_violations = ping_required_violations
-
-        if tab_warning_ms is not NotProvided:
-            assert tab_warning_ms is None or (isinstance(tab_warning_ms, int) and tab_warning_ms >= 0), \
-                "tab_warning_ms must be None or a non-negative integer"
-            self.continuous_tab_warning_ms = tab_warning_ms
-
-        if tab_exclude_ms is not NotProvided:
-            assert tab_exclude_ms is None or (isinstance(tab_exclude_ms, int) and tab_exclude_ms >= 0), \
-                "tab_exclude_ms must be None or a non-negative integer"
-            self.continuous_tab_exclude_ms = tab_exclude_ms
-
-        if exclusion_messages is not NotProvided:
-            assert isinstance(exclusion_messages, dict), \
-                "exclusion_messages must be a dictionary"
-            self.continuous_exclusion_messages = {**self.continuous_exclusion_messages, **exclusion_messages}
-
-        # Validate that required_violations <= window
-        if self.continuous_ping_required_violations > self.continuous_ping_violation_window:
-            raise ValueError(
-                f"ping_required_violations ({self.continuous_ping_required_violations}) "
-                f"cannot exceed ping_violation_window ({self.continuous_ping_violation_window})"
-            )
-
-        return self
-
-    def exclusion_callbacks(
-        self,
-        continuous_callback: Callable = NotProvided,
-        continuous_callback_interval_frames: int = NotProvided,
-    ):
-        """Configure custom exclusion callbacks for the GymScene.
-
-        Callbacks allow researchers to implement arbitrary exclusion logic beyond
-        the built-in rules. Callbacks execute on the server and receive participant
-        context from the client.
-
-        Continuous callback signature:
-            def my_continuous_callback(context: dict) -> dict:
-                # context contains: ping, is_tab_hidden, tab_hidden_duration_ms,
-                #                   frame_number, episode_number, subject_id, scene_id
-                # Return: {"exclude": bool, "warn": bool, "message": str | None}
-                return {"exclude": False, "warn": False, "message": None}
-
-        :param continuous_callback: Function called periodically during gameplay, defaults to NotProvided
-        :type continuous_callback: Callable, optional
-        :param continuous_callback_interval_frames: Frames between continuous callback checks (default 30 ~1s), defaults to NotProvided
-        :type continuous_callback_interval_frames: int, optional
-        :return: The GymScene instance (self)
-        :rtype: GymScene
-        """
-        if continuous_callback is not NotProvided:
-            if continuous_callback is not None and not callable(continuous_callback):
-                raise ValueError("continuous_callback must be callable or None")
-            self.continuous_exclusion_callback = continuous_callback
-
-        if continuous_callback_interval_frames is not NotProvided:
-            if not isinstance(continuous_callback_interval_frames, int) or continuous_callback_interval_frames < 1:
-                raise ValueError("continuous_callback_interval_frames must be a positive integer")
-            self.continuous_callback_interval_frames = continuous_callback_interval_frames
-
-        return self
-
-    def reconnection_config(
-        self,
-        timeout_ms: int = NotProvided,
-    ) -> "GymScene":
-        """Configure mid-game reconnection behavior.
-
-        Args:
-            timeout_ms: Time in milliseconds to wait for reconnection before
-                       ending the game. Default is 30000 (30 seconds).
-
-        Returns:
-            self for chaining.
-        """
-        if timeout_ms is not NotProvided:
-            if not isinstance(timeout_ms, int) or timeout_ms <= 0:
-                raise ValueError("timeout_ms must be a positive integer")
-            self.reconnection_timeout_ms = timeout_ms
-
-        return self
-
-    def partner_disconnect_message_config(
-        self,
-        message: str = NotProvided,
-        show_completion_code: bool = NotProvided,
-    ):
-        """Configure the message shown when partner disconnects mid-game.
-
-        If not configured, a default message is shown:
-        "Your partner has disconnected. The game has ended."
-
-        :param message: Custom message to display when partner disconnects
-        :type message: str
-        :param show_completion_code: Whether to show a completion code to the active participant
-            when their partner disconnects. Defaults to True.
-        :type show_completion_code: bool
-        :return: This scene object
-        :rtype: GymScene
-
-        Example:
-            scene.partner_disconnect_message_config(
-                message="Your partner left the experiment. Thank you for participating.",
-                show_completion_code=True
-            )
-        """
-        if message is not NotProvided:
-            self.partner_disconnect_message = message
-
-        if show_completion_code is not NotProvided:
-            self.partner_disconnect_show_completion_code = show_completion_code
-
-        return self
-
-    def focus_loss_config(
-        self,
-        timeout_ms: int = NotProvided,
-        message: str = NotProvided,
-        pause_on_partner_background: bool = NotProvided,
-    ) -> "GymScene":
-        """Configure focus loss handling for multiplayer games.
-
-        When a participant tabs away for longer than timeout_ms, the game
-        ends for both players and a message is displayed.
-
-        Args:
-            timeout_ms: Time in milliseconds before focus loss ends the game.
-                       Default is 30000 (30 seconds). Set to 0 to disable.
-            message: Custom message to display when game ends due to focus loss.
-                    If not set, a default message is shown.
-            pause_on_partner_background: If True, pause the game and show
-                    "Waiting for partner..." when partner tabs away mid-game.
-                    If False (default), only wait for partner at episode boundaries.
-
-        Returns:
-            self for chaining.
-
-        Example:
-            scene.focus_loss_config(
-                timeout_ms=20000,  # 20 seconds
-                message="Please stay focused on the experiment.",
-                pause_on_partner_background=True
-            )
-        """
-        if timeout_ms is not NotProvided:
-            if not isinstance(timeout_ms, int) or timeout_ms < 0:
-                raise ValueError("timeout_ms must be a non-negative integer")
-            self.focus_loss_timeout_ms = timeout_ms
-
-        if message is not NotProvided:
-            self.focus_loss_message = message
-
-        if pause_on_partner_background is not NotProvided:
-            self.pause_on_partner_background = pause_on_partner_background
-
-        return self
-
-    # Backwards compatibility alias
-    def player_pairing(
-        self,
-        wait_for_known_partner: bool = NotProvided,
-        partner_wait_timeout: int = NotProvided,
-    ):
-        """Deprecated: Use player_grouping() instead.
-
-        This method is kept for backwards compatibility.
-        """
-        return self.player_grouping(
-            wait_for_known_group=wait_for_known_partner,
-            group_wait_timeout=partner_wait_timeout,
-        )
 
     @property
     def simulate_waiting_room(self) -> bool:
