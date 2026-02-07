@@ -28,7 +28,10 @@ Refactor the GymScene chaining API from 14 accumulated builder methods into fewe
   3. `content()` and `waitroom()` methods exist replacing `user_experience()`
   4. `rendering()` retains display params; new `assets()` method holds preload/animation params
   5. `policies()` and `gameplay()` remain unchanged
-**Plans**: TBD
+**Plans:** 2 plans
+Plans:
+- [ ] 67-01-PLAN.md — Add runtime() and multiplayer() builder methods
+- [ ] 67-02-PLAN.md — Add content(), waitroom(), and assets() builder methods
 
 ### Phase 68: Clean Break
 **Goal**: Remove all old method names entirely — no deprecation aliases, no redirect methods
@@ -70,7 +73,7 @@ Phases execute in numeric order: 67 → 68 → 69 → 70
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 67. API Method Consolidation | 0/TBD | Not started | - |
+| 67. API Method Consolidation | 0/2 | Planning complete | - |
 | 68. Clean Break | 0/TBD | Not started | - |
 | 69. Example Configs Migration | 0/TBD | Not started | - |
 | 70. Verification & Test Pass | 0/TBD | Not started | - |
