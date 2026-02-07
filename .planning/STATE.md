@@ -10,17 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-07)
 ## Current Position
 
 Milestone: v1.19 P2P Lifecycle Cleanup
-Phase: 78 of 78 (Group History Tracking) — COMPLETE
-Plan: 01 of 01 complete
-Status: Phase 78 complete, milestone complete
-Last activity: 2026-02-07 — Completed 78-01-PLAN.md (Group History Tracking)
+Phase: 79 of 79 (Post-Game Scene Isolation Test) — COMPLETE
+Plan: 01 of 01
+Status: Phase 79 complete, v1.19 milestone complete
+Last activity: 2026-02-07 — Completed 79-01-PLAN.md (Post-Game Scene Isolation Test)
 
-Progress: ██████████ 100%
+Progress: ██████████░ 68%
 
 ## Milestone History
 
 | Milestone | Phases | Status | Shipped |
 |-----------|--------|--------|---------|
+| v1.19 P2P Lifecycle Cleanup | 77-79 | Complete | 2026-02-07 |
 | v1.18 Loading UX & Cleanup | 75-76 | Complete | 2026-02-07 |
 | v1.17 E2E Test Reliability | 71-74 | Complete | 2026-02-06 |
 | v1.16 Pyodide Pre-loading | 67-70 | Complete | 2026-02-06 |
@@ -249,6 +250,12 @@ Progress: ██████████ 100%
 **v1.19 Execution:**
 - `.planning/phases/77-p2p-connection-scoping/77-01-SUMMARY.md`
 - `.planning/phases/78-group-history-tracking/78-01-SUMMARY.md`
+- `.planning/phases/79-post-game-scene-isolation-test/79-01-SUMMARY.md`
+
+**Post-Game Scene Isolation Test (v1.19 Phase 79 - validated):**
+- `tests/e2e/test_scene_isolation.py` - test_partner_exit_on_survey_no_overlay E2E test
+- `interactive_gym/examples/cogrid/overcooked_human_human_multiplayer_scene_isolation_test.py` - Multi-scene test server config
+- `tests/conftest.py` - flask_server_scene_isolation fixture on port 5707
 
 **Group History Tracking (v1.19 Phase 78 - added):**
 - `interactive_gym/server/matchmaker.py` - GroupHistory dataclass, MatchCandidate.group_history field, GroupReunionMatchmaker class
@@ -335,6 +342,12 @@ Progress: ██████████ 100%
 ### Decisions
 
 See: .planning/PROJECT.md Key Decisions table
+
+**v1.19 Phase 79-01 decisions:**
+- Overlay element is partnerDisconnectedContainer (not partner-disconnected-overlay) -- must check element existence AND offsetParent
+- JavaScript ?.offsetParent !== null returns true when element missing (undefined !== null = true) -- use explicit el !== null && el.offsetParent !== null
+- Console message capture for sceneExited guard is informational, not asserted (server may clean up game before p2p_game_ended fires)
+- 5-second wait after context.close() sufficient for disconnect event propagation
 
 **v1.19 Phase 78-01 decisions:**
 - GroupHistory contains most recent group only (matches PlayerGroupManager.create_group() behavior which replaces previous groups)
@@ -585,9 +598,12 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-02-07
-Stopped at: Completed 78-01-PLAN.md (Group History Tracking)
+Stopped at: Completed 79-01-PLAN.md (Post-Game Scene Isolation Test)
 Resume file: None
 
 ### Next Steps
 
-v1.19 milestone complete (Phases 77-78). All phases executed successfully.
+v1.19 P2P Lifecycle Cleanup milestone complete. All phases (77-79) executed:
+- Phase 77: Client-side P2P connection scoping (cleanupForSceneExit + sceneExited guards)
+- Phase 78: Group history tracking (GroupReunionMatchmaker)
+- Phase 79: E2E validation (scene isolation test passes)
