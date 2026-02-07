@@ -563,6 +563,6 @@ Resume file: None
 
 ### Next Steps
 
-**Phase 76** — Loading UX cleanup and testing (if applicable).
+**Phase 76: Test & Roadmap Cleanup** — ready to plan.
 
-Next action: Proceed to Phase 76 or finalize v1.18 milestone.
+Next action: `/gsd:plan-phase 76`

@@ -469,8 +469,8 @@ Plans:
 **Plans:** 2 plans
 
 Plans:
-- [ ] 75-01-PLAN.md — Add pyodide_load_timeout_s to config classes, dynamic server timeout, unified HTML loading element
-- [ ] 75-02-PLAN.md — Refactor client-side JS with loadingGate, timeout, error handling, and unified loading screen
+- [x] 75-01-PLAN.md — Add pyodide_load_timeout_s to config classes, dynamic server timeout, unified HTML loading element
+- [x] 75-02-PLAN.md — Refactor client-side JS with loadingGate, timeout, error handling, and unified loading screen
 
 ### Phase 76: Test & Roadmap Cleanup
 **Goal**: Remove dead test code and update roadmap to reflect actual completion state
@@ -520,9 +520,9 @@ Plans:
 | 72. Latency Test Diagnosis | v1.17 | 2/2 | Complete | 2026-02-06 |
 | 73. Network & Regression Validation | v1.17 | 2/2 | Complete | 2026-02-06 |
 | 74. Stability Certification | v1.17 | 2/2 | Complete | 2026-02-06 |
-| 75. Merged Loading Screen | v1.18 | 0/2 | Not started | - |
+| 75. Merged Loading Screen | v1.18 | 2/2 | Complete | 2026-02-06 |
 | 76. Test & Roadmap Cleanup | v1.18 | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-07 after Phase 75 planned (2 plans in 2 waves)*
+*Last updated: 2026-02-06 after Phase 75 executed (2/2 plans complete, verified)*

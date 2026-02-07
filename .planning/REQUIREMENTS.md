@@ -9,10 +9,10 @@ Requirements for v1.18 Loading UX & Cleanup. Each maps to roadmap phases.
 
 ### Loading UX
 
-- [ ] **LOAD-01**: Participant sees a single loading screen during pre-game setup (no separate Pyodide spinner)
-- [ ] **LOAD-02**: Loading screen gates advancement on both compatibility check AND Pyodide being ready
-- [ ] **LOAD-03**: Pyodide loading timeout is configurable via experiment config (default 60s)
-- [ ] **LOAD-04**: If Pyodide fails to load or times out, participant sees a clear error page (not a hang or blank screen)
+- [x] **LOAD-01**: Participant sees a single loading screen during pre-game setup (no separate Pyodide spinner)
+- [x] **LOAD-02**: Loading screen gates advancement on both compatibility check AND Pyodide being ready
+- [x] **LOAD-03**: Pyodide loading timeout is configurable via experiment config (default 60s)
+- [x] **LOAD-04**: If Pyodide fails to load or times out, participant sees a clear error page (not a hang or blank screen)
 
 ### Test Cleanup
 
@@ -62,10 +62,10 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| LOAD-01 | Phase 75 | Pending |
-| LOAD-02 | Phase 75 | Pending |
-| LOAD-03 | Phase 75 | Pending |
-| LOAD-04 | Phase 75 | Pending |
+| LOAD-01 | Phase 75 | Complete |
+| LOAD-02 | Phase 75 | Complete |
+| LOAD-03 | Phase 75 | Complete |
+| LOAD-04 | Phase 75 | Complete |
 | CLEAN-01 | Phase 76 | Pending |
 | CLEAN-02 | Phase 76 | Pending |
 | CLEAN-03 | Phase 76 | Pending |
@@ -78,4 +78,4 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 ---
 *Requirements defined: 2026-02-07*
-*Last updated: 2026-02-07 after roadmap creation (all requirements mapped to phases)*
+*Last updated: 2026-02-06 after Phase 75 complete (LOAD-01 through LOAD-04 verified)*
