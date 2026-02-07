@@ -465,11 +465,12 @@ Plans:
   2. Loading screen does not advance until both compatibility check passes AND Pyodide is ready
   3. Pyodide loading timeout is configurable via experiment config (defaults to 60s)
   4. If Pyodide fails or times out, participant sees a clear error page instead of hanging
-**Research flag:** Unlikely — existing loading screen code is well-understood
-**Plans:** TBD
+**Research flag:** Complete (75-RESEARCH.md)
+**Plans:** 2 plans
 
 Plans:
-- [ ] 75-01: TBD
+- [ ] 75-01-PLAN.md — Add pyodide_load_timeout_s to config classes, dynamic server timeout, unified HTML loading element
+- [ ] 75-02-PLAN.md — Refactor client-side JS with loadingGate, timeout, error handling, and unified loading screen
 
 ### Phase 76: Test & Roadmap Cleanup
 **Goal**: Remove dead test code and update roadmap to reflect actual completion state
@@ -519,9 +520,9 @@ Plans:
 | 72. Latency Test Diagnosis | v1.17 | 2/2 | Complete | 2026-02-06 |
 | 73. Network & Regression Validation | v1.17 | 2/2 | Complete | 2026-02-06 |
 | 74. Stability Certification | v1.17 | 2/2 | Complete | 2026-02-06 |
-| 75. Merged Loading Screen | v1.18 | 0/TBD | Not started | - |
+| 75. Merged Loading Screen | v1.18 | 0/2 | Not started | - |
 | 76. Test & Roadmap Cleanup | v1.18 | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-07 after v1.18 roadmap created (2 phases, 8 requirements)*
+*Last updated: 2026-02-07 after Phase 75 planned (2 plans in 2 waves)*
