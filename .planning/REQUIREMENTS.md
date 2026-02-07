@@ -58,10 +58,10 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| MATCH-01 | Phase 81 | Pending |
-| MATCH-02 | Phase 81 | Pending |
+| MATCH-01 | Phase 81 | Complete |
+| MATCH-02 | Phase 81 | Complete |
 | MATCH-03 | Phase 82 | Pending |
-| MATCH-04 | Phase 81 | Pending |
+| MATCH-04 | Phase 81 | Complete |
 | MATCH-05 | Phase 82 | Pending |
 
 **Coverage:**
@@ -71,4 +71,4 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 ---
 *Requirements defined: 2026-02-07*
-*Last updated: 2026-02-07 after v1.21 roadmap creation*
+*Last updated: 2026-02-07 after Phase 81 execution*

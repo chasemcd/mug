@@ -268,7 +268,7 @@ See [milestones/v1.11-ROADMAP.md](milestones/v1.11-ROADMAP.md) for full details.
 
 **Milestone Goal:** A FIFO matchmaker that pre-filters candidates by server RTT heuristic before proposing matches, then verifies with P2P probe — so only low-latency pairs get matched.
 
-- [ ] **Phase 81: LatencyFIFOMatchmaker Core** - Server RTT pre-filtering with configurable threshold and graceful fallback
+- [x] **Phase 81: LatencyFIFOMatchmaker Core** - Server RTT pre-filtering with configurable threshold and graceful fallback
 - [ ] **Phase 82: Scene API & P2P Probe Integration** - Wire into scene.matchmaking(), verify P2P probe coordination
 
 ## Phase Details
@@ -587,7 +587,7 @@ Plans:
 **Plans:** 1 plan
 
 Plans:
-- [ ] 81-01-PLAN.md — Implement LatencyFIFOMatchmaker class with server RTT pre-filtering and unit tests
+- [x] 81-01-PLAN.md — Implement LatencyFIFOMatchmaker class with server RTT pre-filtering and unit tests
 
 ### Phase 82: Scene API & P2P Probe Integration
 **Goal**: Researcher can use LatencyFIFOMatchmaker via scene config, with post-match P2P probe verification
@@ -642,9 +642,9 @@ Plans:
 | 78. Group History Tracking | v1.19 | 1/1 | Complete | 2026-02-07 |
 | 79. Post-Game Scene Isolation Test | v1.19 | 1/1 | Complete | 2026-02-07 |
 | 80. Pre-Game Countdown | v1.20 | 1/1 | Complete | 2026-02-07 |
-| 81. LatencyFIFOMatchmaker Core | v1.21 | 0/1 | Not started | - |
+| 81. LatencyFIFOMatchmaker Core | v1.21 | 1/1 | Complete | 2026-02-07 |
 | 82. Scene API & P2P Probe Integration | v1.21 | 0/1 | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-07 after Phase 81 planning*
+*Last updated: 2026-02-07 after Phase 81 execution*
