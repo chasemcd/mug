@@ -506,11 +506,11 @@ Plans:
   1. When a participant advances past a GymScene, all WebRTC connections are closed (no lingering DataChannels or PeerConnections)
   2. When a participant is on a non-GymScene scene (survey, instructions, end screen), no "partner disconnected" overlay appears even if their former partner disconnects
   3. Existing GymScene gameplay is unaffected (P2P connections still work during active game)
-**Research flag:** Likely — need to trace connection teardown paths and overlay trigger logic
-**Plans:** TBD
+**Research flag:** Complete (77-RESEARCH.md)
+**Plans:** 1 plan
 
 Plans:
-- [ ] 77-01: TBD
+- [ ] 77-01-PLAN.md — Add cleanupForSceneExit() and sceneExited guards to scope P2P connections to GymScene lifetime
 
 ### Phase 78: Group History Tracking
 **Goal**: Server tracks who was paired with whom across scene transitions, queryable by custom matchmakers for re-pairing
@@ -562,9 +562,9 @@ Plans:
 | 74. Stability Certification | v1.17 | 2/2 | Complete | 2026-02-06 |
 | 75. Merged Loading Screen | v1.18 | 2/2 | Complete | 2026-02-06 |
 | 76. Test & Roadmap Cleanup | v1.18 | 1/1 | Complete | 2026-02-07 |
-| 77. P2P Connection Scoping | v1.19 | 0/TBD | Not started | - |
+| 77. P2P Connection Scoping | v1.19 | 0/1 | Not started | - |
 | 78. Group History Tracking | v1.19 | 0/TBD | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-07 after v1.19 roadmap created (2 phases, 4 requirements)*
+*Last updated: 2026-02-07 after Phase 77 planned (1 plan, 1 wave)*
