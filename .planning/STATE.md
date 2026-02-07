@@ -10,12 +10,12 @@ See: .planning/PROJECT.md (updated 2026-02-07)
 ## Current Position
 
 Milestone: v1.19 P2P Lifecycle Cleanup
-Phase: 77 of 78 (P2P Connection Scoping) — COMPLETE
-Plan: All complete
-Status: Phase 77 verified, Phase 78 not started
-Last activity: 2026-02-07 — Phase 77 verified (4/4 must-haves passed)
+Phase: 78 of 78 (Group History Tracking) — COMPLETE
+Plan: 01 of 01 complete
+Status: Phase 78 complete, milestone complete
+Last activity: 2026-02-07 — Completed 78-01-PLAN.md (Group History Tracking)
 
-Progress: █████░░░░░ 50%
+Progress: ██████████ 100%
 
 ## Milestone History
 
@@ -248,6 +248,11 @@ Progress: █████░░░░░ 50%
 
 **v1.19 Execution:**
 - `.planning/phases/77-p2p-connection-scoping/77-01-SUMMARY.md`
+- `.planning/phases/78-group-history-tracking/78-01-SUMMARY.md`
+
+**Group History Tracking (v1.19 Phase 78 - added):**
+- `interactive_gym/server/matchmaker.py` - GroupHistory dataclass, MatchCandidate.group_history field, GroupReunionMatchmaker class
+- `interactive_gym/server/game_manager.py` - GroupHistory import, _build_match_candidate() helper, refactored _add_to_fifo_queue() to use helper
 
 **P2P Connection Scoping (v1.19 Phase 77 - added):**
 - `interactive_gym/server/static/js/pyodide_multiplayer_game.js` - sceneExited flag, cleanupForSceneExit() method, guards in _handleReconnectionGameEnd/_onP2PConnectionLost/_handleFocusLossTimeout, reset in _initP2PConnection
@@ -330,6 +335,13 @@ Progress: █████░░░░░ 50%
 ### Decisions
 
 See: .planning/PROJECT.md Key Decisions table
+
+**v1.19 Phase 78-01 decisions:**
+- GroupHistory contains most recent group only (matches PlayerGroupManager.create_group() behavior which replaces previous groups)
+- group_history defaults to None for full backward compatibility with FIFOMatchmaker and all existing code
+- Bidirectional reunion check: arriving checks waiting list AND waiting participants checked for wanting to reunite with arriving
+- fallback_to_fifo=True by default matches Phase 60 decision to warn and fall through to FIFO
+- _build_match_candidate() centralizes MatchCandidate construction on GameManager (needs self.pairing_manager and self.get_subject_rtt)
 
 **v1.19 Phase 77-01 decisions:**
 - Set sceneExited flag FIRST (synchronous) before closing WebRTC to handle race window between scene exit and partner disconnect events
@@ -559,9 +571,9 @@ See: .planning/PROJECT.md Key Decisions table
 - Input latency root cause fix (tooling now exists via Phase 28 instrumentation)
 - Users can use `[LATENCY]` console logs to diagnose specific issues
 
-**Deferred from v1.13:**
-- Group reunion feature deferred to REUN-01/REUN-02 as future matchmaker variant
-- wait_for_known_group=True logs warning but uses FIFO matching
+**Resolved from v1.13 (Phase 78):**
+- Group reunion feature implemented as GroupReunionMatchmaker (REUN-01/REUN-02 satisfied)
+- wait_for_known_group=True warning updated to reference GroupReunionMatchmaker
 
 **Known E2E test failures (v1.17 targets) -- ALL RESOLVED:**
 - test_focus_loss_episode_boundary_parity: FIXED (71-02 extracted to own module; passes back-to-back with test_data_comparison.py)
@@ -573,9 +585,9 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-02-07
-Stopped at: Completed 77-01-PLAN.md (P2P Connection Scoping)
+Stopped at: Completed 78-01-PLAN.md (Group History Tracking)
 Resume file: None
 
 ### Next Steps
 
-Plan Phase 78 (Group History Tracking) — `/gsd:plan-phase 78`
+v1.19 milestone complete (Phases 77-78). All phases executed successfully.
