@@ -2,6 +2,8 @@ data/
 .DS_Store
 .claude/ 
 .claude/*
+.planning/
+.playwright-mcp/
 build/
 
 # Byte-compiled / optimized / DLL files
