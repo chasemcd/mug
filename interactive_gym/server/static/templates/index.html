@@ -232,13 +232,19 @@
             display: none; /* Initially hidden, shown on invalid session error */
         }
 
-        /* Unified loading screen (Phase 75) */
+        /* Unified loading screen (Phase 75) - full-page overlay */
         #loadingScreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #f0f4f8;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            padding: 40px 20px;
+            z-index: 9999;
         }
 
         .screening-spinner {
@@ -257,7 +263,8 @@
         }
 
         #loadingStatus {
-            font-size: 16px;
+            font-family: 'Roboto', sans-serif;
+            font-size: 18px;
             color: #555;
             text-align: center;
         }
@@ -283,11 +290,6 @@
         <div id="invalidSession">"Invalid Session. Please refresh the page!"</div>
         <div id="errorText"></div>
 
-        <!-- Unified loading screen (Phase 75) - gates on both screening + Pyodide -->
-        <div id="loadingScreen">
-            <div class="screening-spinner"></div>
-            <div id="loadingStatus">Loading...</div>
-        </div>
         <div id="hudText"></div>
 
         <div id="gameContainer">
@@ -308,6 +310,12 @@
             <button id="redirectButton">Finish</button>
         </div>
 
+    </div>
+
+    <!-- Unified loading screen (Phase 75) - full-page overlay, gates on screening + Pyodide -->
+    <div id="loadingScreen">
+        <div class="screening-spinner"></div>
+        <div id="loadingStatus">Loading...</div>
     </div>
 
     <div id="latencyContainer">
