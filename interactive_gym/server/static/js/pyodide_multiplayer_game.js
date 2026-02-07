@@ -1168,6 +1168,9 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
             totalPauseDuration: 0            // Cumulative ms paused (LOG-03)
         };
 
+        // Phase 77: Set true when scene exits to guard stale event handlers
+        this.sceneExited = false;
+
         // GGPO-style input queuing: inputs are queued during network reception
         // and processed synchronously at frame start to prevent race conditions
         this.pendingInputPackets = [];     // Queued P2P input packets
@@ -5572,6 +5575,9 @@ json.dumps({'cumulative_rewards': {str(k): v for k, v in _cumulative_rewards.ite
          * Initialize WebRTC P2P connection to peer.
          * Called after pyodide_game_ready when we know the other player's ID.
          */
+        // Reset scene exit flag for new game (Phase 77 - Pitfall 3: reuse scenario)
+        this.sceneExited = false;
+
         this.p2pValidation.state = 'connecting';
         p2pLog.debug(`Initiating connection to peer ${this.p2pPeerId}`);
 
@@ -5799,6 +5805,41 @@ json.dumps({'cumulative_rewards': {str(k): v for k, v in _cumulative_rewards.ite
             this._p2pHealthReportIntervalId = null;
             p2pLog.debug('P2P health reporting stopped');
         }
+    }
+
+    /**
+     * Clean up P2P resources when exiting a GymScene (Phase 77 - P2P-01, P2P-02).
+     * Called from terminateGymScene() in index.js.
+     * Sets sceneExited flag FIRST (synchronous) to guard all stale event handlers,
+     * then tears down WebRTC, telemetry, health reporting, and timer worker.
+     *
+     * IMPORTANT: Do NOT null out `this` or remove socket listeners.
+     * - Socket listeners are anonymous arrow functions with no stored reference (can't socket.off).
+     * - The game_id filter in each listener + sceneExited guard prevents stale event processing.
+     * - The game instance may be reused if the next scene is also a GymScene (reinitialize_environment path).
+     */
+    cleanupForSceneExit() {
+        // Set flag FIRST (synchronous) to guard all handlers immediately
+        this.sceneExited = true;
+        p2pLog.info('Scene exit cleanup initiated');
+
+        // Close WebRTC connection (P2P-01)
+        // WebRTCManager.close() is idempotent - handles null peerConnection/dataChannel
+        if (this.webrtcManager) {
+            this.webrtcManager.close();
+            this.webrtcManager = null;
+        }
+
+        // Stop latency telemetry polling (Phase 22)
+        if (this.latencyTelemetry) {
+            this.latencyTelemetry.stop();
+        }
+
+        // Stop P2P health reporting interval
+        this._stopP2PHealthReporting();
+
+        // Destroy Web Worker timer (Phase 24)
+        this._destroyTimerWorker();
     }
 
     /**
@@ -6260,8 +6301,8 @@ json.dumps({'cumulative_rewards': {str(k): v for k, v in _cumulative_rewards.ite
      * Called from WebRTCManager callback when connection drop detected.
      */
     _onP2PConnectionLost(info) {
-        // Skip if already paused or game is done
-        if (this.reconnectionState.isPaused || this.state === 'done') {
+        // Skip if already paused, game is done, or scene already exited
+        if (this.sceneExited || this.reconnectionState.isPaused || this.state === 'done') {
             return;
         }
 
@@ -6413,6 +6454,12 @@ json.dumps({'cumulative_rewards': {str(k): v for k, v in _cumulative_rewards.ite
      * @param {string|number} data.disconnected_player_id - ID of player who disconnected
      */
     _handleReconnectionGameEnd(data) {
+        // P2P-02: Don't show overlay if scene already exited
+        if (this.sceneExited) {
+            p2pLog.info('Ignoring p2p_game_ended - scene already exited');
+            return;
+        }
+
         // If we already ended due to focus loss timeout, don't overwrite the message
         // The player who timed out should keep seeing "you left too long", not "partner disconnected"
         if (this.focusLossTimeoutTerminal) {
@@ -6573,6 +6620,9 @@ json.dumps({'cumulative_rewards': {str(k): v for k, v in _cumulative_rewards.ite
      * Ends game for both players when focus loss exceeds configured timeout.
      */
     _handleFocusLossTimeout() {
+        // P2P-02: Don't show overlay if scene already exited
+        if (this.sceneExited) return;
+
         const timeoutMs = this.focusManager.timeoutMs;
         const actualMs = this.focusManager.getCurrentBackgroundDuration();
         // Always log for admin console visibility
