@@ -9,9 +9,9 @@ Requirements for v1.20 Pre-Game Countdown. Each maps to roadmap phases.
 
 ### Countdown
 
-- [ ] **CD-01**: 3-second countdown overlay on waiting room screen after match formed
-- [ ] **CD-02**: "Players found!" message with 3-2-1 countdown visible to all matched players
-- [ ] **CD-03**: Game start remains synced across all players after countdown completes
+- [x] **CD-01**: 3-second countdown overlay on waiting room screen after match formed
+- [x] **CD-02**: "Players found!" message with 3-2-1 countdown visible to all matched players
+- [x] **CD-03**: Game start remains synced across all players after countdown completes
 
 ## v2 Requirements
 
@@ -54,9 +54,9 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CD-01 | Phase 80 | Pending |
-| CD-02 | Phase 80 | Pending |
-| CD-03 | Phase 80 | Pending |
+| CD-01 | Phase 80 | Complete |
+| CD-02 | Phase 80 | Complete |
+| CD-03 | Phase 80 | Complete |
 
 **Coverage:**
 - v1 requirements: 3 total
@@ -65,4 +65,4 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 ---
 *Requirements defined: 2026-02-07*
-*Last updated: 2026-02-07 after roadmap creation*
+*Last updated: 2026-02-07 after Phase 80 completion*

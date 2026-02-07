@@ -21,7 +21,7 @@
 - ✅ **v1.17 E2E Test Reliability** - Phases 71-74 (shipped 2026-02-06)
 - ✅ **v1.18 Loading UX & Cleanup** - Phases 75-76 (shipped 2026-02-07)
 - ✅ **v1.19 P2P Lifecycle Cleanup** - Phases 77-79 (shipped 2026-02-07)
-- 🚧 **v1.20 Pre-Game Countdown** - Phase 80 (in progress)
+- ✅ **v1.20 Pre-Game Countdown** - Phase 80 (shipped 2026-02-07)
 
 ## Phases
 
@@ -257,11 +257,11 @@ See [milestones/v1.11-ROADMAP.md](milestones/v1.11-ROADMAP.md) for full details.
 
 </details>
 
-### v1.20 Pre-Game Countdown (In Progress)
+### v1.20 Pre-Game Countdown (Shipped 2026-02-07)
 
 **Milestone Goal:** After matchmaking, show a brief countdown on the waiting room screen before transitioning to the gym scene, so players know a match was found and can prepare.
 
-- [ ] **Phase 80: Pre-Game Countdown** - 3-second "Players found! 3... 2... 1..." countdown on waiting room after match, synced game start
+- [x] **Phase 80: Pre-Game Countdown** - 3-second "Players found! 3... 2... 1..." countdown on waiting room after match, synced game start
 
 ## Phase Details
 
@@ -564,7 +564,7 @@ Plans:
 **Plans:** 1 plan
 
 Plans:
-- [ ] 80-01-PLAN.md — Server-side countdown delay + client-side countdown display on waiting room screen
+- [x] 80-01-PLAN.md — Server-side countdown delay + client-side countdown display on waiting room screen
 
 ## Progress
 
@@ -604,8 +604,8 @@ Plans:
 | 77. P2P Connection Scoping | v1.19 | 1/1 | Complete | 2026-02-07 |
 | 78. Group History Tracking | v1.19 | 1/1 | Complete | 2026-02-07 |
 | 79. Post-Game Scene Isolation Test | v1.19 | 1/1 | Complete | 2026-02-07 |
-| 80. Pre-Game Countdown | v1.20 | 0/1 | Not started | - |
+| 80. Pre-Game Countdown | v1.20 | 1/1 | Complete | 2026-02-07 |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-07 after Phase 80 plan creation (1 plan in 1 wave)*
+*Last updated: 2026-02-07 after Phase 80 completion*

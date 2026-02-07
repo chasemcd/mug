@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-02-07)
 
 **Core value:** Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
-**Current focus:** Phase 80 — Pre-Game Countdown
+**Current focus:** v1.20 Pre-Game Countdown — COMPLETE
 
 ## Current Position
 
 Phase: 80 of 80 (Pre-Game Countdown)
 Plan: 1 of 1
-Status: Phase complete
-Last activity: 2026-02-07 — Completed 80-01-PLAN.md
+Status: Milestone complete — v1.20 shipped
+Last activity: 2026-02-07 — Phase 80 verified and complete
 
 Progress: ██████████ 100%
 
@@ -65,5 +65,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-07
-Stopped at: Completed 80-01-PLAN.md (Phase 80 complete)
+Stopped at: v1.20 milestone complete — Phase 80 verified
 Resume file: None
