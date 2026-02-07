@@ -238,7 +238,7 @@ See [milestones/v1.11-ROADMAP.md](milestones/v1.11-ROADMAP.md) for full details.
 
 **Milestone Goal:** Fix the double-loading screen UX and clean up accumulated tech debt from rapid milestone delivery.
 
-- [ ] **Phase 75: Merged Loading Screen** - Single loading screen gating on both compat check and Pyodide readiness
+- [x] **Phase 75: Merged Loading Screen** - Single loading screen gating on both compat check and Pyodide readiness
 - [ ] **Phase 76: Test & Roadmap Cleanup** - Remove orphaned fixtures, consolidate helpers, update roadmap
 
 ## Phase Details
@@ -314,8 +314,8 @@ Plans:
 **Plans:** 2 plans
 
 Plans:
-- [ ] 65-01-PLAN.md — Create test server configs (multi-episode + focus-timeout) and pytest fixtures
-- [ ] 65-02-PLAN.md — Create lifecycle stress tests (STRESS-02 through STRESS-07)
+- [x] 65-01-PLAN.md — Create test server configs (multi-episode + focus-timeout) and pytest fixtures
+- [x] 65-02-PLAN.md — Create lifecycle stress tests (STRESS-02 through STRESS-07)
 
 ### Phase 66: Server Recovery Validation
 **Goal**: Prove server handles chaos gracefully and recovers correctly for new participants
@@ -327,10 +327,10 @@ Plans:
   3. New pair's exported data passes exact parity validation
   4. No stale state affects new participants
 **Research flag:** Unlikely (integration test of previous phases)
-**Plans**: TBD
+**Plans:** 1 plan
 
 Plans:
-- [ ] 66-01: TBD
+- [x] 66-01-PLAN.md — Server recovery validation after chaos scenarios
 
 ### Phase 67: Pyodide Pre-load Infrastructure
 **Goal**: Build the pre-loading mechanism that initializes Pyodide during the compatibility check screen
@@ -482,10 +482,10 @@ Plans:
   3. `run_full_episode_flow` exists in exactly one location (`game_helpers.py`) and all consumers import from there
   4. ROADMAP.md shows v1.14 Phases 65-66 as complete
 **Research flag:** Unlikely — straightforward deletions and edits
-**Plans:** TBD
+**Plans:** 1 plan
 
 Plans:
-- [ ] 76-01: TBD
+- [ ] 76-01-PLAN.md — Remove orphaned fixtures, consolidate helpers, update roadmap
 
 ## Progress
 
@@ -521,8 +521,8 @@ Plans:
 | 73. Network & Regression Validation | v1.17 | 2/2 | Complete | 2026-02-06 |
 | 74. Stability Certification | v1.17 | 2/2 | Complete | 2026-02-06 |
 | 75. Merged Loading Screen | v1.18 | 2/2 | Complete | 2026-02-06 |
-| 76. Test & Roadmap Cleanup | v1.18 | 0/TBD | Not started | - |
+| 76. Test & Roadmap Cleanup | v1.18 | 0/1 | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-06 after Phase 75 executed (2/2 plans complete, verified)*
+*Last updated: 2026-02-06 after Phase 76 planned (1 plan created)*
