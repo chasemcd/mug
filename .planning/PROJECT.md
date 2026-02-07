@@ -8,31 +8,40 @@ A framework for running browser-based reinforcement learning experiments with hu
 
 Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
 
-## Current Milestone: v1.17 E2E Test Reliability
+## Current Milestone: v1.18 Loading UX & Cleanup
 
-**Goal:** Achieve 100% pass rate for all E2E tests with zero flakiness — every test passes 10+ consecutive runs.
-
-**Problem:** Several E2E tests have pre-existing flakiness unrelated to application logic:
-- `test_focus_loss_episode_boundary_parity` — Page.goto timeout (server navigation failure)
-- `test_episode_completion_under_fixed_latency[chromium-200]` — 300s test timeout under 200ms latency
-- `test_network_disruption` suite — not validated during v1.16, status unknown
+**Goal:** Fix the double-loading screen UX and clean up accumulated tech debt from rapid milestone delivery.
 
 **Target features:**
 
-*Test stability:*
-- [ ] All E2E tests pass 10+ consecutive runs with zero failures
-- [ ] No xfail markers, no tolerance hacks, no known flaky tests
-- [ ] Root cause identified and fixed for each failing test
+*Loading UX:*
+- [ ] Single merged loading screen (compatibility check + Pyodide loading combined)
+- [ ] No separate Pyodide loading spinner — compat check screen gates on both
+- [ ] Configurable timeout for Pyodide loading (default 60s)
+- [ ] Error page shown if Pyodide fails to load or times out
 
-*Test infrastructure:*
-- [ ] Server startup/teardown reliable between test suites (no Page.goto timeouts)
-- [ ] Test timeouts appropriate for each scenario (200ms latency needs longer than 300s?)
-- [ ] Network disruption tests validated and passing
+*Cleanup:*
+- [ ] Remove orphaned `flask_server_multi_episode` fixture (never consumed)
+- [ ] Remove unused `run_full_episode_flow` import in `test_network_disruption.py`
+- [ ] Consolidate duplicate `run_full_episode_flow` into `game_helpers.py`
+- [ ] Close v1.14 Phases 65-66 in roadmap (work was done, roadmap not updated)
 
 **What done looks like:**
-- Run full E2E suite 10 times in a row, all green every time
-- Zero "known flaky" tests in the codebase
-- CI-ready test suite (if CI were added, it would pass)
+- Participants see one loading screen, not two
+- Loading failure shows a clear error page, not a hang
+- Zero orphaned fixtures or duplicate helper functions in test suite
+- Roadmap accurately reflects completed work
+
+## Previous Milestone: v1.17 E2E Test Reliability (Shipped: 2026-02-06)
+
+**Delivered:** 100% E2E test pass rate — 24 tests across 8 modules, zero failures. Robust server fixture lifecycle, P2P timeout tuning, GGPO fixes, and documented content parity limitation.
+
+**Key accomplishments:**
+- Robust server fixture lifecycle with port-verified teardown (shared helpers)
+- P2P ready gate timeout fix (5000ms → 15000ms) for 200ms latency tests
+- All 24 E2E tests pass (23 passed + 1 xfail for GGPO architectural limitation)
+- Two GGPO fixes: prune guard + boundary ordering
+- GGPO content parity limitation documented in backlog with recommended fix approach
 
 ## Previous Milestone: v1.16 Pyodide Pre-loading (Shipped: 2026-02-06)
 
@@ -270,11 +279,17 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 
 ### Active
 
-*v1.17 E2E Test Reliability:*
-- [ ] All E2E tests pass 10+ consecutive runs with zero failures
-- [ ] Server startup/teardown reliable between test suites
-- [ ] Test timeouts appropriate for each scenario
-- [ ] Network disruption tests validated and passing
+*v1.18 Loading UX & Cleanup:*
+- [ ] Single merged loading screen (compat check + Pyodide)
+- [ ] Configurable Pyodide loading timeout with error page
+- [ ] Orphaned test fixtures and duplicate helpers removed
+- [ ] Roadmap reflects actual v1.14 completion state
+
+*Shipped in v1.17:*
+- ✓ All E2E tests pass with zero failures (24 tests, 23 pass + 1 xfail) — v1.17
+- ✓ Server startup/teardown reliable between test suites — v1.17
+- ✓ Test timeouts appropriate for each scenario — v1.17
+- ✓ Network disruption tests validated and passing — v1.17
 
 *Shipped in v1.16:*
 - ✓ Early Pyodide init during compatibility check — v1.16
@@ -375,7 +390,9 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 - Episode start sync can timeout on slow connections (mitigated with retry mechanism)
 - Rollback visual corrections cause brief teleporting (smoothing not yet implemented)
 - **[CRITICAL]** Users report 1-2 second local input lag in Overcooked (investigating in v1.6)
-- **[RARE, FIXING in v1.14]** Data parity divergence under packet loss + active inputs — `_promoteRemainingAtBoundary()` force-promotes unconfirmed speculative data at episode end; if packets are lost, players may export different actions for the same frame. Affects <1% of stress test runs. Fix requires waiting for input confirmation before export.
+- **[UX]** Double loading spinner on page open — Pyodide loading wheel + compatibility check wheel shown simultaneously. Fixing in v1.18.
+- **[KNOWN]** GGPO content parity divergence under packet loss + active inputs (~40-50% failure rate). Documented in `.planning/backlog/GGPO-PARITY.md`. xfail marker on `test_active_input_with_packet_loss`.
+- ~~**[RESOLVED]** Data parity divergence under packet loss — input confirmation protocol added in v1.14~~
 - ~~**[RESOLVED]** Data export parity issues — fixed in v1.8 with dual-buffer architecture~~
 - ~~**[RESOLVED]** New participants sometimes routed to stale games — fixed in v1.12 with state validation and comprehensive cleanup~~
 
@@ -406,4 +423,4 @@ Both players in a multiplayer game experience local-feeling responsiveness regar
 | Pre-load over Web Worker for v1.16 | Per-frame Python (10-100ms) doesn't cause disconnects; only loadPyodide() does. Pre-loading is simpler and preserves synchronous rollback performance. Web Worker deferred. | ✓ Good |
 
 ---
-*Last updated: 2026-02-06 after v1.17 E2E Test Reliability milestone started*
+*Last updated: 2026-02-07 after v1.18 Loading UX & Cleanup milestone started*

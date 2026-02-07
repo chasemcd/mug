@@ -2,25 +2,26 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-02-06)
+See: .planning/PROJECT.md (updated 2026-02-07)
 
 **Core value:** Both players in a multiplayer game experience local-feeling responsiveness regardless of network latency, enabling valid research data collection without latency-induced behavioral artifacts.
-**Current focus:** v1.17 E2E Test Reliability — Complete
+**Current focus:** v1.18 Loading UX & Cleanup
 
 ## Current Position
 
-Milestone: v1.17 E2E Test Reliability
-Phase: 74 of 74 (Stability Certification) — Complete
-Plan: 2 of 2 complete
-Status: Milestone complete, ready for audit
-Last activity: 2026-02-06 — Phase 74 complete. Full E2E suite stable (24 tests, 0 failures). GGPO content parity limitation documented.
+Milestone: v1.18 Loading UX & Cleanup
+Phase: Not started (run /gsd:define-requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-02-07 — Milestone v1.18 started. Fix double-loading UX and clean up tech debt.
 
-Progress: ██████████ 100%
+Progress: ░░░░░░░░░░ 0%
 
 ## Milestone History
 
 | Milestone | Phases | Status | Shipped |
 |-----------|--------|--------|---------|
+| v1.18 Loading UX & Cleanup | TBD | Defining requirements | — |
 | v1.17 E2E Test Reliability | 71-74 | Complete | 2026-02-06 |
 | v1.16 Pyodide Pre-loading | 67-70 | Complete | 2026-02-06 |
 | v1.15 E2E Test Reliability | - | Root cause found | 2026-02-04 |
@@ -533,6 +534,6 @@ Resume file: None
 
 ### Next Steps
 
-**v1.17 E2E Test Reliability milestone complete.**
+**v1.18 Loading UX & Cleanup milestone started.**
 
-Next action: Run /gsd:audit-milestone or /gsd:complete-milestone
+Next action: Run /gsd:define-requirements to scope the work, then /gsd:create-roadmap to plan phases.

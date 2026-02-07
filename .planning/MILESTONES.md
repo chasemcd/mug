@@ -1,22 +1,33 @@
 # Project Milestones: Interactive Gym P2P Multiplayer
 
-## v1.17 E2E Test Reliability (In Progress)
+## v1.18 Loading UX & Cleanup (In Progress)
 
-**Goal:** Achieve 100% pass rate for all E2E tests with zero flakiness — every test passes 10+ consecutive runs.
+**Goal:** Fix the double-loading screen UX and clean up accumulated tech debt.
 
 **Status:** Defining requirements
 
-**Problem:** Several E2E tests have pre-existing flakiness unrelated to application logic:
-- Page.goto timeouts between test suites (server startup/teardown)
-- 200ms latency test exceeds 300s timeout
-- Network disruption tests not validated
-
 **Target features:**
 
-- All E2E tests pass 10+ consecutive runs with zero failures
-- Server startup/teardown reliable between test suites
-- Test timeouts appropriate for each scenario
-- Network disruption tests validated and passing
+- Single merged loading screen (compatibility check + Pyodide loading)
+- Configurable Pyodide loading timeout with error page (default 60s)
+- Remove orphaned test fixtures and duplicate helpers
+- Close v1.14 roadmap loose ends
+
+---
+
+## v1.17 E2E Test Reliability (Shipped: 2026-02-06)
+
+**Delivered:** 100% E2E test pass rate — 24 tests across 8 modules, zero failures. Robust server fixture lifecycle, P2P timeout tuning, GGPO fixes.
+
+**Phases completed:** 71-74 (8 plans total)
+
+**Key accomplishments:**
+
+- Robust server fixture lifecycle with port-verified teardown (shared helpers)
+- P2P ready gate timeout fix (5000ms → 15000ms) for 200ms latency tests
+- All 24 E2E tests pass (23 passed + 1 xfail for GGPO architectural limitation)
+- Two GGPO fixes: prune guard + episode boundary ordering
+- GGPO content parity limitation documented in .planning/backlog/GGPO-PARITY.md
 
 ---
 
