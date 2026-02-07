@@ -1,6 +1,7 @@
 data/
 .DS_Store
 .claude/ 
+.claude/settings.local.json
 .claude/*
 .planning/
 .playwright-mcp/
