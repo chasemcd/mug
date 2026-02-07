@@ -513,7 +513,7 @@ Plans:
 - [x] 77-01-PLAN.md — Add cleanupForSceneExit() and sceneExited guards to scope P2P connections to GymScene lifetime
 
 ### Phase 78: Group History Tracking
-**Goal**: Server tracks who was paired with whom across scene transitions, queryable by custom matchmakers for re-pairing
+**Goal**: Matchmakers can query group history to re-pair previous partners across GymScenes
 **Depends on**: Phase 77
 **Requirements**: P2P-03, P2P-04
 **Success Criteria** (what must be TRUE):
@@ -521,11 +521,11 @@ Plans:
   2. Group history persists across scene transitions (available in later scenes)
   3. A custom matchmaker can query group history and use it to re-pair previous partners in future GymScenes
   4. Group history does not interfere with fresh matching (new participants unaffected)
-**Research flag:** Likely — need to understand matchmaker API and where to persist group state
-**Plans:** TBD
+**Research flag:** Complete (78-RESEARCH.md)
+**Plans:** 1 plan
 
 Plans:
-- [ ] 78-01: TBD
+- [ ] 78-01-PLAN.md — Add GroupHistory dataclass, extend MatchCandidate, implement GroupReunionMatchmaker, wire group history into GameManager
 
 ## Progress
 
@@ -563,8 +563,8 @@ Plans:
 | 75. Merged Loading Screen | v1.18 | 2/2 | Complete | 2026-02-06 |
 | 76. Test & Roadmap Cleanup | v1.18 | 1/1 | Complete | 2026-02-07 |
 | 77. P2P Connection Scoping | v1.19 | 1/1 | Complete | 2026-02-07 |
-| 78. Group History Tracking | v1.19 | 0/TBD | Not started | - |
+| 78. Group History Tracking | v1.19 | 0/1 | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-07 after Phase 77 complete (P2P Connection Scoping)*
+*Last updated: 2026-02-07 after Phase 78 planned (Group History Tracking)*
