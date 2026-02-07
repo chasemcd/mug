@@ -61,12 +61,12 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| APIC-01 | Phase 67 | Pending |
-| APIC-02 | Phase 67 | Pending |
-| APIC-03 | Phase 67 | Pending |
-| APIC-04 | Phase 67 | Pending |
-| APIC-05 | Phase 67 | Pending |
-| APIC-06 | Phase 67 | Pending |
+| APIC-01 | Phase 67 | Complete |
+| APIC-02 | Phase 67 | Complete |
+| APIC-03 | Phase 67 | Complete |
+| APIC-04 | Phase 67 | Complete |
+| APIC-05 | Phase 67 | Complete |
+| APIC-06 | Phase 67 | Complete |
 | CLNB-01 | Phase 68 | Pending |
 | CLNB-02 | Phase 68 | Pending |
 | EXMP-01 | Phase 69 | Pending |

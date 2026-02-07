@@ -10,7 +10,7 @@ Refactor the GymScene chaining API from 14 accumulated builder methods into fewe
 - Integer phases (67, 68, 69, 70): Planned milestone work
 - Decimal phases (e.g., 67.1): Urgent insertions (marked with INSERTED)
 
-- [ ] **Phase 67: API Method Consolidation** - Refactor GymScene builder methods: rename, split, and merge per new API design
+- [x] **Phase 67: API Method Consolidation** - Refactor GymScene builder methods: rename, split, and merge per new API design
 - [ ] **Phase 68: Clean Break** - Remove all old method names — no aliases, no shims
 - [ ] **Phase 69: Example Configs Migration** - Update all example configs to use new API
 - [ ] **Phase 70: Verification & Test Pass** - Verify zero functionality change across full test suite
@@ -30,8 +30,8 @@ Refactor the GymScene chaining API from 14 accumulated builder methods into fewe
   5. `policies()` and `gameplay()` remain unchanged
 **Plans:** 2 plans
 Plans:
-- [ ] 67-01-PLAN.md — Add runtime() and multiplayer() builder methods
-- [ ] 67-02-PLAN.md — Add content(), waitroom(), and assets() builder methods
+- [x] 67-01-PLAN.md — Add runtime() and multiplayer() builder methods
+- [x] 67-02-PLAN.md — Add content(), waitroom(), and assets() builder methods
 
 ### Phase 68: Clean Break
 **Goal**: Remove all old method names entirely — no deprecation aliases, no redirect methods
@@ -42,7 +42,9 @@ Plans:
   1. Calling any old method name (`pyodide`, `user_experience`, `player_grouping`, `continuous_monitoring`, `exclusion_callbacks`, `reconnection_config`, `partner_disconnect_message_config`, `focus_loss_config`, `player_pairing`) raises AttributeError
   2. No deprecation aliases or redirect methods exist in the codebase
   3. All internal references within GymScene class use new method names
-**Plans**: TBD
+**Plans:** 1 plan
+Plans:
+- [ ] 68-01-PLAN.md — Remove 9 old methods, slim rendering() asset params
 
 ### Phase 69: Example Configs Migration
 **Goal**: Update all 5 example configs to use the new API methods
@@ -73,7 +75,7 @@ Phases execute in numeric order: 67 → 68 → 69 → 70
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 67. API Method Consolidation | 0/2 | Planning complete | - |
-| 68. Clean Break | 0/TBD | Not started | - |
+| 67. API Method Consolidation | 2/2 | ✓ Complete | 2026-02-07 |
+| 68. Clean Break | 0/1 | Not started | - |
 | 69. Example Configs Migration | 0/TBD | Not started | - |
 | 70. Verification & Test Pass | 0/TBD | Not started | - |
