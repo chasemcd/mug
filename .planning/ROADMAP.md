@@ -22,6 +22,7 @@
 - ✅ **v1.18 Loading UX & Cleanup** - Phases 75-76 (shipped 2026-02-07)
 - ✅ **v1.19 P2P Lifecycle Cleanup** - Phases 77-79 (shipped 2026-02-07)
 - ✅ **v1.20 Pre-Game Countdown** - Phase 80 (shipped 2026-02-07)
+- 🚧 **v1.21 Latency-Aware Matchmaking** - Phases 81-82 (in progress)
 
 ## Phases
 
@@ -262,6 +263,13 @@ See [milestones/v1.11-ROADMAP.md](milestones/v1.11-ROADMAP.md) for full details.
 **Milestone Goal:** After matchmaking, show a brief countdown on the waiting room screen before transitioning to the gym scene, so players know a match was found and can prepare.
 
 - [x] **Phase 80: Pre-Game Countdown** - 3-second "Players found! 3... 2... 1..." countdown on waiting room after match, synced game start
+
+### 🚧 v1.21 Latency-Aware Matchmaking (In Progress)
+
+**Milestone Goal:** A FIFO matchmaker that pre-filters candidates by server RTT heuristic before proposing matches, then verifies with P2P probe — so only low-latency pairs get matched.
+
+- [ ] **Phase 81: LatencyFIFOMatchmaker Core** - Server RTT pre-filtering with configurable threshold and graceful fallback
+- [ ] **Phase 82: Scene API & P2P Probe Integration** - Wire into scene.matchmaking(), verify P2P probe coordination
 
 ## Phase Details
 
@@ -566,6 +574,35 @@ Plans:
 Plans:
 - [x] 80-01-PLAN.md — Server-side countdown delay + client-side countdown display on waiting room screen
 
+### Phase 81: LatencyFIFOMatchmaker Core
+**Goal**: A matchmaker class that skips candidates whose estimated P2P RTT (sum of server RTTs) exceeds a configurable threshold
+**Depends on**: Phase 80 (v1.20 complete)
+**Requirements**: MATCH-01, MATCH-02, MATCH-04
+**Success Criteria** (what must be TRUE):
+  1. `LatencyFIFOMatchmaker(max_server_rtt_ms=200)` can be instantiated with a configurable threshold
+  2. `find_match()` skips waiting candidates where sum of server RTTs exceeds `max_server_rtt_ms`
+  3. When no candidate passes the RTT filter, arriving participant waits (returns None)
+  4. When a candidate's RTT data is unavailable (None), they are NOT excluded (graceful fallback)
+**Research flag:** Unlikely — straightforward subclass of existing Matchmaker, server RTT already available on MatchCandidate
+**Plans:** TBD
+
+Plans:
+- [ ] 81-01: TBD
+
+### Phase 82: Scene API & P2P Probe Integration
+**Goal**: Researcher can use LatencyFIFOMatchmaker via scene config, with post-match P2P probe verification
+**Depends on**: Phase 81
+**Requirements**: MATCH-03, MATCH-05
+**Success Criteria** (what must be TRUE):
+  1. `scene.matchmaking(matchmaker=LatencyFIFOMatchmaker(max_server_rtt_ms=200, max_p2p_rtt_ms=150))` works
+  2. After RTT pre-filter match, P2P probe still runs if `max_p2p_rtt_ms` is set
+  3. Rejected P2P probe returns participants to waitroom (existing behavior preserved)
+**Research flag:** Unlikely — existing scene.matchmaking() API and P2P probe flow already support custom matchmakers with max_p2p_rtt_ms
+**Plans:** TBD
+
+Plans:
+- [ ] 82-01: TBD
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -605,7 +642,9 @@ Plans:
 | 78. Group History Tracking | v1.19 | 1/1 | Complete | 2026-02-07 |
 | 79. Post-Game Scene Isolation Test | v1.19 | 1/1 | Complete | 2026-02-07 |
 | 80. Pre-Game Countdown | v1.20 | 1/1 | Complete | 2026-02-07 |
+| 81. LatencyFIFOMatchmaker Core | v1.21 | 0/1 | Not started | - |
+| 82. Scene API & P2P Probe Integration | v1.21 | 0/1 | Not started | - |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-07 after Phase 80 completion*
+*Last updated: 2026-02-07 after v1.21 roadmap creation*

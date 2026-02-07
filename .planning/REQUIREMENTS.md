@@ -58,17 +58,17 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| MATCH-01 | - | Pending |
-| MATCH-02 | - | Pending |
-| MATCH-03 | - | Pending |
-| MATCH-04 | - | Pending |
-| MATCH-05 | - | Pending |
+| MATCH-01 | Phase 81 | Pending |
+| MATCH-02 | Phase 81 | Pending |
+| MATCH-03 | Phase 82 | Pending |
+| MATCH-04 | Phase 81 | Pending |
+| MATCH-05 | Phase 82 | Pending |
 
 **Coverage:**
 - v1 requirements: 5 total
-- Mapped to phases: 0
-- Unmapped: 5 ⚠️
+- Mapped to phases: 5
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-02-07*
-*Last updated: 2026-02-07 after v1.21 milestone requirements definition*
+*Last updated: 2026-02-07 after v1.21 roadmap creation*
