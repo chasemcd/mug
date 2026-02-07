@@ -20,7 +20,7 @@
 - ✅ **v1.16 Pyodide Pre-loading** - Phases 67-70 (shipped 2026-02-06)
 - ✅ **v1.17 E2E Test Reliability** - Phases 71-74 (shipped 2026-02-06)
 - ✅ **v1.18 Loading UX & Cleanup** - Phases 75-76 (shipped 2026-02-07)
-- 🚧 **v1.19 P2P Lifecycle Cleanup** - Phases 77-79 (in progress)
+- ✅ **v1.19 P2P Lifecycle Cleanup** - Phases 77-79 (shipped 2026-02-07)
 
 ## Phases
 
@@ -245,13 +245,13 @@ See [milestones/v1.11-ROADMAP.md](milestones/v1.11-ROADMAP.md) for full details.
 
 </details>
 
-### v1.19 P2P Lifecycle Cleanup (In Progress)
+### v1.19 P2P Lifecycle Cleanup (Shipped 2026-02-07)
 
 **Milestone Goal:** P2P connections are scoped to GymScenes — torn down on scene exit, with group history preserved for future re-pairing.
 
 - [x] **Phase 77: P2P Connection Scoping** - Close P2P/WebRTC on GymScene exit, suppress partner-disconnected overlay on non-game scenes
 - [x] **Phase 78: Group History Tracking** - Server tracks group membership across scenes, matchmakers can query for re-pairing
-- [ ] **Phase 79: Post-Game Scene Isolation Test** - E2E test: two players complete Overcooked, proceed to survey, one exits; remaining player stays on survey without partner-disconnected overlay
+- [x] **Phase 79: Post-Game Scene Isolation Test** - E2E test: two players complete Overcooked, proceed to survey, one exits; remaining player stays on survey without partner-disconnected overlay
 
 ## Phase Details
 
@@ -539,7 +539,7 @@ Plans:
 **Plans:** 1 plan
 
 Plans:
-- [ ] 79-01-PLAN.md — Create multi-scene test server config, server fixture, and E2E test validating post-game scene isolation
+- [x] 79-01-PLAN.md — Create multi-scene test server config, server fixture, and E2E test validating post-game scene isolation
 
 ## Progress
 
@@ -578,8 +578,8 @@ Plans:
 | 76. Test & Roadmap Cleanup | v1.18 | 1/1 | Complete | 2026-02-07 |
 | 77. P2P Connection Scoping | v1.19 | 1/1 | Complete | 2026-02-07 |
 | 78. Group History Tracking | v1.19 | 1/1 | Complete | 2026-02-07 |
-| 79. Post-Game Scene Isolation Test | v1.19 | 0/1 | Not started | - |
+| 79. Post-Game Scene Isolation Test | v1.19 | 1/1 | Complete | 2026-02-07 |
 
 ---
 *Roadmap created: 2026-01-20*
-*Last updated: 2026-02-07 after Phase 79 planned (Post-Game Scene Isolation Test)*
+*Last updated: 2026-02-07 after Phase 79 complete (Post-Game Scene Isolation Test)*

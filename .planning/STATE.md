@@ -15,7 +15,7 @@ Plan: 01 of 01
 Status: Phase 79 complete, v1.19 milestone complete
 Last activity: 2026-02-07 — Completed 79-01-PLAN.md (Post-Game Scene Isolation Test)
 
-Progress: ██████████░ 68%
+Progress: ██████████ 100%
 
 ## Milestone History
 
@@ -260,6 +260,11 @@ Progress: ██████████░ 68%
 **Group History Tracking (v1.19 Phase 78 - added):**
 - `interactive_gym/server/matchmaker.py` - GroupHistory dataclass, MatchCandidate.group_history field, GroupReunionMatchmaker class
 - `interactive_gym/server/game_manager.py` - GroupHistory import, _build_match_candidate() helper, refactored _add_to_fifo_queue() to use helper
+
+**Post-Game Scene Isolation Test (v1.19 Phase 79 - added):**
+- `interactive_gym/examples/cogrid/overcooked_human_human_multiplayer_scene_isolation_test.py` - Multi-scene test config (StartScene -> GymScene -> FeedbackScene -> EndScene)
+- `tests/e2e/test_scene_isolation.py` - test_partner_exit_on_survey_no_overlay E2E test
+- `tests/conftest.py` - flask_server_scene_isolation fixture (function scope, port 5707)
 
 **P2P Connection Scoping (v1.19 Phase 77 - added):**
 - `interactive_gym/server/static/js/pyodide_multiplayer_game.js` - sceneExited flag, cleanupForSceneExit() method, guards in _handleReconnectionGameEnd/_onP2PConnectionLost/_handleFocusLossTimeout, reset in _initP2PConnection
