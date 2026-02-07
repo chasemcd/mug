@@ -11,11 +11,11 @@ See: .planning/PROJECT.md (updated 2026-02-07)
 
 Milestone: v1.18 Loading UX & Cleanup
 Phase: 75 of 76 (Merged Loading Screen)
-Plan: 1 of 2 complete
-Status: In progress
-Last activity: 2026-02-07 — Completed 75-01-PLAN.md (server config + unified HTML)
+Plan: 2 of 2 complete
+Status: Phase complete
+Last activity: 2026-02-07 — Completed 75-02-PLAN.md (client-side JS loading gate + timeout + error handling)
 
-Progress: █████░░░░░ 50%
+Progress: ██████████ 100%
 
 ## Milestone History
 
@@ -248,11 +248,15 @@ Progress: █████░░░░░ 50%
 
 **v1.18 Execution:**
 - `.planning/phases/75-merged-loading-screen/75-01-SUMMARY.md`
+- `.planning/phases/75-merged-loading-screen/75-02-SUMMARY.md`
 
 **Configurable Pyodide Loading Timeout (v1.18 Phase 75-01 - added):**
 - `interactive_gym/configurations/experiment_config.py` - pyodide_load_timeout_s attribute (default 60), included in get_pyodide_config() return dict (both early-return and normal paths)
 - `interactive_gym/configurations/remote_config.py` - pyodide_load_timeout_s attribute (default 60), included in get_pyodide_config() return dict
 - `interactive_gym/server/app.py` - is_client_in_loading_grace() reads timeout from CONFIG.pyodide_load_timeout_s with LOADING_TIMEOUT_S fallback
+
+**Loading Gate Client-Side (v1.18 Phase 75-02 - added):**
+- `interactive_gym/server/static/js/index.js` - loadingGate object, checkLoadingGate() function, experiment_config handler refactored to show #loadingScreen and delegate to checkLoadingGate(), preloadPyodide() integrates with gate signals, configurable Pyodide timeout, reconnect guard via gateResolved, showPyodideProgress/hidePyodideProgress removed
 
 **Unified Loading Screen (v1.18 Phase 75-01 - replaced):**
 - `interactive_gym/server/static/templates/index.html` - #screeningLoader + #pyodideLoader replaced with single #loadingScreen element; CSS selectors updated to #loadingScreen/#loadingStatus
@@ -319,6 +323,13 @@ Progress: █████░░░░░ 50%
 ### Decisions
 
 See: .planning/PROJECT.md Key Decisions table
+
+**v1.18 Phase 75-02 decisions:**
+- loadingGate object with gateResolved boolean prevents re-entry on socket reconnect
+- checkLoadingGate() updates #loadingStatus text based on which signal is still pending
+- Pyodide timeout emits pyodide_loading_complete with { error: true, reason: 'timeout' } to clear server grace state
+- Per-scene Pyodide safety nets (advance button gate, start button gate) preserved unchanged as no-cost safety nets
+- showPyodideProgress/hidePyodideProgress removed (referenced deleted #pyodideLoader element)
 
 **v1.18 Phase 75-01 decisions:**
 - pyodide_load_timeout_s added to both ExperimentConfig and RemoteConfig (default 60) for researcher configurability
@@ -547,11 +558,11 @@ See: .planning/PROJECT.md Key Decisions table
 ## Session Continuity
 
 Last session: 2026-02-07
-Stopped at: Completed 75-01-PLAN.md (server config + unified HTML loading element)
+Stopped at: Completed 75-02-PLAN.md (client-side JS loading gate + timeout + error handling)
 Resume file: None
 
 ### Next Steps
 
-**Phase 75 Plan 02** — client-side JS with loadingGate, timeout, error handling, unified loading screen wiring.
+**Phase 76** — Loading UX cleanup and testing (if applicable).
 
-Next action: Execute 75-02-PLAN.md
+Next action: Proceed to Phase 76 or finalize v1.18 milestone.
