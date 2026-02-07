@@ -206,6 +206,77 @@ window.pyodideMicropip = null;
 window.pyodideInstalledPackages = [];
 window.pyodidePreloadStatus = 'idle'; // 'idle' | 'loading' | 'ready' | 'error'
 
+// Unified loading gate (Phase 75) - coordinates screening + Pyodide readiness
+const loadingGate = {
+    screeningComplete: false,
+    screeningPassed: null,       // true/false/null
+    screeningMessage: null,      // exclusion message if failed
+    pyodideComplete: false,
+    pyodideSuccess: null,        // true/false/null
+    timeoutId: null,
+    gateResolved: false,         // prevents re-entry on reconnect
+};
+
+/**
+ * Check if both loading signals (screening + Pyodide) are complete.
+ * Called by both screening completion and Pyodide completion paths.
+ * When both are done, resolves the gate: proceed to scene or show error.
+ */
+function checkLoadingGate() {
+    if (loadingGate.gateResolved) return;
+
+    // Update status text based on current state
+    const statusEl = document.getElementById('loadingStatus');
+    if (statusEl) {
+        if (!loadingGate.screeningComplete && !loadingGate.pyodideComplete) {
+            statusEl.textContent = 'Checking compatibility...';
+        } else if (loadingGate.screeningComplete && !loadingGate.pyodideComplete) {
+            statusEl.textContent = 'Loading Python runtime...';
+        } else if (!loadingGate.screeningComplete && loadingGate.pyodideComplete) {
+            statusEl.textContent = 'Checking compatibility...';
+        }
+    }
+
+    // Both must be complete before we can resolve
+    if (!loadingGate.screeningComplete || !loadingGate.pyodideComplete) {
+        return;
+    }
+
+    // Gate is resolving -- mark resolved to prevent re-entry
+    loadingGate.gateResolved = true;
+    if (loadingGate.timeoutId) {
+        clearTimeout(loadingGate.timeoutId);
+        loadingGate.timeoutId = null;
+    }
+
+    // Hide loading screen
+    const loadingScreen = document.getElementById('loadingScreen');
+    if (loadingScreen) loadingScreen.style.display = 'none';
+
+    // Screening failed -> show exclusion (existing behavior)
+    if (!loadingGate.screeningPassed) {
+        console.log('[LoadingGate] Screening failed:', loadingGate.screeningMessage);
+        showExclusionMessage(loadingGate.screeningMessage);
+        return;
+    }
+
+    // Pyodide failed -> show error page (LOAD-04)
+    if (!loadingGate.pyodideSuccess) {
+        console.log('[LoadingGate] Pyodide failed - showing error page');
+        showExclusionMessage('Failed to load the Python runtime. Please refresh the page or try a different browser.');
+        return;
+    }
+
+    // Both passed -> proceed to scene
+    console.log('[LoadingGate] Both signals ready - proceeding');
+    if (pendingSceneData) {
+        processPendingScene();
+    } else {
+        console.log('[LoadingGate] No pending scene, requesting from server');
+        socket.emit("request_current_scene", {});
+    }
+}
+
 /**
  * Pre-load Pyodide during compatibility check screen (Phase 67).
  * Starts loadPyodide() + micropip.install() immediately when experiment_config
@@ -216,12 +287,14 @@ window.pyodidePreloadStatus = 'idle'; // 'idle' | 'loading' | 'ready' | 'error'
 async function preloadPyodide(pyodideConfig) {
     if (!pyodideConfig || !pyodideConfig.needs_pyodide) {
         window.pyodidePreloadStatus = 'ready';
+        loadingGate.pyodideComplete = true;
+        loadingGate.pyodideSuccess = true;
+        checkLoadingGate();
         return;
     }
 
     console.log('[PyodidePreload] Starting preload...');
     window.pyodidePreloadStatus = 'loading';
-    showPyodideProgress('Loading Python runtime...');
 
     // Signal server BEFORE blocking the main thread (GRACE-02)
     socket.emit('pyodide_loading_start', {});
@@ -231,7 +304,8 @@ async function preloadPyodide(pyodideConfig) {
     try {
         const pyodide = await loadPyodide();
         console.log('[PyodidePreload] Core loaded, installing micropip...');
-        showPyodideProgress('Installing packages...');
+        const statusEl = document.getElementById('loadingStatus');
+        if (statusEl) statusEl.textContent = 'Installing packages...';
 
         await pyodide.loadPackage("micropip");
         const micropip = pyodide.pyimport("micropip");
@@ -246,8 +320,10 @@ async function preloadPyodide(pyodideConfig) {
         window.pyodideMicropip = micropip;
         window.pyodideInstalledPackages = packages;
         window.pyodidePreloadStatus = 'ready';
-        hidePyodideProgress();
         console.log('[PyodidePreload] Complete');
+        loadingGate.pyodideComplete = true;
+        loadingGate.pyodideSuccess = true;
+        checkLoadingGate();
 
         // Signal server loading is done (GRACE-03)
         socket.emit('pyodide_loading_complete', {});
@@ -255,22 +331,12 @@ async function preloadPyodide(pyodideConfig) {
     } catch (error) {
         console.error('[PyodidePreload] Failed:', error);
         window.pyodidePreloadStatus = 'error';
-        showPyodideProgress('Loading failed - will retry when game starts');
+        loadingGate.pyodideComplete = true;
+        loadingGate.pyodideSuccess = false;
+        checkLoadingGate();
         // Signal server loading is done (even on error) to clear grace state
         socket.emit('pyodide_loading_complete', { error: true });
     }
-}
-
-function showPyodideProgress(message) {
-    const loader = document.getElementById('pyodideLoader');
-    const status = document.getElementById('pyodideStatus');
-    if (loader) loader.style.display = 'flex';
-    if (status) status.textContent = message;
-}
-
-function hidePyodideProgress() {
-    const loader = document.getElementById('pyodideLoader');
-    if (loader) loader.style.display = 'none';
 }
 
 // Expose game instance for debugging (access via window.game)
@@ -585,17 +651,46 @@ socket.on('join_game_error', function(data) {
 socket.on('experiment_config', async function(data) {
     console.log("[ExperimentConfig] Received experiment configuration");
 
-    // Start Pyodide preload concurrently with entry screening (Phase 67)
-    // Fire and forget -- don't await, let it run alongside screening
-    if (data.pyodide_config) {
-        preloadPyodide(data.pyodide_config);
+    // Guard against re-entry on reconnect (Pitfall 5)
+    if (loadingGate.gateResolved) {
+        console.log("[ExperimentConfig] Loading gate already resolved, skipping");
+        return;
     }
 
+    // Show unified loading screen (LOAD-01)
+    const loadingScreen = document.getElementById('loadingScreen');
+    if (loadingScreen) loadingScreen.style.display = 'flex';
+
+    // Start Pyodide preload concurrently (fire and forget)
+    if (data.pyodide_config) {
+        preloadPyodide(data.pyodide_config);
+
+        // Start timeout timer if Pyodide is needed (LOAD-03)
+        if (data.pyodide_config.needs_pyodide) {
+            const timeoutS = data.pyodide_config.pyodide_load_timeout_s || 60;
+            loadingGate.timeoutId = setTimeout(() => {
+                if (!loadingGate.pyodideComplete) {
+                    console.error('[LoadingGate] Pyodide loading timed out after ' + timeoutS + 's');
+                    window.pyodidePreloadStatus = 'error';
+                    loadingGate.pyodideComplete = true;
+                    loadingGate.pyodideSuccess = false;
+                    // Signal server loading is done (timeout) to clear grace state
+                    socket.emit('pyodide_loading_complete', { error: true, reason: 'timeout' });
+                    checkLoadingGate();
+                }
+            }, timeoutS * 1000);
+        }
+    } else {
+        // No Pyodide config -> immediately mark pyodide as complete
+        loadingGate.pyodideComplete = true;
+        loadingGate.pyodideSuccess = true;
+    }
+
+    // Run entry screening
     if (data.entry_screening) {
         experimentScreeningConfig = data.entry_screening;
         console.log("[ExperimentConfig] Entry screening config:", experimentScreeningConfig);
 
-        // Run experiment-level screening immediately if configured
         const hasScreeningRules = experimentScreeningConfig.device_exclusion ||
             (experimentScreeningConfig.browser_requirements && experimentScreeningConfig.browser_requirements.length > 0) ||
             (experimentScreeningConfig.browser_blocklist && experimentScreeningConfig.browser_blocklist.length > 0) ||
@@ -605,49 +700,40 @@ socket.on('experiment_config', async function(data) {
         if (hasScreeningRules) {
             console.log("[ExperimentConfig] Running experiment-level entry screening...");
 
-            // Show loading indicator during screening
-            $("#screeningLoader").show();
+            // Update loading status
+            const statusEl = document.getElementById('loadingStatus');
+            if (statusEl) statusEl.textContent = 'Checking compatibility...';
 
             const result = await runEntryScreening(experimentScreeningConfig);
             experimentScreeningPassed = result.passed;
             experimentScreeningMessage = result.message;
             experimentScreeningComplete = true;
 
-            // Hide loading indicator
-            $("#screeningLoader").hide();
+            // Update loading gate with screening result
+            loadingGate.screeningComplete = true;
+            loadingGate.screeningPassed = result.passed;
+            loadingGate.screeningMessage = result.message;
 
             if (!result.passed) {
                 console.log("[ExperimentConfig] Screening failed:", result.failedRule, result.message);
-                showExclusionMessage(result.message);
-            } else {
-                console.log("[ExperimentConfig] Screening passed");
-                // Process any pending scene that arrived during screening
-                if (pendingSceneData) {
-                    console.log("[ExperimentConfig] Processing pending scene");
-                    processPendingScene();
-                } else {
-                    // No pending scene - request current scene from server
-                    // This handles the race condition where activate_scene arrived before
-                    // the socket.on handler was ready, or was lost due to timing issues
-                    console.log("[ExperimentConfig] No pending scene, requesting current scene from server");
-                    socket.emit("request_current_scene", {});
-                }
             }
+
+            checkLoadingGate();
         } else {
-            // No screening rules configured at experiment level
+            // No screening rules configured
             experimentScreeningPassed = true;
             experimentScreeningComplete = true;
-            if (pendingSceneData) {
-                processPendingScene();
-            }
+            loadingGate.screeningComplete = true;
+            loadingGate.screeningPassed = true;
+            checkLoadingGate();
         }
     } else {
-        // No entry screening config, mark as complete and process pending scene
+        // No entry screening config
         experimentScreeningPassed = true;
         experimentScreeningComplete = true;
-        if (pendingSceneData) {
-            processPendingScene();
-        }
+        loadingGate.screeningComplete = true;
+        loadingGate.screeningPassed = true;
+        checkLoadingGate();
     }
 });
 
