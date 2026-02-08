@@ -364,7 +364,7 @@ window.addEventListener('blur', function() {
     documentInFocus = false;
 });
 
-socket.on('pong', function(data) {
+socket.on('pong', function(latencyData) {
     var latency = Date.now() - window.lastPingTime;
     latencyMeasurements.push(latency);
 
@@ -380,7 +380,7 @@ socket.on('pong', function(data) {
     document.getElementById('latencyValue').innerText = medianLatency.toString().padStart(3, '0');
     document.getElementById('latencyContainer').style.display = 'block'; // Show the latency (ping) display
     curLatency = medianLatency;
-    maxLatency = data.max_latency;
+    maxLatency = latencyData.max_latency;
 
     // Expose for continuous monitoring (Phase 16)
     window.currentPing = medianLatency;
@@ -633,22 +633,22 @@ $(function() {
     })
 })
 
-socket.on('server_session_id', function(data) {
-    window.sessionId = data.session_id;
+socket.on('server_session_id', function(sessionInfo) {
+    window.sessionId = sessionInfo.session_id;
 });
 
 // Handle join_game errors - show start button again so user can retry
-socket.on('join_game_error', function(data) {
-    console.error("join_game_error:", data.message);
+socket.on('join_game_error', function(errorInfo) {
+    console.error("join_game_error:", errorInfo.message);
     $("#startButton").show();
     $("#startButton").attr("disabled", false);
     $("#startButtonLoader").removeClass("visible");
-    $("#errorText").text(data.message);
+    $("#errorText").text(errorInfo.message);
     $("#errorText").show();
 });
 
 // Experiment-level configuration (including entry screening)
-socket.on('experiment_config', async function(data) {
+socket.on('experiment_config', async function(experimentConfig) {
     console.log("[ExperimentConfig] Received experiment configuration");
 
     // Guard against re-entry on reconnect (Pitfall 5)
@@ -662,12 +662,12 @@ socket.on('experiment_config', async function(data) {
     if (loadingScreen) loadingScreen.style.display = 'flex';
 
     // Start Pyodide preload concurrently (fire and forget)
-    if (data.pyodide_config) {
-        preloadPyodide(data.pyodide_config);
+    if (experimentConfig.pyodide_config) {
+        preloadPyodide(experimentConfig.pyodide_config);
 
         // Start timeout timer if Pyodide is needed (LOAD-03)
-        if (data.pyodide_config.needs_pyodide) {
-            const timeoutS = data.pyodide_config.pyodide_load_timeout_s || 60;
+        if (experimentConfig.pyodide_config.needs_pyodide) {
+            const timeoutS = experimentConfig.pyodide_config.pyodide_load_timeout_s || 60;
             loadingGate.timeoutId = setTimeout(() => {
                 if (!loadingGate.pyodideComplete) {
                     console.error('[LoadingGate] Pyodide loading timed out after ' + timeoutS + 's');
@@ -687,8 +687,8 @@ socket.on('experiment_config', async function(data) {
     }
 
     // Run entry screening
-    if (data.entry_screening) {
-        experimentScreeningConfig = data.entry_screening;
+    if (experimentConfig.entry_screening) {
+        experimentScreeningConfig = experimentConfig.entry_screening;
         console.log("[ExperimentConfig] Entry screening config:", experimentScreeningConfig);
 
         const hasScreeningRules = experimentScreeningConfig.device_exclusion ||
@@ -772,8 +772,8 @@ socket.on('connect', function() {
 });
 
 // Handle session restoration from server
-socket.on('session_restored', function(data) {
-    console.log("Session restored from server:", data);
+socket.on('session_restored', function(restoredSession) {
+    console.log("Session restored from server:", restoredSession);
 
     // If screening failed, don't restore session - keep showing exclusion message
     if (experimentScreeningPassed === false) {
@@ -782,8 +782,8 @@ socket.on('session_restored', function(data) {
     }
 
     // Restore interactiveGymGlobals from server (server state is authoritative)
-    if (data.interactiveGymGlobals) {
-        window.interactiveGymGlobals = data.interactiveGymGlobals;
+    if (restoredSession.interactiveGymGlobals) {
+        window.interactiveGymGlobals = restoredSession.interactiveGymGlobals;
         console.log("Restored interactiveGymGlobals:", window.interactiveGymGlobals);
     }
 
@@ -804,8 +804,8 @@ socket.on('session_restored', function(data) {
 
 
 // Handle duplicate session (participant already connected in another tab)
-socket.on('duplicate_session', function(data) {
-    console.error("Duplicate session detected:", data.message);
+socket.on('duplicate_session', function(duplicateInfo) {
+    console.error("Duplicate session detected:", duplicateInfo.message);
 
     // Hide all interactive elements
     $("#startButton").hide();
@@ -819,7 +819,7 @@ socket.on('duplicate_session', function(data) {
     $("#sceneHeader").html("Session Already Active");
     $("#sceneHeader").show();
     $("#sceneBody").html(
-        "<p style='color: red; font-weight: bold;'>" + data.message + "</p>"
+        "<p style='color: red; font-weight: bold;'>" + duplicateInfo.message + "</p>"
     );
     $("#sceneBody").show();
 
@@ -827,8 +827,8 @@ socket.on('duplicate_session', function(data) {
     socket.disconnect();
 });
 
-socket.on('invalid_session', function(data) {
-    alert(data.message);
+socket.on('invalid_session', function(invalidInfo) {
+    alert(invalidInfo.message);
     // $('#finalPageHeaderText').hide()
     // $('#finalPageText').hide()
     // $("#gameHeaderText").hide();
@@ -837,7 +837,7 @@ socket.on('invalid_session', function(data) {
     $("#invalidSession").show();
 });
 
-socket.on('start_game', function(data) {
+socket.on('start_game', function(gameStartData) {
     // Don't start game if screening failed
     if (experimentScreeningPassed === false) {
         console.log("[StartGame] Blocked by failed screening");
@@ -845,20 +845,20 @@ socket.on('start_game', function(data) {
     }
 
     console.log("[StartGame] Game starting. Subject:", window.subjectName || interactiveGymGlobals?.subjectName,
-        "GameID:", data.game_id || 'N/A',
-        "Scene:", data.scene_metadata?.scene_id || 'unknown');
+        "GameID:", gameStartData.game_id || 'N/A',
+        "Scene:", gameStartData.scene_metadata?.scene_id || 'unknown');
 
     // Clear the waitroomInterval to stop the waiting room timer
     if (waitroomInterval) {
         clearInterval(waitroomInterval);
     }
 
-    let scene_metadata = data.scene_metadata
+    let scene_metadata = gameStartData.scene_metadata
 
     // Set game_id on multiplayer game instance if present
-    if (data.game_id && pyodideRemoteGame) {
-        pyodideRemoteGame.gameId = data.game_id;
-        console.debug(`[MultiplayerPyodide] Set game_id: ${data.game_id}`);
+    if (gameStartData.game_id && pyodideRemoteGame) {
+        pyodideRemoteGame.gameId = gameStartData.game_id;
+        console.debug(`[MultiplayerPyodide] Set game_id: ${gameStartData.game_id}`);
     }
 
     // Hide the sceneBody and any waiting room messages or errors
@@ -900,16 +900,16 @@ socket.on('start_game', function(data) {
 var waitroomInterval;
 var waitroomTimeoutMessage = null;  // Store custom timeout message from server
 
-socket.on('match_found_countdown', function(data) {
-    console.log("[Countdown] Match found! Starting", data.countdown_seconds, "second countdown");
+socket.on('match_found_countdown', function(countdownInfo) {
+    console.log("[Countdown] Match found! Starting", countdownInfo.countdown_seconds, "second countdown");
 
     // Stop the waiting room timer
     if (waitroomInterval) {
         clearInterval(waitroomInterval);
     }
 
-    var remaining = data.countdown_seconds;
-    var message = data.message || "Players found!";
+    var remaining = countdownInfo.countdown_seconds;
+    var message = countdownInfo.message || "Players found!";
 
     // Show initial countdown state
     $("#waitroomText").text(message + " Starting in " + remaining + "...");
@@ -927,10 +927,10 @@ socket.on('match_found_countdown', function(data) {
     }, 1000);
 });
 
-socket.on("waiting_room", function(data) {
+socket.on("waiting_room", function(waitroomState) {
     console.log("[WaitingRoom] Added to waiting room. Subject:", window.subjectName || interactiveGymGlobals?.subjectName,
-        "Players:", data.cur_num_players, "/", (data.cur_num_players + data.players_needed),
-        "Timeout:", Math.floor(data.ms_remaining / 1000), "seconds");
+        "Players:", waitroomState.cur_num_players, "/", (waitroomState.cur_num_players + waitroomState.players_needed),
+        "Timeout:", Math.floor(waitroomState.ms_remaining / 1000), "seconds");
 
     if (waitroomInterval) {
         clearInterval(waitroomInterval);
@@ -939,18 +939,18 @@ socket.on("waiting_room", function(data) {
     $("#instructions").hide();
 
     // Store custom timeout message if provided
-    waitroomTimeoutMessage = data.waitroom_timeout_message || null;
+    waitroomTimeoutMessage = waitroomState.waitroom_timeout_message || null;
 
-    var timer = Math.floor(data.ms_remaining / 1000); // Convert milliseconds to seconds
+    var timer = Math.floor(waitroomState.ms_remaining / 1000); // Convert milliseconds to seconds
 
 
     // Update the text immediately to reflect the current state
-    updateWaitroomText(data, timer);
+    updateWaitroomText(waitroomState, timer);
 
     // Set up a new interval
     waitroomInterval = setInterval(function () {
         timer--;
-        updateWaitroomText(data, timer);
+        updateWaitroomText(waitroomState, timer);
 
         // Stop the timer if it reaches zero
         if (timer <= 0) {
@@ -980,7 +980,7 @@ socket.on("waiting_room", function(data) {
 
 
 var singlePlayerWaitroomInterval;
-socket.on("single_player_waiting_room", function(data) {
+socket.on("single_player_waiting_room", function(singlePlayerWaitroom) {
     if (singlePlayerWaitroomInterval) {
         clearInterval(singlePlayerWaitroomInterval);
     }
@@ -989,17 +989,17 @@ socket.on("single_player_waiting_room", function(data) {
     $("#instructions").hide();
 
 
-    var simulater_timer = Math.floor(data.ms_remaining / 1000); // Convert milliseconds to seconds
-    var single_player_timer = Math.floor(data.wait_duration_s); // already in second
+    var simulater_timer = Math.floor(singlePlayerWaitroom.ms_remaining / 1000); // Convert milliseconds to seconds
+    var single_player_timer = Math.floor(singlePlayerWaitroom.wait_duration_s); // already in second
 
     // Update the text immediately to reflect the current state
-    updateWaitroomText(data, simulater_timer);
+    updateWaitroomText(singlePlayerWaitroom, simulater_timer);
 
     // Set up a new interval
     singlePlayerWaitroomInterval = setInterval(function () {
         simulater_timer--;
         single_player_timer--;
-        updateWaitroomText(data, simulater_timer);
+        updateWaitroomText(singlePlayerWaitroom, simulater_timer);
 
         if (single_player_timer <= 0) {
             clearInterval(singlePlayerWaitroomInterval);
@@ -1020,7 +1020,7 @@ socket.on("single_player_waiting_room", function(data) {
 })
 
 
-socket.on("single_player_waiting_room_failure", function(data) {
+socket.on("single_player_waiting_room_failure", function(failureInfo) {
     console.log("Leaving game due to waiting room failure (other player left)...")
     // Prevent start button from being re-enabled after failure
     if (refreshStartButton) {
