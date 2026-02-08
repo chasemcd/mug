@@ -60,7 +60,7 @@ class GameManager:
         self,
         scene: gym_scene.GymScene,
         experiment_config: remote_config.RemoteConfig,
-        sio: flask_socketio.SocketIO,
+        socketio: flask_socketio.SocketIO,
         pyodide_coordinator: pyodide_game_coordinator.PyodideGameCoordinator | None = None,
         pairing_manager: player_pairing_manager.PlayerGroupManager | None = None,
         get_subject_rtt: callable | None = None,
@@ -73,7 +73,7 @@ class GameManager:
         assert isinstance(scene, gym_scene.GymScene)
         self.scene = scene
         self.experiment_config = experiment_config
-        self.sio = sio
+        self.socketio = socketio
         self.pyodide_coordinator = pyodide_coordinator
         self.pairing_manager = pairing_manager
         self.get_subject_rtt = get_subject_rtt  # Callback to get RTT for a subject
@@ -258,7 +258,7 @@ class GameManager:
 
         except Exception as e:
             logger.error(f"Error in `_create_game`: {e}")
-            self.sio.emit(
+            self.socketio.emit(
                 "create_game_failed",
                 {"error": e.__repr__()},
                 room=flask.request.sid,
@@ -280,7 +280,7 @@ class GameManager:
         if game_id in self.active_games:
             self.active_games.remove(game_id)
 
-        self.sio.close_room(game_id)
+        self.socketio.close_room(game_id)
 
         assert game_id not in self.games
         assert game_id not in self.reset_events
@@ -359,7 +359,7 @@ class GameManager:
                 return False
 
             if self.scene.game_page_html_fn is not None:
-                self.sio.emit(
+                self.socketio.emit(
                     "update_game_page_text",
                     {
                         "game_page_text": self.scene.game_page_html_fn(
@@ -501,7 +501,7 @@ class GameManager:
         # hasn't joined a room named after their subject_id yet.
         socket_id = flask.request.sid
 
-        self.sio.emit(
+        self.socketio.emit(
             "waiting_room",
             {
                 "cur_num_players": waitroom_count,
@@ -778,7 +778,7 @@ class GameManager:
                 matchmaker_class=type(self.matchmaker).__name__,
             )
 
-        self.sio.start_background_task(self._start_game_with_countdown, game)
+        self.socketio.start_background_task(self._start_game_with_countdown, game)
         return game
 
     def _create_game_for_match(
@@ -887,7 +887,7 @@ class GameManager:
             )
 
         logger.info(f"[CreateMatch] Starting game {game.game_id} with {len(matched)} players")
-        self.sio.start_background_task(self._start_game_with_countdown, game)
+        self.socketio.start_background_task(self._start_game_with_countdown, game)
 
         return game
 
@@ -956,7 +956,7 @@ class GameManager:
                 )
 
                 # Notify remaining players that someone left and end the lobby
-                self.sio.emit(
+                self.socketio.emit(
                     "waiting_room_player_left",
                     {
                         "message": "Another player left the waiting room. You will be redirected shortly..."
@@ -978,7 +978,7 @@ class GameManager:
 
                 # Emit end_game to remaining players BEFORE cleanup
                 # so they receive the message before the room is closed
-                self.sio.emit(
+                self.socketio.emit(
                     "end_game",
                     {
                         "message": "Your game ended because another player disconnected."
@@ -1013,7 +1013,7 @@ class GameManager:
         del self.subject_games[subject_id]
         del self.subject_rooms[subject_id]
 
-        # Use flask_socketio.leave_room instead of self.sio.leave_room
+        # Use flask_socketio.leave_room instead of self.socketio.leave_room
         flask_socketio.leave_room(game_id)
 
         # If the game is now empty, remove it
@@ -1033,7 +1033,7 @@ class GameManager:
             return
 
         logger.info(f"[Countdown] Starting 3s pre-game countdown for game {game.game_id}")
-        self.sio.emit(
+        self.socketio.emit(
             "match_found_countdown",
             {"countdown_seconds": 3, "message": "Players found!"},
             room=game.game_id,
@@ -1085,7 +1085,7 @@ class GameManager:
 
         self.active_games.add(game.game_id)
 
-        self.sio.emit(
+        self.socketio.emit(
             "start_game",
             {
                 "scene_metadata": self.scene.scene_metadata,
@@ -1098,7 +1098,7 @@ class GameManager:
         if not self.scene.run_through_pyodide:
             # Non-pyodide games go straight to PLAYING (no validation phase)
             game.transition_to(SessionState.PLAYING)
-            self.sio.start_background_task(self.run_server_game, game)
+            self.socketio.start_background_task(self.run_server_game, game)
         # Note: For pyodide_multiplayer games, transition to VALIDATING/PLAYING
         # happens in PyodideGameCoordinator (see Task 3)
 
@@ -1134,9 +1134,9 @@ class GameManager:
                 self.scene.input_mode
                 == configuration_constants.InputModes.PressedKeys
             ):
-                self.sio.emit("request_pressed_keys", {})
+                self.socketio.emit("request_pressed_keys", {})
 
-            self.sio.sleep(1 / game.scene.fps)
+            self.socketio.sleep(1 / game.scene.fps)
 
             if (
                 game.status == remote_game.GameStatus.Reset
@@ -1147,7 +1147,7 @@ class GameManager:
 
             if game.status == remote_game.GameStatus.Reset:
                 eventlet.sleep(self.scene.reset_freeze_s)
-                self.sio.emit(
+                self.socketio.emit(
                     "game_reset",
                     {
                         "timeout": self.scene.reset_timeout,
@@ -1175,7 +1175,7 @@ class GameManager:
 
                 self.render_server_game(game)
 
-                self.sio.sleep(1 / game.scene.fps)
+                self.socketio.sleep(1 / game.scene.fps)
 
         with game.lock:
             logger.info(
@@ -1186,7 +1186,7 @@ class GameManager:
 
             if self.scene.callback is not None:
                 self.scene.callback.on_game_end(game)
-            self.sio.emit(
+            self.socketio.emit(
                 "end_game",
                 {},
                 room=game.game_id,
@@ -1327,7 +1327,7 @@ class GameManager:
         # TODO(chase): this emits the same state to every player in a room, but we may want
         #   to have different observations for each player. Figure that out (maybe state is a dict
         #   with player_ids and their respective observations?).
-        self.sio.emit(
+        self.socketio.emit(
             "environment_state",
             {
                 "game_state_objects": state,
@@ -1391,7 +1391,7 @@ class GameManager:
         self._remove_game(game_id)
 
         # TODO(chase): do we need this?
-        # self.sio.emit("end_game", {}, room=game_id)
+        # self.socketio.emit("end_game", {}, room=game_id)
 
     def tear_down(self) -> None:
         """End all games, but make sure we trigger the ending callbacks."""

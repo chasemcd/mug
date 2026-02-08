@@ -50,7 +50,7 @@ class ServerGameRunner:
         environment_code: str,
         num_players: int,
         state_broadcast_interval: int = 30,
-        sio=None,
+        socketio=None,
         fps: int = 30,
         default_action: int = 0,
         action_population_method: str = "previous_submitted_action",
@@ -63,7 +63,7 @@ class ServerGameRunner:
         self.environment_code = environment_code
         self.num_players = num_players
         self.state_broadcast_interval = state_broadcast_interval
-        self.sio = sio
+        self.socketio = socketio
 
         # Config-driven settings
         self.target_fps = fps
@@ -378,8 +378,8 @@ random.seed({rng_seed})
             self.stop_realtime()
 
             # Broadcast game completion to clients
-            if self.sio:
-                self.sio.emit(
+            if self.socketio:
+                self.socketio.emit(
                     "server_game_complete",
                     {
                         "game_id": self.game_id,
@@ -541,7 +541,7 @@ random.seed({rng_seed})
             env_state = self.env.get_state()
             serialize_time_ms = (time.time() - serialize_start) * 1000
 
-            # Verify it's JSON-serializable (for socket.io transmission)
+            # Verify it's JSON-serializable (for socket.io transmissocketion)
             json_start = time.time()
             json_str = json.dumps(env_state, sort_keys=True)
             json_time_ms = (time.time() - json_start) * 1000
@@ -592,7 +592,7 @@ random.seed({rng_seed})
             event_type: Socket event name to emit. Use "server_authoritative_state"
                        for periodic updates and "server_episode_start" for episode begins.
         """
-        if self.sio is None:
+        if self.socketio is None:
             return
 
         # Only increment sync epoch on episode start broadcasts.
@@ -604,7 +604,7 @@ random.seed({rng_seed})
 
         state = self.get_authoritative_state()
 
-        self.sio.emit(
+        self.socketio.emit(
             event_type,
             {
                 "game_id": self.game_id,

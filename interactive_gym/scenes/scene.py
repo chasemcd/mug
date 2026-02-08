@@ -23,7 +23,7 @@ class Scene:
     def __init__(self, **kwargs):
         self.scene_id = None
         self.experiment_config: dict = {}
-        self.sio: flask_socketio.SocketIO | None = None
+        self.socketio: flask_socketio.SocketIO | None = None
         self.room: str | int | None = None
         self.status = SceneStatus.Inactive
 
@@ -65,25 +65,25 @@ class Scene:
         """
         return [self]
 
-    def activate(self, sio: flask_socketio.SocketIO, room: str | int):
+    def activate(self, socketio: flask_socketio.SocketIO, room: str | int):
         """
         Activate the current scene.
         """
         self.status = SceneStatus.Active
-        self.sio = sio
+        self.socketio = socketio
         self.room = room
-        self.sio.emit("activate_scene", {**self.scene_metadata}, room=room)
+        self.socketio.emit("activate_scene", {**self.scene_metadata}, room=room)
 
     def deactivate(self):
         """
         Deactivate the current scene.
         """
         self.status = SceneStatus.Done
-        self.sio.emit(
+        self.socketio.emit(
             "terminate_scene", {**self.scene_metadata}, room=self.room
         )
 
-    def on_connect(self, sio: flask_socketio.SocketIO, room: str | int):
+    def on_connect(self, socketio: flask_socketio.SocketIO, room: str | int):
         """
         A hook that is called when the client connects to the server.
         """
@@ -110,7 +110,7 @@ class Scene:
             json.dump(self.scene_metadata, f)
 
     def on_client_callback(
-        self, data, sio: flask_socketio.SocketIO, room: str | int
+        self, data, socketio: flask_socketio.SocketIO, room: str | int
     ):
         """
         A hook that is called when the client sends a callback to the server.

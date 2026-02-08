@@ -49,7 +49,7 @@ class AdminEventAggregator:
 
     def __init__(
         self,
-        sio: flask_socketio.SocketIO,
+        socketio: flask_socketio.SocketIO,
         participant_sessions: dict,  # PARTICIPANT_SESSIONS
         stagers: dict,               # STAGERS
         game_managers: dict,         # GAME_MANAGERS
@@ -62,7 +62,7 @@ class AdminEventAggregator:
         Initialize the aggregator with references to experiment state.
 
         Args:
-            sio: Flask-SocketIO instance for emitting updates
+            socketio: Flask-SocketIO instance for emitting updates
             participant_sessions: Reference to PARTICIPANT_SESSIONS dict
             stagers: Reference to STAGERS dict
             game_managers: Reference to GAME_MANAGERS dict
@@ -78,7 +78,7 @@ class AdminEventAggregator:
 
         # Store references (read-only access)
         # Do NOT modify these - observer pattern only
-        self.sio = sio
+        self.socketio = socketio
         self.participant_sessions = participant_sessions
         self.stagers = stagers
         self.game_managers = game_managers
@@ -1130,7 +1130,7 @@ class AdminEventAggregator:
             log_entry: The log entry dict to emit
         """
         try:
-            self.sio.emit(
+            self.socketio.emit(
                 'console_log',
                 log_entry,
                 namespace='/admin',
@@ -1171,7 +1171,7 @@ class AdminEventAggregator:
             event: The ActivityEvent to emit
         """
         try:
-            self.sio.emit(
+            self.socketio.emit(
                 'activity_event',
                 {
                     'timestamp': event.timestamp,
@@ -1244,7 +1244,7 @@ class AdminEventAggregator:
 
         if should_emit:
             try:
-                self.sio.emit(
+                self.socketio.emit(
                     'state_update',
                     snapshot,
                     namespace='/admin',

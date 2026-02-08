@@ -567,7 +567,7 @@ def advance_scene(data):
             game_manager = gm.GameManager(
                 scene=current_scene,
                 experiment_config=CONFIG,
-                sio=socketio,
+                socketio=socketio,
                 pyodide_coordinator=PYODIDE_COORDINATOR,
                 pairing_manager=GROUP_MANAGER,
                 get_subject_rtt=_get_subject_rtt,
@@ -908,7 +908,7 @@ def on_unity_episode_end(data):
 
     current_scene.on_unity_episode_end(
         data,
-        sio=socketio,
+        socketio=socketio,
         room=flask.request.sid,
     )
 
@@ -941,7 +941,7 @@ def on_unity_episode_start(data):
 
     current_scene.on_unity_episode_start(
         data,
-        sio=socketio,
+        socketio=socketio,
         room=flask.request.sid,
     )
 
@@ -978,7 +978,7 @@ def on_client_callback(data):
         return
 
     current_scene = participant_stager.current_scene
-    current_scene.on_client_callback(data, sio=socketio, room=flask.request.sid)
+    current_scene.on_client_callback(data, socketio=socketio, room=flask.request.sid)
 
 
 @socketio.on("waitroom_timeout_completion")
@@ -2859,7 +2859,7 @@ def run(config):
 
     # Initialize probe coordinator for P2P RTT measurement (Phase 57)
     PROBE_COORDINATOR = ProbeCoordinator(
-        sio=socketio,
+        socketio=socketio,
         get_socket_for_subject=get_socket_for_subject,
         turn_username=CONFIG.turn_username,
         turn_credential=CONFIG.turn_credential,
@@ -2868,7 +2868,7 @@ def run(config):
 
     # Initialize admin event aggregator
     ADMIN_AGGREGATOR = AdminEventAggregator(
-        sio=socketio,
+        socketio=socketio,
         participant_sessions=PARTICIPANT_SESSIONS,
         stagers=STAGERS,
         game_managers=GAME_MANAGERS,

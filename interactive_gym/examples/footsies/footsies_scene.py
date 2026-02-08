@@ -50,16 +50,16 @@ class FootsiesScene(unity_scene.UnityScene):
         return self
 
     def on_unity_episode_start(
-        self, data: dict, sio: flask_socketio.SocketIO, room: str
+        self, data: dict, socketio: flask_socketio.SocketIO, room: str
     ):
 
         if len(self.opponent_sequence) == 0:
-            super().on_unity_episode_start(data, sio, room)
+            super().on_unity_episode_start(data, socketio, room)
             return
 
         opponent_config = self.opponent_sequence.pop(0)
 
-        sio.emit(
+        socketio.emit(
             "updateBotSettings",
             {
                 "modelPath": opponent_config.model_path,
@@ -83,7 +83,7 @@ class FootsiesDynamicDifficultyScene(FootsiesScene):
         ]
 
     def on_unity_episode_end(
-        self, data: dict, sio: flask_socketio.SocketIO, room: str
+        self, data: dict, socketio: flask_socketio.SocketIO, room: str
     ):
         winner = data["winner"]
         self.winners.append(winner)
@@ -108,7 +108,7 @@ class FootsiesDynamicDifficultyScene(FootsiesScene):
                 DIFFICULTY_LEVEL_OPPONENTS[self.cur_difficulty_index]
             )
 
-        super().on_unity_episode_end(data, sio, room)
+        super().on_unity_episode_end(data, socketio, room)
 
 
 class FootsiesDynamicEmpowermentScene(FootsiesScene):
@@ -156,7 +156,7 @@ class FootsiesDynamicEmpowermentScene(FootsiesScene):
         self.cur_softmax_temperature = softmax_temperature
 
     def on_unity_episode_end(
-        self, data: dict, sio: flask_socketio.SocketIO, room: str
+        self, data: dict, socketio: flask_socketio.SocketIO, room: str
     ):
         winner = data["winner"]
         self.winners.append(winner)
@@ -187,7 +187,7 @@ class FootsiesDynamicEmpowermentScene(FootsiesScene):
                 softmax_temperature=self.cur_softmax_temperature,
             )
         )
-        super().on_unity_episode_end(data, sio, room)
+        super().on_unity_episode_end(data, socketio, room)
 
 
 class FootsiesRandomDifficultyScene(FootsiesScene):
@@ -209,11 +209,11 @@ class FootsiesRandomDifficultyScene(FootsiesScene):
         self.cur_inference_cadence: int = 4
 
     def on_unity_episode_start(
-        self, data: dict, sio: flask_socketio.SocketIO, room: str
+        self, data: dict, socketio: flask_socketio.SocketIO, room: str
     ):
         sampled_difficulty = random.choice(DIFFICULTY_LEVEL_OPPONENTS)
         self.opponent_sequence.append(sampled_difficulty)
-        super().on_unity_episode_start(data, sio, room)
+        super().on_unity_episode_start(data, socketio, room)
 
 
 class FootsiesControllableDifficultyScene(FootsiesScene):
@@ -226,14 +226,14 @@ class FootsiesControllableDifficultyScene(FootsiesScene):
         ]
 
     def on_client_callback(
-        self, data: dict, sio: flask_socketio.SocketIO, room: str
+        self, data: dict, socketio: flask_socketio.SocketIO, room: str
     ):
         if data.get("type") == "updateFootsiesDifficulty":
             difficulty_idx = data["difficulty"] - 1
             opponent_config = DIFFICULTY_LEVEL_OPPONENTS[difficulty_idx]
             self.opponent_sequence = [opponent_config]
 
-            sio.emit(
+            socketio.emit(
                 "updateBotSettings",
                 {
                     "modelPath": opponent_config.model_path,
