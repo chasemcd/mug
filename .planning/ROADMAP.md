@@ -14,6 +14,7 @@ Refactor the GymScene chaining API from 14 accumulated builder methods into fewe
 - [x] **Phase 68: Clean Break** - Remove all old method names — no aliases, no shims
 - [x] **Phase 69: Example Configs Migration** - Update all example configs to use new API
 - [x] **Phase 70: Verification & Test Pass** - Verify zero functionality change across full test suite
+- [ ] **Phase 71: Documentation Migration** - Update all docs to use new API method names (gap closure)
 
 ## Phase Details
 
@@ -74,10 +75,22 @@ Plans:
 - [x] 70-01-PLAN.md — Migrate remaining unmigrated files (test configs + controllable scenes)
 - [x] 70-02-PLAN.md — Full test suite, parameter coverage audit, and chaining verification
 
+### Phase 71: Documentation Migration
+**Goal**: Update all documentation files to use new API method names — replace references to removed methods (`.pyodide()`, `.user_experience()`, `.continuous_monitoring()`, `.exclusion_callbacks()`, `.focus_loss_config()`, etc.) with their new equivalents
+**Depends on**: Phase 70
+**Requirements**: DOCS-01, DOCS-02
+**Research needed**: Unlikely — mechanical find-and-replace in doc files
+**Gap Closure**: Closes documentation tech debt from v1.22 milestone audit
+**Success Criteria** (what must be TRUE):
+  1. Zero references to removed GymScene method names in any documentation file (docs/, README.md files)
+  2. All code examples in documentation use the new API methods and are accurate
+  3. No documentation references to methods that would raise AttributeError
+**Plans:** TBD
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 67 → 68 → 69 → 70
+Phases execute in numeric order: 67 → 68 → 69 → 70 → 71
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -85,3 +98,4 @@ Phases execute in numeric order: 67 → 68 → 69 → 70
 | 68. Clean Break | 1/1 | ✓ Complete | 2026-02-07 |
 | 69. Example Configs Migration | 2/2 | ✓ Complete | 2026-02-07 |
 | 70. Verification & Test Pass | 2/2 | ✓ Complete | 2026-02-08 |
+| 71. Documentation Migration | 0/? | Pending | — |

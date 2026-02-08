@@ -35,6 +35,11 @@ Requirements for v1.22 milestone. Each maps to roadmap phases.
 - [x] **VERF-02**: Every parameter from the old API is accessible through the new API (no params lost)
 - [x] **VERF-03**: All builder methods return `self` for method chaining
 
+### Documentation
+
+- [ ] **DOCS-01**: All documentation files in `docs/` use new API method names — zero references to removed GymScene methods
+- [ ] **DOCS-02**: All code examples in documentation are accurate and use new API methods
+
 ## v2 Requirements
 
 Deferred to future release. Tracked but not in current roadmap.
@@ -77,10 +82,12 @@ Which phases cover which requirements. Updated by create-roadmap.
 | VERF-01 | Phase 70 | Complete |
 | VERF-02 | Phase 70 | Complete |
 | VERF-03 | Phase 70 | Complete |
+| DOCS-01 | Phase 71 | Pending |
+| DOCS-02 | Phase 71 | Pending |
 
 **Coverage:**
-- v1 requirements: 16 total
-- Mapped to phases: 16
+- v1 requirements: 18 total
+- Mapped to phases: 18
 - Unmapped: 0 ✓
 
 ---
