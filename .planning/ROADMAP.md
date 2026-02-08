@@ -71,7 +71,10 @@ Plans:
   1. No unused Python functions/classes/methods remain in `scenes/` or `examples/`
   2. No vestigial logic (unreachable code, dead branches) remains in scene/environment code
   3. All tests pass after removal
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 73-01-PLAN.md — Delete constructors/ directory, remove dead static scene classes and dead GymScene methods
+- [ ] 73-02-PLAN.md — Fix broken footsies import, remove dead scene variables, delete empty pyodide_overcooked/ directory
 
 ### Phase 74: Client JavaScript Dead Code Removal
 **Goal**: Remove all unused JS functions, classes, and dead code paths from client-side JavaScript
