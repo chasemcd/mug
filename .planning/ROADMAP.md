@@ -69,7 +69,10 @@ Plans:
   1. Full test suite passes with zero failures
   2. Every parameter from old API is accessible through new API (no params lost)
   3. All new builder methods return `self` for method chaining
-**Plans**: TBD
+**Plans:** 2 plans
+Plans:
+- [ ] 70-01-PLAN.md — Migrate remaining unmigrated files (test configs + controllable scenes)
+- [ ] 70-02-PLAN.md — Full test suite, parameter coverage audit, and chaining verification
 
 ## Progress
 
@@ -81,4 +84,4 @@ Phases execute in numeric order: 67 → 68 → 69 → 70
 | 67. API Method Consolidation | 2/2 | ✓ Complete | 2026-02-07 |
 | 68. Clean Break | 1/1 | ✓ Complete | 2026-02-07 |
 | 69. Example Configs Migration | 2/2 | ✓ Complete | 2026-02-07 |
-| 70. Verification & Test Pass | 0/TBD | Not started | - |
+| 70. Verification & Test Pass | 0/2 | Not started | - |
