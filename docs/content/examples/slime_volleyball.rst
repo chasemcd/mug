@@ -167,7 +167,7 @@ Tuple keys ``("ArrowLeft", "ArrowUp")`` represent simultaneous key presses.
             max_steps=3000,
             input_mode=configuration_constants.InputModes.PressedKeys,
         )
-        .user_experience(
+        .content(
             scene_header="Slime Volleyball",
             scene_body="<center><p>Press start to continue.</p></center>",
             in_game_scene_body="""
@@ -176,7 +176,7 @@ Tuple keys ``("ArrowLeft", "ArrowUp")`` represent simultaneous key presses.
                 </center>
             """,
         )
-        .pyodide(
+        .runtime(
             run_through_pyodide=True,
             environment_initialization_code_filepath=(
                 "interactive_gym/examples/slime_volleyball/slimevb_env.py"
@@ -407,7 +407,7 @@ Key differences:
 
 .. code-block:: python
 
-    # No .pyodide() configuration
+    # No .runtime() configuration
     # Environment runs server-side
 
     from interactive_gym.utils import onnx_inference_utils

@@ -244,7 +244,7 @@ Solo practice before playing with AI:
             max_steps=1000,
             input_mode=configuration_constants.InputModes.SingleKeystroke,
         )
-        .user_experience(
+        .content(
             scene_header="Overcooked Tutorial",
             scene_body_filepath="interactive_gym/server/static/templates/overcooked_controls.html",
             in_game_scene_body="""

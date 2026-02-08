@@ -154,11 +154,13 @@ All five Overcooked layouts are included:
 scene = (
     gym_scene.GymScene()
     .scene(scene_id="my_multiplayer_scene", experiment_config={})
-    .pyodide(
+    .runtime(
         run_through_pyodide=True,
-        multiplayer=True,  # Enable multiplayer coordination
         environment_initialization_code_filepath="...",
         packages_to_install=[...]
+    )
+    .multiplayer(
+        multiplayer=True,  # Enable multiplayer coordination
     )
     .policies(policy_mapping={
         0: configuration_constants.PolicyTypes.Human,
