@@ -184,7 +184,7 @@ class GameManager:
         try:
             game_id = str(uuid.uuid4())
 
-            # Even if we're using Pyodide, we'll still instantiate a RemoteGame, since
+            # Even if we're using Pyodide, we'll still instantiate a RemoteGameV2, since
             # it'll track the players within a game.
             # TODO(chase): check if we actually do need this for Pyodide-based games...
             # Game starts in SessionState.WAITING (set in RemoteGameV2.__init__)
@@ -194,13 +194,6 @@ class GameManager:
                 game_id=game_id,
             )
 
-            # Instantiate Game and add it to all the necessary data structures
-            # game = Game(
-            #     game_id=game_id,
-            #     scene=self.scene,
-            #     remote_game=remote_game,
-            #     room=room,
-            # )
             self.games[game_id] = game
             self.waiting_games.append(game_id)
 
@@ -377,59 +370,6 @@ class GameManager:
                 )
 
             return True
-
-    def _is_rtt_compatible(self, subject_id: SubjectID, game: remote_game.RemoteGameV2) -> bool:
-        """Check if a subject's RTT is compatible with players already in a game.
-
-        Returns True if:
-        - No matchmaking_max_rtt is configured
-        - No get_subject_rtt callback is available
-        - The subject's RTT is within max_rtt of all existing players
-        """
-        max_rtt_diff = self.scene.matchmaking_max_rtt
-        if max_rtt_diff is None or self.get_subject_rtt is None:
-            return True
-
-        subject_rtt = self.get_subject_rtt(subject_id)
-        if subject_rtt is None:
-            # No RTT measurement yet, allow pairing
-            logger.debug(f"No RTT measurement for {subject_id}, allowing pairing")
-            return True
-
-        # Check against all players already in the game
-        for player_id, existing_subject_id in game.human_players.items():
-            if existing_subject_id == utils.Available:
-                continue
-
-            existing_rtt = self.get_subject_rtt(existing_subject_id)
-            if existing_rtt is None:
-                # Existing player has no RTT measurement, allow pairing
-                continue
-
-            rtt_diff = abs(subject_rtt - existing_rtt)
-            if rtt_diff > max_rtt_diff:
-                logger.info(
-                    f"RTT incompatible: {subject_id} (RTT={subject_rtt}ms) vs "
-                    f"{existing_subject_id} (RTT={existing_rtt}ms), diff={rtt_diff}ms > max={max_rtt_diff}ms"
-                )
-                return False
-
-        logger.debug(f"RTT compatible: {subject_id} (RTT={subject_rtt}ms)")
-        return True
-
-    def _get_waiting_subject_ids(self) -> list[SubjectID]:
-        """Get list of subject IDs currently waiting in the waitroom.
-
-        Collects subjects from all games in the waiting_games queue.
-        """
-        waiting_subjects = []
-        for game_id in self.waiting_games:
-            game = self.games.get(game_id)
-            if game:
-                for player_id, subject_id in game.human_players.items():
-                    if subject_id and subject_id != utils.Available:
-                        waiting_subjects.append(subject_id)
-        return waiting_subjects
 
     def _get_group_size(self) -> int:
         """Get the number of human players needed for a full game."""
@@ -950,55 +890,6 @@ class GameManager:
         self.sio.start_background_task(self._start_game_with_countdown, game)
 
         return game
-
-    def send_participant_to_waiting_room(self, subject_id: SubjectID):
-        """Send a participant to the waiting room for the game that they're assigned to."""
-        logger.info(f"Sending subject {subject_id} to the waiting room.")
-        game = self.get_subject_game(subject_id)
-
-        remaining_wait_time = (
-            self.waitroom_timeouts[game.game_id] - time.time()
-        ) * 1000
-
-        self.sio.emit(
-            "waiting_room",
-            {
-                "cur_num_players": game.cur_num_human_players(),
-                "players_needed": len(game.get_available_human_agent_ids()),
-                "ms_remaining": remaining_wait_time,
-                "waitroom_timeout_message": self.scene.waitroom_timeout_message,
-                "hide_lobby_count": self.scene.hide_lobby_count,
-            },
-            room=subject_id,
-        )
-
-    def broadcast_waiting_room_status(self, game_id: GameID):
-        """Broadcast waiting room status to all players in the game room."""
-        game = self.games.get(game_id)
-        if game is None or game_id not in self.waiting_games:
-            return
-
-        remaining_wait_time = (
-            self.waitroom_timeouts[game_id] - time.time()
-        ) * 1000
-
-        logger.info(
-            f"Broadcasting waiting room status for game {game_id}: "
-            f"{game.cur_num_human_players()} players, "
-            f"{len(game.get_available_human_agent_ids())} needed"
-        )
-
-        self.sio.emit(
-            "waiting_room",
-            {
-                "cur_num_players": game.cur_num_human_players(),
-                "players_needed": len(game.get_available_human_agent_ids()),
-                "ms_remaining": remaining_wait_time,
-                "waitroom_timeout_message": self.scene.waitroom_timeout_message,
-                "hide_lobby_count": self.scene.hide_lobby_count,
-            },
-            room=game_id,
-        )
 
     def get_subject_game(
         self, subject_id: SubjectID

@@ -97,10 +97,6 @@ class RemoteConfig:
         self.turn_credential: str | None = None
         self.force_turn_relay: bool = False  # For testing TURN without direct P2P
 
-    def logging(self, logfile: str | None = None):
-        if logfile is not None:
-            self.logfile = logfile
-
     def environment(
         self,
         env_creator: typing.Callable | None = None,
@@ -444,57 +440,3 @@ class RemoteConfig:
             "packages_to_install": self.packages_to_install,
             "pyodide_load_timeout_s": self.pyodide_load_timeout_s,
         }
-
-    @property
-    def simulate_waiting_room(self) -> bool:
-        """
-        Returns a boolean indicating whether or not we're
-        forcing all participants to be in a waiting room, regardless
-        of if they're waiting for other players or not.
-        """
-        return max(self.waitroom_time_randomization_interval_s) > 0
-
-    def to_dict(self, serializable=False):
-        config = copy.deepcopy(vars(self))
-        if serializable:
-            config = serialize_dict(config)
-        return config
-
-
-def serialize_dict(data):
-    """
-    Serialize a dictionary to JSON, removing unserializable keys recursively.
-
-    :param data: Dictionary to serialize.
-    :return: Serialized object with unserializable elements removed.
-    """
-    if isinstance(data, dict):
-        # Use dictionary comprehension to process each key-value pair
-        return {
-            key: serialize_dict(value)
-            for key, value in data.items()
-            if is_json_serializable(value)
-        }
-    elif isinstance(data, list):
-        # Use list comprehension to process each item
-        return [
-            serialize_dict(item) for item in data if is_json_serializable(item)
-        ]
-    elif is_json_serializable(data):
-        return data
-    else:
-        return None  # or some other default value
-
-
-def is_json_serializable(value):
-    """
-    Check if a value is JSON serializable.
-
-    :param value: The value to check.
-    :return: True if the value is JSON serializable, False otherwise.
-    """
-    try:
-        json.dumps(value)
-        return True
-    except (TypeError, OverflowError):
-        return False

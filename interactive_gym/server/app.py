@@ -758,24 +758,6 @@ def join_game(data):
             )
 
 
-def is_valid_session(
-    client_session_id: str, subject_id: SubjectID, context: str
-) -> bool:
-    valid_session = client_session_id == SERVER_SESSION_ID
-
-    if not valid_session:
-        logger.warning(
-            f"Invalid session for {subject_id} in {context}. Got {client_session_id} but expected {SERVER_SESSION_ID}"
-        )
-        flask_socketio.emit(
-            "invalid_session",
-            {"message": "Session is invalid. Please reconnect."},
-            room=flask.request.sid,
-        )
-
-    return valid_session
-
-
 @socketio.on("leave_game")
 def leave_game(data):
     subject_id = get_subject_id_from_session_id(flask.request.sid)
