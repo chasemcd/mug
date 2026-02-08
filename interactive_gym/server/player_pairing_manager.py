@@ -309,8 +309,3 @@ class PlayerGroupManager:
             # Remove scene tracking
             if subject_id in self.subject_scenes:
                 del self.subject_scenes[subject_id]
-
-
-# Backwards compatibility aliases
-PlayerPairing = PlayerGroup
-PlayerPairingManager = PlayerGroupManager

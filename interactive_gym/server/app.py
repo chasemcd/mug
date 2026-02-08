@@ -10,7 +10,6 @@ import time
 import uuid
 import msgpack
 import pandas as pd
-import os
 import flatten_dict
 import json
 import socket
@@ -26,7 +25,6 @@ from interactive_gym.server import game_manager as gm
 from interactive_gym.configurations import remote_config
 from interactive_gym.server import utils
 from interactive_gym.scenes import stager
-from interactive_gym.server import game_manager as gm
 from interactive_gym.scenes import unity_scene
 from interactive_gym.server import pyodide_game_coordinator
 from interactive_gym.server import player_pairing_manager
@@ -480,24 +478,6 @@ def sync_globals(data):
         logger.debug(f"Synced globals for {subject_id}: {list(client_globals.keys())}")
 
 
-# @socketio.on("connect")
-# def on_connect():
-#     global SESSION_ID_TO_SUBJECT_ID
-
-#     subject_id = get_subject_id_from_session_id(flask.request.sid)
-
-#     if subject_id in SUBJECTS:
-#         return
-
-#     SUBJECTS[subject_id] = threading.Lock()
-
-#     # TODO(chase): reenable session checkings
-#     # Send the current server session ID to the client
-#     # flask_socketio.emit(
-#     #     "server_session_id",
-#     #     {"server_session_id": SERVER_SESSION_ID},
-#     #     room=subject_id,
-#     # )
 
 
 def _get_subject_rtt(subject_id: str) -> int | None:
@@ -624,10 +604,6 @@ def join_game(data):
             room=flask.request.sid,
         )
         return
-
-    # Validate session
-    # if not is_valid_session(client_session_id, subject_id, "join_game"):
-    #     return
 
     with SUBJECTS[subject_id]:
 
@@ -763,12 +739,7 @@ def leave_game(data):
     subject_id = get_subject_id_from_session_id(flask.request.sid)
     logger.info(f"[LeaveGame] Subject {subject_id} leaving game (likely waitroom timeout or disconnect).")
 
-    # Validate session
     client_reported_session_id = data.get("session_id")
-    # if not is_valid_session(
-    #     client_reported_session_id, subject_id, "leave_game"
-    # ):
-    #     return
 
     with SUBJECTS[subject_id]:
         # If the participant doesn't have a Stager, something is wrong at this point.
@@ -842,49 +813,11 @@ def leave_game(data):
 
 
 # @socketio.on("disconnect")
-# def on_disconnect():
-#     global SUBJECTS
-#     subject_id = get_subject_id_from_session_id(flask.request.sid)
-
-#     participant_stager = STAGERS.get(subject_id, None)
-#     if participant_stager is None:
-#         logger.error(
-#             f"Subject {subject_id} tried to join a game but they don't have a Stager."
-#         )
-#         return
-
-#     current_scene = participant_stager.current_scene
-#     game_manager = GAME_MANAGERS.get(current_scene.scene_id, None)
-
-#     # Get the current game for the participant, if any.
-#     game = game_manager.get_subject_game(subject_id)
-
-#     if game is None:
-#         logger.info(
-#             f"Subject {subject_id} disconnected with no coresponding game."
-#         )
-#     else:
-#         logger.info(
-#             f"Subject {subject_id} disconnected, Game ID: {game.game_id}.",
-#         )
-
-#     with SUBJECTS[subject_id]:
-#         game_manager.leave_game(subject_id=subject_id)
-
-#     del SUBJECTS[subject_id]
-#     if subject_id in SUBJECTS:
-#         logger.warning(
-#             f"Tried to remove {subject_id} but it's still in SUBJECTS."
-#         )
-
-
 @socketio.on("send_pressed_keys")
 def send_pressed_keys(data):
     """
     Translate pressed keys into game action and add them to the pending_actions queue.
     """
-    # return
-    # sess_id = flask.request.sid
     subject_id = get_subject_id_from_session_id(flask.request.sid)
     # Fallback to flask.session if needed
     if subject_id is None:
@@ -894,7 +827,6 @@ def send_pressed_keys(data):
     if subject_id is None:
         return
 
-    # # TODO(chase): figure out why we're getting a different session ID here...
     participant_stager = STAGERS.get(subject_id, None)
     if participant_stager is None:
         logger.warning(
@@ -904,15 +836,8 @@ def send_pressed_keys(data):
 
     current_scene = participant_stager.current_scene
     game_manager = GAME_MANAGERS.get(current_scene.scene_id, None)
-    # game = game_manager.get_subject_game(subject_id)
 
     client_reported_server_session_id = data.get("server_session_id")
-    # print(client_reported_server_session_id, "send_pressed_keys")
-    # print(sess_id, subject_id, "send_pressed_keys")
-    # if not is_valid_session(
-    #     client_reported_server_session_id, subject_id, "send_pressed_keys"
-    # ):
-    #     return
 
     pressed_keys = data["pressed_keys"]
 
@@ -925,9 +850,6 @@ def send_pressed_keys(data):
 def handle_reset_complete(data):
     subject_id = get_subject_id_from_session_id(flask.request.sid)
     client_session_id = data.get("session_id")
-
-    # if not is_valid_session(client_session_id, subject_id, "reset_complete"):
-    #     return
 
     participant_stager = STAGERS.get(subject_id, None)
     game_manager = GAME_MANAGERS.get(
@@ -1102,9 +1024,6 @@ def on_waitroom_timeout_completion(data):
 
 def on_exit():
     # Force-terminate all games on server termination
-    for game_manager in GAME_MANAGERS.values():
-        game_manager.tear_down()
-
     for game_manager in GAME_MANAGERS.values():
         game_manager.tear_down()
 

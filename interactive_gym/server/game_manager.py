@@ -62,7 +62,7 @@ class GameManager:
         experiment_config: remote_config.RemoteConfig,
         sio: flask_socketio.SocketIO,
         pyodide_coordinator: pyodide_game_coordinator.PyodideGameCoordinator | None = None,
-        pairing_manager: player_pairing_manager.PlayerPairingManager | None = None,
+        pairing_manager: player_pairing_manager.PlayerGroupManager | None = None,
         get_subject_rtt: callable | None = None,
         participant_state_tracker=None,  # Optional for backward compatibility
         matchmaker: Matchmaker | None = None,  # Phase 55: pluggable matchmaking
