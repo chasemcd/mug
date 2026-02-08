@@ -84,28 +84,30 @@ slime_scene = (
         input_mode=configuration_constants.InputModes.PressedKeys,
         action_population_method=configuration_constants.ActionSettings.PreviousSubmittedAction,
     )
-    .user_experience(
+    .content(
         scene_header="Slime Volleyball",
         scene_body="<center><p>" "Press start to continue. " "</p></center>",
         in_game_scene_body="""
         <center>
         <p>
-        Use the arrow keys <img src="static/assets/keys/arrow_keys_2.png" alt="Keyboard arrow keys" height="24" width="20" style="vertical-align:middle;"> 
-        to control the slime on the right! 
+        Use the arrow keys <img src="static/assets/keys/arrow_keys_2.png" alt="Keyboard arrow keys" height="24" width="20" style="vertical-align:middle;">
+        to control the slime on the right!
         </p>
         </center>
         <br><br>
         """,
-        waitroom_timeout=120000,  # 2 minutes
     )
-    .pyodide(
+    .waitroom(timeout=120000)  # 2 minutes
+    .runtime(
         run_through_pyodide=True,
-        multiplayer=True,
         environment_initialization_code_filepath="interactive_gym/examples/slime_volleyball/slimevb_env.py",
         packages_to_install=[
             "slimevb==0.0.4",
             "opencv-python",
         ],
+    )
+    .multiplayer(
+        multiplayer=True,
         state_broadcast_interval=30,  # Sync state every 300 frames (~10s at 30fps), None to disable
         server_authoritative=False,  # Server-authoritative mode
         input_delay=2,
