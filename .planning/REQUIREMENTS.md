@@ -9,31 +9,31 @@ Requirements for v1.22 milestone. Each maps to roadmap phases.
 
 ### API Consolidation
 
-- [ ] **APIC-01**: `pyodide()` method is renamed to `runtime()` containing only browser execution params (code, packages, restart flag)
-- [ ] **APIC-02**: Sync/rollback params (input_buffer_size, input_delay, input_confirmation_timeout_ms, server_authoritative, state_broadcast_interval, realtime_mode, multiplayer) are moved out of `pyodide()` into the new `multiplayer()` method
-- [ ] **APIC-03**: `matchmaking()`, `player_grouping()`, `continuous_monitoring()`, `exclusion_callbacks()`, `reconnection_config()`, `partner_disconnect_message_config()`, and `focus_loss_config()` are merged into a single `multiplayer()` method
-- [ ] **APIC-04**: `user_experience()` is split into `content()` (scene header, body, in-game body, game_page_html_fn) and `waitroom()` (timeout, redirect, timeout message, timeout scene)
-- [ ] **APIC-05**: `rendering()` is split into `rendering()` (fps, env_to_state_fn, hud_text_fn, hud_score_carry_over, location_representation, game_width, game_height, background, rollback_smoothing_duration) and `assets()` (preload_specs, assets_dir, assets_to_preload, animation_configs, state_init)
-- [ ] **APIC-06**: `policies()` and `gameplay()` are kept as separate methods with no changes to names or param grouping
+- [x] **APIC-01**: `pyodide()` method is renamed to `runtime()` containing only browser execution params (code, packages, restart flag)
+- [x] **APIC-02**: Sync/rollback params (input_buffer_size, input_delay, input_confirmation_timeout_ms, server_authoritative, state_broadcast_interval, realtime_mode, multiplayer) are moved out of `pyodide()` into the new `multiplayer()` method
+- [x] **APIC-03**: `matchmaking()`, `player_grouping()`, `continuous_monitoring()`, `exclusion_callbacks()`, `reconnection_config()`, `partner_disconnect_message_config()`, and `focus_loss_config()` are merged into a single `multiplayer()` method
+- [x] **APIC-04**: `user_experience()` is split into `content()` (scene header, body, in-game body, game_page_html_fn) and `waitroom()` (timeout, redirect, timeout message, timeout scene)
+- [x] **APIC-05**: `rendering()` is split into `rendering()` (fps, env_to_state_fn, hud_text_fn, hud_score_carry_over, location_representation, game_width, game_height, background, rollback_smoothing_duration) and `assets()` (preload_specs, assets_dir, assets_to_preload, animation_configs, state_init)
+- [x] **APIC-06**: `policies()` and `gameplay()` are kept as separate methods with no changes to names or param grouping
 
 ### Clean Break
 
-- [ ] **CLNB-01**: All old method names (`pyodide`, `user_experience`, `player_grouping`, `continuous_monitoring`, `exclusion_callbacks`, `reconnection_config`, `partner_disconnect_message_config`, `focus_loss_config`, `player_pairing`) are removed entirely — no deprecation aliases
-- [ ] **CLNB-02**: No backwards-compatibility shims or redirect methods exist in the codebase after cleanup
+- [x] **CLNB-01**: All old method names (`pyodide`, `user_experience`, `player_grouping`, `continuous_monitoring`, `exclusion_callbacks`, `reconnection_config`, `partner_disconnect_message_config`, `focus_loss_config`, `player_pairing`) are removed entirely — no deprecation aliases
+- [x] **CLNB-02**: No backwards-compatibility shims or redirect methods exist in the codebase after cleanup
 
 ### Examples Updated
 
-- [ ] **EXMP-01**: `interactive_gym/examples/cogrid/scenes/scenes.py` uses new API methods
-- [ ] **EXMP-02**: `interactive_gym/examples/slime_volleyball/slimevb_human_human.py` uses new API methods
-- [ ] **EXMP-03**: `interactive_gym/examples/mountain_car/mountain_car_experiment.py` uses new API methods
-- [ ] **EXMP-04**: `interactive_gym/examples/cogrid/overcooked_human_human_multiplayer.py` uses new API methods
-- [ ] **EXMP-05**: `interactive_gym/examples/slime_volleyball/human_ai_pyodide_boost.py` uses new API methods
+- [x] **EXMP-01**: `interactive_gym/examples/cogrid/scenes/scenes.py` uses new API methods
+- [x] **EXMP-02**: `interactive_gym/examples/slime_volleyball/slimevb_human_human.py` uses new API methods
+- [x] **EXMP-03**: `interactive_gym/examples/mountain_car/mountain_car_experiment.py` uses new API methods
+- [x] **EXMP-04**: `interactive_gym/examples/cogrid/overcooked_human_human_multiplayer.py` uses new API methods
+- [x] **EXMP-05**: `interactive_gym/examples/slime_volleyball/human_ai_pyodide_boost.py` uses new API methods
 
 ### Verification
 
-- [ ] **VERF-01**: All existing tests pass with new API (zero functionality change)
-- [ ] **VERF-02**: Every parameter from the old API is accessible through the new API (no params lost)
-- [ ] **VERF-03**: All builder methods return `self` for method chaining
+- [x] **VERF-01**: All existing tests pass with new API (zero functionality change)
+- [x] **VERF-02**: Every parameter from the old API is accessible through the new API (no params lost)
+- [x] **VERF-03**: All builder methods return `self` for method chaining
 
 ## v2 Requirements
 
@@ -74,9 +74,9 @@ Which phases cover which requirements. Updated by create-roadmap.
 | EXMP-03 | Phase 69 | Complete |
 | EXMP-04 | Phase 69 | Complete |
 | EXMP-05 | Phase 69 | Complete |
-| VERF-01 | Phase 70 | Pending |
-| VERF-02 | Phase 70 | Pending |
-| VERF-03 | Phase 70 | Pending |
+| VERF-01 | Phase 70 | Complete |
+| VERF-02 | Phase 70 | Complete |
+| VERF-03 | Phase 70 | Complete |
 
 **Coverage:**
 - v1 requirements: 16 total
@@ -85,4 +85,4 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 ---
 *Requirements defined: 2026-02-07*
-*Last updated: 2026-02-07 after roadmap creation*
+*Last updated: 2026-02-08 after Phase 70 completion*
