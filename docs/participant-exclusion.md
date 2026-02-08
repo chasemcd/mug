@@ -17,7 +17,7 @@ This system enables researchers to:
 
 ## Quick Start
 
-Entry screening is configured on `ExperimentConfig`, while continuous monitoring is configured on `GymScene`:
+Entry screening is configured on `ExperimentConfig`, while continuous monitoring is configured on `GymScene` via `.multiplayer()`:
 
 ```python
 from interactive_gym.configurations import ExperimentConfig
@@ -32,14 +32,15 @@ config = ExperimentConfig().experiment(
     max_ping=150
 )
 
-# Scene-level continuous monitoring (runs during gameplay)
+# Scene-level continuous monitoring (configured via .multiplayer())
 scene = GymScene(
     scene_id="my_experiment",
     experiment_id="exp_001",
     ...
-).continuous_monitoring(
-    max_ping=200,
-    tab_exclude_ms=10000
+).multiplayer(
+    continuous_monitoring_enabled=True,
+    continuous_max_ping=200,
+    continuous_tab_exclude_ms=10000
 )
 ```
 
@@ -110,32 +111,35 @@ config = ExperimentConfig().experiment(
 
 ## Continuous Monitoring
 
-Real-time checks during gameplay. Use `GymScene.continuous_monitoring()` to configure.
+Real-time checks during gameplay. Continuous monitoring is configured via parameters on `GymScene.multiplayer()`. To enable it, pass `continuous_monitoring_enabled=True` along with the desired monitoring parameters.
 
-### Method Signature
+### Configuration
+
+Pass the following parameters to `GymScene.multiplayer(...)`:
 
 ```python
-def continuous_monitoring(
-    self,
-    max_ping: int = None,                    # Exclude if ping exceeds this
-    ping_violation_window: int = 5,          # Rolling window size
-    ping_required_violations: int = 3,       # Violations needed in window
-    tab_warning_ms: int = 3000,              # Warn after this duration hidden
-    tab_exclude_ms: int = 10000,             # Exclude after this duration hidden
-    exclusion_messages: dict[str, str] = None,  # Custom messages
-) -> GymScene
+scene.multiplayer(
+    continuous_monitoring_enabled=True,       # Enable continuous monitoring
+    continuous_max_ping=200,                  # Exclude if ping exceeds this
+    continuous_ping_violation_window=5,       # Rolling window size
+    continuous_ping_required_violations=3,    # Violations needed in window
+    continuous_tab_warning_ms=3000,           # Warn after this duration hidden
+    continuous_tab_exclude_ms=10000,          # Exclude after this duration hidden
+    continuous_exclusion_messages={...},      # Custom messages
+)
 ```
 
 ### Parameters
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `max_ping` | `int` | `None` | Exclude if latency exceeds this threshold |
-| `ping_violation_window` | `int` | `5` | Size of rolling window for ping checks |
-| `ping_required_violations` | `int` | `3` | Number of violations in window to trigger exclusion |
-| `tab_warning_ms` | `int` | `3000` | Show warning after tab hidden for this duration (ms) |
-| `tab_exclude_ms` | `int` | `10000` | Exclude after tab hidden for this duration (ms) |
-| `exclusion_messages` | `dict` | See below | Custom messages for monitoring events |
+| `continuous_monitoring_enabled` | `bool` | `False` | Enable continuous monitoring during gameplay |
+| `continuous_max_ping` | `int` | `None` | Exclude if latency exceeds this threshold |
+| `continuous_ping_violation_window` | `int` | `5` | Size of rolling window for ping checks |
+| `continuous_ping_required_violations` | `int` | `3` | Number of violations in window to trigger exclusion |
+| `continuous_tab_warning_ms` | `int` | `3000` | Show warning after tab hidden for this duration (ms) |
+| `continuous_tab_exclude_ms` | `int` | `10000` | Exclude after tab hidden for this duration (ms) |
+| `continuous_exclusion_messages` | `dict` | See below | Custom messages for monitoring events |
 
 ### Rolling Window Logic
 
@@ -157,13 +161,14 @@ The ping check uses a rolling window to prevent false positives from temporary s
 ### Example
 
 ```python
-scene.continuous_monitoring(
-    max_ping=200,
-    ping_violation_window=5,
-    ping_required_violations=3,  # 3 of 5 must violate
-    tab_warning_ms=3000,         # Warn after 3 seconds
-    tab_exclude_ms=10000,        # Exclude after 10 seconds
-    exclusion_messages={
+scene.multiplayer(
+    continuous_monitoring_enabled=True,
+    continuous_max_ping=200,
+    continuous_ping_violation_window=5,
+    continuous_ping_required_violations=3,  # 3 of 5 must violate
+    continuous_tab_warning_ms=3000,         # Warn after 3 seconds
+    continuous_tab_exclude_ms=10000,        # Exclude after 10 seconds
+    continuous_exclusion_messages={
         "ping": "Your connection dropped below acceptable quality.",
         "tab_warning": "Please keep this window focused!",
         "tab_exclude": "The experiment ended because you left the window."
@@ -223,7 +228,7 @@ config = ExperimentConfig().experiment(
 
 ### Continuous Callback
 
-Configure on `GymScene.exclusion_callbacks()`. Called periodically during gameplay (default: every 30 frames, ~1 second at 30 FPS).
+Configure via `GymScene.multiplayer()` using the `continuous_callback` and `continuous_callback_interval_frames` parameters. The callback is called periodically during gameplay (default: every 30 frames, ~1 second at 30 FPS).
 
 **Input Context:**
 ```python
@@ -269,7 +274,7 @@ def my_continuous_check(context: dict) -> dict:
 
     return {"exclude": False, "warn": False, "message": None}
 
-scene.exclusion_callbacks(
+scene.multiplayer(
     continuous_callback=my_continuous_check,
     continuous_callback_interval_frames=30  # Check every ~1 second
 )
@@ -356,13 +361,13 @@ scene = GymScene(
     scene_id="my_multiplayer_experiment",
     experiment_id="exp_001",
     # ... other config ...
-).continuous_monitoring(
-    max_ping=200,
-    ping_violation_window=5,
-    ping_required_violations=3,
-    tab_warning_ms=3000,
-    tab_exclude_ms=10000
-).exclusion_callbacks(
+).multiplayer(
+    continuous_monitoring_enabled=True,
+    continuous_max_ping=200,
+    continuous_ping_violation_window=5,
+    continuous_ping_required_violations=3,
+    continuous_tab_warning_ms=3000,
+    continuous_tab_exclude_ms=10000,
     continuous_callback=custom_continuous_check,
     continuous_callback_interval_frames=30
 )
