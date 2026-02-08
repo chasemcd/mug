@@ -1,5 +1,9 @@
-"""
-This is all stolen from: https://github.com/HumanCompatibleAI/overcooked-demo/blob/master/server/utils.py
+"""Thread-safe collection utilities.
+
+Provides thread-safe wrappers for dict and set, plus sentinel values
+for game state management.
+
+Originally adapted from: https://github.com/HumanCompatibleAI/overcooked-demo/blob/master/server/utils.py
 """
 
 from __future__ import annotations
@@ -75,20 +79,20 @@ class GameExitStatus:
     InactiveWithOtherPlayers = "inactive_with_other_players"
 
 
-class _Available:
+class _AvailableSlot:
     """
     Adapted from RLLib's _NotProvided
     https://github.com/ray-project/ray/rllib/utils/from_config.py#L261
     """
 
-    class __Available:
+    class __AvailableSlot:
         pass
 
     instance = None
 
     def __init__(self):
-        if _Available.instance is None:
-            _Available.instance = _Available.__Available()
+        if _AvailableSlot.instance is None:
+            _AvailableSlot.instance = _AvailableSlot.__AvailableSlot()
 
 
-Available = _Available
+AvailableSlot = _AvailableSlot

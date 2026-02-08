@@ -15,7 +15,7 @@ import numpy as np
 from gymnasium import spaces
 
 from interactive_gym.configurations import configuration_constants
-from interactive_gym.server import utils
+from interactive_gym.server import thread_utils
 from interactive_gym.scenes import gym_scene
 
 logger = logging.getLogger(__name__)
@@ -146,7 +146,7 @@ class RemoteGameV2:
         """Load and instantiates all policies"""
         for agent_id, policy_id in self.scene.policy_mapping.items():
             if policy_id == configuration_constants.PolicyTypes.Human:
-                self.human_players[agent_id] = utils.Available
+                self.human_players[agent_id] = thread_utils.AvailableSlot
             elif policy_id == configuration_constants.PolicyTypes.Random:
                 self.bot_players[agent_id] = policy_id
             elif self.scene.run_through_pyodide:
@@ -188,7 +188,7 @@ class RemoteGameV2:
         return [
             agent_id
             for agent_id, subject_id in self.human_players.items()
-            if subject_id is utils.Available
+            if subject_id is thread_utils.AvailableSlot
         ]
 
     def is_at_player_capacity(self) -> bool:
@@ -200,7 +200,7 @@ class RemoteGameV2:
             [
                 agent_id
                 for agent_id, subject_id in self.human_players.items()
-                if subject_id != utils.Available
+                if subject_id != thread_utils.AvailableSlot
             ]
         )
 
@@ -226,7 +226,7 @@ class RemoteGameV2:
             )
             return
 
-        self.human_players[player_id_to_remove] = utils.Available
+        self.human_players[player_id_to_remove] = thread_utils.AvailableSlot
         logger.debug(f"Removed {subject_id} from slot {player_id_to_remove}")
 
         if subject_id in self.document_focus_status:

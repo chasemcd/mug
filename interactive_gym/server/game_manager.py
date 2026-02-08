@@ -37,7 +37,7 @@ from interactive_gym.configurations import (
     configuration_constants,
     remote_config,
 )
-from interactive_gym.server import remote_game, utils, pyodide_game_coordinator, player_pairing_manager
+from interactive_gym.server import remote_game, thread_utils, pyodide_game_coordinator, player_pairing_manager
 from interactive_gym.server.remote_game import SessionState
 from interactive_gym.server.participant_state import ParticipantState
 from interactive_gym.server.matchmaker import Matchmaker, MatchCandidate, FIFOMatchmaker, GroupHistory
@@ -88,21 +88,21 @@ class GameManager:
         self._pending_matches: dict[str, dict] = {}
 
         # Data structure to save subjects by their socket id
-        self.subject = utils.ThreadSafeDict()
+        self.subject = thread_utils.ThreadSafeDict()
 
         # Data structure to save subjects games in memory OBJECTS by their socket id
         self.games: dict[GameID, remote_game.RemoteGameV2] = (
-            utils.ThreadSafeDict()
+            thread_utils.ThreadSafeDict()
         )
 
         # Map subjects to the game they're in
-        self.subject_games: dict[SubjectID, GameID] = utils.ThreadSafeDict()
+        self.subject_games: dict[SubjectID, GameID] = thread_utils.ThreadSafeDict()
 
         # save subject IDs and the room they are in
-        self.subject_rooms: dict[SubjectID] = utils.ThreadSafeDict()
+        self.subject_rooms: dict[SubjectID] = thread_utils.ThreadSafeDict()
 
         # Games that are currently being played
-        self.active_games = utils.ThreadSafeSet()
+        self.active_games = thread_utils.ThreadSafeSet()
 
         # Queue of games IDs that are waiting for additional players to join.
         # NOTE: In the new flow (Phase 60+), waiting_games should typically be empty
@@ -110,7 +110,7 @@ class GameManager:
         # backward compatibility and edge cases.
         self.waiting_games = []
         self.waiting_games_lock = eventlet.semaphore.Semaphore()  # Protect waiting_games access
-        self.waitroom_timeouts = utils.ThreadSafeDict()
+        self.waitroom_timeouts = thread_utils.ThreadSafeDict()
 
         # Participants waiting in the waitroom for a match (no game allocated yet)
         # This is the primary waitroom in the new flow - participants wait here
@@ -119,7 +119,7 @@ class GameManager:
 
         # holds reset events so we only continue in game loop when triggered
         # this is not used when running with Pyodide
-        self.reset_events = utils.ThreadSafeDict()
+        self.reset_events = thread_utils.ThreadSafeDict()
 
     def subject_in_game(self, subject_id: SubjectID) -> bool:
         return subject_id in self.subject_games
@@ -204,7 +204,7 @@ class GameManager:
             )
 
             # Reset events make sure that we only reset once every player has triggered the event
-            self.reset_events[game_id] = utils.ThreadSafeDict()
+            self.reset_events[game_id] = thread_utils.ThreadSafeDict()
 
             # If this is a multiplayer Pyodide game, create coordinator state
             if self.scene.pyodide_multiplayer and self.pyodide_coordinator:
@@ -756,7 +756,7 @@ class GameManager:
         # so clients must already be in the room to receive it.
         if self.scene.pyodide_multiplayer and self.pyodide_coordinator:
             for player_id, subject_id in game.human_players.items():
-                if subject_id and subject_id != utils.Available:
+                if subject_id and subject_id != thread_utils.AvailableSlot:
                     socket_id = self._get_socket_id(subject_id)
                     self.pyodide_coordinator.add_player(
                         game_id=game.game_id,
@@ -932,7 +932,7 @@ class GameManager:
             game_is_empty = game.cur_num_human_players() == 0
 
             if game_was_active and game_is_empty:
-                exit_status = utils.GameExitStatus.ActiveNoPlayers
+                exit_status = thread_utils.GameExitStatus.ActiveNoPlayers
                 logger.info(
                     f"Subject {subject_id} left game {game.game_id} with exit status {exit_status}. Cleaning up."
                 )
@@ -941,7 +941,7 @@ class GameManager:
             # If the game wasn't active and there are no players,
             # cleanup the traces of the game.
             elif game_is_empty:
-                exit_status = utils.GameExitStatus.InactiveNoPlayers
+                exit_status = thread_utils.GameExitStatus.InactiveNoPlayers
                 logger.info(
                     f"Subject {subject_id} left game {game.game_id} with exit status {exit_status}. Cleaning up."
                 )
@@ -949,7 +949,7 @@ class GameManager:
 
             # if the game was not active and not empty, the remaining players are still in the waiting room.
             elif not game_was_active:
-                exit_status = utils.GameExitStatus.InactiveWithOtherPlayers
+                exit_status = thread_utils.GameExitStatus.InactiveWithOtherPlayers
                 logger.info(
                     f"Subject {subject_id} left game {game.game_id} with exit status {exit_status}. "
                     f"Notifying remaining players and ending lobby."
@@ -971,7 +971,7 @@ class GameManager:
                 self.cleanup_game(game_id)
 
             elif game_was_active and not game_is_empty:
-                exit_status = utils.GameExitStatus.ActiveWithOtherPlayers
+                exit_status = thread_utils.GameExitStatus.ActiveWithOtherPlayers
                 logger.info(
                     f"Subject {subject_id} left game {game.game_id} with exit status {exit_status}. Cleaning up."
                 )
@@ -995,7 +995,7 @@ class GameManager:
                 raise NotImplementedError("Something went wrong on exit!")
 
             # For ActiveNoPlayers, trigger callback (no players to notify)
-            if exit_status == utils.GameExitStatus.ActiveNoPlayers:
+            if exit_status == thread_utils.GameExitStatus.ActiveNoPlayers:
                 if self.scene.callback is not None:
                     self.scene.callback.on_game_end(game)
             # Note: ActiveWithOtherPlayers already emits end_game with message above
@@ -1079,7 +1079,7 @@ class GameManager:
         # Transition all players to IN_GAME (Phase 54)
         if self.participant_state_tracker:
             for subject_id in game.human_players.values():
-                if subject_id and subject_id != utils.Available:
+                if subject_id and subject_id != thread_utils.AvailableSlot:
                     logger.info(f"[StartGame] Transitioning {subject_id} to IN_GAME for game {game.game_id}")
                     self.participant_state_tracker.transition_to(subject_id, ParticipantState.IN_GAME)
 
@@ -1356,12 +1356,12 @@ class GameManager:
         # Transition all players to GAME_ENDED (Phase 54)
         if self.participant_state_tracker:
             for subject_id in list(game.human_players.values()):
-                if subject_id and subject_id != utils.Available:
+                if subject_id and subject_id != thread_utils.AvailableSlot:
                     self.participant_state_tracker.transition_to(subject_id, ParticipantState.GAME_ENDED)
 
         # Clean up subject tracking for ALL players in this game
         for subject_id in list(game.human_players.values()):
-            if subject_id and subject_id != utils.Available:
+            if subject_id and subject_id != thread_utils.AvailableSlot:
                 if subject_id in self.subject_games:
                     del self.subject_games[subject_id]
                 if subject_id in self.subject_rooms:
@@ -1375,7 +1375,7 @@ class GameManager:
             # Filter out "Available" placeholders
             real_subjects = [
                 sid for sid in subject_ids
-                if sid != utils.Available and sid is not None
+                if sid != thread_utils.AvailableSlot and sid is not None
             ]
             if len(real_subjects) > 1:
                 self.pairing_manager.create_group(real_subjects, self.scene.scene_id)
