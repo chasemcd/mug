@@ -41,11 +41,6 @@ export function startUnityScene(data) {
         window.interactiveGymGlobals.unityScore = 0;
     }
     console.log(window.interactiveGymGlobals.unityScore);
-    // Update HUD text to show round progress
-    // if (data.num_episodes && data.num_episodes > 1) {
-    //     const roundText = `Round ${window.interactiveGymGlobals.unityEpisodeCounter + 1}/${data.num_episodes}`;
-    //     $("#hudText").html(roundText);
-    // }
 
     let hudText = '';
     if (data.num_episodes && data.num_episodes > 1) {
@@ -121,8 +116,8 @@ function startUnityGame(config, elementId) {
     const cachedAssets = unityCachedAssets.get(buildName);
     
     if (!cachedAssets) {
-        console.warn(`No cached assets found for ${buildName}, falling back to direct loading`);
-        return startUnityGameDirect(config, elementId);
+        console.error(`No cached assets found for ${buildName}. Call preloadUnityGame() first.`);
+        return;
     }
 
     console.log(`Starting Unity game with cached assets: ${buildName}`);
@@ -243,21 +238,3 @@ export function terminateUnityScene(data) {
   $("#sceneBody").html(data.scene_body);
 
 };
-
-
-function EmitUnityEpisodeResults(json) {
-  if (socket && socket.connected) {
-      socket.emit('unityEpisodeEnd', JSON.parse(json));
-  } else {
-      console.warn('Socket.IO is not connected. Cannot emit round results.');
-  }
-}
-
-function UnityConnectSocketIO() {
-  if (socket) {
-      console.log('Socket.IO is already connected!');
-  } else {
-      console.error('Socket.IO connection is not established.');
-  }
-}
-
