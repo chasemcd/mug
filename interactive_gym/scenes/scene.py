@@ -94,8 +94,8 @@ class Scene:
         """
         Return the metadata for the current scene that will be passed through the Flask app.
         """
-        vv = serialize_dict(vars(self))
-        metadata = copy.deepcopy(vv)
+        serialized_vars = serialize_dict(vars(self))
+        metadata = copy.deepcopy(serialized_vars)
         return {
             "scene_id": self.scene_id,
             "scene_type": self.__class__.__name__,

@@ -20,7 +20,7 @@ import flask_socketio
 
 from interactive_gym.utils.typing import SubjectID, SceneID
 from interactive_gym.scenes import gym_scene
-from interactive_gym.server import game_manager as gm
+from interactive_gym.server import game_manager
 
 from interactive_gym.configurations import remote_config
 from interactive_gym.server import utils
@@ -64,15 +64,15 @@ def setup_logger(name, log_file, level=logging.INFO):
     handler.setFormatter(formatter)
 
     # Create console handler with a higher log level
-    ch = logging.StreamHandler()
-    ch.setFormatter(
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(
         formatter
     )  # Setting the formatter for the console handler as well
 
     logger = logging.getLogger(name)
     logger.setLevel(level)
     logger.addHandler(handler)
-    logger.addHandler(ch)
+    logger.addHandler(console_handler)
     logger.propagate = False
 
     return logger
@@ -96,7 +96,7 @@ STAGERS: dict[SubjectID, stager.Stager] = utils.ThreadSafeDict()
 SUBJECTS = utils.ThreadSafeDict()
 
 # Game managers handle all the game logic, connection, and waiting room for a given scene
-GAME_MANAGERS: dict[SceneID, gm.GameManager] = utils.ThreadSafeDict()
+GAME_MANAGERS: dict[SceneID, game_manager.GameManager] = utils.ThreadSafeDict()
 
 # Pyodide multiplayer game coordinator
 PYODIDE_COORDINATOR: pyodide_game_coordinator.PyodideGameCoordinator | None = None
@@ -564,7 +564,7 @@ def advance_scene(data):
             if MATCH_LOGGER is None:
                 MATCH_LOGGER = MatchAssignmentLogger(admin_aggregator=ADMIN_AGGREGATOR)
 
-            game_manager = gm.GameManager(
+            gm_instance = game_manager.GameManager(
                 scene=current_scene,
                 experiment_config=CONFIG,
                 socketio=socketio,
@@ -577,7 +577,7 @@ def advance_scene(data):
                 probe_coordinator=PROBE_COORDINATOR,  # Phase 59: P2P RTT probing
                 get_socket_for_subject=get_socket_for_subject,  # Phase 60+: waitroom->match
             )
-            GAME_MANAGERS[current_scene.scene_id] = game_manager
+            GAME_MANAGERS[current_scene.scene_id] = gm_instance
         else:
             logger.info(
                 f"Game manager already exists for scene {current_scene.scene_id}, reusing it"
