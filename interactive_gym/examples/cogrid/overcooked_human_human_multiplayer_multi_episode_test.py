@@ -56,8 +56,8 @@ hh_start_scene = (
 #
 # Same as standard test config:
 # - matchmaking(max_rtt=None) removes RTT limit for latency testing
-# - focus_loss_config(timeout_ms=0) disables focus timeout
-# - pyodide(input_confirmation_timeout_ms=2000) for packet loss resilience
+# - multiplayer(focus_loss_timeout_ms=0) disables focus timeout
+# - multiplayer(input_confirmation_timeout_ms=2000) for packet loss resilience
 stager = stager.Stager(
     scenes=[
         hh_start_scene,
@@ -66,8 +66,7 @@ stager = stager.Stager(
             oc_scenes.cramped_room_human_human
             .gameplay(num_episodes=2, max_steps=450)  # Two episodes ~30 seconds total
             .matchmaking(max_rtt=None)  # No RTT limit for latency tests
-            .focus_loss_config(timeout_ms=0, pause_on_partner_background=False)  # Disable focus timeout
-            .pyodide(input_confirmation_timeout_ms=2000)  # Higher timeout for packet loss tests
+            .multiplayer(focus_loss_timeout_ms=0, pause_on_partner_background=False, input_confirmation_timeout_ms=2000)  # Disable focus timeout, higher timeout for packet loss tests
         ),
         oc_scenes.multiplayer_feedback_scene,
         oc_scenes.end_scene,

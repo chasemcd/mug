@@ -3,7 +3,7 @@ Overcooked Human-Human Multiplayer - Focus Timeout Test Configuration
 
 This is a test-specific version for focus loss timeout testing (STRESS-05).
 Based on the standard test config with these changes:
-- focus_loss_config(timeout_ms=10000) enables 10 second focus loss timeout
+- multiplayer(focus_loss_timeout_ms=10000) enables 10 second focus loss timeout
 - When a player's browser tab loses focus for 10+ seconds, game ends gracefully
 
 Other settings remain identical to the standard test config:
@@ -55,12 +55,12 @@ hh_start_scene = (
 
 # Create stager with focus timeout test configuration
 # Key differences from standard test config:
-# - focus_loss_config(timeout_ms=10000) enables 10s focus timeout (STRESS-05)
+# - multiplayer(focus_loss_timeout_ms=10000) enables 10s focus timeout (STRESS-05)
 #
 # Same as standard test config:
 # - gameplay(num_episodes=1, max_steps=450) single episode
 # - matchmaking(max_rtt=None) removes RTT limit for latency testing
-# - pyodide(input_confirmation_timeout_ms=2000) for packet loss resilience
+# - multiplayer(input_confirmation_timeout_ms=2000) for packet loss resilience
 stager = stager.Stager(
     scenes=[
         hh_start_scene,
@@ -69,8 +69,7 @@ stager = stager.Stager(
             oc_scenes.cramped_room_human_human
             .gameplay(num_episodes=1, max_steps=450)  # ~15 seconds per episode
             .matchmaking(max_rtt=None)  # No RTT limit for latency tests
-            .focus_loss_config(timeout_ms=10000, pause_on_partner_background=False)  # 10 second timeout
-            .pyodide(input_confirmation_timeout_ms=2000)  # Higher timeout for packet loss tests
+            .multiplayer(focus_loss_timeout_ms=10000, pause_on_partner_background=False, input_confirmation_timeout_ms=2000)  # 10 second timeout, higher timeout for packet loss tests
         ),
         oc_scenes.multiplayer_feedback_scene,
         oc_scenes.end_scene,

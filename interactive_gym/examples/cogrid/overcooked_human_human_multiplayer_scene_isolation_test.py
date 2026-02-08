@@ -16,9 +16,9 @@ Scene flow:
 Key differences from production:
 - No tutorial scene (saves ~30 seconds per test)
 - matchmaking(max_rtt=None) removes RTT limit for testing
-- focus_loss_config(timeout_ms=0) disables focus timeout
+- multiplayer(focus_loss_timeout_ms=0) disables focus timeout
 - gameplay(num_episodes=1, max_steps=450) shorter episodes (~15s at 30fps)
-- pyodide(input_confirmation_timeout_ms=2000) higher timeout for resilience
+- multiplayer(input_confirmation_timeout_ms=2000) higher timeout for resilience
 
 Usage:
     python -m interactive_gym.examples.cogrid.overcooked_human_human_multiplayer_scene_isolation_test
@@ -68,8 +68,7 @@ stager = stager.Stager(
             oc_scenes.cramped_room_human_human
             .gameplay(num_episodes=1, max_steps=450)  # ~15 seconds per episode
             .matchmaking(max_rtt=None)  # No RTT limit for testing
-            .focus_loss_config(timeout_ms=0, pause_on_partner_background=False)  # Disable focus timeout
-            .pyodide(input_confirmation_timeout_ms=2000)  # Higher timeout for resilience
+            .multiplayer(focus_loss_timeout_ms=0, pause_on_partner_background=False, input_confirmation_timeout_ms=2000)  # Disable focus timeout, higher timeout for resilience
         ),
         oc_scenes.multiplayer_feedback_scene,  # Survey scene (isolation tested here)
         oc_scenes.end_scene,
