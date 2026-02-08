@@ -805,7 +805,7 @@ def advance_scene(data):
 
 **Problem**: Need way for researchers to enable multiplayer.
 
-**Solution**: Add `multiplayer` parameter to `.pyodide()` configuration.
+**Solution**: Enable multiplayer via `.runtime()` for browser execution and `.multiplayer()` for multiplayer coordination.
 
 ```python
 # In gym_scene.py
@@ -815,21 +815,27 @@ class GymScene(scene.Scene):
         super().__init__()
         # ...
         self.run_through_pyodide: bool = False
-        self.pyodide_multiplayer: bool = False  # NEW
+        self.pyodide_multiplayer: bool = False
 
-    def pyodide(
+    def runtime(
         self,
         run_through_pyodide: bool = NotProvided,
-        multiplayer: bool = NotProvided,  # NEW
         environment_initialization_code: str = NotProvided,
-        # ...
+        # ... browser execution params ...
     ):
         if run_through_pyodide is not NotProvided:
             self.run_through_pyodide = run_through_pyodide
+        # ...
+        return self
 
+    def multiplayer(
+        self,
+        multiplayer: bool = NotProvided,
+        server_authoritative: bool = NotProvided,
+        # ... multiplayer/sync params ...
+    ):
         if multiplayer is not NotProvided:
             self.pyodide_multiplayer = multiplayer
-
         # ...
         return self
 ```
@@ -1199,9 +1205,8 @@ multiplayer_scene = (
         scene_id="overcooked_multiplayer",
         experiment_config={}
     )
-    .pyodide(
+    .runtime(
         run_through_pyodide=True,
-        multiplayer=True,  # Enable multiplayer coordination
         environment_initialization_code="""
 import gymnasium as gym
 from cogrid.envs import OvercookedGridworld
@@ -1214,6 +1219,9 @@ env = OvercookedGridworld(
         packages_to_install=[
             "cogrid @ git+https://github.com/chasemcd/cogrid.git"
         ]
+    )
+    .multiplayer(
+        multiplayer=True,  # Enable multiplayer coordination
     )
     .policies(
         policy_mapping={
@@ -1234,10 +1242,12 @@ env = OvercookedGridworld(
         max_steps=30 * 60,  # 60 seconds
         input_mode=configuration_constants.InputModes.SingleKeystroke
     )
-    .user_experience(
+    .content(
         scene_header="Overcooked - 2 Players",
         scene_body="Work together to prepare and deliver dishes!",
-        waitroom_timeout=60000  # 60 seconds
+    )
+    .waitroom(
+        timeout=60000  # 60 seconds
     )
 )
 ```
@@ -1249,11 +1259,13 @@ env = OvercookedGridworld(
 multiplayer_scene = (
     gym_scene.GymScene()
     .scene(scene_id="overcooked_human_ai", experiment_config={})
-    .pyodide(
+    .runtime(
         run_through_pyodide=True,
-        multiplayer=True,
         environment_initialization_code="""...""",
         packages_to_install=[...]
+    )
+    .multiplayer(
+        multiplayer=True,
     )
     .policies(
         policy_mapping={

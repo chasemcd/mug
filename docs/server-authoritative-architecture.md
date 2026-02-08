@@ -538,36 +538,44 @@ env.set_state(${JSON.stringify(state.env_state)})
 **File**: `interactive_gym/scenes/gym_scene.py`
 
 ```python
-def pyodide(
+def runtime(
     self,
-    run_through_pyodide: bool,
-    multiplayer: bool = False,
-    environment_initialization_code: str = None,
-    environment_initialization_code_filepath: str = None,
-    packages_to_install: list[str] = None,
-    state_sync_frequency_frames: int = 20,
-    queue_resync_threshold: int = 50,
-    action_population_method: str = "previous_submitted_action",
-    # New parameters
-    server_authoritative: bool = False,
-    authoritative_broadcast_interval: int = 30,  # Frames between server broadcasts
+    run_through_pyodide: bool = NotProvided,
+    environment_initialization_code: str = NotProvided,
+    environment_initialization_code_filepath: str = NotProvided,
+    packages_to_install: list[str] = NotProvided,
+    # ... browser execution params ...
+):
+    """Configure Pyodide-based browser execution."""
+    # ...
+    return self
+
+def multiplayer(
+    self,
+    multiplayer: bool = NotProvided,
+    server_authoritative: bool = NotProvided,
+    state_broadcast_interval: int = NotProvided,
+    # ... other multiplayer params ...
 ):
     """
-    Configure Pyodide-based game execution.
+    Configure multiplayer settings.
 
     Args:
         server_authoritative: If True, server runs parallel authoritative env
             and broadcasts state periodically. Clients still run locally but
             resync to server state instead of host state.
-        authoritative_broadcast_interval: How often (in frames) server broadcasts
+        state_broadcast_interval: How often (in frames) server broadcasts
             authoritative state. Lower = more bandwidth, faster correction.
             Higher = less bandwidth, potential for longer drift.
     """
-    self.run_through_pyodide = run_through_pyodide
-    self.multiplayer = multiplayer
-    self.server_authoritative = server_authoritative
-    self.authoritative_broadcast_interval = authoritative_broadcast_interval
+    if multiplayer is not NotProvided:
+        self.pyodide_multiplayer = multiplayer
+    if server_authoritative is not NotProvided:
+        self.server_authoritative = server_authoritative
+    if state_broadcast_interval is not NotProvided:
+        self.server_state_broadcast_interval = state_broadcast_interval
     # ... rest of existing code ...
+    return self
 ```
 
 ### Phase 4: GameManager Integration
@@ -663,17 +671,17 @@ slime_scene = (
         num_episodes=5,
         max_steps=3000,
     )
-    .pyodide(
+    .runtime(
         run_through_pyodide=True,
-        multiplayer=True,
         environment_initialization_code_filepath="slimevb_env.py",
         packages_to_install=["slimevb==0.0.4"],
+    )
+    .multiplayer(
+        multiplayer=True,
         # Current client-side sync settings (still used)
-        state_sync_frequency_frames=20,
-        queue_resync_threshold=50,
+        state_broadcast_interval=20,
         # New server-authoritative settings
         server_authoritative=True,
-        authoritative_broadcast_interval=30,  # ~1 sec at 30fps
     )
 )
 ```
@@ -705,7 +713,7 @@ slime_scene = (
 - [ ] Add eventlet-based game loop
 
 ### Phase 2: Configuration
-- [ ] Add `server_authoritative` option to `GymScene.pyodide()`
+- [ ] Add `server_authoritative` option to `GymScene.multiplayer()`
 - [ ] Add `authoritative_broadcast_interval` option
 - [ ] Update `GameManager._create_game()` to pass config
 - [ ] Start runner when all players join

@@ -107,8 +107,9 @@ This document analyzes the current multiplayer Pyodide game synchronization arch
 ### Current Configuration Options
 
 ```python
-.pyodide(
-    state_sync_frequency_frames=20,  # Hash verification every N frames
+.multiplayer(
+    state_broadcast_interval=20,  # Hash verification every N frames
+).gameplay(
     queue_resync_threshold=50,       # Trigger resync if queue > threshold
     action_population_method='previous_submitted_action',  # Fallback for missing actions
 )
@@ -470,8 +471,8 @@ env.t if hasattr(env, 't') else 0
 
 If games are staying in sync, increase `state_sync_frequency_frames`:
 ```python
-.pyodide(
-    state_sync_frequency_frames=60,  # Was 20, now every 2 seconds at 30fps
+.multiplayer(
+    state_broadcast_interval=60,  # Was 20, now every 2 seconds at 30fps
 )
 ```
 
