@@ -70,7 +70,7 @@ mountain_car_scene = (
         max_steps=200,
         input_mode=configuration_constants.InputModes.PressedKeys,
     )
-    .user_experience(
+    .content(
         scene_header="Mountain Car",
         scene_body="<center><p>" "On this page, Python is initializing and loading packages in the background. With a decent internet connection, it should only be a few moments. If it takes longer than inspected, right click on the page and select 'Inspect -> Console' to see if an error was logged. <br> <br> When it has initialized, the button will become active and you can continue on in the experiment." "</p></center>",
         in_game_scene_body="""
@@ -82,7 +82,7 @@ mountain_car_scene = (
         <br><br>
         """,
     )
-    .pyodide(
+    .runtime(
         run_through_pyodide=True,
         environment_initialization_code_filepath="interactive_gym/examples/mountain_car/mountain_car_rgb_env.py",
     )
