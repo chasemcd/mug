@@ -811,8 +811,6 @@ def leave_game(data):
             # Close console log file for completed subject
             ADMIN_AGGREGATOR.close_subject_console_log(subject_id)
 
-
-# @socketio.on("disconnect")
 @socketio.on("send_pressed_keys")
 def send_pressed_keys(data):
     """
