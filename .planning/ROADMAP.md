@@ -112,7 +112,10 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. All unclear JS variable/function names have been renamed to reflect their purpose
   2. All tests pass with new names
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 76-01-PLAN.md — Expand WebRTC abbreviations (`pc`, `dc`) and rename cryptic `pgg` import alias
+- [ ] 76-02-PLAN.md — Rename generic `data` parameters in all socket handlers in index.js to context-specific names
 
 ### Phase 77: Structural Organization
 **Goal**: Reorganize files into logical locations, consolidate unnecessarily split modules, move misplaced code
@@ -148,6 +151,6 @@ Phases execute in numeric order: 72 → 73 → 74 → 75 → 76 → 77 → 78
 | 73. Scene & Environment Dead Code Removal | 2/2 | ✓ Complete | 2026-02-08 |
 | 74. Client JavaScript Dead Code Removal | 2/2 | ✓ Complete | 2026-02-08 |
 | 75. Python Naming Clarity | 2/2 | ✓ Complete | 2026-02-08 |
-| 76. JavaScript Naming Clarity | 0/TBD | Not started | - |
+| 76. JavaScript Naming Clarity | 0/2 | Not started | - |
 | 77. Structural Organization | 0/TBD | Not started | - |
 | 78. Final Verification | 0/TBD | Not started | - |
