@@ -14,7 +14,7 @@ import uuid
 import threading
 from typing import TYPE_CHECKING
 
-from interactive_gym.server import thread_utils
+from interactive_gym.server import thread_safe_collections
 from interactive_gym.utils.typing import SubjectID, SceneID
 
 if TYPE_CHECKING:
@@ -51,13 +51,13 @@ class PlayerGroupManager:
 
     def __init__(self):
         # subject_id -> group_id
-        self.subject_groups: thread_utils.ThreadSafeDict = thread_utils.ThreadSafeDict()
+        self.subject_groups: thread_safe_collections.ThreadSafeDict = thread_safe_collections.ThreadSafeDict()
 
         # group_id -> PlayerGroup
-        self.groups: thread_utils.ThreadSafeDict = thread_utils.ThreadSafeDict()
+        self.groups: thread_safe_collections.ThreadSafeDict = thread_safe_collections.ThreadSafeDict()
 
         # subject_id -> current scene_id (for disconnect handling)
-        self.subject_scenes: thread_utils.ThreadSafeDict = thread_utils.ThreadSafeDict()
+        self.subject_scenes: thread_safe_collections.ThreadSafeDict = thread_safe_collections.ThreadSafeDict()
 
         # Lock for complex operations that need atomicity
         self.lock = threading.Lock()

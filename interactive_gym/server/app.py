@@ -23,7 +23,8 @@ from interactive_gym.scenes import gym_scene
 from interactive_gym.server import game_manager
 
 from interactive_gym.configurations import remote_config
-from interactive_gym.server import thread_utils
+from interactive_gym.server import thread_safe_collections
+from interactive_gym.server.remote_game import AvailableSlot
 from interactive_gym.scenes import stager
 from interactive_gym.scenes import unity_scene
 from interactive_gym.server import pyodide_game_coordinator
@@ -90,13 +91,13 @@ GENERIC_STAGER: stager.Stager = None  # Instantiate on run()
 
 # Each participant has their own instance of the Stager to manage
 # their progression through the experiment.
-STAGERS: dict[SubjectID, stager.Stager] = thread_utils.ThreadSafeDict()
+STAGERS: dict[SubjectID, stager.Stager] = thread_safe_collections.ThreadSafeDict()
 
 # Data structure to save subjects by their socket id
-SUBJECTS = thread_utils.ThreadSafeDict()
+SUBJECTS = thread_safe_collections.ThreadSafeDict()
 
 # Game managers handle all the game logic, connection, and waiting room for a given scene
-GAME_MANAGERS: dict[SceneID, game_manager.GameManager] = thread_utils.ThreadSafeDict()
+GAME_MANAGERS: dict[SceneID, game_manager.GameManager] = thread_safe_collections.ThreadSafeDict()
 
 # Pyodide multiplayer game coordinator
 PYODIDE_COORDINATOR: pyodide_game_coordinator.PyodideGameCoordinator | None = None
@@ -115,15 +116,15 @@ MATCH_LOGGER: MatchAssignmentLogger | None = None
 PROBE_COORDINATOR: ProbeCoordinator | None = None
 
 # Mapping of users to locks associated with the ID. Enforces user-level serialization
-USER_LOCKS = thread_utils.ThreadSafeDict()
+USER_LOCKS = thread_safe_collections.ThreadSafeDict()
 
 
 # Session ID to participant ID map
-SESSION_ID_TO_SUBJECT_ID = thread_utils.ThreadSafeDict()
+SESSION_ID_TO_SUBJECT_ID = thread_safe_collections.ThreadSafeDict()
 
 # Participant session storage for session restoration after disconnect
 # Maps subject_id -> ParticipantSession
-PARTICIPANT_SESSIONS: dict[SubjectID, ParticipantSession] = thread_utils.ThreadSafeDict()
+PARTICIPANT_SESSIONS: dict[SubjectID, ParticipantSession] = thread_safe_collections.ThreadSafeDict()
 
 # Participant state tracker - single source of truth for participant lifecycle states
 # Prevents routing to wrong games by tracking IDLE/IN_WAITROOM/IN_GAME/GAME_ENDED
@@ -132,7 +133,7 @@ PARTICIPANT_TRACKER: ParticipantStateTracker = ParticipantStateTracker()
 # Pending multiplayer metrics for aggregation
 # Maps (scene_id, game_id) -> {player_id: metrics, ...}
 # When both players submit, metrics are aggregated into a comparison file
-PENDING_MULTIPLAYER_METRICS: dict[tuple[str, str], dict] = thread_utils.ThreadSafeDict()
+PENDING_MULTIPLAYER_METRICS: dict[tuple[str, str], dict] = thread_safe_collections.ThreadSafeDict()
 
 # Pyodide loading grace period tracking (Phase 69)
 # Maps subject_id -> loading start timestamp. Clients in this dict are currently
@@ -2063,7 +2064,7 @@ def handle_p2p_validation_failed(data):
         if game:
             subject_ids_to_reset = [
                 sid for sid in game.human_players.values()
-                if sid and sid != thread_utils.AvailableSlot
+                if sid and sid != AvailableSlot
             ]
             break
 
@@ -2091,7 +2092,7 @@ def handle_p2p_validation_failed(data):
             # Manual cleanup without transitioning to GAME_ENDED
             game = game_manager.games[game_id]
             for subject_id in list(game.human_players.values()):
-                if subject_id and subject_id != thread_utils.AvailableSlot:
+                if subject_id and subject_id != AvailableSlot:
                     if subject_id in game_manager.subject_games:
                         del game_manager.subject_games[subject_id]
                     if subject_id in game_manager.subject_rooms:
