@@ -1067,13 +1067,13 @@ socket.on("waiting_room_player_left", function() {
 })
 
 // P2P Validation Status (Phase 19) - log only, no UI updates
-socket.on('p2p_validation_status', function(data) {
-    console.log("[P2P] Validation status:", data.status);
+socket.on('p2p_validation_status', function(validationStatus) {
+    console.log("[P2P] Validation status:", validationStatus.status);
 });
 
 // P2P Validation Re-pool (Phase 19)
-socket.on('p2p_validation_repool', function(data) {
-    console.log("[P2P] Re-pool requested:", data.reason);
+socket.on('p2p_validation_repool', function(repoolInfo) {
+    console.log("[P2P] Re-pool requested:", repoolInfo.reason);
 
     // Clear any existing waitroom intervals
     if (waitroomInterval) {
@@ -1082,7 +1082,7 @@ socket.on('p2p_validation_repool', function(data) {
     }
 
     // Show message to user
-    var message = data.message || "Finding new partner...";
+    var message = repoolInfo.message || "Finding new partner...";
     $("#waitroomText").text(message);
     $("#waitroomText").show();
 
@@ -1094,42 +1094,42 @@ socket.on('p2p_validation_repool', function(data) {
 });
 
 // P2P Validation Complete (Phase 19)
-socket.on('p2p_validation_complete', function(data) {
+socket.on('p2p_validation_complete', function(validationResult) {
     console.log("[P2P] Validation complete, game starting");
 });
 
 
-function updateWaitroomText(data, timer) {
+function updateWaitroomText(waitroomConfig, timer) {
     var minutes = parseInt(timer / 60, 10);
     var seconds = parseInt(timer % 60, 10);
 
     minutes = minutes < 10 ? "0" + minutes : minutes;
     seconds = seconds < 10 ? "0" + seconds : seconds;
 
-    if (data.hide_lobby_count) {
+    if (waitroomConfig.hide_lobby_count) {
         // Hide participant count, only show timer
         $("#waitroomText").text(`Waiting ${minutes}:${seconds} for more players to join...`);
     } else {
         // Show participant count and timer
-        $("#waitroomText").text(`There are ${data.cur_num_players} / ${data.cur_num_players + data.players_needed} players in the lobby. Waiting ${minutes}:${seconds} for more to join...`);
+        $("#waitroomText").text(`There are ${waitroomConfig.cur_num_players} / ${waitroomConfig.cur_num_players + waitroomConfig.players_needed} players in the lobby. Waiting ${minutes}:${seconds} for more to join...`);
     }
 }
 
-socket.on("game_reset", function(data) {
+socket.on("game_reset", function(resetData) {
     graphics_end()
     $('#hudText').hide()
     ui_utils.disableKeyListener();
 
-    let scene_metadata = data.scene_metadata
+    let scene_metadata = resetData.scene_metadata
 
     if (!scene_metadata) {
-        scene_metadata = data.config;
+        scene_metadata = resetData.config;
     }
 
     if (!scene_metadata) {
         console.log("scene_metadata is undefined on game reset!")
         return;
-    }   
+    }
 
     // Initialize game
     let graphics_config = {
@@ -1150,12 +1150,12 @@ socket.on("game_reset", function(data) {
 
     let input_mode = scene_metadata.input_mode;
 
-    startResetCountdown(data.timeout, function() {
+    startResetCountdown(resetData.timeout, function() {
         // This function will be called after the countdown
         ui_utils.enableKeyListener(input_mode);
         graphics_start(graphics_config);
 
-        socket.emit("reset_complete", {room: data.room, session_id: window.sessionId});
+        socket.emit("reset_complete", {room: resetData.room, session_id: window.sessionId});
     });
 
 
@@ -1191,7 +1191,7 @@ function startResetCountdown(timeout, callback) {
     }, 1000);
 }
 
-socket.on("create_game_failed", function(data) {
+socket.on("create_game_failed", function(failureData) {
     $("#welcomeHeader").show();
     $("#welcomeText").show();
     $("#instructions").show();
@@ -1201,23 +1201,23 @@ socket.on("create_game_failed", function(data) {
      $("#startButton").attr("disabled", false);
 
 
-    let err = data['error']
+    let err = failureData['error']
     $('#errorText').show()
     $('#errorText').text(`Sorry, game creation code failed with error: ${JSON.stringify(err)}. You may try again by pressing the start button.`);
 })
 
 
-socket.on('environment_state', function(data) {
+socket.on('environment_state', function(stateUpdate) {
     $('#hudText').show()
-    $('#hudText').text(data.hud_text)
-    addStateToBuffer(data);
+    $('#hudText').text(stateUpdate.hud_text)
+    addStateToBuffer(stateUpdate);
 });
 
 
 
 
 
-socket.on('end_game', function(data) {
+socket.on('end_game', function(endGameInfo) {
     console.log("game ended!")
     // Hide game data and display game-over html
     graphics_end();
@@ -1226,8 +1226,8 @@ socket.on('end_game', function(data) {
     socket.emit("leave_game", {session_id: window.sessionId});
     $("#gameContainer").hide();
 
-    if (data.message != undefined) {
-        $('#errorText').text(data.message);
+    if (endGameInfo.message != undefined) {
+        $('#errorText').text(endGameInfo.message);
         $('#errorText').show();
     }
 
@@ -1237,25 +1237,25 @@ socket.on('end_game', function(data) {
 });
 
 
-socket.on('end_game_request_redirect', function(data) {
+socket.on('end_game_request_redirect', function(redirectInfo) {
     console.log("received redirect")
     setTimeout(function() {
         // Redirect to the specified URL after the timeout
-        window.location.href = data.redirect_url;
-    }, data.redirect_timeout);
+        window.location.href = redirectInfo.redirect_url;
+    }, redirectInfo.redirect_timeout);
 });
 
 
-socket.on('update_game_page_text', function(data) {
+socket.on('update_game_page_text', function(pageUpdate) {
     // Don't update if screening failed
     if (experimentScreeningPassed === false) return;
 
-    $("#sceneBody").html(data.game_page_text);
+    $("#sceneBody").html(pageUpdate.game_page_text);
     $("#sceneBody").show();
 })
 
 
-socket.on('request_pressed_keys', function(data) {
+socket.on('request_pressed_keys', function(keyRequest) {
     console.log("request_pressed_keys", ui_utils.pressedKeys, pressedKeys, window.sessionId)
     socket.emit('send_pressed_keys', {'pressed_keys': Object.keys(pressedKeys), session_id: window.sessionId});
 });
@@ -1268,31 +1268,31 @@ socket.on('request_pressed_keys', function(data) {
 
 var currentSceneMetadata = {};
 
-socket.on("activate_scene", function(data) {
-    console.log("Activating scene", data.scene_id)
+socket.on("activate_scene", function(sceneData) {
+    console.log("Activating scene", sceneData.scene_id)
     // Retrieve interactiveGymGlobals from the global scope
     console.log("interactiveGymGlobals", interactiveGymGlobals)
     if (typeof interactiveGymGlobals !== 'undefined') {
-        // Add interactiveGymGlobals to data.globals
+        // Add interactiveGymGlobals to sceneData.globals
         console.log("interactiveGymGlobals", interactiveGymGlobals)
-        data.globals = data.globals || {};
-        Object.assign(data.globals, interactiveGymGlobals);
+        sceneData.globals = sceneData.globals || {};
+        Object.assign(sceneData.globals, interactiveGymGlobals);
     }
-    activateScene(data);
+    activateScene(sceneData);
 });
 
 
-socket.on("terminate_scene", function(data) {
+socket.on("terminate_scene", function(terminationData) {
     // Sync globals to server before terminating scene
     socket.emit("sync_globals", {interactiveGymGlobals: window.interactiveGymGlobals});
 
-    if (data.element_ids && data.element_ids.length > 0) {
-        let retrievedData = getData(data.element_ids);
-        socket.emit("static_scene_data_emission", {data: retrievedData, scene_id: data.scene_id, session_id: window.sessionId, interactiveGymGlobals: window.interactiveGymGlobals});
+    if (terminationData.element_ids && terminationData.element_ids.length > 0) {
+        let retrievedData = getData(terminationData.element_ids);
+        socket.emit("static_scene_data_emission", {data: retrievedData, scene_id: terminationData.scene_id, session_id: window.sessionId, interactiveGymGlobals: window.interactiveGymGlobals});
     }
 
-    terminateScene(data);
-    console.log("Terminating scene", data.scene_id);
+    terminateScene(terminationData);
+    console.log("Terminating scene", terminationData.scene_id);
 });
 
 
@@ -1760,16 +1760,16 @@ function redirect_subject(url) {
 const startButton = window.document.getElementById('startButton');
 
 
-socket.on("update_unity_score", function(data) {
-    console.log("Updating Unity score", data.score);
-    window.interactiveGymGlobals.unityScore = data.score;
+socket.on("update_unity_score", function(scoreUpdate) {
+    console.log("Updating Unity score", scoreUpdate.score);
+    window.interactiveGymGlobals.unityScore = scoreUpdate.score;
 
 
     let hudText = '';
-    if (data.num_episodes && data.num_episodes > 1) {
-        hudText += `Round ${window.interactiveGymGlobals.unityEpisodeCounter + 1}/${data.num_episodes}`;
+    if (scoreUpdate.num_episodes && scoreUpdate.num_episodes > 1) {
+        hudText += `Round ${window.interactiveGymGlobals.unityEpisodeCounter + 1}/${scoreUpdate.num_episodes}`;
     }
-    
+
     if (window.interactiveGymGlobals.unityScore !== null) {
         if (hudText) hudText += ' | ';
         hudText += `Score: ${window.interactiveGymGlobals.unityScore}`;
@@ -1779,26 +1779,26 @@ socket.on("update_unity_score", function(data) {
 
 });
 
-socket.on("unity_episode_end", function(data) {
+socket.on("unity_episode_end", function(episodeEndData) {
 
     // Update the HUD text to show the round progress and score
     window.interactiveGymGlobals.unityEpisodeCounter++;
-    
+
     let hudText = '';
-    if (data.num_episodes && data.num_episodes > 1) {
-        hudText += `Round ${window.interactiveGymGlobals.unityEpisodeCounter + 1}/${data.num_episodes}`;
+    if (episodeEndData.num_episodes && episodeEndData.num_episodes > 1) {
+        hudText += `Round ${window.interactiveGymGlobals.unityEpisodeCounter + 1}/${episodeEndData.num_episodes}`;
     }
-    
+
     if (window.interactiveGymGlobals.unityScore !== null) {
         if (hudText) hudText += ' | ';
         hudText += `Score: ${window.interactiveGymGlobals.unityScore}`;
     }
-    
+
     $("#hudText").html(hudText);
 
 
 
-    if (data.all_episodes_done) {
+    if (episodeEndData.all_episodes_done) {
         // Clear the Unity game container
         $("#gameContainer").hide();
         shutdownUnityGame();
@@ -1826,7 +1826,7 @@ socket.on("unity_episode_end", function(data) {
         }, 1000);
 
     }
-    
+
 
 });
 
