@@ -14,7 +14,7 @@ Refactor the GymScene chaining API from 14 accumulated builder methods into fewe
 - [x] **Phase 68: Clean Break** - Remove all old method names — no aliases, no shims
 - [x] **Phase 69: Example Configs Migration** - Update all example configs to use new API
 - [x] **Phase 70: Verification & Test Pass** - Verify zero functionality change across full test suite
-- [ ] **Phase 71: Documentation Migration** - Update all docs to use new API method names (gap closure)
+- [x] **Phase 71: Documentation Migration** - Update all docs to use new API method names (gap closure)
 
 ## Phase Details
 
@@ -87,9 +87,9 @@ Plans:
   3. No documentation references to methods that would raise AttributeError
 **Plans:** 3 plans
 Plans:
-- [ ] 71-01-PLAN.md — Migrate 9 RST files + cogrid README to new API method names
-- [ ] 71-02-PLAN.md — Migrate 5 MD design docs + delete stale HTML export
-- [ ] 71-03-PLAN.md — Final verification sweep across all documentation
+- [x] 71-01-PLAN.md — Migrate 9 RST files + cogrid README to new API method names
+- [x] 71-02-PLAN.md — Migrate 5 MD design docs + delete stale HTML export
+- [x] 71-03-PLAN.md — Final verification sweep across all documentation
 
 ## Progress
 
@@ -102,4 +102,4 @@ Phases execute in numeric order: 67 → 68 → 69 → 70 → 71
 | 68. Clean Break | 1/1 | ✓ Complete | 2026-02-07 |
 | 69. Example Configs Migration | 2/2 | ✓ Complete | 2026-02-07 |
 | 70. Verification & Test Pass | 2/2 | ✓ Complete | 2026-02-08 |
-| 71. Documentation Migration | 0/3 | Planned | — |
+| 71. Documentation Migration | 3/3 | ✓ Complete | 2026-02-08 |

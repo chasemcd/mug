@@ -37,8 +37,8 @@ Requirements for v1.22 milestone. Each maps to roadmap phases.
 
 ### Documentation
 
-- [ ] **DOCS-01**: All documentation files in `docs/` use new API method names — zero references to removed GymScene methods
-- [ ] **DOCS-02**: All code examples in documentation are accurate and use new API methods
+- [x] **DOCS-01**: All documentation files in `docs/` use new API method names — zero references to removed GymScene methods
+- [x] **DOCS-02**: All code examples in documentation are accurate and use new API methods
 
 ## v2 Requirements
 
@@ -82,8 +82,8 @@ Which phases cover which requirements. Updated by create-roadmap.
 | VERF-01 | Phase 70 | Complete |
 | VERF-02 | Phase 70 | Complete |
 | VERF-03 | Phase 70 | Complete |
-| DOCS-01 | Phase 71 | Pending |
-| DOCS-02 | Phase 71 | Pending |
+| DOCS-01 | Phase 71 | Complete |
+| DOCS-02 | Phase 71 | Complete |
 
 **Coverage:**
 - v1 requirements: 18 total
@@ -92,4 +92,4 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 ---
 *Requirements defined: 2026-02-07*
-*Last updated: 2026-02-08 after Phase 70 completion*
+*Last updated: 2026-02-08 after Phase 71 completion*
