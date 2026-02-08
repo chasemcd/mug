@@ -85,7 +85,11 @@ Plans:
   1. Zero references to removed GymScene method names in any documentation file (docs/, README.md files)
   2. All code examples in documentation use the new API methods and are accurate
   3. No documentation references to methods that would raise AttributeError
-**Plans:** TBD
+**Plans:** 3 plans
+Plans:
+- [ ] 71-01-PLAN.md — Migrate 9 RST files + cogrid README to new API method names
+- [ ] 71-02-PLAN.md — Migrate 5 MD design docs + delete stale HTML export
+- [ ] 71-03-PLAN.md — Final verification sweep across all documentation
 
 ## Progress
 
@@ -98,4 +102,4 @@ Phases execute in numeric order: 67 → 68 → 69 → 70 → 71
 | 68. Clean Break | 1/1 | ✓ Complete | 2026-02-07 |
 | 69. Example Configs Migration | 2/2 | ✓ Complete | 2026-02-07 |
 | 70. Verification & Test Pass | 2/2 | ✓ Complete | 2026-02-08 |
-| 71. Documentation Migration | 0/? | Pending | — |
+| 71. Documentation Migration | 0/3 | Planned | — |
