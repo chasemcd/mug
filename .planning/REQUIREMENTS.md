@@ -1,53 +1,43 @@
-# Requirements: Interactive Gym — GymScene Config Cleanup
+# Requirements: Interactive Gym — v1.23 Pre-Merge Cleanup
 
-**Defined:** 2026-02-07
+**Defined:** 2026-02-08
 **Core Value:** Researchers can configure and deploy multiplayer browser experiments with minimal code — a chained scene config and a Python environment are all that's needed.
 
 ## v1 Requirements
 
-Requirements for v1.22 milestone. Each maps to roadmap phases.
+Requirements for v1.23 milestone. Each maps to roadmap phases.
 
-### API Consolidation
+### Dead Code Removal
 
-- [x] **APIC-01**: `pyodide()` method is renamed to `runtime()` containing only browser execution params (code, packages, restart flag)
-- [x] **APIC-02**: Sync/rollback params (input_buffer_size, input_delay, input_confirmation_timeout_ms, server_authoritative, state_broadcast_interval, realtime_mode, multiplayer) are moved out of `pyodide()` into the new `multiplayer()` method
-- [x] **APIC-03**: `matchmaking()`, `player_grouping()`, `continuous_monitoring()`, `exclusion_callbacks()`, `reconnection_config()`, `partner_disconnect_message_config()`, and `focus_loss_config()` are merged into a single `multiplayer()` method
-- [x] **APIC-04**: `user_experience()` is split into `content()` (scene header, body, in-game body, game_page_html_fn) and `waitroom()` (timeout, redirect, timeout message, timeout scene)
-- [x] **APIC-05**: `rendering()` is split into `rendering()` (fps, env_to_state_fn, hud_text_fn, hud_score_carry_over, location_representation, game_width, game_height, background, rollback_smoothing_duration) and `assets()` (preload_specs, assets_dir, assets_to_preload, animation_configs, state_init)
-- [x] **APIC-06**: `policies()` and `gameplay()` are kept as separate methods with no changes to names or param grouping
+- [ ] **DEAD-01**: All unused Python functions, classes, and methods are removed from server code
+- [ ] **DEAD-02**: All unused Python functions, classes, and methods are removed from scene/environment code
+- [ ] **DEAD-03**: All unused JavaScript functions and classes are removed from client code
+- [ ] **DEAD-04**: All vestigial logic from earlier development phases is removed (unreachable code paths, obsolete feature flags, dead branches)
 
-### Clean Break
+### Naming Clarity
 
-- [x] **CLNB-01**: All old method names (`pyodide`, `user_experience`, `player_grouping`, `continuous_monitoring`, `exclusion_callbacks`, `reconnection_config`, `partner_disconnect_message_config`, `focus_loss_config`, `player_pairing`) are removed entirely — no deprecation aliases
-- [x] **CLNB-02**: No backwards-compatibility shims or redirect methods exist in the codebase after cleanup
+- [ ] **NAME-01**: Unclear Python variable and function names are renamed to reflect their purpose
+- [ ] **NAME-02**: Unclear JavaScript variable and function names are renamed to reflect their purpose
+- [ ] **NAME-03**: File and module names that don't reflect their contents are renamed
 
-### Examples Updated
+### Structural Organization
 
-- [x] **EXMP-01**: `interactive_gym/examples/cogrid/scenes/scenes.py` uses new API methods
-- [x] **EXMP-02**: `interactive_gym/examples/slime_volleyball/slimevb_human_human.py` uses new API methods
-- [x] **EXMP-03**: `interactive_gym/examples/mountain_car/mountain_car_experiment.py` uses new API methods
-- [x] **EXMP-04**: `interactive_gym/examples/cogrid/overcooked_human_human_multiplayer.py` uses new API methods
-- [x] **EXMP-05**: `interactive_gym/examples/slime_volleyball/human_ai_pyodide_boost.py` uses new API methods
+- [ ] **STRUCT-01**: Files are reorganized into logical locations in the directory tree
+- [ ] **STRUCT-02**: Unnecessarily split modules are consolidated where it reduces complexity
+- [ ] **STRUCT-03**: Misplaced functions and classes are moved to the modules where they logically belong
 
 ### Verification
 
-- [x] **VERF-01**: All existing tests pass with new API (zero functionality change)
-- [x] **VERF-02**: Every parameter from the old API is accessible through the new API (no params lost)
-- [x] **VERF-03**: All builder methods return `self` for method chaining
-
-### Documentation
-
-- [x] **DOCS-01**: All documentation files in `docs/` use new API method names — zero references to removed GymScene methods
-- [x] **DOCS-02**: All code examples in documentation are accurate and use new API methods
+- [ ] **VERIF-01**: All existing tests pass after every refactoring change
+- [ ] **VERIF-02**: No functionality changes are introduced (behavior is identical before and after)
 
 ## v2 Requirements
 
 Deferred to future release. Tracked but not in current roadmap.
 
-### Further Simplification
+### Automated Cleanup
 
-- **SIMP-01**: Consider splitting `multiplayer()` if it accumulates too many params after merge
-- **SIMP-02**: Consider parameter objects/dataclasses for methods with >10 params (e.g., `rendering()`)
+- **DEAD-05**: Remove unused imports across Python and JS files
 
 ## Out of Scope
 
@@ -55,10 +45,10 @@ Explicitly excluded. Documented to prevent scope creep.
 
 | Feature | Reason |
 |---------|--------|
-| New functionality or capabilities | This milestone is API cleanup only |
-| Changes to server, game_manager, or runtime behavior | Pure surface refactor |
-| Changes to non-GymScene scene types (StartScene, StaticScene, FeedbackScene) | Out of milestone scope |
-| Parameter renaming within methods | Only method-level grouping/naming changes |
+| New features or capabilities | This milestone is cleanup only |
+| Functionality changes of any kind | Pure readability/structure refactor |
+| Removing or restructuring `.planning/` directory | Preserves project history |
+| Changes that would require updating external documentation or APIs | No breaking changes |
 
 ## Traceability
 
@@ -66,30 +56,24 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| APIC-01 | Phase 67 | Complete |
-| APIC-02 | Phase 67 | Complete |
-| APIC-03 | Phase 67 | Complete |
-| APIC-04 | Phase 67 | Complete |
-| APIC-05 | Phase 67 | Complete |
-| APIC-06 | Phase 67 | Complete |
-| CLNB-01 | Phase 68 | Complete |
-| CLNB-02 | Phase 68 | Complete |
-| EXMP-01 | Phase 69 | Complete |
-| EXMP-02 | Phase 69 | Complete |
-| EXMP-03 | Phase 69 | Complete |
-| EXMP-04 | Phase 69 | Complete |
-| EXMP-05 | Phase 69 | Complete |
-| VERF-01 | Phase 70 | Complete |
-| VERF-02 | Phase 70 | Complete |
-| VERF-03 | Phase 70 | Complete |
-| DOCS-01 | Phase 71 | Complete |
-| DOCS-02 | Phase 71 | Complete |
+| DEAD-01 | — | Pending |
+| DEAD-02 | — | Pending |
+| DEAD-03 | — | Pending |
+| DEAD-04 | — | Pending |
+| NAME-01 | — | Pending |
+| NAME-02 | — | Pending |
+| NAME-03 | — | Pending |
+| STRUCT-01 | — | Pending |
+| STRUCT-02 | — | Pending |
+| STRUCT-03 | — | Pending |
+| VERIF-01 | — | Pending |
+| VERIF-02 | — | Pending |
 
 **Coverage:**
-- v1 requirements: 18 total
-- Mapped to phases: 18
-- Unmapped: 0 ✓
+- v1 requirements: 12 total
+- Mapped to phases: 0
+- Unmapped: 12 ⚠️
 
 ---
-*Requirements defined: 2026-02-07*
-*Last updated: 2026-02-08 after Phase 71 completion*
+*Requirements defined: 2026-02-08*
+*Last updated: 2026-02-08 after v1.23 requirements definition*
