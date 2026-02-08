@@ -854,7 +854,6 @@ socket.on('start_game', function(data) {
     }
 
     let scene_metadata = data.scene_metadata
-    // let experiment_config = data.experiment_config
 
     // Set game_id on multiplayer game instance if present
     if (data.game_id && pyodideRemoteGame) {
@@ -1255,8 +1254,6 @@ socket.on('update_game_page_text', function(data) {
     $("#sceneBody").show();
 })
 
-
-// var pressedKeys = {};
 
 socket.on('request_pressed_keys', function(data) {
     console.log("request_pressed_keys", ui_utils.pressedKeys, pressedKeys, window.sessionId)

@@ -11,10 +11,6 @@ export function showHUD() {
     $('#hudText').show()
 }
 
-export function hideHUD() {
-    $('#hudText').hide()
-}
-
 export function updateHUDText(text) {
     $('#hudText').html(text)
 }

@@ -234,16 +234,6 @@ export function emitEpisodeData(sceneId, episodeNum) {
     });
 }
 
-/**
- * Log fast-forward frame data to the remote game logger.
- * Called from multiplayer game during fast-forward to ensure these frames
- * are included in CSV exports with correct focus state (isFocused=false).
- * @param {Object} frameData - Frame data to log
- */
-export function logFastForwardFrame(frameData) {
-    remoteGameLogger.logData(frameData);
-}
-
 export function graphics_start(graphics_config) {
     // Clean up any existing game instance before creating a new one
     // This prevents duplicate Phaser canvases from appearing

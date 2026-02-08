@@ -1028,5 +1028,5 @@ class LatencyTelemetry {
 }
 
 // Export for ES modules and global access
-export { WebRTCManager, ConnectionQualityMonitor, LatencyTelemetry };
+export { WebRTCManager, LatencyTelemetry };
 export default WebRTCManager;
