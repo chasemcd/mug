@@ -56,24 +56,24 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DEAD-01 | — | Pending |
-| DEAD-02 | — | Pending |
-| DEAD-03 | — | Pending |
-| DEAD-04 | — | Pending |
-| NAME-01 | — | Pending |
-| NAME-02 | — | Pending |
-| NAME-03 | — | Pending |
-| STRUCT-01 | — | Pending |
-| STRUCT-02 | — | Pending |
-| STRUCT-03 | — | Pending |
-| VERIF-01 | — | Pending |
-| VERIF-02 | — | Pending |
+| DEAD-01 | Phase 72 | Pending |
+| DEAD-02 | Phase 73 | Pending |
+| DEAD-03 | Phase 74 | Pending |
+| DEAD-04 | Phases 72, 73, 74 | Pending |
+| NAME-01 | Phase 75 | Pending |
+| NAME-02 | Phase 76 | Pending |
+| NAME-03 | Phase 75 | Pending |
+| STRUCT-01 | Phase 77 | Pending |
+| STRUCT-02 | Phase 77 | Pending |
+| STRUCT-03 | Phase 77 | Pending |
+| VERIF-01 | Phase 78 | Pending |
+| VERIF-02 | Phase 78 | Pending |
 
 **Coverage:**
 - v1 requirements: 12 total
-- Mapped to phases: 0
-- Unmapped: 12 ⚠️
+- Mapped to phases: 12
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-02-08*
-*Last updated: 2026-02-08 after v1.23 requirements definition*
+*Last updated: 2026-02-08 after roadmap creation (phases 72-78)*

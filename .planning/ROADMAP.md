@@ -1,105 +1,141 @@
-# Roadmap: Interactive Gym — GymScene Config Cleanup
+# Roadmap: Interactive Gym — v1.23 Pre-Merge Cleanup
 
 ## Overview
 
-Refactor the GymScene chaining API from 14 accumulated builder methods into fewer, intuitively grouped methods. This is a pure API surface cleanup — rename, split, merge methods with zero functionality change. Phases progress from core method consolidation → old name removal → example migration → full verification.
+Clean the entire codebase before merging `feature/p2p-multiplayer` to `main`. Three passes: remove dead code (server → scenes → client JS), improve naming (Python → JS), reorganize structure, then verify everything. Zero functionality changes throughout.
+
+## Milestones
+
+- ✅ **v1.0–v1.21** - Phases 1-66 (shipped)
+- ✅ **v1.22 GymScene Config Cleanup** - Phases 67-71 (shipped 2026-02-08)
+- 🚧 **v1.23 Pre-Merge Cleanup** - Phases 72-78 (in progress)
 
 ## Phases
 
 **Phase Numbering:**
-- Integer phases (67, 68, 69, 70): Planned milestone work
-- Decimal phases (e.g., 67.1): Urgent insertions (marked with INSERTED)
+- Integer phases (72, 73, ...): Planned milestone work
+- Decimal phases (e.g., 72.1): Urgent insertions (marked with INSERTED)
 
-- [x] **Phase 67: API Method Consolidation** - Refactor GymScene builder methods: rename, split, and merge per new API design
-- [x] **Phase 68: Clean Break** - Remove all old method names — no aliases, no shims
-- [x] **Phase 69: Example Configs Migration** - Update all example configs to use new API
-- [x] **Phase 70: Verification & Test Pass** - Verify zero functionality change across full test suite
-- [x] **Phase 71: Documentation Migration** - Update all docs to use new API method names (gap closure)
+<details>
+<summary>✅ v1.0–v1.21 (Phases 1-66) — SHIPPED</summary>
+
+See previous milestone records.
+
+</details>
+
+<details>
+<summary>✅ v1.22 GymScene Config Cleanup (Phases 67-71) — SHIPPED 2026-02-08</summary>
+
+- [x] **Phase 67: API Method Consolidation** - Refactor GymScene builder methods
+- [x] **Phase 68: Clean Break** - Remove all old method names
+- [x] **Phase 69: Example Configs Migration** - Update all example configs
+- [x] **Phase 70: Verification & Test Pass** - Verify zero functionality change
+- [x] **Phase 71: Documentation Migration** - Update all docs to new API
+
+</details>
+
+### 🚧 v1.23 Pre-Merge Cleanup (In Progress)
+
+**Milestone Goal:** Make the entire codebase clean, readable, and coherent before merging to `main`. Zero functionality changes.
+
+- [ ] **Phase 72: Server Python Dead Code Removal** - Remove unused functions, classes, methods, and vestigial logic from server code
+- [ ] **Phase 73: Scene & Environment Dead Code Removal** - Remove unused code from scenes, examples, and environment code
+- [ ] **Phase 74: Client JavaScript Dead Code Removal** - Remove unused JS functions, classes, and dead code paths
+- [ ] **Phase 75: Python Naming Clarity** - Rename unclear Python variable, function, and module names
+- [ ] **Phase 76: JavaScript Naming Clarity** - Rename unclear JS variable and function names
+- [ ] **Phase 77: Structural Organization** - Reorganize files, consolidate modules, move misplaced code
+- [ ] **Phase 78: Final Verification** - Full test suite pass and behavioral verification
 
 ## Phase Details
 
-### Phase 67: API Method Consolidation
-**Goal**: Refactor GymScene builder methods — rename `pyodide()` to `runtime()`, create `multiplayer()` from sync params + 7 merged methods, split `user_experience()` into `content()` + `waitroom()`, split `rendering()` into `rendering()` + `assets()`
-**Depends on**: Nothing (first phase)
-**Requirements**: APIC-01, APIC-02, APIC-03, APIC-04, APIC-05, APIC-06
-**Research needed**: Unlikely — straightforward method restructuring on existing code
+### Phase 72: Server Python Dead Code Removal
+**Goal**: Remove all unused functions, classes, methods, and vestigial logic from server Python code (`server/`, `configurations/`, `utils/`)
+**Depends on**: Nothing (first phase of v1.23)
+**Requirements**: DEAD-01, DEAD-04 (server portion)
+**Research needed**: Unlikely — grep for unused definitions, review call graphs
 **Success Criteria** (what must be TRUE):
-  1. `runtime()` method exists with only browser execution params (code, packages, restart flag)
-  2. `multiplayer()` method exists containing sync/rollback params AND matchmaking/monitoring/resilience params
-  3. `content()` and `waitroom()` methods exist replacing `user_experience()`
-  4. `rendering()` retains display params; new `assets()` method holds preload/animation params
-  5. `policies()` and `gameplay()` remain unchanged
-**Plans:** 2 plans
-Plans:
-- [x] 67-01-PLAN.md — Add runtime() and multiplayer() builder methods
-- [x] 67-02-PLAN.md — Add content(), waitroom(), and assets() builder methods
+  1. No unused Python functions/classes/methods remain in `server/`, `configurations/`, or `utils/`
+  2. No vestigial logic (unreachable code, obsolete feature flags, dead branches) remains in server code
+  3. All tests pass after removal
+**Plans**: TBD
 
-### Phase 68: Clean Break
-**Goal**: Remove all old method names entirely — no deprecation aliases, no redirect methods
-**Depends on**: Phase 67
-**Requirements**: CLNB-01, CLNB-02
-**Research needed**: Unlikely — deletion of old names, grep to confirm no remnants
+### Phase 73: Scene & Environment Dead Code Removal
+**Goal**: Remove all unused Python functions, classes, methods, and vestigial logic from scenes and example code
+**Depends on**: Phase 72
+**Requirements**: DEAD-02, DEAD-04 (scene portion)
+**Research needed**: Unlikely — grep for unused definitions, review call graphs
 **Success Criteria** (what must be TRUE):
-  1. Calling any old method name (`pyodide`, `user_experience`, `player_grouping`, `continuous_monitoring`, `exclusion_callbacks`, `reconnection_config`, `partner_disconnect_message_config`, `focus_loss_config`, `player_pairing`) raises AttributeError
-  2. No deprecation aliases or redirect methods exist in the codebase
-  3. All internal references within GymScene class use new method names
-**Plans:** 1 plan
-Plans:
-- [x] 68-01-PLAN.md — Remove 9 old methods, slim rendering() asset params
+  1. No unused Python functions/classes/methods remain in `scenes/` or `examples/`
+  2. No vestigial logic (unreachable code, dead branches) remains in scene/environment code
+  3. All tests pass after removal
+**Plans**: TBD
 
-### Phase 69: Example Configs Migration
-**Goal**: Update all 5 example configs to use the new API methods
-**Depends on**: Phase 68
-**Requirements**: EXMP-01, EXMP-02, EXMP-03, EXMP-04, EXMP-05
-**Research needed**: Unlikely — mechanical find-and-replace in example files
+### Phase 74: Client JavaScript Dead Code Removal
+**Goal**: Remove all unused JS functions, classes, and dead code paths from client-side JavaScript
+**Depends on**: Phase 73
+**Requirements**: DEAD-03, DEAD-04 (JS portion)
+**Research needed**: Unlikely — grep for unused functions, trace call graphs in JS modules
 **Success Criteria** (what must be TRUE):
-  1. All 5 example configs exclusively use new method names
-  2. Each example can be imported/loaded without errors
-  3. No references to old method names remain in any example file
-**Plans:** 2 plans
-Plans:
-- [x] 69-01-PLAN.md — Migrate cogrid scenes.py to new API methods
-- [x] 69-02-PLAN.md — Migrate slime volleyball, mountain car, and overcooked multiplayer examples
+  1. No unused JS functions/classes remain in `server/static/js/`
+  2. No dead code paths or obsolete feature logic remains in client code
+  3. All tests pass after removal
+**Plans**: TBD
 
-### Phase 70: Verification & Test Pass
-**Goal**: Verify zero functionality change — all tests pass, no params lost, chaining works
-**Depends on**: Phase 69
-**Requirements**: VERF-01, VERF-02, VERF-03
-**Research needed**: Unlikely — run existing tests and verify param coverage
+### Phase 75: Python Naming Clarity
+**Goal**: Rename unclear Python variable, function, and module names across the codebase to reflect their purpose
+**Depends on**: Phase 74
+**Requirements**: NAME-01, NAME-03
+**Research needed**: Unlikely — review code for unclear names, apply renames
+**Success Criteria** (what must be TRUE):
+  1. All unclear Python variable/function names have been renamed to reflect their purpose
+  2. File/module names reflect their contents
+  3. All tests pass with new names
+**Plans**: TBD
+
+### Phase 76: JavaScript Naming Clarity
+**Goal**: Rename unclear JS variable and function names to reflect their purpose
+**Depends on**: Phase 75
+**Requirements**: NAME-02
+**Research needed**: Unlikely — review JS code for unclear names, apply renames
+**Success Criteria** (what must be TRUE):
+  1. All unclear JS variable/function names have been renamed to reflect their purpose
+  2. All tests pass with new names
+**Plans**: TBD
+
+### Phase 77: Structural Organization
+**Goal**: Reorganize files into logical locations, consolidate unnecessarily split modules, move misplaced code
+**Depends on**: Phase 76
+**Requirements**: STRUCT-01, STRUCT-02, STRUCT-03
+**Research needed**: Likely — need to analyze module boundaries, identify misplaced code, plan reorganization
+**Research topics**: Module dependency analysis, import graph, identifying consolidation candidates
+**Success Criteria** (what must be TRUE):
+  1. Files are in logical locations in the directory tree
+  2. Unnecessarily split modules are consolidated where it reduces complexity
+  3. Misplaced functions/classes are in the modules where they logically belong
+  4. All tests pass after reorganization
+**Plans**: TBD
+
+### Phase 78: Final Verification
+**Goal**: Full verification that zero functionality changes were introduced across all cleanup phases
+**Depends on**: Phase 77
+**Requirements**: VERIF-01, VERIF-02
+**Research needed**: Unlikely — run tests, compare behavior
 **Success Criteria** (what must be TRUE):
   1. Full test suite passes with zero failures
-  2. Every parameter from old API is accessible through new API (no params lost)
-  3. All new builder methods return `self` for method chaining
-**Plans:** 2 plans
-Plans:
-- [x] 70-01-PLAN.md — Migrate remaining unmigrated files (test configs + controllable scenes)
-- [x] 70-02-PLAN.md — Full test suite, parameter coverage audit, and chaining verification
-
-### Phase 71: Documentation Migration
-**Goal**: Update all documentation files to use new API method names — replace references to removed methods (`.pyodide()`, `.user_experience()`, `.continuous_monitoring()`, `.exclusion_callbacks()`, `.focus_loss_config()`, etc.) with their new equivalents
-**Depends on**: Phase 70
-**Requirements**: DOCS-01, DOCS-02
-**Research needed**: Unlikely — mechanical find-and-replace in doc files
-**Gap Closure**: Closes documentation tech debt from v1.22 milestone audit
-**Success Criteria** (what must be TRUE):
-  1. Zero references to removed GymScene method names in any documentation file (docs/, README.md files)
-  2. All code examples in documentation use the new API methods and are accurate
-  3. No documentation references to methods that would raise AttributeError
-**Plans:** 3 plans
-Plans:
-- [x] 71-01-PLAN.md — Migrate 9 RST files + cogrid README to new API method names
-- [x] 71-02-PLAN.md — Migrate 5 MD design docs + delete stale HTML export
-- [x] 71-03-PLAN.md — Final verification sweep across all documentation
+  2. No functionality changes introduced (behavior identical before and after all cleanup)
+**Plans**: TBD
 
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 67 → 68 → 69 → 70 → 71
+Phases execute in numeric order: 72 → 73 → 74 → 75 → 76 → 77 → 78
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 67. API Method Consolidation | 2/2 | ✓ Complete | 2026-02-07 |
-| 68. Clean Break | 1/1 | ✓ Complete | 2026-02-07 |
-| 69. Example Configs Migration | 2/2 | ✓ Complete | 2026-02-07 |
-| 70. Verification & Test Pass | 2/2 | ✓ Complete | 2026-02-08 |
-| 71. Documentation Migration | 3/3 | ✓ Complete | 2026-02-08 |
+| 72. Server Python Dead Code Removal | 0/TBD | Not started | - |
+| 73. Scene & Environment Dead Code Removal | 0/TBD | Not started | - |
+| 74. Client JavaScript Dead Code Removal | 0/TBD | Not started | - |
+| 75. Python Naming Clarity | 0/TBD | Not started | - |
+| 76. JavaScript Naming Clarity | 0/TBD | Not started | - |
+| 77. Structural Organization | 0/TBD | Not started | - |
+| 78. Final Verification | 0/TBD | Not started | - |
