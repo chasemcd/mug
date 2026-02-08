@@ -128,7 +128,10 @@ Plans:
   2. Unnecessarily split modules are consolidated where it reduces complexity
   3. Misplaced functions/classes are in the modules where they logically belong
   4. All tests pass after reorganization
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 77-01-PLAN.md — Move NotProvided sentinel from scenes/sentinels.py to utils/sentinels.py, update all imports
+- [ ] 77-02-PLAN.md — Consolidate game state types and callbacks into remote_game.py, rename thread_utils.py to thread_safe_collections.py
 
 ### Phase 78: Final Verification
 **Goal**: Full verification that zero functionality changes were introduced across all cleanup phases
@@ -152,5 +155,5 @@ Phases execute in numeric order: 72 → 73 → 74 → 75 → 76 → 77 → 78
 | 74. Client JavaScript Dead Code Removal | 2/2 | ✓ Complete | 2026-02-08 |
 | 75. Python Naming Clarity | 2/2 | ✓ Complete | 2026-02-08 |
 | 76. JavaScript Naming Clarity | 2/2 | ✓ Complete | 2026-02-08 |
-| 77. Structural Organization | 0/TBD | Not started | - |
+| 77. Structural Organization | 0/2 | Not started | - |
 | 78. Final Verification | 0/TBD | Not started | - |
