@@ -99,7 +99,10 @@ Plans:
   1. All unclear Python variable/function names have been renamed to reflect their purpose
   2. File/module names reflect their contents
   3. All tests pass with new names
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 75-01-PLAN.md — Rename `sio` to `socketio` across all Python files, fix cryptic variables (`vv`, `ch`, `gm`)
+- [ ] 75-02-PLAN.md — Rename `server/utils.py` to `server/thread_utils.py`, `scenes/utils.py` to `scenes/sentinels.py`, rename `Available` to `AvailableSlot`
 
 ### Phase 76: JavaScript Naming Clarity
 **Goal**: Rename unclear JS variable and function names to reflect their purpose
