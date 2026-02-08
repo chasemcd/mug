@@ -39,7 +39,7 @@ See previous milestone records.
 **Milestone Goal:** Make the entire codebase clean, readable, and coherent before merging to `main`. Zero functionality changes.
 
 - [x] **Phase 72: Server Python Dead Code Removal** - Remove unused functions, classes, methods, and vestigial logic from server code ✓ 2026-02-07
-- [ ] **Phase 73: Scene & Environment Dead Code Removal** - Remove unused code from scenes, examples, and environment code
+- [x] **Phase 73: Scene & Environment Dead Code Removal** - Remove unused code from scenes, examples, and environment code ✓ 2026-02-08
 - [ ] **Phase 74: Client JavaScript Dead Code Removal** - Remove unused JS functions, classes, and dead code paths
 - [ ] **Phase 75: Python Naming Clarity** - Rename unclear Python variable, function, and module names
 - [ ] **Phase 76: JavaScript Naming Clarity** - Rename unclear JS variable and function names
@@ -73,8 +73,8 @@ Plans:
   3. All tests pass after removal
 **Plans**: 2 plans
 Plans:
-- [ ] 73-01-PLAN.md — Delete constructors/ directory, remove dead static scene classes and dead GymScene methods
-- [ ] 73-02-PLAN.md — Fix broken footsies import, remove dead scene variables, delete empty pyodide_overcooked/ directory
+- [x] 73-01-PLAN.md — Delete constructors/ directory, remove dead static scene classes and dead GymScene methods
+- [x] 73-02-PLAN.md — Fix broken footsies import, remove dead scene variables, delete empty pyodide_overcooked/ directory
 
 ### Phase 74: Client JavaScript Dead Code Removal
 **Goal**: Remove all unused JS functions, classes, and dead code paths from client-side JavaScript
@@ -139,7 +139,7 @@ Phases execute in numeric order: 72 → 73 → 74 → 75 → 76 → 77 → 78
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 72. Server Python Dead Code Removal | 2/2 | ✓ Complete | 2026-02-07 |
-| 73. Scene & Environment Dead Code Removal | 0/TBD | Not started | - |
+| 73. Scene & Environment Dead Code Removal | 2/2 | ✓ Complete | 2026-02-08 |
 | 74. Client JavaScript Dead Code Removal | 0/TBD | Not started | - |
 | 75. Python Naming Clarity | 0/TBD | Not started | - |
 | 76. JavaScript Naming Clarity | 0/TBD | Not started | - |
