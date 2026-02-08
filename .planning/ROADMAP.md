@@ -40,7 +40,7 @@ See previous milestone records.
 
 - [x] **Phase 72: Server Python Dead Code Removal** - Remove unused functions, classes, methods, and vestigial logic from server code ✓ 2026-02-07
 - [x] **Phase 73: Scene & Environment Dead Code Removal** - Remove unused code from scenes, examples, and environment code ✓ 2026-02-08
-- [ ] **Phase 74: Client JavaScript Dead Code Removal** - Remove unused JS functions, classes, and dead code paths
+- [x] **Phase 74: Client JavaScript Dead Code Removal** - Remove unused JS functions, classes, and dead code paths ✓ 2026-02-08
 - [ ] **Phase 75: Python Naming Clarity** - Rename unclear Python variable, function, and module names
 - [ ] **Phase 76: JavaScript Naming Clarity** - Rename unclear JS variable and function names
 - [ ] **Phase 77: Structural Organization** - Reorganize files, consolidate modules, move misplaced code
@@ -87,8 +87,8 @@ Plans:
   3. All tests pass after removal
 **Plans**: 2 plans
 Plans:
-- [ ] 74-01-PLAN.md — Delete dead JS files (latency.js, socket_handlers.js, game_events.js) and remove dead functions from unity_utils.js
-- [ ] 74-02-PLAN.md — Remove dead exports from ui_utils.js, phaser_gym_graphics.js, webrtc_manager.js and commented-out code from index.js
+- [x] 74-01-PLAN.md — Delete dead JS files (latency.js, socket_handlers.js, game_events.js) and remove dead functions from unity_utils.js
+- [x] 74-02-PLAN.md — Remove dead exports from ui_utils.js, phaser_gym_graphics.js, webrtc_manager.js and commented-out code from index.js
 
 ### Phase 75: Python Naming Clarity
 **Goal**: Rename unclear Python variable, function, and module names across the codebase to reflect their purpose
@@ -143,7 +143,7 @@ Phases execute in numeric order: 72 → 73 → 74 → 75 → 76 → 77 → 78
 |-------|----------------|--------|-----------|
 | 72. Server Python Dead Code Removal | 2/2 | ✓ Complete | 2026-02-07 |
 | 73. Scene & Environment Dead Code Removal | 2/2 | ✓ Complete | 2026-02-08 |
-| 74. Client JavaScript Dead Code Removal | 0/TBD | Not started | - |
+| 74. Client JavaScript Dead Code Removal | 2/2 | ✓ Complete | 2026-02-08 |
 | 75. Python Naming Clarity | 0/TBD | Not started | - |
 | 76. JavaScript Naming Clarity | 0/TBD | Not started | - |
 | 77. Structural Organization | 0/TBD | Not started | - |
