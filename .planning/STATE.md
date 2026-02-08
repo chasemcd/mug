@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-08)
 
 **Core value:** Researchers can configure and deploy multiplayer browser experiments with minimal code — a chained scene config and a Python environment are all that's needed.
-**Current focus:** Phase 76 complete — ready for Phase 77
+**Current focus:** Phase 77 complete — ready for Phase 78
 
 ## Current Position
 
 Phase: 77 of 78 (Structural Organization)
-Plan: 1 of 2 complete
-Status: In progress
-Last activity: 2026-02-08 — Completed 77-01-PLAN.md (sentinel relocation)
+Plan: 2 of 2 complete
+Status: Phase complete
+Last activity: 2026-02-08 — Completed 77-02-PLAN.md (server module consolidation)
 
-Progress: ██████░░░░ 58%
+Progress: ███████░░░ 64%
 
 ## Performance Metrics
 
@@ -51,6 +51,9 @@ Decisions are logged in PROJECT.md Key Decisions table.
 - Renamed pgg import alias → phaserGraphics in ui_utils.js for clarity
 - Renamed generic 'data' parameters to context-specific names in all 26 socket event handlers in index.js
 - Moved NotProvided sentinel from scenes/sentinels.py to utils/sentinels.py (proper leaf-module location, eliminates cross-boundary import)
+- Consolidated game state types (GameExitStatus, AvailableSlot) into remote_game.py alongside SessionState and GameStatus
+- Consolidated callback interface (GameCallback, MultiCallback) from dead callback.py into remote_game.py
+- Renamed thread_utils.py → thread_safe_collections.py to accurately describe remaining content (ThreadSafeSet, ThreadSafeDict)
 
 ### Pending Todos
 
@@ -63,5 +66,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-08
-Stopped at: Phase 77 Plan 1 complete (sentinel relocation)
-Resume file: .planning/phases/77-structural-organization/77-02-PLAN.md
+Stopped at: Phase 77 complete (structural organization)
+Resume file: .planning/phases/78-final-verification/78-01-PLAN.md
