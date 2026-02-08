@@ -57,7 +57,10 @@ See previous milestone records.
   1. No unused Python functions/classes/methods remain in `server/`, `configurations/`, or `utils/`
   2. No vestigial logic (unreachable code, obsolete feature flags, dead branches) remains in server code
   3. All tests pass after removal
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 72-01-PLAN.md — Delete dead files, remove dead classes (RemoteGame, RenderedEnvRGB), update type annotations
+- [ ] 72-02-PLAN.md — Remove dead methods, dead functions, vestigial logic, and backward compat aliases
 
 ### Phase 73: Scene & Environment Dead Code Removal
 **Goal**: Remove all unused Python functions, classes, methods, and vestigial logic from scenes and example code
@@ -132,7 +135,7 @@ Phases execute in numeric order: 72 → 73 → 74 → 75 → 76 → 77 → 78
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 72. Server Python Dead Code Removal | 0/TBD | Not started | - |
+| 72. Server Python Dead Code Removal | 0/2 | Planned | - |
 | 73. Scene & Environment Dead Code Removal | 0/TBD | Not started | - |
 | 74. Client JavaScript Dead Code Removal | 0/TBD | Not started | - |
 | 75. Python Naming Clarity | 0/TBD | Not started | - |
