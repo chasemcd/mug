@@ -38,7 +38,7 @@ See previous milestone records.
 
 **Milestone Goal:** Make the entire codebase clean, readable, and coherent before merging to `main`. Zero functionality changes.
 
-- [ ] **Phase 72: Server Python Dead Code Removal** - Remove unused functions, classes, methods, and vestigial logic from server code
+- [x] **Phase 72: Server Python Dead Code Removal** - Remove unused functions, classes, methods, and vestigial logic from server code ✓ 2026-02-07
 - [ ] **Phase 73: Scene & Environment Dead Code Removal** - Remove unused code from scenes, examples, and environment code
 - [ ] **Phase 74: Client JavaScript Dead Code Removal** - Remove unused JS functions, classes, and dead code paths
 - [ ] **Phase 75: Python Naming Clarity** - Rename unclear Python variable, function, and module names
@@ -59,8 +59,8 @@ See previous milestone records.
   3. All tests pass after removal
 **Plans**: 2 plans
 Plans:
-- [ ] 72-01-PLAN.md — Delete dead files, remove dead classes (RemoteGame, RenderedEnvRGB), update type annotations
-- [ ] 72-02-PLAN.md — Remove dead methods, dead functions, vestigial logic, and backward compat aliases
+- [x] 72-01-PLAN.md — Delete dead files, remove dead classes (RemoteGame, RenderedEnvRGB), update type annotations
+- [x] 72-02-PLAN.md — Remove dead methods, dead functions, vestigial logic, and backward compat aliases
 
 ### Phase 73: Scene & Environment Dead Code Removal
 **Goal**: Remove all unused Python functions, classes, methods, and vestigial logic from scenes and example code
@@ -135,7 +135,7 @@ Phases execute in numeric order: 72 → 73 → 74 → 75 → 76 → 77 → 78
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 72. Server Python Dead Code Removal | 0/2 | Planned | - |
+| 72. Server Python Dead Code Removal | 2/2 | ✓ Complete | 2026-02-07 |
 | 73. Scene & Environment Dead Code Removal | 0/TBD | Not started | - |
 | 74. Client JavaScript Dead Code Removal | 0/TBD | Not started | - |
 | 75. Python Naming Clarity | 0/TBD | Not started | - |
