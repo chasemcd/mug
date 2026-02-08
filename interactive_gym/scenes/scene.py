@@ -4,7 +4,7 @@ import copy
 import json
 import random
 from datetime import datetime
-from interactive_gym.scenes.utils import NotProvided
+from interactive_gym.scenes.sentinels import NotProvided
 
 import flask_socketio
 
