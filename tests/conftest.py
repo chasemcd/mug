@@ -186,12 +186,12 @@ def browser_type_launch_args(browser_type_launch_args):
 # ---------------------------------------------------------------------------
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def flask_server():
     """
-    Start Flask server as subprocess before tests, stop after.
+    Start Flask server as subprocess before each test, stop after.
 
-    Scope: module (starts once per test module, not per test)
+    Scope: function (fresh server per test for isolation)
     Yields: dict with 'url' and 'process' keys
 
     Uses robust startup/teardown:

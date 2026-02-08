@@ -35,6 +35,7 @@ eventlet.monkey_patch()
 import argparse
 
 from interactive_gym.server import app
+from interactive_gym.server.matchmaker import FIFOMatchmaker
 from interactive_gym.scenes import stager
 from interactive_gym.examples.cogrid.scenes import (
     scenes as oc_scenes,
@@ -67,7 +68,7 @@ stager = stager.Stager(
         (
             oc_scenes.cramped_room_human_human
             .gameplay(num_episodes=1, max_steps=450)  # ~15 seconds per episode
-            .matchmaking(max_rtt=None)  # No RTT limit for testing
+            .matchmaking(max_rtt=None, matchmaker=FIFOMatchmaker())  # No RTT limit for testing
             .multiplayer(focus_loss_timeout_ms=0, pause_on_partner_background=False, input_confirmation_timeout_ms=2000)  # Disable focus timeout, higher timeout for resilience
         ),
         oc_scenes.multiplayer_feedback_scene,  # Survey scene (isolation tested here)
