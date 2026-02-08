@@ -5,7 +5,7 @@ from typing import Any
 from flask_socketio import SocketIO
 
 from interactive_gym.scenes import scene
-from interactive_gym.scenes.sentinels import NotProvided
+from interactive_gym.utils.sentinels import NotProvided
 
 
 class StaticScene(scene.Scene):

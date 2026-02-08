@@ -10,9 +10,8 @@ if TYPE_CHECKING:
 
 from interactive_gym.scenes import scene
 from interactive_gym.configurations import remote_config
-from interactive_gym.scenes import sentinels as scene_sentinels
 from interactive_gym.configurations import configuration_constants
-from interactive_gym.scenes.sentinels import NotProvided
+from interactive_gym.utils.sentinels import NotProvided
 
 
 class GymScene(scene.Scene):

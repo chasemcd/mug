@@ -4,7 +4,7 @@ import json
 from typing import Callable
 
 from interactive_gym.scenes.stager import Stager
-from interactive_gym.scenes.sentinels import NotProvided
+from interactive_gym.utils.sentinels import NotProvided
 
 
 class ExperimentConfig:
