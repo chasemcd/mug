@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-07)
 ## Current Position
 
 Phase: 71 of 71 (Documentation Migration)
-Plan: 02 of 3 (design MD files migration)
+Plan: 02 of 3 (71-01 + 71-02 complete)
 Status: In progress
-Last activity: 2026-02-08 -- Completed 71-02-PLAN.md
+Last activity: 2026-02-08 -- Completed 71-01-PLAN.md and 71-02-PLAN.md
 
-Progress: ████████░░ 80% (8/10 plans)
+Progress: █████████░ 90% (9/10 plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 8
+- Total plans completed: 9
 - Average duration: 3.2 min
-- Total execution time: 0.43 hours
+- Total execution time: 0.50 hours
 
 **By Phase:**
 
@@ -31,10 +31,10 @@ Progress: ████████░░ 80% (8/10 plans)
 | 68 | 1/1 | 4 min | 4 min |
 | 69 | 2/2 | 3 min | 1.5 min |
 | 70 | 2/2 | 4 min | 2 min |
-| 71 | 1/3 | 4 min | 4 min |
+| 71 | 2/3 | 8 min | 4 min |
 
 **Recent Trend:**
-- Last 5 plans: 69-01 (2 min), 69-02 (1 min), 70-01 (3 min), 70-02 (1 min), 71-02 (4 min)
+- Last 5 plans: 69-02 (1 min), 70-01 (3 min), 70-02 (1 min), 71-01 (4 min), 71-02 (4 min)
 - Trend: Doc migration plans take slightly longer due to structural rework
 
 ## Accumulated Context
@@ -58,6 +58,7 @@ Recent decisions affecting current work:
 - [69-02] All 4 remaining example files migrated; zero old method references in examples
 - [70-01] Merged .focus_loss_config()+.pyodide() into single .multiplayer() call; timeout_ms renamed to focus_loss_timeout_ms
 - [70-02] All 3 VERF requirements confirmed: 27/27 tests pass, full parameter coverage, all 10 methods chain
+- [71-01] All 9 RST files + cogrid README migrated: zero .pyodide()/.user_experience() references; waitroom_time_randomization_interval_s removed (no new API equivalent)
 - [71-02] participant-exclusion.md restructured: continuous monitoring and exclusion callbacks shown as .multiplayer() params with continuous_ prefix
 - [71-02] Stale Quarto HTML export deleted (MD source is canonical)
 
@@ -72,5 +73,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-08
-Stopped at: Completed 71-02-PLAN.md
+Stopped at: Completed 71-01-PLAN.md and 71-02-PLAN.md
 Resume file: None
