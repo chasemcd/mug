@@ -192,12 +192,12 @@ Now create the main experiment file ``mountain_car_experiment.py``:
             max_steps=200,
             input_mode=configuration_constants.InputModes.PressedKeys,
         )
-        .user_experience(
+        .content(
             scene_header="Mountain Car",
             scene_body="<center><p>Loading Python environment...</p></center>",
             in_game_scene_body="<center><p>Use arrow keys to reach the flag!</p></center>",
         )
-        .pyodide(
+        .runtime(
             run_through_pyodide=True,
             environment_initialization_code_filepath="mountain_car_rgb_env.py",
         )
@@ -327,7 +327,7 @@ Install server dependencies:
 
 **"File not found: mountain_car_rgb_env.py"**
 
-Make sure the file path in ``.pyodide()`` is relative to where you run the script, or use an absolute path.
+Make sure the file path in ``.runtime()`` is relative to where you run the script, or use an absolute path.
 
 **Browser shows blank page or loading forever**
 

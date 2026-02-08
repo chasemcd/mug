@@ -123,7 +123,7 @@ For single-player with server-side execution:
         .policies(
             policy_mapping={"player_0": configuration_constants.PolicyTypes.Human}
         )
-        # No .pyodide() call = server mode by default
+        # No .runtime() call = server mode by default
     )
 
 With AI Policies
@@ -201,9 +201,8 @@ When games are full, participants wait:
 
 .. code-block:: python
 
-    .user_experience(
-        waitroom_timeout_redirect_url="https://example.com/sorry",
-        waitroom_time_randomization_interval_s=(0, 30),  # Random 0-30s wait
+    .waitroom(
+        timeout_redirect_url="https://example.com/sorry",
     )
 
 Participants see a waiting screen until:
