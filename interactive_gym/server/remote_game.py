@@ -15,7 +15,6 @@ import numpy as np
 from gymnasium import spaces
 
 from interactive_gym.configurations import configuration_constants
-from interactive_gym.server import thread_utils
 from interactive_gym.scenes import gym_scene
 
 logger = logging.getLogger(__name__)
@@ -40,6 +39,126 @@ class GameStatus:
     Active = "active"
     Inactive = "inactive"
     Reset = "reset"
+
+
+class GameExitStatus:
+    """Exit status for game cleanup based on activity and player count."""
+    ActiveWithOtherPlayers = "active_with_other_players"
+    ActiveNoPlayers = "active_no_players"
+    InactiveNoPlayers = "inactive_no_players"
+    InactiveWithOtherPlayers = "inactive_with_other_players"
+
+
+class _AvailableSlot:
+    """Sentinel value indicating a human player slot is available.
+
+    Adapted from RLLib's _NotProvided:
+    https://github.com/ray-project/ray/rllib/utils/from_config.py#L261
+    """
+
+    class __AvailableSlot:
+        pass
+
+    instance = None
+
+    def __init__(self):
+        if _AvailableSlot.instance is None:
+            _AvailableSlot.instance = _AvailableSlot.__AvailableSlot()
+
+
+AvailableSlot = _AvailableSlot
+
+
+class GameCallback:
+    """Base callback interface for game lifecycle hooks."""
+
+    def __init__(self, **kwargs) -> None:
+        pass
+
+    def on_episode_start(self, remote_game: RemoteGameV2):
+        pass
+
+    def on_episode_end(self, remote_game: RemoteGameV2):
+        pass
+
+    def on_game_tick_start(self, remote_game: RemoteGameV2):
+        pass
+
+    def on_game_tick_end(self, remote_game: RemoteGameV2):
+        pass
+
+    def on_graphics_start(self, remote_game: RemoteGameV2):
+        pass
+
+    def on_graphics_end(self, remote_game: RemoteGameV2):
+        pass
+
+    def on_waitroom_start(self, remote_game: RemoteGameV2):
+        pass
+
+    def on_waitroom_join(self, remote_game: RemoteGameV2):
+        pass
+
+    def on_waitroom_end(self, remote_game: RemoteGameV2):
+        pass
+
+    def on_waitroom_timeout(self, remote_game: RemoteGameV2):
+        pass
+
+    def on_game_end(self, remote_game: RemoteGameV2):
+        pass
+
+
+class MultiCallback(GameCallback):
+    """Aggregates multiple callbacks into a single callback interface."""
+
+    def __init__(self, callbacks: list[GameCallback], **kwargs) -> None:
+        # Initialize all callbacks
+        self.callbacks = [callback() for callback in callbacks]
+
+    def on_episode_start(self, remote_game: RemoteGameV2):
+        for callback in self.callbacks:
+            callback.on_episode_start(remote_game)
+
+    def on_episode_end(self, remote_game: RemoteGameV2):
+        for callback in self.callbacks:
+            callback.on_episode_end(remote_game)
+
+    def on_game_tick_start(self, remote_game: RemoteGameV2):
+        for callback in self.callbacks:
+            callback.on_game_tick_start(remote_game)
+
+    def on_game_tick_end(self, remote_game: RemoteGameV2):
+        for callback in self.callbacks:
+            callback.on_game_tick_end(remote_game)
+
+    def on_graphics_start(self, remote_game: RemoteGameV2):
+        for callback in self.callbacks:
+            callback.on_graphics_start(remote_game)
+
+    def on_graphics_end(self, remote_game: RemoteGameV2):
+        for callback in self.callbacks:
+            callback.on_graphics_end(remote_game)
+
+    def on_waitroom_start(self, remote_game: RemoteGameV2):
+        for callback in self.callbacks:
+            callback.on_waitroom_start(remote_game)
+
+    def on_waitroom_join(self, remote_game: RemoteGameV2):
+        for callback in self.callbacks:
+            callback.on_waitroom_join(remote_game)
+
+    def on_waitroom_end(self, remote_game: RemoteGameV2):
+        for callback in self.callbacks:
+            callback.on_waitroom_end(remote_game)
+
+    def on_waitroom_timeout(self, remote_game: RemoteGameV2):
+        for callback in self.callbacks:
+            callback.on_waitroom_timeout(remote_game)
+
+    def on_game_end(self, remote_game: RemoteGameV2):
+        for callback in self.callbacks:
+            callback.on_game_end(remote_game)
 
 
 class RemoteGameV2:
@@ -146,7 +265,7 @@ class RemoteGameV2:
         """Load and instantiates all policies"""
         for agent_id, policy_id in self.scene.policy_mapping.items():
             if policy_id == configuration_constants.PolicyTypes.Human:
-                self.human_players[agent_id] = thread_utils.AvailableSlot
+                self.human_players[agent_id] = AvailableSlot
             elif policy_id == configuration_constants.PolicyTypes.Random:
                 self.bot_players[agent_id] = policy_id
             elif self.scene.run_through_pyodide:
@@ -188,7 +307,7 @@ class RemoteGameV2:
         return [
             agent_id
             for agent_id, subject_id in self.human_players.items()
-            if subject_id is thread_utils.AvailableSlot
+            if subject_id is AvailableSlot
         ]
 
     def is_at_player_capacity(self) -> bool:
@@ -200,7 +319,7 @@ class RemoteGameV2:
             [
                 agent_id
                 for agent_id, subject_id in self.human_players.items()
-                if subject_id != thread_utils.AvailableSlot
+                if subject_id != AvailableSlot
             ]
         )
 
@@ -226,7 +345,7 @@ class RemoteGameV2:
             )
             return
 
-        self.human_players[player_id_to_remove] = thread_utils.AvailableSlot
+        self.human_players[player_id_to_remove] = AvailableSlot
         logger.debug(f"Removed {subject_id} from slot {player_id_to_remove}")
 
         if subject_id in self.document_focus_status:

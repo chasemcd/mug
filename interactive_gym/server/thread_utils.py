@@ -1,7 +1,4 @@
-"""Thread-safe collection utilities.
-
-Provides thread-safe wrappers for dict and set, plus sentinel values
-for game state management.
+"""Thread-safe collection wrappers for dict and set.
 
 Originally adapted from: https://github.com/HumanCompatibleAI/overcooked-demo/blob/master/server/utils.py
 """
@@ -70,29 +67,3 @@ class ThreadSafeDict(dict):
             else:
                 retval = None
         return retval
-
-
-class GameExitStatus:
-    ActiveWithOtherPlayers = "active_with_other_players"
-    ActiveNoPlayers = "active_no_players"
-    InactiveNoPlayers = "inactive_no_players"
-    InactiveWithOtherPlayers = "inactive_with_other_players"
-
-
-class _AvailableSlot:
-    """
-    Adapted from RLLib's _NotProvided
-    https://github.com/ray-project/ray/rllib/utils/from_config.py#L261
-    """
-
-    class __AvailableSlot:
-        pass
-
-    instance = None
-
-    def __init__(self):
-        if _AvailableSlot.instance is None:
-            _AvailableSlot.instance = _AvailableSlot.__AvailableSlot()
-
-
-AvailableSlot = _AvailableSlot
