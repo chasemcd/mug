@@ -69,11 +69,11 @@ Which phases cover which requirements. Updated by create-roadmap.
 | APIC-06 | Phase 67 | Complete |
 | CLNB-01 | Phase 68 | Complete |
 | CLNB-02 | Phase 68 | Complete |
-| EXMP-01 | Phase 69 | Pending |
-| EXMP-02 | Phase 69 | Pending |
-| EXMP-03 | Phase 69 | Pending |
-| EXMP-04 | Phase 69 | Pending |
-| EXMP-05 | Phase 69 | Pending |
+| EXMP-01 | Phase 69 | Complete |
+| EXMP-02 | Phase 69 | Complete |
+| EXMP-03 | Phase 69 | Complete |
+| EXMP-04 | Phase 69 | Complete |
+| EXMP-05 | Phase 69 | Complete |
 | VERF-01 | Phase 70 | Pending |
 | VERF-02 | Phase 70 | Pending |
 | VERF-03 | Phase 70 | Pending |
