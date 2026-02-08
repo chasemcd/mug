@@ -57,7 +57,7 @@ control_scene = (
 
 choice_scene = controllable_scenes.make_choice_scene(
     layout_name="cramped_room"
-).user_experience(
+).content(
     scene_body_filepath="interactive_gym/examples/cogrid/html_pages/demo_choice_cramped_room.html",
 )
 
