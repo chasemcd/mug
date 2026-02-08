@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-08)
 ## Current Position
 
 Phase: 75 of 78 (Python Naming Clarity)
-Plan: 1 of 1 complete
+Plan: 2 of 2 complete
 Status: Phase complete
-Last activity: 2026-02-08 — Completed 75-01-PLAN.md (Python naming clarity)
+Last activity: 2026-02-08 — Completed 75-02-PLAN.md (module renames: utils→thread_utils, utils→sentinels)
 
-Progress: ███░░░░░░░ 29%
+Progress: ███░░░░░░░ 30%
 
 ## Performance Metrics
 
@@ -44,6 +44,9 @@ Decisions are logged in PROJECT.md Key Decisions table.
 - Renamed all sio to socketio for clarity (93 occurrences across 10 files)
 - Kept local variable name game_manager in app.py (widely used), only expanded import alias
 - Use word-boundary patterns for bulk renames to avoid unintended replacements
+- Renamed server/utils.py → server/thread_utils.py to reflect actual content (thread-safe collections)
+- Renamed scenes/utils.py → scenes/sentinels.py to reflect actual content (sentinel values)
+- Renamed Available sentinel → AvailableSlot for clarity
 
 ### Pending Todos
 
@@ -56,5 +59,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-08
-Stopped at: Phase 75 complete, ready for Phase 76
+Stopped at: Phase 75 complete (2/2 plans), ready for Phase 76
 Resume file: None
