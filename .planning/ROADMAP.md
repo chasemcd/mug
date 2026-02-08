@@ -85,7 +85,10 @@ Plans:
   1. No unused JS functions/classes remain in `server/static/js/`
   2. No dead code paths or obsolete feature logic remains in client code
   3. All tests pass after removal
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 74-01-PLAN.md — Delete dead JS files (latency.js, socket_handlers.js, game_events.js) and remove dead functions from unity_utils.js
+- [ ] 74-02-PLAN.md — Remove dead exports from ui_utils.js, phaser_gym_graphics.js, webrtc_manager.js and commented-out code from index.js
 
 ### Phase 75: Python Naming Clarity
 **Goal**: Rename unclear Python variable, function, and module names across the codebase to reflect their purpose
