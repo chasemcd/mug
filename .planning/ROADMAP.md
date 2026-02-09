@@ -54,7 +54,7 @@ See previous milestone records.
 
 - [x] **Phase 79: Rename Corruption Fix** - Restore all 72 corrupted identifiers from bulk `sio` → `socketio` rename ✓ 2026-02-08
 - [x] **Phase 80: Test Suite Restoration** - Get all 52 tests passing with zero exceptions ✓ 2026-02-09
-- [ ] **Phase 81: Data Parity Hardening** - Add export parity validation to all data-producing tests
+- [x] **Phase 81: Data Parity Hardening** - Add export parity validation to all data-producing tests ✓ 2026-02-09
 - [ ] **Phase 82: Examples & Documentation** - Verify examples run end-to-end and docs reflect refactored API
 
 ## Phase Details
@@ -107,8 +107,8 @@ Plans:
 **Plans:** 2 plans
 
 Plans:
-- [ ] 81-01-PLAN.md — Add parity validation to test_multiplayer_basic.py and test_latency_injection.py
-- [ ] 81-02-PLAN.md — Add parity validation to test_network_disruption.py and test_scene_isolation.py
+- [x] 81-01-PLAN.md — Add parity validation to test_multiplayer_basic.py and test_latency_injection.py ✓
+- [x] 81-02-PLAN.md — Add parity validation to test_network_disruption.py and test_scene_isolation.py ✓
 
 ### Phase 82: Examples & Documentation
 **Goal**: Verify all examples run end-to-end and documentation reflects post-refactor API names and module paths
@@ -133,5 +133,5 @@ Phases execute in numeric order: 79 → 80 → 81 → 82
 |-------|----------------|--------|-----------|
 | 79. Rename Corruption Fix | 1/1 | ✓ Complete | 2026-02-08 |
 | 80. Test Suite Restoration | 1/1 | ✓ Complete | 2026-02-09 |
-| 81. Data Parity Hardening | 0/? | Not started | - |
+| 81. Data Parity Hardening | 2/2 | ✓ Complete | 2026-02-09 |
 | 82. Examples & Documentation | 0/? | Not started | - |
