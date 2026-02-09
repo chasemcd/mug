@@ -899,6 +899,15 @@ class GameManager:
 
     def leave_game(self, subject_id: SubjectID) -> bool:
         """Handle the logic for when a subject leaves a game."""
+        # Check if subject is in waitroom (not yet in a game)
+        if subject_id in self.waitroom_participants:
+            self.waitroom_participants.remove(subject_id)
+            logger.info(
+                f"[LeaveGame] Removed {subject_id} from waitroom_participants. "
+                f"Remaining: {self.waitroom_participants}"
+            )
+            return True
+
         game_id = self.subject_games.get(subject_id)
 
         if game_id is None:

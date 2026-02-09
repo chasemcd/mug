@@ -2787,6 +2787,16 @@ def on_disconnect():
                 logger.info(f"Found subject {subject_id} in game manager for scene {scene_id}")
                 break
 
+    # Clean up waitroom state across all game managers
+    # (waitroom participants aren't in subject_games, so subject_in_game() misses them)
+    for _scene_id, _gm in GAME_MANAGERS.items():
+        if subject_id in _gm.waitroom_participants:
+            _gm.waitroom_participants.remove(subject_id)
+            logger.info(
+                f"[Disconnect] Removed {subject_id} from waitroom_participants "
+                f"for scene {_scene_id}. Remaining: {_gm.waitroom_participants}"
+            )
+
     if game_manager is None:
         logger.info(
             f"Subject {subject_id} disconnected but no game manager found"
