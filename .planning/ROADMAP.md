@@ -10,7 +10,7 @@ Interactive Gym enables researchers to configure and deploy multiplayer browser 
 - ✅ **v1.22 GymScene Config Cleanup** - Phases 67-71 (shipped 2026-02-08)
 - ✅ **v1.23 Pre-Merge Cleanup** - Phases 72-78 (shipped 2026-02-08)
 - ✅ **v1.24 Test Fix & Hardening** - Phases 79-82 (shipped 2026-02-09)
-- [ ] **v1.25 Data Export Path Fix** - Phase 83 (in progress)
+- ✅ **v1.25 Data Export Path Fix** - Phase 83 (shipped 2026-02-09)
 
 ## Phases
 
@@ -55,11 +55,11 @@ See previous milestone records.
 
 </details>
 
-### v1.25 Data Export Path Fix (In Progress)
+### v1.25 Data Export Path Fix -- SHIPPED 2026-02-09
 
 **Milestone Goal:** Ensure all exported data (scene metadata, match logs) lands under `data/<experiment-id>/` -- not scattered in `data/`.
 
-- [ ] **Phase 83: Export Path Consolidation** - Fix scene metadata and match log paths to use experiment_id prefix
+- [x] **Phase 83: Export Path Consolidation** - Fix scene metadata and match log paths to use experiment_id prefix (2026-02-09)
 
 ## Phase Details
 
@@ -75,7 +75,7 @@ See previous milestone records.
 **Plans**: 1 plan
 
 Plans:
-- [ ] 83-01-PLAN.md -- Fix scene metadata and match log export paths to use experiment_id prefix
+- [x] 83-01-PLAN.md -- Fix scene metadata and match log export paths to use experiment_id prefix (2026-02-09)
 
 ## Progress
 
@@ -87,4 +87,4 @@ Plans:
 | 67-71 | v1.22 | - | Complete | 2026-02-08 |
 | 72-78 | v1.23 | - | Complete | 2026-02-08 |
 | 79-82 | v1.24 | - | Complete | 2026-02-09 |
-| 83. Export Path Consolidation | v1.25 | 0/? | Not started | - |
+| 83. Export Path Consolidation | v1.25 | 1/1 | Complete | 2026-02-09 |
