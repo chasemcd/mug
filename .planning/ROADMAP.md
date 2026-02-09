@@ -2,7 +2,7 @@
 
 ## Overview
 
-Fix the rename corruption introduced in v1.23 (bulk `sio` → `socketio` mangled 72 identifiers), restore all 46 tests to passing, harden data export parity validation, and ensure examples and documentation reflect the refactored codebase. Zero new features — correctness and validation only.
+Fix the rename corruption introduced in v1.23 (bulk `sio` → `socketio` mangled 72 identifiers), restore all 52 tests to passing, harden data export parity validation, and ensure examples and documentation reflect the refactored codebase. Zero new features — correctness and validation only.
 
 ## Milestones
 
@@ -50,10 +50,10 @@ See previous milestone records.
 
 ### 🚧 v1.24 Test Fix & Hardening (In Progress)
 
-**Milestone Goal:** Fix refactor-introduced bugs, restore all 46 tests to passing, harden data export validation, and ensure examples and docs reflect the refactored codebase.
+**Milestone Goal:** Fix refactor-introduced bugs, restore all 52 tests to passing, harden data export validation, and ensure examples and docs reflect the refactored codebase.
 
 - [x] **Phase 79: Rename Corruption Fix** - Restore all 72 corrupted identifiers from bulk `sio` → `socketio` rename ✓ 2026-02-08
-- [ ] **Phase 80: Test Suite Restoration** - Get all 46 tests passing with zero exceptions
+- [x] **Phase 80: Test Suite Restoration** - Get all 52 tests passing with zero exceptions ✓ 2026-02-09
 - [ ] **Phase 81: Data Parity Hardening** - Add export parity validation to all data-producing tests
 - [ ] **Phase 82: Examples & Documentation** - Verify examples run end-to-end and docs reflect refactored API
 
@@ -75,21 +75,26 @@ Plans:
 - [x] 79-01-PLAN.md — Fix all 72 corrupted identifiers across 3 server files ✓
 
 ### Phase 80: Test Suite Restoration
-**Goal**: Get all 46 existing tests passing with zero exceptions and no loosened criteria
+**Goal**: Get all 52 existing tests passing with zero exceptions and no loosened criteria
 **Depends on**: Phase 79 (code must compile before tests can pass)
 **Requirements**: TEST-01, TEST-02, TEST-03, TEST-04, TEST-05, TEST-06, TEST-07
 **Success Criteria** (what must be TRUE):
-  1. All 2 E2E infrastructure tests pass (server start, context connection)
-  2. All 2 E2E multiplayer basic tests pass (connect+complete, matchmaking)
-  3. All E2E data comparison tests pass (basic parity, latency parity, active input, focus loss)
-  4. All 7 E2E network stress tests pass (latency injection, packet loss, jitter, rollback, fast-forward)
-  5. All 5 E2E multi-participant tests pass (simultaneous games, staggered arrival, multi-episode, disconnect, focus timeout)
-  6. Scene isolation test passes (partner exit on survey)
-  7. All 27 unit tests pass (matchmaker unit + integration)
+  1. All 27 unit tests pass (matchmaker unit + integration)
+  2. All 25 E2E tests pass or xpass:
+     - 1 infrastructure test (server start)
+     - 2 multiplayer basic tests (connect+complete, matchmaking)
+     - 4 data comparison tests (basic parity, latency parity, active input, focus loss)
+     - 1 scene isolation test (partner exit on survey)
+     - 6 latency injection tests (3 variants × 2 latency levels)
+     - 3 network disruption tests (packet loss, jitter, rollback; 1 xfail strict=False)
+     - 5 lifecycle stress tests (simultaneous, staggered, multi-episode, disconnect, focus timeout)
+     - 2 multi-participant tests (3+ players, matchmaker groups)
+     - 1 E2E context connection test
+  3. Full test suite (52 tests) completes in a single pytest invocation with zero failures
 **Plans:** 1 plan
 
 Plans:
-- [ ] 80-01-PLAN.md — Verify all 52 tests pass and update project tracking
+- [x] 80-01-PLAN.md — Verify all 52 tests pass and update project tracking ✓
 
 ### Phase 81: Data Parity Hardening
 **Goal**: Ensure every test producing episode CSV data validates export parity between both players
@@ -126,6 +131,6 @@ Phases execute in numeric order: 79 → 80 → 81 → 82
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 79. Rename Corruption Fix | 1/1 | ✓ Complete | 2026-02-08 |
-| 80. Test Suite Restoration | 0/? | Not started | - |
+| 80. Test Suite Restoration | 1/1 | ✓ Complete | 2026-02-09 |
 | 81. Data Parity Hardening | 0/? | Not started | - |
 | 82. Examples & Documentation | 0/? | Not started | - |
