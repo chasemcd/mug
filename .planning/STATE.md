@@ -55,6 +55,7 @@ Progress: [████████████████▓░] 97% (80/82 ph
 **Recent Trend:**
 - Last execution: Phase 80 - Test suite restoration (2 min)
 - Trend: Efficient verification and documentation updates
+| Phase 80 P01 | 2 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -67,6 +68,7 @@ Recent decisions affecting current work:
 - Milestone v1.24: Fix code, not tests — tests define correctness, code must conform
 - Phase 67-71: Aggressive method merging and clean break (no aliases) — feature branch, no external consumers
 - Use word-boundary patterns for bulk renames to avoid unintended replacements (lesson learned from v1.23)
+- [Phase 80]: Test count corrected from 46 to 52 (27 unit + 25 E2E)
 
 ### Pending Todos
 
