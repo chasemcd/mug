@@ -5,14 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-08)
 
 **Core value:** Researchers can configure and deploy multiplayer browser experiments with minimal code — a chained scene config and a Python environment are all that's needed.
-**Current focus:** Milestone v1.24 — Test Fix & Hardening
+**Current focus:** Phase 79 - Rename Corruption Fix
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-02-08 — Milestone v1.24 started
+Phase: 79 of 82 (Rename Corruption Fix)
+Plan: None yet (ready to plan)
+Status: Ready to plan
+Last activity: 2026-02-08 — v1.24 milestone initialized, roadmap created
+
+Progress: [████████████████░░] 95% (78/82 phases complete from all milestones)
 
 ## Performance Metrics
 
@@ -26,32 +28,33 @@ Last activity: 2026-02-08 — Milestone v1.24 started
 - Average duration: 4.2 min
 - Total execution time: 1.09 hours
 
+**By Phase (v1.23):**
+
+| Phase | Plans | Total | Avg/Plan |
+|-------|-------|-------|----------|
+| 72 | 2 | ~8 min | ~4 min |
+| 73 | 2 | ~8 min | ~4 min |
+| 74 | 2 | ~8 min | ~4 min |
+| 75 | 2 | ~8 min | ~4 min |
+| 76 | 2 | ~9 min | ~4.5 min |
+| 77 | 2 | ~10 min | ~5 min |
+| 78 | 1 | ~4 min | ~4 min |
+
+**Recent Trend:**
+- Last 7 phases: Stable execution time (4-5 min/plan)
+- Trend: Stable
+
 ## Accumulated Context
 
 ### Decisions
 
 Decisions are logged in PROJECT.md Key Decisions table.
+Recent decisions affecting current work:
 
-- Aggressive cleanup scope: full repo (server, client JS, scenes, examples, tests, docs)
-- Zero functionality changes — every refactor verified by tests
-- Keep .planning/ directory as project history
-- Dead code removal first (3 phases by layer), then naming (2 phases), then structure (1 phase), then final verification
-- Removed ConnectionQualityMonitor from exports but kept class internally - used within webrtc_manager.js
-- EmitUnityEpisodeResults and UnityConnectSocketIO removed as unreachable (ES6 module scope prevents Unity SendMessage from calling them)
-- Unity callbacks must be on window object to be reachable from SendMessage
-- Renamed all sio to socketio for clarity (93 occurrences across 10 files)
-- Kept local variable name game_manager in app.py (widely used), only expanded import alias
-- Use word-boundary patterns for bulk renames to avoid unintended replacements
-- Renamed server/utils.py → server/thread_utils.py to reflect actual content (thread-safe collections)
-- Renamed scenes/utils.py → scenes/sentinels.py to reflect actual content (sentinel values)
-- Renamed Available sentinel → AvailableSlot for clarity
-- Expanded WebRTC abbreviations: this.pc → this.peerConnection, dc → dataChannel in webrtc_manager.js
-- Renamed pgg import alias → phaserGraphics in ui_utils.js for clarity
-- Renamed generic 'data' parameters to context-specific names in all 26 socket event handlers in index.js
-- Moved NotProvided sentinel from scenes/sentinels.py to utils/sentinels.py (proper leaf-module location, eliminates cross-boundary import)
-- Consolidated game state types (GameExitStatus, AvailableSlot) into remote_game.py alongside SessionState and GameStatus
-- Consolidated callback interface (GameCallback, MultiCallback) from dead callback.py into remote_game.py
-- Renamed thread_utils.py → thread_safe_collections.py to accurately describe remaining content (ThreadSafeSet, ThreadSafeDict)
+- Phase 75-78: Bulk `sio` → `socketio` rename introduced corruption (72 occurrences) — v1.24 fixes this
+- Milestone v1.24: Fix code, not tests — tests define correctness, code must conform
+- Phase 67-71: Aggressive method merging and clean break (no aliases) — feature branch, no external consumers
+- Use word-boundary patterns for bulk renames to avoid unintended replacements (lesson learned from v1.23)
 
 ### Pending Todos
 
@@ -59,11 +62,20 @@ None.
 
 ### Blockers/Concerns
 
-- v1.23 bulk `sio` → `socketio` rename corrupted 72 occurrences of "session", "exclusion", "transmission" across 3 server Python files
-- All 46 tests currently failing due to this corruption
+**Current (from v1.23 corruption):**
+- All 46 tests are failing due to rename corruption introduced in Phase 75
+- 72 corrupted identifiers across 3 server files: pyodide_game_coordinator.py, probe_coordinator.py, server_game_runner.py
+- Code does not currently compile without NameError exceptions
+
+**Resolution path:**
+- Phase 79 will fix all rename corruption
+- Phase 80 will restore all tests to passing
+- Phase 81 will harden data validation
+- Phase 82 will verify examples and docs
 
 ## Session Continuity
 
-Last session: 2026-02-08
-Stopped at: Milestone v1.24 initialization — defining requirements
-Resume file: —
+Last session: 2026-02-08 23:29
+Stopped at: v1.24 milestone initialized, roadmap and state created
+Resume file: None
+Next action: Begin phase 79 planning with `/gsd:plan-phase 79`

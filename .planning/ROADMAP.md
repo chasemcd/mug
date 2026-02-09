@@ -1,20 +1,21 @@
-# Roadmap: Interactive Gym — v1.23 Pre-Merge Cleanup
+# Roadmap: Interactive Gym — v1.24 Test Fix & Hardening
 
 ## Overview
 
-Clean the entire codebase before merging `feature/p2p-multiplayer` to `main`. Three passes: remove dead code (server → scenes → client JS), improve naming (Python → JS), reorganize structure, then verify everything. Zero functionality changes throughout.
+Fix the rename corruption introduced in v1.23 (bulk `sio` → `socketio` mangled 72 identifiers), restore all 46 tests to passing, harden data export parity validation, and ensure examples and documentation reflect the refactored codebase. Zero new features — correctness and validation only.
 
 ## Milestones
 
 - ✅ **v1.0–v1.21** - Phases 1-66 (shipped)
 - ✅ **v1.22 GymScene Config Cleanup** - Phases 67-71 (shipped 2026-02-08)
 - ✅ **v1.23 Pre-Merge Cleanup** - Phases 72-78 (shipped 2026-02-08)
+- 🚧 **v1.24 Test Fix & Hardening** - Phases 79-82 (in progress)
 
 ## Phases
 
 **Phase Numbering:**
-- Integer phases (72, 73, ...): Planned milestone work
-- Decimal phases (e.g., 72.1): Urgent insertions (marked with INSERTED)
+- Integer phases (79, 80, ...): Planned milestone work
+- Decimal phases (e.g., 79.1): Urgent insertions (marked with INSERTED)
 
 <details>
 <summary>✅ v1.0–v1.21 (Phases 1-66) — SHIPPED</summary>
@@ -34,128 +35,97 @@ See previous milestone records.
 
 </details>
 
-### ✅ v1.23 Pre-Merge Cleanup (COMPLETE)
+<details>
+<summary>✅ v1.23 Pre-Merge Cleanup (Phases 72-78) — SHIPPED 2026-02-08</summary>
 
-**Milestone Goal:** Make the entire codebase clean, readable, and coherent before merging to `main`. Zero functionality changes.
+- [x] **Phase 72: Server Python Dead Code Removal** - Remove unused functions, classes, methods from server code
+- [x] **Phase 73: Scene & Environment Dead Code Removal** - Remove unused code from scenes/examples
+- [x] **Phase 74: Client JavaScript Dead Code Removal** - Remove unused JS functions and dead paths
+- [x] **Phase 75: Python Naming Clarity** - Rename unclear Python variables/functions/modules
+- [x] **Phase 76: JavaScript Naming Clarity** - Rename unclear JS variables/functions
+- [x] **Phase 77: Structural Organization** - Reorganize files, consolidate modules
+- [x] **Phase 78: Final Verification** - Full test suite pass after cleanup
 
-- [x] **Phase 72: Server Python Dead Code Removal** - Remove unused functions, classes, methods, and vestigial logic from server code ✓ 2026-02-07
-- [x] **Phase 73: Scene & Environment Dead Code Removal** - Remove unused code from scenes, examples, and environment code ✓ 2026-02-08
-- [x] **Phase 74: Client JavaScript Dead Code Removal** - Remove unused JS functions, classes, and dead code paths ✓ 2026-02-08
-- [x] **Phase 75: Python Naming Clarity** - Rename unclear Python variable, function, and module names ✓ 2026-02-08
-- [x] **Phase 76: JavaScript Naming Clarity** - Rename unclear JS variable and function names ✓ 2026-02-08
-- [x] **Phase 77: Structural Organization** - Reorganize files, consolidate modules, move misplaced code ✓ 2026-02-08
-- [x] **Phase 78: Final Verification** - Full test suite pass and behavioral verification ✓ 2026-02-08
+</details>
+
+### 🚧 v1.24 Test Fix & Hardening (In Progress)
+
+**Milestone Goal:** Fix refactor-introduced bugs, restore all 46 tests to passing, harden data export validation, and ensure examples and docs reflect the refactored codebase.
+
+- [ ] **Phase 79: Rename Corruption Fix** - Restore all 72 corrupted identifiers from bulk `sio` → `socketio` rename
+- [ ] **Phase 80: Test Suite Restoration** - Get all 46 tests passing with zero exceptions
+- [ ] **Phase 81: Data Parity Hardening** - Add export parity validation to all data-producing tests
+- [ ] **Phase 82: Examples & Documentation** - Verify examples run end-to-end and docs reflect refactored API
 
 ## Phase Details
 
-### Phase 72: Server Python Dead Code Removal
-**Goal**: Remove all unused functions, classes, methods, and vestigial logic from server Python code (`server/`, `configurations/`, `utils/`)
-**Depends on**: Nothing (first phase of v1.23)
-**Requirements**: DEAD-01, DEAD-04 (server portion)
-**Research needed**: Unlikely — grep for unused definitions, review call graphs
+### Phase 79: Rename Corruption Fix
+**Goal**: Restore all corrupted identifiers from v1.23 bulk `sio` → `socketio` rename that mangled words containing "sio"
+**Depends on**: Nothing (first phase of v1.24)
+**Requirements**: FIX-01, FIX-02, FIX-03, FIX-04
 **Success Criteria** (what must be TRUE):
-  1. No unused Python functions/classes/methods remain in `server/`, `configurations/`, or `utils/`
-  2. No vestigial logic (unreachable code, obsolete feature flags, dead branches) remains in server code
-  3. All tests pass after removal
-**Plans**: 2 plans
-Plans:
-- [x] 72-01-PLAN.md — Delete dead files, remove dead classes (RemoteGame, RenderedEnvRGB), update type annotations
-- [x] 72-02-PLAN.md — Remove dead methods, dead functions, vestigial logic, and backward compat aliases
+  1. All `Sessocketion` → `Session` occurrences restored in pyodide_game_coordinator.py
+  2. All `sessocketion` → `session` occurrences restored in probe_coordinator.py
+  3. All `transmissocketion` → `transmission` occurrences restored in server_game_runner.py
+  4. All `exclusocketion` → `exclusion` occurrences restored in pyodide_game_coordinator.py
+  5. Server starts without import errors or NameError exceptions
+**Plans**: TBD
 
-### Phase 73: Scene & Environment Dead Code Removal
-**Goal**: Remove all unused Python functions, classes, methods, and vestigial logic from scenes and example code
-**Depends on**: Phase 72
-**Requirements**: DEAD-02, DEAD-04 (scene portion)
-**Research needed**: Unlikely — grep for unused definitions, review call graphs
-**Success Criteria** (what must be TRUE):
-  1. No unused Python functions/classes/methods remain in `scenes/` or `examples/`
-  2. No vestigial logic (unreachable code, dead branches) remains in scene/environment code
-  3. All tests pass after removal
-**Plans**: 2 plans
 Plans:
-- [x] 73-01-PLAN.md — Delete constructors/ directory, remove dead static scene classes and dead GymScene methods
-- [x] 73-02-PLAN.md — Fix broken footsies import, remove dead scene variables, delete empty pyodide_overcooked/ directory
+- [ ] TBD
 
-### Phase 74: Client JavaScript Dead Code Removal
-**Goal**: Remove all unused JS functions, classes, and dead code paths from client-side JavaScript
-**Depends on**: Phase 73
-**Requirements**: DEAD-03, DEAD-04 (JS portion)
-**Research needed**: Unlikely — grep for unused functions, trace call graphs in JS modules
+### Phase 80: Test Suite Restoration
+**Goal**: Get all 46 existing tests passing with zero exceptions and no loosened criteria
+**Depends on**: Phase 79 (code must compile before tests can pass)
+**Requirements**: TEST-01, TEST-02, TEST-03, TEST-04, TEST-05, TEST-06, TEST-07
 **Success Criteria** (what must be TRUE):
-  1. No unused JS functions/classes remain in `server/static/js/`
-  2. No dead code paths or obsolete feature logic remains in client code
-  3. All tests pass after removal
-**Plans**: 2 plans
-Plans:
-- [x] 74-01-PLAN.md — Delete dead JS files (latency.js, socket_handlers.js, game_events.js) and remove dead functions from unity_utils.js
-- [x] 74-02-PLAN.md — Remove dead exports from ui_utils.js, phaser_gym_graphics.js, webrtc_manager.js and commented-out code from index.js
+  1. All 2 E2E infrastructure tests pass (server start, context connection)
+  2. All 2 E2E multiplayer basic tests pass (connect+complete, matchmaking)
+  3. All E2E data comparison tests pass (basic parity, latency parity, active input, focus loss)
+  4. All 7 E2E network stress tests pass (latency injection, packet loss, jitter, rollback, fast-forward)
+  5. All 5 E2E multi-participant tests pass (simultaneous games, staggered arrival, multi-episode, disconnect, focus timeout)
+  6. Scene isolation test passes (partner exit on survey)
+  7. All 27 unit tests pass (matchmaker unit + integration)
+**Plans**: TBD
 
-### Phase 75: Python Naming Clarity
-**Goal**: Rename unclear Python variable, function, and module names across the codebase to reflect their purpose
-**Depends on**: Phase 74
-**Requirements**: NAME-01, NAME-03
-**Research needed**: Unlikely — review code for unclear names, apply renames
-**Success Criteria** (what must be TRUE):
-  1. All unclear Python variable/function names have been renamed to reflect their purpose
-  2. File/module names reflect their contents
-  3. All tests pass with new names
-**Plans**: 2 plans
 Plans:
-- [x] 75-01-PLAN.md — Rename `sio` to `socketio` across all Python files, fix cryptic variables (`vv`, `ch`, `gm`)
-- [x] 75-02-PLAN.md — Rename `server/utils.py` to `server/thread_utils.py`, `scenes/utils.py` to `scenes/sentinels.py`, rename `Available` to `AvailableSlot`
+- [ ] TBD
 
-### Phase 76: JavaScript Naming Clarity
-**Goal**: Rename unclear JS variable and function names to reflect their purpose
-**Depends on**: Phase 75
-**Requirements**: NAME-02
-**Research needed**: Unlikely — review JS code for unclear names, apply renames
+### Phase 81: Data Parity Hardening
+**Goal**: Ensure every test producing episode CSV data validates export parity between both players
+**Depends on**: Phase 80 (tests must pass before adding validation)
+**Requirements**: DATA-01, DATA-02, DATA-03
 **Success Criteria** (what must be TRUE):
-  1. All unclear JS variable/function names have been renamed to reflect their purpose
-  2. All tests pass with new names
-**Plans**: 2 plans
-Plans:
-- [x] 76-01-PLAN.md — Expand WebRTC abbreviations (`pc`, `dc`) and rename cryptic `pgg` import alias
-- [x] 76-02-PLAN.md — Rename generic `data` parameters in all socket handlers in index.js to context-specific names
+  1. Every E2E test that produces episode data calls validate_action_sequences.py --compare
+  2. Tests that currently skip parity checks have been updated to include them
+  3. No test produces episode CSV data without asserting that both players' exports match
+**Plans**: TBD
 
-### Phase 77: Structural Organization
-**Goal**: Reorganize files into logical locations, consolidate unnecessarily split modules, move misplaced code
-**Depends on**: Phase 76
-**Requirements**: STRUCT-01, STRUCT-02, STRUCT-03
-**Research needed**: Likely — need to analyze module boundaries, identify misplaced code, plan reorganization
-**Research topics**: Module dependency analysis, import graph, identifying consolidation candidates
-**Success Criteria** (what must be TRUE):
-  1. Files are in logical locations in the directory tree
-  2. Unnecessarily split modules are consolidated where it reduces complexity
-  3. Misplaced functions/classes are in the modules where they logically belong
-  4. All tests pass after reorganization
-**Plans**: 2 plans
 Plans:
-- [x] 77-01-PLAN.md — Move NotProvided sentinel from scenes/sentinels.py to utils/sentinels.py, update all imports
-- [x] 77-02-PLAN.md — Consolidate game state types and callbacks into remote_game.py, rename thread_utils.py to thread_safe_collections.py
+- [ ] TBD
 
-### Phase 78: Final Verification
-**Goal**: Full verification that zero functionality changes were introduced across all cleanup phases
-**Depends on**: Phase 77
-**Requirements**: VERIF-01, VERIF-02
-**Research needed**: Unlikely — run tests, compare behavior
+### Phase 82: Examples & Documentation
+**Goal**: Verify all examples run end-to-end and documentation reflects post-refactor API names and module paths
+**Depends on**: Phase 79 (examples need working code)
+**Requirements**: EXAM-01, EXAM-02, DOCS-01, DOCS-02
 **Success Criteria** (what must be TRUE):
-  1. Full test suite passes with zero failures
-  2. No functionality changes introduced (behavior identical before and after all cleanup)
-**Plans**: 1 plan
+  1. All example configurations in interactive_gym/examples/ run end-to-end without errors
+  2. Example imports and API calls use post-v1.23 renamed modules and methods
+  3. All documentation files reference correct module paths after v1.23 reorganization
+  4. All documentation files reference correct API method names after v1.22/v1.23 renames
+**Plans**: TBD
+
 Plans:
-- [x] 78-01-PLAN.md — Run full test suite, verify all phase artifacts and cross-phase integration
+- [ ] TBD
 
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 72 → 73 → 74 → 75 → 76 → 77 → 78
+Phases execute in numeric order: 79 → 80 → 81 → 82
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 72. Server Python Dead Code Removal | 2/2 | ✓ Complete | 2026-02-07 |
-| 73. Scene & Environment Dead Code Removal | 2/2 | ✓ Complete | 2026-02-08 |
-| 74. Client JavaScript Dead Code Removal | 2/2 | ✓ Complete | 2026-02-08 |
-| 75. Python Naming Clarity | 2/2 | ✓ Complete | 2026-02-08 |
-| 76. JavaScript Naming Clarity | 2/2 | ✓ Complete | 2026-02-08 |
-| 77. Structural Organization | 2/2 | ✓ Complete | 2026-02-08 |
-| 78. Final Verification | 1/1 | ✓ Complete | 2026-02-08 |
+| 79. Rename Corruption Fix | 0/? | Not started | - |
+| 80. Test Suite Restoration | 0/? | Not started | - |
+| 81. Data Parity Hardening | 0/? | Not started | - |
+| 82. Examples & Documentation | 0/? | Not started | - |

@@ -66,30 +66,30 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FIX-01 | — | Pending |
-| FIX-02 | — | Pending |
-| FIX-03 | — | Pending |
-| FIX-04 | — | Pending |
-| TEST-01 | — | Pending |
-| TEST-02 | — | Pending |
-| TEST-03 | — | Pending |
-| TEST-04 | — | Pending |
-| TEST-05 | — | Pending |
-| TEST-06 | — | Pending |
-| TEST-07 | — | Pending |
-| DATA-01 | — | Pending |
-| DATA-02 | — | Pending |
-| DATA-03 | — | Pending |
-| EXAM-01 | — | Pending |
-| EXAM-02 | — | Pending |
-| DOCS-01 | — | Pending |
-| DOCS-02 | — | Pending |
+| FIX-01 | Phase 79 | Pending |
+| FIX-02 | Phase 79 | Pending |
+| FIX-03 | Phase 79 | Pending |
+| FIX-04 | Phase 79 | Pending |
+| TEST-01 | Phase 80 | Pending |
+| TEST-02 | Phase 80 | Pending |
+| TEST-03 | Phase 80 | Pending |
+| TEST-04 | Phase 80 | Pending |
+| TEST-05 | Phase 80 | Pending |
+| TEST-06 | Phase 80 | Pending |
+| TEST-07 | Phase 80 | Pending |
+| DATA-01 | Phase 81 | Pending |
+| DATA-02 | Phase 81 | Pending |
+| DATA-03 | Phase 81 | Pending |
+| EXAM-01 | Phase 82 | Pending |
+| EXAM-02 | Phase 82 | Pending |
+| DOCS-01 | Phase 82 | Pending |
+| DOCS-02 | Phase 82 | Pending |
 
 **Coverage:**
 - v1 requirements: 18 total
-- Mapped to phases: 0
-- Unmapped: 18 ⚠️
+- Mapped to phases: 18
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-02-08*
-*Last updated: 2026-02-08 after initial definition*
+*Last updated: 2026-02-08 after roadmap creation*
