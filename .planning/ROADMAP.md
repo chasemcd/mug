@@ -104,10 +104,11 @@ Plans:
   1. Every E2E test that produces episode data calls validate_action_sequences.py --compare
   2. Tests that currently skip parity checks have been updated to include them
   3. No test produces episode CSV data without asserting that both players' exports match
-**Plans**: TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] TBD
+- [ ] 81-01-PLAN.md — Add parity validation to test_multiplayer_basic.py and test_latency_injection.py
+- [ ] 81-02-PLAN.md — Add parity validation to test_network_disruption.py and test_scene_isolation.py
 
 ### Phase 82: Examples & Documentation
 **Goal**: Verify all examples run end-to-end and documentation reflects post-refactor API names and module paths
