@@ -564,7 +564,7 @@ def advance_scene(data):
             # Initialize match logger if not already done (Phase 56)
             global MATCH_LOGGER
             if MATCH_LOGGER is None:
-                MATCH_LOGGER = MatchAssignmentLogger(admin_aggregator=ADMIN_AGGREGATOR)
+                MATCH_LOGGER = MatchAssignmentLogger(admin_aggregator=ADMIN_AGGREGATOR, experiment_id=CONFIG.experiment_id)
 
             gm_instance = game_manager.GameManager(
                 scene=current_scene,
