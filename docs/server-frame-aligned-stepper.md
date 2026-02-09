@@ -117,13 +117,13 @@ class ServerGameRunner:
         environment_code: str,
         num_players: int,
         state_broadcast_interval: int = 30,
-        sio=None,
+        socketio=None,
     ):
         self.game_id = game_id
         self.environment_code = environment_code
         self.num_players = num_players
         self.state_broadcast_interval = state_broadcast_interval
-        self.sio = sio
+        self.socketio = socketio
 
         # Environment state
         self.env = None
@@ -313,12 +313,12 @@ random.seed({rng_seed})
         """
         Broadcast authoritative state to all clients.
         """
-        if self.sio is None:
+        if self.socketio is None:
             return
 
         state = self.get_authoritative_state()
 
-        self.sio.emit(
+        self.socketio.emit(
             "server_authoritative_state",
             {
                 "game_id": self.game_id,
@@ -408,7 +408,7 @@ def create_game(
             environment_code=environment_code,
             num_players=num_players,
             state_broadcast_interval=state_broadcast_interval,
-            sio=self.sio,
+            socketio=self.socketio,
         )
 
     return game_state
@@ -461,7 +461,7 @@ def receive_action(
         # Existing: Relay to other players
         for other_player_id, socket_id in game.players.items():
             if other_player_id != player_id:
-                self.sio.emit('pyodide_other_player_action', {
+                self.socketio.emit('pyodide_other_player_action', {
                     'player_id': player_id,
                     'action': action,
                     'frame_number': frame_number,

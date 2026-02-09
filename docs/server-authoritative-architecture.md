@@ -151,14 +151,14 @@ class AuthoritativeGameRunner:
         num_players: int,
         fps: int = 30,
         state_broadcast_interval: int = 30,  # Frames between broadcasts
-        sio=None,
+        socketio=None,
     ):
         self.game_id = game_id
         self.environment_code = environment_code
         self.num_players = num_players
         self.fps = fps
         self.state_broadcast_interval = state_broadcast_interval
-        self.sio = sio
+        self.socketio = socketio
 
         # Game state
         self.env = None
@@ -274,7 +274,7 @@ class AuthoritativeGameRunner:
         """
         Broadcast authoritative state to all connected clients.
         """
-        if self.sio is None:
+        if self.socketio is None:
             return
 
         state = self.get_full_state()
@@ -291,7 +291,7 @@ class AuthoritativeGameRunner:
             encoded_state = json.dumps(state)
             compressed = False
 
-        self.sio.emit(
+        self.socketio.emit(
             "authoritative_state_sync",
             {"game_id": self.game_id, "state": encoded_state, "compressed": compressed},
             room=self.game_id,
@@ -419,7 +419,7 @@ def create_game(
             num_players=num_players,
             fps=fps,
             state_broadcast_interval=state_broadcast_interval,
-            sio=self.sio,
+            socketio=self.socketio,
         )
 
     return game_state
@@ -454,7 +454,7 @@ def receive_action(self, game_id: str, player_id: str, action: Any, frame_number
     # Existing behavior: relay to other players
     for other_player_id, socket_id in game.players.items():
         if other_player_id != player_id:
-            self.sio.emit(
+            self.socketio.emit(
                 "pyodide_other_player_action",
                 {
                     "player_id": player_id,

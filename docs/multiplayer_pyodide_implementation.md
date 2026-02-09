@@ -241,7 +241,7 @@ def add_player(self, game_id: str, player_id: str | int, socket_id: str):
     game.players[player_id] = socket_id
 
     # Notify player of their assignment (symmetric - all players get same structure)
-    self.sio.emit('pyodide_player_assigned', {
+    self.socketio.emit('pyodide_player_assigned', {
         'player_id': player_id,
         'game_id': game_id,
         'game_seed': game.rng_seed,
@@ -277,7 +277,7 @@ def _broadcast_actions(self, game_id: str):
     game = self.games[game_id]
 
     # Broadcast all actions to all players
-    self.sio.emit('pyodide_actions_ready', {
+    self.socketio.emit('pyodide_actions_ready', {
         'game_id': game_id,
         'actions': game.pending_actions.copy(),
         'frame_number': game.frame_number,
@@ -300,7 +300,7 @@ def _request_state_verification(self, game_id: str):
     game = self.games[game_id]
 
     # Request hash from all players
-    self.sio.emit('pyodide_verify_state', {
+    self.socketio.emit('pyodide_verify_state', {
         'frame_number': game.frame_number
     }, room=game_id)
 
@@ -367,7 +367,7 @@ def remove_player(self, game_id: str, player_id: str | int):
         del game.players[player_id]
 
     # Notify remaining players
-    self.sio.emit('pyodide_player_disconnected', {
+    self.socketio.emit('pyodide_player_disconnected', {
         'player_id': player_id
     }, room=game_id)
 
@@ -748,9 +748,9 @@ def run(config):
 # In game_manager.py
 
 class GameManager:
-    def __init__(self, scene, experiment_config, sio, pyodide_coordinator=None):
+    def __init__(self, scene, experiment_config, socketio, pyodide_coordinator=None):
         self.scene = scene
-        self.sio = sio
+        self.socketio = socketio
         self.pyodide_coordinator = pyodide_coordinator
         # ...
 
@@ -795,7 +795,7 @@ def advance_scene(data):
         game_manager = gm.GameManager(
             scene=current_scene,
             experiment_config=CONFIG,
-            sio=socketio,
+            socketio=socketio,
             pyodide_coordinator=PYODIDE_COORDINATOR  # Pass coordinator
         )
         GAME_MANAGERS[current_scene.scene_id] = game_manager
