@@ -36,10 +36,21 @@ Bug fixes (post v1.21):
 
 Audit: passed (18/18 requirements, 5/5 phases, 6/6 integration, 3/3 flows)
 
+### v1.23 Pre-Merge Cleanup
+
+7 phases (72–78), 13 plans, 4 requirements:
+- Phase 72–74: Dead code removal (server, client JS, scenes/examples)
+- Phase 75–76: Naming cleanup (sio→socketio, abbreviation expansion, parameter renames)
+- Phase 77: Module structure reorganization (sentinels, thread_safe_collections, consolidation)
+- Phase 78: Final verification (27/27 tests, 35/35 artifact checks)
+
+Note: Bulk `sio` → `socketio` rename introduced corruption (72 occurrences of "session"/"exclusion"/"transmission" mangled). Fixed in v1.24.
+
 ## Current
 
-### v1.23 Pre-Merge Cleanup
-- Remove dead code, unused functions/classes/imports across full repo
-- Rename unclear variables, functions, modules for readability
-- Reorganize file/module structure where it aids navigation
-- Zero functionality changes — every refactor verified by tests
+### v1.24 Test Fix & Hardening
+- Fix rename corruption from v1.23 (`Sessocketion` → `Session`, etc.)
+- All 46 tests passing — no exceptions, no loosened criteria
+- Every data-producing test validates export parity
+- All examples run end-to-end
+- Docs reflect post-refactor API names and module paths

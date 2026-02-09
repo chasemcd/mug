@@ -5,16 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-02-08)
 
 **Core value:** Researchers can configure and deploy multiplayer browser experiments with minimal code — a chained scene config and a Python environment are all that's needed.
-**Current focus:** Phase 78 complete — final verification
+**Current focus:** Milestone v1.24 — Test Fix & Hardening
 
 ## Current Position
 
-Phase: 78 of 78 (Final Verification) — COMPLETE
-Plan: 1/1 complete
-Status: Phase complete, verified
-Last activity: 2026-02-08 — Completed 78-01-PLAN.md (final verification)
-
-Progress: ████████████ 100%
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-02-08 — Milestone v1.24 started
 
 ## Performance Metrics
 
@@ -61,10 +59,11 @@ None.
 
 ### Blockers/Concerns
 
-None.
+- v1.23 bulk `sio` → `socketio` rename corrupted 72 occurrences of "session", "exclusion", "transmission" across 3 server Python files
+- All 46 tests currently failing due to this corruption
 
 ## Session Continuity
 
 Last session: 2026-02-08
-Stopped at: Phase 78 complete — final verification passed (27/27 tests, 35/35 artifact checks)
-Resume file: .planning/phases/78-final-verification/78-01-SUMMARY.md
+Stopped at: Milestone v1.24 initialization — defining requirements
+Resume file: —
