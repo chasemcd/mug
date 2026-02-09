@@ -86,10 +86,10 @@ Plans:
   5. All 5 E2E multi-participant tests pass (simultaneous games, staggered arrival, multi-episode, disconnect, focus timeout)
   6. Scene isolation test passes (partner exit on survey)
   7. All 27 unit tests pass (matchmaker unit + integration)
-**Plans**: TBD
+**Plans:** 1 plan
 
 Plans:
-- [ ] TBD
+- [ ] 80-01-PLAN.md — Verify all 52 tests pass and update project tracking
 
 ### Phase 81: Data Parity Hardening
 **Goal**: Ensure every test producing episode CSV data validates export parity between both players
