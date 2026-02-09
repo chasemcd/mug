@@ -1,43 +1,53 @@
-# Requirements: Interactive Gym — v1.23 Pre-Merge Cleanup
+# Requirements: Interactive Gym — v1.24 Test Fix & Hardening
 
 **Defined:** 2026-02-08
 **Core Value:** Researchers can configure and deploy multiplayer browser experiments with minimal code — a chained scene config and a Python environment are all that's needed.
 
 ## v1 Requirements
 
-Requirements for v1.23 milestone. Each maps to roadmap phases.
+Requirements for v1.24 milestone. Each maps to roadmap phases.
 
-### Dead Code Removal
+### Rename Fix
 
-- [ ] **DEAD-01**: All unused Python functions, classes, and methods are removed from server code
-- [ ] **DEAD-02**: All unused Python functions, classes, and methods are removed from scene/environment code
-- [ ] **DEAD-03**: All unused JavaScript functions and classes are removed from client code
-- [ ] **DEAD-04**: All vestigial logic from earlier development phases is removed (unreachable code paths, obsolete feature flags, dead branches)
+- [ ] **FIX-01**: All corrupted `Sessocketion` → `Session` identifiers restored in `pyodide_game_coordinator.py`
+- [ ] **FIX-02**: All corrupted `sessocketion` → `session` identifiers restored in `probe_coordinator.py`
+- [ ] **FIX-03**: All corrupted `transmissocketion` → `transmission` identifiers restored in `server_game_runner.py`
+- [ ] **FIX-04**: All corrupted `exclusocketion` → `exclusion` identifiers restored in `pyodide_game_coordinator.py`
 
-### Naming Clarity
+### Test Restoration
 
-- [ ] **NAME-01**: Unclear Python variable and function names are renamed to reflect their purpose
-- [ ] **NAME-02**: Unclear JavaScript variable and function names are renamed to reflect their purpose
-- [ ] **NAME-03**: File and module names that don't reflect their contents are renamed
+- [ ] **TEST-01**: All E2E infrastructure tests pass (server starts, contexts connect)
+- [ ] **TEST-02**: All E2E multiplayer basic tests pass (connect+complete, matchmaking)
+- [ ] **TEST-03**: All E2E data comparison tests pass (basic parity, latency parity, active input, focus loss)
+- [ ] **TEST-04**: All E2E network stress tests pass (latency injection, packet loss, jitter, rollback, fast-forward)
+- [ ] **TEST-05**: All E2E multi-participant tests pass (simultaneous games, staggered arrival, multi-episode, disconnect, focus timeout)
+- [ ] **TEST-06**: All E2E scene isolation tests pass (partner exit on survey)
+- [ ] **TEST-07**: All unit tests pass (matchmaker unit + integration — 27 tests)
 
-### Structural Organization
+### Data Parity
 
-- [ ] **STRUCT-01**: Files are reorganized into logical locations in the directory tree
-- [ ] **STRUCT-02**: Unnecessarily split modules are consolidated where it reduces complexity
-- [ ] **STRUCT-03**: Misplaced functions and classes are moved to the modules where they logically belong
+- [ ] **DATA-01**: Every test producing episode CSV data runs export parity validation (validate_action_sequences.py --compare)
+- [ ] **DATA-02**: Tests that currently skip parity checks are updated to include them
+- [ ] **DATA-03**: No test produces episode data without asserting on it
 
-### Verification
+### Examples
 
-- [ ] **VERIF-01**: All existing tests pass after every refactoring change
-- [ ] **VERIF-02**: No functionality changes are introduced (behavior is identical before and after)
+- [ ] **EXAM-01**: All example configurations in `interactive_gym/examples/` run end-to-end without errors
+- [ ] **EXAM-02**: Example imports and API calls reflect v1.23 renamed modules and methods
+
+### Documentation
+
+- [ ] **DOCS-01**: All documentation files reference correct module paths after v1.23 reorganization
+- [ ] **DOCS-02**: All documentation files reference correct API method names after v1.22/v1.23 renames
 
 ## v2 Requirements
 
 Deferred to future release. Tracked but not in current roadmap.
 
-### Automated Cleanup
+### Additional Testing
 
-- **DEAD-05**: Remove unused imports across Python and JS files
+- **TEST-08**: Add new tests for code paths that have zero coverage
+- **TEST-09**: Performance benchmarks for latency-sensitive operations
 
 ## Out of Scope
 
@@ -45,35 +55,41 @@ Explicitly excluded. Documented to prevent scope creep.
 
 | Feature | Reason |
 |---------|--------|
-| New features or capabilities | This milestone is cleanup only |
-| Functionality changes of any kind | Pure readability/structure refactor |
-| Removing or restructuring `.planning/` directory | Preserves project history |
-| Changes that would require updating external documentation or APIs | No breaking changes |
+| New features or capabilities | This milestone is fix + harden only |
+| New test infrastructure or frameworks | Use existing pytest + Playwright setup |
+| Performance optimization | Focus is correctness, not speed |
+| Loosening test criteria | Fix the code, not the tests |
 
 ## Traceability
 
-Which phases cover which requirements. Updated by create-roadmap.
+Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DEAD-01 | Phase 72 | Pending |
-| DEAD-02 | Phase 73 | Pending |
-| DEAD-03 | Phase 74 | Pending |
-| DEAD-04 | Phases 72, 73, 74 | Pending |
-| NAME-01 | Phase 75 | Pending |
-| NAME-02 | Phase 76 | Pending |
-| NAME-03 | Phase 75 | Pending |
-| STRUCT-01 | Phase 77 | Pending |
-| STRUCT-02 | Phase 77 | Pending |
-| STRUCT-03 | Phase 77 | Pending |
-| VERIF-01 | Phase 78 | Pending |
-| VERIF-02 | Phase 78 | Pending |
+| FIX-01 | — | Pending |
+| FIX-02 | — | Pending |
+| FIX-03 | — | Pending |
+| FIX-04 | — | Pending |
+| TEST-01 | — | Pending |
+| TEST-02 | — | Pending |
+| TEST-03 | — | Pending |
+| TEST-04 | — | Pending |
+| TEST-05 | — | Pending |
+| TEST-06 | — | Pending |
+| TEST-07 | — | Pending |
+| DATA-01 | — | Pending |
+| DATA-02 | — | Pending |
+| DATA-03 | — | Pending |
+| EXAM-01 | — | Pending |
+| EXAM-02 | — | Pending |
+| DOCS-01 | — | Pending |
+| DOCS-02 | — | Pending |
 
 **Coverage:**
-- v1 requirements: 12 total
-- Mapped to phases: 12
-- Unmapped: 0 ✓
+- v1 requirements: 18 total
+- Mapped to phases: 0
+- Unmapped: 18 ⚠️
 
 ---
 *Requirements defined: 2026-02-08*
-*Last updated: 2026-02-08 after roadmap creation (phases 72-78)*
+*Last updated: 2026-02-08 after initial definition*
