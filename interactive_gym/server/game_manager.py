@@ -462,8 +462,13 @@ class GameManager:
             )
 
             if needs_probe:
-                # Defer game creation until probe completes
-                return self._probe_and_create_game(matched, subject_id)
+                # Get ordered candidate list for iterative probing
+                candidates = self.matchmaker.rank_candidates(
+                    arriving, waiting, group_size
+                )
+                return self._probe_and_create_game(
+                    matched, subject_id, candidates
+                )
             else:
                 # Create game immediately (no P2P RTT filtering)
                 return self._create_game_for_match(matched, subject_id)
@@ -526,18 +531,19 @@ class GameManager:
         self,
         matched: list[MatchCandidate],
         arriving_subject_id: SubjectID,
+        candidates: list[MatchCandidate] | None = None,
     ) -> None:
         """Initiate P2P RTT probe before creating game for matched participants.
 
-        Adds all matched participants to the waitroom immediately, then triggers
-        a WebRTC probe between the first two. If probe succeeds and RTT is acceptable,
-        game is created. Otherwise, candidates stay in waitroom for future matching.
-
-        Phase 59: P2P RTT filtering integration.
+        When candidates is provided, probes are attempted iteratively: if the
+        first candidate's probe fails, the next is tried, and so on until a
+        probe succeeds or all candidates are exhausted.
 
         Args:
             matched: List of matched MatchCandidates (from matchmaker.find_match)
             arriving_subject_id: The subject that triggered this match
+            candidates: Ordered list of candidates to try (from rank_candidates).
+                        If None, falls back to matched list minus arriving.
 
         Returns:
             None - game creation is deferred until probe completes
@@ -546,31 +552,84 @@ class GameManager:
         # (waiting participants are already in the waitroom)
         self._add_to_waitroom(arriving_subject_id)
 
-        # For 2-player games, probe between the two candidates
-        if len(matched) >= 2:
-            subject_a = matched[0].subject_id
-            subject_b = matched[1].subject_id
+        # Get the arriving participant's MatchCandidate from the matched list
+        arriving_candidate = next(
+            c for c in matched if c.subject_id == arriving_subject_id
+        )
 
-            logger.info(
-                f"Starting P2P RTT probe for match: {subject_a} <-> {subject_b}. "
-                f"Threshold: {self.matchmaker.max_p2p_rtt_ms}ms"
-            )
+        # Build candidate list if not provided
+        if candidates is None:
+            candidates = [
+                c for c in matched if c.subject_id != arriving_subject_id
+            ]
 
-            # Create probe with callback
-            probe_session_id = self.probe_coordinator.create_probe(
-                subject_a=subject_a,
-                subject_b=subject_b,
-                on_complete=self._on_probe_complete,
-            )
-
-            # Store match context for callback
-            self._pending_matches[probe_session_id] = {
-                'matched': matched,
-                'arriving_subject_id': arriving_subject_id,
-                'created_at': time.time(),
-            }
-
+        self._start_next_probe(arriving_subject_id, arriving_candidate, candidates)
         return None
+
+    def _start_next_probe(
+        self,
+        arriving_subject_id: SubjectID,
+        arriving_candidate: MatchCandidate,
+        candidates: list[MatchCandidate],
+    ) -> None:
+        """Start a P2P probe with the next viable candidate.
+
+        Skips candidates no longer in the waitroom. If no candidates remain
+        or the arriving player has left, gives up.
+
+        Args:
+            arriving_subject_id: The subject that triggered matching
+            arriving_candidate: MatchCandidate for the arriving subject
+            candidates: Remaining candidates to try, in priority order
+        """
+        # Check if arriving player is still in waitroom
+        if arriving_subject_id not in self.waitroom_participants:
+            logger.info(
+                f"[Probe:Iterate] Arriving {arriving_subject_id} left waitroom. "
+                f"Giving up."
+            )
+            return
+
+        # Filter to candidates still in waitroom
+        candidates = [
+            c for c in candidates
+            if c.subject_id in self.waitroom_participants
+        ]
+
+        if not candidates:
+            logger.info(
+                f"[Probe:Iterate] All candidates exhausted for "
+                f"{arriving_subject_id}. Remaining in waitroom for future matching."
+            )
+            return
+
+        # Take first candidate, rest are remaining
+        next_candidate = candidates[0]
+        remaining = candidates[1:]
+
+        logger.info(
+            f"[Probe:Iterate] Starting probe: {arriving_subject_id} <-> "
+            f"{next_candidate.subject_id}. "
+            f"Threshold: {self.matchmaker.max_p2p_rtt_ms}ms. "
+            f"Remaining candidates to try: {[c.subject_id for c in remaining]}"
+        )
+
+        probe_session_id = self.probe_coordinator.create_probe(
+            subject_a=arriving_subject_id,
+            subject_b=next_candidate.subject_id,
+            on_complete=self._on_probe_complete,
+        )
+
+        # Build matched list for this specific pairing
+        matched = [next_candidate, arriving_candidate]
+
+        self._pending_matches[probe_session_id] = {
+            'matched': matched,
+            'arriving_subject_id': arriving_subject_id,
+            'arriving_candidate': arriving_candidate,
+            'remaining_candidates': remaining,
+            'created_at': time.time(),
+        }
 
     def _on_probe_complete(
         self,
@@ -609,23 +668,34 @@ class GameManager:
         matched = match_context['matched']
         arriving_subject_id = match_context['arriving_subject_id']
 
-        # Check if match should be rejected based on RTT
+        # Always log the probe result regardless of accept/reject
+        threshold = self.matchmaker.max_p2p_rtt_ms
         should_reject = self.matchmaker.should_reject_for_rtt(rtt_ms)
+        verdict = "REJECTED" if should_reject else "ACCEPTED"
+        logger.info(
+            f"[Probe:Result] {subject_a} <-> {subject_b}: "
+            f"rtt={rtt_ms}ms, threshold={threshold}ms, verdict={verdict}"
+        )
 
         if should_reject:
-            threshold = self.matchmaker.max_p2p_rtt_ms
-            logger.info(
-                f"RTT rejection: {rtt_ms}ms {'> ' + str(threshold) + 'ms' if rtt_ms else '(failed)'} "
-                f"for {subject_a} <-> {subject_b}. Candidates remain in waitroom."
-            )
-            # Candidates stay in waitroom, no action needed - they were already added
-            # Future matches will try different pairings
+            # Try next candidate if available
+            remaining = match_context.get('remaining_candidates', [])
+            arriving_candidate = match_context.get('arriving_candidate')
+            if remaining and arriving_candidate:
+                logger.info(
+                    f"[Probe:Retry] Trying next candidate for "
+                    f"{arriving_subject_id}. "
+                    f"Remaining: {[c.subject_id for c in remaining]}"
+                )
+                self._start_next_probe(
+                    arriving_subject_id, arriving_candidate, remaining
+                )
+            else:
+                logger.info(
+                    f"[Probe:Exhausted] All candidates exhausted for "
+                    f"{arriving_subject_id}. Remaining in waitroom."
+                )
             return
-
-        logger.info(
-            f"RTT accepted: {rtt_ms}ms <= {self.matchmaker.max_p2p_rtt_ms}ms "
-            f"for {subject_a} <-> {subject_b}. Creating game."
-        )
 
         # RTT acceptable - create game for matched participants
         # Need to acquire lock since we're modifying game state
