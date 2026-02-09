@@ -28,8 +28,10 @@ from tests.fixtures.game_helpers import (
     click_advance_button,
     click_start_button,
     wait_for_scene_header_contains,
+    get_scene_id,
 )
 from tests.fixtures.network_helpers import set_tab_visibility
+from tests.fixtures.export_helpers import get_experiment_id, wait_for_episode_with_parity
 
 
 @pytest.mark.timeout(300)  # 5 minutes max for full flow
@@ -78,6 +80,20 @@ def test_partner_exit_on_survey_no_overlay(flask_server_scene_isolation, player_
     # Players are idle, episode ends via time limit (~15s at 30fps with 450 steps)
     wait_for_episode_complete(page1, episode_num=1, timeout=180000)
     wait_for_episode_complete(page2, episode_num=1, timeout=180000)
+
+    # ---- Step 6b: Validate data parity for the completed episode ----
+    scene_id = get_scene_id(page1)
+    success, parity_msg = wait_for_episode_with_parity(
+        page1, page2,
+        experiment_id="overcooked_multiplayer_hh_scene_isolation_test",
+        scene_id=scene_id,
+        episode_num=0,
+        episode_timeout_sec=10,  # Episode already complete
+        export_timeout_sec=30,
+        parity_row_tolerance=10,
+        verbose=True,
+    )
+    assert success, f"Episode parity validation failed: {parity_msg}"
 
     # ---- Step 7: Wait for both players to advance to survey scene ----
     # After episode completes, the game auto-advances.
