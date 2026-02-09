@@ -52,8 +52,8 @@ class ProbeCoordinator:
         self.turn_username = turn_username
         self.turn_credential = turn_credential
 
-        # Active probe sessocketions: probe_sessocketion_id -> ProbeSession dict
-        self.probe_sessocketions: Dict[str, Dict[str, Any]] = {}
+        # Active probe sessions: probe_session_id -> ProbeSession dict
+        self.probe_sessions: Dict[str, Dict[str, Any]] = {}
 
         # Timeout for entire probe lifecycle (15 seconds default)
         self.probe_timeout_s = 15.0
@@ -64,7 +64,7 @@ class ProbeCoordinator:
         subject_b: str,
         on_complete: Callable[[str, str, float | None], None],
     ) -> str:
-        """Create a probe sessocketion between two candidates.
+        """Create a probe session between two candidates.
 
         Args:
             subject_a: First participant's subject_id
@@ -72,9 +72,9 @@ class ProbeCoordinator:
             on_complete: Callback(subject_a, subject_b, rtt_ms) - rtt_ms is None on failure
 
         Returns:
-            probe_sessocketion_id
+            probe_session_id
         """
-        probe_sessocketion_id = f"probe_{uuid.uuid4()}"
+        probe_session_id = f"probe_{uuid.uuid4()}"
 
         # Look up current socket IDs (fresh, not cached)
         socket_a = self.get_socket_for_subject(subject_a)
@@ -88,9 +88,9 @@ class ProbeCoordinator:
             )
             # Immediately call on_complete with None RTT
             on_complete(subject_a, subject_b, None)
-            return probe_sessocketion_id
+            return probe_session_id
 
-        self.probe_sessocketions[probe_sessocketion_id] = {
+        self.probe_sessions[probe_session_id] = {
             'subject_a': subject_a,
             'subject_b': subject_b,
             'socket_a': socket_a,
@@ -104,7 +104,7 @@ class ProbeCoordinator:
         # Send probe_prepare signal to both clients
         # Each client needs to know their peer's subject_id
         prepare_data_a = {
-            'probe_sessocketion_id': probe_sessocketion_id,
+            'probe_session_id': probe_session_id,
             'peer_subject_id': subject_b,
             'turn_username': self.turn_username,
             'turn_credential': self.turn_credential,
@@ -112,56 +112,56 @@ class ProbeCoordinator:
         self.socketio.emit('probe_prepare', prepare_data_a, room=socket_a)
 
         prepare_data_b = {
-            'probe_sessocketion_id': probe_sessocketion_id,
+            'probe_session_id': probe_session_id,
             'peer_subject_id': subject_a,
             'turn_username': self.turn_username,
             'turn_credential': self.turn_credential,
         }
         self.socketio.emit('probe_prepare', prepare_data_b, room=socket_b)
 
-        logger.info(f"Created probe sessocketion {probe_sessocketion_id}: {subject_a} <-> {subject_b}")
+        logger.info(f"Created probe session {probe_session_id}: {subject_a} <-> {subject_b}")
 
-        return probe_sessocketion_id
+        return probe_session_id
 
-    def handle_ready(self, probe_sessocketion_id: str, subject_id: str) -> None:
+    def handle_ready(self, probe_session_id: str, subject_id: str) -> None:
         """Handle client reporting ready to probe.
 
         After both clients report ready, emit probe_start to trigger
         WebRTC connection establishment.
 
         Args:
-            probe_sessocketion_id: The probe sessocketion identifier
+            probe_session_id: The probe session identifier
             subject_id: The subject_id of the client reporting ready
         """
-        sessocketion = self.probe_sessocketions.get(probe_sessocketion_id)
-        if not sessocketion:
-            logger.warning(f"Ready signal for unknown probe {probe_sessocketion_id}")
+        session = self.probe_sessions.get(probe_session_id)
+        if not session:
+            logger.warning(f"Ready signal for unknown probe {probe_session_id}")
             return
 
-        if sessocketion['state'] != 'preparing':
+        if session['state'] != 'preparing':
             logger.debug(
-                f"Ignoring ready signal for probe {probe_sessocketion_id} "
-                f"in state {sessocketion['state']}"
+                f"Ignoring ready signal for probe {probe_session_id} "
+                f"in state {session['state']}"
             )
             return
 
-        sessocketion['ready_count'] += 1
+        session['ready_count'] += 1
         logger.debug(
-            f"Probe {probe_sessocketion_id}: {subject_id} ready "
-            f"({sessocketion['ready_count']}/2)"
+            f"Probe {probe_session_id}: {subject_id} ready "
+            f"({session['ready_count']}/2)"
         )
 
-        if sessocketion['ready_count'] >= 2:
-            sessocketion['state'] = 'connecting'
+        if session['ready_count'] >= 2:
+            session['state'] = 'connecting'
             # Both ready - signal start to both clients
-            start_data = {'probe_sessocketion_id': probe_sessocketion_id}
-            self.socketio.emit('probe_start', start_data, room=sessocketion['socket_a'])
-            self.socketio.emit('probe_start', start_data, room=sessocketion['socket_b'])
-            logger.info(f"Probe {probe_sessocketion_id}: both ready, starting connection")
+            start_data = {'probe_session_id': probe_session_id}
+            self.socketio.emit('probe_start', start_data, room=session['socket_a'])
+            self.socketio.emit('probe_start', start_data, room=session['socket_b'])
+            logger.info(f"Probe {probe_session_id}: both ready, starting connection")
 
     def handle_signal(
         self,
-        probe_sessocketion_id: str,
+        probe_session_id: str,
         target_subject_id: str,
         signal_type: str,
         payload: Any,
@@ -172,82 +172,82 @@ class ProbeCoordinator:
         Routes SDP offers/answers and ICE candidates between probe peers.
 
         Args:
-            probe_sessocketion_id: The probe sessocketion identifier
+            probe_session_id: The probe session identifier
             target_subject_id: Subject ID of the intended recipient
             signal_type: Type of signal ('offer', 'answer', 'ice-candidate')
             payload: Signal payload (SDP or ICE candidate data)
             sender_socket_id: Socket ID of the sender (for validation)
         """
-        sessocketion = self.probe_sessocketions.get(probe_sessocketion_id)
-        if not sessocketion:
-            logger.warning(f"Signal for unknown probe {probe_sessocketion_id}")
+        session = self.probe_sessions.get(probe_session_id)
+        if not session:
+            logger.warning(f"Signal for unknown probe {probe_session_id}")
             return
 
         # Find target socket
-        if target_subject_id == sessocketion['subject_a']:
-            target_socket = sessocketion['socket_a']
-        elif target_subject_id == sessocketion['subject_b']:
-            target_socket = sessocketion['socket_b']
+        if target_subject_id == session['subject_a']:
+            target_socket = session['socket_a']
+        elif target_subject_id == session['subject_b']:
+            target_socket = session['socket_b']
         else:
             logger.warning(
-                f"Unknown target {target_subject_id} for probe {probe_sessocketion_id}"
+                f"Unknown target {target_subject_id} for probe {probe_session_id}"
             )
             return
 
         # Find sender subject for attribution
         sender_subject = None
-        if sender_socket_id == sessocketion['socket_a']:
-            sender_subject = sessocketion['subject_a']
-        elif sender_socket_id == sessocketion['socket_b']:
-            sender_subject = sessocketion['subject_b']
+        if sender_socket_id == session['socket_a']:
+            sender_subject = session['subject_a']
+        elif sender_socket_id == session['socket_b']:
+            sender_subject = session['subject_b']
 
         # Relay the signal to target
         self.socketio.emit('probe_signal', {
-            'probe_sessocketion_id': probe_sessocketion_id,
+            'probe_session_id': probe_session_id,
             'type': signal_type,
             'from_subject_id': sender_subject,
             'payload': payload,
         }, room=target_socket)
 
         logger.debug(
-            f"Probe {probe_sessocketion_id}: relayed {signal_type} "
+            f"Probe {probe_session_id}: relayed {signal_type} "
             f"from {sender_subject} to {target_subject_id}"
         )
 
     def handle_result(
         self,
-        probe_sessocketion_id: str,
+        probe_session_id: str,
         rtt_ms: float | None,
         success: bool,
     ) -> None:
         """Handle probe measurement result from client.
 
         Called when a client reports the RTT measurement result.
-        Invokes the on_complete callback and cleans up the sessocketion.
+        Invokes the on_complete callback and cleans up the session.
 
         Args:
-            probe_sessocketion_id: The probe sessocketion identifier
+            probe_session_id: The probe session identifier
             rtt_ms: Measured RTT in milliseconds (None if failed)
             success: Whether measurement succeeded
         """
-        sessocketion = self.probe_sessocketions.get(probe_sessocketion_id)
-        if not sessocketion:
-            logger.warning(f"Result for unknown probe {probe_sessocketion_id}")
+        session = self.probe_sessions.get(probe_session_id)
+        if not session:
+            logger.warning(f"Result for unknown probe {probe_session_id}")
             return
 
         # Update state
-        sessocketion['state'] = 'complete' if success else 'failed'
+        session['state'] = 'complete' if success else 'failed'
 
         # Call completion callback
-        on_complete = sessocketion.get('on_complete')
+        on_complete = session.get('on_complete')
         if on_complete:
             result_rtt = rtt_ms if success else None
-            on_complete(sessocketion['subject_a'], sessocketion['subject_b'], result_rtt)
+            on_complete(session['subject_a'], session['subject_b'], result_rtt)
 
-        # Clean up sessocketion
-        del self.probe_sessocketions[probe_sessocketion_id]
+        # Clean up session
+        del self.probe_sessions[probe_session_id]
         logger.info(
-            f"Probe {probe_sessocketion_id} complete: "
+            f"Probe {probe_session_id} complete: "
             f"{'success' if success else 'failed'}, rtt={rtt_ms}ms"
         )
 
@@ -255,24 +255,24 @@ class ProbeCoordinator:
         """Remove probes that have exceeded the timeout.
 
         Should be called periodically (e.g., every few seconds) to clean
-        up abandoned probe sessocketions.
+        up abandoned probe sessions.
 
         Returns:
             Number of probes cleaned up
         """
         now = time.time()
         stale_ids = [
-            probe_id for probe_id, sessocketion in self.probe_sessocketions.items()
-            if now - sessocketion['created_at'] > self.probe_timeout_s
+            probe_id for probe_id, session in self.probe_sessions.items()
+            if now - session['created_at'] > self.probe_timeout_s
         ]
 
-        for probe_sessocketion_id in stale_ids:
-            sessocketion = self.probe_sessocketions[probe_sessocketion_id]
-            on_complete = sessocketion.get('on_complete')
+        for probe_session_id in stale_ids:
+            session = self.probe_sessions[probe_session_id]
+            on_complete = session.get('on_complete')
             if on_complete:
                 # Call callback with None RTT to indicate timeout
-                on_complete(sessocketion['subject_a'], sessocketion['subject_b'], None)
-            del self.probe_sessocketions[probe_sessocketion_id]
-            logger.warning(f"Probe {probe_sessocketion_id} timed out and was cleaned up")
+                on_complete(session['subject_a'], session['subject_b'], None)
+            del self.probe_sessions[probe_session_id]
+            logger.warning(f"Probe {probe_session_id} timed out and was cleaned up")
 
         return len(stale_ids)

@@ -541,7 +541,7 @@ random.seed({rng_seed})
             env_state = self.env.get_state()
             serialize_time_ms = (time.time() - serialize_start) * 1000
 
-            # Verify it's JSON-serializable (for socket.io transmissocketion)
+            # Verify it's JSON-serializable (for socket.io transmission)
             json_start = time.time()
             json_str = json.dumps(env_state, sort_keys=True)
             json_time_ms = (time.time() - json_start) * 1000

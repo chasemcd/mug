@@ -283,8 +283,8 @@ class PyodideGameCoordinator:
             if gm:
                 remote_game = gm.games.get(game_id)
                 if remote_game:
-                    from interactive_gym.server.remote_game import SessocketionState
-                    remote_game.transition_to(SessocketionState.PLAYING)
+                    from interactive_gym.server.remote_game import SessionState
+                    remote_game.transition_to(SessionState.PLAYING)
 
         # Initialize server runner if enabled (this is CPU-bound, OK to do in lock)
         server_runner = None
@@ -649,12 +649,12 @@ class PyodideGameCoordinator:
         Args:
             game_id: Game identifier
             excluded_player_id: ID of excluded player
-            reason: Exclusocketion reason ('sustained_ping', 'tab_hidden')
+            reason: Exclusion reason ('sustained_ping', 'tab_hidden')
             frame_number: Frame number when exclusion occurred
         """
         with self.lock:
             if game_id not in self.games:
-                logger.warning(f"Exclusocketion for non-existent game {game_id}")
+                logger.warning(f"Exclusion for non-existent game {game_id}")
                 return
 
             game = self.games[game_id]
@@ -726,8 +726,8 @@ class PyodideGameCoordinator:
                 if gm:
                     remote_game = gm.games.get(game_id)
                     if remote_game:
-                        from interactive_gym.server.remote_game import SessocketionState
-                        remote_game.transition_to(SessocketionState.VALIDATING)
+                        from interactive_gym.server.remote_game import SessionState
+                        remote_game.transition_to(SessionState.VALIDATING)
 
             logger.info(f"P2P validation started for game {game_id}")
             return True
