@@ -46,11 +46,15 @@ Audit: passed (18/18 requirements, 5/5 phases, 6/6 integration, 3/3 flows)
 
 Note: Bulk `sio` → `socketio` rename introduced corruption (72 occurrences of "session"/"exclusion"/"transmission" mangled). Fixed in v1.24.
 
-## Current
+### v1.24 Test Fix & Hardening (Shipped: 2026-02-09)
 
-### v1.24 Test Fix & Hardening
-- Fix rename corruption from v1.23 (`Sessocketion` → `Session`, etc.)
-- All 46 tests passing — no exceptions, no loosened criteria
-- Every data-producing test validates export parity
-- All examples run end-to-end
-- Docs reflect post-refactor API names and module paths
+4 phases (79–82), 6 plans, 16 requirements:
+- Phase 79: Rename corruption fix (72 mangled identifiers restored across 3 server files)
+- Phase 80: Test suite restoration (all 52 tests passing — 27 unit + 25 E2E)
+- Phase 81: Data parity hardening (export parity validation added to all 7 episode-producing E2E tests)
+- Phase 82: Examples & documentation (12 examples verified, 22 sio→socketio doc fixes, 3 stale file refs removed)
+
+Note: This milestone was pure correctness — zero new features, only fixing v1.23 bulk rename damage and hardening validation.
+
+---
+

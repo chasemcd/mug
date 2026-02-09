@@ -24,37 +24,38 @@ Researchers can configure and deploy multiplayer browser experiments with minima
 - Group history tracking for cross-scene re-pairing
 - ✓ GymScene chaining API consolidated (14 → 10 methods, clean break) — v1.22
 - ✓ Dead code removal, naming cleanup, module reorganization — v1.23
-- ✓ All 52 existing tests pass — no exceptions, no loosened criteria (27 unit + 25 E2E)
+- ✓ All 52 existing tests pass — no exceptions, no loosened criteria (27 unit + 25 E2E) — v1.24
+- ✓ Every data-producing test validates export parity (both players' CSVs match) — v1.24
+- ✓ All examples run end-to-end with refactored code — v1.24
+- ✓ Documentation reflects renamed APIs, module paths from v1.23 refactor — v1.24
 
 ### Active
 
-- [ ] Every test producing episode data validates export parity (both players' CSVs match)
-- [ ] All examples run end-to-end with refactored code
-- [ ] Documentation reflects renamed APIs, module paths from v1.23 refactor
+(None — all requirements through v1.24 shipped)
 
 ### Out of Scope
 
-- New features or capabilities — this milestone is fix + harden only
-- New test infrastructure or frameworks — use existing pytest + Playwright setup
-- Performance optimization — focus is correctness
 - Removing or restructuring `.planning/` directory
 
 ## Context
 
-The codebase has been developed over 82+ phases on the `feature/p2p-multiplayer` branch. v1.22 cleaned up the GymScene API (14 → 10 methods). v1.23 removed dead code, renamed unclear identifiers, and reorganized modules — but introduced a bulk rename bug: `sio` → `socketio` corrupted words containing "sio" (e.g., `Session` → `Sessocketion`). 72 occurrences across 3 server files.
+The codebase has been developed over 82 phases on the `refactor/p2pcleanup` branch across 4 milestones (v1.0–v1.21 feature development, v1.22 API cleanup, v1.23 code cleanup, v1.24 test fix & hardening).
 
-Phase 79 fixed all rename corruption. Phase 80 verified all 52 tests now pass. The test suite covers: unit tests (27), infrastructure (1), multiplayer (2), data comparison (4), scene isolation (1), latency injection (6), network disruption (3), lifecycle stress (5), and multi-participant (2).
+**Current state (post v1.24):**
+- All 52 tests pass (27 unit + 25 E2E) in a single pytest invocation
+- All 7 episode-producing E2E tests validate export parity between both players
+- All 12 example files import successfully, 2 representative examples smoke-tested via HTTP
+- All documentation reflects post-v1.23 module paths (`utils/sentinels`, `server/thread_safe_collections`) and parameter names (`socketio` not `sio`)
+- GymScene API: 10 builder methods (environment, rendering, assets, policies, gameplay, content, waitroom, matchmaking, runtime, multiplayer)
 
-## Current Milestone: v1.24 Test Fix & Hardening
+## Shipped Milestones
 
-**Goal:** Fix refactor-introduced bugs, get all tests passing, harden data export parity validation, ensure examples work and docs are accurate.
-
-**Target features:**
-- ✓ Fix rename corruption (`Sessocketion` → `Session`, etc.) in 3 files
-- ✓ All 52 tests passing — zero exceptions, zero loosened criteria
-- Every data-producing test validates export parity
-- All examples run end-to-end
-- Docs reflect post-refactor API names and module paths
+| Milestone | Phases | Shipped |
+|-----------|--------|---------|
+| v1.0–v1.21 Feature Branch | 1-66 | - |
+| v1.22 GymScene Config Cleanup | 67-71 | 2026-02-08 |
+| v1.23 Pre-Merge Cleanup | 72-78 | 2026-02-08 |
+| v1.24 Test Fix & Hardening | 79-82 | 2026-02-09 |
 
 ## Constraints
 
@@ -71,8 +72,10 @@ Phase 79 fixed all rename corruption. Phase 80 verified all 52 tests now pass. T
 | Clean break — no aliases (v1.22) | Pre-merge feature branch, no external consumers | ✓ Good |
 | Rename freely (v1.22) | Pick clearest names regardless of history | ✓ Good |
 | Aggressive cleanup, test everything (v1.23) | Codebase must be readable to newcomers before merge | ⚠️ Revisit — bulk rename introduced corruption |
-| Keep .planning/ directory (v1.23) | Preserves project history | — Pending |
-| Fix code, not tests (v1.24) | Tests define correctness — code must conform | ✓ Good — all tests pass without criteria loosening |
+| Use word-boundary patterns for bulk renames | Lesson learned from v1.23 — avoid mangling words containing target string | ✓ Good |
+| Fix code, not tests (v1.24) | Tests define correctness — code must conform | ✓ Good — all 52 tests pass without criteria loosening |
+| Only modify code examples in docs, not prose (v1.24) | Prose references to "SocketIO" library are conceptual, not API calls | ✓ Good |
+| Keep .planning/ directory | Preserves project history across milestones | — Pending |
 
 ---
-*Last updated: 2026-02-09 after Phase 80 completion*
+*Last updated: 2026-02-09 after v1.24 milestone completion*
