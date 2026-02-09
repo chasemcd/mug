@@ -9,7 +9,7 @@ Fix the rename corruption introduced in v1.23 (bulk `sio` → `socketio` mangled
 - ✅ **v1.0–v1.21** - Phases 1-66 (shipped)
 - ✅ **v1.22 GymScene Config Cleanup** - Phases 67-71 (shipped 2026-02-08)
 - ✅ **v1.23 Pre-Merge Cleanup** - Phases 72-78 (shipped 2026-02-08)
-- 🚧 **v1.24 Test Fix & Hardening** - Phases 79-82 (in progress)
+- ✅ **v1.24 Test Fix & Hardening** - Phases 79-82 (shipped 2026-02-09)
 
 ## Phases
 
@@ -48,14 +48,14 @@ See previous milestone records.
 
 </details>
 
-### 🚧 v1.24 Test Fix & Hardening (In Progress)
+### ✅ v1.24 Test Fix & Hardening (Shipped 2026-02-09)
 
 **Milestone Goal:** Fix refactor-introduced bugs, restore all 52 tests to passing, harden data export validation, and ensure examples and docs reflect the refactored codebase.
 
 - [x] **Phase 79: Rename Corruption Fix** - Restore all 72 corrupted identifiers from bulk `sio` → `socketio` rename ✓ 2026-02-08
 - [x] **Phase 80: Test Suite Restoration** - Get all 52 tests passing with zero exceptions ✓ 2026-02-09
 - [x] **Phase 81: Data Parity Hardening** - Add export parity validation to all data-producing tests ✓ 2026-02-09
-- [ ] **Phase 82: Examples & Documentation** - Verify examples run end-to-end and docs reflect refactored API
+- [x] **Phase 82: Examples & Documentation** - Verify examples run end-to-end and docs reflect refactored API ✓ 2026-02-09
 
 ## Phase Details
 
@@ -122,8 +122,8 @@ Plans:
 **Plans:** 2 plans
 
 Plans:
-- [ ] 82-01-PLAN.md — Verify example API usage, fix old references, E2E smoke test 2 examples
-- [ ] 82-02-PLAN.md — Audit and update docs for v1.23 module paths, parameter names, removed files
+- [x] 82-01-PLAN.md — Verify example API usage, fix old references, E2E smoke test 2 examples ✓
+- [x] 82-02-PLAN.md — Audit and update docs for v1.23 module paths, parameter names, removed files ✓
 
 ## Progress
 
@@ -135,4 +135,4 @@ Phases execute in numeric order: 79 → 80 → 81 → 82
 | 79. Rename Corruption Fix | 1/1 | ✓ Complete | 2026-02-08 |
 | 80. Test Suite Restoration | 1/1 | ✓ Complete | 2026-02-09 |
 | 81. Data Parity Hardening | 2/2 | ✓ Complete | 2026-02-09 |
-| 82. Examples & Documentation | 0/2 | Not started | - |
+| 82. Examples & Documentation | 2/2 | ✓ Complete | 2026-02-09 |
