@@ -430,6 +430,7 @@ def register_subject(data):
 
         participant_stager.start(socketio, room=sid)
 
+    participant_stager.current_scene.experiment_id = CONFIG.experiment_id
     participant_stager.current_scene.export_metadata(subject_id)
 
 
@@ -584,6 +585,7 @@ def advance_scene(data):
                 f"Game manager already exists for scene {current_scene.scene_id}, reusing it"
             )
 
+    current_scene.experiment_id = CONFIG.experiment_id
     if current_scene.should_export_metadata:
         current_scene.export_metadata(subject_id)
 

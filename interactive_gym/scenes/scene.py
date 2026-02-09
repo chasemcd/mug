@@ -23,6 +23,7 @@ class Scene:
     def __init__(self, **kwargs):
         self.scene_id = None
         self.experiment_config: dict = {}
+        self.experiment_id: str | None = None
         self.socketio: flask_socketio.SocketIO | None = None
         self.room: str | int | None = None
         self.status = SceneStatus.Inactive
@@ -105,8 +106,12 @@ class Scene:
 
     def export_metadata(self, subject_id: str):
         """Save the metadata for the current scene."""
-        os.makedirs(f"data/{self.scene_id}", exist_ok=True)
-        with open(f"data/{self.scene_id}/{subject_id}_metadata.json", "w") as f:
+        if self.experiment_id:
+            base_dir = f"data/{self.experiment_id}/{self.scene_id}"
+        else:
+            base_dir = f"data/{self.scene_id}"
+        os.makedirs(base_dir, exist_ok=True)
+        with open(f"{base_dir}/{subject_id}_metadata.json", "w") as f:
             json.dump(self.scene_metadata, f)
 
     def on_client_callback(
