@@ -439,7 +439,7 @@ class PyodideGameCoordinator:
                     player_id, action, frame_number, sync_epoch
                 )
 
-    def remove_player(self, game_id: str, player_id: str | int, notify_others: bool = True):
+    def remove_player(self, game_id: str, player_id: str | int, notify_others: bool = True, reason: str = 'partner_disconnected'):
         """
         Handle player disconnection.
 
@@ -506,7 +506,7 @@ class PyodideGameCoordinator:
                     'p2p_game_ended',
                     {
                         'game_id': game_id,
-                        'reason': 'partner_disconnected',
+                        'reason': reason,
                         'disconnected_player_id': player_id
                     },
                     room=socket_id

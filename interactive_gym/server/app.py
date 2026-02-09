@@ -513,6 +513,24 @@ def advance_scene(data):
         )
         PARTICIPANT_TRACKER.reset(subject_id)
 
+    # Clean up Pyodide game state BEFORE scene transition
+    # This prevents false 'partner_disconnected' when WebRTC closes during transition
+    if PYODIDE_COORDINATOR is not None:
+        for game_id, game_state in list(PYODIDE_COORDINATOR.games.items()):
+            for player_id, socket_id in list(game_state.players.items()):
+                if socket_id == flask.request.sid:
+                    logger.info(
+                        f"[AdvanceScene] Removing {subject_id} (player {player_id}) "
+                        f"from Pyodide game {game_id} before scene transition"
+                    )
+                    PYODIDE_COORDINATOR.remove_player(
+                        game_id=game_id,
+                        player_id=player_id,
+                        notify_others=True,
+                        reason='scene_completed',
+                    )
+                    break
+
     participant_stager.advance(socketio, room=flask.request.sid)
 
     # If the current scene is a GymScene, we'll instantiate a

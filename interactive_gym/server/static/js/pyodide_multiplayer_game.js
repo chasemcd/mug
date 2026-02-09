@@ -6460,6 +6460,17 @@ json.dumps({'cumulative_rewards': {str(k): v for k, v in _cumulative_rewards.ite
             return;
         }
 
+        // Handle graceful scene completion - partner advanced to next scene
+        if (data.reason === 'scene_completed') {
+            p2pLog.info('Partner completed scene and advanced. Closing P2P connection gracefully.');
+            this._clearReconnectionTimeout();
+            if (this.webrtcManager) {
+                this.webrtcManager.close();
+                this.webrtcManager = null;
+            }
+            return;
+        }
+
         // If we already ended due to focus loss timeout, don't overwrite the message
         // The player who timed out should keep seeing "you left too long", not "partner disconnected"
         if (this.focusLossTimeoutTerminal) {
