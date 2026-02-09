@@ -290,13 +290,13 @@ Each scene goes through a lifecycle:
 
     class CustomScene(gym_scene.GymScene):
 
-        def on_connect(self, sio, room):
+        def on_connect(self, socketio, room):
             """Called when participant connects to server"""
             pass
 
-        def activate(self, sio, room):
+        def activate(self, socketio, room):
             """Called when scene becomes active"""
-            super().activate(sio, room)
+            super().activate(socketio, room)
             # Custom activation logic
 
         def deactivate(self):
