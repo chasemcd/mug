@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-02-08)
 
 ## Current Position
 
-Phase: 81 of 82 (Data Parity Hardening)
+Phase: 82 of 82 (Examples & Documentation)
 Plan: 2 of 2 (complete)
-Status: Phase complete — verified passed (7/7 truths)
-Last activity: 2026-02-09 — Export parity validation added to 7 episode-producing E2E tests across 4 test files
+Status: Phase complete — all documentation updated with correct post-v1.23 naming
+Last activity: 2026-02-09 — Updated 22 sio->socketio refs and removed 3 callback file refs across 8 docs
 
-Progress: [████████████████▓░] 98% (81/82 phases complete from all milestones)
+Progress: [██████████████████] 100% (82/82 phases complete from all milestones)
 
 ## Performance Metrics
 
@@ -52,10 +52,11 @@ Progress: [████████████████▓░] 98% (81/82 ph
 | 79 | 1 | ~1 min | ~1 min |
 | 80 | 1 | ~2 min | ~2 min |
 | 81 | 2 | ~17 min | ~8.5 min |
+| 82 | 2 | ~6 min | ~3 min |
 
 **Recent Trend:**
-- Last execution: Phase 81 - Data parity hardening (2 plans parallel, ~9 min each)
-- Trend: E2E test modifications take longer due to browser test execution
+- Last execution: Phase 82 - Examples & Documentation (2 plans, ~3 min each)
+- Trend: Documentation-only changes execute quickly
 
 ## Accumulated Context
 
@@ -70,6 +71,7 @@ Recent decisions affecting current work:
 - Use word-boundary patterns for bulk renames to avoid unintended replacements (lesson learned from v1.23)
 - [Phase 80]: Test count corrected from 46 to 52 (27 unit + 25 E2E)
 - [Phase 81]: Scene isolation test requires experiment_id override due to different server fixture
+- [Phase 82]: Only modified code examples in docs; prose references to SocketIO left unchanged
 
 ### Pending Todos
 
@@ -86,11 +88,11 @@ None.
 - ✓ Phase 79: Fix all rename corruption (COMPLETE)
 - ✓ Phase 80: Restore all tests to passing (COMPLETE)
 - ✓ Phase 81: Harden data validation (COMPLETE)
-- Phase 82 will verify examples and docs
+- ✓ Phase 82: Examples and documentation verified and updated (COMPLETE)
 
 ## Session Continuity
 
 Last session: 2026-02-09
-Stopped at: Completed phase 81 execution and verification
+Stopped at: Completed 82-02-PLAN.md (documentation audit)
 Resume file: None
-Next action: Begin phase 82 planning with `/gsd:plan-phase 82`
+Next action: All milestones complete (v1.22, v1.23, v1.24)
