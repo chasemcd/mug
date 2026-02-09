@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-02-09)
 ## Current Position
 
 Phase: 83 of 83 (Export Path Consolidation)
-Plan: 0 of ? in current phase
-Status: Ready to plan
-Last activity: 2026-02-09 -- Roadmap created for v1.25
+Plan: 1 of 1 in current phase
+Status: Phase complete
+Last activity: 2026-02-09 -- Completed 83-01 Export Path Consolidation
 
-Progress: [####################] 100% (prior milestones) | Phase 83: not started
+Progress: [####################] 100% (all milestones) | Phase 83: complete
 
 ## Performance Metrics
 
@@ -42,11 +42,24 @@ Progress: [####################] 100% (prior milestones) | Phase 83: not started
 | 81 | 2 | ~17 min | ~8.5 min |
 | 82 | 2 | ~6 min | ~3 min |
 
+**Velocity (v1.25):**
+- Total plans completed: 1
+- Average duration: 19 min
+- Total execution time: 0.32 hours
+
+**By Phase (v1.25):**
+
+| Phase | Plans | Total | Avg/Plan |
+|-------|-------|-------|----------|
+| 83 | 1 | ~19 min | ~19 min |
+
 ## Accumulated Context
 
 ### Decisions
 
-Decisions are logged in PROJECT.md Key Decisions table.
+- Phase 83: Added experiment_id as first-class Scene attribute (not via experiment_config dict)
+- Phase 83: Backward-compatible fallback paths when experiment_id is None
+- Phase 83: Converted MATCH_LOGS_DIR from class constant to instance attribute
 
 ### Pending Todos
 
@@ -59,6 +72,6 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-09
-Stopped at: Roadmap created for v1.25 Data Export Path Fix
+Stopped at: Completed 83-01-PLAN.md (Export Path Consolidation)
 Resume file: None
-Next action: `/gsd:plan-phase 83`
+Next action: Milestone v1.25 complete
