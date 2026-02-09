@@ -5,16 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-02-09)
 
 **Core value:** Researchers can configure and deploy multiplayer browser experiments with minimal code — a chained scene config and a Python environment are all that's needed.
-**Current focus:** v1.24 milestone complete — planning next milestone
+**Current focus:** v1.25 Data Export Path Fix
 
 ## Current Position
 
-Phase: 82 of 82 (all milestones complete through v1.24)
-Plan: N/A
-Status: v1.24 Test Fix & Hardening milestone shipped
-Last activity: 2026-02-09 — Milestone v1.24 archived
-
-Progress: [██████████████████] 100% (82/82 phases complete from all milestones)
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-02-09 — Milestone v1.25 started
 
 ## Performance Metrics
 

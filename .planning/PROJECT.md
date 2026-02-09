@@ -31,7 +31,13 @@ Researchers can configure and deploy multiplayer browser experiments with minima
 
 ### Active
 
-(None — all requirements through v1.24 shipped)
+## Current Milestone: v1.25 Data Export Path Fix
+
+**Goal:** Ensure all exported data (scene metadata, match logs) lands under `data/<experiment-id>/` — not scattered in `data/`.
+
+**Target features:**
+- Scene metadata exports use experiment_id subdirectory
+- Match logs export uses experiment_id subdirectory
 
 ### Out of Scope
 
@@ -78,4 +84,4 @@ The codebase has been developed over 82 phases on the `refactor/p2pcleanup` bran
 | Keep .planning/ directory | Preserves project history across milestones | — Pending |
 
 ---
-*Last updated: 2026-02-09 after v1.24 milestone completion*
+*Last updated: 2026-02-09 after v1.25 milestone started*
