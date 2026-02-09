@@ -72,10 +72,10 @@ See previous milestone records.
   2. Match log files are written to `data/{experiment_id}/match_logs/` instead of `data/match_logs/`
   3. All 52 existing tests pass with the updated export paths
   4. Running an experiment produces zero data files outside `data/{experiment_id}/`
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 83-01: TBD
+- [ ] 83-01-PLAN.md -- Fix scene metadata and match log export paths to use experiment_id prefix
 
 ## Progress
 
