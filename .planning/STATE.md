@@ -29,9 +29,9 @@ Progress: [██████████████████] 100% (82/82 p
 - Total execution time: 1.09 hours
 
 **Velocity (v1.24):**
-- Total plans completed: 4
-- Average duration: 5.0 min
-- Total execution time: 0.33 hours
+- Total plans completed: 6
+- Average duration: 4.3 min
+- Total execution time: 0.43 hours
 
 **By Phase (v1.23):**
 
@@ -72,6 +72,7 @@ Recent decisions affecting current work:
 - [Phase 80]: Test count corrected from 46 to 52 (27 unit + 25 E2E)
 - [Phase 81]: Scene isolation test requires experiment_id override due to different server fixture
 - [Phase 82]: Only modified code examples in docs; prose references to SocketIO left unchanged
+- [Phase 82-01]: No code changes needed - all examples already use correct post-v1.23 API; HTTP 302 root redirect accepted as valid
 
 ### Pending Todos
 
@@ -93,6 +94,6 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-09
-Stopped at: Completed 82-02-PLAN.md (documentation audit)
+Stopped at: Completed 82-01-PLAN.md (example verification & E2E smoke tests)
 Resume file: None
-Next action: All milestones complete (v1.22, v1.23, v1.24)
+Next action: All milestones complete (v1.22, v1.23, v1.24) - both 82-01 and 82-02 verified
