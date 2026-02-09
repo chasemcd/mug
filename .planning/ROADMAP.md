@@ -119,10 +119,11 @@ Plans:
   2. Example imports and API calls use post-v1.23 renamed modules and methods
   3. All documentation files reference correct module paths after v1.23 reorganization
   4. All documentation files reference correct API method names after v1.22/v1.23 renames
-**Plans**: TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] TBD
+- [ ] 82-01-PLAN.md — Verify example API usage, fix old references, E2E smoke test 2 examples
+- [ ] 82-02-PLAN.md — Audit and update docs for v1.23 module paths, parameter names, removed files
 
 ## Progress
 
@@ -134,4 +135,4 @@ Phases execute in numeric order: 79 → 80 → 81 → 82
 | 79. Rename Corruption Fix | 1/1 | ✓ Complete | 2026-02-08 |
 | 80. Test Suite Restoration | 1/1 | ✓ Complete | 2026-02-09 |
 | 81. Data Parity Hardening | 2/2 | ✓ Complete | 2026-02-09 |
-| 82. Examples & Documentation | 0/? | Not started | - |
+| 82. Examples & Documentation | 0/2 | Not started | - |
