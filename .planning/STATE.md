@@ -4,15 +4,17 @@
 
 See: .planning/PROJECT.md (updated 2026-02-09)
 
-**Core value:** Researchers can configure and deploy multiplayer browser experiments with minimal code — a chained scene config and a Python environment are all that's needed.
-**Current focus:** v1.25 Data Export Path Fix
+**Core value:** Researchers can configure and deploy multiplayer browser experiments with minimal code -- a chained scene config and a Python environment are all that's needed.
+**Current focus:** Phase 83 - Export Path Consolidation (v1.25)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-02-09 — Milestone v1.25 started
+Phase: 83 of 83 (Export Path Consolidation)
+Plan: 0 of ? in current phase
+Status: Ready to plan
+Last activity: 2026-02-09 -- Roadmap created for v1.25
+
+Progress: [####################] 100% (prior milestones) | Phase 83: not started
 
 ## Performance Metrics
 
@@ -52,11 +54,11 @@ None.
 
 ### Blockers/Concerns
 
-None — all milestones through v1.24 complete.
+None.
 
 ## Session Continuity
 
 Last session: 2026-02-09
-Stopped at: Completed v1.24 milestone archival
+Stopped at: Roadmap created for v1.25 Data Export Path Fix
 Resume file: None
-Next action: `/gsd:new-milestone` to start next milestone
+Next action: `/gsd:plan-phase 83`
