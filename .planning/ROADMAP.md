@@ -69,10 +69,10 @@ See previous milestone records.
   3. All `transmissocketion` → `transmission` occurrences restored in server_game_runner.py
   4. All `exclusocketion` → `exclusion` occurrences restored in pyodide_game_coordinator.py
   5. Server starts without import errors or NameError exceptions
-**Plans**: TBD
+**Plans:** 1 plan
 
 Plans:
-- [ ] TBD
+- [ ] 79-01-PLAN.md — Fix all 72 corrupted identifiers across 3 server files
 
 ### Phase 80: Test Suite Restoration
 **Goal**: Get all 46 existing tests passing with zero exceptions and no loosened criteria
