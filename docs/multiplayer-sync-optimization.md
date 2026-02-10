@@ -405,7 +405,7 @@ See separate document: `server-authoritative-architecture.md` (to be created)
 Based on code review, here are the highest-impact, lowest-effort changes:
 
 ### 1. Force WebSocket Transport (5 minutes)
-**File:** `interactive_gym/server/static/js/index.js` or where socket is initialized
+**File:** `mug/server/static/js/index.js` or where socket is initialized
 
 ```javascript
 const socket = io({
@@ -415,7 +415,7 @@ const socket = io({
 ```
 
 ### 2. Remove Debug Logging from Hot Path (10 minutes)
-**File:** `interactive_gym/server/static/js/pyodide_multiplayer_game.js`
+**File:** `mug/server/static/js/pyodide_multiplayer_game.js`
 
 Change `console.debug` to conditional or remove entirely in:
 - Line 139: Action queue logging
@@ -432,7 +432,7 @@ if (this.debugMode) {
 ```
 
 ### 3. Optimize Hash Computation (30 minutes)
-**File:** `interactive_gym/server/static/js/pyodide_multiplayer_game.js`
+**File:** `mug/server/static/js/pyodide_multiplayer_game.js`
 
 Current: Full Python execution for every hash
 ```javascript
@@ -477,7 +477,7 @@ If games are staying in sync, increase `state_sync_frequency_frames`:
 ```
 
 ### 5. Add Frame Rate Independence (1 hour)
-**File:** `interactive_gym/server/static/js/phaser_gym_graphics.js`
+**File:** `mug/server/static/js/phaser_gym_graphics.js`
 
 Ensure simulation runs at fixed timestep regardless of render rate:
 ```javascript

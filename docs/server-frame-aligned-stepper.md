@@ -80,7 +80,7 @@ Client A                     Server                   Client B
 
 #### 1.1 Create `ServerGameRunner` Class
 
-**File**: `interactive_gym/server/server_game_runner.py` (new file)
+**File**: `mug/server/server_game_runner.py` (new file)
 
 ```python
 """
@@ -365,7 +365,7 @@ random.seed({rng_seed})
 
 #### 1.2 Extend PyodideGameCoordinator
 
-**File**: `interactive_gym/server/pyodide_game_coordinator.py`
+**File**: `mug/server/pyodide_game_coordinator.py`
 
 Add to `PyodideGameState`:
 
@@ -401,7 +401,7 @@ def create_game(
     game_state.server_authoritative = server_authoritative
 
     if server_authoritative and environment_code:
-        from interactive_gym.server.server_game_runner import ServerGameRunner
+        from mug.server.server_game_runner import ServerGameRunner
 
         game_state.server_runner = ServerGameRunner(
             game_id=game_id,
@@ -588,7 +588,7 @@ constructor(config) {
 
 #### 3.1 Add Options to GymScene
 
-**File**: `interactive_gym/scenes/gym_scene.py`
+**File**: `mug/scenes/gym_scene.py`
 
 Add to `__init__`:
 
@@ -651,7 +651,7 @@ def multiplayer(
 
 ### Phase 4: GameManager Integration
 
-**File**: `interactive_gym/server/game_manager.py`
+**File**: `mug/server/game_manager.py`
 
 In the Pyodide game creation section, pass server_authoritative config:
 
@@ -676,7 +676,7 @@ if self.scene.run_through_pyodide and self.scene.pyodide_multiplayer:
 
 ### Phase 5: Pass Config to Client
 
-**File**: `interactive_gym/server/static/js/index.js` or where game config is built
+**File**: `mug/server/static/js/index.js` or where game config is built
 
 Ensure `server_authoritative` is passed to the client game:
 
