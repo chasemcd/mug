@@ -17,7 +17,7 @@ class UnityScene(scene.Scene):
     UnityScene is a Scene that represents an interaction with a Unity-based environment.
 
     This is particularly focused on settings where we have a game, e.g., a Unity game built
-    with WebGL, and we want users to interact with it in an Interactive Gym experiment.
+    with WebGL, and we want users to interact with it in an MUG experiment.
     """
 
     def __init__(self):
