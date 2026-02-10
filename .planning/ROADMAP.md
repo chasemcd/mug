@@ -16,7 +16,7 @@ Rename the project from "Interactive Gym" to "Multi-User Gymnasium" (MUG) across
 ## Phases
 
 - [x] **Phase 84: Package & Code Rename** - Rename package directory, update all Python imports and class names ✓ 2026-02-10
-- [ ] **Phase 85: Documentation & Frontend** - Update all docs, templates, and frontend branding
+- [x] **Phase 85: Documentation & Frontend** - Update all docs, templates, and frontend branding ✓ 2026-02-10
 - [ ] **Phase 86: Final Verification** - Confirm zero stale references, all tests pass, all examples import
 
 ## Phase Details
@@ -49,9 +49,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 85-01-PLAN.md — Update README.rst, docs/conf.py, CSS, and all RST documentation source files
-- [ ] 85-02-PLAN.md — Update admin templates, JS comments, HTML template prose, and example READMEs
-- [ ] 85-03-PLAN.md — Update docs/ .md files and mountain_car_experiment.py with MUG branding
+- [x] 85-01-PLAN.md — Update README.rst, docs/conf.py, CSS, and all RST documentation source files
+- [x] 85-02-PLAN.md — Update admin templates, JS comments, HTML template prose, and example READMEs
+- [x] 85-03-PLAN.md — Update docs/ .md files and mountain_car_experiment.py with MUG branding
 
 ### Phase 86: Final Verification
 **Goal**: Zero stale references remain and the full test suite confirms no functional regressions
@@ -74,5 +74,5 @@ Plans:
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 84. Package & Code Rename | v1.26 | 2/2 | ✓ Complete | 2026-02-10 |
-| 85. Documentation & Frontend | v1.26 | 0/3 | Planned | - |
+| 85. Documentation & Frontend | v1.26 | 3/3 | ✓ Complete | 2026-02-10 |
 | 86. Final Verification | v1.26 | 0/TBD | Not started | - |
