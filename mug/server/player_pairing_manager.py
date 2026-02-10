@@ -14,8 +14,8 @@ import uuid
 import threading
 from typing import TYPE_CHECKING
 
-from interactive_gym.server import thread_safe_collections
-from interactive_gym.utils.typing import SubjectID, SceneID
+from mug.server import thread_safe_collections
+from mug.utils.typing import SubjectID, SceneID
 
 if TYPE_CHECKING:
     pass

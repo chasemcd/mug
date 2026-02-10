@@ -16,8 +16,8 @@ from dataclasses import dataclass, field, asdict
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from interactive_gym.server.matchmaker import MatchCandidate
-    from interactive_gym.server.admin.aggregator import AdminEventAggregator
+    from mug.server.matchmaker import MatchCandidate
+    from mug.server.admin.aggregator import AdminEventAggregator
 
 logger = logging.getLogger(__name__)
 

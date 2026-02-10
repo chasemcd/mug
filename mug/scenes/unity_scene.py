@@ -5,10 +5,10 @@ from typing import Any, Callable
 import copy
 import json
 
-from interactive_gym.scenes import scene
-from interactive_gym.configurations import remote_config
-from interactive_gym.configurations import configuration_constants
-from interactive_gym.utils.sentinels import NotProvided
+from mug.scenes import scene
+from mug.configurations import remote_config
+from mug.configurations import configuration_constants
+from mug.utils.sentinels import NotProvided
 import flask_socketio
 
 

@@ -174,7 +174,7 @@ class PyodideGameCoordinator:
 
             # Create server runner if server_authoritative mode enabled
             if server_authoritative and environment_code:
-                from interactive_gym.server.server_game_runner import ServerGameRunner
+                from mug.server.server_game_runner import ServerGameRunner
 
                 game_state.server_runner = ServerGameRunner(
                     game_id=game_id,
@@ -283,7 +283,7 @@ class PyodideGameCoordinator:
             if gm:
                 remote_game = gm.games.get(game_id)
                 if remote_game:
-                    from interactive_gym.server.remote_game import SessionState
+                    from mug.server.remote_game import SessionState
                     remote_game.transition_to(SessionState.PLAYING)
 
         # Initialize server runner if enabled (this is CPU-bound, OK to do in lock)
@@ -726,7 +726,7 @@ class PyodideGameCoordinator:
                 if gm:
                     remote_game = gm.games.get(game_id)
                     if remote_game:
-                        from interactive_gym.server.remote_game import SessionState
+                        from mug.server.remote_game import SessionState
                         remote_game.transition_to(SessionState.VALIDATING)
 
             logger.info(f"P2P validation started for game {game_id}")

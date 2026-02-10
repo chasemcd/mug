@@ -245,7 +245,7 @@ class LatencyFIFOMatchmaker(Matchmaker):
     is a precise post-filter.
 
     Example:
-        from interactive_gym.server.matchmaker import LatencyFIFOMatchmaker
+        from mug.server.matchmaker import LatencyFIFOMatchmaker
 
         matchmaker = LatencyFIFOMatchmaker(max_server_rtt_ms=200)
 
@@ -362,7 +362,7 @@ class GroupReunionMatchmaker(Matchmaker):
     where the same partners should play together across scenes.
 
     Example:
-        from interactive_gym.server.matchmaker import GroupReunionMatchmaker
+        from mug.server.matchmaker import GroupReunionMatchmaker
 
         scene_2 = (
             GymScene()

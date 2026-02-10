@@ -14,8 +14,8 @@ import eventlet
 import numpy as np
 from gymnasium import spaces
 
-from interactive_gym.configurations import configuration_constants
-from interactive_gym.scenes import gym_scene
+from mug.configurations import configuration_constants
+from mug.scenes import gym_scene
 
 logger = logging.getLogger(__name__)
 

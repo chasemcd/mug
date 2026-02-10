@@ -19,8 +19,8 @@ import eventlet
 
 if TYPE_CHECKING:
     import flask_socketio
-    from interactive_gym.server.pyodide_game_coordinator import PyodideGameCoordinator
-    from interactive_gym.server.app import ParticipantSession
+    from mug.server.pyodide_game_coordinator import PyodideGameCoordinator
+    from mug.server.app import ParticipantSession
 
 logger = logging.getLogger(__name__)
 

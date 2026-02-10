@@ -3,8 +3,8 @@ import copy
 import json
 from typing import Callable
 
-from interactive_gym.scenes.stager import Stager
-from interactive_gym.utils.sentinels import NotProvided
+from mug.scenes.stager import Stager
+from mug.utils.sentinels import NotProvided
 
 
 class ExperimentConfig:

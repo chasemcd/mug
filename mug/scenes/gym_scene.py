@@ -6,12 +6,12 @@ import copy
 import json
 
 if TYPE_CHECKING:
-    from interactive_gym.server.matchmaker import Matchmaker
+    from mug.server.matchmaker import Matchmaker
 
-from interactive_gym.scenes import scene
-from interactive_gym.configurations import remote_config
-from interactive_gym.configurations import configuration_constants
-from interactive_gym.utils.sentinels import NotProvided
+from mug.scenes import scene
+from mug.configurations import remote_config
+from mug.configurations import configuration_constants
+from mug.utils.sentinels import NotProvided
 
 
 class GymScene(scene.Scene):
@@ -582,7 +582,7 @@ class GymScene(scene.Scene):
         :rtype: GymScene
 
         Example:
-            from interactive_gym.server.matchmaker import FIFOMatchmaker
+            from mug.server.matchmaker import FIFOMatchmaker
 
             scene.matchmaking(
                 hide_lobby_count=True,  # Don't show "2/4 players in lobby"
@@ -600,7 +600,7 @@ class GymScene(scene.Scene):
 
         if matchmaker is not NotProvided:
             # Runtime import to avoid circular dependency
-            from interactive_gym.server.matchmaker import Matchmaker as MatchmakerABC
+            from mug.server.matchmaker import Matchmaker as MatchmakerABC
             if not isinstance(matchmaker, MatchmakerABC):
                 raise TypeError("matchmaker must be a Matchmaker subclass instance")
             self._matchmaker = matchmaker
@@ -849,7 +849,7 @@ class GymScene(scene.Scene):
 
         if matchmaker is not NotProvided:
             # Runtime import to avoid circular dependency
-            from interactive_gym.server.matchmaker import Matchmaker as MatchmakerABC
+            from mug.server.matchmaker import Matchmaker as MatchmakerABC
             if not isinstance(matchmaker, MatchmakerABC):
                 raise TypeError("matchmaker must be a Matchmaker subclass instance")
             self._matchmaker = matchmaker

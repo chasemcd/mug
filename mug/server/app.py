@@ -18,25 +18,25 @@ import urllib.request
 import flask
 import flask_socketio
 
-from interactive_gym.utils.typing import SubjectID, SceneID
-from interactive_gym.scenes import gym_scene
-from interactive_gym.server import game_manager
+from mug.utils.typing import SubjectID, SceneID
+from mug.scenes import gym_scene
+from mug.server import game_manager
 
-from interactive_gym.configurations import remote_config
-from interactive_gym.server import thread_safe_collections
-from interactive_gym.server.remote_game import AvailableSlot
-from interactive_gym.scenes import stager
-from interactive_gym.scenes import unity_scene
-from interactive_gym.server import pyodide_game_coordinator
-from interactive_gym.server import player_pairing_manager
-from interactive_gym.server.participant_state import ParticipantState, ParticipantStateTracker
+from mug.configurations import remote_config
+from mug.server import thread_safe_collections
+from mug.server.remote_game import AvailableSlot
+from mug.scenes import stager
+from mug.scenes import unity_scene
+from mug.server import pyodide_game_coordinator
+from mug.server import player_pairing_manager
+from mug.server.participant_state import ParticipantState, ParticipantStateTracker
 
 from flask_login import LoginManager
-from interactive_gym.server.admin import admin_bp, AdminUser
-from interactive_gym.server.admin.namespace import AdminNamespace
-from interactive_gym.server.admin.aggregator import AdminEventAggregator
-from interactive_gym.server.match_logger import MatchAssignmentLogger
-from interactive_gym.server.probe_coordinator import ProbeCoordinator
+from mug.server.admin import admin_bp, AdminUser
+from mug.server.admin.namespace import AdminNamespace
+from mug.server.admin.aggregator import AdminEventAggregator
+from mug.server.match_logger import MatchAssignmentLogger
+from mug.server.probe_coordinator import ProbeCoordinator
 
 
 @dataclasses.dataclass

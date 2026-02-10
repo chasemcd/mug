@@ -2,7 +2,7 @@ import logging
 import copy
 import flask_socketio
 
-from interactive_gym.scenes import scene, static_scene
+from mug.scenes import scene, static_scene
 
 
 logger = logging.getLogger(__name__)

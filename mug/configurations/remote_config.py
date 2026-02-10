@@ -4,7 +4,7 @@ import copy
 import json
 import typing
 
-from interactive_gym.configurations import configuration_constants
+from mug.configurations import configuration_constants
 
 
 class RemoteConfig:

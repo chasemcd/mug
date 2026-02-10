@@ -12,7 +12,7 @@ import eventlet
 import flask
 import flask_socketio
 
-from interactive_gym.utils.typing import SubjectID, GameID, RoomID
+from mug.utils.typing import SubjectID, GameID, RoomID
 
 logger = logging.getLogger(__name__)
 # Add console handler to see game_manager logs
@@ -33,20 +33,20 @@ except ImportError:
         "have the canvas display whatever is returned from `env.render('rgb_array')`."
     )
 
-from interactive_gym.configurations import (
+from mug.configurations import (
     configuration_constants,
     remote_config,
 )
-from interactive_gym.server import remote_game, thread_safe_collections, pyodide_game_coordinator, player_pairing_manager
-from interactive_gym.server.remote_game import SessionState, GameExitStatus, AvailableSlot
-from interactive_gym.server.participant_state import ParticipantState
-from interactive_gym.server.matchmaker import Matchmaker, MatchCandidate, FIFOMatchmaker, GroupHistory
-from interactive_gym.server.match_logger import MatchAssignmentLogger
-from interactive_gym.scenes import stager, gym_scene, scene
+from mug.server import remote_game, thread_safe_collections, pyodide_game_coordinator, player_pairing_manager
+from mug.server.remote_game import SessionState, GameExitStatus, AvailableSlot
+from mug.server.participant_state import ParticipantState
+from mug.server.matchmaker import Matchmaker, MatchCandidate, FIFOMatchmaker, GroupHistory
+from mug.server.match_logger import MatchAssignmentLogger
+from mug.scenes import stager, gym_scene, scene
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from interactive_gym.server.probe_coordinator import ProbeCoordinator
+    from mug.server.probe_coordinator import ProbeCoordinator
 import flask_socketio
 
 
