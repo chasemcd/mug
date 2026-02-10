@@ -651,3 +651,142 @@ def multi_participant_contexts(browser):
         # This is critical for test isolation - ensures all WebRTC connections
         # are fully cleaned up before next test starts
         time.sleep(5)
+
+
+@pytest.fixture(scope="function")
+def flask_server_probe(tmp_path):
+    """
+    Start Flask server with P2P probe-enabled matchmaking for each test function.
+
+    Scope: function (fresh server per test for isolation)
+    Yields: dict with 'url', 'process', and 'stderr_path' keys
+
+    Uses overcooked_human_human_multiplayer_probe_test config with:
+    - FIFOMatchmaker(max_p2p_rtt_ms=100) for P2P RTT probing
+    - No RTT limit, no focus timeout, single short episode
+    - Port 5708 (different from other test ports)
+
+    stderr is written to a temp file (not subprocess.PIPE) to avoid pipe buffer
+    deadlock when 12+ clients generate heavy log output. Tests that need to parse
+    [Probe:Track] lines can read from stderr_path after the server is stopped.
+    """
+    port = 5708
+    base_url = f"http://localhost:{port}"
+
+    # Pre-startup: ensure port is available
+    _ensure_port_available(port)
+
+    # Write stderr to a file to avoid pipe buffer deadlock with 12+ clients
+    stderr_file_path = tmp_path / "server_stderr.log"
+    stderr_fh = open(stderr_file_path, "w")
+
+    process = subprocess.Popen(
+        [
+            "python",
+            "-m",
+            "interactive_gym.examples.cogrid.overcooked_human_human_multiplayer_probe_test",
+            "--port",
+            str(port),
+        ],
+        stdout=subprocess.DEVNULL,
+        stderr=stderr_fh,
+        start_new_session=True,
+    )
+
+    # Wait for server to be ready (poll health endpoint)
+    max_retries = 30
+    for attempt in range(max_retries):
+        try:
+            conn = HTTPConnection("localhost", port, timeout=1)
+            conn.request("GET", "/")
+            response = conn.getresponse()
+            conn.close()
+            if response.status < 500:
+                break
+        except (ConnectionRefusedError, OSError, TimeoutError):
+            pass
+
+        if process.poll() is not None:
+            stderr_fh.close()
+            stderr_content = stderr_file_path.read_text()
+            raise RuntimeError(
+                f"Probe Flask server exited unexpectedly (code {process.returncode}).\n"
+                f"stderr: {stderr_content}"
+            )
+
+        time.sleep(1)
+    else:
+        stderr_fh.close()
+        _teardown_server(process, port)
+        raise RuntimeError(
+            f"Probe Flask server failed to start after {max_retries} retries"
+        )
+
+    yield {"url": base_url, "process": process, "stderr_path": stderr_file_path}
+
+    # Teardown with port verification
+    _teardown_server(process, port)
+    stderr_fh.close()
+
+
+@pytest.fixture(scope="function")
+def stress_test_contexts(browser):
+    """
+    Create 12 isolated browser contexts for waitroom stress testing.
+
+    Scope: function (fresh contexts for each test)
+    Yields: tuple of 12 pages
+
+    Intended grouping: 6 pairs for probe-based matchmaking stress tests.
+
+    Note: Uses standard Chrome user agent to pass browser entry screening.
+    Browser contexts are lightweight (KB not MB) so 12 contexts per browser is safe.
+    """
+    chrome_ua = (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/120.0.0.0 Safari/537.36"
+    )
+
+    contexts = []
+    pages = []
+
+    try:
+        for i in range(12):
+            ctx = browser.new_context(user_agent=chrome_ua)
+            page = ctx.new_page()
+            contexts.append(ctx)
+            pages.append(page)
+
+        yield tuple(pages)
+
+    finally:
+        # Cleanup: close WebRTC connections before closing contexts
+        for page in pages:
+            try:
+                page.evaluate("""() => {
+                    // Close WebRTC peer connections
+                    if (window.webrtcManager && window.webrtcManager.peerConnection) {
+                        window.webrtcManager.peerConnection.close();
+                    }
+                    // Close probe connections if any
+                    if (window.probeConnection && window.probeConnection.peerConnection) {
+                        window.probeConnection.peerConnection.close();
+                    }
+                    // Disconnect socket
+                    if (window.socket && window.socket.connected) {
+                        window.socket.disconnect();
+                    }
+                }""")
+            except Exception:
+                pass  # Page may already be closed
+
+        # Close all contexts
+        for ctx in contexts:
+            try:
+                ctx.close()
+            except Exception:
+                pass
+
+        # Pause to allow server-side cleanup to process disconnect events
+        time.sleep(5)

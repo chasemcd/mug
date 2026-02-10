@@ -117,6 +117,10 @@ class GameManager:
         # until the matchmaker forms a complete match, then a game is created.
         self.waitroom_participants: list[SubjectID] = []
 
+        # Participants currently in an active P2P probe.
+        # Prevents a participant from entering two probes simultaneously.
+        self._probing_subjects: set[SubjectID] = set()
+
         # holds reset events so we only continue in game loop when triggered
         # this is not used when running with Pyodide
         self.reset_events = thread_safe_collections.ThreadSafeDict()
@@ -590,10 +594,17 @@ class GameManager:
             )
             return
 
-        # Filter to candidates still in waitroom
+        if arriving_subject_id in self._probing_subjects:
+            logger.info(
+                f"[Probe:Iterate] Arriving {arriving_subject_id} already in active probe. Deferring."
+            )
+            return
+
+        # Filter to candidates still in waitroom and not already probing
         candidates = [
             c for c in candidates
             if c.subject_id in self.waitroom_participants
+            and c.subject_id not in self._probing_subjects
         ]
 
         if not candidates:
@@ -618,6 +629,13 @@ class GameManager:
             subject_a=arriving_subject_id,
             subject_b=next_candidate.subject_id,
             on_complete=self._on_probe_complete,
+        )
+
+        self._probing_subjects.add(arriving_subject_id)
+        self._probing_subjects.add(next_candidate.subject_id)
+        logger.info(
+            f"[Probe:Track] Added {arriving_subject_id}, {next_candidate.subject_id} "
+            f"to _probing_subjects. Active: {self._probing_subjects}"
         )
 
         # Build matched list for this specific pairing
@@ -646,6 +664,13 @@ class GameManager:
             subject_b: Second subject in the probe
             rtt_ms: Measured RTT in milliseconds, or None if failed/timed out
         """
+        self._probing_subjects.discard(subject_a)
+        self._probing_subjects.discard(subject_b)
+        logger.info(
+            f"[Probe:Track] Removed {subject_a}, {subject_b} from _probing_subjects. "
+            f"Active: {self._probing_subjects}"
+        )
+
         # Find the pending match for this probe
         probe_session_id = None
         match_context = None
@@ -722,6 +747,7 @@ class GameManager:
                 if candidate.subject_id in self.waitroom_participants:
                     self.waitroom_participants.remove(candidate.subject_id)
                     logger.info(f"[Probe:Complete] Removed {candidate.subject_id} from waitroom_participants")
+                self._probing_subjects.discard(candidate.subject_id)
 
             # Create and start the game
             self._create_game_for_match_internal(matched)
@@ -895,6 +921,7 @@ class GameManager:
             if subject_id in self.waitroom_participants:
                 self.waitroom_participants.remove(subject_id)
                 logger.info(f"[CreateMatch] Removed {subject_id} from waitroom_participants")
+            self._probing_subjects.discard(subject_id)
 
             # Add to game tracking
             self.subject_games[subject_id] = game.game_id
@@ -972,6 +999,7 @@ class GameManager:
         # Check if subject is in waitroom (not yet in a game)
         if subject_id in self.waitroom_participants:
             self.waitroom_participants.remove(subject_id)
+            self._probing_subjects.discard(subject_id)
             logger.info(
                 f"[LeaveGame] Removed {subject_id} from waitroom_participants. "
                 f"Remaining: {self.waitroom_participants}"
@@ -1488,6 +1516,7 @@ class GameManager:
         # Phase 60+: Check if subject is in waitroom_participants (no game yet)
         if subject_id in self.waitroom_participants:
             self.waitroom_participants.remove(subject_id)
+            self._probing_subjects.discard(subject_id)
             logger.info(
                 f"[RemoveQuietly] Removed {subject_id} from waitroom_participants. "
                 f"Remaining: {self.waitroom_participants}"
