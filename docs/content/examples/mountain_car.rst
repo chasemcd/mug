@@ -1,7 +1,7 @@
 Mountain Car
 ============
 
-The Mountain Car example demonstrates how to create a single-player Pyodide experiment with custom rendering. It's the perfect starting point for learning Interactive Gym.
+The Mountain Car example demonstrates how to create a single-player Pyodide experiment with custom rendering. It's the perfect starting point for learning MUG.
 
 Overview
 --------
@@ -41,7 +41,7 @@ Features Demonstrated
 Prerequisites
 -------------
 
-1. Clone the Interactive Gym repository and install with server dependencies:
+1. Clone the MUG repository and install with server dependencies:
 
    .. code-block:: bash
 
@@ -49,7 +49,7 @@ Prerequisites
        cd interactive-gym
        pip install -e .[server]
 
-2. No additional dependencies required—this example uses only Gymnasium, which is included with Interactive Gym.
+2. No additional dependencies required—this example uses only Gymnasium, which is included with MUG.
 
 Running the Example
 -------------------
@@ -58,7 +58,7 @@ From the repository root, run as a module:
 
 .. code-block:: bash
 
-    python -m interactive_gym.examples.mountain_car.mountain_car_experiment
+    python -m mug.examples.mountain_car.mountain_car_experiment
 
 Then:
 
@@ -89,7 +89,7 @@ Main Experiment File
 
 **1. Eventlet Monkey Patching**
 
-All Interactive Gym experiments must start with:
+All MUG experiments must start with:
 
 .. code-block:: python
 
@@ -122,7 +122,7 @@ Specify that a human controls the environment:
 
 .. code-block:: python
 
-    from interactive_gym.configurations import configuration_constants
+    from mug.configurations import configuration_constants
 
     POLICY_MAPPING = {
         "human": configuration_constants.PolicyTypes.Human,
@@ -134,7 +134,7 @@ Create a welcome screen:
 
 .. code-block:: python
 
-    from interactive_gym.scenes import static_scene
+    from mug.scenes import static_scene
 
     start_scene = (
         static_scene.StartScene()
@@ -159,7 +159,7 @@ Configure the main gameplay scene:
 
 .. code-block:: python
 
-    from interactive_gym.scenes import gym_scene
+    from mug.scenes import gym_scene
 
     mountain_car_scene = (
         gym_scene.GymScene()
@@ -189,7 +189,7 @@ Configure the main gameplay scene:
         .runtime(
             run_through_pyodide=True,
             environment_initialization_code_filepath=(
-                "interactive_gym/examples/mountain_car/mountain_car_rgb_env.py"
+                "mug/examples/mountain_car/mountain_car_rgb_env.py"
             ),
         )
     )
@@ -222,9 +222,9 @@ Combine scenes and run the server:
 
 .. code-block:: python
 
-    from interactive_gym.scenes import stager
-    from interactive_gym.configurations import experiment_config
-    from interactive_gym.server import app
+    from mug.scenes import stager
+    from mug.configurations import experiment_config
+    from mug.server import app
 
     stager = stager.Stager(
         scenes=[start_scene, mountain_car_scene, end_scene]
@@ -251,16 +251,16 @@ Standard MountainCar uses pygame for rendering, which isn't pure Python and won'
 
 .. code-block:: python
 
-    from interactive_gym.configurations.object_contexts import Polygon, Circle, Line
+    from mug.configurations.object_contexts import Polygon, Circle, Line
 
 **2. Extend MountainCarEnv**
 
 .. code-block:: python
 
     import numpy as np
-    from gymnasium.envs.classic_control.mountain_car import MountainCarEnv
+    from gymnasium.envs.classic_control.mountain_car import MountainCarEnv as _BaseMountainCarEnv
 
-    class InteractiveGymMountainCar(MountainCarEnv):
+    class MountainCarEnv(_BaseMountainCarEnv):
 
         def step(self, actions: dict[str, int | float]):
             """Accept dict actions for multi-agent format."""
@@ -268,7 +268,7 @@ Standard MountainCar uses pygame for rendering, which isn't pure Python and won'
             action = actions["human"]
             return super().step(action)
 
-Interactive Gym passes actions as dictionaries with agent IDs as keys.
+MUG passes actions as dictionaries with agent IDs as keys.
 
 **3. Custom Render Method**
 
@@ -369,7 +369,7 @@ All objects are converted to dictionaries and returned for rendering.
 
 .. code-block:: python
 
-    env = InteractiveGymMountainCar(render_mode="interactive-gym")
+    env = MountainCarEnv(render_mode="interactive-gym")
 
 The environment must be created with ``render_mode="interactive-gym"`` and assigned to a variable named ``env``.
 
@@ -407,7 +407,7 @@ All computation happens in the browser. The server only receives and saves data.
 Data Collection
 ^^^^^^^^^^^^^^^
 
-Interactive Gym automatically tracks:
+MUG automatically tracks:
 
 - Observations
 - Actions

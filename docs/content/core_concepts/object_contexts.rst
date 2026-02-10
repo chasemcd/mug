@@ -1,7 +1,7 @@
 Object Contexts
 ===============
 
-Object contexts are lightweight dataclasses that define visual elements for rendering in Interactive Gym. Instead of sending RGB images, you describe **what** to render using objects like circles, lines, polygons, and sprites.
+Object contexts are lightweight dataclasses that define visual elements for rendering in MUG. Instead of sending RGB images, you describe **what** to render using objects like circles, lines, polygons, and sprites.
 
 Why Object Contexts?
 --------------------
@@ -24,7 +24,7 @@ Draw circular objects.
 
 .. code-block:: python
 
-    from interactive_gym.configurations.object_contexts import Circle
+    from mug.configurations.object_contexts import Circle
 
     ball = Circle(
         uuid="ball1",            # Unique identifier (required)
@@ -49,7 +49,7 @@ Draw lines, paths, or filled areas.
 
 .. code-block:: python
 
-    from interactive_gym.configurations.object_contexts import Line
+    from mug.configurations.object_contexts import Line
 
     path = Line(
         uuid="path1",            # Unique identifier (required)
@@ -75,7 +75,7 @@ Draw filled shapes with arbitrary vertices.
 
 .. code-block:: python
 
-    from interactive_gym.configurations.object_contexts import Polygon
+    from mug.configurations.object_contexts import Polygon
 
     triangle = Polygon(
         uuid="tri1",             # Unique identifier (required)
@@ -99,7 +99,7 @@ Display text labels or HUD elements.
 
 .. code-block:: python
 
-    from interactive_gym.configurations.object_contexts import Text
+    from mug.configurations.object_contexts import Text
 
     label = Text(
         uuid="score",            # Unique identifier (required)
@@ -122,7 +122,7 @@ Display images or animated sprites.
 
 .. code-block:: python
 
-    from interactive_gym.configurations.object_contexts import Sprite
+    from mug.configurations.object_contexts import Sprite
 
     player = Sprite(
         uuid="player1",          # Unique identifier (required)

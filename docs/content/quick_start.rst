@@ -1,7 +1,7 @@
 Quick Start
 ===========
 
-This guide will walk you through building your first Interactive Gym experiment. We'll create a Mountain Car experiment where participants control a car trying to reach a flag on a hill.
+This guide will walk you through building your first MUG experiment. We'll create a Mountain Car experiment where participants control a car trying to reach a flag on a hill.
 
 What You'll Build
 -----------------
@@ -18,32 +18,32 @@ The environment runs entirely in the participant's browser using Pyodide.
 Prerequisites
 -------------
 
-Install Interactive Gym with server dependencies:
+Install MUG with server dependencies:
 
 .. code-block:: bash
 
-    pip install interactive-gym[server]
+    pip install mug-py[server]
 
 Step 1: Create the Custom Environment
 --------------------------------------
 
-First, we'll create a custom Mountain Car environment with Interactive Gym's rendering system. The standard Mountain Car uses pygame for rendering, which isn't available in the browser. We'll override the ``render()`` method to use Interactive Gym's object-based rendering instead.
+First, we'll create a custom Mountain Car environment with MUG's rendering system. The standard Mountain Car uses pygame for rendering, which isn't available in the browser. We'll override the ``render()`` method to use MUG's object-based rendering instead.
 
 Create a file called ``mountain_car_rgb_env.py``:
 
 .. code-block:: python
 
     """
-    Custom Mountain Car that renders using Interactive Gym's object contexts.
+    Custom Mountain Car that renders using MUG's object contexts.
     This allows it to run in the browser via Pyodide.
     """
 
     import numpy as np
-    from gymnasium.envs.classic_control.mountain_car import MountainCarEnv
-    from interactive_gym.configurations.object_contexts import Circle, Line, Polygon
+    from gymnasium.envs.classic_control.mountain_car import MountainCarEnv as _BaseMountainCarEnv
+    from mug.configurations.object_contexts import Circle, Line, Polygon
 
 
-    class InteractiveGymMountainCar(MountainCarEnv):
+    class MountainCarEnv(_BaseMountainCarEnv):
 
         def step(self, actions: dict[str, int | float]):
             """Override step to accept dict of actions (required for multi-agent format)"""
@@ -125,13 +125,13 @@ Create a file called ``mountain_car_rgb_env.py``:
 
 
     # Create the environment instance (must be named 'env')
-    env = InteractiveGymMountainCar(render_mode="interactive-gym")
+    env = MountainCarEnv(render_mode="interactive-gym")
 
 **Key Points:**
 
 - Use ``render_mode="interactive-gym"`` when creating the environment
 - The ``render()`` method returns a list of object dictionaries
-- Objects are created using classes from ``interactive_gym.configurations.object_contexts``
+- Objects are created using classes from ``mug.configurations.object_contexts``
 - Coordinates are typically normalized to 0-1 range (relative to canvas size)
 - Each object needs a unique ``uuid`` identifier
 
@@ -148,9 +148,9 @@ Now create the main experiment file ``mountain_car_experiment.py``:
 
     eventlet.monkey_patch()
 
-    from interactive_gym.server import app
-    from interactive_gym.scenes import stager, static_scene, gym_scene
-    from interactive_gym.configurations import experiment_config, configuration_constants
+    from mug.server import app
+    from mug.scenes import stager, static_scene, gym_scene
+    from mug.configurations import experiment_config, configuration_constants
 
     # Define action constants
     LEFT_ACCELERATION = 0
@@ -301,18 +301,18 @@ Now that you've built your first experiment:
 Run Built-in Examples
 ----------------------
 
-Interactive Gym includes several complete examples you can try:
+MUG includes several complete examples you can try:
 
 .. code-block:: bash
 
     # Mountain Car (similar to what we built)
-    python -m interactive_gym.examples.mountain_car.mountain_car_experiment
+    python -m mug.examples.mountain_car.mountain_car_experiment
 
     # Slime Volleyball (human vs AI)
-    python -m interactive_gym.examples.slime_volleyball.human_ai_server
+    python -m mug.examples.slime_volleyball.human_ai_server
 
     # Overcooked (two-player cooperation)
-    python -m interactive_gym.examples.cogrid.overcooked_human_human_server_side
+    python -m mug.examples.cogrid.overcooked_human_human_server_side
 
 Troubleshooting
 ---------------
@@ -323,7 +323,7 @@ Install server dependencies:
 
 .. code-block:: bash
 
-    pip install interactive-gym[server]
+    pip install mug-py[server]
 
 **"File not found: mountain_car_rgb_env.py"**
 
@@ -349,4 +349,4 @@ Get Help
 - **Core Concepts**: :doc:`core_concepts/index` for detailed explanations
 - **Full Documentation**: Browse all docs at the main page
 - **GitHub Issues**: Report bugs at `github.com/chasemcd/interactive-gym/issues <https://github.com/chasemcd/interactive-gym/issues>`_
-- **Examples**: Check ``interactive_gym/examples/`` in the repository
+- **Examples**: Check ``mug/examples/`` in the repository

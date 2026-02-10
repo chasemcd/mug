@@ -42,7 +42,7 @@ Features Demonstrated
 Prerequisites
 -------------
 
-1. Clone the Interactive Gym repository and install with server dependencies:
+1. Clone the MUG repository and install with server dependencies:
 
    .. code-block:: bash
 
@@ -63,7 +63,7 @@ From the repository root, run as a module:
 
 .. code-block:: bash
 
-    python -m interactive_gym.examples.cogrid.overcooked_human_ai_client_side
+    python -m mug.examples.cogrid.overcooked_human_ai_client_side
 
 Then:
 
@@ -97,8 +97,8 @@ The experiment uses a Stager to manage scene progression:
 
 .. code-block:: python
 
-    from interactive_gym.scenes import stager, scene
-    from interactive_gym.examples.cogrid.scenes import scenes as oc_scenes
+    from mug.scenes import stager, scene
+    from mug.examples.cogrid.scenes import scenes as oc_scenes
 
     stager = stager.Stager(
         scenes=[
@@ -245,7 +245,7 @@ Solo practice before playing with AI:
         )
         .content(
             scene_header="Overcooked Tutorial",
-            scene_body_filepath="interactive_gym/server/static/templates/overcooked_controls.html",
+            scene_body_filepath="mug/server/static/templates/overcooked_controls.html",
             in_game_scene_body="""
                 <center>
                 <p>Use arrow keys and W to pick up/drop. Try delivering a dish!</p>
@@ -276,7 +276,7 @@ Overcooked uses texture atlases for efficient rendering:
 
 .. code-block:: python
 
-    from interactive_gym.configurations import object_contexts
+    from mug.configurations import object_contexts
 
     def overcooked_preload_assets_spec():
         terrain = object_contexts.AtlasSpec(
@@ -344,7 +344,7 @@ HUD Display
 Data Collection
 ---------------
 
-Interactive Gym automatically tracks:
+MUG automatically tracks:
 
 - Each player's observations
 - Actions taken by human and AI

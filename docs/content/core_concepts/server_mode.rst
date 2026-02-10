@@ -91,8 +91,8 @@ Server mode is enabled automatically when you have multiple human players:
 
 .. code-block:: python
 
-    from interactive_gym.scenes import gym_scene
-    from interactive_gym.configurations import configuration_constants
+    from mug.scenes import gym_scene
+    from mug.configurations import configuration_constants
 
     game_scene = (
         gym_scene.GymScene()

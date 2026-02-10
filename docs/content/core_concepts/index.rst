@@ -1,12 +1,12 @@
 Core Concepts
 =============
 
-This section provides in-depth documentation of Interactive Gym's architecture and key components. If you're new to Interactive Gym, start with the :doc:`../quick_start` guide first.
+This section provides in-depth documentation of MUG's architecture and key components. If you're new to MUG, start with the :doc:`../quick_start` guide first.
 
 Overview
 --------
 
-Interactive Gym is built around a simple architecture for running human experiments with Python-based environments in the browser:
+MUG is built around a simple architecture for running human experiments with Python-based environments in the browser:
 
 .. code-block:: text
 
@@ -36,7 +36,7 @@ Key Components
     Object contexts are lightweight dataclasses that define visual elements for rendering. Available types: Circle, Line, Polygon, Text, and Sprite.
 
 :doc:`rendering_system`
-    Understanding how Interactive Gym renders environments: coordinate systems, depth ordering, object lifecycle, and the frame-by-frame rendering process.
+    Understanding how MUG renders environments: coordinate systems, depth ordering, object lifecycle, and the frame-by-frame rendering process.
 
 :doc:`pyodide_mode`
     Run environments entirely in the participant's browser using Pyodide. Best for single-player experiments with pure Python environments.
@@ -47,7 +47,7 @@ Key Components
 Execution Modes
 ---------------
 
-Interactive Gym supports two execution modes:
+MUG supports two execution modes:
 
 **Pyodide (Client-Side)**
 
@@ -152,7 +152,7 @@ Data Flow
 Configuration Philosophy
 ------------------------
 
-Interactive Gym uses a fluent API for configuration:
+MUG uses a fluent API for configuration:
 
 .. code-block:: python
 
@@ -172,7 +172,7 @@ Each method returns the scene object, allowing you to chain configurations. This
 Thread Safety
 -------------
 
-Interactive Gym handles multiple participants concurrently using thread-safe data structures:
+MUG handles multiple participants concurrently using thread-safe data structures:
 
 - Each participant has their own Stager instance
 - Games are managed with locks to prevent race conditions

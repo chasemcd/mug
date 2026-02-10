@@ -41,7 +41,7 @@ Features Demonstrated
 Prerequisites
 -------------
 
-1. Clone the Interactive Gym repository and install with server dependencies:
+1. Clone the MUG repository and install with server dependencies:
 
    .. code-block:: bash
 
@@ -58,7 +58,7 @@ From the repository root, run as a module:
 
 .. code-block:: bash
 
-    python -m interactive_gym.examples.footsies.footsies_experiment
+    python -m mug.examples.footsies.footsies_experiment
 
 Then:
 
@@ -93,8 +93,8 @@ Experiment Flow
 
 .. code-block:: python
 
-    from interactive_gym.scenes import stager, scene
-    from interactive_gym.examples.footsies import scenes
+    from mug.scenes import stager, scene
+    from mug.examples.footsies import scenes
 
     stager = stager.Stager(
         scenes=[
@@ -134,7 +134,7 @@ Unity WebGL Scene
 
 .. code-block:: python
 
-    from interactive_gym.examples.footsies import footsies_scene
+    from mug.examples.footsies import footsies_scene
 
     FOOTSIES_BUILD_NAME = "footsies_webgl_47f26fc"
 
@@ -296,7 +296,7 @@ Player controls difficulty via slider:
     footsies_controllable_difficulty_scene = (
         footsies_scene.FootsiesControllableDifficultyScene()
         .display(
-            scene_body_filepath="interactive_gym/examples/footsies/static/controllable_difficulty.html",
+            scene_body_filepath="mug/examples/footsies/static/controllable_difficulty.html",
         )
         .game(num_episodes=45)
     )
@@ -310,7 +310,7 @@ Survey Collection
 
 .. code-block:: python
 
-    from interactive_gym.scenes import static_scene
+    from mug.scenes import static_scene
 
     footsies_initial_survey_scene = (
         static_scene.ScalesAndTextBox(
@@ -406,7 +406,7 @@ End with a completion code for Prolific/MTurk:
         )
     )
 
-Interactive Gym automatically generates a unique completion code displayed to the participant.
+MUG automatically generates a unique completion code displayed to the participant.
 
 How It Works
 ------------
@@ -432,7 +432,7 @@ Unity-Flask Communication
                                    12. Log data
     (Repeat 6-12)
 
-Unity communicates with Flask via JavaScript bridge, allowing Interactive Gym to control opponent policies and collect data.
+Unity communicates with Flask via JavaScript bridge, allowing MUG to control opponent policies and collect data.
 
 Opponent Randomization
 ^^^^^^^^^^^^^^^^^^^^^^

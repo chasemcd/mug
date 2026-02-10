@@ -1,12 +1,12 @@
 Installation
 ============
 
-Interactive Gym requires Python 3.8 or higher and can be installed via pip.
+Multi-User Gymnasium (MUG) requires Python 3.8 or higher and can be installed via pip.
 
 Prerequisites
 -------------
 
-Before installing Interactive Gym, ensure you have:
+Before installing MUG, ensure you have:
 
 - Python 3.8 or higher
 - pip (Python package installer)
@@ -15,11 +15,11 @@ Before installing Interactive Gym, ensure you have:
 Installation
 ------------
 
-When building experiments, always install Interactive Gym with the server option:
+When building experiments, always install MUG with the server option:
 
 .. code-block:: bash
 
-    pip install interactive-gym[server]
+    pip install mug-py[server]
 
 This installs all dependencies needed to create and host experiments:
 
@@ -39,12 +39,12 @@ This installs all dependencies needed to create and host experiments:
 
 .. note::
 
-   The base installation (``pip install interactive-gym``) without ``[server]`` only installs the minimal core dependencies (``gymnasium`` and ``numpy``). This minimal version is automatically installed by Pyodide in the participant's browser when running client-side experiments. **As an experiment developer, you should always use the ``[server]`` option.**
+   The base installation (``pip install mug-py``) without ``[server]`` only installs the minimal core dependencies (``gymnasium`` and ``numpy``). This minimal version is automatically installed by Pyodide in the participant's browser when running client-side experiments. **As an experiment developer, you should always use the ``[server]`` option.**
 
 Development Installation
 ------------------------
 
-To contribute to Interactive Gym or modify the source code, clone the repository and install in editable mode:
+To contribute to MUG or modify the source code, clone the repository and install in editable mode:
 
 .. code-block:: bash
 
@@ -61,16 +61,16 @@ For development with server dependencies:
 Verify Installation
 -------------------
 
-Verify that Interactive Gym is installed correctly:
+Verify that MUG is installed correctly:
 
 .. code-block:: python
 
-    import interactive_gym
+    import mug
 
     # Check that core modules are available
-    from interactive_gym.scenes import gym_scene, static_scene, stager
-    from interactive_gym.configurations import experiment_config
-    from interactive_gym.server import app
+    from mug.scenes import gym_scene, static_scene, stager
+    from mug.configurations import experiment_config
+    from mug.server import app
 
     print("Installation successful!")
 
@@ -91,9 +91,9 @@ All experiment files must include eventlet monkey patching at the very top, befo
 
     eventlet.monkey_patch()
 
-    # Now import Interactive Gym and other modules
-    from interactive_gym.server import app
-    from interactive_gym.scenes import stager, static_scene, gym_scene
+    # Now import MUG and other modules
+    from mug.server import app
+    from mug.scenes import stager, static_scene, gym_scene
     # ... rest of your imports
 
 This monkey patching must occur before importing any other modules to ensure proper asynchronous networking behavior. Without it, your experiments may not work correctly.
@@ -101,13 +101,13 @@ This monkey patching must occur before importing any other modules to ensure pro
 Common Installation Issues
 --------------------------
 
-**ImportError: No module named 'interactive_gym'**
+**ImportError: No module named 'mug'**
 
 Ensure you've activated the correct Python environment and that pip installed the package successfully:
 
 .. code-block:: bash
 
-    pip show interactive-gym
+    pip show mug-py
 
 **Module 'eventlet' has no attribute 'monkey_patch'**
 
@@ -144,7 +144,7 @@ On Windows, if you encounter issues with eventlet, consider using Windows Subsys
 
 .. code-block:: bash
 
-    conda install -c conda-forge interactive-gym
+    conda install -c conda-forge mug-py
 
 Linux
 ^^^^^
@@ -167,23 +167,23 @@ Using venv (built-in)
 
 .. code-block:: bash
 
-    python -m venv interactive-gym-env
-    source interactive-gym-env/bin/activate  # On Windows: interactive-gym-env\Scripts\activate
-    pip install interactive-gym
+    python -m venv mug-env
+    source mug-env/bin/activate  # On Windows: mug-env\Scripts\activate
+    pip install mug-py
 
 Using conda
 ^^^^^^^^^^^
 
 .. code-block:: bash
 
-    conda create -n interactive-gym python=3.11
-    conda activate interactive-gym
-    pip install interactive-gym
+    conda create -n mug python=3.11
+    conda activate mug
+    pip install mug-py
 
 Next Steps
 ----------
 
-Now that you have Interactive Gym installed, you can:
+Now that you have MUG installed, you can:
 
 1. Follow the :doc:`quick_start` to create your first experiment
 2. Explore the :doc:`tutorials/basic_single_player` for a complete walkthrough

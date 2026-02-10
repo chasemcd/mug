@@ -40,7 +40,7 @@ Features Demonstrated
 Prerequisites
 -------------
 
-1. Clone the Interactive Gym repository and install with server dependencies:
+1. Clone the MUG repository and install with server dependencies:
 
    .. code-block:: bash
 
@@ -65,7 +65,7 @@ Run the game entirely in the browser:
 
 .. code-block:: bash
 
-    python -m interactive_gym.examples.slime_volleyball.human_ai_pyodide
+    python -m mug.examples.slime_volleyball.human_ai_pyodide
 
 **Server Mode**
 
@@ -73,7 +73,7 @@ Run with server-side environment execution:
 
 .. code-block:: bash
 
-    python -m interactive_gym.examples.slime_volleyball.human_ai_server
+    python -m mug.examples.slime_volleyball.human_ai_server
 
 Both modes:
 
@@ -112,7 +112,7 @@ Define human and AI players:
 
 .. code-block:: python
 
-    from interactive_gym.configurations import configuration_constants
+    from mug.configurations import configuration_constants
 
     POLICY_MAPPING = {
         "agent_right": configuration_constants.PolicyTypes.Human,
@@ -148,7 +148,7 @@ Tuple keys ``("ArrowLeft", "ArrowUp")`` represent simultaneous key presses.
 
 .. code-block:: python
 
-    from interactive_gym.scenes import gym_scene
+    from mug.scenes import gym_scene
 
     slime_scene = (
         gym_scene.GymScene()
@@ -178,7 +178,7 @@ Tuple keys ``("ArrowLeft", "ArrowUp")`` represent simultaneous key presses.
         .runtime(
             run_through_pyodide=True,
             environment_initialization_code_filepath=(
-                "interactive_gym/examples/slime_volleyball/slimevb_env.py"
+                "mug/examples/slime_volleyball/slimevb_env.py"
             ),
             packages_to_install=[
                 "slimevb==0.0.2",
@@ -221,7 +221,7 @@ The file defines lightweight versions of object contexts for Pyodide:
         def as_dict(self):
             return dataclasses.asdict(self)
 
-These are duplicated from Interactive Gym's object contexts to run in Pyodide without importing the full library.
+These are duplicated from MUG's object contexts to run in Pyodide without importing the full library.
 
 **2. Coordinate Conversion**
 
@@ -409,7 +409,7 @@ Key differences:
     # No .runtime() configuration
     # Environment runs server-side
 
-    from interactive_gym.utils import onnx_inference_utils
+    from mug.utils import onnx_inference_utils
 
     config = (
         remote_config.RemoteConfig()
@@ -495,7 +495,7 @@ The ONNX model is loaded in the browser:
         "agent_left": "static/assets/slime_volleyball/models/model.onnx",
     }
 
-Interactive Gym automatically:
+MUG automatically:
 
 1. Downloads the ONNX file to the browser
 2. Loads it with ONNX Runtime Web
@@ -508,7 +508,7 @@ ONNX models run server-side:
 
 .. code-block:: python
 
-    from interactive_gym.utils import onnx_inference_utils
+    from mug.utils import onnx_inference_utils
 
     config.policies(
         policy_mapping=POLICY_MAPPING,
@@ -516,4 +516,4 @@ ONNX models run server-side:
         load_policy_fn=onnx_inference_utils.load_onnx_policy_fn,
     )
 
-Interactive Gym loads the model on the server and runs inference using ``onnxruntime``.
+MUG loads the model on the server and runs inference using ``onnxruntime``.

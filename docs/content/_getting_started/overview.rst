@@ -1,7 +1,7 @@
 Getting Started
 ----------------
 
-At a high level, an Interactive Gym experiment is defined by a set of scenes. 
+At a high level, a MUG experiment is defined by a set of scenes. 
 Each scene defines what should be displayed to participants and what interactions can 
 occur. 
 
@@ -10,7 +10,7 @@ displays static informaiton to clients and can also be used to collect some form
 (e.g., text boxes, option buttons). The latter defines an interaction with a simulation 
 environment and is where the core interactions occur. 
 
-Interactive Gym utilizes a ``Stager``, which manages participants' progression through a sequence
+MUG utilizes a ``Stager``, which manages participants' progression through a sequence
 of scenes. A ``Stager`` is initialized with a list of scenes and, when a participant joins, a stager
 is initialized for that participant to track their progress through the scenes. 
 
@@ -23,7 +23,7 @@ advancing).
 A ``GymScenes`` takes in all parameters to configure interaction with a 
 simulation environment (in ``PettingZoo`` parallel environment format).
 
-The structure of an Interactive Gym experiment is as follows:
+The structure of a MUG experiment is as follows:
 
 .. code-block:: python
 
@@ -33,7 +33,7 @@ The structure of an Interactive Gym experiment is as follows:
             scene_id="my_start_scene",
         )
         .display(
-            scene_header="Welcome to my Interactive Gym Experiment!",
+            scene_header="Welcome to my MUG Experiment!",
             scene_body_filepath="This is an example body text for a start scene.",
         )
     )
