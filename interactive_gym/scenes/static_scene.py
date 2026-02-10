@@ -5,7 +5,7 @@ from typing import Any
 from flask_socketio import SocketIO
 
 from interactive_gym.scenes import scene
-from interactive_gym.scenes.utils import NotProvided
+from interactive_gym.utils.sentinels import NotProvided
 
 
 class StaticScene(scene.Scene):
@@ -178,88 +178,6 @@ class CompletionCodeScene(EndScene):
         return metadata
 
 
-class OptionBoxes(StaticScene):
-    """A StaticScene that presents a set of clickable option boxes to the user.
-
-    This scene displays a horizontal line of colored boxes, each representing an option.
-    Users can click on a box to select it, which enables the advance button.
-    """
-
-    def __init__(
-        self, scene_id: str, experiment_config: dict, options: list[str]
-    ):
-        super().__init__(scene_id, experiment_config)
-
-        self.scene_body = self._create_html_option_boxes(options)
-
-    def _create_html_option_boxes(self, options: list[str]) -> str:
-        """
-        Given a list of N options, creates HTML code to display a horizontal line of N boxes,
-        each with a unique color. Each box is labeled by a string in the options list.
-        When a user clicks a box, it becomes highlighted.
-        The advance button is only enabled when a box is clicked.
-        """
-        colors = [
-            "#FF6F61",
-            "#6B5B95",
-            "#88B04B",
-            "#F7CAC9",
-            "#92A8D1",
-            "#955251",
-            "#B565A7",
-            "#009B77",
-        ]  # Example colors
-        html = '<div id="option-boxes-container" style="display: flex; justify-content: space-around; gap: 10px;">\n'
-
-        for i, option in enumerate(options):
-            color = colors[
-                i % len(colors)
-            ]  # Cycle through colors if there are more options than colors
-            html += f"""
-            <div id="option-{i}" class="option-box" style="
-                background-color: {color};
-                padding: 20px;
-                cursor: pointer;
-                border-radius: 10px;
-                border: 2px solid transparent;
-                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-                text-align: center;
-                transition: transform 0.2s ease, box-shadow 0.2s ease;">
-                <span style="font-size: 16px; color: white;">{option}</span>
-            </div>
-            """
-
-        html += "</div>\n"
-        html += """
-        <script>
-        $("#advanceButton").attr("disabled", true);
-        $("#advanceButton").show();
-
-        document.querySelectorAll('.option-box').forEach(function(box) {
-            box.addEventListener('click', function() {
-                // Reset all boxes
-                document.querySelectorAll('.option-box').forEach(function(b) {
-                    b.style.border = '2px solid transparent';
-                    b.style.transform = 'scale(1)';
-                    b.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.1)';
-                });
-
-                // Highlight the clicked box
-                box.style.border = '2px solid black';
-                box.style.transform = 'scale(1.05)';
-                box.style.boxShadow = '0 8px 16px rgba(0, 0, 0, 0.2)';
-
-                // Enable the advance button
-                document.getElementById('advanceButton').disabled = false;
-            });
-        });
-
-        </script>
-        """
-
-        return html
-
-
 class TextBox(StaticScene):
     """A StaticScene that displays a text box for user input.
 
@@ -328,118 +246,6 @@ class TextBox(StaticScene):
             });
             </script>
             """
-
-        return html
-
-
-class OptionBoxesWithTextBox(StaticScene):
-    """A StaticScene subclass that displays option boxes and a text box.
-
-    This class creates a scene with multiple clickable option boxes and a text input box.
-    It allows users to select an option and provide additional text input.
-
-    :param StaticScene: The parent class for static scenes in the Interactive Gym.
-    :type StaticScene: StaticScene
-    """
-
-    def __init__(
-        self,
-        scene_id: str,
-        experiment_config: dict,
-        options: list[str],
-        text_box_header: str,  # TODO(chase): Move this to .display()
-    ):
-        super().__init__(scene_id, experiment_config)
-
-        self.scene_body = self._create_html_option_boxes(
-            options, text_box_header
-        )
-
-    def _create_html_option_boxes(
-        self, options: list[str], text_box_header: str
-    ) -> str:
-        """
-        Given a list of N options, creates HTML code to display a horizontal line of N boxes,
-        each with a unique color. Each box is labeled by a string in the options list.
-        When a user clicks a box, it becomes highlighted.
-        The advance button is only enabled when a box is clicked.
-        """
-        colors = [
-            "#FF6F61",
-            "#6B5B95",
-            "#88B04B",
-            "#F7CAC9",
-            "#92A8D1",
-            "#955251",
-            "#B565A7",
-            "#009B77",
-        ]  # Example colors
-        html = '<div id="option-boxes-container" style="display: flex; justify-content: space-around; gap: 10px;">\n'
-
-        for i, option in enumerate(options):
-            color = colors[
-                i % len(colors)
-            ]  # Cycle through colors if there are more options than colors
-            html += f"""
-            <div id="option-{i}" class="option-box" style="
-                background-color: {color};
-                padding: 20px;
-                cursor: pointer;
-                border-radius: 10px;
-                border: 2px solid transparent;
-                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-                text-align: center;
-                transition: transform 0.2s ease, box-shadow 0.2s ease;">
-                <span style="font-size: 16px; color: white;">{option}</span>
-            </div>
-            """
-
-        html += "</div>\n"
-        html += "</div>\n"
-
-        # Add text box
-        html += f"""
-        <div style="margin-top: 20px; text-align: center;">
-            <h3>{text_box_header}</h3>
-            <textarea id="user-input" rows="4" cols="50" style="width: 100%; max-width: 500px;"></textarea>
-        </div>
-        """
-
-        html += """
-        <script>
-        $("#advanceButton").attr("disabled", true);
-        $("#advanceButton").show();
-
-        function checkInputs() {
-            var boxSelected = document.querySelector('.option-box[style*="border: 2px solid black"]') !== null;
-            var textEntered = document.getElementById('user-input').value.trim() !== '';
-            document.getElementById('advanceButton').disabled = !(boxSelected && textEntered);
-        }
-
-        document.querySelectorAll('.option-box').forEach(function(box) {
-            box.addEventListener('click', function() {
-                // Reset all boxes
-                document.querySelectorAll('.option-box').forEach(function(b) {
-                    b.style.border = '2px solid transparent';
-                    b.style.transform = 'scale(1)';
-                    b.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.1)';
-                });
-
-                // Highlight the clicked box
-                box.style.border = '2px solid black';
-                box.style.transform = 'scale(1.05)';
-                box.style.boxShadow = '0 8px 16px rgba(0, 0, 0, 0.2)';
-
-                // Enable the advance button
-                document.getElementById('advanceButton').disabled = false;
-
-                checkInputs();
-            });
-        });
-
-        document.getElementById('user-input').addEventListener('input', checkInputs);
-        </script>
-        """
 
         return html
 

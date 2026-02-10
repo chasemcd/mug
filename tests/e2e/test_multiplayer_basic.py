@@ -24,8 +24,10 @@ from tests.fixtures.game_helpers import (
     get_game_state,
     click_advance_button,
     click_start_button,
+    get_scene_id,
 )
 from tests.fixtures.network_helpers import set_tab_visibility
+from tests.fixtures.export_helpers import get_experiment_id, wait_for_episode_with_parity
 
 
 @pytest.mark.timeout(300)  # 5 minutes max for full flow
@@ -81,20 +83,24 @@ def test_two_players_connect_and_complete_episode(flask_server, player_contexts)
     assert state1["gameId"] == state2["gameId"], "Players should be in same game"
     assert state1["playerId"] != state2["playerId"], "Players should have different IDs"
 
-    # Step 7: Wait for first episode to complete
-    # Players are idle, so episode completes via time limit
-    # Overcooked cramped_room has short episodes (~60s)
-    wait_for_episode_complete(page1, episode_num=1, timeout=180000)
-    wait_for_episode_complete(page2, episode_num=1, timeout=180000)
+    # Step 7: Wait for first episode to complete WITH parity validation
+    scene_id = get_scene_id(page1)
+    success, message = wait_for_episode_with_parity(
+        page1, page2,
+        experiment_id=get_experiment_id(),
+        scene_id=scene_id,
+        episode_num=0,  # 0-indexed for file names
+        episode_timeout_sec=180,
+        export_timeout_sec=30,
+        parity_row_tolerance=10,
+        verbose=True,
+    )
+    assert success, f"Episode parity validation failed: {message}"
 
-    # Step 8: Verify completion state
+    # Step 8: Get final state and log success metrics
     final_state1 = get_game_state(page1)
     final_state2 = get_game_state(page2)
 
-    assert final_state1["numEpisodes"] >= 1, "Player 1 should have completed 1+ episodes"
-    assert final_state2["numEpisodes"] >= 1, "Player 2 should have completed 1+ episodes"
-
-    # Log success metrics
     print(f"Game completed: gameId={final_state1['gameId']}")
     print(f"Player 1: episodes={final_state1['numEpisodes']}, frames={final_state1['frameNumber']}")
     print(f"Player 2: episodes={final_state2['numEpisodes']}, frames={final_state2['frameNumber']}")

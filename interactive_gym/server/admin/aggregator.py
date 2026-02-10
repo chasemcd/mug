@@ -49,7 +49,7 @@ class AdminEventAggregator:
 
     def __init__(
         self,
-        sio: flask_socketio.SocketIO,
+        socketio: flask_socketio.SocketIO,
         participant_sessions: dict,  # PARTICIPANT_SESSIONS
         stagers: dict,               # STAGERS
         game_managers: dict,         # GAME_MANAGERS
@@ -62,7 +62,7 @@ class AdminEventAggregator:
         Initialize the aggregator with references to experiment state.
 
         Args:
-            sio: Flask-SocketIO instance for emitting updates
+            socketio: Flask-SocketIO instance for emitting updates
             participant_sessions: Reference to PARTICIPANT_SESSIONS dict
             stagers: Reference to STAGERS dict
             game_managers: Reference to GAME_MANAGERS dict
@@ -78,7 +78,7 @@ class AdminEventAggregator:
 
         # Store references (read-only access)
         # Do NOT modify these - observer pattern only
-        self.sio = sio
+        self.socketio = socketio
         self.participant_sessions = participant_sessions
         self.stagers = stagers
         self.game_managers = game_managers
@@ -203,57 +203,6 @@ class AdminEventAggregator:
         if subject_id not in self._participant_games:
             self._participant_games[subject_id] = []
 
-    def track_participant_game_start(
-        self,
-        subject_id: str,
-        game_id: str,
-        role: str = 'player'
-    ) -> None:
-        """
-        Track when a participant joins a game.
-
-        Args:
-            subject_id: The participant's subject ID
-            game_id: The game ID they joined
-            role: Their role (e.g., 'host', 'player')
-        """
-        if subject_id not in self._participant_games:
-            self._participant_games[subject_id] = []
-
-        self._participant_games[subject_id].append({
-            'game_id': game_id,
-            'started_at': time.time(),
-            'ended_at': None,
-            'role': role,
-            'termination_reason': None
-        })
-        logger.debug(f"Tracked game start for {subject_id} in {game_id}")
-
-    def track_participant_game_end(
-        self,
-        subject_id: str,
-        game_id: str,
-        termination_reason: str = 'normal'
-    ) -> None:
-        """
-        Track when a participant's game ends.
-
-        Args:
-            subject_id: The participant's subject ID
-            game_id: The game ID that ended
-            termination_reason: Why the game ended
-        """
-        if subject_id not in self._participant_games:
-            return
-
-        # Find and update the matching game entry
-        for game_entry in reversed(self._participant_games[subject_id]):
-            if game_entry['game_id'] == game_id and game_entry['ended_at'] is None:
-                game_entry['ended_at'] = time.time()
-                game_entry['termination_reason'] = termination_reason
-                logger.debug(f"Tracked game end for {subject_id} in {game_id}: {termination_reason}")
-                break
-
     def record_session_termination(
         self,
         game_id: str,
@@ -351,109 +300,6 @@ class AdminEventAggregator:
                 del self._completed_games[old_id]
 
         logger.debug(f"Added completed game to history: {game_id}")
-
-    def archive_active_session(self, game_id: str, reason: str = 'normal') -> None:
-        """
-        Archive an active session to history when it ends.
-
-        Call this when a game ends (normally or abnormally) to preserve
-        it in session history for admin viewing.
-
-        Args:
-            game_id: The game ID to archive
-            reason: Termination reason
-        """
-        # Get current state of this session
-        active_games = self._get_active_games_state()
-        session = next((g for g in active_games if g['game_id'] == game_id), None)
-
-        if session:
-            # Get player console logs for this session
-            subject_ids = session.get('subject_ids', [])
-            player_logs = [
-                log for log in list(self._console_logs)
-                if log.get('subject_id') in subject_ids
-            ][-50:]  # Last 50 logs
-
-            session['archived_logs'] = player_logs
-            self._add_completed_game(
-                game_id,
-                session,
-                self._session_terminations.get(game_id, {
-                    'reason': reason,
-                    'timestamp': time.time(),
-                    'players': subject_ids,
-                    'details': {}
-                })
-            )
-            logger.info(f"Archived session {game_id} to history")
-
-    def get_session_detail(self, game_id: str) -> dict | None:
-        """
-        Get detailed information for a specific session.
-
-        Args:
-            game_id: The game ID
-
-        Returns:
-            Dict with session info, termination reason, and player console logs
-        """
-        # Get active game state if still running
-        game_state = None
-        if self.pyodide_coordinator and game_id in self.pyodide_coordinator.games:
-            game = self.pyodide_coordinator.games[game_id]
-            p2p_health = self._get_p2p_health_for_game(game_id)
-            game_state = {
-                'game_id': game_id,
-                'players': list(game.players.keys()),
-                'host_id': game.host_id,
-                'is_server_authoritative': game.server_authoritative,
-                'created_at': getattr(game, 'created_at', None),
-                'p2p_health': p2p_health,
-                'session_health': self._compute_session_health(p2p_health)
-            }
-
-        # Get termination info if session ended
-        termination = self._session_terminations.get(game_id)
-
-        # Get player list from game_state or termination
-        players = []
-        if game_state:
-            players = game_state['players']
-        elif termination:
-            players = termination.get('players', [])
-
-        # Filter console logs for these players (last 50 per player, errors prioritized)
-        player_logs = []
-        for log in list(self._console_logs):
-            if log.get('subject_id') in players:
-                player_logs.append(log)
-
-        # Sort by timestamp descending, prioritize errors
-        player_logs.sort(key=lambda x: (
-            0 if x.get('level') == 'error' else 1,
-            -x.get('timestamp', 0)
-        ))
-        player_logs = player_logs[:100]  # Limit to 100 logs
-
-        return {
-            'game_state': game_state,
-            'termination': termination,
-            'player_logs': player_logs
-        }
-
-    def track_wait_complete(self, subject_id: str, wait_duration_ms: float) -> None:
-        """
-        Track when a participant finishes waiting in a waitroom.
-
-        Called when a participant is matched and leaves the waiting room.
-
-        Args:
-            subject_id: The participant's subject ID
-            wait_duration_ms: How long they waited in milliseconds
-        """
-        self._wait_time_samples.append(wait_duration_ms)
-        logger.debug(f"Wait time recorded for {subject_id}: {wait_duration_ms:.0f}ms")
 
     def track_waitroom_timeout(self, subject_id: str, scene_id: str | None = None) -> None:
         """
@@ -821,44 +667,6 @@ class AdminEventAggregator:
             'current_episode': current_episode
         }
 
-    def get_participant_detail(self, subject_id: str) -> dict | None:
-        """
-        Get detailed information for a specific participant.
-
-        Args:
-            subject_id: The participant's subject ID
-
-        Returns:
-            Full participant details including all logs and game history
-        """
-        # Get base state
-        state = self._get_participant_state(subject_id)
-        if not state:
-            return None
-
-        # Get all console logs for this participant
-        participant_logs = [
-            log for log in list(self._console_logs)
-            if log.get('subject_id') == subject_id
-        ]
-
-        # Get activity events for this participant
-        participant_activity = [
-            {
-                'timestamp': event.timestamp,
-                'event_type': event.event_type,
-                'details': event.details
-            }
-            for event in self._activity_log
-            if event.subject_id == subject_id
-        ]
-
-        return {
-            **state,
-            'logs': participant_logs,
-            'activity': participant_activity
-        }
-
     def _get_participant_waitroom_info(self, subject_id: str) -> dict | None:
         """
         Check if a participant is in a waitroom and return info.
@@ -1217,18 +1025,6 @@ class AdminEventAggregator:
             'scene_endings': dict(self._scene_ending_counts)
         }
 
-    def get_session_history_detail(self, game_id: str) -> dict | None:
-        """
-        Get detailed information for a historical/completed session.
-
-        Args:
-            game_id: The game ID
-
-        Returns:
-            Full session details including archived logs, or None if not found
-        """
-        return self._completed_games.get(game_id)
-
     def receive_console_log(
         self,
         subject_id: str,
@@ -1309,21 +1105,6 @@ class AdminEventAggregator:
         except Exception as e:
             logger.warning(f"Failed to persist console log for {subject_id}: {e}")
 
-    def close_console_log_files(self) -> None:
-        """
-        Close all open console log file handles.
-
-        Should be called during server shutdown or when cleaning up.
-        """
-        for subject_id, file_handle in list(self._console_log_files.items()):
-            try:
-                file_handle.close()
-                logger.debug(f"Closed console log file for {subject_id}")
-            except Exception as e:
-                logger.warning(f"Error closing console log file for {subject_id}: {e}")
-        self._console_log_files.clear()
-        logger.info("All console log files closed")
-
     def close_subject_console_log(self, subject_id: str) -> None:
         """
         Close the console log file for a specific subject.
@@ -1349,7 +1130,7 @@ class AdminEventAggregator:
             log_entry: The log entry dict to emit
         """
         try:
-            self.sio.emit(
+            self.socketio.emit(
                 'console_log',
                 log_entry,
                 namespace='/admin',
@@ -1390,7 +1171,7 @@ class AdminEventAggregator:
             event: The ActivityEvent to emit
         """
         try:
-            self.sio.emit(
+            self.socketio.emit(
                 'activity_event',
                 {
                     'timestamp': event.timestamp,
@@ -1433,12 +1214,6 @@ class AdminEventAggregator:
         eventlet.spawn(_broadcast_loop)
         logger.info("Admin broadcast loop spawned")
 
-    def stop_broadcast_loop(self) -> None:
-        """Stop the periodic broadcast loop and clean up resources."""
-        self._broadcast_running = False
-        self.close_console_log_files()
-        logger.info("Admin broadcast loop stopped")
-
     def _broadcast_state(self) -> None:
         """
         Broadcast state to admin clients if changed or timeout elapsed.
@@ -1469,7 +1244,7 @@ class AdminEventAggregator:
 
         if should_emit:
             try:
-                self.sio.emit(
+                self.socketio.emit(
                     'state_update',
                     snapshot,
                     namespace='/admin',

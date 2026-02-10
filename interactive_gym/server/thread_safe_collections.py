@@ -1,5 +1,6 @@
-"""
-This is all stolen from: https://github.com/HumanCompatibleAI/overcooked-demo/blob/master/server/utils.py
+"""Thread-safe collection wrappers for dict and set.
+
+Originally adapted from: https://github.com/HumanCompatibleAI/overcooked-demo/blob/master/server/utils.py
 """
 
 from __future__ import annotations
@@ -66,29 +67,3 @@ class ThreadSafeDict(dict):
             else:
                 retval = None
         return retval
-
-
-class GameExitStatus:
-    ActiveWithOtherPlayers = "active_with_other_players"
-    ActiveNoPlayers = "active_no_players"
-    InactiveNoPlayers = "inactive_no_players"
-    InactiveWithOtherPlayers = "inactive_with_other_players"
-
-
-class _Available:
-    """
-    Adapted from RLLib's _NotProvided
-    https://github.com/ray-project/ray/rllib/utils/from_config.py#L261
-    """
-
-    class __Available:
-        pass
-
-    instance = None
-
-    def __init__(self):
-        if _Available.instance is None:
-            _Available.instance = _Available.__Available()
-
-
-Available = _Available

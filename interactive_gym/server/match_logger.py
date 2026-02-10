@@ -45,25 +45,30 @@ class MatchAssignmentLogger:
     """Logger for match assignment events.
 
     Writes match events to:
-    1. JSONL files in data/match_logs/{scene_id}_matches.jsonl
+    1. JSONL files in data/{experiment_id}/match_logs/{scene_id}_matches.jsonl
     2. Admin dashboard activity timeline (via AdminEventAggregator)
 
     Thread-safe: File writes are synchronous but fast at match rate.
     """
 
-    MATCH_LOGS_DIR = "data/match_logs"
-
-    def __init__(self, admin_aggregator: AdminEventAggregator | None = None):
+    def __init__(self, admin_aggregator: AdminEventAggregator | None = None, experiment_id: str | None = None):
         """Initialize the match logger.
 
         Args:
             admin_aggregator: Optional AdminEventAggregator for dashboard updates
+            experiment_id: Optional experiment ID for path namespacing
         """
         self.admin_aggregator = admin_aggregator
 
+        # Compute logs directory with experiment_id prefix when available
+        if experiment_id:
+            self.match_logs_dir = f"data/{experiment_id}/match_logs"
+        else:
+            self.match_logs_dir = "data/match_logs"
+
         # Create logs directory
-        os.makedirs(self.MATCH_LOGS_DIR, exist_ok=True)
-        logger.info(f"Match logs will be saved to {self.MATCH_LOGS_DIR}/")
+        os.makedirs(self.match_logs_dir, exist_ok=True)
+        logger.info(f"Match logs will be saved to {self.match_logs_dir}/")
 
     def log_match(
         self,
@@ -128,7 +133,7 @@ class MatchAssignmentLogger:
             scene_id: The scene ID (used for filename)
             assignment: The MatchAssignment to persist
         """
-        filepath = os.path.join(self.MATCH_LOGS_DIR, f"{scene_id}_matches.jsonl")
+        filepath = os.path.join(self.match_logs_dir, f"{scene_id}_matches.jsonl")
 
         try:
             with open(filepath, "a", encoding="utf-8") as f:

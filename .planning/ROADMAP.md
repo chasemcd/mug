@@ -1,105 +1,90 @@
-# Roadmap: Interactive Gym — GymScene Config Cleanup
+# Roadmap: Interactive Gym
 
 ## Overview
 
-Refactor the GymScene chaining API from 14 accumulated builder methods into fewer, intuitively grouped methods. This is a pure API surface cleanup — rename, split, merge methods with zero functionality change. Phases progress from core method consolidation → old name removal → example migration → full verification.
+Interactive Gym enables researchers to configure and deploy multiplayer browser experiments with minimal code. This roadmap tracks milestone-based development across the refactor/p2pcleanup branch.
+
+## Milestones
+
+- ✅ **v1.0–v1.21** - Phases 1-66 (shipped)
+- ✅ **v1.22 GymScene Config Cleanup** - Phases 67-71 (shipped 2026-02-08)
+- ✅ **v1.23 Pre-Merge Cleanup** - Phases 72-78 (shipped 2026-02-08)
+- ✅ **v1.24 Test Fix & Hardening** - Phases 79-82 (shipped 2026-02-09)
+- ✅ **v1.25 Data Export Path Fix** - Phase 83 (shipped 2026-02-09)
 
 ## Phases
 
-**Phase Numbering:**
-- Integer phases (67, 68, 69, 70): Planned milestone work
-- Decimal phases (e.g., 67.1): Urgent insertions (marked with INSERTED)
+<details>
+<summary>v1.0-v1.21 (Phases 1-66) -- SHIPPED</summary>
 
-- [x] **Phase 67: API Method Consolidation** - Refactor GymScene builder methods: rename, split, and merge per new API design
-- [x] **Phase 68: Clean Break** - Remove all old method names — no aliases, no shims
-- [x] **Phase 69: Example Configs Migration** - Update all example configs to use new API
-- [x] **Phase 70: Verification & Test Pass** - Verify zero functionality change across full test suite
-- [x] **Phase 71: Documentation Migration** - Update all docs to use new API method names (gap closure)
+See previous milestone records.
+
+</details>
+
+<details>
+<summary>v1.22 GymScene Config Cleanup (Phases 67-71) -- SHIPPED 2026-02-08</summary>
+
+- [x] **Phase 67: API Method Consolidation** - Refactor GymScene builder methods
+- [x] **Phase 68: Clean Break** - Remove all old method names
+- [x] **Phase 69: Example Configs Migration** - Update all example configs
+- [x] **Phase 70: Verification & Test Pass** - Verify zero functionality change
+- [x] **Phase 71: Documentation Migration** - Update all docs to new API
+
+</details>
+
+<details>
+<summary>v1.23 Pre-Merge Cleanup (Phases 72-78) -- SHIPPED 2026-02-08</summary>
+
+- [x] **Phase 72: Server Python Dead Code Removal** - Remove unused functions, classes, methods from server code
+- [x] **Phase 73: Scene & Environment Dead Code Removal** - Remove unused code from scenes/examples
+- [x] **Phase 74: Client JavaScript Dead Code Removal** - Remove unused JS functions and dead paths
+- [x] **Phase 75: Python Naming Clarity** - Rename unclear Python variables/functions/modules
+- [x] **Phase 76: JavaScript Naming Clarity** - Rename unclear JS variables/functions
+- [x] **Phase 77: Structural Organization** - Reorganize files, consolidate modules
+- [x] **Phase 78: Final Verification** - Full test suite pass after cleanup
+
+</details>
+
+<details>
+<summary>v1.24 Test Fix & Hardening (Phases 79-82) -- SHIPPED 2026-02-09</summary>
+
+- [x] **Phase 79: Rename Corruption Fix** - Restore all 72 corrupted identifiers
+- [x] **Phase 80: Test Suite Restoration** - Get all 52 tests passing
+- [x] **Phase 81: Data Parity Hardening** - Add export parity validation to all data-producing tests
+- [x] **Phase 82: Examples & Documentation** - Verify examples and update docs
+
+</details>
+
+### v1.25 Data Export Path Fix -- SHIPPED 2026-02-09
+
+**Milestone Goal:** Ensure all exported data (scene metadata, match logs) lands under `data/<experiment-id>/` -- not scattered in `data/`.
+
+- [x] **Phase 83: Export Path Consolidation** - Fix scene metadata and match log paths to use experiment_id prefix (2026-02-09)
 
 ## Phase Details
 
-### Phase 67: API Method Consolidation
-**Goal**: Refactor GymScene builder methods — rename `pyodide()` to `runtime()`, create `multiplayer()` from sync params + 7 merged methods, split `user_experience()` into `content()` + `waitroom()`, split `rendering()` into `rendering()` + `assets()`
-**Depends on**: Nothing (first phase)
-**Requirements**: APIC-01, APIC-02, APIC-03, APIC-04, APIC-05, APIC-06
-**Research needed**: Unlikely — straightforward method restructuring on existing code
+### Phase 83: Export Path Consolidation
+**Goal**: All exported experiment data lands under a single `data/{experiment_id}/` directory
+**Depends on**: Phase 82 (v1.24 complete)
+**Requirements**: DEXP-01, DEXP-02, DEXP-03, DEXP-04
 **Success Criteria** (what must be TRUE):
-  1. `runtime()` method exists with only browser execution params (code, packages, restart flag)
-  2. `multiplayer()` method exists containing sync/rollback params AND matchmaking/monitoring/resilience params
-  3. `content()` and `waitroom()` methods exist replacing `user_experience()`
-  4. `rendering()` retains display params; new `assets()` method holds preload/animation params
-  5. `policies()` and `gameplay()` remain unchanged
-**Plans:** 2 plans
-Plans:
-- [x] 67-01-PLAN.md — Add runtime() and multiplayer() builder methods
-- [x] 67-02-PLAN.md — Add content(), waitroom(), and assets() builder methods
+  1. Scene metadata CSVs are written to `data/{experiment_id}/{scene_id}/` instead of `data/{scene_id}/`
+  2. Match log files are written to `data/{experiment_id}/match_logs/` instead of `data/match_logs/`
+  3. All 52 existing tests pass with the updated export paths
+  4. Running an experiment produces zero data files outside `data/{experiment_id}/`
+**Plans**: 1 plan
 
-### Phase 68: Clean Break
-**Goal**: Remove all old method names entirely — no deprecation aliases, no redirect methods
-**Depends on**: Phase 67
-**Requirements**: CLNB-01, CLNB-02
-**Research needed**: Unlikely — deletion of old names, grep to confirm no remnants
-**Success Criteria** (what must be TRUE):
-  1. Calling any old method name (`pyodide`, `user_experience`, `player_grouping`, `continuous_monitoring`, `exclusion_callbacks`, `reconnection_config`, `partner_disconnect_message_config`, `focus_loss_config`, `player_pairing`) raises AttributeError
-  2. No deprecation aliases or redirect methods exist in the codebase
-  3. All internal references within GymScene class use new method names
-**Plans:** 1 plan
 Plans:
-- [x] 68-01-PLAN.md — Remove 9 old methods, slim rendering() asset params
-
-### Phase 69: Example Configs Migration
-**Goal**: Update all 5 example configs to use the new API methods
-**Depends on**: Phase 68
-**Requirements**: EXMP-01, EXMP-02, EXMP-03, EXMP-04, EXMP-05
-**Research needed**: Unlikely — mechanical find-and-replace in example files
-**Success Criteria** (what must be TRUE):
-  1. All 5 example configs exclusively use new method names
-  2. Each example can be imported/loaded without errors
-  3. No references to old method names remain in any example file
-**Plans:** 2 plans
-Plans:
-- [x] 69-01-PLAN.md — Migrate cogrid scenes.py to new API methods
-- [x] 69-02-PLAN.md — Migrate slime volleyball, mountain car, and overcooked multiplayer examples
-
-### Phase 70: Verification & Test Pass
-**Goal**: Verify zero functionality change — all tests pass, no params lost, chaining works
-**Depends on**: Phase 69
-**Requirements**: VERF-01, VERF-02, VERF-03
-**Research needed**: Unlikely — run existing tests and verify param coverage
-**Success Criteria** (what must be TRUE):
-  1. Full test suite passes with zero failures
-  2. Every parameter from old API is accessible through new API (no params lost)
-  3. All new builder methods return `self` for method chaining
-**Plans:** 2 plans
-Plans:
-- [x] 70-01-PLAN.md — Migrate remaining unmigrated files (test configs + controllable scenes)
-- [x] 70-02-PLAN.md — Full test suite, parameter coverage audit, and chaining verification
-
-### Phase 71: Documentation Migration
-**Goal**: Update all documentation files to use new API method names — replace references to removed methods (`.pyodide()`, `.user_experience()`, `.continuous_monitoring()`, `.exclusion_callbacks()`, `.focus_loss_config()`, etc.) with their new equivalents
-**Depends on**: Phase 70
-**Requirements**: DOCS-01, DOCS-02
-**Research needed**: Unlikely — mechanical find-and-replace in doc files
-**Gap Closure**: Closes documentation tech debt from v1.22 milestone audit
-**Success Criteria** (what must be TRUE):
-  1. Zero references to removed GymScene method names in any documentation file (docs/, README.md files)
-  2. All code examples in documentation use the new API methods and are accurate
-  3. No documentation references to methods that would raise AttributeError
-**Plans:** 3 plans
-Plans:
-- [x] 71-01-PLAN.md — Migrate 9 RST files + cogrid README to new API method names
-- [x] 71-02-PLAN.md — Migrate 5 MD design docs + delete stale HTML export
-- [x] 71-03-PLAN.md — Final verification sweep across all documentation
+- [x] 83-01-PLAN.md -- Fix scene metadata and match log export paths to use experiment_id prefix (2026-02-09)
 
 ## Progress
 
-**Execution Order:**
-Phases execute in numeric order: 67 → 68 → 69 → 70 → 71
+**Execution Order:** Phase 83
 
-| Phase | Plans Complete | Status | Completed |
-|-------|----------------|--------|-----------|
-| 67. API Method Consolidation | 2/2 | ✓ Complete | 2026-02-07 |
-| 68. Clean Break | 1/1 | ✓ Complete | 2026-02-07 |
-| 69. Example Configs Migration | 2/2 | ✓ Complete | 2026-02-07 |
-| 70. Verification & Test Pass | 2/2 | ✓ Complete | 2026-02-08 |
-| 71. Documentation Migration | 3/3 | ✓ Complete | 2026-02-08 |
+| Phase | Milestone | Plans Complete | Status | Completed |
+|-------|-----------|----------------|--------|-----------|
+| 1-66 | v1.0-v1.21 | - | Complete | - |
+| 67-71 | v1.22 | - | Complete | 2026-02-08 |
+| 72-78 | v1.23 | - | Complete | 2026-02-08 |
+| 79-82 | v1.24 | - | Complete | 2026-02-09 |
+| 83. Export Path Consolidation | v1.25 | 1/1 | Complete | 2026-02-09 |

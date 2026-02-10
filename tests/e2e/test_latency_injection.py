@@ -82,6 +82,7 @@ from tests.fixtures.export_helpers import (
     get_subject_ids_from_pages,
     wait_for_export_files,
     run_comparison,
+    wait_for_episode_with_parity,
 )
 
 
@@ -120,6 +121,20 @@ def test_episode_completion_under_fixed_latency(flask_server, player_contexts, l
         # Verify completion
         assert final_state1["numEpisodes"] >= 1, f"Player 1 should complete 1+ episodes under {latency_ms}ms latency"
         assert final_state2["numEpisodes"] >= 1, f"Player 2 should complete 1+ episodes under {latency_ms}ms latency"
+
+        # Validate data parity
+        scene_id = get_scene_id(page1)
+        success, parity_msg = wait_for_episode_with_parity(
+            page1, page2,
+            experiment_id=get_experiment_id(),
+            scene_id=scene_id,
+            episode_num=0,
+            episode_timeout_sec=10,  # Episode already complete
+            export_timeout_sec=30,
+            parity_row_tolerance=10,
+            verbose=True,
+        )
+        assert success, f"Data parity failed under {latency_ms}ms latency: {parity_msg}"
 
         # Log success metrics
         print(f"\n[{latency_ms}ms latency] Game completed successfully:")
@@ -173,6 +188,20 @@ def test_episode_completion_under_asymmetric_latency(flask_server, player_contex
 
         # Verify they're still in the same game
         assert final_state1["gameId"] == final_state2["gameId"], "Players should remain in same game"
+
+        # Validate data parity
+        scene_id = get_scene_id(page1)
+        success, parity_msg = wait_for_episode_with_parity(
+            page1, page2,
+            experiment_id=get_experiment_id(),
+            scene_id=scene_id,
+            episode_num=0,
+            episode_timeout_sec=10,  # Episode already complete
+            export_timeout_sec=30,
+            parity_row_tolerance=10,
+            verbose=True,
+        )
+        assert success, f"Data parity failed under asymmetric latency: {parity_msg}"
 
         # Log success metrics
         print("\n[Asymmetric: 50ms vs 200ms] Game completed successfully:")
@@ -242,6 +271,20 @@ def test_episode_completion_under_jitter(flask_server, player_contexts):
         # Verify completion
         assert final_state1["numEpisodes"] >= 1, "Player 1 should complete 1+ episodes under jitter"
         assert final_state2["numEpisodes"] >= 1, "Player 2 should complete 1+ episodes under jitter"
+
+        # Validate data parity
+        scene_id = get_scene_id(page1)
+        success, parity_msg = wait_for_episode_with_parity(
+            page1, page2,
+            experiment_id=get_experiment_id(),
+            scene_id=scene_id,
+            episode_num=0,
+            episode_timeout_sec=10,  # Episode already complete
+            export_timeout_sec=30,
+            parity_row_tolerance=10,
+            verbose=True,
+        )
+        assert success, f"Data parity failed under jitter: {parity_msg}"
 
         # Log success metrics
         print("\n[Jitter: 100ms +/- 75ms] Game completed successfully:")

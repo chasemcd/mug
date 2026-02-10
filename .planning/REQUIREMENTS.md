@@ -1,95 +1,42 @@
-# Requirements: Interactive Gym — GymScene Config Cleanup
+# Requirements: Interactive Gym
 
-**Defined:** 2026-02-07
-**Core Value:** Researchers can configure and deploy multiplayer browser experiments with minimal code — a chained scene config and a Python environment are all that's needed.
+**Defined:** 2026-02-09
+**Core Value:** Researchers can configure and deploy multiplayer browser experiments with minimal code -- a chained scene config and a Python environment are all that's needed.
 
-## v1 Requirements
+## v1.25 Requirements
 
-Requirements for v1.22 milestone. Each maps to roadmap phases.
+### Data Export
 
-### API Consolidation
+- [ ] **DEXP-01**: Scene metadata exports to `data/{experiment_id}/{scene_id}/` instead of `data/{scene_id}/`
+- [ ] **DEXP-02**: Match logs export to `data/{experiment_id}/match_logs/` instead of `data/match_logs/`
+- [ ] **DEXP-03**: Existing tests pass with updated export paths
+- [ ] **DEXP-04**: All data produced by an experiment resides under `data/{experiment_id}/`
 
-- [x] **APIC-01**: `pyodide()` method is renamed to `runtime()` containing only browser execution params (code, packages, restart flag)
-- [x] **APIC-02**: Sync/rollback params (input_buffer_size, input_delay, input_confirmation_timeout_ms, server_authoritative, state_broadcast_interval, realtime_mode, multiplayer) are moved out of `pyodide()` into the new `multiplayer()` method
-- [x] **APIC-03**: `matchmaking()`, `player_grouping()`, `continuous_monitoring()`, `exclusion_callbacks()`, `reconnection_config()`, `partner_disconnect_message_config()`, and `focus_loss_config()` are merged into a single `multiplayer()` method
-- [x] **APIC-04**: `user_experience()` is split into `content()` (scene header, body, in-game body, game_page_html_fn) and `waitroom()` (timeout, redirect, timeout message, timeout scene)
-- [x] **APIC-05**: `rendering()` is split into `rendering()` (fps, env_to_state_fn, hud_text_fn, hud_score_carry_over, location_representation, game_width, game_height, background, rollback_smoothing_duration) and `assets()` (preload_specs, assets_dir, assets_to_preload, animation_configs, state_init)
-- [x] **APIC-06**: `policies()` and `gameplay()` are kept as separate methods with no changes to names or param grouping
+## Future Requirements
 
-### Clean Break
-
-- [x] **CLNB-01**: All old method names (`pyodide`, `user_experience`, `player_grouping`, `continuous_monitoring`, `exclusion_callbacks`, `reconnection_config`, `partner_disconnect_message_config`, `focus_loss_config`, `player_pairing`) are removed entirely — no deprecation aliases
-- [x] **CLNB-02**: No backwards-compatibility shims or redirect methods exist in the codebase after cleanup
-
-### Examples Updated
-
-- [x] **EXMP-01**: `interactive_gym/examples/cogrid/scenes/scenes.py` uses new API methods
-- [x] **EXMP-02**: `interactive_gym/examples/slime_volleyball/slimevb_human_human.py` uses new API methods
-- [x] **EXMP-03**: `interactive_gym/examples/mountain_car/mountain_car_experiment.py` uses new API methods
-- [x] **EXMP-04**: `interactive_gym/examples/cogrid/overcooked_human_human_multiplayer.py` uses new API methods
-- [x] **EXMP-05**: `interactive_gym/examples/slime_volleyball/human_ai_pyodide_boost.py` uses new API methods
-
-### Verification
-
-- [x] **VERF-01**: All existing tests pass with new API (zero functionality change)
-- [x] **VERF-02**: Every parameter from the old API is accessible through the new API (no params lost)
-- [x] **VERF-03**: All builder methods return `self` for method chaining
-
-### Documentation
-
-- [x] **DOCS-01**: All documentation files in `docs/` use new API method names — zero references to removed GymScene methods
-- [x] **DOCS-02**: All code examples in documentation are accurate and use new API methods
-
-## v2 Requirements
-
-Deferred to future release. Tracked but not in current roadmap.
-
-### Further Simplification
-
-- **SIMP-01**: Consider splitting `multiplayer()` if it accumulates too many params after merge
-- **SIMP-02**: Consider parameter objects/dataclasses for methods with >10 params (e.g., `rendering()`)
+(None)
 
 ## Out of Scope
 
-Explicitly excluded. Documented to prevent scope creep.
-
 | Feature | Reason |
 |---------|--------|
-| New functionality or capabilities | This milestone is API cleanup only |
-| Changes to server, game_manager, or runtime behavior | Pure surface refactor |
-| Changes to non-GymScene scene types (StartScene, StaticScene, FeedbackScene) | Out of milestone scope |
-| Parameter renaming within methods | Only method-level grouping/naming changes |
+| Retroactive migration of old data | Not needed -- this is a pre-merge fix |
+| Configurable data directory root | Adds complexity for no current need |
 
 ## Traceability
 
-Which phases cover which requirements. Updated by create-roadmap.
-
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| APIC-01 | Phase 67 | Complete |
-| APIC-02 | Phase 67 | Complete |
-| APIC-03 | Phase 67 | Complete |
-| APIC-04 | Phase 67 | Complete |
-| APIC-05 | Phase 67 | Complete |
-| APIC-06 | Phase 67 | Complete |
-| CLNB-01 | Phase 68 | Complete |
-| CLNB-02 | Phase 68 | Complete |
-| EXMP-01 | Phase 69 | Complete |
-| EXMP-02 | Phase 69 | Complete |
-| EXMP-03 | Phase 69 | Complete |
-| EXMP-04 | Phase 69 | Complete |
-| EXMP-05 | Phase 69 | Complete |
-| VERF-01 | Phase 70 | Complete |
-| VERF-02 | Phase 70 | Complete |
-| VERF-03 | Phase 70 | Complete |
-| DOCS-01 | Phase 71 | Complete |
-| DOCS-02 | Phase 71 | Complete |
+| DEXP-01 | Phase 83 | Pending |
+| DEXP-02 | Phase 83 | Pending |
+| DEXP-03 | Phase 83 | Pending |
+| DEXP-04 | Phase 83 | Pending |
 
 **Coverage:**
-- v1 requirements: 18 total
-- Mapped to phases: 18
-- Unmapped: 0 ✓
+- v1.25 requirements: 4 total
+- Mapped to phases: 4
+- Unmapped: 0
 
 ---
-*Requirements defined: 2026-02-07*
-*Last updated: 2026-02-08 after Phase 71 completion*
+*Requirements defined: 2026-02-09*
+*Last updated: 2026-02-09 after roadmap creation*

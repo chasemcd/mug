@@ -43,6 +43,7 @@ from tests.fixtures.export_helpers import (
     get_subject_ids_from_pages,
     wait_for_export_files,
     run_comparison,
+    wait_for_episode_with_parity,
 )
 
 
@@ -124,6 +125,20 @@ def test_packet_loss_triggers_rollback(flask_server, player_contexts):
 
         # Verify they stayed in same game
         assert final_state1['gameId'] == final_state2['gameId'], "Players should be in same game"
+
+        # Validate data parity
+        scene_id = get_scene_id(page1)
+        success, parity_msg = wait_for_episode_with_parity(
+            page1, page2,
+            experiment_id=get_experiment_id(),
+            scene_id=scene_id,
+            episode_num=0,
+            episode_timeout_sec=10,  # Episode already complete
+            export_timeout_sec=30,
+            parity_row_tolerance=10,
+            verbose=True,
+        )
+        assert success, f"Data parity failed under packet loss: {parity_msg}"
 
         print(f"  Episode completed: gameId={final_state1['gameId']}")
 
@@ -247,6 +262,21 @@ def test_tab_visibility_triggers_fast_forward(flask_server, player_contexts):
     assert final_state1['numEpisodes'] >= 1, "Player 1 should complete episode"
     assert final_state2['numEpisodes'] >= 1, "Player 2 should complete episode"
     assert final_state1['gameId'] == final_state2['gameId'], "Players should be in same game"
+
+    # Validate data parity
+    scene_id = get_scene_id(page1)
+    experiment_id = get_experiment_id()
+    success, parity_msg = wait_for_episode_with_parity(
+        page1, page2,
+        experiment_id=experiment_id,
+        scene_id=scene_id,
+        episode_num=0,
+        episode_timeout_sec=10,  # Episode already complete
+        export_timeout_sec=30,
+        parity_row_tolerance=10,
+        verbose=True,
+    )
+    assert success, f"Data parity failed after tab visibility toggle: {parity_msg}"
 
     print(f"  Episode completed: gameId={final_state1['gameId']}")
 

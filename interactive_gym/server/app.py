@@ -10,7 +10,6 @@ import time
 import uuid
 import msgpack
 import pandas as pd
-import os
 import flatten_dict
 import json
 import socket
@@ -21,12 +20,12 @@ import flask_socketio
 
 from interactive_gym.utils.typing import SubjectID, SceneID
 from interactive_gym.scenes import gym_scene
-from interactive_gym.server import game_manager as gm
+from interactive_gym.server import game_manager
 
 from interactive_gym.configurations import remote_config
-from interactive_gym.server import utils
+from interactive_gym.server import thread_safe_collections
+from interactive_gym.server.remote_game import AvailableSlot
 from interactive_gym.scenes import stager
-from interactive_gym.server import game_manager as gm
 from interactive_gym.scenes import unity_scene
 from interactive_gym.server import pyodide_game_coordinator
 from interactive_gym.server import player_pairing_manager
@@ -66,15 +65,15 @@ def setup_logger(name, log_file, level=logging.INFO):
     handler.setFormatter(formatter)
 
     # Create console handler with a higher log level
-    ch = logging.StreamHandler()
-    ch.setFormatter(
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(
         formatter
     )  # Setting the formatter for the console handler as well
 
     logger = logging.getLogger(name)
     logger.setLevel(level)
     logger.addHandler(handler)
-    logger.addHandler(ch)
+    logger.addHandler(console_handler)
     logger.propagate = False
 
     return logger
@@ -92,13 +91,13 @@ GENERIC_STAGER: stager.Stager = None  # Instantiate on run()
 
 # Each participant has their own instance of the Stager to manage
 # their progression through the experiment.
-STAGERS: dict[SubjectID, stager.Stager] = utils.ThreadSafeDict()
+STAGERS: dict[SubjectID, stager.Stager] = thread_safe_collections.ThreadSafeDict()
 
 # Data structure to save subjects by their socket id
-SUBJECTS = utils.ThreadSafeDict()
+SUBJECTS = thread_safe_collections.ThreadSafeDict()
 
 # Game managers handle all the game logic, connection, and waiting room for a given scene
-GAME_MANAGERS: dict[SceneID, gm.GameManager] = utils.ThreadSafeDict()
+GAME_MANAGERS: dict[SceneID, game_manager.GameManager] = thread_safe_collections.ThreadSafeDict()
 
 # Pyodide multiplayer game coordinator
 PYODIDE_COORDINATOR: pyodide_game_coordinator.PyodideGameCoordinator | None = None
@@ -117,15 +116,15 @@ MATCH_LOGGER: MatchAssignmentLogger | None = None
 PROBE_COORDINATOR: ProbeCoordinator | None = None
 
 # Mapping of users to locks associated with the ID. Enforces user-level serialization
-USER_LOCKS = utils.ThreadSafeDict()
+USER_LOCKS = thread_safe_collections.ThreadSafeDict()
 
 
 # Session ID to participant ID map
-SESSION_ID_TO_SUBJECT_ID = utils.ThreadSafeDict()
+SESSION_ID_TO_SUBJECT_ID = thread_safe_collections.ThreadSafeDict()
 
 # Participant session storage for session restoration after disconnect
 # Maps subject_id -> ParticipantSession
-PARTICIPANT_SESSIONS: dict[SubjectID, ParticipantSession] = utils.ThreadSafeDict()
+PARTICIPANT_SESSIONS: dict[SubjectID, ParticipantSession] = thread_safe_collections.ThreadSafeDict()
 
 # Participant state tracker - single source of truth for participant lifecycle states
 # Prevents routing to wrong games by tracking IDLE/IN_WAITROOM/IN_GAME/GAME_ENDED
@@ -134,7 +133,7 @@ PARTICIPANT_TRACKER: ParticipantStateTracker = ParticipantStateTracker()
 # Pending multiplayer metrics for aggregation
 # Maps (scene_id, game_id) -> {player_id: metrics, ...}
 # When both players submit, metrics are aggregated into a comparison file
-PENDING_MULTIPLAYER_METRICS: dict[tuple[str, str], dict] = utils.ThreadSafeDict()
+PENDING_MULTIPLAYER_METRICS: dict[tuple[str, str], dict] = thread_safe_collections.ThreadSafeDict()
 
 # Pyodide loading grace period tracking (Phase 69)
 # Maps subject_id -> loading start timestamp. Clients in this dict are currently
@@ -431,6 +430,7 @@ def register_subject(data):
 
         participant_stager.start(socketio, room=sid)
 
+    participant_stager.current_scene.experiment_id = CONFIG.experiment_id
     participant_stager.current_scene.export_metadata(subject_id)
 
 
@@ -480,24 +480,6 @@ def sync_globals(data):
         logger.debug(f"Synced globals for {subject_id}: {list(client_globals.keys())}")
 
 
-# @socketio.on("connect")
-# def on_connect():
-#     global SESSION_ID_TO_SUBJECT_ID
-
-#     subject_id = get_subject_id_from_session_id(flask.request.sid)
-
-#     if subject_id in SUBJECTS:
-#         return
-
-#     SUBJECTS[subject_id] = threading.Lock()
-
-#     # TODO(chase): reenable session checkings
-#     # Send the current server session ID to the client
-#     # flask_socketio.emit(
-#     #     "server_session_id",
-#     #     {"server_session_id": SERVER_SESSION_ID},
-#     #     room=subject_id,
-#     # )
 
 
 def _get_subject_rtt(subject_id: str) -> int | None:
@@ -530,6 +512,24 @@ def advance_scene(data):
             f"for new scene"
         )
         PARTICIPANT_TRACKER.reset(subject_id)
+
+    # Clean up Pyodide game state BEFORE scene transition
+    # This prevents false 'partner_disconnected' when WebRTC closes during transition
+    if PYODIDE_COORDINATOR is not None:
+        for game_id, game_state in list(PYODIDE_COORDINATOR.games.items()):
+            for player_id, socket_id in list(game_state.players.items()):
+                if socket_id == flask.request.sid:
+                    logger.info(
+                        f"[AdvanceScene] Removing {subject_id} (player {player_id}) "
+                        f"from Pyodide game {game_id} before scene transition"
+                    )
+                    PYODIDE_COORDINATOR.remove_player(
+                        game_id=game_id,
+                        player_id=player_id,
+                        notify_others=True,
+                        reason='scene_completed',
+                    )
+                    break
 
     participant_stager.advance(socketio, room=flask.request.sid)
 
@@ -582,12 +582,12 @@ def advance_scene(data):
             # Initialize match logger if not already done (Phase 56)
             global MATCH_LOGGER
             if MATCH_LOGGER is None:
-                MATCH_LOGGER = MatchAssignmentLogger(admin_aggregator=ADMIN_AGGREGATOR)
+                MATCH_LOGGER = MatchAssignmentLogger(admin_aggregator=ADMIN_AGGREGATOR, experiment_id=CONFIG.experiment_id)
 
-            game_manager = gm.GameManager(
+            gm_instance = game_manager.GameManager(
                 scene=current_scene,
                 experiment_config=CONFIG,
-                sio=socketio,
+                socketio=socketio,
                 pyodide_coordinator=PYODIDE_COORDINATOR,
                 pairing_manager=GROUP_MANAGER,
                 get_subject_rtt=_get_subject_rtt,
@@ -597,12 +597,13 @@ def advance_scene(data):
                 probe_coordinator=PROBE_COORDINATOR,  # Phase 59: P2P RTT probing
                 get_socket_for_subject=get_socket_for_subject,  # Phase 60+: waitroom->match
             )
-            GAME_MANAGERS[current_scene.scene_id] = game_manager
+            GAME_MANAGERS[current_scene.scene_id] = gm_instance
         else:
             logger.info(
                 f"Game manager already exists for scene {current_scene.scene_id}, reusing it"
             )
 
+    current_scene.experiment_id = CONFIG.experiment_id
     if current_scene.should_export_metadata:
         current_scene.export_metadata(subject_id)
 
@@ -624,10 +625,6 @@ def join_game(data):
             room=flask.request.sid,
         )
         return
-
-    # Validate session
-    # if not is_valid_session(client_session_id, subject_id, "join_game"):
-    #     return
 
     with SUBJECTS[subject_id]:
 
@@ -758,35 +755,12 @@ def join_game(data):
             )
 
 
-def is_valid_session(
-    client_session_id: str, subject_id: SubjectID, context: str
-) -> bool:
-    valid_session = client_session_id == SERVER_SESSION_ID
-
-    if not valid_session:
-        logger.warning(
-            f"Invalid session for {subject_id} in {context}. Got {client_session_id} but expected {SERVER_SESSION_ID}"
-        )
-        flask_socketio.emit(
-            "invalid_session",
-            {"message": "Session is invalid. Please reconnect."},
-            room=flask.request.sid,
-        )
-
-    return valid_session
-
-
 @socketio.on("leave_game")
 def leave_game(data):
     subject_id = get_subject_id_from_session_id(flask.request.sid)
     logger.info(f"[LeaveGame] Subject {subject_id} leaving game (likely waitroom timeout or disconnect).")
 
-    # Validate session
     client_reported_session_id = data.get("session_id")
-    # if not is_valid_session(
-    #     client_reported_session_id, subject_id, "leave_game"
-    # ):
-    #     return
 
     with SUBJECTS[subject_id]:
         # If the participant doesn't have a Stager, something is wrong at this point.
@@ -858,51 +832,11 @@ def leave_game(data):
             # Close console log file for completed subject
             ADMIN_AGGREGATOR.close_subject_console_log(subject_id)
 
-
-# @socketio.on("disconnect")
-# def on_disconnect():
-#     global SUBJECTS
-#     subject_id = get_subject_id_from_session_id(flask.request.sid)
-
-#     participant_stager = STAGERS.get(subject_id, None)
-#     if participant_stager is None:
-#         logger.error(
-#             f"Subject {subject_id} tried to join a game but they don't have a Stager."
-#         )
-#         return
-
-#     current_scene = participant_stager.current_scene
-#     game_manager = GAME_MANAGERS.get(current_scene.scene_id, None)
-
-#     # Get the current game for the participant, if any.
-#     game = game_manager.get_subject_game(subject_id)
-
-#     if game is None:
-#         logger.info(
-#             f"Subject {subject_id} disconnected with no coresponding game."
-#         )
-#     else:
-#         logger.info(
-#             f"Subject {subject_id} disconnected, Game ID: {game.game_id}.",
-#         )
-
-#     with SUBJECTS[subject_id]:
-#         game_manager.leave_game(subject_id=subject_id)
-
-#     del SUBJECTS[subject_id]
-#     if subject_id in SUBJECTS:
-#         logger.warning(
-#             f"Tried to remove {subject_id} but it's still in SUBJECTS."
-#         )
-
-
 @socketio.on("send_pressed_keys")
 def send_pressed_keys(data):
     """
     Translate pressed keys into game action and add them to the pending_actions queue.
     """
-    # return
-    # sess_id = flask.request.sid
     subject_id = get_subject_id_from_session_id(flask.request.sid)
     # Fallback to flask.session if needed
     if subject_id is None:
@@ -912,7 +846,6 @@ def send_pressed_keys(data):
     if subject_id is None:
         return
 
-    # # TODO(chase): figure out why we're getting a different session ID here...
     participant_stager = STAGERS.get(subject_id, None)
     if participant_stager is None:
         logger.warning(
@@ -922,15 +855,8 @@ def send_pressed_keys(data):
 
     current_scene = participant_stager.current_scene
     game_manager = GAME_MANAGERS.get(current_scene.scene_id, None)
-    # game = game_manager.get_subject_game(subject_id)
 
     client_reported_server_session_id = data.get("server_session_id")
-    # print(client_reported_server_session_id, "send_pressed_keys")
-    # print(sess_id, subject_id, "send_pressed_keys")
-    # if not is_valid_session(
-    #     client_reported_server_session_id, subject_id, "send_pressed_keys"
-    # ):
-    #     return
 
     pressed_keys = data["pressed_keys"]
 
@@ -943,9 +869,6 @@ def send_pressed_keys(data):
 def handle_reset_complete(data):
     subject_id = get_subject_id_from_session_id(flask.request.sid)
     client_session_id = data.get("session_id")
-
-    # if not is_valid_session(client_session_id, subject_id, "reset_complete"):
-    #     return
 
     participant_stager = STAGERS.get(subject_id, None)
     game_manager = GAME_MANAGERS.get(
@@ -1006,7 +929,7 @@ def on_unity_episode_end(data):
 
     current_scene.on_unity_episode_end(
         data,
-        sio=socketio,
+        socketio=socketio,
         room=flask.request.sid,
     )
 
@@ -1039,7 +962,7 @@ def on_unity_episode_start(data):
 
     current_scene.on_unity_episode_start(
         data,
-        sio=socketio,
+        socketio=socketio,
         room=flask.request.sid,
     )
 
@@ -1076,7 +999,7 @@ def on_client_callback(data):
         return
 
     current_scene = participant_stager.current_scene
-    current_scene.on_client_callback(data, sio=socketio, room=flask.request.sid)
+    current_scene.on_client_callback(data, socketio=socketio, room=flask.request.sid)
 
 
 @socketio.on("waitroom_timeout_completion")
@@ -1120,9 +1043,6 @@ def on_waitroom_timeout_completion(data):
 
 def on_exit():
     # Force-terminate all games on server termination
-    for game_manager in GAME_MANAGERS.values():
-        game_manager.tear_down()
-
     for game_manager in GAME_MANAGERS.values():
         game_manager.tear_down()
 
@@ -2164,7 +2084,7 @@ def handle_p2p_validation_failed(data):
         if game:
             subject_ids_to_reset = [
                 sid for sid in game.human_players.values()
-                if sid and sid != utils.Available
+                if sid and sid != AvailableSlot
             ]
             break
 
@@ -2192,7 +2112,7 @@ def handle_p2p_validation_failed(data):
             # Manual cleanup without transitioning to GAME_ENDED
             game = game_manager.games[game_id]
             for subject_id in list(game.human_players.values()):
-                if subject_id and subject_id != utils.Available:
+                if subject_id and subject_id != AvailableSlot:
                     if subject_id in game_manager.subject_games:
                         del game_manager.subject_games[subject_id]
                     if subject_id in game_manager.subject_rooms:
@@ -2885,6 +2805,16 @@ def on_disconnect():
                 logger.info(f"Found subject {subject_id} in game manager for scene {scene_id}")
                 break
 
+    # Clean up waitroom state across all game managers
+    # (waitroom participants aren't in subject_games, so subject_in_game() misses them)
+    for _scene_id, _gm in GAME_MANAGERS.items():
+        if subject_id in _gm.waitroom_participants:
+            _gm.waitroom_participants.remove(subject_id)
+            logger.info(
+                f"[Disconnect] Removed {subject_id} from waitroom_participants "
+                f"for scene {_scene_id}. Remaining: {_gm.waitroom_participants}"
+            )
+
     if game_manager is None:
         logger.info(
             f"Subject {subject_id} disconnected but no game manager found"
@@ -2960,7 +2890,7 @@ def run(config):
 
     # Initialize probe coordinator for P2P RTT measurement (Phase 57)
     PROBE_COORDINATOR = ProbeCoordinator(
-        sio=socketio,
+        socketio=socketio,
         get_socket_for_subject=get_socket_for_subject,
         turn_username=CONFIG.turn_username,
         turn_credential=CONFIG.turn_credential,
@@ -2969,7 +2899,7 @@ def run(config):
 
     # Initialize admin event aggregator
     ADMIN_AGGREGATOR = AdminEventAggregator(
-        sio=socketio,
+        socketio=socketio,
         participant_sessions=PARTICIPANT_SESSIONS,
         stagers=STAGERS,
         game_managers=GAME_MANAGERS,

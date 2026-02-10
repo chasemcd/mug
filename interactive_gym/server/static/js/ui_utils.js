@@ -1,4 +1,4 @@
-import * as pgg  from './phaser_gym_graphics.js';
+import * as phaserGraphics  from './phaser_gym_graphics.js';
 
 var socket = io({
     transports: ['websocket'],
@@ -9,10 +9,6 @@ var socket = io({
 // HUD
 export function showHUD() {
     $('#hudText').show()
-}
-
-export function hideHUD() {
-    $('#hudText').hide()
 }
 
 export function updateHUDText(text) {
@@ -39,7 +35,7 @@ export function enableKeyListener(input_mode) {
         // If we're using the single keystroke input method, we just send the key when it's pressed.
         // This means no composite actions.
         if (input_mode == "single_keystroke") {
-            pgg.addHumanKeyPressToBuffer({key: event.key, keypressTimestamp: keypressTimestamp});
+            phaserGraphics.addHumanKeyPressToBuffer({key: event.key, keypressTimestamp: keypressTimestamp});
             socket.emit('send_pressed_keys', {'pressed_keys': Array(event.key), session_id: window.sessionId});
             return;
         }
@@ -50,7 +46,7 @@ export function enableKeyListener(input_mode) {
         }
 
         pressedKeys[event.key] = true; // Add key to pressedKeys when it is pressed
-        pgg.updatePressedKeys(pressedKeys, keypressTimestamp);
+        phaserGraphics.updatePressedKeys(pressedKeys, keypressTimestamp);
     });
 
     $(document).on('keyup', function(event) {
@@ -60,7 +56,7 @@ export function enableKeyListener(input_mode) {
 
         // If we're tracking pressed keys, remove it
         delete pressedKeys[event.key]; // Remove key from pressedKeys when it is released
-        pgg.updatePressedKeys(pressedKeys);
+        phaserGraphics.updatePressedKeys(pressedKeys);
     });
 }
 

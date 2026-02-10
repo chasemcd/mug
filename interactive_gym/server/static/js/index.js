@@ -364,7 +364,7 @@ window.addEventListener('blur', function() {
     documentInFocus = false;
 });
 
-socket.on('pong', function(data) {
+socket.on('pong', function(latencyData) {
     var latency = Date.now() - window.lastPingTime;
     latencyMeasurements.push(latency);
 
@@ -380,7 +380,7 @@ socket.on('pong', function(data) {
     document.getElementById('latencyValue').innerText = medianLatency.toString().padStart(3, '0');
     document.getElementById('latencyContainer').style.display = 'block'; // Show the latency (ping) display
     curLatency = medianLatency;
-    maxLatency = data.max_latency;
+    maxLatency = latencyData.max_latency;
 
     // Expose for continuous monitoring (Phase 16)
     window.currentPing = medianLatency;
@@ -633,22 +633,22 @@ $(function() {
     })
 })
 
-socket.on('server_session_id', function(data) {
-    window.sessionId = data.session_id;
+socket.on('server_session_id', function(sessionInfo) {
+    window.sessionId = sessionInfo.session_id;
 });
 
 // Handle join_game errors - show start button again so user can retry
-socket.on('join_game_error', function(data) {
-    console.error("join_game_error:", data.message);
+socket.on('join_game_error', function(errorInfo) {
+    console.error("join_game_error:", errorInfo.message);
     $("#startButton").show();
     $("#startButton").attr("disabled", false);
     $("#startButtonLoader").removeClass("visible");
-    $("#errorText").text(data.message);
+    $("#errorText").text(errorInfo.message);
     $("#errorText").show();
 });
 
 // Experiment-level configuration (including entry screening)
-socket.on('experiment_config', async function(data) {
+socket.on('experiment_config', async function(experimentConfig) {
     console.log("[ExperimentConfig] Received experiment configuration");
 
     // Guard against re-entry on reconnect (Pitfall 5)
@@ -662,12 +662,12 @@ socket.on('experiment_config', async function(data) {
     if (loadingScreen) loadingScreen.style.display = 'flex';
 
     // Start Pyodide preload concurrently (fire and forget)
-    if (data.pyodide_config) {
-        preloadPyodide(data.pyodide_config);
+    if (experimentConfig.pyodide_config) {
+        preloadPyodide(experimentConfig.pyodide_config);
 
         // Start timeout timer if Pyodide is needed (LOAD-03)
-        if (data.pyodide_config.needs_pyodide) {
-            const timeoutS = data.pyodide_config.pyodide_load_timeout_s || 60;
+        if (experimentConfig.pyodide_config.needs_pyodide) {
+            const timeoutS = experimentConfig.pyodide_config.pyodide_load_timeout_s || 60;
             loadingGate.timeoutId = setTimeout(() => {
                 if (!loadingGate.pyodideComplete) {
                     console.error('[LoadingGate] Pyodide loading timed out after ' + timeoutS + 's');
@@ -687,8 +687,8 @@ socket.on('experiment_config', async function(data) {
     }
 
     // Run entry screening
-    if (data.entry_screening) {
-        experimentScreeningConfig = data.entry_screening;
+    if (experimentConfig.entry_screening) {
+        experimentScreeningConfig = experimentConfig.entry_screening;
         console.log("[ExperimentConfig] Entry screening config:", experimentScreeningConfig);
 
         const hasScreeningRules = experimentScreeningConfig.device_exclusion ||
@@ -772,8 +772,8 @@ socket.on('connect', function() {
 });
 
 // Handle session restoration from server
-socket.on('session_restored', function(data) {
-    console.log("Session restored from server:", data);
+socket.on('session_restored', function(restoredSession) {
+    console.log("Session restored from server:", restoredSession);
 
     // If screening failed, don't restore session - keep showing exclusion message
     if (experimentScreeningPassed === false) {
@@ -782,8 +782,8 @@ socket.on('session_restored', function(data) {
     }
 
     // Restore interactiveGymGlobals from server (server state is authoritative)
-    if (data.interactiveGymGlobals) {
-        window.interactiveGymGlobals = data.interactiveGymGlobals;
+    if (restoredSession.interactiveGymGlobals) {
+        window.interactiveGymGlobals = restoredSession.interactiveGymGlobals;
         console.log("Restored interactiveGymGlobals:", window.interactiveGymGlobals);
     }
 
@@ -804,8 +804,8 @@ socket.on('session_restored', function(data) {
 
 
 // Handle duplicate session (participant already connected in another tab)
-socket.on('duplicate_session', function(data) {
-    console.error("Duplicate session detected:", data.message);
+socket.on('duplicate_session', function(duplicateInfo) {
+    console.error("Duplicate session detected:", duplicateInfo.message);
 
     // Hide all interactive elements
     $("#startButton").hide();
@@ -819,7 +819,7 @@ socket.on('duplicate_session', function(data) {
     $("#sceneHeader").html("Session Already Active");
     $("#sceneHeader").show();
     $("#sceneBody").html(
-        "<p style='color: red; font-weight: bold;'>" + data.message + "</p>"
+        "<p style='color: red; font-weight: bold;'>" + duplicateInfo.message + "</p>"
     );
     $("#sceneBody").show();
 
@@ -827,8 +827,8 @@ socket.on('duplicate_session', function(data) {
     socket.disconnect();
 });
 
-socket.on('invalid_session', function(data) {
-    alert(data.message);
+socket.on('invalid_session', function(invalidInfo) {
+    alert(invalidInfo.message);
     // $('#finalPageHeaderText').hide()
     // $('#finalPageText').hide()
     // $("#gameHeaderText").hide();
@@ -837,7 +837,7 @@ socket.on('invalid_session', function(data) {
     $("#invalidSession").show();
 });
 
-socket.on('start_game', function(data) {
+socket.on('start_game', function(gameStartData) {
     // Don't start game if screening failed
     if (experimentScreeningPassed === false) {
         console.log("[StartGame] Blocked by failed screening");
@@ -845,21 +845,20 @@ socket.on('start_game', function(data) {
     }
 
     console.log("[StartGame] Game starting. Subject:", window.subjectName || interactiveGymGlobals?.subjectName,
-        "GameID:", data.game_id || 'N/A',
-        "Scene:", data.scene_metadata?.scene_id || 'unknown');
+        "GameID:", gameStartData.game_id || 'N/A',
+        "Scene:", gameStartData.scene_metadata?.scene_id || 'unknown');
 
     // Clear the waitroomInterval to stop the waiting room timer
     if (waitroomInterval) {
         clearInterval(waitroomInterval);
     }
 
-    let scene_metadata = data.scene_metadata
-    // let experiment_config = data.experiment_config
+    let scene_metadata = gameStartData.scene_metadata
 
     // Set game_id on multiplayer game instance if present
-    if (data.game_id && pyodideRemoteGame) {
-        pyodideRemoteGame.gameId = data.game_id;
-        console.debug(`[MultiplayerPyodide] Set game_id: ${data.game_id}`);
+    if (gameStartData.game_id && pyodideRemoteGame) {
+        pyodideRemoteGame.gameId = gameStartData.game_id;
+        console.debug(`[MultiplayerPyodide] Set game_id: ${gameStartData.game_id}`);
     }
 
     // Hide the sceneBody and any waiting room messages or errors
@@ -901,16 +900,16 @@ socket.on('start_game', function(data) {
 var waitroomInterval;
 var waitroomTimeoutMessage = null;  // Store custom timeout message from server
 
-socket.on('match_found_countdown', function(data) {
-    console.log("[Countdown] Match found! Starting", data.countdown_seconds, "second countdown");
+socket.on('match_found_countdown', function(countdownInfo) {
+    console.log("[Countdown] Match found! Starting", countdownInfo.countdown_seconds, "second countdown");
 
     // Stop the waiting room timer
     if (waitroomInterval) {
         clearInterval(waitroomInterval);
     }
 
-    var remaining = data.countdown_seconds;
-    var message = data.message || "Players found!";
+    var remaining = countdownInfo.countdown_seconds;
+    var message = countdownInfo.message || "Players found!";
 
     // Show initial countdown state
     $("#waitroomText").text(message + " Starting in " + remaining + "...");
@@ -928,10 +927,10 @@ socket.on('match_found_countdown', function(data) {
     }, 1000);
 });
 
-socket.on("waiting_room", function(data) {
+socket.on("waiting_room", function(waitroomState) {
     console.log("[WaitingRoom] Added to waiting room. Subject:", window.subjectName || interactiveGymGlobals?.subjectName,
-        "Players:", data.cur_num_players, "/", (data.cur_num_players + data.players_needed),
-        "Timeout:", Math.floor(data.ms_remaining / 1000), "seconds");
+        "Players:", waitroomState.cur_num_players, "/", (waitroomState.cur_num_players + waitroomState.players_needed),
+        "Timeout:", Math.floor(waitroomState.ms_remaining / 1000), "seconds");
 
     if (waitroomInterval) {
         clearInterval(waitroomInterval);
@@ -940,18 +939,18 @@ socket.on("waiting_room", function(data) {
     $("#instructions").hide();
 
     // Store custom timeout message if provided
-    waitroomTimeoutMessage = data.waitroom_timeout_message || null;
+    waitroomTimeoutMessage = waitroomState.waitroom_timeout_message || null;
 
-    var timer = Math.floor(data.ms_remaining / 1000); // Convert milliseconds to seconds
+    var timer = Math.floor(waitroomState.ms_remaining / 1000); // Convert milliseconds to seconds
 
 
     // Update the text immediately to reflect the current state
-    updateWaitroomText(data, timer);
+    updateWaitroomText(waitroomState, timer);
 
     // Set up a new interval
     waitroomInterval = setInterval(function () {
         timer--;
-        updateWaitroomText(data, timer);
+        updateWaitroomText(waitroomState, timer);
 
         // Stop the timer if it reaches zero
         if (timer <= 0) {
@@ -981,7 +980,7 @@ socket.on("waiting_room", function(data) {
 
 
 var singlePlayerWaitroomInterval;
-socket.on("single_player_waiting_room", function(data) {
+socket.on("single_player_waiting_room", function(singlePlayerWaitroom) {
     if (singlePlayerWaitroomInterval) {
         clearInterval(singlePlayerWaitroomInterval);
     }
@@ -990,17 +989,17 @@ socket.on("single_player_waiting_room", function(data) {
     $("#instructions").hide();
 
 
-    var simulater_timer = Math.floor(data.ms_remaining / 1000); // Convert milliseconds to seconds
-    var single_player_timer = Math.floor(data.wait_duration_s); // already in second
+    var simulater_timer = Math.floor(singlePlayerWaitroom.ms_remaining / 1000); // Convert milliseconds to seconds
+    var single_player_timer = Math.floor(singlePlayerWaitroom.wait_duration_s); // already in second
 
     // Update the text immediately to reflect the current state
-    updateWaitroomText(data, simulater_timer);
+    updateWaitroomText(singlePlayerWaitroom, simulater_timer);
 
     // Set up a new interval
     singlePlayerWaitroomInterval = setInterval(function () {
         simulater_timer--;
         single_player_timer--;
-        updateWaitroomText(data, simulater_timer);
+        updateWaitroomText(singlePlayerWaitroom, simulater_timer);
 
         if (single_player_timer <= 0) {
             clearInterval(singlePlayerWaitroomInterval);
@@ -1021,7 +1020,7 @@ socket.on("single_player_waiting_room", function(data) {
 })
 
 
-socket.on("single_player_waiting_room_failure", function(data) {
+socket.on("single_player_waiting_room_failure", function(failureInfo) {
     console.log("Leaving game due to waiting room failure (other player left)...")
     // Prevent start button from being re-enabled after failure
     if (refreshStartButton) {
@@ -1068,13 +1067,13 @@ socket.on("waiting_room_player_left", function() {
 })
 
 // P2P Validation Status (Phase 19) - log only, no UI updates
-socket.on('p2p_validation_status', function(data) {
-    console.log("[P2P] Validation status:", data.status);
+socket.on('p2p_validation_status', function(validationStatus) {
+    console.log("[P2P] Validation status:", validationStatus.status);
 });
 
 // P2P Validation Re-pool (Phase 19)
-socket.on('p2p_validation_repool', function(data) {
-    console.log("[P2P] Re-pool requested:", data.reason);
+socket.on('p2p_validation_repool', function(repoolInfo) {
+    console.log("[P2P] Re-pool requested:", repoolInfo.reason);
 
     // Clear any existing waitroom intervals
     if (waitroomInterval) {
@@ -1083,7 +1082,7 @@ socket.on('p2p_validation_repool', function(data) {
     }
 
     // Show message to user
-    var message = data.message || "Finding new partner...";
+    var message = repoolInfo.message || "Finding new partner...";
     $("#waitroomText").text(message);
     $("#waitroomText").show();
 
@@ -1095,42 +1094,42 @@ socket.on('p2p_validation_repool', function(data) {
 });
 
 // P2P Validation Complete (Phase 19)
-socket.on('p2p_validation_complete', function(data) {
+socket.on('p2p_validation_complete', function(validationResult) {
     console.log("[P2P] Validation complete, game starting");
 });
 
 
-function updateWaitroomText(data, timer) {
+function updateWaitroomText(waitroomConfig, timer) {
     var minutes = parseInt(timer / 60, 10);
     var seconds = parseInt(timer % 60, 10);
 
     minutes = minutes < 10 ? "0" + minutes : minutes;
     seconds = seconds < 10 ? "0" + seconds : seconds;
 
-    if (data.hide_lobby_count) {
+    if (waitroomConfig.hide_lobby_count) {
         // Hide participant count, only show timer
         $("#waitroomText").text(`Waiting ${minutes}:${seconds} for more players to join...`);
     } else {
         // Show participant count and timer
-        $("#waitroomText").text(`There are ${data.cur_num_players} / ${data.cur_num_players + data.players_needed} players in the lobby. Waiting ${minutes}:${seconds} for more to join...`);
+        $("#waitroomText").text(`There are ${waitroomConfig.cur_num_players} / ${waitroomConfig.cur_num_players + waitroomConfig.players_needed} players in the lobby. Waiting ${minutes}:${seconds} for more to join...`);
     }
 }
 
-socket.on("game_reset", function(data) {
+socket.on("game_reset", function(resetData) {
     graphics_end()
     $('#hudText').hide()
     ui_utils.disableKeyListener();
 
-    let scene_metadata = data.scene_metadata
+    let scene_metadata = resetData.scene_metadata
 
     if (!scene_metadata) {
-        scene_metadata = data.config;
+        scene_metadata = resetData.config;
     }
 
     if (!scene_metadata) {
         console.log("scene_metadata is undefined on game reset!")
         return;
-    }   
+    }
 
     // Initialize game
     let graphics_config = {
@@ -1151,12 +1150,12 @@ socket.on("game_reset", function(data) {
 
     let input_mode = scene_metadata.input_mode;
 
-    startResetCountdown(data.timeout, function() {
+    startResetCountdown(resetData.timeout, function() {
         // This function will be called after the countdown
         ui_utils.enableKeyListener(input_mode);
         graphics_start(graphics_config);
 
-        socket.emit("reset_complete", {room: data.room, session_id: window.sessionId});
+        socket.emit("reset_complete", {room: resetData.room, session_id: window.sessionId});
     });
 
 
@@ -1192,7 +1191,7 @@ function startResetCountdown(timeout, callback) {
     }, 1000);
 }
 
-socket.on("create_game_failed", function(data) {
+socket.on("create_game_failed", function(failureData) {
     $("#welcomeHeader").show();
     $("#welcomeText").show();
     $("#instructions").show();
@@ -1202,23 +1201,23 @@ socket.on("create_game_failed", function(data) {
      $("#startButton").attr("disabled", false);
 
 
-    let err = data['error']
+    let err = failureData['error']
     $('#errorText').show()
     $('#errorText').text(`Sorry, game creation code failed with error: ${JSON.stringify(err)}. You may try again by pressing the start button.`);
 })
 
 
-socket.on('environment_state', function(data) {
+socket.on('environment_state', function(stateUpdate) {
     $('#hudText').show()
-    $('#hudText').text(data.hud_text)
-    addStateToBuffer(data);
+    $('#hudText').text(stateUpdate.hud_text)
+    addStateToBuffer(stateUpdate);
 });
 
 
 
 
 
-socket.on('end_game', function(data) {
+socket.on('end_game', function(endGameInfo) {
     console.log("game ended!")
     // Hide game data and display game-over html
     graphics_end();
@@ -1227,8 +1226,8 @@ socket.on('end_game', function(data) {
     socket.emit("leave_game", {session_id: window.sessionId});
     $("#gameContainer").hide();
 
-    if (data.message != undefined) {
-        $('#errorText').text(data.message);
+    if (endGameInfo.message != undefined) {
+        $('#errorText').text(endGameInfo.message);
         $('#errorText').show();
     }
 
@@ -1238,27 +1237,25 @@ socket.on('end_game', function(data) {
 });
 
 
-socket.on('end_game_request_redirect', function(data) {
+socket.on('end_game_request_redirect', function(redirectInfo) {
     console.log("received redirect")
     setTimeout(function() {
         // Redirect to the specified URL after the timeout
-        window.location.href = data.redirect_url;
-    }, data.redirect_timeout);
+        window.location.href = redirectInfo.redirect_url;
+    }, redirectInfo.redirect_timeout);
 });
 
 
-socket.on('update_game_page_text', function(data) {
+socket.on('update_game_page_text', function(pageUpdate) {
     // Don't update if screening failed
     if (experimentScreeningPassed === false) return;
 
-    $("#sceneBody").html(data.game_page_text);
+    $("#sceneBody").html(pageUpdate.game_page_text);
     $("#sceneBody").show();
 })
 
 
-// var pressedKeys = {};
-
-socket.on('request_pressed_keys', function(data) {
+socket.on('request_pressed_keys', function(keyRequest) {
     console.log("request_pressed_keys", ui_utils.pressedKeys, pressedKeys, window.sessionId)
     socket.emit('send_pressed_keys', {'pressed_keys': Object.keys(pressedKeys), session_id: window.sessionId});
 });
@@ -1271,31 +1268,31 @@ socket.on('request_pressed_keys', function(data) {
 
 var currentSceneMetadata = {};
 
-socket.on("activate_scene", function(data) {
-    console.log("Activating scene", data.scene_id)
+socket.on("activate_scene", function(sceneData) {
+    console.log("Activating scene", sceneData.scene_id)
     // Retrieve interactiveGymGlobals from the global scope
     console.log("interactiveGymGlobals", interactiveGymGlobals)
     if (typeof interactiveGymGlobals !== 'undefined') {
-        // Add interactiveGymGlobals to data.globals
+        // Add interactiveGymGlobals to sceneData.globals
         console.log("interactiveGymGlobals", interactiveGymGlobals)
-        data.globals = data.globals || {};
-        Object.assign(data.globals, interactiveGymGlobals);
+        sceneData.globals = sceneData.globals || {};
+        Object.assign(sceneData.globals, interactiveGymGlobals);
     }
-    activateScene(data);
+    activateScene(sceneData);
 });
 
 
-socket.on("terminate_scene", function(data) {
+socket.on("terminate_scene", function(terminationData) {
     // Sync globals to server before terminating scene
     socket.emit("sync_globals", {interactiveGymGlobals: window.interactiveGymGlobals});
 
-    if (data.element_ids && data.element_ids.length > 0) {
-        let retrievedData = getData(data.element_ids);
-        socket.emit("static_scene_data_emission", {data: retrievedData, scene_id: data.scene_id, session_id: window.sessionId, interactiveGymGlobals: window.interactiveGymGlobals});
+    if (terminationData.element_ids && terminationData.element_ids.length > 0) {
+        let retrievedData = getData(terminationData.element_ids);
+        socket.emit("static_scene_data_emission", {data: retrievedData, scene_id: terminationData.scene_id, session_id: window.sessionId, interactiveGymGlobals: window.interactiveGymGlobals});
     }
 
-    terminateScene(data);
-    console.log("Terminating scene", data.scene_id);
+    terminateScene(terminationData);
+    console.log("Terminating scene", terminationData.scene_id);
 });
 
 
@@ -1763,16 +1760,16 @@ function redirect_subject(url) {
 const startButton = window.document.getElementById('startButton');
 
 
-socket.on("update_unity_score", function(data) {
-    console.log("Updating Unity score", data.score);
-    window.interactiveGymGlobals.unityScore = data.score;
+socket.on("update_unity_score", function(scoreUpdate) {
+    console.log("Updating Unity score", scoreUpdate.score);
+    window.interactiveGymGlobals.unityScore = scoreUpdate.score;
 
 
     let hudText = '';
-    if (data.num_episodes && data.num_episodes > 1) {
-        hudText += `Round ${window.interactiveGymGlobals.unityEpisodeCounter + 1}/${data.num_episodes}`;
+    if (scoreUpdate.num_episodes && scoreUpdate.num_episodes > 1) {
+        hudText += `Round ${window.interactiveGymGlobals.unityEpisodeCounter + 1}/${scoreUpdate.num_episodes}`;
     }
-    
+
     if (window.interactiveGymGlobals.unityScore !== null) {
         if (hudText) hudText += ' | ';
         hudText += `Score: ${window.interactiveGymGlobals.unityScore}`;
@@ -1782,26 +1779,26 @@ socket.on("update_unity_score", function(data) {
 
 });
 
-socket.on("unity_episode_end", function(data) {
+socket.on("unity_episode_end", function(episodeEndData) {
 
     // Update the HUD text to show the round progress and score
     window.interactiveGymGlobals.unityEpisodeCounter++;
-    
+
     let hudText = '';
-    if (data.num_episodes && data.num_episodes > 1) {
-        hudText += `Round ${window.interactiveGymGlobals.unityEpisodeCounter + 1}/${data.num_episodes}`;
+    if (episodeEndData.num_episodes && episodeEndData.num_episodes > 1) {
+        hudText += `Round ${window.interactiveGymGlobals.unityEpisodeCounter + 1}/${episodeEndData.num_episodes}`;
     }
-    
+
     if (window.interactiveGymGlobals.unityScore !== null) {
         if (hudText) hudText += ' | ';
         hudText += `Score: ${window.interactiveGymGlobals.unityScore}`;
     }
-    
+
     $("#hudText").html(hudText);
 
 
 
-    if (data.all_episodes_done) {
+    if (episodeEndData.all_episodes_done) {
         // Clear the Unity game container
         $("#gameContainer").hide();
         shutdownUnityGame();
@@ -1829,7 +1826,7 @@ socket.on("unity_episode_end", function(data) {
         }, 1000);
 
     }
-    
+
 
 });
 

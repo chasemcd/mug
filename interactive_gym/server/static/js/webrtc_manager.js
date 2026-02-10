@@ -29,7 +29,7 @@ class ConnectionQualityMonitor {
      * @param {number} options.criticalLatency - RTT threshold for critical in ms (default: 300)
      */
     constructor(peerConnection, options = {}) {
-        this.pc = peerConnection;
+        this.peerConnection = peerConnection;
         this.pollInterval = options.pollInterval || 2000;
         this.warningLatencyMs = options.warningLatency || 150;
         this.criticalLatencyMs = options.criticalLatency || 300;
@@ -64,10 +64,10 @@ class ConnectionQualityMonitor {
      * @private
      */
     async _poll() {
-        if (!this.pc || this.pc.connectionState !== 'connected') return;
+        if (!this.peerConnection || this.peerConnection.connectionState !== 'connected') return;
 
         try {
-            const stats = await this.pc.getStats();
+            const stats = await this.peerConnection.getStats();
             const quality = this._extractQualityMetrics(stats);
 
             if (quality) {
@@ -647,21 +647,21 @@ class WebRTCManager {
     /**
      * Configure DataChannel event handlers.
      * @private
-     * @param {RTCDataChannel} dc - The DataChannel to configure
+     * @param {RTCDataChannel} dataChannel - The DataChannel to configure
      */
-    _setupDataChannel(dc) {
-        dc.binaryType = 'arraybuffer';
+    _setupDataChannel(dataChannel) {
+        dataChannel.binaryType = 'arraybuffer';
 
-        dc.onopen = () => {
+        dataChannel.onopen = () => {
             console.log('[WebRTC] DataChannel open');
             this.onDataChannelOpen?.();
         };
 
-        dc.onmessage = (event) => {
+        dataChannel.onmessage = (event) => {
             this.onDataChannelMessage?.(event.data);
         };
 
-        dc.onclose = () => {
+        dataChannel.onclose = () => {
             console.log('[WebRTC] DataChannel closed');
             this.onDataChannelClose?.();
             // If DataChannel closes unexpectedly during active game, notify (Phase 20)
@@ -674,7 +674,7 @@ class WebRTCManager {
             }
         };
 
-        dc.onerror = (error) => {
+        dataChannel.onerror = (error) => {
             console.error('[WebRTC] DataChannel error:', error);
         };
     }
@@ -908,7 +908,7 @@ class LatencyTelemetry {
      * @param {number} options.maxSamples - Max samples to retain (default: 600 for ~10 min at 1Hz)
      */
     constructor(peerConnection, options = {}) {
-        this.pc = peerConnection;
+        this.peerConnection = peerConnection;
         this.pollInterval = options.pollInterval || 1000;
         this.maxSamples = options.maxSamples || 600;
 
@@ -939,10 +939,10 @@ class LatencyTelemetry {
      * @private
      */
     async _poll() {
-        if (!this.pc || this.pc.connectionState !== 'connected') return;
+        if (!this.peerConnection || this.peerConnection.connectionState !== 'connected') return;
 
         try {
-            const stats = await this.pc.getStats();
+            const stats = await this.peerConnection.getStats();
             const rttMs = this._extractRtt(stats);
 
             if (rttMs !== null) {
@@ -1028,5 +1028,5 @@ class LatencyTelemetry {
 }
 
 // Export for ES modules and global access
-export { WebRTCManager, ConnectionQualityMonitor, LatencyTelemetry };
+export { WebRTCManager, LatencyTelemetry };
 export default WebRTCManager;

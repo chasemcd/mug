@@ -107,6 +107,33 @@ class Matchmaker(ABC):
             return True  # Measurement failed, reject for safety
         return measured_rtt_ms > self.max_p2p_rtt_ms
 
+    def rank_candidates(
+        self,
+        arriving: MatchCandidate,
+        waiting: list[MatchCandidate],
+        group_size: int,
+    ) -> list[MatchCandidate]:
+        """Return viable candidates in priority order for iterative P2P probing.
+
+        When P2P RTT probing is enabled and a probe fails, GameManager uses
+        this ordered list to try the next candidate. Override to customize
+        candidate ordering or filtering.
+
+        Default returns all waiting candidates in their current order (FIFO).
+
+        Args:
+            arriving: The participant who just arrived
+            waiting: Participants already in the waitroom
+            group_size: Number needed for a match
+
+        Returns:
+            Ordered list of candidates to try pairing with the arriving
+            participant. Empty list if not enough participants.
+        """
+        if len(waiting) + 1 < group_size:
+            return []
+        return list(waiting)
+
     @abstractmethod
     def find_match(
         self,
@@ -238,6 +265,48 @@ class LatencyFIFOMatchmaker(Matchmaker):
         super().__init__(max_p2p_rtt_ms=max_p2p_rtt_ms)
         self.max_server_rtt_ms = max_server_rtt_ms
 
+    def _filter_by_server_rtt(
+        self,
+        arriving: MatchCandidate,
+        waiting: list[MatchCandidate],
+    ) -> list[MatchCandidate]:
+        """Filter waiting candidates by estimated P2P RTT (sum of server RTTs)."""
+        filtered = []
+        for candidate in waiting:
+            if arriving.rtt_ms is None or candidate.rtt_ms is None:
+                logger.info(
+                    f"[LatencyFIFOMatchmaker] Candidate {candidate.subject_id} "
+                    f"has missing RTT data (arriving={arriving.rtt_ms}, "
+                    f"candidate={candidate.rtt_ms}). Not excluded."
+                )
+                filtered.append(candidate)
+            else:
+                estimated_rtt = arriving.rtt_ms + candidate.rtt_ms
+                if estimated_rtt <= self.max_server_rtt_ms:
+                    logger.info(
+                        f"[LatencyFIFOMatchmaker] Candidate {candidate.subject_id} "
+                        f"passes RTT filter: {estimated_rtt}ms <= "
+                        f"{self.max_server_rtt_ms}ms"
+                    )
+                    filtered.append(candidate)
+                else:
+                    logger.info(
+                        f"[LatencyFIFOMatchmaker] Candidate {candidate.subject_id} "
+                        f"SKIPPED: estimated RTT {estimated_rtt}ms > "
+                        f"{self.max_server_rtt_ms}ms"
+                    )
+        return filtered
+
+    def rank_candidates(
+        self,
+        arriving: MatchCandidate,
+        waiting: list[MatchCandidate],
+        group_size: int,
+    ) -> list[MatchCandidate]:
+        if len(waiting) + 1 < group_size:
+            return []
+        return self._filter_by_server_rtt(arriving, waiting)
+
     def find_match(
         self,
         arriving: MatchCandidate,
@@ -260,32 +329,7 @@ class LatencyFIFOMatchmaker(Matchmaker):
             )
             return None
 
-        # Filter candidates by estimated P2P RTT (sum of server RTTs)
-        filtered = []
-        for candidate in waiting:
-            if arriving.rtt_ms is None or candidate.rtt_ms is None:
-                # Missing RTT data: do not exclude (graceful fallback)
-                logger.info(
-                    f"[LatencyFIFOMatchmaker] Candidate {candidate.subject_id} "
-                    f"has missing RTT data (arriving={arriving.rtt_ms}, "
-                    f"candidate={candidate.rtt_ms}). Not excluded."
-                )
-                filtered.append(candidate)
-            else:
-                estimated_rtt = arriving.rtt_ms + candidate.rtt_ms
-                if estimated_rtt <= self.max_server_rtt_ms:
-                    logger.info(
-                        f"[LatencyFIFOMatchmaker] Candidate {candidate.subject_id} "
-                        f"passes RTT filter: {estimated_rtt}ms <= "
-                        f"{self.max_server_rtt_ms}ms"
-                    )
-                    filtered.append(candidate)
-                else:
-                    logger.info(
-                        f"[LatencyFIFOMatchmaker] Candidate {candidate.subject_id} "
-                        f"SKIPPED: estimated RTT {estimated_rtt}ms > "
-                        f"{self.max_server_rtt_ms}ms"
-                    )
+        filtered = self._filter_by_server_rtt(arriving, waiting)
 
         # Check if enough candidates passed the filter
         if len(filtered) < group_size - 1:
@@ -339,6 +383,38 @@ class GroupReunionMatchmaker(Matchmaker):
     ):
         super().__init__(max_p2p_rtt_ms=max_p2p_rtt_ms)
         self.fallback_to_fifo = fallback_to_fifo
+
+    def rank_candidates(
+        self,
+        arriving: MatchCandidate,
+        waiting: list[MatchCandidate],
+        group_size: int,
+    ) -> list[MatchCandidate]:
+        if len(waiting) + 1 < group_size:
+            return []
+        # Previous partners first, then others in FIFO order
+        partners = []
+        others = []
+        prev_ids = set()
+        if arriving.group_history and arriving.group_history.previous_partners:
+            prev_ids = set(arriving.group_history.previous_partners)
+        # Also check reverse: waiting participants who want the arriving player
+        reverse_ids = set()
+        for w in waiting:
+            if (
+                w.group_history
+                and w.group_history.previous_partners
+                and arriving.subject_id in w.group_history.previous_partners
+            ):
+                reverse_ids.add(w.subject_id)
+        for w in waiting:
+            if w.subject_id in prev_ids or w.subject_id in reverse_ids:
+                partners.append(w)
+            else:
+                others.append(w)
+        if self.fallback_to_fifo:
+            return partners + others
+        return partners
 
     def find_match(
         self,

@@ -26,7 +26,7 @@ class ProbeCoordinator:
     They exist independently of games - no game_id is needed.
 
     Usage:
-        coordinator = ProbeCoordinator(sio, get_socket_fn)
+        coordinator = ProbeCoordinator(socketio, get_socket_fn)
         probe_id = coordinator.create_probe(subject_a, subject_b, on_complete)
         # ... wait for client-side probe to complete ...
         # on_complete(subject_a, subject_b, rtt_ms) called when done
@@ -34,7 +34,7 @@ class ProbeCoordinator:
 
     def __init__(
         self,
-        sio: flask_socketio.SocketIO,
+        socketio: flask_socketio.SocketIO,
         get_socket_for_subject: Callable[[str], str | None],
         turn_username: str | None = None,
         turn_credential: str | None = None,
@@ -42,12 +42,12 @@ class ProbeCoordinator:
         """Initialize ProbeCoordinator.
 
         Args:
-            sio: Flask-SocketIO instance
+            socketio: Flask-SocketIO instance
             get_socket_for_subject: Callable that returns socket_id for a subject_id
             turn_username: TURN server username (optional)
             turn_credential: TURN server credential (optional)
         """
-        self.sio = sio
+        self.socketio = socketio
         self.get_socket_for_subject = get_socket_for_subject
         self.turn_username = turn_username
         self.turn_credential = turn_credential
@@ -109,7 +109,7 @@ class ProbeCoordinator:
             'turn_username': self.turn_username,
             'turn_credential': self.turn_credential,
         }
-        self.sio.emit('probe_prepare', prepare_data_a, room=socket_a)
+        self.socketio.emit('probe_prepare', prepare_data_a, room=socket_a)
 
         prepare_data_b = {
             'probe_session_id': probe_session_id,
@@ -117,7 +117,7 @@ class ProbeCoordinator:
             'turn_username': self.turn_username,
             'turn_credential': self.turn_credential,
         }
-        self.sio.emit('probe_prepare', prepare_data_b, room=socket_b)
+        self.socketio.emit('probe_prepare', prepare_data_b, room=socket_b)
 
         logger.info(f"Created probe session {probe_session_id}: {subject_a} <-> {subject_b}")
 
@@ -155,8 +155,8 @@ class ProbeCoordinator:
             session['state'] = 'connecting'
             # Both ready - signal start to both clients
             start_data = {'probe_session_id': probe_session_id}
-            self.sio.emit('probe_start', start_data, room=session['socket_a'])
-            self.sio.emit('probe_start', start_data, room=session['socket_b'])
+            self.socketio.emit('probe_start', start_data, room=session['socket_a'])
+            self.socketio.emit('probe_start', start_data, room=session['socket_b'])
             logger.info(f"Probe {probe_session_id}: both ready, starting connection")
 
     def handle_signal(
@@ -202,7 +202,7 @@ class ProbeCoordinator:
             sender_subject = session['subject_b']
 
         # Relay the signal to target
-        self.sio.emit('probe_signal', {
+        self.socketio.emit('probe_signal', {
             'probe_session_id': probe_session_id,
             'type': signal_type,
             'from_subject_id': sender_subject,

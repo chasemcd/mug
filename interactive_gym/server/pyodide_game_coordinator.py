@@ -93,8 +93,8 @@ class PyodideGameCoordinator:
     5. Assign player IDs to symmetric peers
     """
 
-    def __init__(self, sio: flask_socketio.SocketIO, game_manager_getter: callable = None):
-        self.sio = sio
+    def __init__(self, socketio: flask_socketio.SocketIO, game_manager_getter: callable = None):
+        self.socketio = socketio
         self.games: Dict[str, PyodideGameState] = {}
         self.lock = threading.Lock()
         self.get_game_manager = game_manager_getter  # Returns GameManager for a game_id
@@ -181,7 +181,7 @@ class PyodideGameCoordinator:
                     environment_code=environment_code,
                     num_players=num_players,
                     state_broadcast_interval=state_broadcast_interval,
-                    sio=self.sio,
+                    socketio=self.socketio,
                     # New config options
                     fps=fps,
                     default_action=default_action,
@@ -262,7 +262,7 @@ class PyodideGameCoordinator:
 
         # Emit OUTSIDE the lock to avoid eventlet deadlock
         if emit_assigned_data:
-            self.sio.emit('pyodide_player_assigned',
+            self.socketio.emit('pyodide_player_assigned',
                          emit_assigned_data['payload'],
                          room=emit_assigned_data['socket_id'])
 
@@ -340,7 +340,7 @@ class PyodideGameCoordinator:
         game_id = start_data['game_id']
 
         # Emit game ready event
-        self.sio.emit('pyodide_game_ready', start_data['emit_payload'], room=game_id)
+        self.socketio.emit('pyodide_game_ready', start_data['emit_payload'], room=game_id)
 
         # Start real-time loop for server runner (this spawns eventlet greenlets)
         if start_data['server_runner']:
@@ -421,7 +421,7 @@ class PyodideGameCoordinator:
             # Broadcast to ALL OTHER players immediately (Action Queue approach)
             for other_player_id, socket_id in game.players.items():
                 if other_player_id != player_id:
-                    self.sio.emit('pyodide_other_player_action', {
+                    self.socketio.emit('pyodide_other_player_action', {
                         'player_id': player_id,
                         'action': action,
                         'frame_number': frame_number,
@@ -439,7 +439,7 @@ class PyodideGameCoordinator:
                     player_id, action, frame_number, sync_epoch
                 )
 
-    def remove_player(self, game_id: str, player_id: str | int, notify_others: bool = True):
+    def remove_player(self, game_id: str, player_id: str | int, notify_others: bool = True, reason: str = 'partner_disconnected'):
         """
         Handle player disconnection.
 
@@ -502,11 +502,11 @@ class PyodideGameCoordinator:
         if should_notify:
             for socket_id in sockets_to_notify:
                 # Emit p2p_game_ended so client handles with proper overlay and completion code
-                self.sio.emit(
+                self.socketio.emit(
                     'p2p_game_ended',
                     {
                         'game_id': game_id,
-                        'reason': 'partner_disconnected',
+                        'reason': reason,
                         'disconnected_player_id': player_id
                     },
                     room=socket_id
@@ -617,7 +617,7 @@ class PyodideGameCoordinator:
                 return
 
             # Relay the signal to target peer
-            self.sio.emit(
+            self.socketio.emit(
                 'webrtc_signal',
                 {
                     'type': signal_type,
@@ -673,7 +673,7 @@ class PyodideGameCoordinator:
 
             # Notify partner(s) with clear, non-alarming message
             for socket_id in partner_sockets:
-                self.sio.emit(
+                self.socketio.emit(
                     'partner_excluded',
                     {
                         'message': 'Your partner experienced a technical issue. The game has ended.',
@@ -684,7 +684,7 @@ class PyodideGameCoordinator:
                 )
 
                 # Trigger data export for partner before cleanup
-                self.sio.emit(
+                self.socketio.emit(
                     'trigger_data_export',
                     {
                         'is_partial': True,

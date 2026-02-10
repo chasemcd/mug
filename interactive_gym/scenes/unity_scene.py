@@ -7,9 +7,8 @@ import json
 
 from interactive_gym.scenes import scene
 from interactive_gym.configurations import remote_config
-from interactive_gym.scenes import utils as scene_utils
 from interactive_gym.configurations import configuration_constants
-from interactive_gym.scenes.utils import NotProvided
+from interactive_gym.utils.sentinels import NotProvided
 import flask_socketio
 
 
@@ -158,7 +157,7 @@ class UnityScene(scene.Scene):
         return self
 
     def on_unity_episode_start(
-        self, data: dict, sio: flask_socketio.SocketIO, room: str
+        self, data: dict, socketio: flask_socketio.SocketIO, room: str
     ):
         """
         This method is called when the Unity episode starts.
@@ -166,14 +165,14 @@ class UnityScene(scene.Scene):
         pass
 
     def on_unity_episode_end(
-        self, data: dict, sio: flask_socketio.SocketIO, room: str
+        self, data: dict, socketio: flask_socketio.SocketIO, room: str
     ):
         """
         This method is called when the Unity episode ends.
         """
         self.episodes_completed += 1
 
-        sio.emit(
+        socketio.emit(
             "unity_episode_end",
             {
                 "all_episodes_done": self.episodes_completed
@@ -193,7 +192,7 @@ class UnityScene(scene.Scene):
         else:
             self.score += score_this_round
 
-        sio.emit(
+        socketio.emit(
             "update_unity_score",
             {
                 "score": self.score,
@@ -202,9 +201,9 @@ class UnityScene(scene.Scene):
             room=room,
         )
 
-    def on_connect(self, sio: flask_socketio.SocketIO, room: str | int):
+    def on_connect(self, socketio: flask_socketio.SocketIO, room: str | int):
         """
         A hook that is called when the client connects to the server.
         """
         if self.preload_game:
-            sio.emit("preload_unity_game", {**self.scene_metadata}, room=room)
+            socketio.emit("preload_unity_game", {**self.scene_metadata}, room=room)

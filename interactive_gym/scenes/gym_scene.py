@@ -10,9 +10,8 @@ if TYPE_CHECKING:
 
 from interactive_gym.scenes import scene
 from interactive_gym.configurations import remote_config
-from interactive_gym.scenes import utils as scene_utils
 from interactive_gym.configurations import configuration_constants
-from interactive_gym.scenes.utils import NotProvided
+from interactive_gym.utils.sentinels import NotProvided
 
 
 class GymScene(scene.Scene):
@@ -954,52 +953,3 @@ class GymScene(scene.Scene):
             self.pause_on_partner_background = pause_on_partner_background
 
         return self
-
-    @property
-    def simulate_waiting_room(self) -> bool:
-        """Determines if the scene should simulate a waiting room.
-
-        This property checks if there's any randomization in the waiting room time,
-        which would necessitate simulating a waiting room experience.
-
-        Returns a boolean indicating whether or not we're
-        forcing all participants to be in a waiting room, regardless
-        of if they're waiting for other players or not.
-
-        :return: True if the maximum waiting room time randomization interval is greater than 0, False otherwise.
-        :rtype: bool
-        """
-        return max(self.waitroom_time_randomization_interval_s) > 0
-
-    def get_complete_scene_metadata(self) -> dict:
-        """Get the complete metadata for the scene.
-
-        This method returns a dictionary containing all the metadata for the scene,
-        including all class properties that are not already in the base scene metadata.
-        It handles various data types, converting complex objects to dictionaries or strings
-        to ensure all data is serializable.
-
-        :return: A dictionary containing all the scene's metadata
-        :rtype: dict
-        """
-        metadata = super().scene_metadata
-
-        # Add all of the class properties to the metadata
-        for k, v in self.__dict__.items():
-            if k not in metadata and k != "sio":
-                if (
-                    isinstance(v, (str, int, float, bool, list, dict))
-                    or v is None
-                ):
-                    metadata[k] = v
-                elif hasattr(v, "__dict__"):
-                    metadata[k] = v.__dict__
-                else:
-                    metadata[k] = str(v)
-
-        # Add custom callback flags (Phase 18)
-        # Only include boolean flags, not the actual callback functions (they run server-side only)
-        metadata["has_continuous_callback"] = self.continuous_exclusion_callback is not None
-        metadata["continuous_callback_interval_frames"] = self.continuous_callback_interval_frames
-
-        return metadata

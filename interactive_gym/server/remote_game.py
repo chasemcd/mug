@@ -14,12 +14,8 @@ import eventlet
 import numpy as np
 from gymnasium import spaces
 
-from interactive_gym.configurations import (
-    configuration_constants,
-    remote_config,
-)
-from interactive_gym.server import utils
-from interactive_gym.scenes import scene, gym_scene
+from interactive_gym.configurations import configuration_constants
+from interactive_gym.scenes import gym_scene
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +39,126 @@ class GameStatus:
     Active = "active"
     Inactive = "inactive"
     Reset = "reset"
+
+
+class GameExitStatus:
+    """Exit status for game cleanup based on activity and player count."""
+    ActiveWithOtherPlayers = "active_with_other_players"
+    ActiveNoPlayers = "active_no_players"
+    InactiveNoPlayers = "inactive_no_players"
+    InactiveWithOtherPlayers = "inactive_with_other_players"
+
+
+class _AvailableSlot:
+    """Sentinel value indicating a human player slot is available.
+
+    Adapted from RLLib's _NotProvided:
+    https://github.com/ray-project/ray/rllib/utils/from_config.py#L261
+    """
+
+    class __AvailableSlot:
+        pass
+
+    instance = None
+
+    def __init__(self):
+        if _AvailableSlot.instance is None:
+            _AvailableSlot.instance = _AvailableSlot.__AvailableSlot()
+
+
+AvailableSlot = _AvailableSlot
+
+
+class GameCallback:
+    """Base callback interface for game lifecycle hooks."""
+
+    def __init__(self, **kwargs) -> None:
+        pass
+
+    def on_episode_start(self, remote_game: RemoteGameV2):
+        pass
+
+    def on_episode_end(self, remote_game: RemoteGameV2):
+        pass
+
+    def on_game_tick_start(self, remote_game: RemoteGameV2):
+        pass
+
+    def on_game_tick_end(self, remote_game: RemoteGameV2):
+        pass
+
+    def on_graphics_start(self, remote_game: RemoteGameV2):
+        pass
+
+    def on_graphics_end(self, remote_game: RemoteGameV2):
+        pass
+
+    def on_waitroom_start(self, remote_game: RemoteGameV2):
+        pass
+
+    def on_waitroom_join(self, remote_game: RemoteGameV2):
+        pass
+
+    def on_waitroom_end(self, remote_game: RemoteGameV2):
+        pass
+
+    def on_waitroom_timeout(self, remote_game: RemoteGameV2):
+        pass
+
+    def on_game_end(self, remote_game: RemoteGameV2):
+        pass
+
+
+class MultiCallback(GameCallback):
+    """Aggregates multiple callbacks into a single callback interface."""
+
+    def __init__(self, callbacks: list[GameCallback], **kwargs) -> None:
+        # Initialize all callbacks
+        self.callbacks = [callback() for callback in callbacks]
+
+    def on_episode_start(self, remote_game: RemoteGameV2):
+        for callback in self.callbacks:
+            callback.on_episode_start(remote_game)
+
+    def on_episode_end(self, remote_game: RemoteGameV2):
+        for callback in self.callbacks:
+            callback.on_episode_end(remote_game)
+
+    def on_game_tick_start(self, remote_game: RemoteGameV2):
+        for callback in self.callbacks:
+            callback.on_game_tick_start(remote_game)
+
+    def on_game_tick_end(self, remote_game: RemoteGameV2):
+        for callback in self.callbacks:
+            callback.on_game_tick_end(remote_game)
+
+    def on_graphics_start(self, remote_game: RemoteGameV2):
+        for callback in self.callbacks:
+            callback.on_graphics_start(remote_game)
+
+    def on_graphics_end(self, remote_game: RemoteGameV2):
+        for callback in self.callbacks:
+            callback.on_graphics_end(remote_game)
+
+    def on_waitroom_start(self, remote_game: RemoteGameV2):
+        for callback in self.callbacks:
+            callback.on_waitroom_start(remote_game)
+
+    def on_waitroom_join(self, remote_game: RemoteGameV2):
+        for callback in self.callbacks:
+            callback.on_waitroom_join(remote_game)
+
+    def on_waitroom_end(self, remote_game: RemoteGameV2):
+        for callback in self.callbacks:
+            callback.on_waitroom_end(remote_game)
+
+    def on_waitroom_timeout(self, remote_game: RemoteGameV2):
+        for callback in self.callbacks:
+            callback.on_waitroom_timeout(remote_game)
+
+    def on_game_end(self, remote_game: RemoteGameV2):
+        for callback in self.callbacks:
+            callback.on_game_end(remote_game)
 
 
 class RemoteGameV2:
@@ -149,7 +265,7 @@ class RemoteGameV2:
         """Load and instantiates all policies"""
         for agent_id, policy_id in self.scene.policy_mapping.items():
             if policy_id == configuration_constants.PolicyTypes.Human:
-                self.human_players[agent_id] = utils.Available
+                self.human_players[agent_id] = AvailableSlot
             elif policy_id == configuration_constants.PolicyTypes.Random:
                 self.bot_players[agent_id] = policy_id
             elif self.scene.run_through_pyodide:
@@ -191,7 +307,7 @@ class RemoteGameV2:
         return [
             agent_id
             for agent_id, subject_id in self.human_players.items()
-            if subject_id is utils.Available
+            if subject_id is AvailableSlot
         ]
 
     def is_at_player_capacity(self) -> bool:
@@ -203,7 +319,7 @@ class RemoteGameV2:
             [
                 agent_id
                 for agent_id, subject_id in self.human_players.items()
-                if subject_id != utils.Available
+                if subject_id != AvailableSlot
             ]
         )
 
@@ -229,7 +345,7 @@ class RemoteGameV2:
             )
             return
 
-        self.human_players[player_id_to_remove] = utils.Available
+        self.human_players[player_id_to_remove] = AvailableSlot
         logger.debug(f"Removed {subject_id} from slot {player_id_to_remove}")
 
         if subject_id in self.document_focus_status:
@@ -401,344 +517,6 @@ class RemoteGameV2:
         self.tick_num += 1
         if terminateds or truncateds:
             if self.episode_num < self.scene.num_episodes:
-                self.status = GameStatus.Reset
-            else:
-                self.status = GameStatus.Done
-
-    def enqueue_observations(self) -> None:
-        """Add self.obs to the state queues for all bots"""
-        if self.status != GameStatus.Active:
-            return
-
-        if not self.bot_players:
-            return
-
-        for pid, obs in self.obs.items():
-            if pid not in self.bot_players:
-                continue
-
-            try:
-                self.state_queues[pid].put(obs, block=False)
-            except queue.Full:
-                pass
-
-    def reset_pending_actions(self) -> None:
-        self.pending_actions = collections.defaultdict(
-            lambda: queue.Queue(maxsize=1)
-        )
-
-    def reset_state_queues(self) -> None:
-        self.state_queues = collections.defaultdict(
-            lambda: queue.Queue(maxsize=1)
-        )
-
-    def reset(self, seed: int | None = None) -> None:
-        self.reset_pending_actions()
-        self.prev_actions = {}
-        self.prev_rewards = {}
-        self.obs, _ = self.env.reset(seed=seed)
-        self.status = GameStatus.Active
-
-        self._init_bot_threads()
-
-        self.tick_num = 0
-
-        self.enqueue_observations()
-
-        self.episode_num += 1
-        self.episode_rewards = collections.defaultdict(lambda: 0)
-
-
-class RemoteGame:
-    def __init__(
-        self, config: remote_config.RemoteConfig, game_id: int | None = None
-    ):
-        self.config = config
-        self.status = GameStatus.Inactive
-        self.lock = threading.Lock()
-        self.reset_event: eventlet.event.Event | None = None
-        self.set_reset_event()
-
-        self.document_focus_status: dict[str | int, bool] = (
-            collections.defaultdict(lambda: True)
-        )
-        self.current_ping: dict[str | int, int] = collections.defaultdict(
-            lambda: 0
-        )
-
-        # Players and actions
-        self.pending_actions = None
-        self.reset_pending_actions()
-
-        self.state_queues = None
-        self.reset_state_queues()
-
-        self.human_players = {}
-        self.bot_players = {}
-        self.bot_threads = {}
-
-        # Game environment
-        self.env = None
-        self.obs: np.ndarray | dict[str, typing.Any] | None = None
-        self.game_uuid: str = str(uuid.uuid4())
-        self.game_id: int | str = (
-            game_id if game_id is not None else self.game_uuid
-        )
-        assert (
-            game_id is not None
-        ), f"Must pass valid game id! Got {game_id} but expected an int."
-
-        self.tick_num: int = 0
-        self.episode_num: int = 0
-        self.episode_rewards = collections.defaultdict(lambda: 0)
-        self.total_rewards = collections.defaultdict(
-            lambda: 0
-        )  # score across episodes
-        self.total_positive_rewards = collections.defaultdict(
-            lambda: 0
-        )  # sum of positives
-        self.total_negative_rewards = collections.defaultdict(
-            lambda: 0
-        )  # sum of negatives
-        self.prev_rewards: dict[str | int, float] = {}
-        self.prev_actions: dict[str | int, str | int] = {}
-
-        self._build()
-
-    def set_reset_event(self) -> None:
-        """Reinitialize the reset event."""
-        self.reset_event = eventlet.event.Event()
-
-    def _build_env(self) -> None:
-        self.env = self.config.env_creator(
-            **self.config.env_config, render_mode="rgb_array"
-        )
-
-    def _load_policies(self) -> None:
-        """Load and instantiates all policies"""
-        for agent_id, policy_id in self.config.policy_mapping.items():
-            if policy_id == configuration_constants.PolicyTypes.Human:
-                self.human_players[agent_id] = utils.Available
-            elif policy_id == configuration_constants.PolicyTypes.Random:
-                self.bot_players[agent_id] = policy_id
-            elif self.config.run_through_pyodide:
-                continue
-            else:
-                assert (
-                    self.config.load_policy_fn is not None
-                ), "Must provide a method to load policies via policy name to RemoteConfig!"
-                self.bot_players[agent_id] = self.config.load_policy_fn(
-                    policy_id
-                )
-
-    def _init_bot_threads(self):
-        # TODO(chase): put this in a separate function
-        for agent_id, pid in self.bot_players.items():
-            if pid == configuration_constants.PolicyTypes.Random:
-                continue
-            self.bot_threads[agent_id] = eventlet.spawn(
-                self.policy_consumer, agent_id=agent_id
-            )
-
-    def policy_consumer(self, agent_id: str | int) -> None:
-        while self.status == GameStatus.Active:
-
-            # Game hangs if we don't do this
-            time.sleep(1 / self.config.fps)
-
-            try:
-                state = self.state_queues[agent_id].get(block=False)
-            except queue.Empty:
-                continue
-
-            policy = self.bot_players[agent_id]
-            action = self.config.policy_inference_fn(state, policy)
-            self.enqueue_action(agent_id, action)
-
-    def get_available_human_player_ids(self) -> list[str]:
-        """List the available human player IDs"""
-        return [
-            pid
-            for pid, player in self.human_players.items()
-            if player is utils.Available
-        ]
-
-    def is_at_player_capacity(self) -> bool:
-        """Check if there are any available human player IDs."""
-        return not self.get_available_human_player_ids()
-
-    def cur_num_human_players(self) -> int:
-        return len(
-            [
-                pid
-                for pid, sid in self.human_players.items()
-                if sid != utils.Available
-            ]
-        )
-
-    def remove_human_player(self, subject_id) -> None:
-        """Remove a human player from the game"""
-        player_id = None
-        for pid, sid in self.human_players.items():
-            if subject_id == sid:
-                player_id = pid
-                break
-
-        if player_id is None:
-            logger.warning(
-                f"Attempted to remove {subject_id} but player wasn't found."
-            )
-            return
-
-        self.human_players[player_id] = utils.Available
-
-        if subject_id in self.document_focus_status:
-            del self.document_focus_status[subject_id]
-            del self.current_ping[subject_id]
-
-    def is_ready_to_start(self) -> bool:
-        ready = self.is_at_player_capacity()
-        return ready
-
-    def _build(self):
-        self._build_env()
-        self._load_policies()
-
-    def tear_down(self):
-        self.status = GameStatus.Inactive
-
-        for bot_thread in self.bot_threads.values():
-            bot_thread.kill()
-
-        for q in self.pending_actions.values():
-            q.queue.clear()
-
-    def enqueue_action(self, subject_id, action) -> None:
-        """Queue an action for a human player"""
-        if self.status != GameStatus.Active:
-            return
-
-        try:
-            self.pending_actions[subject_id].put(action, block=False)
-        except queue.Full:
-            pass
-
-    def add_player(self, player_id: str | int, identifier: str | int) -> None:
-        available_ids = self.get_available_human_player_ids()
-        assert (
-            player_id in available_ids
-        ), f"Player ID is not available! Available IDs are: {available_ids}"
-
-        self.human_players[player_id] = identifier
-
-    def update_document_focus_status_and_ping(
-        self, player_identifier: str | int, hidden_status: bool, ping: int
-    ) -> None:
-        self.document_focus_status[player_identifier] = hidden_status
-        self.current_ping[player_identifier] = ping
-
-    def tick(self) -> None:
-
-        # If the queue is empty, we have a mechanism for deciding which action to submit
-        # Either the previous submitted action or the default action.
-        player_actions = {}
-        for pid, sid in self.human_players.items():
-            action = None
-            # Attempt to get an action from the action queue
-            # If there's no action, use default or previous depending
-            # on the method specified.
-            try:
-                action = self.pending_actions[sid].get(block=False)
-            except queue.Empty:
-                if (
-                    self.config.action_population_method
-                    == configuration_constants.ActionSettings.PreviousSubmittedAction
-                ):
-                    action = self.prev_actions.get(pid)
-
-            if action is None:
-                action = self.config.default_action
-
-            player_actions[pid] = action
-
-        # Bot actions
-        for pid, bot in self.bot_players.items():
-
-            # set default action
-            if (
-                self.config.action_population_method
-                == configuration_constants.ActionSettings.PreviousSubmittedAction
-            ):
-                action = self.prev_actions.get(pid)
-                if action is None:
-                    action = self.config.default_action
-                player_actions[pid] = self.config.default_action
-            elif (
-                self.config.action_population_method
-                == configuration_constants.ActionSettings.DefaultAction
-            ):
-                player_actions[pid] = self.config.default_action
-            else:
-                raise NotImplementedError(
-                    f"Action population method logic not specified for method: {self.config.action_population_method}"
-                )
-
-            # If the bot is random, just sample the action space at
-            # frame_skip intervals
-            if (
-                bot == configuration_constants.PolicyTypes.Random
-                and self.tick_num % self.config.frame_skip == 0
-            ):
-                if isinstance(self.env.action_space, spaces.Dict) or isinstance(
-                    self.env.action_space, dict
-                ):
-                    player_actions[pid] = self.env.action_space[pid].sample()
-                elif callable(self.env.action_space):
-                    player_actions[pid] = self.env.action_space(pid).sample()
-                else:
-                    player_actions[pid] = self.env.action_space.sample()
-
-            # If we have a specified policy, pop an action from the pending actions queue
-            # if there are any
-            elif self.pending_actions[pid].qsize() > 0:
-                player_actions[pid] = self.pending_actions[pid].get(block=False)
-
-        self.prev_actions = player_actions
-        try:
-            self.obs, rewards, terminateds, truncateds, _ = self.env.step(
-                player_actions
-            )
-
-        except AssertionError:
-            player_actions = list(player_actions.values())[0]
-            self.obs, rewards, terminateds, truncateds, _ = self.env.step(
-                player_actions
-            )
-
-        self.prev_rewards = (
-            rewards if isinstance(rewards, dict) else {"reward": rewards}
-        )
-
-        if self.tick_num % self.config.frame_skip == 0:
-            self.enqueue_observations()
-
-        if not isinstance(rewards, dict):
-            self.episode_rewards[0] += rewards
-            self.total_rewards[0] += rewards
-        else:
-            for k, v in rewards.items():
-                self.episode_rewards[k] += v
-                self.total_rewards[k] += v
-                self.total_positive_rewards[k] += max(0, v)
-                self.total_negative_rewards[k] += min(0, v)
-
-        if isinstance(terminateds, dict):
-            terminateds = all([t for t in terminateds.values()])
-            truncateds = all([t for t in truncateds.values()])
-
-        self.tick_num += 1
-        if terminateds or truncateds:
-            if self.episode_num < self.config.num_episodes:
                 self.status = GameStatus.Reset
             else:
                 self.status = GameStatus.Done

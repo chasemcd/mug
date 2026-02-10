@@ -102,8 +102,7 @@ File Structure
     ├── overcooked_human_human_server_side.py  # Main experiment file
     ├── scenes/
     │   └── scenes.py                          # Scene definitions
-    ├── overcooked_utils.py                    # Rendering functions
-    └── overcooked_callback.py                 # Game callbacks
+    └── overcooked_utils.py                    # Rendering functions
 
 Experiment Flow
 ---------------

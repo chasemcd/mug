@@ -95,7 +95,6 @@ File Structure
     ├── human_ai_server.py           # Server-side experiment
     ├── slimevb_env.py               # Environment with custom rendering
     ├── slime_volleyball_utils.py    # Rendering helper functions
-    ├── slime_volleyball_callback.py # Game callbacks
     └── policies/
         └── model.onnx               # Trained AI policy
 

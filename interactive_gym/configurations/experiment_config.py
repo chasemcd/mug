@@ -4,7 +4,7 @@ import json
 from typing import Callable
 
 from interactive_gym.scenes.stager import Stager
-from interactive_gym.scenes.utils import NotProvided
+from interactive_gym.utils.sentinels import NotProvided
 
 
 class ExperimentConfig:
@@ -252,48 +252,3 @@ class ExperimentConfig:
             "packages_to_install": list(all_packages),
             "pyodide_load_timeout_s": self.pyodide_load_timeout_s,
         }
-
-    def to_dict(self, serializable=False):
-        config = copy.deepcopy(vars(self))
-        if serializable:
-            config = serialize_dict(config)
-        return config
-
-
-def serialize_dict(data):
-    """
-    Serialize a dictionary to JSON, removing unserializable keys recursively.
-
-    :param data: Dictionary to serialize.
-    :return: Serialized object with unserializable elements removed.
-    """
-    if isinstance(data, dict):
-        # Use dictionary comprehension to process each key-value pair
-        return {
-            key: serialize_dict(value)
-            for key, value in data.items()
-            if is_json_serializable(value)
-        }
-    elif isinstance(data, list):
-        # Use list comprehension to process each item
-        return [
-            serialize_dict(item) for item in data if is_json_serializable(item)
-        ]
-    elif is_json_serializable(data):
-        return data
-    else:
-        return None  # or some other default value
-
-
-def is_json_serializable(value):
-    """
-    Check if a value is JSON serializable.
-
-    :param value: The value to check.
-    :return: True if the value is JSON serializable, False otherwise.
-    """
-    try:
-        json.dumps(value)
-        return True
-    except (TypeError, OverflowError):
-        return False
