@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-10)
 
 **Core value:** Researchers can configure and deploy multiplayer browser experiments with minimal code
-**Current focus:** Phase 84 — Package & Code Rename (v1.26)
+**Current focus:** Phase 85 — Documentation & Frontend (v1.26)
 
 ## Current Position
 
-Phase: 84 of 86 (Package & Code Rename)
-Plan: 2 of 2 complete
-Status: Phase 84 Complete
-Last activity: 2026-02-10 — Completed 84-02-PLAN.md
+Phase: 85 of 86 (Documentation & Frontend)
+Plan: — (not yet planned)
+Status: Phase 84 verified and complete. Ready to plan Phase 85.
+Last activity: 2026-02-10 — Phase 84 verified (passed, 5/5 criteria)
 
-Progress: [##########] ~33%
+Progress: [███░░░░░░░] 33%
 
 ## Performance Metrics
 
@@ -55,6 +55,6 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-10
-Stopped at: Completed 84-02-PLAN.md (Phase 84 complete)
+Stopped at: Phase 84 verified and complete
 Resume file: None
-Next action: Begin Phase 85
+Next action: Plan Phase 85
