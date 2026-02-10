@@ -81,7 +81,6 @@ def slime_volleyball_env_to_rendering(
         y=env.game.agent_left.y,
         dir=env.game.agent_left.dir,
         radius=env.game.agent_left.r,
-        is_boosting=False,
         color="#FF0000",
         env=env,
     )
@@ -92,7 +91,6 @@ def slime_volleyball_env_to_rendering(
         y=env.game.agent_right.y,
         dir=env.game.agent_right.dir,
         radius=env.game.agent_right.r,
-        is_boosting=False,
         color="#0000FF",
         env=env,
     )
@@ -116,7 +114,6 @@ def generate_slime_agent_objects(
     y: int,
     dir: int,
     radius: int,
-    is_boosting: bool,
     color: str,
     env: slimevolley_env.SlimeVolleyEnv,
     resolution: int = 30,
@@ -132,16 +129,6 @@ def generate_slime_agent_objects(
     objects.append(
         Polygon(uuid=f"{identifier}_body", color=color, points=points, depth=-1)
     )
-
-    if is_boosting:
-        objects.append(
-            Polygon(
-                uuid=f"{identifier}_body_boost",
-                color="#FFFF00",
-                points=[p * 1.1 for p in points],
-                depth=-1,
-            )
-        )
 
     # You can also render with sprites, which could be done like this:
     # objects.append(
