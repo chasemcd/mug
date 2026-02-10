@@ -4,6 +4,7 @@ data/
 .claude/settings.local.json
 .claude/*
 .planning/
+.planning/*
 .playwright-mcp/
 build/
 
