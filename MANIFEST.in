@@ -1,6 +1,6 @@
 include README.rst
 include LICENSE
 include MANIFEST.in
-include interactive_gym/**/*.py
+include mug/**/*.py
 recursive-include mypackage *
 recursive-include tests *
