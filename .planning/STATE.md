@@ -10,25 +10,25 @@ See: .planning/PROJECT.md (updated 2026-02-10)
 ## Current Position
 
 Phase: 85 of 86 (Documentation & Frontend)
-Plan: 2 of 3 complete
-Status: Executing Phase 85 plans
-Last activity: 2026-02-10 — Completed 85-02-PLAN.md
+Plan: 3 of 3 complete
+Status: Phase 85 complete. Ready for Phase 86.
+Last activity: 2026-02-10 — Completed 85-03-PLAN.md
 
-Progress: [██████░░░░] 55%
+Progress: [████████░░] 83%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 3 (this milestone)
-- Average duration: 2.2min
-- Total execution time: 6.6min
+- Total plans completed: 4 (this milestone)
+- Average duration: 2.7min
+- Total execution time: 10.6min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 84 | 2/2 | 5min | 2.5min |
-| 85 | 1/3 | 1.6min | 1.6min |
+| 85 | 2/3 | 5.6min | 2.8min |
 | 86 | 0/TBD | — | — |
 
 ## Accumulated Context
@@ -44,6 +44,7 @@ Progress: [██████░░░░] 55%
 - (84-02) Used _BaseMountainCarEnv alias to resolve name collision when renaming InteractiveGymMountainCar to MountainCarEnv
 - (84-02) Extended file path string updates to all example files (12 beyond plan-specified scene configs)
 - (85-02) Kept docs URL as interactive-gym.readthedocs.io (not yet migrated); GitHub URL stays as-is per project decision
+- (85-03) Preserved interactive-gym as repo root dir name in file tree diagrams; preserved GitHub/readthedocs URLs as-is
 
 ### Pending Todos
 
@@ -56,6 +57,6 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-10
-Stopped at: Completed 85-02-PLAN.md
+Stopped at: Completed 85-03-PLAN.md
 Resume file: None
-Next action: Execute 85-03-PLAN.md
+Next action: Plan Phase 86
