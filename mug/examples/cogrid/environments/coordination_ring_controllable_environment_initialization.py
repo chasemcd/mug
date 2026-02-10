@@ -356,7 +356,7 @@ class OvercookedRewardEnv(overcooked.Overcooked):
 
             # Add component rewards to per agent reward
             # NOTE(chase): We're not multiplying by the reward weights here
-            # because interactive gym will display the returned value
+            # because MUG will display the returned value
             # and we only want to display the delivery reward.
             for agent_id, reward_value in calculated_rewards.items():
                 self.per_agent_reward[agent_id] += reward_value * int(

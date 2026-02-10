@@ -10,7 +10,7 @@ from mug.utils.sentinels import NotProvided
 
 class StaticScene(scene.Scene):
     """
-    A class representing a static scene in the Interactive Gym.
+    A class representing a static scene with fixed content.
 
     StaticScene is used to display static content to participants, such as
     instructions, information, or data collection forms. It extends the base
