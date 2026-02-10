@@ -94,7 +94,7 @@ end_scene = (
     .scene(scene_id="mountain_car_end_scene")
     .display(
         scene_header="Thanks for playing!",
-        scene_body="For more information on Interactive Gym or to contact us with any questions, visit interactive-gym.readthedocs.io!",
+        scene_body="For more information on MUG or to contact us with any questions, visit interactive-gym.readthedocs.io!",
     )
 )
 
