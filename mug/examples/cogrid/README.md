@@ -1,6 +1,6 @@
 # Overcooked Examples
 
-This directory contains Interactive Gym examples using the CoGrid Overcooked environment. These examples demonstrate both single-player (Human-AI) and multiplayer (Human-Human) experiments using client-side Pyodide execution.
+This directory contains MUG examples using the CoGrid Overcooked environment. These examples demonstrate both single-player (Human-AI) and multiplayer (Human-Human) experiments using client-side Pyodide execution.
 
 ## Prerequisites
 
@@ -31,7 +31,7 @@ pip install cogrid==0.0.15
 
 **Usage**:
 ```bash
-python -m interactive_gym.examples.cogrid.overcooked_human_ai_client_side
+python -m mug.examples.cogrid.overcooked_human_ai_client_side
 ```
 
 Navigate to `http://localhost:5702` in your browser.
@@ -60,7 +60,7 @@ Navigate to `http://localhost:5702` in your browser.
 
 **Usage**:
 ```bash
-python -m interactive_gym.examples.cogrid.overcooked_human_human_multiplayer
+python -m mug.examples.cogrid.overcooked_human_human_multiplayer
 ```
 
 Open **TWO** browser windows to `http://localhost:5702`.
@@ -249,8 +249,8 @@ localStorage.debug = '*';  // Enable all debug logs
 If you use these examples in research, please cite:
 
 ```bibtex
-@software{interactive_gym,
-  title={Interactive Gym: Browser-Based Multi-Agent RL Experiments},
+@software{mug,
+  title={Multi-User Gymnasium (MUG): Browser-Based Multi-Agent RL Experiments},
   author={McDonald, Chase},
   year={2024},
   url={https://github.com/chasemcd/interactive-gym}
@@ -267,4 +267,4 @@ If you use these examples in research, please cite:
 ## Related Examples
 
 - `../pettingzoo/` - Other multi-agent environments
-- See main Interactive Gym documentation for more examples
+- See main MUG documentation for more examples

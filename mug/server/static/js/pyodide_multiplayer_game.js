@@ -6757,7 +6757,7 @@ json.dumps({'cumulative_rewards': {str(k): v for k, v in _cumulative_rewards.ite
     /**
      * Show reconnecting overlay (Phase 20 - RECON-03).
      * Displays centered overlay with spinner and status message.
-     * Styled to match Interactive Gym aesthetic.
+     * Styled to match MUG aesthetic.
      */
     _showReconnectingOverlay() {
         // Remove existing overlay if any
