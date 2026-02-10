@@ -1,7 +1,7 @@
 import setuptools
 
 setuptools.setup(
-    name="mug-py",
+    name="multi-user-gymnasium",
     version="0.1.0",
     description="A platform for running interactive experiments in the browser with standard simulation environments.",
     author="Chase McDonald",

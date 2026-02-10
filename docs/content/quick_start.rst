@@ -22,7 +22,7 @@ Install MUG with server dependencies:
 
 .. code-block:: bash
 
-    pip install mug-py[server]
+    pip install multi-user-gymnasium[server]
 
 Step 1: Create the Custom Environment
 --------------------------------------
@@ -323,7 +323,7 @@ Install server dependencies:
 
 .. code-block:: bash
 
-    pip install mug-py[server]
+    pip install multi-user-gymnasium[server]
 
 **"File not found: mountain_car_rgb_env.py"**
 

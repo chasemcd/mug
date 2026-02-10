@@ -19,7 +19,7 @@ When building experiments, always install MUG with the server option:
 
 .. code-block:: bash
 
-    pip install mug-py[server]
+    pip install multi-user-gymnasium[server]
 
 This installs all dependencies needed to create and host experiments:
 
@@ -39,7 +39,7 @@ This installs all dependencies needed to create and host experiments:
 
 .. note::
 
-   The base installation (``pip install mug-py``) without ``[server]`` only installs the minimal core dependencies (``gymnasium`` and ``numpy``). This minimal version is automatically installed by Pyodide in the participant's browser when running client-side experiments. **As an experiment developer, you should always use the ``[server]`` option.**
+   The base installation (``pip install multi-user-gymnasium``) without ``[server]`` only installs the minimal core dependencies (``gymnasium`` and ``numpy``). This minimal version is automatically installed by Pyodide in the participant's browser when running client-side experiments. **As an experiment developer, you should always use the ``[server]`` option.**
 
 Development Installation
 ------------------------
@@ -107,7 +107,7 @@ Ensure you've activated the correct Python environment and that pip installed th
 
 .. code-block:: bash
 
-    pip show mug-py
+    pip show multi-user-gymnasium
 
 **Module 'eventlet' has no attribute 'monkey_patch'**
 
@@ -144,7 +144,7 @@ On Windows, if you encounter issues with eventlet, consider using Windows Subsys
 
 .. code-block:: bash
 
-    conda install -c conda-forge mug-py
+    conda install -c conda-forge multi-user-gymnasium
 
 Linux
 ^^^^^
@@ -169,7 +169,7 @@ Using venv (built-in)
 
     python -m venv mug-env
     source mug-env/bin/activate  # On Windows: mug-env\Scripts\activate
-    pip install mug-py
+    pip install multi-user-gymnasium
 
 Using conda
 ^^^^^^^^^^^
@@ -178,7 +178,7 @@ Using conda
 
     conda create -n mug python=3.11
     conda activate mug
-    pip install mug-py
+    pip install multi-user-gymnasium
 
 Next Steps
 ----------
