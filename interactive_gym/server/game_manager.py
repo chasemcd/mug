@@ -121,6 +121,10 @@ class GameManager:
         # Prevents a participant from entering two probes simultaneously.
         self._probing_subjects: set[SubjectID] = set()
 
+        # Pairs that failed P2P probes (RTT too high). Prevents re-probing
+        # the same pair on retry, allowing the matchmaker to try other candidates.
+        self._failed_probe_pairs: set[frozenset] = set()
+
         # holds reset events so we only continue in game loop when triggered
         # this is not used when running with Pyodide
         self.reset_events = thread_safe_collections.ThreadSafeDict()
@@ -570,6 +574,82 @@ class GameManager:
         self._start_next_probe(arriving_subject_id, arriving_candidate, candidates)
         return None
 
+    def _retry_matchmaking_for_waitroom(self) -> None:
+        """Re-run the matchmaker for all non-probing waitroom participants.
+
+        Called (via eventlet.spawn) after probe exhaustion to pick up new
+        waitroom participants that arrived since the original match was formed.
+
+        Iterates through each non-probing waitroom participant as the "arriving"
+        subject and attempts to form a match. Stops after the first successful
+        match-and-probe to avoid over-matching (the probe completion callback
+        will re-trigger this if needed).
+        """
+        # Copy the list since it may be modified during iteration
+        candidates_to_try = [
+            sid for sid in list(self.waitroom_participants)
+            if sid not in self._probing_subjects
+        ]
+
+        for subject_id in candidates_to_try:
+            if subject_id not in self.waitroom_participants:
+                continue
+            if subject_id in self._probing_subjects:
+                continue
+
+            with self.waiting_games_lock:
+                arriving = self._build_match_candidate(subject_id)
+
+                # Exclude the arriving subject, probing subjects, and
+                # subjects with failed probes against this arriving subject
+                waiting = []
+                for waiting_sid in self.waitroom_participants:
+                    if waiting_sid == subject_id:
+                        continue
+                    if waiting_sid in self._probing_subjects:
+                        continue
+                    if frozenset({subject_id, waiting_sid}) in self._failed_probe_pairs:
+                        continue
+                    waiting.append(self._build_match_candidate(waiting_sid))
+
+                group_size = self._get_group_size()
+
+                logger.info(
+                    f"[Probe:Rematch] Trying {subject_id}, "
+                    f"eligible_waiting={[w.subject_id for w in waiting]}, "
+                    f"group_size={group_size}"
+                )
+
+                matched = self.matchmaker.find_match(arriving, waiting, group_size)
+
+                if matched is None:
+                    continue
+
+                logger.info(
+                    f"[Probe:Rematch] Match found for {subject_id}: "
+                    f"{[c.subject_id for c in matched]}"
+                )
+
+                needs_probe = (
+                    self.probe_coordinator is not None
+                    and self.matchmaker.max_p2p_rtt_ms is not None
+                )
+
+                if needs_probe:
+                    candidates = self.matchmaker.rank_candidates(
+                        arriving, waiting, group_size
+                    )
+                    arriving_candidate = next(
+                        c for c in matched if c.subject_id == subject_id
+                    )
+                    if candidates is None:
+                        candidates = [
+                            c for c in matched if c.subject_id != subject_id
+                        ]
+                    self._start_next_probe(subject_id, arriving_candidate, candidates)
+                else:
+                    self._create_game_for_match(matched, subject_id)
+
     def _start_next_probe(
         self,
         arriving_subject_id: SubjectID,
@@ -600,11 +680,12 @@ class GameManager:
             )
             return
 
-        # Filter to candidates still in waitroom and not already probing
+        # Filter to candidates still in waitroom, not probing, and not a failed pair
         candidates = [
             c for c in candidates
             if c.subject_id in self.waitroom_participants
             and c.subject_id not in self._probing_subjects
+            and frozenset({arriving_subject_id, c.subject_id}) not in self._failed_probe_pairs
         ]
 
         if not candidates:
@@ -703,6 +784,9 @@ class GameManager:
         )
 
         if should_reject:
+            # Record this pair as failed so retry logic doesn't re-probe them
+            self._failed_probe_pairs.add(frozenset({subject_a, subject_b}))
+
             # Try next candidate if available
             remaining = match_context.get('remaining_candidates', [])
             arriving_candidate = match_context.get('arriving_candidate')
@@ -718,8 +802,12 @@ class GameManager:
             else:
                 logger.info(
                     f"[Probe:Exhausted] All candidates exhausted for "
-                    f"{arriving_subject_id}. Remaining in waitroom."
+                    f"{arriving_subject_id}. Scheduling rematch for "
+                    f"waitroom participants."
                 )
+                # Defer to avoid recursive call stack and let current
+                # probe cleanup finish before re-matching
+                eventlet.spawn(self._retry_matchmaking_for_waitroom)
             return
 
         # RTT acceptable - create game for matched participants

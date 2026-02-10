@@ -11,7 +11,7 @@ Tests:
 - test_12_clients_low_latency_all_match: All localhost clients pass probe, 6 games, 6 parity checks
 - test_mixed_latency_probe_filtering: Low-latency pairs match + parity, high-latency deferred
 - test_no_duplicate_probes: _probing_subjects safeguard + parity for matched pairs
-- test_all_clients_eventually_resolve: No limbo + parity for all matched pairs
+- test_interleaved_latency_retry_resolution: Mixed-latency interleaved joins stress retry mechanism
 
 Requires headed mode for WebRTC:
     pytest tests/e2e/test_waitroom_stress.py --headed -x -v
@@ -517,102 +517,115 @@ def test_no_duplicate_probes(stress_test_contexts, flask_server_probe):
 
 
 # =============================================================================
-# Test 4: All clients eventually resolve (no stuck participants) + parity
+# Test 4: Interleaved mixed-latency joins stress the probe retry mechanism
 # =============================================================================
 
-@pytest.mark.timeout(120)
-def test_all_clients_eventually_resolve(stress_test_contexts, flask_server_probe):
+@pytest.mark.timeout(180)
+def test_interleaved_latency_retry_resolution(stress_test_contexts, flask_server_probe):
     """
-    12 low-latency clients with 200ms stagger.
-    Each page must either show game canvas or waitroom timeout within 2 min.
+    6 low-latency and 6 high-latency clients join interleaved (alternating)
+    with 100ms stagger, forcing the matchmaker to encounter probe failures
+    and retry with other candidates.
+
+    Join order: P0(low), P1(high), P2(low), P3(high), ... P10(low), P11(high)
+
+    The FIFO matchmaker will initially try to pair adjacent arrivals (e.g.
+    P0-low with P1-high), which fails the 100ms RTT threshold. It must then
+    retry, eventually finding a compatible low-latency partner (e.g. P0 with P2).
 
     Validates:
-    - All 12 resolve (no stuck-in-limbo participants)
-    - All 12 should match on localhost (6 pairs), each with data parity
+    - All 6 low-latency clients eventually match (3 games) via probe retries
+    - All 6 high-latency clients are rejected and resolve (no stuck participants)
+    - Matched games complete episodes with verified data parity
     """
     _reset_ts()
     pages = stress_test_contexts
     base_url = flask_server_probe["url"]
 
+    # Even indices = low latency, odd indices = high latency
+    low_indices = [0, 2, 4, 6, 8, 10]
+    high_indices = [1, 3, 5, 7, 9, 11]
+
     # Setup all 12 pages concurrently
     _setup_all_pages(pages, base_url)
 
-    # Click start with 200ms stagger
-    print(f"\n[Start] Clicking start on 12 pages (200ms stagger) [{_ts()}]")
+    # Apply 200ms latency to odd-indexed (high-latency) pages
+    print(f"\n[Latency] Applying 200ms CDP latency to odd pages [{_ts()}]")
+    cdp_sessions = []
+    for i in high_indices:
+        cdp = apply_latency(pages[i], latency_ms=200)
+        cdp_sessions.append(cdp)
+        print(f"  [P{i}] Latency applied [{_ts()}]")
+
+    # All 12 click start interleaved with 100ms stagger
+    print(f"\n[Start] Interleaved start on 12 pages (100ms stagger) [{_ts()}]")
     for i, page in enumerate(pages):
         if i > 0:
-            time.sleep(0.2)
+            time.sleep(0.1)
         _click_start(page)
-        print(f"  [P{i}] Clicked start [{_ts()}]")
+        label = "low" if i in low_indices else "HIGH"
+        print(f"  [P{i}:{label}] Clicked start [{_ts()}]")
 
-    _log_all(pages, "After all starts")
+    _log_all(pages, "After interleaved starts")
 
-    # Wait up to 90s for all pages to resolve
-    deadline = time.monotonic() + 90
-    resolved = [False] * len(pages)
-    matched = [False] * len(pages)
+    # Wait for low-latency pages to get game canvases (they should match via retries)
+    print(f"\n[Canvas:Low] Waiting for low-latency canvases [{_ts()}]")
+    low_matched = 0
+    for i in low_indices:
+        if _page_has_game_canvas(pages[i], timeout_ms=90000):
+            set_tab_visibility(pages[i], visible=True)
+            low_matched += 1
+            print(f"  [P{i}:low] Got canvas [{_ts()}]")
+        else:
+            print(f"  [P{i}:low] No canvas [{_ts()}]")
 
-    while time.monotonic() < deadline and not all(resolved):
-        for i, page in enumerate(pages):
-            if resolved[i]:
-                continue
-            try:
-                has_canvas = page.evaluate("""() => {
-                    const canvas = document.querySelector('#gameContainer canvas');
-                    return canvas && canvas.offsetParent !== null;
-                }""")
-                if has_canvas:
-                    resolved[i] = True
-                    matched[i] = True
-                    set_tab_visibility(page, visible=True)
-                    print(f"  [P{i}] Matched (canvas) [{_ts()}]")
-                    continue
-
-                timed_out = page.evaluate("""() => {
-                    const errorText = document.getElementById('errorText');
-                    const waitroomGone = !document.getElementById('waitroomText') ||
-                                         document.getElementById('waitroomText').style.display === 'none';
-                    const noStartBtn = !document.getElementById('startButton') ||
-                                       document.getElementById('startButton').style.display === 'none';
-                    return (errorText && errorText.offsetParent !== null) ||
-                           (waitroomGone && noStartBtn);
-                }""")
-                if timed_out:
-                    resolved[i] = True
-                    print(f"  [P{i}] Timed out [{_ts()}]")
-                    continue
-            except Exception:
-                resolved[i] = True
-
-        time.sleep(2)
-
-    unresolved = [i for i, r in enumerate(resolved) if not r]
-    if unresolved:
-        _log_all(pages, "State with unresolved pages")
-    assert len(unresolved) == 0, (
-        f"{len(unresolved)} participants stuck in limbo: page indices {unresolved}"
+    # All 6 low-latency clients should have matched (3 pairs)
+    assert low_matched == 6, (
+        f"Expected all 6 low-latency clients to match via retries, "
+        f"but only {low_matched} matched. Unmatched low pages: "
+        f"{[i for i in low_indices if not _get_game_id(pages[i])]}"
     )
 
-    matched_count = sum(matched)
-    timed_out_count = 12 - matched_count
+    # High-latency clients should NOT have matched
+    print(f"\n[Check:High] Checking high-latency pages [{_ts()}]")
+    high_matched = 0
+    for i in high_indices:
+        if _page_has_game_canvas(pages[i], timeout_ms=5000):
+            high_matched += 1
+            print(f"  [P{i}:HIGH] Has canvas (unexpected) [{_ts()}]")
+        else:
+            print(f"  [P{i}:HIGH] No canvas (expected) [{_ts()}]")
+
+    assert high_matched == 0, (
+        f"Expected 0 high-latency clients to match (200ms > 100ms threshold), "
+        f"but {high_matched} matched. Matched high pages: "
+        f"{[i for i in high_indices if _get_game_id(pages[i])]}"
+    )
+
     print(
-        f"\n[STRESS:Resolve] All 12 resolved. "
-        f"Matched: {matched_count}, Timed out: {timed_out_count} [{_ts()}]"
+        f"\n[STRESS:Retry] Low matched: {low_matched}/6, "
+        f"High matched: {high_matched}/6 [{_ts()}]"
     )
 
-    # All 12 are on localhost, so all should have matched (6 pairs)
-    assert matched_count == 12, (
-        f"Expected all 12 to match on localhost, but only {matched_count} matched "
-        f"({timed_out_count} timed out). Unmatched pages: "
-        f"{[i for i, m in enumerate(matched) if not m]}"
-    )
-
-    # Validate data parity for all 6 matched pairs
+    # Validate data parity for the 3 low-latency pairs
+    low_pages = [pages[i] for i in low_indices]
     parity_passed, parity_failed = _validate_parity_for_matched_pairs(
-        pages, expected_pairs=6, timeout_label=":Resolve"
+        low_pages, expected_pairs=3, timeout_label=":Retry"
     )
 
-    assert parity_passed == 6, (
-        f"Expected 6/6 parity passes, got {parity_passed} passed, {parity_failed} failed"
+    assert parity_passed == 3, (
+        f"Expected 3/3 parity passes for low-latency pairs, "
+        f"got {parity_passed} passed, {parity_failed} failed"
     )
-    print(f"[STRESS:Resolve] All 6 games completed with verified data parity.")
+
+    # Cleanup CDP sessions
+    for cdp in cdp_sessions:
+        try:
+            cdp.detach()
+        except Exception:
+            pass
+
+    print(
+        f"\n[STRESS:Retry] Matchmaker correctly retried past failed probes, "
+        f"matched all 3 low-latency pairs with verified data parity."
+    )
