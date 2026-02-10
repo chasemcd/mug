@@ -57,7 +57,7 @@ class GymScene(scene.Scene):
         queue_resync_threshold (int): Trigger state resync if action queue exceeds this size (default 50).
     """
 
-    DEFAULT_MUG_PACKAGE = "multi-user-gymnasium==0.1.0"
+    DEFAULT_MUG_PACKAGE = "multi-user-gymnasium==0.1.1"
 
     def __init__(
         self,
