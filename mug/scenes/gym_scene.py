@@ -57,7 +57,7 @@ class GymScene(scene.Scene):
         queue_resync_threshold (int): Trigger state resync if action queue exceeds this size (default 50).
     """
 
-    DEFAULT_IG_PACKAGE = "interactive-gym==0.1.1"
+    DEFAULT_MUG_PACKAGE = "mug-py==0.1.0"
 
     def __init__(
         self,
@@ -126,7 +126,7 @@ class GymScene(scene.Scene):
         self.pyodide_multiplayer: bool = False  # Enable multiplayer Pyodide coordination
         self.environment_initialization_code: str = ""
         self.on_game_step_code: str = ""
-        self.packages_to_install: list[str] = [GymScene.DEFAULT_IG_PACKAGE]
+        self.packages_to_install: list[str] = [GymScene.DEFAULT_MUG_PACKAGE]
         self.restart_pyodide: bool = False
 
         # Multiplayer sync settings (for pyodide_multiplayer=True)
@@ -661,8 +661,8 @@ class GymScene(scene.Scene):
 
         if packages_to_install is not NotProvided:
             self.packages_to_install = packages_to_install
-            if not any("interactive-gym" in pkg for pkg in packages_to_install):
-                self.packages_to_install.append(self.DEFAULT_IG_PACKAGE)
+            if not any("mug-py" in pkg for pkg in packages_to_install):
+                self.packages_to_install.append(self.DEFAULT_MUG_PACKAGE)
 
         if restart_pyodide is not NotProvided:
             self.restart_pyodide = restart_pyodide

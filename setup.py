@@ -2,7 +2,7 @@ import setuptools
 
 setuptools.setup(
     name="mug-py",
-    version="0.1.1",
+    version="0.1.0",
     description="A platform for running interactive experiments in the browser with standard simulation environments.",
     author="Chase McDonald",
     author_email="chasecmcdonald@gmail.com",
