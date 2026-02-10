@@ -1,5 +1,5 @@
 """
-Shared pytest fixtures for interactive-gym tests.
+Shared pytest fixtures for mug tests.
 
 Provides:
 - flask_server: Module-scoped fixture that starts/stops the Flask server
@@ -215,7 +215,7 @@ def flask_server():
         [
             "python",
             "-m",
-            "interactive_gym.examples.cogrid.overcooked_human_human_multiplayer_test",
+            "mug.examples.cogrid.overcooked_human_human_multiplayer_test",
             "--port",
             str(port),
         ],
@@ -289,7 +289,7 @@ def flask_server_fresh():
         [
             "python",
             "-m",
-            "interactive_gym.examples.cogrid.overcooked_human_human_multiplayer_test",
+            "mug.examples.cogrid.overcooked_human_human_multiplayer_test",
             "--port",
             str(port),
         ],
@@ -395,7 +395,7 @@ def flask_server_scene_isolation():
         [
             "python",
             "-m",
-            "interactive_gym.examples.cogrid.overcooked_human_human_multiplayer_scene_isolation_test",
+            "mug.examples.cogrid.overcooked_human_human_multiplayer_scene_isolation_test",
             "--port",
             str(port),
         ],
@@ -463,7 +463,7 @@ def flask_server_multi_episode_fresh():
         [
             "python",
             "-m",
-            "interactive_gym.examples.cogrid.overcooked_human_human_multiplayer_multi_episode_test",
+            "mug.examples.cogrid.overcooked_human_human_multiplayer_multi_episode_test",
             "--port",
             str(port),
         ],
@@ -539,7 +539,7 @@ def flask_server_focus_timeout():
         [
             "python",
             "-m",
-            "interactive_gym.examples.cogrid.overcooked_human_human_multiplayer_focus_timeout_test",
+            "mug.examples.cogrid.overcooked_human_human_multiplayer_focus_timeout_test",
             "--port",
             str(port),
         ],
@@ -684,7 +684,7 @@ def flask_server_probe(tmp_path):
         [
             "python",
             "-m",
-            "interactive_gym.examples.cogrid.overcooked_human_human_multiplayer_probe_test",
+            "mug.examples.cogrid.overcooked_human_human_multiplayer_probe_test",
             "--port",
             str(port),
         ],
