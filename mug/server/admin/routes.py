@@ -1,5 +1,5 @@
 """
-Admin routes for Interactive Gym dashboard.
+Admin routes for MUG dashboard.
 
 Provides:
 - /admin/ - Main dashboard (requires authentication)

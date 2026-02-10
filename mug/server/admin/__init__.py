@@ -1,5 +1,5 @@
 """
-Admin module for Interactive Gym experiment monitoring dashboard.
+Admin module for MUG experiment monitoring dashboard.
 
 Provides:
 - Flask Blueprint for /admin routes
