@@ -1,9 +1,9 @@
-from interactive_gym.scenes import unity_scene
+from mug.scenes import unity_scene
 import flask_socketio
 import dataclasses
 import random
 
-from interactive_gym.scenes.scene import Scene
+from mug.scenes.scene import Scene
 
 
 @dataclasses.dataclass

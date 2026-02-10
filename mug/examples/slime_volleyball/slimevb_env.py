@@ -2,7 +2,7 @@ import slime_volleyball.slimevolley_env as slimevolley_env
 from slime_volleyball.core import constants
 import math
 import typing
-from interactive_gym.configurations.object_contexts import Line, Circle, Polygon
+from mug.configurations.object_contexts import Line, Circle, Polygon
 
 import dataclasses
 

@@ -6,16 +6,16 @@ import copy
 eventlet.monkey_patch()
 
 
-from interactive_gym.configurations import (
+from mug.configurations import (
     configuration_constants,
 )
-from interactive_gym.examples.cogrid import (
+from mug.examples.cogrid import (
     overcooked_utils,
 )
-from interactive_gym.scenes import gym_scene
-from interactive_gym.scenes import static_scene
-from interactive_gym.scenes import scene
-from interactive_gym.server.matchmaker import FIFOMatchmaker
+from mug.scenes import gym_scene
+from mug.scenes import static_scene
+from mug.scenes import scene
+from mug.server.matchmaker import FIFOMatchmaker
 
 
 # Constants for controls/actions/etc.
@@ -102,7 +102,7 @@ start_scene = (
     )
     .display(
         scene_header="Welcome",
-        scene_body_filepath="interactive_gym/server/static/templates/overcooked_instructions.html",
+        scene_body_filepath="mug/server/static/templates/overcooked_instructions.html",
     )
 )
 
@@ -139,7 +139,7 @@ tutorial_gym_scene = (
     )
     .content(
         scene_header="Overcooked Tutorial",
-        scene_body_filepath="interactive_gym/server/static/templates/overcooked_controls.html",
+        scene_body_filepath="mug/server/static/templates/overcooked_controls.html",
         in_game_scene_body="""
         <center>
         <p>
@@ -156,7 +156,7 @@ tutorial_gym_scene = (
     )
     .runtime(
         run_through_pyodide=True,
-        environment_initialization_code_filepath="interactive_gym/examples/cogrid/environments/tutorial_cramped_room_environment_initialization.py",
+        environment_initialization_code_filepath="mug/examples/cogrid/environments/tutorial_cramped_room_environment_initialization.py",
         packages_to_install=["numpy", "cogrid==0.1.2", "opencv-python"],
     )
 )
@@ -211,7 +211,7 @@ cramped_room_sp_0 = (
     )
     .runtime(
         run_through_pyodide=True,
-        environment_initialization_code_filepath="interactive_gym/examples/cogrid/environments/cramped_room_environment_initialization.py",
+        environment_initialization_code_filepath="mug/examples/cogrid/environments/cramped_room_environment_initialization.py",
         packages_to_install=["numpy", "cogrid==0.0.15", "opencv-python"],
     )
 )
@@ -250,7 +250,7 @@ counter_circuit_sp_0 = (
     copy.deepcopy(cramped_room_sp_0)
     .scene(scene_id="counter_circuit_sp_0", experiment_config={})
     .runtime(
-        environment_initialization_code_filepath="interactive_gym/examples/cogrid/environments/counter_circuit_environment_initialization.py"
+        environment_initialization_code_filepath="mug/examples/cogrid/environments/counter_circuit_environment_initialization.py"
     )
     .content(
         scene_header="Overcooked",
@@ -294,7 +294,7 @@ forced_coordination_sp_0 = (
     copy.deepcopy(cramped_room_sp_0)
     .scene(scene_id="forced_coordination_sp_0", experiment_config={})
     .runtime(
-        environment_initialization_code_filepath="interactive_gym/examples/cogrid/environments/forced_coordination_environment_initialization.py"
+        environment_initialization_code_filepath="mug/examples/cogrid/environments/forced_coordination_environment_initialization.py"
     )
     .content(
         scene_header="Overcooked",
@@ -338,7 +338,7 @@ asymmetric_advantages_sp_0 = (
     copy.deepcopy(cramped_room_sp_0)
     .scene(scene_id="asymmetric_advantages_sp_0", experiment_config={})
     .runtime(
-        environment_initialization_code_filepath="interactive_gym/examples/cogrid/environments/asymmetric_advantages_environment_initialization.py"
+        environment_initialization_code_filepath="mug/examples/cogrid/environments/asymmetric_advantages_environment_initialization.py"
     )
     .content(
         scene_header="Overcooked",
@@ -382,7 +382,7 @@ coordination_ring_sp_0 = (
     copy.deepcopy(cramped_room_sp_0)
     .scene(scene_id="coordination_ring_sp_0", experiment_config={})
     .runtime(
-        environment_initialization_code_filepath="interactive_gym/examples/cogrid/environments/coordination_ring_environment_initialization.py"
+        environment_initialization_code_filepath="mug/examples/cogrid/environments/coordination_ring_environment_initialization.py"
     )
     .content(
         scene_header="Overcooked",
@@ -484,7 +484,7 @@ cramped_room_human_human = (
     )
     .runtime(
         run_through_pyodide=True,
-        environment_initialization_code_filepath="interactive_gym/examples/cogrid/environments/cramped_room_environment_initialization_hh.py",
+        environment_initialization_code_filepath="mug/examples/cogrid/environments/cramped_room_environment_initialization_hh.py",
         packages_to_install=["numpy", "cogrid==0.1.2", "opencv-python"],
     )
     .multiplayer(
@@ -501,7 +501,7 @@ counter_circuit_human_human = (
     copy.deepcopy(cramped_room_human_human)
     .scene(scene_id="counter_circuit_hh", experiment_config={})
     .runtime(
-        environment_initialization_code_filepath="interactive_gym/examples/cogrid/environments/counter_circuit_environment_initialization.py"
+        environment_initialization_code_filepath="mug/examples/cogrid/environments/counter_circuit_environment_initialization.py"
     )
     .content(
         scene_body="<center><p>"
@@ -523,7 +523,7 @@ forced_coordination_human_human = (
     copy.deepcopy(cramped_room_human_human)
     .scene(scene_id="forced_coordination_hh", experiment_config={})
     .runtime(
-        environment_initialization_code_filepath="interactive_gym/examples/cogrid/environments/forced_coordination_environment_initialization.py"
+        environment_initialization_code_filepath="mug/examples/cogrid/environments/forced_coordination_environment_initialization.py"
     )
     .content(
         scene_body="<center><p>"
@@ -545,7 +545,7 @@ asymmetric_advantages_human_human = (
     copy.deepcopy(cramped_room_human_human)
     .scene(scene_id="asymmetric_advantages_hh", experiment_config={})
     .runtime(
-        environment_initialization_code_filepath="interactive_gym/examples/cogrid/environments/asymmetric_advantages_environment_initialization.py"
+        environment_initialization_code_filepath="mug/examples/cogrid/environments/asymmetric_advantages_environment_initialization.py"
     )
     .content(
         scene_body="<center><p>"
@@ -567,7 +567,7 @@ coordination_ring_human_human = (
     copy.deepcopy(cramped_room_human_human)
     .scene(scene_id="coordination_ring_hh", experiment_config={})
     .runtime(
-        environment_initialization_code_filepath="interactive_gym/examples/cogrid/environments/coordination_ring_environment_initialization.py"
+        environment_initialization_code_filepath="mug/examples/cogrid/environments/coordination_ring_environment_initialization.py"
     )
     .content(
         scene_body="<center><p>"

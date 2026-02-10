@@ -6,8 +6,8 @@ import os
 from slimevb import slimevolley_env
 from slimevb.core import constants
 
-from interactive_gym.configurations import object_contexts, remote_config
-from interactive_gym.server import remote_game
+from mug.configurations import object_contexts, remote_config
+from mug.server import remote_game
 
 ASSET_PATH = "static/assets/slime_volleyball/sprites"
 
@@ -24,9 +24,9 @@ def slime_volleyball_game_page_header_fn(
     assert player_id is not None
 
     if player_id == "agent_right":
-        html_path = "interactive_gym/server/static/templates/slime_vb_agent_right_header.html"
+        html_path = "mug/server/static/templates/slime_vb_agent_right_header.html"
     else:
-        html_path = "interactive_gym/server/static/templates/slime_vb_agent_left_header.html"
+        html_path = "mug/server/static/templates/slime_vb_agent_left_header.html"
 
     try:
         with open(html_path, encoding="utf-8") as f:

@@ -5,11 +5,11 @@ use pure python in a way that will allow it to be run via Pyodide.
 """
 
 import numpy as np
-from gymnasium.envs.classic_control.mountain_car import MountainCarEnv
-from interactive_gym.configurations.object_contexts import Polygon, Circle, Line
+from gymnasium.envs.classic_control.mountain_car import MountainCarEnv as _BaseMountainCarEnv
+from mug.configurations.object_contexts import Polygon, Circle, Line
 
 
-class InteractiveGymMountainCar(MountainCarEnv):
+class MountainCarEnv(_BaseMountainCarEnv):
 
 
     def step(self, actions: dict[str, int | float]):
@@ -88,5 +88,5 @@ class InteractiveGymMountainCar(MountainCarEnv):
         ]
 
 
-env = InteractiveGymMountainCar(render_mode="interactive-gym")
+env = MountainCarEnv(render_mode="interactive-gym")
 env

@@ -6,21 +6,21 @@ eventlet.monkey_patch()
 
 import argparse
 
-from interactive_gym.server import app
-from interactive_gym.scenes import scene
-from interactive_gym.scenes import stager
-from interactive_gym.examples.cogrid.scenes import (
+from mug.server import app
+from mug.scenes import scene
+from mug.scenes import stager
+from mug.examples.cogrid.scenes import (
     scenes as oc_scenes,
 )
-from interactive_gym.scenes import static_scene
+from mug.scenes import static_scene
 
-from interactive_gym.configurations import experiment_config
-from interactive_gym.scenes import gym_scene
-from interactive_gym.scenes import static_scene
-from interactive_gym.scenes import scene
+from mug.configurations import experiment_config
+from mug.scenes import gym_scene
+from mug.scenes import static_scene
+from mug.scenes import scene
 
 
-from interactive_gym.configurations import (
+from mug.configurations import (
     configuration_constants,
 )
 
@@ -94,7 +94,7 @@ slime_scene = (
     )
     .runtime(
         run_through_pyodide=True,
-        environment_initialization_code_filepath="interactive_gym/examples/slime_volleyball/slimevb_env.py",
+        environment_initialization_code_filepath="mug/examples/slime_volleyball/slimevb_env.py",
         packages_to_install=[
             "slimevb==0.0.4",
             "opencv-python",

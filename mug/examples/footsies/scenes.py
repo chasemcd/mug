@@ -6,20 +6,20 @@ eventlet.monkey_patch()
 
 import argparse
 import copy
-from interactive_gym.server import app
-from interactive_gym.scenes import scene
-from interactive_gym.scenes import stager
-from interactive_gym.scenes import static_scene
+from mug.server import app
+from mug.scenes import scene
+from mug.scenes import stager
+from mug.scenes import static_scene
 
-from interactive_gym.configurations import experiment_config
-from interactive_gym.scenes import unity_scene
-from interactive_gym.scenes import static_scene
-from interactive_gym.scenes import scene
+from mug.configurations import experiment_config
+from mug.scenes import unity_scene
+from mug.scenes import static_scene
+from mug.scenes import scene
 
-from interactive_gym.configurations import (
+from mug.configurations import (
     configuration_constants,
 )
-from interactive_gym.examples.footsies import footsies_scene
+from mug.examples.footsies import footsies_scene
 
 
 FOOTSIES_BUILD_NAME = "footsies_webgl_47f26fc"
@@ -35,7 +35,7 @@ start_scene = (
     )
     .display(
         scene_header="Welcome",
-        scene_body_filepath="interactive_gym/examples/footsies/static/introduction.html",
+        scene_body_filepath="mug/examples/footsies/static/introduction.html",
     )
 )
 
@@ -66,7 +66,7 @@ footsies_tutorial_scene = (
     .scene("footsies_tutorial_scene")
     .display(
         scene_header="Footsies Tutorial",
-        scene_body_filepath="interactive_gym/examples/footsies/static/tutorial_static.html",
+        scene_body_filepath="mug/examples/footsies/static/tutorial_static.html",
     )
 )
 
@@ -455,7 +455,7 @@ footsies_controllable_difficulty_scene = (
         </div>
         """
         + CONTROLS_SUBHEADER,
-        scene_body_filepath="interactive_gym/examples/footsies/static/controllable_difficulty.html",
+        scene_body_filepath="mug/examples/footsies/static/controllable_difficulty.html",
     )
     .scene(scene_id="footsies_controllable_difficulty", experiment_config={})
     .webgl(

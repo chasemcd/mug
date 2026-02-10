@@ -6,16 +6,16 @@ eventlet.monkey_patch()
 
 import argparse
 
-from interactive_gym.server import app
-from interactive_gym.scenes import scene
-from interactive_gym.scenes import stager
-from interactive_gym.examples.cogrid.scenes import (
+from mug.server import app
+from mug.scenes import scene
+from mug.scenes import stager
+from mug.examples.cogrid.scenes import (
     controllable_scenes,
     scenes,
 )
-from interactive_gym.scenes import static_scene
+from mug.scenes import static_scene
 
-from interactive_gym.configurations import experiment_config
+from mug.configurations import experiment_config
 
 
 start_scene = (
@@ -27,7 +27,7 @@ start_scene = (
     )
     .display(
         scene_header="Welcome",
-        scene_body_filepath="interactive_gym/server/static/templates/overcooked_demo_instructions.html",
+        scene_body_filepath="mug/server/static/templates/overcooked_demo_instructions.html",
     )
 )
 
@@ -50,7 +50,7 @@ control_scene = (
     .scene("controls_static")
     .display(
         scene_header="Controls",
-        scene_body_filepath="interactive_gym/server/static/templates/overcooked_controls_static.html",
+        scene_body_filepath="mug/server/static/templates/overcooked_controls_static.html",
     )
 )
 
@@ -58,7 +58,7 @@ control_scene = (
 choice_scene = controllable_scenes.make_choice_scene(
     layout_name="cramped_room"
 ).content(
-    scene_body_filepath="interactive_gym/examples/cogrid/html_pages/demo_choice_cramped_room.html",
+    scene_body_filepath="mug/examples/cogrid/html_pages/demo_choice_cramped_room.html",
 )
 
 

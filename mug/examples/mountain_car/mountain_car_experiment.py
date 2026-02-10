@@ -6,17 +6,17 @@ eventlet.monkey_patch()
 
 import argparse
 
-from interactive_gym.server import app
-from interactive_gym.scenes import stager
+from mug.server import app
+from mug.scenes import stager
 
-from interactive_gym.scenes import static_scene
+from mug.scenes import static_scene
 
-from interactive_gym.configurations import experiment_config
-from interactive_gym.scenes import gym_scene
-from interactive_gym.scenes import static_scene
+from mug.configurations import experiment_config
+from mug.scenes import gym_scene
+from mug.scenes import static_scene
 
 
-from interactive_gym.configurations import (
+from mug.configurations import (
     configuration_constants,
 )
 
@@ -84,7 +84,7 @@ mountain_car_scene = (
     )
     .runtime(
         run_through_pyodide=True,
-        environment_initialization_code_filepath="interactive_gym/examples/mountain_car/mountain_car_rgb_env.py",
+        environment_initialization_code_filepath="mug/examples/mountain_car/mountain_car_rgb_env.py",
     )
 )
 

@@ -22,15 +22,15 @@ eventlet.monkey_patch()
 
 import argparse
 
-from interactive_gym.server import app
-from interactive_gym.server.matchmaker import FIFOMatchmaker
-from interactive_gym.scenes import stager
-from interactive_gym.examples.cogrid.scenes import (
+from mug.server import app
+from mug.server.matchmaker import FIFOMatchmaker
+from mug.scenes import stager
+from mug.examples.cogrid.scenes import (
     scenes as oc_scenes,
 )
-from interactive_gym.scenes import static_scene
+from mug.scenes import static_scene
 
-from interactive_gym.configurations import experiment_config
+from mug.configurations import experiment_config
 
 
 hh_start_scene = (
@@ -42,7 +42,7 @@ hh_start_scene = (
     )
     .display(
         scene_header="Welcome",
-        scene_body_filepath="interactive_gym/server/static/templates/overcooked_hh_instructions.html",
+        scene_body_filepath="mug/server/static/templates/overcooked_hh_instructions.html",
     )
 )
 

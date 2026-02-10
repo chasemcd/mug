@@ -6,14 +6,14 @@ eventlet.monkey_patch()
 
 import argparse
 
-from interactive_gym.server import app
-from interactive_gym.scenes import stager
+from mug.server import app
+from mug.scenes import stager
 
-from interactive_gym.configurations import experiment_config
-from interactive_gym.scenes import scene
+from mug.configurations import experiment_config
+from mug.scenes import scene
 
 
-from interactive_gym.examples.footsies import scenes
+from mug.examples.footsies import scenes
 
 
 stager = stager.Stager(

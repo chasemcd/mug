@@ -34,7 +34,7 @@ from cogrid.core import typing
 import dataclasses
 
 
-from interactive_gym.configurations.object_contexts import (
+from mug.configurations.object_contexts import (
     Sprite,
     Text,
 )
@@ -667,7 +667,7 @@ def temp_object_creation(obj: grid_object.GridObj):
     return []
 
 
-class InteractiveGymOvercooked(OvercookedRewardEnv):
+class OvercookedEnv(OvercookedRewardEnv):
     def render(self):
         return self.env_to_render_fn()
 
@@ -752,7 +752,7 @@ overcooked_config = {
 registry.register(
     environment_id="Overcooked-BehaviorFeatures-CoordinationRing-EnvToRender",
     env_class=functools.partial(
-        InteractiveGymOvercooked, config=overcooked_config
+        OvercookedEnv, config=overcooked_config
     ),
 )
 
