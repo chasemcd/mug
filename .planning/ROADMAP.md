@@ -62,10 +62,11 @@ Plans:
   2. `grep -r "interactive_gym" --include="*.py"` returns zero hits (excluding .planning/, .git/)
   3. `grep -r "Interactive Gym"` returns zero hits (excluding .planning/, .git/, PLAN_multiplayer_refactor.md)
   4. Every example file imports successfully under the `mug` package name
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 86-01: TBD
+- [ ] 86-01-PLAN.md — Fix 7 stale docstring module paths, verify zero stale references (VER-02, VER-03)
+- [ ] 86-02-PLAN.md — Run full test suite, verify example imports (VER-01, VER-04)
 
 ## Progress
 
@@ -75,4 +76,4 @@ Plans:
 |-------|-----------|----------------|--------|-----------|
 | 84. Package & Code Rename | v1.26 | 2/2 | ✓ Complete | 2026-02-10 |
 | 85. Documentation & Frontend | v1.26 | 3/3 | ✓ Complete | 2026-02-10 |
-| 86. Final Verification | v1.26 | 0/TBD | Not started | - |
+| 86. Final Verification | v1.26 | 0/2 | Not started | - |
