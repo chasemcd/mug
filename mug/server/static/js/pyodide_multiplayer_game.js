@@ -5368,18 +5368,30 @@ json.dumps({'cumulative_rewards': {str(k): v for k, v in _cumulative_rewards.ite
     /**
      * Prune old entries from input buffer.
      * Removes frames we've already passed to prevent unbounded growth.
+     *
+     * Pruning boundary is aligned with snapshot pruning: only inputs strictly
+     * before the anchor snapshot are removed. The anchor is the highest snapshot
+     * at or below confirmedFrame — the earliest point any rollback replay can
+     * start from. Inputs from the anchor onward must be retained so that
+     * rollback replay has real (confirmed) inputs available instead of falling
+     * back to prediction.
      */
     pruneInputBuffer() {
-        // Prune entries at or below confirmedFrame (IBUF-01)
-        // Confirmed frames have all player inputs verified, so they're safe to remove.
-        // Unconfirmed frames must be retained for rollback replay correctness
-        // and to prevent gaps in the confirmation chain (_updateConfirmedFrame
-        // scans consecutively and breaks at the first missing frame).
         if (this.confirmedFrame < 0) return;  // Nothing confirmed yet
+
+        // Find anchor snapshot (same logic as snapshot pruning in saveStateSnapshot)
+        let anchorFrame = -1;
+        for (const snapFrame of this.stateSnapshots.keys()) {
+            if (snapFrame <= this.confirmedFrame && snapFrame > anchorFrame) {
+                anchorFrame = snapFrame;
+            }
+        }
+
+        if (anchorFrame < 0) return;  // No anchor yet, nothing safe to prune
 
         const keysToDelete = [];
         for (const key of this.inputBuffer.keys()) {
-            if (key <= this.confirmedFrame) {
+            if (key < anchorFrame) {  // strictly before anchor
                 keysToDelete.push(key);
             }
         }
