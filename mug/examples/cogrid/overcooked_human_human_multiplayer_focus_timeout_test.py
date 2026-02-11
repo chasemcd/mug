@@ -15,7 +15,7 @@ The 10 second timeout is short enough for tests to complete quickly but long
 enough to be realistic for actual focus loss scenarios.
 
 Usage:
-    python -m interactive_gym.examples.cogrid.overcooked_human_human_multiplayer_focus_timeout_test
+    python -m mug.examples.cogrid.overcooked_human_human_multiplayer_focus_timeout_test
 
 This is used by pytest E2E tests via the conftest.py flask_server_focus_timeout fixture.
 Default port: 5704

@@ -21,7 +21,7 @@ Key differences from production:
 - multiplayer(input_confirmation_timeout_ms=2000) higher timeout for resilience
 
 Usage:
-    python -m interactive_gym.examples.cogrid.overcooked_human_human_multiplayer_scene_isolation_test
+    python -m mug.examples.cogrid.overcooked_human_human_multiplayer_scene_isolation_test
 
 This is used by pytest E2E tests via the conftest.py flask_server_scene_isolation fixture.
 """

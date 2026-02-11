@@ -15,7 +15,7 @@ Sync Architecture:
 - Fallback: State Verification (periodic hash comparison with full state resync if needed)
 
 Usage:
-    python -m interactive_gym.examples.cogrid.overcooked_human_human_multiplayer
+    python -m mug.examples.cogrid.overcooked_human_human_multiplayer
 
 Then open two browser windows to http://localhost:5702 and play together!
 """

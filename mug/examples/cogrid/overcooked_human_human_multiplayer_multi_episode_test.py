@@ -12,7 +12,7 @@ Other settings remain identical to the standard test config:
 - Higher input confirmation timeout (2000ms) for packet loss resilience
 
 Usage:
-    python -m interactive_gym.examples.cogrid.overcooked_human_human_multiplayer_multi_episode_test
+    python -m mug.examples.cogrid.overcooked_human_human_multiplayer_multi_episode_test
 
 This is used by pytest E2E tests via the conftest.py flask_server_multi_episode fixture.
 Default port: 5703

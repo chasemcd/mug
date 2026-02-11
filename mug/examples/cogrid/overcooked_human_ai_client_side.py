@@ -15,7 +15,7 @@ an example of two humans playing together with synchronized Pyodide
 environments.
 
 Usage:
-    python -m interactive_gym.examples.cogrid.overcooked_human_ai_client_side
+    python -m mug.examples.cogrid.overcooked_human_ai_client_side
 """
 
 from __future__ import annotations
