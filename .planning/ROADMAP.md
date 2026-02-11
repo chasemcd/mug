@@ -94,7 +94,8 @@
   3. The anchor snapshot at or before confirmedFrame is never deleted (always available as rollback recovery point)
   4. Input buffer entries at or before confirmedFrame are pruned instead of using a hardcoded frame offset
   5. snapshotInterval is configurable via GymScene.multiplayer() in Python and read by the JS constructor with a default of 5
-**Plans**: TBD
+**Plans**: 1 plan
+- [ ] 87-01-PLAN.md -- Config plumbing + confirmedFrame-based snapshot and input buffer pruning
 
 ### Phase 88: Verification
 **Goal**: All existing tests pass and rollback correctness is preserved after the pruning changes
@@ -115,7 +116,7 @@
 | 79-82 | v1.24 | 6/6 | Complete | 2026-02-09 |
 | 83 | v1.25 | 1/1 | Complete | 2026-02-09 |
 | 84-86 | v1.26 | 7/7 | Complete | 2026-02-10 |
-| 87 | v1.27 | 0/TBD | Not started | - |
+| 87 | v1.27 | 0/1 | Not started | - |
 | 88 | v1.27 | 0/TBD | Not started | - |
 
 ---
