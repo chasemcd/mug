@@ -5,17 +5,17 @@
 
 ## v1.27 Requirements
 
-Requirements for principled rollback resource management — replacing arbitrary hardcoded limits with confirmedFrame-based pruning.
+Requirements for principled rollback resource management -- replacing arbitrary hardcoded limits with confirmedFrame-based pruning.
 
 ### Snapshot Management
 
-- [ ] **SNAP-01**: Snapshot pruning is tied to `confirmedFrame` — all snapshots before the anchor snapshot (highest snapshot <= `confirmedFrame`) are deleted
-- [ ] **SNAP-02**: `maxSnapshots` parameter is removed — snapshot count adapts to network conditions (more snapshots when inputs are unconfirmed, fewer when confirmed)
+- [ ] **SNAP-01**: Snapshot pruning is tied to `confirmedFrame` -- all snapshots before the anchor snapshot (highest snapshot <= `confirmedFrame`) are deleted
+- [ ] **SNAP-02**: `maxSnapshots` parameter is removed -- snapshot count adapts to network conditions (more snapshots when inputs are unconfirmed, fewer when confirmed)
 - [ ] **SNAP-03**: The anchor snapshot (one snapshot at or before `confirmedFrame`) is always retained as a rollback recovery point
 
 ### Input Buffer Management
 
-- [ ] **IBUF-01**: Input buffer pruning is tied to `confirmedFrame` — entries at or before `confirmedFrame` are pruned (replacing hardcoded `frameNumber - 60` threshold)
+- [ ] **IBUF-01**: Input buffer pruning is tied to `confirmedFrame` -- entries at or before `confirmedFrame` are pruned (replacing hardcoded `frameNumber - 60` threshold)
 - [ ] **IBUF-02**: The hardcoded `pruneThreshold` of `frameNumber - 60` is removed
 - [ ] **IBUF-03**: `inputBufferMaxSize` (120) is removed or made a safety-only cap, not the primary pruning mechanism
 
@@ -27,7 +27,7 @@ Requirements for principled rollback resource management — replacing arbitrary
 ### Verification
 
 - [ ] **VER-01**: All 52 existing tests pass after changes (27 unit + 25 E2E)
-- [ ] **VER-02**: Rollback correctness preserved — multiplayer E2E tests with rollback scenarios still pass
+- [ ] **VER-02**: Rollback correctness preserved -- multiplayer E2E tests with rollback scenarios still pass
 
 ## Out of Scope
 
@@ -42,22 +42,22 @@ Requirements for principled rollback resource management — replacing arbitrary
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SNAP-01 | TBD | Pending |
-| SNAP-02 | TBD | Pending |
-| SNAP-03 | TBD | Pending |
-| IBUF-01 | TBD | Pending |
-| IBUF-02 | TBD | Pending |
-| IBUF-03 | TBD | Pending |
-| CONF-01 | TBD | Pending |
-| CONF-02 | TBD | Pending |
-| VER-01 | TBD | Pending |
-| VER-02 | TBD | Pending |
+| SNAP-01 | Phase 87 | Pending |
+| SNAP-02 | Phase 87 | Pending |
+| SNAP-03 | Phase 87 | Pending |
+| IBUF-01 | Phase 87 | Pending |
+| IBUF-02 | Phase 87 | Pending |
+| IBUF-03 | Phase 87 | Pending |
+| CONF-01 | Phase 87 | Pending |
+| CONF-02 | Phase 87 | Pending |
+| VER-01 | Phase 88 | Pending |
+| VER-02 | Phase 88 | Pending |
 
 **Coverage:**
 - v1.27 requirements: 10 total
-- Mapped to phases: 0 (pending roadmap)
-- Unmapped: 10
+- Mapped to phases: 10
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-11*
-*Last updated: 2026-02-11 — initial definition*
+*Last updated: 2026-02-11 -- roadmap created, traceability complete*
