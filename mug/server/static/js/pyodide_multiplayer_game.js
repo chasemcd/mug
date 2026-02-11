@@ -925,15 +925,15 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         // Input buffers: store inputs by frame number
         // inputBuffer[frame][playerId] = action
         this.inputBuffer = new Map();   // Map<frameNumber, Map<playerId, action>>
-        this.inputBufferMaxSize = 120;  // Keep ~4 seconds at 30 FPS
+        // Input buffer size adapts to unconfirmed window (confirmedFrame-based pruning)
 
         // Local input queue: inputs scheduled for future frames due to input delay
         this.localInputQueue = [];      // [{frame, action}] - sorted by frame
 
         // State snapshots for rollback (stored periodically)
         this.stateSnapshots = new Map();  // Map<frameNumber, envState>
-        this.snapshotInterval = 5;        // Save snapshot every N frames
-        this.maxSnapshots = 30;           // Keep ~5 seconds of snapshots
+        this.snapshotInterval = config.snapshot_interval ?? 5;  // Save snapshot every N frames
+        // Snapshot count adapts to unconfirmed window (anchor-based pruning)
 
         // Prediction tracking
         this.lastConfirmedActions = {};   // {playerId: lastAction} - for prediction
@@ -3131,7 +3131,7 @@ obs, rewards, terminateds, truncateds, infos, render_state
         const snapshotJson = this.stateSnapshots.get(frameNumber);
         if (!snapshotJson) {
             // No snapshot available for this frame - can happen if:
-            // - Frame is older than maxSnapshots
+            // - Frame was pruned (before anchor snapshot)
             // - Snapshot was never saved (shouldn't happen in normal flow)
             p2pLog.debug(`No snapshot for confirmed frame ${frameNumber}, skipping hash`);
             return;
@@ -4503,17 +4503,25 @@ json.dumps(_snapshot)
             ).join(' ');
             p2pLog.debug(`SAVE_SNAPSHOT: frame=${frameNumber} agents=[${agentSummary}]`);
 
-            // Prune old snapshots
-            if (this.stateSnapshots.size > this.maxSnapshots) {
-                const keysToDelete = [];
-                for (const key of this.stateSnapshots.keys()) {
-                    if (this.stateSnapshots.size - keysToDelete.length <= this.maxSnapshots) {
-                        break;
+            // Prune snapshots before the anchor snapshot (SNAP-01, SNAP-03)
+            // The anchor snapshot is the highest snapshot frame <= confirmedFrame.
+            // It serves as the recovery point for rollback. All snapshots before it
+            // are no longer needed because we'd never roll back past the anchor.
+            if (this.confirmedFrame >= 0) {
+                // Find anchor: highest snapshot frame <= confirmedFrame
+                let anchorFrame = -1;
+                for (const snapFrame of this.stateSnapshots.keys()) {
+                    if (snapFrame <= this.confirmedFrame && snapFrame > anchorFrame) {
+                        anchorFrame = snapFrame;
                     }
-                    keysToDelete.push(key);
                 }
-                for (const key of keysToDelete) {
-                    this.stateSnapshots.delete(key);
+                // Delete all snapshots strictly before the anchor
+                if (anchorFrame >= 0) {
+                    for (const snapFrame of this.stateSnapshots.keys()) {
+                        if (snapFrame < anchorFrame) {
+                            this.stateSnapshots.delete(snapFrame);
+                        }
+                    }
                 }
             }
         } catch (e) {
@@ -5208,11 +5216,20 @@ json.dumps({'cumulative_rewards': {str(k): v for k, v in _cumulative_rewards.ite
             // Update HUD to reflect fast-forwarded state
             ui_utils.updateHUDText(this.getHUDText());
 
-            // Clear old snapshots that are now before our confirmed frame
-            // This prevents rollback to pre-fast-forward state
-            for (const [snapFrame, _] of this.stateSnapshots) {
-                if (snapFrame < this.confirmedFrame - 30) {  // Keep some buffer
-                    this.stateSnapshots.delete(snapFrame);
+            // Prune snapshots using anchor-based approach (same as saveStateSnapshot)
+            if (this.confirmedFrame >= 0) {
+                let anchorFrame = -1;
+                for (const snapFrame of this.stateSnapshots.keys()) {
+                    if (snapFrame <= this.confirmedFrame && snapFrame > anchorFrame) {
+                        anchorFrame = snapFrame;
+                    }
+                }
+                if (anchorFrame >= 0) {
+                    for (const snapFrame of this.stateSnapshots.keys()) {
+                        if (snapFrame < anchorFrame) {
+                            this.stateSnapshots.delete(snapFrame);
+                        }
+                    }
                 }
             }
 
@@ -5353,9 +5370,8 @@ json.dumps({'cumulative_rewards': {str(k): v for k, v in _cumulative_rewards.ite
      * Removes frames we've already passed to prevent unbounded growth.
      */
     pruneInputBuffer() {
-        // Remove entries for frames we've already simulated
-        // Keep a larger buffer behind for potential rollback (must be >= maxSnapshots * snapshotInterval)
-        // With snapshotInterval=5 and maxSnapshots=30, we need at least 150 frames of buffer
+        // Input buffer pruning is tied to confirmedFrame (IBUF-01)
+        // Entries at or before confirmedFrame are pruned -- no hardcoded offset needed
         const pruneThreshold = this.frameNumber - 60;  // Keep ~2 seconds at 30 FPS
         const keysToDelete = [];
 
