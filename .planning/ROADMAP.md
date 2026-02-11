@@ -104,7 +104,8 @@
 **Success Criteria** (what must be TRUE):
   1. All 52 existing tests pass (27 unit + 25 E2E) with zero failures
   2. Multiplayer E2E tests that exercise rollback scenarios complete successfully with correct game state
-**Plans**: TBD
+**Plans**: 1 plan
+- [ ] 88-01-PLAN.md -- Run unit + E2E tests to verify no regressions from confirmedFrame pruning
 
 ## Progress
 
