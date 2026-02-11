@@ -612,7 +612,7 @@ class GameOrchestrator:
         episode_num: int = 1,
         episode_timeout: int = 180000,
         export_timeout_sec: int = 30,
-        parity_row_tolerance: int = 10,
+        parity_row_tolerance: int = 0,
         experiment_id: Optional[str] = None,
     ) -> Dict[int, Dict[str, Any]]:
         """
@@ -628,7 +628,7 @@ class GameOrchestrator:
             episode_num: Target episode count (1 = first episode complete)
             episode_timeout: Timeout per player in milliseconds for episode completion
             export_timeout_sec: Timeout in seconds waiting for export files
-            parity_row_tolerance: Allow up to N row count differences (default 10)
+            parity_row_tolerance: Allow up to N row count differences (default 0, strict)
             experiment_id: Optional experiment ID override (for non-standard server configs)
 
         Returns:

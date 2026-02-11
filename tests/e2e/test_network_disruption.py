@@ -18,6 +18,7 @@ import pytest
 import time
 from tests.fixtures.network_helpers import (
     apply_packet_loss,
+    apply_latency,
     set_tab_visibility,
     wait_for_focus_manager_state,
     get_rollback_stats,
@@ -135,7 +136,7 @@ def test_packet_loss_triggers_rollback(flask_server, player_contexts):
             episode_num=0,
             episode_timeout_sec=10,  # Episode already complete
             export_timeout_sec=30,
-            parity_row_tolerance=10,
+            parity_row_tolerance=0,
             verbose=True,
         )
         assert success, f"Data parity failed under packet loss: {parity_msg}"
@@ -273,7 +274,7 @@ def test_tab_visibility_triggers_fast_forward(flask_server, player_contexts):
         episode_num=0,
         episode_timeout_sec=10,  # Episode already complete
         export_timeout_sec=30,
-        parity_row_tolerance=10,
+        parity_row_tolerance=0,
         verbose=True,
     )
     assert success, f"Data parity failed after tab visibility toggle: {parity_msg}"
@@ -405,6 +406,174 @@ def test_active_input_with_packet_loss(flask_server, player_contexts):
 
         print(f"\n[Active Input + Packet Loss] Data parity verified despite {total_rollbacks} rollbacks")
         print(f"  Episodes completed: gameId={final_state1['gameId']}")
+
+    finally:
+        try:
+            cdp2.detach()
+        except Exception:
+            pass
+
+
+# =============================================================================
+# Deep Rollback Stress Test (>5 seconds / >150 frames)
+# =============================================================================
+
+@pytest.mark.timeout(300)  # 5 minutes max
+def test_deep_rollback_via_tab_hide(flask_server, player_contexts):
+    """
+    Stress test GGPO rollback with >150 frames depth (>5 seconds at 30 FPS).
+
+    Validates anchor-based input buffer pruning by creating a scenario where
+    Player 1 must rollback and replay 180+ frames of game history.
+
+    Mechanism:
+    1. Apply 300ms latency to Player 2 (delayed input delivery)
+    2. Both players inject random actions (creates mispredictions)
+    3. Hide Player 2's tab for 6 seconds (~180 frames at 30 FPS)
+       - Player 2's game loop pauses (FocusManager backgrounded)
+       - Player 2 stops sending inputs to Player 1
+       - Player 1 continues, predicting Player 2's inputs for 180 frames
+    4. Show Player 2's tab (triggers fast-forward + sends buffered inputs)
+       - Player 2 catches up by processing 180 buffered frames
+       - Player 2 sends all 180+ newly-generated inputs to Player 1
+       - Player 1 receives inputs 6+ seconds late → deep rollback
+    5. Verify rollback depth ≥150 frames and data parity passes
+
+    Configuration:
+    - Player 1: random actions every 150ms, no network disruption
+    - Player 2: random actions every 200ms, 300ms latency, 6s tab hide
+    """
+    page1, page2 = player_contexts
+    base_url = flask_server["url"]
+
+    # Apply 300ms latency to player 2 BEFORE navigation
+    cdp2 = apply_latency(page2, latency_ms=300)
+
+    try:
+        # Run through to gameplay
+        run_full_episode_flow_until_gameplay(page1, page2, base_url)
+
+        # Verify both players are in same game
+        state1 = get_game_state(page1)
+        state2 = get_game_state(page2)
+        assert state1["gameId"] == state2["gameId"], "Players should be in same game"
+        assert state1["playerId"] != state2["playerId"], "Players should have different IDs"
+
+        # Start random action injection on both players
+        interval1 = start_random_actions(page1, interval_ms=150)
+        interval2 = start_random_actions(page2, interval_ms=200)
+
+        print(f"\n[Deep Rollback] Started random actions, letting game run...")
+
+        try:
+            # Let game run for 3 seconds to build up state
+            time.sleep(3)
+
+            # Record Player 1's state before hiding Player 2
+            state1_before = get_game_state(page1)
+            stats1_before = get_rollback_stats(page1)
+            print(f"  Before hide: P1 frame={state1_before['frameNumber']}, "
+                  f"rollbacks={stats1_before['rollbackCount']}")
+
+            # Hide Player 2's tab — FocusManager pauses, stops sending inputs
+            print(f"  Hiding Player 2's tab for 6 seconds...")
+            set_tab_visibility(page2, visible=False)
+            wait_for_focus_manager_state(page2, backgrounded=True, timeout=5000)
+
+            # Wait 6 seconds — Player 1 predicts Player 2's inputs for ~180 frames
+            time.sleep(6)
+
+            state1_during = get_game_state(page1)
+            predicted_frames = state1_during['frameNumber'] - state1_before['frameNumber']
+            print(f"  During hide: P1 frame={state1_during['frameNumber']} "
+                  f"(predicted {predicted_frames} frames for P2)")
+
+            # Show Player 2's tab — triggers fast-forward + sends buffered inputs
+            print(f"  Showing Player 2's tab (triggers fast-forward + deep rollback)...")
+            set_tab_visibility(page2, visible=True)
+            wait_for_focus_manager_state(page2, backgrounded=False, timeout=5000)
+
+            # Wait for Player 2 to fast-forward and catch up
+            initial_p2_frame = get_game_state(page2)['frameNumber']
+            page2.wait_for_function(
+                f"""() => {{
+                    const game = window.game;
+                    return game &&
+                           !game._pendingFastForward &&
+                           game.frameNumber > {initial_p2_frame + 50};
+                }}""",
+                timeout=30000
+            )
+
+            state2_after = get_game_state(page2)
+            print(f"  After fast-forward: P2 frame={state2_after['frameNumber']}")
+
+            # Wait for Player 1's rollback to complete
+            page1.wait_for_function(
+                """() => {
+                    const game = window.game;
+                    return game && !game.rollbackInProgress;
+                }""",
+                timeout=30000
+            )
+
+            # Brief pause for rollback stats to settle
+            time.sleep(1)
+
+            # Verify deep rollback occurred
+            stats1 = get_rollback_stats(page1)
+            stats2 = get_rollback_stats(page2)
+
+            print(f"\n  Rollback statistics:")
+            print(f"    Player 1: rollbacks={stats1['rollbackCount']}, "
+                  f"maxFrames={stats1['maxRollbackFrames']}")
+            print(f"    Player 2: rollbacks={stats2['rollbackCount']}, "
+                  f"maxFrames={stats2['maxRollbackFrames']}")
+
+            max_depth = max(
+                stats1['maxRollbackFrames'] or 0,
+                stats2['maxRollbackFrames'] or 0
+            )
+            assert max_depth >= 150, (
+                f"Expected deep rollback (>=150 frames / 5+ seconds) but max depth "
+                f"was {max_depth} frames. P1={stats1['maxRollbackFrames']}, "
+                f"P2={stats2['maxRollbackFrames']}"
+            )
+
+            # Wait for episode completion (extended timeout for rollback processing)
+            wait_for_episode_complete(page1, episode_num=1, timeout=240000)
+            wait_for_episode_complete(page2, episode_num=1, timeout=240000)
+
+        finally:
+            stop_random_actions(page1, interval1)
+            stop_random_actions(page2, interval2)
+
+        # Verify completion
+        final_state1 = get_game_state(page1)
+        final_state2 = get_game_state(page2)
+        assert final_state1["numEpisodes"] >= 1, "Player 1 should complete 1+ episodes"
+        assert final_state2["numEpisodes"] >= 1, "Player 2 should complete 1+ episodes"
+
+        # Data parity check — the ultimate validation
+        experiment_id = get_experiment_id()
+        scene_id = get_scene_id(page1)
+        assert scene_id, "Could not get scene ID from game"
+
+        success, parity_msg = wait_for_episode_with_parity(
+            page1, page2,
+            experiment_id=experiment_id,
+            scene_id=scene_id,
+            episode_num=0,
+            episode_timeout_sec=10,
+            export_timeout_sec=30,
+            parity_row_tolerance=0,
+            verbose=True,
+        )
+        assert success, f"Data parity failed after deep rollback: {parity_msg}"
+
+        print(f"\n[Deep Rollback] Data parity verified despite "
+              f"{max_depth}-frame rollback")
+        print(f"  Episode completed: gameId={final_state1['gameId']}")
 
     finally:
         try:

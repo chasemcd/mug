@@ -131,7 +131,7 @@ def test_episode_completion_under_fixed_latency(flask_server, player_contexts, l
             episode_num=0,
             episode_timeout_sec=10,  # Episode already complete
             export_timeout_sec=30,
-            parity_row_tolerance=10,
+            parity_row_tolerance=0,
             verbose=True,
         )
         assert success, f"Data parity failed under {latency_ms}ms latency: {parity_msg}"
@@ -198,7 +198,7 @@ def test_episode_completion_under_asymmetric_latency(flask_server, player_contex
             episode_num=0,
             episode_timeout_sec=10,  # Episode already complete
             export_timeout_sec=30,
-            parity_row_tolerance=10,
+            parity_row_tolerance=0,
             verbose=True,
         )
         assert success, f"Data parity failed under asymmetric latency: {parity_msg}"
@@ -281,7 +281,7 @@ def test_episode_completion_under_jitter(flask_server, player_contexts):
             episode_num=0,
             episode_timeout_sec=10,  # Episode already complete
             export_timeout_sec=30,
-            parity_row_tolerance=10,
+            parity_row_tolerance=0,
             verbose=True,
         )
         assert success, f"Data parity failed under jitter: {parity_msg}"
@@ -392,13 +392,7 @@ def test_active_input_with_latency(flask_server, player_contexts, latency_ms):
         except TimeoutError as e:
             pytest.fail(f"Export files not found: {e}")
 
-        # Run comparison with slightly higher row tolerance for active input tests.
-        # Active inputs + latency creates more episode boundary timing variance
-        # than idle tests (Phase 62 decision: minor row count differences are
-        # acceptable under latency). The default 10-row tolerance covers most
-        # cases but active inputs with ~100-200ms latency can produce up to ~15
-        # rows of drift due to input-confirmation timing at episode boundaries.
-        exit_code, output = run_comparison(file1, file2, verbose=True, row_tolerance=15)
+        exit_code, output = run_comparison(file1, file2, verbose=True, row_tolerance=0)
 
         print(f"\nComparison output:\n{output}")
 

@@ -5277,6 +5277,28 @@ json.dumps({'cumulative_rewards': {str(k): v for k, v in _cumulative_rewards.ite
             }
             p2pLog.info(`Sent ${catchUpInputs.length} catch-up inputs to partner (frames ${startFrame}-${this.frameNumber - 1})`);
         }
+
+        // 8. Check for episode end immediately after fast-forward
+        // Without this, episode end detection waits for the next processTick() call,
+        // causing a visible delay where the fast-forwarded player appears to keep
+        // playing after the partner has already exited the scene.
+        if (!this.episodeComplete && !this.p2pEpisodeSync.localEpisodeEndDetected) {
+            const maxStepsReached = this.step_num >= this.max_steps;
+            if (maxStepsReached) {
+                p2pLog.info(`FAST-FORWARD: episode end detected at frame ${this.frameNumber} (step ${this.step_num}/${this.max_steps})`);
+                this._logEpisodeEndMetrics();
+
+                if (this.serverAuthoritative) {
+                    this.episodeComplete = true;
+                    this.signalEpisodeComplete();
+                } else if (this.webrtcManager?.isReady()) {
+                    this._broadcastEpisodeEnd();
+                } else {
+                    this.episodeComplete = true;
+                    this.signalEpisodeComplete();
+                }
+            }
+        }
     }
 
     /**

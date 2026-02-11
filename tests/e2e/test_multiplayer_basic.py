@@ -92,7 +92,7 @@ def test_two_players_connect_and_complete_episode(flask_server, player_contexts)
         episode_num=0,  # 0-indexed for file names
         episode_timeout_sec=180,
         export_timeout_sec=30,
-        parity_row_tolerance=10,
+        parity_row_tolerance=0,
         verbose=True,
     )
     assert success, f"Episode parity validation failed: {message}"
