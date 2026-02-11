@@ -5370,17 +5370,16 @@ json.dumps({'cumulative_rewards': {str(k): v for k, v in _cumulative_rewards.ite
      * Removes frames we've already passed to prevent unbounded growth.
      */
     pruneInputBuffer() {
-        // Input buffer pruning is tied to confirmedFrame (IBUF-01)
-        // Entries at or before confirmedFrame are pruned -- no hardcoded offset needed
-        const pruneThreshold = this.frameNumber - 60;  // Keep ~2 seconds at 30 FPS
-        const keysToDelete = [];
+        // Prune entries at or below confirmedFrame (IBUF-01)
+        // Confirmed frames have all player inputs verified, so they're safe to remove.
+        // Unconfirmed frames must be retained for rollback replay correctness
+        // and to prevent gaps in the confirmation chain (_updateConfirmedFrame
+        // scans consecutively and breaks at the first missing frame).
+        if (this.confirmedFrame < 0) return;  // Nothing confirmed yet
 
+        const keysToDelete = [];
         for (const key of this.inputBuffer.keys()) {
-            // Only prune frames that are confirmed AND old enough
-            // Unconfirmed frames must be retained for rollback replay correctness
-            // and to prevent gaps in the confirmation chain (_updateConfirmedFrame
-            // scans consecutively and breaks at the first missing frame)
-            if (key < pruneThreshold && key <= this.confirmedFrame) {
+            if (key <= this.confirmedFrame) {
                 keysToDelete.push(key);
             }
         }
@@ -5388,16 +5387,6 @@ json.dumps({'cumulative_rewards': {str(k): v for k, v in _cumulative_rewards.ite
         for (const key of keysToDelete) {
             this.inputBuffer.delete(key);
             this.predictedFrames.delete(key);
-        }
-
-        // Also enforce max size limit - but still respect confirmedFrame
-        if (this.inputBuffer.size > this.inputBufferMaxSize) {
-            const sortedKeys = Array.from(this.inputBuffer.keys()).sort((a, b) => a - b);
-            const toRemove = sortedKeys.filter(k => k <= this.confirmedFrame).slice(0, this.inputBuffer.size - this.inputBufferMaxSize);
-            for (const key of toRemove) {
-                this.inputBuffer.delete(key);
-                this.predictedFrames.delete(key);
-            }
         }
     }
 
