@@ -102,7 +102,7 @@
 **Depends on**: Phase 87
 **Requirements**: VER-01, VER-02
 **Success Criteria** (what must be TRUE):
-  1. All 52 existing tests pass (27 unit + 25 E2E) with zero failures
+  1. All 56 existing tests pass (27 unit + 29 E2E) with zero failures
   2. Multiplayer E2E tests that exercise rollback scenarios complete successfully with correct game state
 **Plans**: 1 plan
 - [ ] 88-01-PLAN.md -- Run unit + E2E tests to verify no regressions from confirmedFrame pruning
@@ -118,7 +118,7 @@
 | 83 | v1.25 | 1/1 | Complete | 2026-02-09 |
 | 84-86 | v1.26 | 7/7 | Complete | 2026-02-10 |
 | 87 | v1.27 | 1/1 | Complete | 2026-02-11 |
-| 88 | v1.27 | 0/TBD | Not started | - |
+| 88 | v1.27 | 0/1 | Not started | - |
 
 ---
 *Roadmap created: 2026-02-11 for v1.27 Principled Rollback Management*
