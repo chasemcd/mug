@@ -72,6 +72,14 @@ html_theme_options = {
     "navigation_with_keys": False,
     "collapse_navigation": False,  # Keep navigation expanded
     "navigation_depth": 4,  # Show nested structure
+    "icon_links": [
+        {
+            "name": "GitHub",
+            "url": "https://github.com/chasemcd/interactive-gym",
+            "icon": "fa-brands fa-github",
+            "type": "fontawesome",
+        },
+    ],
 }
 
 # Always show the full global TOC in the sidebar
