@@ -7,6 +7,8 @@ This test:
 3. Does NOT test game logic - just infrastructure
 """
 
+from __future__ import annotations
+
 import pytest
 
 

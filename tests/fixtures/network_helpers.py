@@ -21,11 +21,13 @@ Usage:
     # ... run test ...
     jitter.stop()
 """
+from __future__ import annotations
+
 import random
 import threading
 import time
 
-from playwright.sync_api import Page, CDPSession
+from playwright.sync_api import CDPSession, Page
 
 
 def apply_latency(page: Page, latency_ms: int) -> CDPSession:

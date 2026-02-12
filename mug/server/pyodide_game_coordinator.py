@@ -11,9 +11,9 @@ Coordinates client-side Pyodide games by:
 from __future__ import annotations
 
 import dataclasses
-import threading
 import logging
 import random
+import threading
 import time
 from typing import Any, Dict
 
@@ -34,8 +34,8 @@ class PyodideGameState:
     """State for a single Pyodide multiplayer game."""
 
     game_id: str
-    players: Dict[str | int, str]  # player_id -> socket_id
-    player_subjects: Dict[str | int, str]  # player_id -> subject_id (participant name)
+    players: dict[str | int, str]  # player_id -> socket_id
+    player_subjects: dict[str | int, str]  # player_id -> subject_id (participant name)
     frame_number: int
     is_active: bool
     rng_seed: int  # Shared seed for deterministic AI
@@ -51,8 +51,8 @@ class PyodideGameState:
     server_runner: Any = None  # ServerGameRunner instance when enabled
 
     # Diagnostics for lag tracking
-    last_action_times: Dict[str | int, float] = dataclasses.field(default_factory=dict)
-    action_delays: Dict[str | int, list] = dataclasses.field(default_factory=dict)
+    last_action_times: dict[str | int, float] = dataclasses.field(default_factory=dict)
+    action_delays: dict[str | int, list] = dataclasses.field(default_factory=dict)
     last_diagnostics_log: float = 0.0
 
     # WebRTC TURN configuration
@@ -95,7 +95,7 @@ class PyodideGameCoordinator:
 
     def __init__(self, socketio: flask_socketio.SocketIO, game_manager_getter: callable = None):
         self.socketio = socketio
-        self.games: Dict[str, PyodideGameState] = {}
+        self.games: dict[str, PyodideGameState] = {}
         self.lock = threading.Lock()
         self.get_game_manager = game_manager_getter  # Returns GameManager for a game_id
 

@@ -1,12 +1,14 @@
 from __future__ import annotations
-import os
+
 import copy
 import json
+import os
 import random
 from datetime import datetime
-from mug.utils.sentinels import NotProvided
 
 import flask_socketio
+
+from mug.utils.sentinels import NotProvided
 
 
 class SceneStatus:

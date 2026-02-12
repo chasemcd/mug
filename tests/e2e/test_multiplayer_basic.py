@@ -15,19 +15,20 @@ Scene flow for the example experiment:
 2. Tutorial GymScene (single player) - startButton -> auto-completes
 3. Multiplayer GymScene - startButton -> waitroom -> P2P game
 """
+from __future__ import annotations
+
 import pytest
-from tests.fixtures.game_helpers import (
-    wait_for_socket_connected,
-    wait_for_game_canvas,
-    wait_for_game_object,
-    wait_for_episode_complete,
-    get_game_state,
-    click_advance_button,
-    click_start_button,
-    get_scene_id,
-)
+
+from tests.fixtures.export_helpers import (get_experiment_id,
+                                           wait_for_episode_with_parity)
+from tests.fixtures.game_helpers import (click_advance_button,
+                                         click_start_button, get_game_state,
+                                         get_scene_id,
+                                         wait_for_episode_complete,
+                                         wait_for_game_canvas,
+                                         wait_for_game_object,
+                                         wait_for_socket_connected)
 from tests.fixtures.network_helpers import set_tab_visibility
-from tests.fixtures.export_helpers import get_experiment_id, wait_for_episode_with_parity
 
 
 @pytest.mark.timeout(300)  # 5 minutes max for full flow

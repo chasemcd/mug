@@ -2,41 +2,36 @@ from __future__ import annotations
 
 import atexit
 import dataclasses
+import json
 import logging
 import os
 import secrets
+import socket
 import threading
 import time
-import uuid
-import msgpack
-import pandas as pd
-import flatten_dict
-import json
-import socket
 import urllib.request
+import uuid
 
 import flask
 import flask_socketio
-
-from mug.utils.typing import SubjectID, SceneID
-from mug.scenes import gym_scene
-from mug.server import game_manager
+import flatten_dict
+import msgpack
+import pandas as pd
+from flask_login import LoginManager
 
 from mug.configurations import remote_config
-from mug.server import thread_safe_collections
-from mug.server.remote_game import AvailableSlot
-from mug.scenes import stager
-from mug.scenes import unity_scene
-from mug.server import pyodide_game_coordinator
-from mug.server import player_pairing_manager
-from mug.server.participant_state import ParticipantState, ParticipantStateTracker
-
-from flask_login import LoginManager
-from mug.server.admin import admin_bp, AdminUser
-from mug.server.admin.namespace import AdminNamespace
+from mug.scenes import gym_scene, stager, unity_scene
+from mug.server import (game_manager, player_pairing_manager,
+                        pyodide_game_coordinator, thread_safe_collections)
+from mug.server.admin import AdminUser, admin_bp
 from mug.server.admin.aggregator import AdminEventAggregator
+from mug.server.admin.namespace import AdminNamespace
 from mug.server.match_logger import MatchAssignmentLogger
+from mug.server.participant_state import (ParticipantState,
+                                          ParticipantStateTracker)
 from mug.server.probe_coordinator import ProbeCoordinator
+from mug.server.remote_game import AvailableSlot
+from mug.utils.typing import SceneID, SubjectID
 
 
 @dataclasses.dataclass

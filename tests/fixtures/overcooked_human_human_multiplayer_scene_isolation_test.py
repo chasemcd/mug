@@ -21,7 +21,7 @@ Key differences from production:
 - multiplayer(input_confirmation_timeout_ms=2000) higher timeout for resilience
 
 Usage:
-    python -m mug.examples.cogrid.overcooked_human_human_multiplayer_scene_isolation_test
+    python -m tests.fixtures.overcooked_human_human_multiplayer_scene_isolation_test
 
 This is used by pytest E2E tests via the conftest.py flask_server_scene_isolation fixture.
 """
@@ -34,16 +34,11 @@ eventlet.monkey_patch()
 
 import argparse
 
+from mug.configurations import experiment_config
+from mug.examples.cogrid.scenes import scenes as oc_scenes
+from mug.scenes import stager, static_scene
 from mug.server import app
 from mug.server.matchmaker import FIFOMatchmaker
-from mug.scenes import stager
-from mug.examples.cogrid.scenes import (
-    scenes as oc_scenes,
-)
-from mug.scenes import static_scene
-
-from mug.configurations import experiment_config
-
 
 hh_start_scene = (
     static_scene.StartScene()

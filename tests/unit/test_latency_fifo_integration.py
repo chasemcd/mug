@@ -5,6 +5,8 @@ Covers two v1.21 requirements:
 - MATCH-03: P2P probe integration (needs_probe, should_reject_for_rtt, full flow)
 """
 
+from __future__ import annotations
+
 from unittest.mock import MagicMock
 
 from mug.scenes.gym_scene import GymScene

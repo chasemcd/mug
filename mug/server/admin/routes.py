@@ -6,11 +6,15 @@ Provides:
 - /admin/login - Login page and authentication
 - /admin/logout - Session logout
 """
-import os
+from __future__ import annotations
+
 import functools
-from flask import render_template, redirect, url_for, request, flash, session
-from flask_login import login_user, logout_user, login_required, current_user
-from . import admin_bp, AdminUser
+import os
+
+from flask import flash, redirect, render_template, request, session, url_for
+from flask_login import current_user, login_required, login_user, logout_user
+
+from . import AdminUser, admin_bp
 
 # Admin password from environment variable (default for development)
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'admin123')

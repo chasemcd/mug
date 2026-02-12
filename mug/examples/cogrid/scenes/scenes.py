@@ -1,22 +1,18 @@
 from __future__ import annotations
 
-import eventlet
 import copy
+import dataclasses
+
+import eventlet
 
 eventlet.monkey_patch()
 
 
-from mug.configurations import (
-    configuration_constants,
-)
-from mug.examples.cogrid import (
-    overcooked_utils,
-)
-from mug.scenes import gym_scene
-from mug.scenes import static_scene
-from mug.scenes import scene
+from mug.configurations import configuration_constants
+from mug.configurations.configuration_constants import ModelConfig
+from mug.examples.cogrid import overcooked_utils
+from mug.scenes import gym_scene, scene, static_scene
 from mug.server.matchmaker import FIFOMatchmaker
-
 
 # Constants for controls/actions/etc.
 MoveUp = 0
@@ -28,54 +24,63 @@ Toggle = 5
 Noop = 6
 
 
+OVERCOOKED_MODEL_CONFIG = ModelConfig(
+    obs_input="obs",
+    logit_output="output",
+    state_inputs=["state_in_0", "state_in_1"],
+    state_outputs=["state_out_0", "state_out_1"],
+    state_shape=[1, 256],
+    fixed_inputs={"seq_lens": 1},
+)
+
 SP_POLICY_MAPPING_CRAMPED_ROOM = {
     0: configuration_constants.PolicyTypes.Human,
-    1: "static/assets/overcooked/models/sp_cramped_room_00.onnx",
+    1: dataclasses.replace(OVERCOOKED_MODEL_CONFIG, onnx_path="static/assets/overcooked/models/sp_cramped_room_00.onnx"),
 }
 
 IBC_POLICY_MAPPING_CRAMPED_ROOM = {
     0: configuration_constants.PolicyTypes.Human,
-    1: "static/assets/overcooked/models/ibc_cramped_room_00.onnx",
+    1: dataclasses.replace(OVERCOOKED_MODEL_CONFIG, onnx_path="static/assets/overcooked/models/ibc_cramped_room_00.onnx"),
 }
 
 SP_POLICY_MAPPING_ASYMMETRIC_ADVANTAGES = {
     0: configuration_constants.PolicyTypes.Human,
-    1: "static/assets/overcooked/models/sp_asymmetric_advantages_00.onnx",
+    1: dataclasses.replace(OVERCOOKED_MODEL_CONFIG, onnx_path="static/assets/overcooked/models/sp_asymmetric_advantages_00.onnx"),
 }
 
 IBC_POLICY_MAPPING_ASYMMETRIC_ADVANTAGES = {
     0: configuration_constants.PolicyTypes.Human,
-    1: "static/assets/overcooked/models/ibc_asymmetric_advantages_00.onnx",
+    1: dataclasses.replace(OVERCOOKED_MODEL_CONFIG, onnx_path="static/assets/overcooked/models/ibc_asymmetric_advantages_00.onnx"),
 }
 
 SP_POLICY_MAPPING_COUNTER_CIRCUIT = {
     0: configuration_constants.PolicyTypes.Human,
-    1: "static/assets/overcooked/models/sp_counter_circuit_00.onnx",
+    1: dataclasses.replace(OVERCOOKED_MODEL_CONFIG, onnx_path="static/assets/overcooked/models/sp_counter_circuit_00.onnx"),
 }
 
 IBC_POLICY_MAPPING_COUNTER_CIRCUIT = {
     0: configuration_constants.PolicyTypes.Human,
-    1: "static/assets/overcooked/models/ibc_counter_circuit_00.onnx",
+    1: dataclasses.replace(OVERCOOKED_MODEL_CONFIG, onnx_path="static/assets/overcooked/models/ibc_counter_circuit_00.onnx"),
 }
 
 SP_POLICY_MAPPING_FORCED_COORDINATION = {
     0: configuration_constants.PolicyTypes.Human,
-    1: "static/assets/overcooked/models/sp_forced_coordination_00.onnx",
+    1: dataclasses.replace(OVERCOOKED_MODEL_CONFIG, onnx_path="static/assets/overcooked/models/sp_forced_coordination_00.onnx"),
 }
 
 IBC_POLICY_MAPPING_FORCED_COORDINATION = {
     0: configuration_constants.PolicyTypes.Human,
-    1: "static/assets/overcooked/models/ibc_forced_coordination_00.onnx",
+    1: dataclasses.replace(OVERCOOKED_MODEL_CONFIG, onnx_path="static/assets/overcooked/models/ibc_forced_coordination_00.onnx"),
 }
 
 SP_POLICY_MAPPING_COORDINATION_RING = {
     0: configuration_constants.PolicyTypes.Human,
-    1: "static/assets/overcooked/models/sp_coordination_ring_00.onnx",
+    1: dataclasses.replace(OVERCOOKED_MODEL_CONFIG, onnx_path="static/assets/overcooked/models/sp_coordination_ring_00.onnx"),
 }
 
 IBC_POLICY_MAPPING_COORDINATION_RING = {
     0: configuration_constants.PolicyTypes.Human,
-    1: "static/assets/overcooked/models/ibc_coordination_ring_00.onnx",
+    1: dataclasses.replace(OVERCOOKED_MODEL_CONFIG, onnx_path="static/assets/overcooked/models/ibc_coordination_ring_00.onnx"),
 }
 
 

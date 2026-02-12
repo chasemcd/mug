@@ -1,16 +1,15 @@
 from __future__ import annotations
 
-
-from typing import Any, Callable, TYPE_CHECKING
 import copy
 import json
+from typing import TYPE_CHECKING, Any, Callable
 
 if TYPE_CHECKING:
     from mug.server.matchmaker import Matchmaker
 
+from mug.configurations import configuration_constants, remote_config
+from mug.configurations.configuration_constants import ModelConfig
 from mug.scenes import scene
-from mug.configurations import remote_config
-from mug.configurations import configuration_constants
 from mug.utils.sentinels import NotProvided
 
 
@@ -170,7 +169,7 @@ class GymScene(scene.Scene):
 
         # Matchmaking settings
         self.matchmaking_max_rtt: int | None = None  # Max RTT difference (ms) between paired participants
-        self._matchmaker: "Matchmaker | None" = None  # Custom matchmaker, None uses default FIFO
+        self._matchmaker: Matchmaker | None = None  # Custom matchmaker, None uses default FIFO
 
         # Player group settings (for multiplayer games)
         # Groups are always tracked automatically after each game completes.
@@ -362,9 +361,13 @@ class GymScene(scene.Scene):
         policy_inference_fn: Callable = NotProvided,
         frame_skip: int = NotProvided,
     ):
-        """_summary_
+        """Configure policy settings for the GymScene.
 
-        :param policy_mapping: A dictionary mapping agent IDs to policy names, defaults to NotProvided
+        :param policy_mapping: A dictionary mapping agent IDs to policy names, types,
+            or ``ModelConfig`` instances. ``ModelConfig`` values (with ``onnx_path``
+            set) are automatically decomposed: the ONNX path replaces the value in
+            ``self.policy_mapping`` and the config dict is stored in
+            ``self.policy_configs``. Defaults to NotProvided.
         :type policy_mapping: dict, optional
         :param load_policy_fn: A function to load policies, defaults to NotProvided
         :type load_policy_fn: Callable, optional
@@ -387,7 +390,46 @@ class GymScene(scene.Scene):
         if frame_skip is not NotProvided:
             self.frame_skip = frame_skip
 
+        # Decompose ModelConfig values in policy_mapping into path strings
+        # and policy_configs dicts so the JS client sees the same structure.
+        if policy_mapping is not NotProvided and self.policy_mapping:
+            self._decompose_model_configs()
+            self._validate_policy_configs()
+
         return self
+
+    def _decompose_model_configs(self):
+        """Extract ModelConfig values from policy_mapping.
+
+        For each ModelConfig value: store its onnx_path as the policy_mapping
+        value and its to_dict() output in policy_configs.
+        """
+        for key, value in list(self.policy_mapping.items()):
+            if isinstance(value, ModelConfig):
+                if not value.onnx_path:
+                    raise ValueError(
+                        f"ModelConfig for policy '{key}' must have a non-empty "
+                        f"onnx_path when used as a policy_mapping value."
+                    )
+                self.policy_mapping[key] = value.onnx_path
+                self.policy_configs[key] = value.to_dict()
+
+    def _validate_policy_configs(self):
+        """Validate that policy_configs is consistent with policy_mapping.
+
+        Raises:
+            ValueError: If an ONNX policy has no config entry.
+        """
+        for policy_id, policy_value in self.policy_mapping.items():
+            if (
+                isinstance(policy_value, str)
+                and policy_value.endswith(".onnx")
+                and policy_id not in self.policy_configs
+            ):
+                raise ValueError(
+                    f"ONNX policy '{policy_id}' has no entry in policy_configs. "
+                    f"Use a ModelConfig with onnx_path set as the policy_mapping value."
+                )
 
     def gameplay(
         self,
@@ -502,7 +544,7 @@ class GymScene(scene.Scene):
                 scene_body is NotProvided
             ), "Cannot set both filepath and html_body."
 
-            with open(scene_body_filepath, "r", encoding="utf-8") as f:
+            with open(scene_body_filepath, encoding="utf-8") as f:
                 self.scene_body = f.read()
 
         if scene_body is not NotProvided:
@@ -516,7 +558,7 @@ class GymScene(scene.Scene):
                 in_game_scene_body is NotProvided
             ), "Cannot set both filepath and html_body."
 
-            with open(in_game_scene_body_filepath, "r", encoding="utf-8") as f:
+            with open(in_game_scene_body_filepath, encoding="utf-8") as f:
                 self.in_game_scene_body = f.read()
 
         if in_game_scene_body is not NotProvided:
@@ -565,7 +607,7 @@ class GymScene(scene.Scene):
         self,
         hide_lobby_count: bool = NotProvided,
         max_rtt: int = NotProvided,
-        matchmaker: "Matchmaker" = NotProvided,
+        matchmaker: Matchmaker = NotProvided,
     ):
         """Configure matchmaking and lobby settings for the GymScene.
 
@@ -612,7 +654,7 @@ class GymScene(scene.Scene):
         return self
 
     @property
-    def matchmaker(self) -> "Matchmaker | None":
+    def matchmaker(self) -> Matchmaker | None:
         """Return configured matchmaker, or None for default FIFO."""
         return self._matchmaker
 
@@ -659,7 +701,7 @@ class GymScene(scene.Scene):
                 environment_initialization_code is NotProvided
             ), "Cannot set both filepath and code!"
             with open(
-                environment_initialization_code_filepath, "r", encoding="utf-8"
+                environment_initialization_code_filepath, encoding="utf-8"
             ) as f:
                 self.environment_initialization_code = f.read()
 
@@ -690,7 +732,7 @@ class GymScene(scene.Scene):
         # Matchmaking params (from matchmaking)
         hide_lobby_count: bool = NotProvided,
         max_rtt: int = NotProvided,
-        matchmaker: "Matchmaker" = NotProvided,
+        matchmaker: Matchmaker = NotProvided,
         # Player grouping params (from player_grouping)
         wait_for_known_group: bool = NotProvided,
         group_wait_timeout: int = NotProvided,

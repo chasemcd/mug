@@ -1,8 +1,11 @@
-from mug.scenes import unity_scene
-import flask_socketio
+from __future__ import annotations
+
 import dataclasses
 import random
 
+import flask_socketio
+
+from mug.scenes import unity_scene
 from mug.scenes.scene import Scene
 
 

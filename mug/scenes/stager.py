@@ -1,9 +1,11 @@
-import logging
+from __future__ import annotations
+
 import copy
+import logging
+
 import flask_socketio
 
 from mug.scenes import scene, static_scene
-
 
 logger = logging.getLogger(__name__)
 

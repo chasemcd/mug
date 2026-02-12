@@ -6,23 +6,10 @@ eventlet.monkey_patch()
 
 import argparse
 
+from mug.configurations import configuration_constants, experiment_config
+from mug.examples.cogrid.scenes import scenes as oc_scenes
+from mug.scenes import gym_scene, scene, stager, static_scene
 from mug.server import app
-from mug.scenes import scene
-from mug.scenes import stager
-from mug.examples.cogrid.scenes import (
-    scenes as oc_scenes,
-)
-from mug.scenes import static_scene
-
-from mug.configurations import experiment_config
-from mug.scenes import gym_scene
-from mug.scenes import static_scene
-from mug.scenes import scene
-
-
-from mug.configurations import (
-    configuration_constants,
-)
 
 POLICY_MAPPING = {
     "agent_right": configuration_constants.PolicyTypes.Human,

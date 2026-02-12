@@ -12,12 +12,12 @@ import json
 import logging
 import os
 import time
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from mug.server.matchmaker import MatchCandidate
     from mug.server.admin.aggregator import AdminEventAggregator
+    from mug.server.matchmaker import MatchCandidate
 
 logger = logging.getLogger(__name__)
 

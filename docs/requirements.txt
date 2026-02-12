@@ -1,4 +1,4 @@
-sphinx-rtd-theme==2.0.0
+ipython
 sphinx-book-theme
 sphinx-copybutton
-ipython
+sphinx-rtd-theme==2.0.0

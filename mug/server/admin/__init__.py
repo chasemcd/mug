@@ -6,6 +6,8 @@ Provides:
 - AdminUser class for Flask-Login session management
 - Admin namespace for real-time SocketIO updates
 """
+from __future__ import annotations
+
 from flask import Blueprint
 from flask_login import LoginManager
 

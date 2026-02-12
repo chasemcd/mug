@@ -1,11 +1,13 @@
-import slime_volleyball.slimevolley_env as slimevolley_env
-from slime_volleyball.core import constants
-import math
-import typing
-from mug.configurations.object_contexts import Line, Circle, Polygon
+from __future__ import annotations
 
 import dataclasses
+import math
+import typing
 
+import slime_volleyball.slimevolley_env as slimevolley_env
+from slime_volleyball.core import constants
+
+from mug.configurations.object_contexts import Circle, Line, Polygon
 
 Y_OFFSET = 0.018
 
@@ -287,6 +289,6 @@ class SlimeVBEnvIG(slimevolley_env.SlimeVolleyEnv):
         self.game.agent_right.should_powerup = state["agent_right_should_powerup"]
 
 # Initialize the environment for use in the browser. SlimeVB uses a seed only in initialization
-# rather than on reset() so that each episode isn't identical; we want the sequence of episodes to 
-# be identical. 
+# rather than on reset() so that each episode isn't identical; we want the sequence of episodes to
+# be identical.
 env = SlimeVBEnvIG(config={"human_inputs": True, "seed": 42}, render_mode="interactive-gym")

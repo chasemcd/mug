@@ -1,6 +1,6 @@
 data/
 .DS_Store
-.claude/ 
+.claude/
 .claude/settings.local.json
 .claude/*
 .planning/
@@ -11,7 +11,7 @@ build/
 .claude
 .claude/*
 update_pypi.sh
-scratch.py 
+scratch.py
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

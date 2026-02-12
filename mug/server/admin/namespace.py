@@ -6,10 +6,13 @@ This namespace is isolated from the participant namespace (/) to ensure:
 - Different authentication can be applied
 - Can be disabled in production without affecting participants
 """
+from __future__ import annotations
+
 import logging
+
 from flask import session
-from flask_socketio import Namespace, emit, join_room, leave_room
 from flask_login import current_user
+from flask_socketio import Namespace, emit, join_room, leave_room
 
 logger = logging.getLogger(__name__)
 

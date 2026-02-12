@@ -1,4 +1,4 @@
-import {actionFromONNX} from './onnx_inference.js';
+import {actionFromONNX, initModelConfigs} from './onnx_inference.js';
 
 
 var game_config = {
@@ -131,13 +131,13 @@ class RemoteGameDataLogger {
                     if (field !== 'observations') {
                         this.data[field][agentId].push(data[agentId]);
                     }
-                   
+
                 }
             }
         };
 
         ['observations', 'actions', 'rewards', 'terminateds', 'truncateds', 'isFocused'].forEach(logDataForField);
-        
+
         if (gameData.infos !== undefined) {
             const infos = gameData.infos instanceof Map ? Object.fromEntries(gameData.infos) : gameData.infos;
             for (let agentId in infos) {
@@ -319,6 +319,7 @@ class GymScene extends Phaser.Scene {
         this.background = config.background;
         this.last_rendered_step = -1;
         this.scene_metadata = config.scene_metadata;
+        initModelConfigs(this.scene_metadata);
         this.pyodide_remote_game = config.pyodide_remote_game;
         this.isProcessingPyodide = false;
         this.stateImageSprite = null;
@@ -369,7 +370,7 @@ class GymScene extends Phaser.Scene {
         // Check if the background is just a color, if so fill
         if (this._checkIfHex(this.background)) {
             this.cameras.main.setBackgroundColor(this._strToHex(this.background));
-        } else { 
+        } else {
             // If the background isn't a color, load the specified image
             this._addTexture(this.background);
             this.add.image(this.height / 2, this.width / 2, this.background);
@@ -581,7 +582,7 @@ class GymScene extends Phaser.Scene {
 
     getBotAction(agentID) {
         let policy_mapping = this.scene_metadata.policy_mapping;
-        
+
         // If the bot is action on this step (according to frame skip), calculate an action.
         if (this.pyodide_remote_game && this.pyodide_remote_game.step_num % this.scene_metadata.frame_skip == 0) {
             let policyID = policy_mapping[agentID];
@@ -594,7 +595,7 @@ class GymScene extends Phaser.Scene {
                 // If the policy is random, return a random action
                 return Math.floor(Math.random() * Object.keys(this.scene_metadata.action_mapping).length + 1) - 1;
             }
-        } 
+        }
 
         // If the bot was queried asynchronously, we may now have an action to execute
         if (botActionBuffers[agentID] !== undefined && botActionBuffers[agentID].length > 0) {
@@ -604,7 +605,7 @@ class GymScene extends Phaser.Scene {
 
             // If we're using previous_action as population method, return the previous action
             if (
-                this.scene_metadata.action_population_method === "previous_submitted_action" && 
+                this.scene_metadata.action_population_method === "previous_submitted_action" &&
                 previousSubmittedActions[agentID] !== undefined
             ) {
                 return previousSubmittedActions[agentID];
@@ -612,7 +613,7 @@ class GymScene extends Phaser.Scene {
                 // If we're using default_action as population method, return the default action
                 return this.scene_metadata.default_action;
             }
-        } 
+        }
     }
 
     async queryBotPolicy(agentID, policyID, observation) {
@@ -622,7 +623,7 @@ class GymScene extends Phaser.Scene {
         }
 
         // Calculate the action and add it to the buffer
-        let action = await actionFromONNX(policyID, observation);
+        let action = await actionFromONNX(policyID, observation, agentID);
         botActionBuffers[agentID].push(action);
     }
 
@@ -699,7 +700,7 @@ class GymScene extends Phaser.Scene {
                 .map(key => key.split(',').length),
             0
         );
-    
+
         if (maxCompositeActionSize > 1) {
             const compositeActions = Object.keys(this.scene_metadata.action_mapping)
             .filter(key => typeof key === 'string' && key.includes(','))
@@ -709,7 +710,7 @@ class GymScene extends Phaser.Scene {
             for (let k = 2; k <= maxCompositeActionSize; k++) {
                 combinations = combinations.concat(combinationsOf(curKeys, k));
             }
-            
+
             for (const combination of combinations) {
                 const sortedCombination = combination.sort().join(',');
                 if (compositeActions.includes(sortedCombination)) {
@@ -717,12 +718,12 @@ class GymScene extends Phaser.Scene {
                     break;
                 }
             }
-        } 
-        
+        }
+
         // If we don't get a composite action, check if any single-keys within the composite work
         if (compPressedKeys == undefined) {
             // For single key actions, find the first pressed key that has a valid mapping
-            const validKeys = Object.keys(pressedKeys).filter(key => 
+            const validKeys = Object.keys(pressedKeys).filter(key =>
                 key in this.scene_metadata.action_mapping
             );
             if (validKeys.length > 0) {
@@ -811,8 +812,8 @@ class GymScene extends Phaser.Scene {
             //         this.stateImageSprite.setTexture("curStateImage");
             //     }
             //     console.log("set texture curstateImage in addBase64");
-            //  });        
-            
+            //  });
+
                 // Create an image element to load Blob URL
             const img = new Image();
             img.crossOrigin = "anonymous"; // Prevent CORS issues
@@ -880,8 +881,8 @@ class GymScene extends Phaser.Scene {
             // }, this);
 
             // // Load the new image
-            // var base64String = this.state.game_image_base64.startsWith('data:image/png;base64,') ? 
-            //     this.state.game_image_binary : 
+            // var base64String = this.state.game_image_base64.startsWith('data:image/png;base64,') ?
+            //     this.state.game_image_binary :
             //     'data:image/png;base64,' + this.state.game_image_binary;
 
             // // Success here will trigger the `addtexture` callback

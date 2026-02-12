@@ -1,32 +1,31 @@
 from __future__ import annotations
 
+import dataclasses
+
 import eventlet
 
 eventlet.monkey_patch()
 
 import argparse
 
+from mug.configurations import configuration_constants, experiment_config
+from mug.configurations.configuration_constants import ModelConfig
+from mug.examples.cogrid.scenes import scenes as oc_scenes
+from mug.scenes import gym_scene, scene, stager, static_scene
 from mug.server import app
-from mug.scenes import scene
-from mug.scenes import stager
-from mug.examples.cogrid.scenes import (
-    scenes as oc_scenes,
-)
-from mug.scenes import static_scene
 
-from mug.configurations import experiment_config
-from mug.scenes import gym_scene
-from mug.scenes import static_scene
-from mug.scenes import scene
-
-
-from mug.configurations import (
-    configuration_constants,
+SLIMEVB_MODEL_CONFIG = ModelConfig(
+    obs_input="obs",
+    logit_output="output",
+    state_inputs=["state_ins"],
+    state_outputs=["state_outs"],
+    state_shape=[1],
+    onnx_path="static/assets/slime_volleyball/models/model.onnx"
 )
 
 POLICY_MAPPING = {
-    "agent_right": configuration_constants.PolicyTypes.Human,
-    "agent_left": "static/assets/slime_volleyball/models/model.onnx",
+    "agent_right": SLIMEVB_MODEL_CONFIG,
+    "agent_left": configuration_constants.PolicyTypes.Human,
 }
 
 NOOP = 0

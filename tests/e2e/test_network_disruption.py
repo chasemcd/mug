@@ -14,39 +14,32 @@ Key behaviors tested:
 2. Tab backgrounding causes frame deficit, triggering fast-forward on refocus
 3. Both disruption types complete episode without data corruption
 """
-import pytest
-import time
-from tests.fixtures.network_helpers import (
-    apply_packet_loss,
-    apply_latency,
-    set_tab_visibility,
-    wait_for_focus_manager_state,
-    get_rollback_stats,
-    get_fast_forward_state,
-)
-from tests.fixtures.game_helpers import (
-    wait_for_socket_connected,
-    wait_for_game_canvas,
-    wait_for_game_object,
-    wait_for_episode_complete,
-    get_game_state,
-    click_advance_button,
-    click_start_button,
-    get_scene_id,
-    run_full_episode_flow_until_gameplay,
-)
-from tests.fixtures.input_helpers import (
-    start_random_actions,
-    stop_random_actions,
-)
-from tests.fixtures.export_helpers import (
-    get_experiment_id,
-    get_subject_ids_from_pages,
-    wait_for_export_files,
-    run_comparison,
-    wait_for_episode_with_parity,
-)
+from __future__ import annotations
 
+import time
+
+import pytest
+
+from tests.fixtures.export_helpers import (get_experiment_id,
+                                           get_subject_ids_from_pages,
+                                           run_comparison,
+                                           wait_for_episode_with_parity,
+                                           wait_for_export_files)
+from tests.fixtures.game_helpers import (click_advance_button,
+                                         click_start_button, get_game_state,
+                                         get_scene_id,
+                                         run_full_episode_flow_until_gameplay,
+                                         wait_for_episode_complete,
+                                         wait_for_game_canvas,
+                                         wait_for_game_object,
+                                         wait_for_socket_connected)
+from tests.fixtures.input_helpers import (start_random_actions,
+                                          stop_random_actions)
+from tests.fixtures.network_helpers import (apply_latency, apply_packet_loss,
+                                            get_fast_forward_state,
+                                            get_rollback_stats,
+                                            set_tab_visibility,
+                                            wait_for_focus_manager_state)
 
 # =============================================================================
 # NET-02: Packet Loss Test

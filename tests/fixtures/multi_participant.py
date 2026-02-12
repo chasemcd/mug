@@ -4,33 +4,29 @@ Multi-participant test orchestration helpers.
 Provides GameOrchestrator class for managing 3 concurrent 2-player games,
 used by multi-participant stress tests (STRESS-01 through STRESS-07).
 """
+from __future__ import annotations
+
 import time
-from typing import List, Tuple, Dict, Any, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from playwright.sync_api import Page
 
-from tests.fixtures.game_helpers import (
-    wait_for_socket_connected,
-    wait_for_game_canvas,
-    wait_for_game_object,
-    wait_for_episode_complete,
-    get_game_state,
-    click_advance_button,
-    click_start_button,
-    get_scene_id,
-    wait_for_advance_button,
-    wait_for_start_button_enabled,
-)
+from tests.fixtures.export_helpers import (get_experiment_id,
+                                           get_subject_ids_from_pages,
+                                           run_comparison,
+                                           wait_for_export_files)
+from tests.fixtures.game_helpers import (click_advance_button,
+                                         click_start_button, get_game_state,
+                                         get_scene_id, wait_for_advance_button,
+                                         wait_for_episode_complete,
+                                         wait_for_game_canvas,
+                                         wait_for_game_object,
+                                         wait_for_socket_connected,
+                                         wait_for_start_button_enabled)
 from tests.fixtures.network_helpers import set_tab_visibility
-from tests.fixtures.export_helpers import (
-    get_experiment_id,
-    get_subject_ids_from_pages,
-    wait_for_export_files,
-    run_comparison,
-)
 
 
-def get_page_state(page: Page) -> Dict[str, Any]:
+def get_page_state(page: Page) -> dict[str, Any]:
     """
     Get comprehensive UI state from a page for debugging.
 
@@ -117,7 +113,7 @@ def get_page_state(page: Page) -> Dict[str, Any]:
     }""")
 
 
-def log_page_state(page: Page, label: str) -> Dict[str, Any]:
+def log_page_state(page: Page, label: str) -> dict[str, Any]:
     """Get and log page state with a label."""
     state = get_page_state(page)
     print(f"  [{label}] scene={state['scene_type']}, "
@@ -133,7 +129,7 @@ def log_page_state(page: Page, label: str) -> Dict[str, Any]:
     return state
 
 
-def log_all_pages_state(pages: Tuple[Page, ...], step_name: str) -> List[Dict[str, Any]]:
+def log_all_pages_state(pages: tuple[Page, ...], step_name: str) -> list[dict[str, Any]]:
     """Log state of all pages at a checkpoint."""
     print(f"\n=== {step_name} ===")
     states = []
@@ -161,7 +157,7 @@ class GameOrchestrator:
         results = orchestrator.validate_all_data_parity()
     """
 
-    def __init__(self, pages: Tuple[Page, ...], base_url: str):
+    def __init__(self, pages: tuple[Page, ...], base_url: str):
         """
         Initialize orchestrator with 6 pages organized as 3 game pairs.
 
@@ -179,15 +175,15 @@ class GameOrchestrator:
         self.base_url = base_url
 
         # Organize into game pairs: (page1, page2) = Game 0, etc.
-        self.games: List[Tuple[Page, Page]] = [
+        self.games: list[tuple[Page, Page]] = [
             (pages[0], pages[1]),  # Game 0
             (pages[2], pages[3]),  # Game 1
             (pages[4], pages[5]),  # Game 2
         ]
 
         # Per-game tracking (populated after games start)
-        self.game_ids: List[Optional[str]] = [None, None, None]
-        self.subject_ids: List[Optional[Tuple[str, str]]] = [None, None, None]
+        self.game_ids: list[str | None] = [None, None, None]
+        self.subject_ids: list[tuple[str, str] | None] = [None, None, None]
 
     def navigate_all_staggered(self, delay_between_pairs_ms: int = 100, delay_between_games_ms: int = 1000) -> None:
         """
@@ -548,7 +544,7 @@ class GameOrchestrator:
             print(f"Game {game_idx}: Failed to start - {e}")
             return False
 
-    def get_game_completion_status(self) -> Dict[int, Dict[str, Any]]:
+    def get_game_completion_status(self) -> dict[int, dict[str, Any]]:
         """
         Get completion status for all games.
 
@@ -613,8 +609,8 @@ class GameOrchestrator:
         episode_timeout: int = 180000,
         export_timeout_sec: int = 30,
         parity_row_tolerance: int = 0,
-        experiment_id: Optional[str] = None,
-    ) -> Dict[int, Dict[str, Any]]:
+        experiment_id: str | None = None,
+    ) -> dict[int, dict[str, Any]]:
         """
         Wait for episode completion AND validate data parity for all games.
 
@@ -676,7 +672,7 @@ class GameOrchestrator:
 
         return results
 
-    def validate_all_data_parity(self, episode_num: int = 0, timeout_sec: int = 30) -> List[Tuple[int, str]]:
+    def validate_all_data_parity(self, episode_num: int = 0, timeout_sec: int = 30) -> list[tuple[int, str]]:
         """
         Validate data parity for all completed games.
 

@@ -25,7 +25,6 @@ Then open two browser windows to http://localhost:5702 and play together!
 #   Stage 1 (pre-filter): Skips candidates where sum of server RTTs > max_server_rtt_ms
 #   Stage 2 (post-filter): Rejects matches where actual P2P RTT > max_p2p_rtt_ms
 # To disable latency filtering, use the default FIFOMatchmaker (no matchmaker= argument).
-
 from __future__ import annotations
 
 import eventlet
@@ -34,16 +33,10 @@ eventlet.monkey_patch()
 
 import argparse
 
-from mug.server import app
-from mug.scenes import stager
-from mug.examples.cogrid.scenes import (
-    scenes as oc_scenes,
-)
-from mug.scenes import static_scene
-
 from mug.configurations import experiment_config
-
-
+from mug.examples.cogrid.scenes import scenes as oc_scenes
+from mug.scenes import stager, static_scene
+from mug.server import app
 
 hh_start_scene = (
     static_scene.StartScene()
@@ -94,5 +87,5 @@ if __name__ == "__main__":
         # Or pass them in below.
         .webrtc(force_relay=False)
     )
-		
+
     app.run(experiment_config)

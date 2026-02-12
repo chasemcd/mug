@@ -46,7 +46,7 @@ export function startUnityScene(data) {
     if (data.num_episodes && data.num_episodes > 1) {
         hudText += `Round ${window.interactiveGymGlobals.unityEpisodeCounter + 1}/${data.num_episodes}`;
     }
-    
+
     if (window.interactiveGymGlobals.unityScore !== null) {
         if (hudText) hudText += ' | ';
         hudText += `Score: ${window.interactiveGymGlobals.unityScore}`;
@@ -69,7 +69,7 @@ const unityCachedAssets = new Map(); // Map of build_name -> {data, framework, w
 export function preloadUnityGame(config) {
     console.log("Preloading Unity game assets", config);
     const buildName = config.build_name;
-    
+
     // Return existing cache if already downloaded
     if (unityCachedAssets.has(buildName)) {
         console.log(`Assets for ${buildName} already cached`);
@@ -77,7 +77,7 @@ export function preloadUnityGame(config) {
     }
 
     const buildUrl = `static/web_gl/${buildName}/Build`;
-    
+
     // Create promises for all asset downloads
     const assetPromises = {
         loader: fetch(buildUrl + `/${buildName}.loader.js`).then(r => r.blob()),
@@ -97,11 +97,11 @@ export function preloadUnityGame(config) {
                 codeUrl: URL.createObjectURL(wasmBlob),
                 buildName: buildName
             };
-            
+
             // Store in cache
             unityCachedAssets.set(buildName, cachedAssets);
             console.log(`Assets for ${buildName} cached successfully`);
-            
+
             return cachedAssets;
         })
         .catch(error => {
@@ -114,14 +114,14 @@ export function preloadUnityGame(config) {
 function startUnityGame(config, elementId) {
     const buildName = config.build_name;
     const cachedAssets = unityCachedAssets.get(buildName);
-    
+
     if (!cachedAssets) {
         console.error(`No cached assets found for ${buildName}. Call preloadUnityGame() first.`);
         return;
     }
 
     console.log(`Starting Unity game with cached assets: ${buildName}`);
-    
+
     $(`#${elementId}`).html(`
         <div id="unity-container" class="unity-desktop">
             <canvas id="unity-canvas" tabindex="-1"></canvas>
@@ -159,7 +159,7 @@ function startUnityGame(config, elementId) {
         productName: buildName,
         productVersion: "1.0",
     };
-    
+
     loadingBar.style.display = "block";
 
     const script = document.createElement("script");
@@ -192,7 +192,7 @@ export function shutdownUnityGame() {
 
             // Attempt to quit the Unity instance with a timeout
             const quitPromise = window.unityInstance.Quit();
-            const timeoutPromise = new Promise((_, reject) => 
+            const timeoutPromise = new Promise((_, reject) =>
                 setTimeout(() => reject(new Error('Unity quit timeout')), 5000));
 
             Promise.race([quitPromise, timeoutPromise])
@@ -210,15 +210,15 @@ export function shutdownUnityGame() {
     }
 }
 
-function cleanupUnityResources() {    
+function cleanupUnityResources() {
     // Clear the Unity instance
     window.unityInstance = null;
-    
+
     // Force garbage collection if possible
     if (window.gc) {
         window.gc();
     }
-    
+
     console.log("Unity WebGL cleanup completed");
 }
 

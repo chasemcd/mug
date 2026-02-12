@@ -79,7 +79,7 @@ class ServerGameRunner:
         self.frame_number = 0
         self.step_num = 0
         self.episode_num = 0
-        self.cumulative_rewards: Dict[str, float] = {}
+        self.cumulative_rewards: dict[str, float] = {}
         self.is_initialized = False
         self.rng_seed: int | None = None
 
@@ -88,22 +88,22 @@ class ServerGameRunner:
 
         # GGPO-style frame-indexed input buffer
         # input_buffer[frame_number][player_id] = action
-        self.input_buffer: Dict[int, Dict[str, int]] = {}
+        self.input_buffer: dict[int, dict[str, int]] = {}
         self.input_buffer_max_size = 120  # Keep ~4 seconds at 30 FPS
 
         # Legacy sticky actions (kept for backwards compatibility during transition)
-        self.current_actions: Dict[str, int] = {}
+        self.current_actions: dict[str, int] = {}
 
         # For action_population_method="previous_submitted_action"
         # Tracks the last action each player actually submitted
-        self.last_submitted_actions: Dict[str, int] = {}
+        self.last_submitted_actions: dict[str, int] = {}
 
         # Track expected players
         self.player_ids: set = set()
 
         # Action tracking for sync verification
         self.action_sequence: list[dict] = []
-        self.action_counts: Dict[str, Dict[int, int]] = {}
+        self.action_counts: dict[str, dict[int, int]] = {}
 
         # Sync epoch counter - incremented on episode start
         self.sync_epoch = 0
@@ -402,8 +402,9 @@ random.seed({rng_seed})
 
         # Re-seed RNG
         if self.rng_seed is not None:
-            import numpy as np
             import random
+
+            import numpy as np
             np.random.seed(self.rng_seed)
             random.seed(self.rng_seed)
 
@@ -492,7 +493,7 @@ random.seed({rng_seed})
             f"action={action}, target_frame={client_frame}"
         )
 
-    def get_authoritative_state(self) -> Dict[str, Any]:
+    def get_authoritative_state(self) -> dict[str, Any]:
         """
         Get full authoritative state for broadcast.
 
@@ -534,8 +535,8 @@ random.seed({rng_seed})
             return state
 
         try:
-            import json
             import hashlib
+            import json
 
             serialize_start = time.time()
             env_state = self.env.get_state()

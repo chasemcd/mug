@@ -14,6 +14,8 @@ Usage:
     exit_code, output = run_comparison(paths[0], paths[1])
     assert exit_code == 0, f"Data parity failed: {output}"
 """
+from __future__ import annotations
+
 import subprocess
 import time
 from pathlib import Path

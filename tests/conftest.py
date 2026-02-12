@@ -15,6 +15,8 @@ gathering limitations. Run E2E tests with:
 Or set PWHEADED=1 environment variable.
 """
 
+from __future__ import annotations
+
 import os
 import signal
 import socket
@@ -23,7 +25,6 @@ import time
 from http.client import HTTPConnection
 
 import pytest
-
 
 # ---------------------------------------------------------------------------
 # Shared server lifecycle helpers
@@ -215,7 +216,7 @@ def flask_server():
         [
             "python",
             "-m",
-            "mug.examples.cogrid.overcooked_human_human_multiplayer_test",
+            "tests.fixtures.overcooked_human_human_multiplayer_test",
             "--port",
             str(port),
         ],
@@ -289,7 +290,7 @@ def flask_server_fresh():
         [
             "python",
             "-m",
-            "mug.examples.cogrid.overcooked_human_human_multiplayer_test",
+            "tests.fixtures.overcooked_human_human_multiplayer_test",
             "--port",
             str(port),
         ],
@@ -395,7 +396,7 @@ def flask_server_scene_isolation():
         [
             "python",
             "-m",
-            "mug.examples.cogrid.overcooked_human_human_multiplayer_scene_isolation_test",
+            "tests.fixtures.overcooked_human_human_multiplayer_scene_isolation_test",
             "--port",
             str(port),
         ],
@@ -463,7 +464,7 @@ def flask_server_multi_episode_fresh():
         [
             "python",
             "-m",
-            "mug.examples.cogrid.overcooked_human_human_multiplayer_multi_episode_test",
+            "tests.fixtures.overcooked_human_human_multiplayer_multi_episode_test",
             "--port",
             str(port),
         ],
@@ -539,7 +540,7 @@ def flask_server_focus_timeout():
         [
             "python",
             "-m",
-            "mug.examples.cogrid.overcooked_human_human_multiplayer_focus_timeout_test",
+            "tests.fixtures.overcooked_human_human_multiplayer_focus_timeout_test",
             "--port",
             str(port),
         ],
@@ -684,7 +685,7 @@ def flask_server_probe(tmp_path):
         [
             "python",
             "-m",
-            "mug.examples.cogrid.overcooked_human_human_multiplayer_probe_test",
+            "tests.fixtures.overcooked_human_human_multiplayer_probe_test",
             "--port",
             str(port),
         ],
@@ -790,3 +791,95 @@ def stress_test_contexts(browser):
 
         # Pause to allow server-side cleanup to process disconnect events
         time.sleep(5)
+
+
+# ---------------------------------------------------------------------------
+# Human-AI (ONNX inference) fixtures
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(scope="function")
+def flask_server_human_ai():
+    """
+    Start Flask server for human-AI ONNX inference testing.
+
+    Scope: function (fresh server per test for clean state)
+    Yields: dict with 'url' and 'process' keys
+
+    Uses overcooked_human_ai_test config with:
+    - Single human + ONNX AI partner (cramped_room_sp_0 with ModelConfig)
+    - Short episode (200 steps)
+    - No tutorial, no feedback
+    - Port 5709 (different from other test ports)
+    """
+    port = 5709
+    base_url = f"http://localhost:{port}"
+
+    _ensure_port_available(port)
+
+    process = subprocess.Popen(
+        [
+            "python",
+            "-m",
+            "tests.fixtures.overcooked_human_ai_test",
+            "--port",
+            str(port),
+        ],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        start_new_session=True,
+    )
+
+    max_retries = 30
+    for attempt in range(max_retries):
+        try:
+            conn = HTTPConnection("localhost", port, timeout=1)
+            conn.request("GET", "/")
+            response = conn.getresponse()
+            conn.close()
+            if response.status < 500:
+                break
+        except (ConnectionRefusedError, OSError, TimeoutError):
+            pass
+
+        if process.poll() is not None:
+            stderr = process.stderr.read() if process.stderr else b""
+            raise RuntimeError(
+                f"Human-AI Flask server exited unexpectedly (code {process.returncode}).\n"
+                f"stderr: {stderr.decode()}"
+            )
+
+        time.sleep(1)
+    else:
+        _teardown_server(process, port)
+        raise RuntimeError(
+            f"Human-AI Flask server failed to start after {max_retries} retries"
+        )
+
+    yield {"url": base_url, "process": process}
+
+    _teardown_server(process, port)
+
+
+@pytest.fixture(scope="function")
+def single_player_context(browser):
+    """
+    Create a single browser context for human-AI testing.
+
+    Scope: function (fresh context for each test)
+    Yields: page
+
+    No WebRTC needed (only one human player), just Chrome UA for screening.
+    """
+    chrome_ua = (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/120.0.0.0 Safari/537.36"
+    )
+
+    context = browser.new_context(user_agent=chrome_ua)
+    page = context.new_page()
+
+    yield page
+
+    context.close()

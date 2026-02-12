@@ -1,22 +1,17 @@
 # from __future__ import annotations
 
+from __future__ import annotations
+
 import eventlet
 
 eventlet.monkey_patch()
 
 import argparse
 
-from mug.server import app
-from mug.scenes import scene
-from mug.scenes import stager
-from mug.examples.cogrid.scenes import (
-    controllable_scenes,
-    scenes,
-)
-from mug.scenes import static_scene
-
 from mug.configurations import experiment_config
-
+from mug.examples.cogrid.scenes import controllable_scenes, scenes
+from mug.scenes import scene, stager, static_scene
+from mug.server import app
 
 start_scene = (
     static_scene.StartScene()

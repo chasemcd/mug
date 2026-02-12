@@ -1585,10 +1585,10 @@ function terminateGymScene(data) {
 
     $("#sceneHeader").show();
     $("#sceneHeader").html("");
-    
+
     $("#sceneSubHeader").show();
     $("#sceneSubHeader").html("");
-    
+
     $("#sceneBody").show();
     $("#sceneBody").html("");
 
@@ -1660,7 +1660,7 @@ function enableCheckPyodideDone() {
             clearInterval(checkPyodideDone);
             clearInterval(refreshStartButton);
             // pyodideRemoteGame = undefined;
-            
+
             // Create and show the countdown popup
             const popup = document.createElement('div');
             popup.style.cssText = `
@@ -1681,7 +1681,7 @@ function enableCheckPyodideDone() {
             const gameContainer = document.getElementById('gameContainer');
             gameContainer.style.position = 'relative';
             gameContainer.appendChild(popup);
-            
+
             let countdown = 3;
             const updatePopup = () => {
                 popup.innerHTML = `
@@ -1697,7 +1697,7 @@ function enableCheckPyodideDone() {
                 }
             };
             updatePopup();
-        } 
+        }
     }, 100);
 }
 
@@ -1832,7 +1832,7 @@ socket.on("unity_episode_end", function(episodeEndData) {
 
 socket.on('preload_unity_game', (config) => {
     console.log(`Received preload request for Unity game: ${config.build_name}`);
-    preloadUnityGame(config).catch(error => 
+    preloadUnityGame(config).catch(error =>
         console.error(`Failed to preload ${config.build_name}:`, error)
     );
 });

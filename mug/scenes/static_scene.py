@@ -68,7 +68,7 @@ class StaticScene(scene.Scene):
                 scene_body is NotProvided
             ), "Cannot set both filepath and html_body."
 
-            with open(scene_body_filepath, "r", encoding="utf-8") as f:
+            with open(scene_body_filepath, encoding="utf-8") as f:
                 self.scene_body = f.read()
 
         if scene_body is not NotProvided:
@@ -736,13 +736,13 @@ class MultipleChoice(StaticScene):
                 var groupName = 'mc-' + index;
                 var $inputs = $(this).find('input');
                 var selectedIndices = [];
-                
+
                 $inputs.each(function(optionIndex) {
                     if (this.checked) {
                         selectedIndices.push(optionIndex);
                     }
                 });
-                
+
                 // Create or update a hidden input to store the selected indices
                 var hiddenInput = document.getElementById(groupName);
                 if (!hiddenInput) {

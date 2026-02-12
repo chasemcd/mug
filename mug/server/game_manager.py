@@ -1,5 +1,4 @@
 from __future__ import annotations
-from typing import Any
 
 import base64
 import itertools
@@ -7,12 +6,13 @@ import logging
 import random
 import time
 import uuid
+from typing import Any
 
 import eventlet
 import flask
 import flask_socketio
 
-from mug.utils.typing import SubjectID, GameID, RoomID
+from mug.utils.typing import GameID, RoomID, SubjectID
 
 logger = logging.getLogger(__name__)
 # Add console handler to see game_manager logs
@@ -33,20 +33,21 @@ except ImportError:
         "have the canvas display whatever is returned from `env.render('rgb_array')`."
     )
 
-from mug.configurations import (
-    configuration_constants,
-    remote_config,
-)
-from mug.server import remote_game, thread_safe_collections, pyodide_game_coordinator, player_pairing_manager
-from mug.server.remote_game import SessionState, GameExitStatus, AvailableSlot
-from mug.server.participant_state import ParticipantState
-from mug.server.matchmaker import Matchmaker, MatchCandidate, FIFOMatchmaker, GroupHistory
-from mug.server.match_logger import MatchAssignmentLogger
-from mug.scenes import stager, gym_scene, scene
-
 from typing import TYPE_CHECKING
+
+from mug.configurations import configuration_constants, remote_config
+from mug.scenes import gym_scene, scene, stager
+from mug.server import (player_pairing_manager, pyodide_game_coordinator,
+                        remote_game, thread_safe_collections)
+from mug.server.match_logger import MatchAssignmentLogger
+from mug.server.matchmaker import (FIFOMatchmaker, GroupHistory,
+                                   MatchCandidate, Matchmaker)
+from mug.server.participant_state import ParticipantState
+from mug.server.remote_game import AvailableSlot, GameExitStatus, SessionState
+
 if TYPE_CHECKING:
     from mug.server.probe_coordinator import ProbeCoordinator
+
 import flask_socketio
 
 
@@ -67,7 +68,7 @@ class GameManager:
         participant_state_tracker=None,  # Optional for backward compatibility
         matchmaker: Matchmaker | None = None,  # Phase 55: pluggable matchmaking
         match_logger: MatchAssignmentLogger | None = None,  # Phase 56: assignment logging
-        probe_coordinator: "ProbeCoordinator | None" = None,  # Phase 59: P2P RTT probing
+        probe_coordinator: ProbeCoordinator | None = None,  # Phase 59: P2P RTT probing
         get_socket_for_subject: callable | None = None,  # Phase 60+: for waitroom->match flow
     ):
         assert isinstance(scene, gym_scene.GymScene)
