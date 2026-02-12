@@ -3,61 +3,94 @@
 **Defined:** 2026-02-11
 **Core Value:** Researchers can configure and deploy multiplayer browser experiments with minimal code
 
-## v1.27 Requirements
+## v1.28 Requirements
 
-Requirements for principled rollback resource management -- replacing arbitrary hardcoded limits with confirmedFrame-based pruning.
+Requirements for configurable client-side ONNX inference -- replacing hardcoded RLlib LSTM assumptions with flexible, user-specified model config.
 
-### Snapshot Management
+### Declarative Config
 
-- [ ] **SNAP-01**: Snapshot pruning is tied to `confirmedFrame` -- all snapshots before the anchor snapshot (highest snapshot <= `confirmedFrame`) are deleted
-- [ ] **SNAP-02**: `maxSnapshots` parameter is removed -- snapshot count adapts to network conditions (more snapshots when inputs are unconfirmed, fewer when confirmed)
-- [ ] **SNAP-03**: The anchor snapshot (one snapshot at or before `confirmedFrame`) is always retained as a rollback recovery point
+- [ ] **DECL-01**: User can specify observation input tensor name per policy via Python builder API
+- [ ] **DECL-02**: User can specify logit output tensor name per policy via Python builder API
+- [ ] **DECL-03**: User can specify hidden state input/output tensor names per policy (not locked to `state_in_*`/`state_out_*`)
+- [ ] **DECL-04**: User can specify hidden state tensor shapes per policy (not locked to `[1, 256]`)
+- [ ] **DECL-05**: Declarative inference config flows from Python scene_metadata to JS client automatically
 
-### Input Buffer Management
+### State Persistence
 
-- [ ] **IBUF-01**: Input buffer pruning is tied to `confirmedFrame` -- entries at or before `confirmedFrame` are pruned (replacing hardcoded `frameNumber - 60` threshold)
-- [ ] **IBUF-02**: The hardcoded `pruneThreshold` of `frameNumber - 60` is removed
-- [ ] **IBUF-03**: `inputBufferMaxSize` (120) is removed or made a safety-only cap, not the primary pruning mechanism
+- [ ] **STATE-01**: After ONNX inference, output state tensors are captured and cached for the next step
+- [ ] **STATE-02**: On next inference step, cached output state tensors are fed as input state tensors
+- [ ] **STATE-03**: Hidden states are initialized to zeros with the configured shape on first inference call
 
-### Configuration
+### Custom Inference
 
-- [ ] **CONF-01**: `snapshot_interval` parameter added to `GymScene.multiplayer()` builder method (default: 5)
-- [ ] **CONF-02**: JS constructor reads `config.snapshot_interval` with fallback to 5
+- [ ] **CUST-01**: User can provide an inline JS function string via Python builder API that handles inference
+- [ ] **CUST-02**: Custom inference function receives the ONNX session, observation, and model config as arguments
+- [ ] **CUST-03**: When custom inference function is specified, it takes precedence over the declarative path
 
 ### Verification
 
-- [ ] **VER-01**: All 52 existing tests pass after changes (27 unit + 25 E2E)
-- [ ] **VER-02**: Rollback correctness preserved -- multiplayer E2E tests with rollback scenarios still pass
+- [ ] **VER-01**: All existing tests pass with no regressions
+
+## v1.27 Requirements (Shipped)
+
+<details>
+<summary>Principled Rollback Management (10 requirements)</summary>
+
+### Snapshot Management
+
+- [x] **SNAP-01**: Snapshot pruning tied to `confirmedFrame`
+- [x] **SNAP-02**: `maxSnapshots` parameter removed
+- [x] **SNAP-03**: Anchor snapshot always retained
+
+### Input Buffer Management
+
+- [x] **IBUF-01**: Input buffer pruning tied to `confirmedFrame`
+- [x] **IBUF-02**: Hardcoded `pruneThreshold` removed
+- [x] **IBUF-03**: `inputBufferMaxSize` removed
+
+### Configuration
+
+- [x] **CONF-01**: `snapshot_interval` added to `GymScene.multiplayer()`
+- [x] **CONF-02**: JS constructor reads `config.snapshot_interval`
+
+### Verification
+
+- [x] **VER-01**: All existing tests pass
+- [x] **VER-02**: Rollback correctness preserved
+
+</details>
 
 ## Out of Scope
 
 | Feature | Reason |
 |---------|--------|
-| Adaptive snapshotInterval based on network | Over-engineering; fixed interval with config override is sufficient |
-| Delta-compressed snapshots | Separate optimization concern, different milestone |
-| Snapshot format changes | Current JSON serialization works; performance optimization is separate |
-| New rollback tests | Testing existing rollback behavior, not adding new test scenarios |
+| Softmax temperature / sampling params | Not needed for this milestone; can add later |
+| Observation preprocessing (normalization, reshaping) | Users can handle in custom function if needed |
+| Action masking | Separate concern, different milestone |
+| Non-ONNX model formats (TensorFlow.js, etc.) | ONNX is the only client-side format for now |
 
 ## Traceability
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SNAP-01 | Phase 87 | Pending |
-| SNAP-02 | Phase 87 | Pending |
-| SNAP-03 | Phase 87 | Pending |
-| IBUF-01 | Phase 87 | Pending |
-| IBUF-02 | Phase 87 | Pending |
-| IBUF-03 | Phase 87 | Pending |
-| CONF-01 | Phase 87 | Pending |
-| CONF-02 | Phase 87 | Pending |
-| VER-01 | Phase 88 | Pending |
-| VER-02 | Phase 88 | Pending |
+| DECL-01 | TBD | Pending |
+| DECL-02 | TBD | Pending |
+| DECL-03 | TBD | Pending |
+| DECL-04 | TBD | Pending |
+| DECL-05 | TBD | Pending |
+| STATE-01 | TBD | Pending |
+| STATE-02 | TBD | Pending |
+| STATE-03 | TBD | Pending |
+| CUST-01 | TBD | Pending |
+| CUST-02 | TBD | Pending |
+| CUST-03 | TBD | Pending |
+| VER-01 | TBD | Pending |
 
 **Coverage:**
-- v1.27 requirements: 10 total
-- Mapped to phases: 10
-- Unmapped: 0
+- v1.28 requirements: 12 total
+- Mapped to phases: 0
+- Unmapped: 12 (pending roadmap)
 
 ---
 *Requirements defined: 2026-02-11*
-*Last updated: 2026-02-11 -- roadmap created, traceability complete*
+*Last updated: 2026-02-11 after initial definition*
