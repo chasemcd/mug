@@ -90,7 +90,7 @@
 
 - [x] **Phase 89: Declarative Model Config** - Python builder API for ONNX tensor config with transport to JS client -- completed 2026-02-12
 - [x] **Phase 90: LSTM State Persistence** - JS runtime captures output hidden states and feeds them back on next inference -- completed 2026-02-12
-- [ ] **Phase 91: Custom Inference Escape Hatch** - Inline JS function override for full inference control
+- [x] **Phase 91: Custom Inference Escape Hatch** - Inline JS function override for full inference control -- completed 2026-02-12
 - [ ] **Phase 92: Verification** - All existing tests pass with no regressions
 
 ## Phase Details
@@ -132,7 +132,7 @@ Plans:
   3. When a custom inference function is specified for a policy, the declarative inference path is skipped entirely for that policy
 **Plans:** 1 plan
 Plans:
-- [ ] 91-01-PLAN.md -- Custom inference fn on ModelConfig (Python) + JS compilation and invocation
+- [x] 91-01-PLAN.md -- Custom inference fn on ModelConfig (Python) + JS compilation and invocation
 
 ### Phase 92: Verification
 **Goal**: All existing tests pass and no regressions were introduced by the inference configurability changes
@@ -156,8 +156,8 @@ Plans:
 | 87-88 | v1.27 | 2/2 | Complete | 2026-02-11 |
 | 89 | v1.28 | 2/2 | Complete | 2026-02-12 |
 | 90 | v1.28 | 1/1 | Complete | 2026-02-12 |
-| 91 | v1.28 | 0/? | Not started | - |
+| 91 | v1.28 | 1/1 | Complete | 2026-02-12 |
 | 92 | v1.28 | 0/? | Not started | - |
 
 ---
-*Roadmap updated: 2026-02-12 — Phase 90 complete*
+*Roadmap updated: 2026-02-12 — Phase 91 complete*
