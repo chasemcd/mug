@@ -17,27 +17,23 @@ Requires headed mode for WebRTC:
     pytest tests/e2e/test_waitroom_stress.py --headed -x -v
 """
 
+from __future__ import annotations
+
 import re
 import time
 from collections import defaultdict
 
 import pytest
 
-from tests.fixtures.game_helpers import (
-    wait_for_socket_connected,
-    click_advance_button,
-    click_start_button,
-    wait_for_game_canvas,
-    wait_for_game_object,
-    get_game_state,
-    wait_for_start_button_enabled,
-    wait_for_advance_button,
-    get_scene_id,
-)
+from tests.fixtures.export_helpers import wait_for_episode_with_parity
+from tests.fixtures.game_helpers import (click_advance_button,
+                                         click_start_button, get_game_state,
+                                         get_scene_id, wait_for_advance_button,
+                                         wait_for_game_canvas,
+                                         wait_for_game_object,
+                                         wait_for_socket_connected,
+                                         wait_for_start_button_enabled)
 from tests.fixtures.network_helpers import apply_latency, set_tab_visibility
-from tests.fixtures.export_helpers import (
-    wait_for_episode_with_parity,
-)
 
 # Experiment ID for the probe test server config
 PROBE_EXPERIMENT_ID = "overcooked_multiplayer_hh_probe_test"

@@ -1,12 +1,16 @@
 """"
 MountainCar renders an environment using libraries that aren't
-pure python. Here, we override the rgb_array rendering to 
+pure python. Here, we override the rgb_array rendering to
 use pure python in a way that will allow it to be run via Pyodide.
 """
 
+from __future__ import annotations
+
 import numpy as np
-from gymnasium.envs.classic_control.mountain_car import MountainCarEnv as _BaseMountainCarEnv
-from mug.configurations.object_contexts import Polygon, Circle, Line
+from gymnasium.envs.classic_control.mountain_car import \
+    MountainCarEnv as _BaseMountainCarEnv
+
+from mug.configurations.object_contexts import Circle, Line, Polygon
 
 
 class MountainCarEnv(_BaseMountainCarEnv):

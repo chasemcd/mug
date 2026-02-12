@@ -18,5 +18,3 @@
    content/getting_started_index
    content/core_concepts/index
    content/resources_index
-
-

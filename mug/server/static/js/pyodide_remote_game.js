@@ -7,7 +7,7 @@ export class RemoteGame {
     constructor(config) {
         this.setAttributes(config);
         this.installed_packages = [];
-        this.initialize(); 
+        this.initialize();
     }
 
     setAttributes(config) {
@@ -121,10 +121,10 @@ env
 
             if (new_packages.length > 0) {
                 await this.micropip.install(new_packages);
-                this.installed_packages.push(...new_packages);    
+                this.installed_packages.push(...new_packages);
             }
         }
-    
+
         // The code executed here must instantiate an environment `env`
         const env = await this.pyodide.runPythonAsync(`
 import js
@@ -357,7 +357,7 @@ obs, rewards, terminateds, truncateds, infos, render_state
             game_image_base64 = canvas.toDataURL('image/png'); // You can change 'image/png' to 'image/jpeg' if needed
         }
 
-        
+
 
         render_state = {
             "game_state_objects": game_image_base64 ? null : render_state.map(item => convertUndefinedToNull(item)),

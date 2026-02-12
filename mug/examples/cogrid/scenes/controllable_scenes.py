@@ -1,21 +1,15 @@
 from __future__ import annotations
 
-import eventlet
 import copy
+
+import eventlet
 
 eventlet.monkey_patch()
 
 
-from mug.configurations import (
-    configuration_constants,
-)
-from mug.examples.cogrid import (
-    overcooked_utils,
-)
-from mug.scenes import gym_scene
-from mug.scenes import static_scene
-from mug.scenes import scene
-
+from mug.configurations import configuration_constants
+from mug.examples.cogrid import overcooked_utils
+from mug.scenes import gym_scene, scene, static_scene
 
 SCENES_PER_SETTING = 1
 
@@ -171,11 +165,11 @@ tutorial_with_bot_scene = (
         scene_header="Overcooked",
         scene_body="""
         <center><p>
-        You'll now try playing with a partner for a single practice round. 
+        You'll now try playing with a partner for a single practice round.
         <br><br>
-        You will be playing on the layout pictured below. 
+        You will be playing on the layout pictured below.
         <center><img src="static/assets/overcooked/cramped_room.png" alt="Annotated Overcooked environment." height="270" width="315"></center>
-        
+
         <div style="display: flex; justify-content: center; align-items: center; gap: 40px; margin: 20px 0;">
         <div style="text-align: center;">
             <img src="static/assets/overcooked/blue_chef.png" alt="Chef with blue hat." width="24" height="32">
@@ -186,18 +180,18 @@ tutorial_with_bot_scene = (
             <p style="margin: 5px 0;">AI Chef</p>
         </div>
     </div>
-        
-        When the button activates, click it to begin. 
+
+        When the button activates, click it to begin.
         </p></center>
         """,
         game_page_html_fn=overcooked_utils.overcooked_game_page_header_fn,
         in_game_scene_body="""
         <center>
         <p>
-        Use the arrow keys <img src="static/assets/keys/arrow_keys_2.png" alt="Keyboard arrow keys" height="24" width="20" style="vertical-align:middle;"> 
-        to control your chef <img src="static/assets/overcooked/blue_chef.png" alt="Blue Chef" height="24" width="24" style="vertical-align:middle;"> 
-        and press <img src="static/assets/keys/icons8-w-key-50.png" alt="W key" height="24" width="24" style="vertical-align:middle;"> to pick up and 
-        drop objects. Try to deliver as many dishes as possible by combining onions in the pot, plating the cooked onions, 
+        Use the arrow keys <img src="static/assets/keys/arrow_keys_2.png" alt="Keyboard arrow keys" height="24" width="20" style="vertical-align:middle;">
+        to control your chef <img src="static/assets/overcooked/blue_chef.png" alt="Blue Chef" height="24" width="24" style="vertical-align:middle;">
+        and press <img src="static/assets/keys/icons8-w-key-50.png" alt="W key" height="24" width="24" style="vertical-align:middle;"> to pick up and
+        drop objects. Try to deliver as many dishes as possible by combining onions in the pot, plating the cooked onions,
         and delivering them to the grey delivery zone.
         </p>
         </center>
@@ -250,10 +244,10 @@ base_controllable_ = (
         in_game_scene_body="""
         <center>
         <p>
-        Use the arrow keys <img src="static/assets/keys/arrow_keys_2.png" alt="Keyboard arrow keys" height="24" width="20" style="vertical-align:middle;"> 
-        to control your chef <img src="static/assets/overcooked/blue_chef.png" alt="Blue Chef" height="24" width="24" style="vertical-align:middle;"> 
-        and press <img src="static/assets/keys/icons8-w-key-50.png" alt="W key" height="24" width="24" style="vertical-align:middle;"> to pick up and 
-        drop objects. Try to deliver as many dishes as possible by combining onions in the pot, plating the cooked onions, 
+        Use the arrow keys <img src="static/assets/keys/arrow_keys_2.png" alt="Keyboard arrow keys" height="24" width="20" style="vertical-align:middle;">
+        to control your chef <img src="static/assets/overcooked/blue_chef.png" alt="Blue Chef" height="24" width="24" style="vertical-align:middle;">
+        and press <img src="static/assets/keys/icons8-w-key-50.png" alt="W key" height="24" width="24" style="vertical-align:middle;"> to pick up and
+        drop objects. Try to deliver as many dishes as possible by combining onions in the pot, plating the cooked onions,
         and delivering them to the grey delivery zone.
         </p>
         <div style="border: 1px solid black; padding: 10px; display: inline-block;">
@@ -263,13 +257,13 @@ base_controllable_ = (
         <script>
             function getControlText(value) {
                 if (value === -1) return "<span style='color: red'>Discourage</span>";
-                if (value === 1) return "<span style='color: green'>Encourage</span>"; 
+                if (value === 1) return "<span style='color: green'>Encourage</span>";
                 if (value === 0) return "<span style='color: #b3a600'>Neutral</span>";
                 return value;
             }
 
 
-            document.getElementById('reward-status').innerHTML = 
+            document.getElementById('reward-status').innerHTML =
                 "Delivering Dishes: " + getControlText(window.interactiveGymGlobals.delivery_act_reward) + ", " +
                 "Onions in Pot: " + getControlText(window.interactiveGymGlobals.onion_in_pot_reward);
         </script>
@@ -349,10 +343,10 @@ base_nospec_ = (
         in_game_scene_body="""
         <center>
         <p>
-        Use the arrow keys <img src="static/assets/keys/arrow_keys_2.png" alt="Keyboard arrow keys" height="24" width="20" style="vertical-align:middle;"> 
-        to control your chef <img src="static/assets/overcooked/blue_chef.png" alt="Blue Chef" height="24" width="24" style="vertical-align:middle;"> 
-        and press <img src="static/assets/keys/icons8-w-key-50.png" alt="W key" height="24" width="24" style="vertical-align:middle;"> to pick up and 
-        drop objects. Try to deliver as many dishes as possible by combining onions in the pot, plating the cooked onions, 
+        Use the arrow keys <img src="static/assets/keys/arrow_keys_2.png" alt="Keyboard arrow keys" height="24" width="20" style="vertical-align:middle;">
+        to control your chef <img src="static/assets/overcooked/blue_chef.png" alt="Blue Chef" height="24" width="24" style="vertical-align:middle;">
+        and press <img src="static/assets/keys/icons8-w-key-50.png" alt="W key" height="24" width="24" style="vertical-align:middle;"> to pick up and
+        drop objects. Try to deliver as many dishes as possible by combining onions in the pot, plating the cooked onions,
         and delivering them to the grey delivery zone.
         </p>
         </center>
@@ -390,10 +384,10 @@ base_choice_ = (
         in_game_scene_body="""
         <center>
         <p>
-        Use the arrow keys <img src="static/assets/keys/arrow_keys_2.png" alt="Keyboard arrow keys" height="24" width="20" style="vertical-align:middle;"> 
-        to control your chef <img src="static/assets/overcooked/blue_chef.png" alt="Blue Chef" height="24" width="24" style="vertical-align:middle;"> 
-        and press <img src="static/assets/keys/icons8-w-key-50.png" alt="W key" height="24" width="24" style="vertical-align:middle;"> to pick up and 
-        drop objects. Try to deliver as many dishes as possible by combining onions in the pot, plating the cooked onions, 
+        Use the arrow keys <img src="static/assets/keys/arrow_keys_2.png" alt="Keyboard arrow keys" height="24" width="20" style="vertical-align:middle;">
+        to control your chef <img src="static/assets/overcooked/blue_chef.png" alt="Blue Chef" height="24" width="24" style="vertical-align:middle;">
+        and press <img src="static/assets/keys/icons8-w-key-50.png" alt="W key" height="24" width="24" style="vertical-align:middle;"> to pick up and
+        drop objects. Try to deliver as many dishes as possible by combining onions in the pot, plating the cooked onions,
         and delivering them to the grey delivery zone.
         </p>
         <div id="behavior-settings" style="border: 1px solid black; padding: 10px; display: inline-block;">
@@ -403,7 +397,7 @@ base_choice_ = (
         <script>
             function getControlText(value) {
                 if (value === -1) return "<span style='color: red'>Discourage</span>";
-                if (value === 1) return "<span style='color: green'>Encourage</span>"; 
+                if (value === 1) return "<span style='color: green'>Encourage</span>";
                 if (value === 0) return "<span style='color: #b3a600'>Neutral</span>";
                 return value;
             }
@@ -411,7 +405,7 @@ base_choice_ = (
             if (window.interactiveGymGlobals.partner_mode === "noSpec") {
                 document.getElementById('behavior-settings').style.display = 'none';
             } else {
-                document.getElementById('reward-status').innerHTML = 
+                document.getElementById('reward-status').innerHTML =
                     "Delivering Dishes: " + getControlText(window.interactiveGymGlobals.delivery_act_reward) + ", " +
                     "Onions in Pot: " + getControlText(window.interactiveGymGlobals.onion_in_pot_reward);
             }

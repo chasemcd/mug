@@ -1,30 +1,18 @@
 from __future__ import annotations
 
 import dataclasses
+
 import eventlet
 
 eventlet.monkey_patch()
 
 import argparse
 
-from mug.server import app
-from mug.scenes import scene
-from mug.scenes import stager
-from mug.examples.cogrid.scenes import (
-    scenes as oc_scenes,
-)
-from mug.scenes import static_scene
-
-from mug.configurations import experiment_config
-from mug.scenes import gym_scene
-from mug.scenes import static_scene
-from mug.scenes import scene
-
-
-from mug.configurations import (
-    configuration_constants,
-)
+from mug.configurations import configuration_constants, experiment_config
 from mug.configurations.configuration_constants import ModelConfig
+from mug.examples.cogrid.scenes import scenes as oc_scenes
+from mug.scenes import gym_scene, scene, stager, static_scene
+from mug.server import app
 
 SLIMEVB_MODEL_CONFIG = ModelConfig(
     obs_input="obs",

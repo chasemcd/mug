@@ -7,6 +7,8 @@ Covers all four success criteria from the v1.21 roadmap:
 4. find_match() does NOT exclude candidates with rtt_ms=None (graceful fallback)
 """
 
+from __future__ import annotations
+
 from mug.server.matchmaker import LatencyFIFOMatchmaker, MatchCandidate
 
 

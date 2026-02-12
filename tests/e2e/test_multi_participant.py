@@ -18,19 +18,18 @@ Requires headed mode for WebRTC:
 
 Or set PWHEADED=1 environment variable.
 """
-import pytest
+from __future__ import annotations
+
 import time
 
-from tests.fixtures.multi_participant import GameOrchestrator
-from tests.fixtures.game_helpers import (
-    wait_for_socket_connected,
-    click_advance_button,
-    click_start_button,
-    wait_for_game_canvas,
-    get_game_state,
-)
-from tests.fixtures.network_helpers import set_tab_visibility
+import pytest
 
+from tests.fixtures.game_helpers import (click_advance_button,
+                                         click_start_button, get_game_state,
+                                         wait_for_game_canvas,
+                                         wait_for_socket_connected)
+from tests.fixtures.multi_participant import GameOrchestrator
+from tests.fixtures.network_helpers import set_tab_visibility
 
 # =============================================================================
 # STRESS-01: Multi-Participant Infrastructure Validation

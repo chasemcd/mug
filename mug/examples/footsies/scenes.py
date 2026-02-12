@@ -6,21 +6,11 @@ eventlet.monkey_patch()
 
 import argparse
 import copy
-from mug.server import app
-from mug.scenes import scene
-from mug.scenes import stager
-from mug.scenes import static_scene
 
-from mug.configurations import experiment_config
-from mug.scenes import unity_scene
-from mug.scenes import static_scene
-from mug.scenes import scene
-
-from mug.configurations import (
-    configuration_constants,
-)
+from mug.configurations import configuration_constants, experiment_config
 from mug.examples.footsies import footsies_scene
-
+from mug.scenes import scene, stager, static_scene, unity_scene
+from mug.server import app
 
 FOOTSIES_BUILD_NAME = "footsies_webgl_47f26fc"
 BONUS_PER_WIN = 0.20
@@ -70,7 +60,7 @@ footsies_tutorial_scene = (
     )
 )
 
-CONTROLS_SUBHEADER = """ 
+CONTROLS_SUBHEADER = """
         <div style="text-align: center; font-family: 'Press Start 2P', cursive; padding: 8px; color: #000;">
         <p style="margin: 10px;">
         MOVE WITH <img src="static/assets/keys/icons8-a-key-50.png" alt="A key" height="24" width="24" style="vertical-align:middle;"> AND <img src="static/assets/keys/icons8-d-key-50.png" alt="D key" height="24" width="24" style="vertical-align:middle;">
@@ -229,13 +219,13 @@ footsies_training_scene_intro = (
         scene_header="Footsies",
         scene_body="""
     <div style="text-align: center; font-family: 'Press Start 2P', cursive; padding: 8px;">
-        <p>You'll now play 45 rounds against a CPU training partner. Remember, your goal is to build up your skill as much as 
-        possible to maximize your bonus in the final challenge rounds. <span style="color: red;">You will not earn a bonus for winning in these rounds</span>. 
-        
+        <p>You'll now play 45 rounds against a CPU training partner. Remember, your goal is to build up your skill as much as
+        possible to maximize your bonus in the final challenge rounds. <span style="color: red;">You will not earn a bonus for winning in these rounds</span>.
+
         <br>
         <br>
         When the game loads on the next screen, click "vs CPU" to start.
-        
+
         </p>
     </div>
     """,
@@ -435,8 +425,8 @@ footsies_controllable_difficulty_scene_intro = static_scene.StaticScene().displa
     scene_header="Footsies",
     scene_body="""
     <div style="text-align: center; font-family: 'Press Start 2P', cursive; padding: 8px;">
-        <p>You'll now play 45 rounds against a CPU training partner. You will be able to control the difficulty by using the slider on the next page. Remember, your goal is to build up your skill as much as 
-        possible to maximize your bonus in the final challenge rounds. <span style="color: red;">You will not earn a bonus for winning in these rounds</span> 
+        <p>You'll now play 45 rounds against a CPU training partner. You will be able to control the difficulty by using the slider on the next page. Remember, your goal is to build up your skill as much as
+        possible to maximize your bonus in the final challenge rounds. <span style="color: red;">You will not earn a bonus for winning in these rounds</span>
         <br>
         <br>
         When the game loads on the next screen, click "vs CPU" to start.
@@ -509,14 +499,14 @@ footsies_training_survey_scene = (
 footsies_mc_survey = (
     static_scene.MultipleChoice(
         pre_questions_header="""
-    In this survey, we'll ask about what you learned about the game. Specifically in how controls result in particular actions in the game. Please select all that apply for each option. 
-    You will earn an aditional bonus of $0.10 for each question that you answer correctly.
+    In this survey, we'll ask about what you learned about the game. Specifically in how controls result in particular actions in the game. Please select all that apply for each option.
+    You will earn an additional bonus of $0.10 for each question that you answer correctly.
     <br>
     <br>
-    The answer correspond to key press sequence or single pressses. For example 
+    The answer correspond to key press sequence or single pressses. For example
     <img src='static/assets/keys/icons8-d-key-50.png' alt='D key' height='24' width='24' style='vertical-align:middle;'> -> <img src='static/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'>
     means pressing the "D" key followed by the space bar. On the other hand, <img src='static/assets/keys/icons8-d-key-50.png' alt='D key' height='24' width='24' style='vertical-align:middle;'> + <img src='static/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'> means
-    pressing the "D" key and the space bar at the same time. 
+    pressing the "D" key and the space bar at the same time.
     """,
         questions=[
             "What key press(es) result in this movement?",

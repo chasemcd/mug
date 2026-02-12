@@ -1,15 +1,14 @@
 from __future__ import annotations
 
-
-from typing import Any, Callable
 import copy
 import json
+from typing import Any, Callable
 
-from mug.scenes import scene
-from mug.configurations import remote_config
-from mug.configurations import configuration_constants
-from mug.utils.sentinels import NotProvided
 import flask_socketio
+
+from mug.configurations import configuration_constants, remote_config
+from mug.scenes import scene
+from mug.utils.sentinels import NotProvided
 
 
 class UnityScene(scene.Scene):
@@ -79,7 +78,7 @@ class UnityScene(scene.Scene):
                 scene_body is NotProvided
             ), "Cannot set both filepath and html_body."
 
-            with open(scene_body_filepath, "r", encoding="utf-8") as f:
+            with open(scene_body_filepath, encoding="utf-8") as f:
                 self.scene_body = f.read()
 
         if scene_body is not NotProvided:

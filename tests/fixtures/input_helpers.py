@@ -14,6 +14,8 @@ Action mapping (from controllable_scenes.py):
 - (no key) -> Noop (6)
 """
 
+from __future__ import annotations
+
 # Key constants matching controllable_scenes.py action mapping
 MOVEMENT_KEYS = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"]
 ACTION_KEYS = ["w", "q"]

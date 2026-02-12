@@ -383,8 +383,8 @@ class RemoteConfig:
                             Falls back to TURN_CREDENTIAL env var if not provided.
             force_relay: Force relay mode (for testing TURN without direct P2P)
         """
-        import os
         import logging
+        import os
 
         logger = logging.getLogger(__name__)
 

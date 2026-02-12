@@ -18,6 +18,8 @@ Compare mode (Phase 39: VERIFY-01):
     python scripts/validate_action_sequences.py --compare file1.csv file2.csv --verbose
 """
 
+from __future__ import annotations
+
 import argparse
 import csv
 import sys
@@ -52,7 +54,7 @@ COLUMNS_EXCLUDE_FROM_COMPARE = {
 
 def load_csv(filepath: Path) -> tuple[list[str], list[dict]]:
     """Load a CSV file and return (headers, list of row dicts)."""
-    with open(filepath, "r", newline="", encoding="utf-8") as f:
+    with open(filepath, newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         headers = reader.fieldnames or []
         rows = list(reader)

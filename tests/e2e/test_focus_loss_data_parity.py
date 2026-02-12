@@ -7,32 +7,28 @@ sessions within a single module, causing Page.goto timeouts on the 5th test.
 By placing this test in its own module, it gets a fresh server instance via the
 existing module-scoped fixture in conftest.py.
 """
+from __future__ import annotations
+
 import os
 import shutil
 import time
+
 import pytest
 
-from tests.fixtures.export_helpers import (
-    get_experiment_id,
-    get_subject_ids_from_pages,
-    wait_for_export_files,
-    run_comparison,
-)
-from tests.fixtures.game_helpers import (
-    wait_for_socket_connected,
-    wait_for_game_canvas,
-    wait_for_game_object,
-    wait_for_episode_complete,
-    get_game_state,
-    click_advance_button,
-    click_start_button,
-    get_scene_id,
-    run_full_episode_flow_until_gameplay,
-)
-from tests.fixtures.network_helpers import (
-    set_tab_visibility,
-    wait_for_focus_manager_state,
-)
+from tests.fixtures.export_helpers import (get_experiment_id,
+                                           get_subject_ids_from_pages,
+                                           run_comparison,
+                                           wait_for_export_files)
+from tests.fixtures.game_helpers import (click_advance_button,
+                                         click_start_button, get_game_state,
+                                         get_scene_id,
+                                         run_full_episode_flow_until_gameplay,
+                                         wait_for_episode_complete,
+                                         wait_for_game_canvas,
+                                         wait_for_game_object,
+                                         wait_for_socket_connected)
+from tests.fixtures.network_helpers import (set_tab_visibility,
+                                            wait_for_focus_manager_state)
 
 
 @pytest.fixture

@@ -36,7 +36,7 @@ class MatchCandidate:
 
     subject_id: str
     rtt_ms: int | None = None
-    group_history: "GroupHistory | None" = None  # Phase 78: group history for re-pairing
+    group_history: GroupHistory | None = None  # Phase 78: group history for re-pairing
 
 
 @dataclass

@@ -22,14 +22,10 @@ eventlet.monkey_patch()
 import argparse
 import copy
 
-from mug.server import app
-from mug.scenes import stager
-from mug.examples.cogrid.scenes import (
-    scenes as oc_scenes,
-)
-
 from mug.configurations import experiment_config
-
+from mug.examples.cogrid.scenes import scenes as oc_scenes
+from mug.scenes import stager
+from mug.server import app
 
 stager = stager.Stager(
     scenes=[

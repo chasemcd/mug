@@ -1,9 +1,9 @@
 Overcooked: Human-AI (Client-Side)
 ===================================
 
-Human-AI coordination experiment where one human player collaborates with an AI teammate to prepare and deliver dishes. The environment runs client-side with AI policy inference in the browser or on the server. In the example, we show Experiment 1 from from [McDonald & Gonzalez (2025)](https://arxiv.org/abs/2503.05455). 
-It represents an experiment where humans play with two different AI partners, produced by two separate algorithms. Participants play 
-with the agents across layouts and their subjective preferences between the two are evaluated, alongside survey responses. 
+Human-AI coordination experiment where one human player collaborates with an AI teammate to prepare and deliver dishes. The environment runs client-side with AI policy inference in the browser or on the server. In the example, we show Experiment 1 from from [McDonald & Gonzalez (2025)](https://arxiv.org/abs/2503.05455).
+It represents an experiment where humans play with two different AI partners, produced by two separate algorithms. Participants play
+with the agents across layouts and their subjective preferences between the two are evaluated, alongside survey responses.
 
 Overview
 --------

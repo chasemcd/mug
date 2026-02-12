@@ -80,7 +80,7 @@
 
 <script>
     const slider = document.getElementById('difficultySlider');
-    
+
     slider.addEventListener('change', function() {
         const difficulty = parseInt(this.value);
         window.socket.emit('client_callback', {"type": "updateFootsiesDifficulty", "difficulty": difficulty});

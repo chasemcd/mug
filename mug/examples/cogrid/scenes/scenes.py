@@ -1,24 +1,18 @@
 from __future__ import annotations
 
-import dataclasses
-import eventlet
 import copy
+import dataclasses
+
+import eventlet
 
 eventlet.monkey_patch()
 
 
-from mug.configurations import (
-    configuration_constants,
-)
+from mug.configurations import configuration_constants
 from mug.configurations.configuration_constants import ModelConfig
-from mug.examples.cogrid import (
-    overcooked_utils,
-)
-from mug.scenes import gym_scene
-from mug.scenes import static_scene
-from mug.scenes import scene
+from mug.examples.cogrid import overcooked_utils
+from mug.scenes import gym_scene, scene, static_scene
 from mug.server.matchmaker import FIFOMatchmaker
-
 
 # Constants for controls/actions/etc.
 MoveUp = 0

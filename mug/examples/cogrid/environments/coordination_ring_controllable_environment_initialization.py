@@ -1,43 +1,26 @@
+from __future__ import annotations
+
+import collections
+import copy
+import dataclasses
 import functools
 import random
 from typing import Any
 
-from cogrid.envs import overcooked
-import functools
-
-from cogrid.envs.overcooked import overcooked
-from cogrid.envs import registry
-from cogrid.feature_space import feature_space
-from cogrid.core import layouts
-import collections
-from cogrid.core import layouts
-
-
-import copy
-from cogrid.feature_space import feature
-from cogrid.feature_space import features
-from cogrid.feature_space import feature_space
-from cogrid.core import grid_utils
-from cogrid import cogrid_env
-from cogrid.core import grid_object
-from cogrid.envs.overcooked import overcooked_grid_objects
-from cogrid.envs.overcooked import rewards as overcooked_rewards
-from cogrid.envs.overcooked import overcooked_features
-from cogrid.core import typing as cogrid_typing
 import numpy as np
-from cogrid.core import reward
-from cogrid.core import reward
+from cogrid import cogrid_env
 from cogrid.core import actions as cogrid_actions
-from cogrid.core.grid import Grid
-from cogrid.envs.overcooked import overcooked_grid_objects
+from cogrid.core import grid_object, grid_utils, layouts, reward
 from cogrid.core import typing
-import dataclasses
+from cogrid.core import typing as cogrid_typing
+from cogrid.core.grid import Grid
+from cogrid.envs import overcooked, registry
+from cogrid.envs.overcooked import (overcooked, overcooked_features,
+                                    overcooked_grid_objects)
+from cogrid.envs.overcooked import rewards as overcooked_rewards
+from cogrid.feature_space import feature, feature_space, features
 
-
-from mug.configurations.object_contexts import (
-    Sprite,
-    Text,
-)
+from mug.configurations.object_contexts import Sprite, Text
 
 
 class BehaviorFeatures(feature.Feature):

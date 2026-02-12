@@ -10,6 +10,9 @@ This conftest.py uses pytest-playwright's --headed option by default.
 """
 
 
+from __future__ import annotations
+
+
 def pytest_configure(config):
     """Force headed mode for E2E tests."""
     # Only set if not explicitly provided by user

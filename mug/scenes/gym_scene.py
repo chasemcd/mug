@@ -1,17 +1,15 @@
 from __future__ import annotations
 
-
-from typing import Any, Callable, TYPE_CHECKING
 import copy
 import json
+from typing import TYPE_CHECKING, Any, Callable
 
 if TYPE_CHECKING:
     from mug.server.matchmaker import Matchmaker
 
-from mug.scenes import scene
-from mug.configurations import remote_config
-from mug.configurations import configuration_constants
+from mug.configurations import configuration_constants, remote_config
 from mug.configurations.configuration_constants import ModelConfig
+from mug.scenes import scene
 from mug.utils.sentinels import NotProvided
 
 
@@ -171,7 +169,7 @@ class GymScene(scene.Scene):
 
         # Matchmaking settings
         self.matchmaking_max_rtt: int | None = None  # Max RTT difference (ms) between paired participants
-        self._matchmaker: "Matchmaker | None" = None  # Custom matchmaker, None uses default FIFO
+        self._matchmaker: Matchmaker | None = None  # Custom matchmaker, None uses default FIFO
 
         # Player group settings (for multiplayer games)
         # Groups are always tracked automatically after each game completes.
@@ -546,7 +544,7 @@ class GymScene(scene.Scene):
                 scene_body is NotProvided
             ), "Cannot set both filepath and html_body."
 
-            with open(scene_body_filepath, "r", encoding="utf-8") as f:
+            with open(scene_body_filepath, encoding="utf-8") as f:
                 self.scene_body = f.read()
 
         if scene_body is not NotProvided:
@@ -560,7 +558,7 @@ class GymScene(scene.Scene):
                 in_game_scene_body is NotProvided
             ), "Cannot set both filepath and html_body."
 
-            with open(in_game_scene_body_filepath, "r", encoding="utf-8") as f:
+            with open(in_game_scene_body_filepath, encoding="utf-8") as f:
                 self.in_game_scene_body = f.read()
 
         if in_game_scene_body is not NotProvided:
@@ -609,7 +607,7 @@ class GymScene(scene.Scene):
         self,
         hide_lobby_count: bool = NotProvided,
         max_rtt: int = NotProvided,
-        matchmaker: "Matchmaker" = NotProvided,
+        matchmaker: Matchmaker = NotProvided,
     ):
         """Configure matchmaking and lobby settings for the GymScene.
 
@@ -656,7 +654,7 @@ class GymScene(scene.Scene):
         return self
 
     @property
-    def matchmaker(self) -> "Matchmaker | None":
+    def matchmaker(self) -> Matchmaker | None:
         """Return configured matchmaker, or None for default FIFO."""
         return self._matchmaker
 
@@ -703,7 +701,7 @@ class GymScene(scene.Scene):
                 environment_initialization_code is NotProvided
             ), "Cannot set both filepath and code!"
             with open(
-                environment_initialization_code_filepath, "r", encoding="utf-8"
+                environment_initialization_code_filepath, encoding="utf-8"
             ) as f:
                 self.environment_initialization_code = f.read()
 
@@ -734,7 +732,7 @@ class GymScene(scene.Scene):
         # Matchmaking params (from matchmaking)
         hide_lobby_count: bool = NotProvided,
         max_rtt: int = NotProvided,
-        matchmaker: "Matchmaker" = NotProvided,
+        matchmaker: Matchmaker = NotProvided,
         # Player grouping params (from player_grouping)
         wait_for_known_group: bool = NotProvided,
         group_wait_timeout: int = NotProvided,

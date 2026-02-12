@@ -25,7 +25,7 @@
             </div>
         </div>
         <div style="margin-bottom: 40px;"></div>
-        
+
         <div id="control-panel" style="display: none;">
             <div class="scale-question" style="margin-bottom: 15px; text-align: center;">
                 <p style="margin: 0 0 10px 0;">Delivering Dishes <span style="color: red;">*</span></p>
@@ -81,7 +81,7 @@
         deliveryRadio.checked = true;
         deliveryRadio.nextElementSibling.style.background = 'rgba(0, 123, 255, 0.3)';
         window.interactiveGymGlobals.delivery_act_reward = window.interactiveGymGlobals.fixedControls.delivery_act_reward;
-        
+
         const onionRadio = document.querySelector(`input[name="onion_in_pot_reward"][value="${window.interactiveGymGlobals.fixedControls.onion_in_pot_reward}"]`);
         onionRadio.checked = true;
         onionRadio.nextElementSibling.style.background = 'rgba(0, 123, 255, 0.3)';
@@ -90,7 +90,7 @@
 
     function checkStartButtonState() {
         const mode = document.querySelector('input[name="partner-mode"]:checked')?.value;
-        
+
         if (!window.startConditionMet) {
             startButton.disabled = true;
             return;
@@ -109,7 +109,7 @@
         const mode = document.querySelector('input[name="partner-mode"]:checked')?.value;
         const radioButtons = document.querySelectorAll('input[type="radio"]');
         const controlPanel = document.getElementById('control-panel');
-        
+
         window.interactiveGymGlobals.partner_mode = mode;
 
         if (!mode) {
@@ -148,7 +148,7 @@
             window.interactiveGymGlobals.delivery_act_reward = window.interactiveGymGlobals.hiddenControls.delivery_act_reward;
             window.interactiveGymGlobals.onion_in_pot_reward = window.interactiveGymGlobals.hiddenControls.onion_in_pot_reward;
         }
-        
+
         checkStartButtonState();
     }
 
@@ -176,12 +176,12 @@
             window.interactiveGymGlobals = {};
         }
         window.interactiveGymGlobals[key] = parseFloat(value);
-        
+
         const radioGroup = document.querySelectorAll(`input[name="${key}"]`);
         radioGroup.forEach(radio => {
             radio.nextElementSibling.style.background = 'transparent';
         });
-        
+
         const selectedRadio = document.querySelector(`input[name="${key}"][value="${value}"]`);
         if (selectedRadio.disabled) {
             selectedRadio.nextElementSibling.style.background = 'rgba(0, 123, 255, 0.3)';
@@ -197,5 +197,5 @@
 
     </script>
 
-When the button activates, click it to begin. 
+When the button activates, click it to begin.
 </p></center>

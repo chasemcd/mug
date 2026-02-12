@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+
 class _NotProvided:
     """Singleton class to provide a "not provided" value for Scene and config signatures.
 

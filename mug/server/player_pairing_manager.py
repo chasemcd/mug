@@ -9,13 +9,13 @@ Supports groups of any size (2 or more players).
 from __future__ import annotations
 
 import dataclasses
+import threading
 import time
 import uuid
-import threading
 from typing import TYPE_CHECKING
 
 from mug.server import thread_safe_collections
-from mug.utils.typing import SubjectID, SceneID
+from mug.utils.typing import SceneID, SubjectID
 
 if TYPE_CHECKING:
     pass

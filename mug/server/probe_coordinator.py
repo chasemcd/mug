@@ -53,7 +53,7 @@ class ProbeCoordinator:
         self.turn_credential = turn_credential
 
         # Active probe sessions: probe_session_id -> ProbeSession dict
-        self.probe_sessions: Dict[str, Dict[str, Any]] = {}
+        self.probe_sessions: dict[str, dict[str, Any]] = {}
 
         # Timeout for entire probe lifecycle (15 seconds default)
         self.probe_timeout_s = 15.0

@@ -22,16 +22,11 @@ eventlet.monkey_patch()
 
 import argparse
 
+from mug.configurations import experiment_config
+from mug.examples.cogrid.scenes import scenes as oc_scenes
+from mug.scenes import stager, static_scene
 from mug.server import app
 from mug.server.matchmaker import FIFOMatchmaker
-from mug.scenes import stager
-from mug.examples.cogrid.scenes import (
-    scenes as oc_scenes,
-)
-from mug.scenes import static_scene
-
-from mug.configurations import experiment_config
-
 
 hh_start_scene = (
     static_scene.StartScene()

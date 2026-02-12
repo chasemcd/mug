@@ -13,7 +13,7 @@
 
     <p>
         One of the partners you'll be playing with will be controllable by you. You can control the behavior of this partner across two dimensions: delivering dishes or putting onions in the pot.
-        You'll have the opportunity to adjust the behaviors at the beginning of each round that you interact with them. The other partners will have fixed behaviors. One of them has pre-set behaviors (which remain fixed throughout the 
+        You'll have the opportunity to adjust the behaviors at the beginning of each round that you interact with them. The other partners will have fixed behaviors. One of them has pre-set behaviors (which remain fixed throughout the
         experiment) and the other has no specific behavioral settings.
     </p>
 
@@ -38,15 +38,15 @@
 
         // Initialize the values to 0
         window.interactiveGymGlobals.delivery_act_reward = 0;
-        window.interactiveGymGlobals.onion_in_pot_reward = 0; 
-        
-        
+        window.interactiveGymGlobals.onion_in_pot_reward = 0;
+
+
         // Initialize fixedControls with random values
         // Helper function to generate random values ensuring only one -1
         function generateRandomPair() {
             const values = [-1, 0, 1];
             let delivery, onion;
-            
+
             // Randomly decide which value might be -1
             if (Math.random() < 0.5) {
                 delivery = values[Math.floor(Math.random() * values.length)];
@@ -57,27 +57,27 @@
                 // If onion is -1, delivery can only be 0 or 1
                 delivery = onion === -1 ? [0, 1][Math.floor(Math.random() * 2)] : values[Math.floor(Math.random() * values.length)];
             }
-            
+
             return {delivery_act_reward: delivery, onion_in_pot_reward: onion};
         }
-        
+
         // Initialize fixedControls with random values
         window.interactiveGymGlobals.fixedControls = generateRandomPair();
-        
-        // Initialize hiddenControls with random values 
+
+        // Initialize hiddenControls with random values
         window.interactiveGymGlobals.hiddenControls = generateRandomPair();
-        
+
             // Function to randomly select initial radio values and highlight selected buttons
         function setFixedValues() {
             const deliveryValue = window.interactiveGymGlobals.fixedControls.delivery_act_reward;
             const onionValue = window.interactiveGymGlobals.fixedControls.onion_in_pot_reward;
-            
+
             // Set delivery radio and highlight
             const deliveryRadio = document.querySelector(`input[name="delivery_act_reward"][value="${deliveryValue}"]`);
             deliveryRadio.checked = true;
             deliveryRadio.nextElementSibling.style.background = 'rgba(0, 123, 255, 0.3)';
             window.interactiveGymGlobals.delivery_act_reward = deliveryValue;
-            
+
             // Set onion radio and highlight
             const onionRadio = document.querySelector(`input[name="onion_in_pot_reward"][value="${onionValue}"]`);
             onionRadio.checked = true;
@@ -92,8 +92,8 @@
             window.interactiveGymGlobals.delivery_act_reward = deliveryValue;
             window.interactiveGymGlobals.onion_in_pot_reward = onionValue;
         }
-        
-        
+
+
         </script>
 
 

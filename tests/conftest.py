@@ -15,6 +15,8 @@ gathering limitations. Run E2E tests with:
 Or set PWHEADED=1 environment variable.
 """
 
+from __future__ import annotations
+
 import os
 import signal
 import socket
@@ -23,7 +25,6 @@ import time
 from http.client import HTTPConnection
 
 import pytest
-
 
 # ---------------------------------------------------------------------------
 # Shared server lifecycle helpers

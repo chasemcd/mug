@@ -11,24 +11,25 @@ Tests validate STRESS-02 through STRESS-07 requirements:
 Requires headed mode for WebRTC:
     pytest tests/e2e/test_lifecycle_stress.py --headed
 """
-import pytest
+from __future__ import annotations
+
 import time
+
+import pytest
 from playwright.sync_api import Error as PlaywrightError
 
-from tests.fixtures.multi_participant import GameOrchestrator, get_page_state, log_page_state
-from tests.fixtures.game_helpers import (
-    run_full_episode_flow_until_gameplay,
-    wait_for_episode_complete,
-    get_game_state,
-    wait_for_socket_connected,
-    click_advance_button,
-    click_start_button,
-    wait_for_game_canvas,
-    wait_for_waitroom,
-    wait_for_game_object,
-)
-from tests.fixtures.network_helpers import set_tab_visibility, wait_for_focus_manager_state
-
+from tests.fixtures.game_helpers import (click_advance_button,
+                                         click_start_button, get_game_state,
+                                         run_full_episode_flow_until_gameplay,
+                                         wait_for_episode_complete,
+                                         wait_for_game_canvas,
+                                         wait_for_game_object,
+                                         wait_for_socket_connected,
+                                         wait_for_waitroom)
+from tests.fixtures.multi_participant import (GameOrchestrator, get_page_state,
+                                              log_page_state)
+from tests.fixtures.network_helpers import (set_tab_visibility,
+                                            wait_for_focus_manager_state)
 
 # =============================================================================
 # STRESS-02: Multi-Episode Completion Without State Corruption
@@ -522,12 +523,10 @@ def test_mixed_lifecycle_scenarios(multi_participant_contexts, flask_server_fres
     # Note: We manually validate instead of using orchestrator.validate_all_data_parity()
     # because Game 2 was intentionally disconnected
 
-    from tests.fixtures.export_helpers import (
-        get_experiment_id,
-        get_subject_ids_from_pages,
-        wait_for_export_files,
-        run_comparison,
-    )
+    from tests.fixtures.export_helpers import (get_experiment_id,
+                                               get_subject_ids_from_pages,
+                                               run_comparison,
+                                               wait_for_export_files)
     from tests.fixtures.game_helpers import get_scene_id
 
     experiment_id = get_experiment_id()

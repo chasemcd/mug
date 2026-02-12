@@ -7,7 +7,10 @@ making tests cleaner and more maintainable.
 Note: The game object is exposed via window.game (defined in index.js).
 For multiplayer, this is an instance of MultiplayerPyodideGame.
 """
+from __future__ import annotations
+
 from playwright.sync_api import Page
+
 from tests.fixtures.network_helpers import set_tab_visibility
 
 

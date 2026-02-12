@@ -112,16 +112,16 @@ async function inferenceONNXPolicy(policyID, observation, modelConfig, agentID) 
 
     // If there are any image observations, make sure that they are appropriately shaped
     // toJs will return an Array full of Array objects, but we need a single 3-D array
-    
+
     // Load the model if not already loaded
     if (!loadedModels[policyID]) {
         loadedModels[policyID] = await window.ort.InferenceSession.create(
             policyID, {executionProviders: ["wasm"],}
           );
     }
-    
+
     const session = loadedModels[policyID];
-    
+
     // If the observation is a dictionary, flatten all the values into a single array
     if (typeof observation === 'object' && !Array.isArray(observation)) {
         observation = flattenObservation(observation);
