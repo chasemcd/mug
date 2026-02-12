@@ -118,7 +118,9 @@ Plans:
   1. After an ONNX inference call, the output state tensors (e.g., state_out) are captured and stored for the next step
   2. On the next inference call, the previously captured state tensors are fed as input state tensors (e.g., state_in) instead of zeros
   3. On the first inference call (no prior state), hidden states are initialized to zero tensors with the shape specified in the declarative config
-**Plans**: TBD
+**Plans:** 1 plan
+Plans:
+- [ ] 90-01-PLAN.md -- Fix hidden state keying to agentID and add legacy output state capture
 
 ### Phase 91: Custom Inference Escape Hatch
 **Goal**: Users who need non-standard inference logic can provide their own JS function and bypass the declarative path entirely
