@@ -84,6 +84,35 @@
             cursor: not-allowed;
         }
 
+        /* Start button loading spinner */
+        .start-button-wrapper {
+            display: inline-flex;
+            align-items: center;
+            position: relative;
+            margin: 15px 10px;
+        }
+
+        .start-button-wrapper #startButton {
+            margin: 0;
+        }
+
+        #startButtonLoader {
+            display: none;
+            width: 24px;
+            height: 24px;
+            border: 3px solid #ecf0f1;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            position: absolute;
+            left: 100%;
+            margin-left: 10px;
+        }
+
+        #startButtonLoader.visible {
+            display: inline-block;
+        }
+
         #resetGame, #waitroomText, #hudText, #errorText {
             background-color: #ecf0f1;
             border: 2px solid #34495e;
@@ -138,6 +167,49 @@
             border-radius: 10px;
             padding: 20px;
             background-color: #ecf0f1;
+            position: relative;
+        }
+
+        /* Episode transition overlay */
+        #episodeTransitionOverlay {
+            display: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.75);
+            z-index: 1000;  /* High z-index to ensure it's above Phaser canvas */
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            border-radius: 8px;
+        }
+
+        #episodeTransitionOverlay.visible {
+            display: flex;
+        }
+
+        #episodeTransitionText {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 18px;
+            color: #ffffff;
+            text-align: center;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+
+        #episodeCountdown {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 72px;
+            color: #3498db;
+            text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.5);
+            animation: pulse 1s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
         }
 
         #startButton {
@@ -146,6 +218,55 @@
 
         #redirectButton {
             display: none; /* Initially hidden */
+        }
+
+        #advanceButton {
+            display: none; /* Initially hidden until screening passes */
+        }
+
+        #sceneBody {
+            display: none; /* Initially hidden until screening passes */
+        }
+
+        #invalidSession {
+            display: none; /* Initially hidden, shown on invalid session error */
+        }
+
+        /* Unified loading screen (Phase 75) - full-page overlay */
+        #loadingScreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #f0f4f8;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+
+        .screening-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #ecf0f1;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        #loadingStatus {
+            font-family: 'Roboto', sans-serif;
+            font-size: 18px;
+            color: #555;
+            text-align: center;
         }
 
         .centered-container {
@@ -157,8 +278,8 @@
 </head>
 <body>
     <div class="text-container">
-        <h1 id="sceneHeader">{{ scene_header | safe }}</h1>
-        <h2 id="sceneSubHeader">{{ scene_subheader | safe }}</h2>
+        <h1 id="sceneHeader" style="display: none;">{{ scene_header | safe }}</h1>
+        <h2 id="sceneSubHeader" style="display: none;">{{ scene_subheader | safe }}</h2>
         <div id="sceneBody">
             {{ scene_body | safe }}
         </div>
@@ -168,17 +289,33 @@
         <div id="resetGame"></div>
         <div id="invalidSession">"Invalid Session. Please refresh the page!"</div>
         <div id="errorText"></div>
+
         <div id="hudText"></div>
 
-        <div id="gameContainer"></div>
+        <div id="gameContainer">
+            <!-- Episode transition overlay -->
+            <div id="episodeTransitionOverlay">
+                <div id="episodeTransitionText">Next round will begin shortly...</div>
+                <div id="episodeCountdown"></div>
+            </div>
+        </div>
 
         <!-- Centered container for the start button -->
         <div class="centered-container">
-            <button id="startButton" disabled>Start</button>
+            <div class="start-button-wrapper">
+                <button id="startButton" disabled>Start</button>
+                <div id="startButtonLoader"></div>
+            </div>
             <button id="advanceButton">Continue</button>
             <button id="redirectButton">Finish</button>
         </div>
 
+    </div>
+
+    <!-- Unified loading screen (Phase 75) - full-page overlay, gates on screening + Pyodide -->
+    <div id="loadingScreen">
+        <div class="screening-spinner"></div>
+        <div id="loadingStatus">Loading...</div>
     </div>
 
     <div id="latencyContainer">
@@ -192,10 +329,12 @@
     <!-- Scripts -->
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"></script>
+    <!-- TODO(chase): Update the Pyodide version, there is more package availability (e.g., scipy) in later versions. -->
     <script src="https://cdn.jsdelivr.net/pyodide/v0.26.2/full/pyodide.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/onnxruntime-web/1.10.0/ort.min.js"></script>
-    
+    <script src="https://cdn.jsdelivr.net/npm/ua-parser-js@1.0.38/src/ua-parser.min.js"></script>
+
     <script src="static/js/index.js" type="module"></script>
     <script src="static/js/onnx_inference.js" type="module"></script>
     <script src="static/js/phaser_gym_graphics.js" type="module"></script>

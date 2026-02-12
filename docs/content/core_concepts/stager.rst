@@ -142,7 +142,7 @@ The Stager handles scene lifecycle:
 
         # Activate new scene
         self.current_scene = self.scenes[scene_index]
-        self.current_scene.activate(sio=self.sio, room=self.room)
+        self.current_scene.activate(socketio=self.socketio, room=self.room)
         self.current_scene_index = scene_index
 
 **Deactivation:**

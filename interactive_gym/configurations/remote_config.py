@@ -90,10 +90,12 @@ class RemoteConfig:
         self.run_through_pyodide: bool = False
         self.environment_initialization_code: str = ""
         self.packages_to_install: list[str] = []
+        self.pyodide_load_timeout_s: int = 60
 
-    def logging(self, logfile: str | None = None):
-        if logfile is not None:
-            self.logfile = logfile
+        # webrtc / turn server configuration
+        self.turn_username: str | None = None
+        self.turn_credential: str | None = None
+        self.force_turn_relay: bool = False  # For testing TURN without direct P2P
 
     def environment(
         self,
@@ -357,56 +359,84 @@ class RemoteConfig:
 
         return self
 
-    @property
-    def simulate_waiting_room(self) -> bool:
+    def webrtc(
+        self,
+        turn_username: str | None = None,
+        turn_credential: str | None = None,
+        force_relay: bool = False,
+    ):
         """
-        Returns a boolean indicating whether or not we're
-        forcing all participants to be in a waiting room, regardless
-        of if they're waiting for other players or not.
+        Configure WebRTC settings for P2P multiplayer.
+
+        Credentials can be provided directly or via environment variables:
+            - TURN_USERNAME: TURN server username
+            - TURN_CREDENTIAL: TURN server credential/password
+
+        Args:
+            turn_username: TURN server username (from metered.ca or similar).
+                          Falls back to TURN_USERNAME env var if not provided.
+            turn_credential: TURN server credential/password.
+                            Falls back to TURN_CREDENTIAL env var if not provided.
+            force_relay: Force relay mode (for testing TURN without direct P2P)
         """
-        return max(self.waitroom_time_randomization_interval_s) > 0
+        import os
+        import logging
 
-    def to_dict(self, serializable=False):
-        config = copy.deepcopy(vars(self))
-        if serializable:
-            config = serialize_dict(config)
-        return config
+        logger = logging.getLogger(__name__)
 
+        # Use provided values, fall back to environment variables
+        resolved_username = turn_username or os.environ.get("TURN_USERNAME")
+        resolved_credential = turn_credential or os.environ.get("TURN_CREDENTIAL")
 
-def serialize_dict(data):
-    """
-    Serialize a dictionary to JSON, removing unserializable keys recursively.
+        if resolved_username and resolved_credential:
+            self.turn_username = resolved_username
+            self.turn_credential = resolved_credential
+            logger.info(
+                f"TURN credentials loaded (username: {resolved_username[:4]}...)"
+            )
+        elif resolved_username or resolved_credential:
+            logger.warning(
+                "Partial TURN config: both TURN_USERNAME and TURN_CREDENTIAL required"
+            )
+        else:
+            logger.warning(
+                "No TURN credentials found. Set TURN_USERNAME and TURN_CREDENTIAL "
+                "env vars for NAT traversal fallback."
+            )
 
-    :param data: Dictionary to serialize.
-    :return: Serialized object with unserializable elements removed.
-    """
-    if isinstance(data, dict):
-        # Use dictionary comprehension to process each key-value pair
+        self.force_turn_relay = force_relay
+        if force_relay:
+            logger.info("TURN force_relay enabled - all connections will use TURN")
+
+        return self
+
+    def get_entry_screening_config(self) -> dict:
+        """Get the entry screening configuration for sending to the client.
+
+        RemoteConfig does not support full entry screening, so this returns
+        safe defaults to prevent crashes when called from app.py.
+
+        :return: Dictionary with entry screening settings
+        :rtype: dict
+        """
         return {
-            key: serialize_dict(value)
-            for key, value in data.items()
-            if is_json_serializable(value)
+            "device_exclusion": None,
+            "browser_requirements": None,
+            "browser_blocklist": None,
+            "max_ping": self.max_ping,
+            "min_ping_measurements": self.min_ping_measurements,
+            "exclusion_messages": {},
+            "has_entry_callback": False,
         }
-    elif isinstance(data, list):
-        # Use list comprehension to process each item
-        return [
-            serialize_dict(item) for item in data if is_json_serializable(item)
-        ]
-    elif is_json_serializable(data):
-        return data
-    else:
-        return None  # or some other default value
 
+    def get_pyodide_config(self) -> dict:
+        """Get Pyodide configuration from this RemoteConfig.
 
-def is_json_serializable(value):
-    """
-    Check if a value is JSON serializable.
-
-    :param value: The value to check.
-    :return: True if the value is JSON serializable, False otherwise.
-    """
-    try:
-        json.dumps(value)
-        return True
-    except (TypeError, OverflowError):
-        return False
+        :return: Dictionary with needs_pyodide flag and packages list
+        :rtype: dict
+        """
+        return {
+            "needs_pyodide": self.run_through_pyodide,
+            "packages_to_install": self.packages_to_install,
+            "pyodide_load_timeout_s": self.pyodide_load_timeout_s,
+        }

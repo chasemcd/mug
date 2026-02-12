@@ -1,0 +1,887 @@
+/**
+ * Admin Dashboard CSS - v3
+ * Participant-centric dashboard with table layout
+ */
+
+/* ============================================
+   Summary Stats Bar
+   ============================================ */
+
+.stats-bar {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+}
+
+.stat-card {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem;
+    background: oklch(var(--b1));
+    border-radius: 0.75rem;
+    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+}
+
+.stat-card-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 0.5rem;
+    flex-shrink: 0;
+}
+
+.stat-card-icon svg {
+    width: 1.25rem;
+    height: 1.25rem;
+}
+
+.stat-card-content {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.stat-card-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.stat-card-label {
+    font-size: 0.75rem;
+    color: oklch(var(--bc) / 0.6);
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+}
+
+@media (max-width: 1200px) {
+    .stats-bar {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    .stats-bar {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+/* ============================================
+   Section Cards
+   ============================================ */
+
+.section-card {
+    background: oklch(var(--b1));
+    border-radius: 0.75rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    overflow: hidden;
+}
+
+.section-header {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid oklch(var(--bc) / 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.section-header h3 {
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin: 0;
+}
+
+.section-body {
+    padding: 1rem;
+}
+
+.section-body.p-0 {
+    padding: 0;
+}
+
+/* Filter Toggle */
+.filter-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.75rem;
+    color: oklch(var(--bc) / 0.6);
+    cursor: pointer;
+    user-select: none;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    transition: background 0.15s ease;
+}
+
+.filter-toggle:hover {
+    background: oklch(var(--bc) / 0.05);
+}
+
+.filter-toggle .checkbox {
+    margin: 0;
+}
+
+/* ============================================
+   Participant Table
+   ============================================ */
+
+.participant-table,
+.completed-table,
+.archived-sessions-table,
+.players-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+
+.participant-table th,
+.completed-table th,
+.archived-sessions-table th,
+.players-table th {
+    text-align: left;
+    padding: 0.75rem 1rem;
+    background: oklch(var(--b2));
+    font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    color: oklch(var(--bc) / 0.6);
+    border-bottom: 1px solid oklch(var(--bc) / 0.1);
+}
+
+.participant-table td,
+.completed-table td,
+.archived-sessions-table td,
+.players-table td {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid oklch(var(--bc) / 0.05);
+    vertical-align: middle;
+}
+
+.participant-table tbody tr,
+.completed-table tbody tr,
+.archived-sessions-table tbody tr,
+.players-table tbody tr {
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.participant-table tbody tr:hover,
+.completed-table tbody tr:hover,
+.archived-sessions-table tbody tr:hover,
+.players-table tbody tr:hover {
+    background: oklch(var(--bc) / 0.05);
+}
+
+.status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.status-indicator .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.status-indicator .status-label {
+    font-size: 0.8rem;
+}
+
+.error-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #ef4444;
+    color: white;
+    padding: 0.125rem 0.5rem;
+    border-radius: 9999px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    min-width: 1.25rem;
+}
+
+.error-badge-small {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #ef4444;
+    color: white;
+    padding: 0.1rem 0.35rem;
+    border-radius: 9999px;
+    font-size: 0.6rem;
+    font-weight: 600;
+    min-width: 1rem;
+}
+
+.font-mono {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+/* Game Type Badge */
+.game-type-badge {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.7rem;
+    font-weight: 500;
+    background: oklch(var(--bc) / 0.1);
+    color: oklch(var(--bc) / 0.6);
+}
+
+.game-type-badge.type-multiplayer {
+    background: rgba(147, 51, 234, 0.15);
+    color: #9333ea;
+}
+
+.game-type-badge.type-single {
+    background: rgba(59, 130, 246, 0.15);
+    color: #3b82f6;
+}
+
+/* ============================================
+   Multiplayer Session Cards
+   ============================================ */
+
+#multiplayer-sessions-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 0.75rem;
+}
+
+.multiplayer-session-card {
+    background: oklch(var(--b2));
+    border-radius: 0.5rem;
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    border: 1px solid transparent;
+}
+
+.multiplayer-session-card:hover {
+    background: oklch(var(--b3));
+    border-color: oklch(var(--bc) / 0.1);
+}
+
+.session-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.session-health {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.session-health .health-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+.session-id {
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.session-metrics-row {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.metric-pill {
+    background: oklch(var(--bc) / 0.1);
+    padding: 0.2rem 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.7rem;
+    color: oklch(var(--bc) / 0.7);
+}
+
+.session-players-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.session-player {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    background: oklch(var(--b1));
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+}
+
+.player-name {
+    font-size: 0.75rem;
+}
+
+/* ============================================
+   Outcome Badge
+   ============================================ */
+
+.outcome-badge {
+    display: inline-block;
+    padding: 0.15rem 0.4rem;
+    border-radius: 0.25rem;
+    font-size: 0.7rem;
+    font-weight: 500;
+}
+
+.outcome-badge.outcome-normal,
+.outcome-badge.outcome-completed {
+    background: rgba(34, 197, 94, 0.2);
+    color: #22c55e;
+}
+
+.outcome-badge.outcome-partner_disconnected,
+.outcome-badge.outcome-reconnection_timeout {
+    background: rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+}
+
+.outcome-badge.outcome-focus_loss_timeout,
+.outcome-badge.outcome-tab_hidden,
+.outcome-badge.outcome-waitroom_timeout {
+    background: rgba(234, 179, 8, 0.2);
+    color: #eab308;
+}
+
+.outcome-badge.outcome-sustained_ping,
+.outcome-badge.outcome-exclusion {
+    background: rgba(156, 163, 175, 0.2);
+    color: #6b7280;
+}
+
+/* ============================================
+   Problems Panel
+   ============================================ */
+
+#problems-list {
+    max-height: 250px;
+    overflow-y: auto;
+}
+
+.problem-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    border-radius: 0.375rem;
+    font-size: 0.8rem;
+    margin-bottom: 0.25rem;
+}
+
+.problem-item.problem-error {
+    background: rgba(239, 68, 68, 0.1);
+}
+
+.problem-item.problem-warning {
+    background: rgba(234, 179, 8, 0.1);
+}
+
+.problem-item.problem-info {
+    background: rgba(59, 130, 246, 0.1);
+}
+
+.problem-icon {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+.problem-error .problem-icon {
+    background: #ef4444;
+    color: white;
+}
+
+.problem-warning .problem-icon {
+    background: #eab308;
+    color: white;
+}
+
+.problem-info .problem-icon {
+    background: #3b82f6;
+    color: white;
+}
+
+.problem-time {
+    color: oklch(var(--bc) / 0.5);
+    font-size: 0.7rem;
+    flex-shrink: 0;
+}
+
+.problem-msg {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.problem-subject {
+    font-family: ui-monospace, monospace;
+    font-size: 0.7rem;
+    color: oklch(var(--bc) / 0.6);
+}
+
+/* ============================================
+   Session Outcomes (Aggregates)
+   ============================================ */
+
+.outcome-summary {
+    display: flex;
+    gap: 2rem;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid oklch(var(--bc) / 0.1);
+}
+
+.outcome-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+
+.outcome-stat-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.outcome-stat-label {
+    font-size: 0.7rem;
+    color: oklch(var(--bc) / 0.6);
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+}
+
+/* Scene Histogram */
+.scene-histogram-container {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid oklch(var(--bc) / 0.1);
+}
+
+.scene-histogram-label {
+    font-size: 0.75rem;
+    color: oklch(var(--bc) / 0.6);
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+}
+
+.scene-histogram {
+    display: flex;
+    align-items: flex-end;
+    gap: 4px;
+    height: 60px;
+    min-height: 40px;
+}
+
+.scene-bar-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+    max-width: 60px;
+    min-width: 30px;
+}
+
+.scene-bar {
+    width: 100%;
+    background: oklch(var(--p));
+    border-radius: 2px 2px 0 0;
+    min-height: 4px;
+    transition: height 0.3s ease;
+}
+
+.scene-bar-label {
+    font-size: 0.65rem;
+    color: oklch(var(--bc) / 0.5);
+    margin-top: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    text-align: center;
+}
+
+.scene-bar-count {
+    font-size: 0.6rem;
+    color: oklch(var(--bc) / 0.7);
+    font-weight: 500;
+}
+
+.scene-bar-pct {
+    font-size: 0.7rem;
+    color: oklch(var(--bc) / 0.8);
+    font-weight: 600;
+    margin-bottom: 2px;
+}
+
+/* Metrics Panel Row */
+.metrics-panel-row {
+    display: flex;
+    gap: 2rem;
+    flex-wrap: wrap;
+}
+
+.metrics-panel-row .metric-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.metrics-panel-row .metric-label {
+    font-size: 0.75rem;
+    color: oklch(var(--bc) / 0.6);
+}
+
+.metrics-panel-row .metric-value {
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.sparkline-container {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.sparkline {
+    display: block;
+}
+
+/* ============================================
+   Console Logs
+   ============================================ */
+
+.logs-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.logs-header select {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    min-height: auto;
+    height: auto;
+}
+
+#console-logs-list {
+    max-height: 300px;
+    overflow-y: auto;
+    font-family: ui-monospace, monospace;
+    font-size: 0.75rem;
+}
+
+.log-entry {
+    display: flex;
+    gap: 0.5rem;
+    padding: 0.25rem 0.75rem;
+    border-bottom: 1px solid oklch(var(--bc) / 0.05);
+}
+
+.log-entry.log-error {
+    background: rgba(239, 68, 68, 0.1);
+}
+
+.log-entry.log-warn {
+    background: rgba(234, 179, 8, 0.1);
+}
+
+.log-time {
+    color: oklch(var(--bc) / 0.5);
+    flex-shrink: 0;
+    width: 70px;
+}
+
+.log-level {
+    font-weight: 600;
+    flex-shrink: 0;
+    width: 50px;
+}
+
+.log-entry.log-error .log-level { color: #ef4444; }
+.log-entry.log-warn .log-level { color: #eab308; }
+.log-entry.log-info .log-level { color: #3b82f6; }
+
+.log-subject {
+    color: oklch(var(--bc) / 0.6);
+    flex-shrink: 0;
+    width: 80px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.log-msg {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ============================================
+   Detail Panels (Participant & Session)
+   ============================================ */
+
+#participant-detail-overlay,
+#session-detail-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 9999;
+    display: none;
+    justify-content: flex-end;
+    backdrop-filter: blur(4px);
+}
+
+#participant-detail-overlay:not(.hidden),
+#session-detail-overlay:not(.hidden) {
+    display: flex;
+}
+
+.detail-panel {
+    width: 450px;
+    max-width: 90%;
+    background-color: #ffffff;
+    color: #1f2937;
+    height: 100%;
+    overflow-y: auto;
+    box-shadow: -8px 0 30px rgba(0, 0, 0, 0.2);
+    border-left: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.detail-panel-wide {
+    width: 600px;
+}
+
+/* Dark theme support */
+[data-theme="dark"] .detail-panel {
+    background-color: #1d232a;
+    color: #a6adbb;
+    border-left-color: rgba(255, 255, 255, 0.1);
+}
+
+.detail-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    position: sticky;
+    top: 0;
+    background-color: inherit;
+    z-index: 10;
+}
+
+.detail-header h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0;
+}
+
+.detail-content {
+    padding: 1rem;
+}
+
+.detail-section {
+    margin-bottom: 1.5rem;
+}
+
+.detail-section h4 {
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: #6b7280;
+    margin-bottom: 0.75rem;
+}
+
+.detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+}
+
+.detail-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.detail-label {
+    font-size: 0.7rem;
+    color: #6b7280;
+    text-transform: uppercase;
+}
+
+.detail-value {
+    font-size: 0.9rem;
+}
+
+.detail-logs {
+    max-height: 300px;
+    overflow-y: auto;
+    background-color: rgba(0, 0, 0, 0.03);
+    border-radius: 0.375rem;
+    padding: 0.5rem;
+}
+
+[data-theme="dark"] .detail-logs {
+    background-color: rgba(255, 255, 255, 0.03);
+}
+
+.detail-logs .log-entry {
+    font-size: 0.7rem;
+    padding: 0.2rem 0.5rem;
+}
+
+.termination-section {
+    background-color: rgba(239, 68, 68, 0.1);
+    padding: 0.75rem;
+    border-radius: 0.5rem;
+}
+
+.termination-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.termination-reason {
+    font-weight: 600;
+    color: #ef4444;
+}
+
+.termination-time {
+    font-size: 0.8rem;
+    color: #6b7280;
+}
+
+/* ============================================
+   Connection Status Badge (navbar)
+   ============================================ */
+
+#connection-status {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+#connection-status .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: oklch(var(--bc) / 0.3);
+}
+
+#connection-status.badge-success .status-dot {
+    background: oklch(var(--su));
+    animation: pulse-dot 2s infinite;
+}
+
+#connection-status.badge-error .status-dot {
+    background: oklch(var(--er));
+}
+
+#connection-status.badge-warning .status-dot {
+    background: oklch(var(--wa));
+    animation: pulse-dot 1s infinite;
+}
+
+@keyframes pulse-dot {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}
+
+/* ============================================
+   Empty States
+   ============================================ */
+
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    color: oklch(var(--bc) / 0.4);
+    text-align: center;
+}
+
+/* ============================================
+   Health Legend
+   ============================================ */
+
+.health-legend {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.65rem;
+    color: oklch(var(--bc) / 0.6);
+}
+
+.health-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+/* ============================================
+   Responsive
+   ============================================ */
+
+@media (max-width: 768px) {
+    .detail-panel {
+        width: 100%;
+        max-width: 100%;
+    }
+
+    .detail-panel-wide {
+        width: 100%;
+    }
+
+    #multiplayer-sessions-list {
+        grid-template-columns: 1fr;
+    }
+
+    .session-header-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+
+    .session-metrics-row {
+        flex-wrap: wrap;
+    }
+}
+
+/* ============================================
+   Custom Color Utilities
+   ============================================ */
+
+/* Orange color for "Partner Away" timeout category */
+.text-orange-500 {
+    color: #f97316;
+}

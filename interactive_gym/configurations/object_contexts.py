@@ -348,13 +348,3 @@ class ImgSpec:
 
     def as_dict(self) -> dict[str, typing.Any]:
         return dataclasses.asdict(self)
-
-
-@dataclasses.dataclass
-class RenderedEnvRGB:
-    name: str
-    game_image: list[list[float]]
-    object_type: str = "rendered_env_rgb"
-
-    def as_dict(self) -> dict[str, typing.Any]:
-        return dataclasses.asdict(self)

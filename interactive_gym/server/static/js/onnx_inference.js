@@ -1,5 +1,7 @@
 // import * as ort from 'https://cdnjs.cloudflare.com/ajax/libs/onnxruntime-web/1.10.0/ort.min.js';
 
+import * as seeded_random from './seeded_random.js';
+
 // Store loaded models to avoid reloading
 const loadedModels = {};
 const hiddenStates = {};
@@ -13,6 +15,11 @@ export async function actionFromONNX(policyID, observation) {
 
     // Sample an action based on the probabilities
     const action = sampleAction(probabilities);
+
+    // Log RNG usage in multiplayer mode for verification
+    if (seeded_random.isMultiplayer()) {
+        console.debug(`[ONNX] Sampled action ${action} using seeded RNG (state: ${seeded_random.getRNGState()})`);
+    }
 
     return action;
 }
@@ -133,7 +140,8 @@ function sampleAction(probabilities) {
         }
     }, []);
 
-    const randomValue = Math.random();
+    // Use seeded RNG in multiplayer, Math.random() in single-player
+    const randomValue = seeded_random.getRandom();
 
     for (let i = 0; i < cumulativeProbabilities.length; i++) {
         if (randomValue < cumulativeProbabilities[i]) {

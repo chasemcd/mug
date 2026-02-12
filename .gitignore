@@ -1,5 +1,12 @@
 data/
 .DS_Store
+.claude/ 
+.claude/settings.local.json
+.claude/*
+.planning/
+.planning/*
+.playwright-mcp/
+build/
 
 .claude
 .claude/*

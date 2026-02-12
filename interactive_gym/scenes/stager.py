@@ -54,12 +54,12 @@ class Stager:
 
         return participant_copy
 
-    def on_connect(self, sio: flask_socketio.SocketIO, room: str | int):
+    def on_connect(self, socketio: flask_socketio.SocketIO, room: str | int):
         """
         A hook that is called when the client's stager is built (they're connected to the server).
         """
         for scene in self.scenes:
-            scene.on_connect(sio, room)
+            scene.on_connect(socketio, room)
 
     def get_current_scene(self) -> scene.Scene:
         return self.current_scene
@@ -70,7 +70,7 @@ class Stager:
         """
         self.scenes = scenes
 
-    def start(self, sio: flask_socketio.SocketIO, room: str | int):
+    def start(self, socketio: flask_socketio.SocketIO, room: str | int):
         """
         Initialize the Stager by activating the first Scene in the sequence.
         """
@@ -78,10 +78,10 @@ class Stager:
         assert isinstance(
             self.current_scene, static_scene.StartScene
         ), f"start() was called with a current_scene other than StartScene. Got {type(self.current_scene)}."
-        self.current_scene.activate(sio, room)
-        self.on_connect(sio, room)
+        self.current_scene.activate(socketio, room)
+        self.on_connect(socketio, room)
 
-    def advance(self, sio: flask_socketio.SocketIO, room: str | int):
+    def advance(self, socketio: flask_socketio.SocketIO, room: str | int):
         """
         Move to the next Scene in the sequence.
         """
@@ -92,4 +92,38 @@ class Stager:
             return None
 
         self.current_scene = self.scenes[self.current_scene_index]
-        self.current_scene.activate(sio=sio, room=room)
+        self.current_scene.activate(socketio=socketio, room=room)
+
+    def get_state(self) -> dict:
+        """
+        Serialize stager state for session persistence.
+
+        Returns:
+            dict: Serialized state containing current scene index.
+        """
+        return {
+            "current_scene_index": self.current_scene_index,
+        }
+
+    def set_state(self, state: dict):
+        """
+        Restore stager state from serialized data.
+
+        Args:
+            state: Serialized state from get_state().
+        """
+        self.current_scene_index = state["current_scene_index"]
+        self.current_scene = self.scenes[self.current_scene_index]
+
+    def resume(self, socketio: flask_socketio.SocketIO, room: str | int):
+        """
+        Resume a restored session by activating the current scene.
+
+        Unlike start(), this can be called at any scene index for session restoration.
+
+        Args:
+            socketio: The SocketIO instance.
+            room: The room to emit events to.
+        """
+        self.current_scene.activate(socketio, room)
+        self.on_connect(socketio, room)

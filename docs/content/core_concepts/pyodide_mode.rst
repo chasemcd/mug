@@ -47,7 +47,7 @@ Basic Configuration
     game_scene = (
         gym_scene.GymScene()
         .scene(scene_id="my_game")
-        .pyodide(
+        .runtime(
             run_through_pyodide=True,
             environment_initialization_code=(
                 "import gymnasium as gym\n"
@@ -64,7 +64,7 @@ For complex environments, use a separate file:
 
 .. code-block:: python
 
-    .pyodide(
+    .runtime(
         run_through_pyodide=True,
         environment_initialization_code_filepath="my_environment.py",
         packages_to_install=["gymnasium==1.0.0", "numpy"],
@@ -246,7 +246,7 @@ List all required packages with versions:
 
 .. code-block:: python
 
-    .pyodide(
+    .runtime(
         packages_to_install=[
             "gymnasium==1.0.0",
             "numpy",
@@ -269,7 +269,7 @@ For pure Python packages not in Pyodide:
 
 .. code-block:: python
 
-    .pyodide(
+    .runtime(
         packages_to_install=[
             "my-pure-python-package",  # Installed via micropip
         ],
@@ -282,7 +282,7 @@ If you need setup code before creating the environment:
 
 .. code-block:: python
 
-    .pyodide(
+    .runtime(
         environment_initialization_code="""
 import gymnasium as gym
 import numpy as np
@@ -363,7 +363,7 @@ Provide clear feedback during initialization:
 
 .. code-block:: python
 
-    .user_experience(
+    .content(
         scene_header="Game Loading...",
         scene_body="""
             <center>
@@ -455,7 +455,7 @@ Run AI inference in the browser:
 
 .. code-block:: python
 
-    .pyodide(
+    .runtime(
         environment_initialization_code="""
 import gymnasium as gym
 import numpy as np
@@ -489,7 +489,7 @@ By default, Pyodide persists across scenes. To restart:
 
 .. code-block:: python
 
-    .pyodide(
+    .runtime(
         run_through_pyodide=True,
         restart_pyodide=True,  # Restart between scenes
     )
@@ -571,7 +571,7 @@ Example: Complete Pyodide Scene
         .policies(
             policy_mapping={"human": configuration_constants.PolicyTypes.Human}
         )
-        .user_experience(
+        .content(
             scene_header="Mountain Car",
             scene_body="""
                 <center>
@@ -582,7 +582,7 @@ Example: Complete Pyodide Scene
             """,
             in_game_scene_body="<center><p>Use arrow keys to reach the flag!</p></center>",
         )
-        .pyodide(
+        .runtime(
             run_through_pyodide=True,
             environment_initialization_code_filepath="environments/mountain_car.py",
             packages_to_install=["gymnasium==1.0.0", "numpy"],

@@ -115,11 +115,13 @@ control_tutorial_scene = (
     )
     .rendering(
         fps=30,
-        assets_to_preload=overcooked_utils.overcooked_preload_assets_spec(),
         hud_text_fn=overcooked_utils.hud_text_fn,
         game_width=overcooked_utils.TILE_SIZE * 7,
         game_height=overcooked_utils.TILE_SIZE * 6,
         background="#e6b453",
+    )
+    .assets(
+        assets_to_preload=overcooked_utils.overcooked_preload_assets_spec(),
     )
     .gameplay(
         default_action=Noop,
@@ -128,13 +130,13 @@ control_tutorial_scene = (
         max_steps=2000,
         input_mode=configuration_constants.InputModes.SingleKeystroke,
     )
-    .user_experience(
+    .content(
         scene_header="Overcooked",
         scene_body_filepath="interactive_gym/examples/cogrid/html_pages/control_tutorial.html",
         game_page_html_fn=overcooked_utils.overcooked_game_page_header_fn,
         in_game_scene_body_filepath="interactive_gym/examples/cogrid/html_pages/control_tutorial_in_game_body.html",
     )
-    .pyodide(
+    .runtime(
         run_through_pyodide=True,
         environment_initialization_code_filepath="interactive_gym/examples/cogrid/environments/cramped_room_controllable_tutorial_environment_initialization.py",
         on_game_step_code=on_game_step_code,
@@ -150,11 +152,13 @@ tutorial_with_bot_scene = (
     .rendering(
         fps=30,
         env_to_state_fn=overcooked_utils.overcooked_env_to_render_fn,
-        assets_to_preload=overcooked_utils.overcooked_preload_assets_spec(),
         hud_text_fn=overcooked_utils.hud_text_fn,
         game_width=overcooked_utils.TILE_SIZE * 7,
         game_height=overcooked_utils.TILE_SIZE * 6,
         background="#e6b453",
+    )
+    .assets(
+        assets_to_preload=overcooked_utils.overcooked_preload_assets_spec(),
     )
     .gameplay(
         default_action=Noop,
@@ -163,7 +167,7 @@ tutorial_with_bot_scene = (
         max_steps=1350,
         input_mode=configuration_constants.InputModes.SingleKeystroke,
     )
-    .user_experience(
+    .content(
         scene_header="Overcooked",
         scene_body="""
         <center><p>
@@ -200,7 +204,7 @@ tutorial_with_bot_scene = (
         <br><br>
         """,
     )
-    .pyodide(
+    .runtime(
         run_through_pyodide=True,
         environment_initialization_code_filepath="interactive_gym/examples/cogrid/environments/cramped_room_environment_initialization.py",
         packages_to_install=["numpy", "cogrid==0.0.15", "opencv-python"],
@@ -224,11 +228,13 @@ base_controllable_ = (
     .policies(policy_mapping=IBC_POLICY_MAPPING_CRAMPED_ROOM, frame_skip=5)
     .rendering(
         fps=30,
-        assets_to_preload=overcooked_utils.overcooked_preload_assets_spec(),
         hud_text_fn=overcooked_utils.hud_text_fn,
         game_width=overcooked_utils.TILE_SIZE * 7,
         game_height=overcooked_utils.TILE_SIZE * 6,
         background="#e6b453",
+    )
+    .assets(
+        assets_to_preload=overcooked_utils.overcooked_preload_assets_spec(),
     )
     .gameplay(
         default_action=Noop,
@@ -237,7 +243,7 @@ base_controllable_ = (
         max_steps=1350,
         input_mode=configuration_constants.InputModes.SingleKeystroke,
     )
-    .user_experience(
+    .content(
         scene_header="Overcooked",
         scene_body_filepath="interactive_gym/examples/cogrid/html_pages/controllable_cramped_room.html",
         game_page_html_fn=overcooked_utils.overcooked_game_page_header_fn,
@@ -270,7 +276,7 @@ base_controllable_ = (
         </center>
         """,
     )
-    .pyodide(
+    .runtime(
         run_through_pyodide=True,
         environment_initialization_code_filepath="interactive_gym/examples/cogrid/environments/cramped_room_controllable_environment_initialization.py",
         packages_to_install=["numpy", "cogrid==0.0.15", "opencv-python"],
@@ -306,7 +312,7 @@ base_fixed_ = (
     copy.deepcopy(base_controllable_)
     .scene(scene_id="base_fixed_", experiment_config={})
     .policies(policy_mapping=IBC_POLICY_MAPPING_CRAMPED_ROOM, frame_skip=5)
-    .user_experience(
+    .content(
         scene_body_filepath="interactive_gym/examples/cogrid/html_pages/fixed_cramped_room.html",
     )
 )
@@ -339,7 +345,7 @@ base_fixed_eval_ = (
 base_nospec_ = (
     copy.deepcopy(base_controllable_)
     .scene(scene_id="base_nospec_", experiment_config={})
-    .user_experience(
+    .content(
         in_game_scene_body="""
         <center>
         <p>
@@ -380,7 +386,7 @@ base_nospec_eval_ = (
 base_choice_ = (
     copy.deepcopy(base_controllable_)
     .scene(scene_id="base_choice_", experiment_config={})
-    .user_experience(
+    .content(
         in_game_scene_body="""
         <center>
         <p>
@@ -426,10 +432,10 @@ def make_n_controllable_scenes(layout_name, n):
                 scene_id=f"{layout_name}_controllable_{i}",
                 experiment_config={},
             )
-            .pyodide(
+            .runtime(
                 environment_initialization_code_filepath=f"interactive_gym/examples/cogrid/environments/{layout_name}_controllable_environment_initialization.py",
             )
-            .user_experience(
+            .content(
                 scene_body_filepath=f"interactive_gym/examples/cogrid/html_pages/controllable_{layout_name}.html",
             )
             .rendering(
@@ -461,10 +467,10 @@ def make_n_fixed_scenes(layout_name, n):
                 scene_id=f"{layout_name}_fixed_{i}",
                 experiment_config={},
             )
-            .pyodide(
+            .runtime(
                 environment_initialization_code_filepath=f"interactive_gym/examples/cogrid/environments/{layout_name}_controllable_environment_initialization.py",
             )
-            .user_experience(
+            .content(
                 scene_body_filepath=f"interactive_gym/examples/cogrid/html_pages/fixed_{layout_name}.html",
             )
             .policies(policy_mapping=POLICY_MAPPING_BY_LAYOUT[layout_name])
@@ -496,10 +502,10 @@ def make_n_nospec_scenes(layout_name, n):
                 scene_id=f"{layout_name}_nospec_{i}",
                 experiment_config={},
             )
-            .pyodide(
+            .runtime(
                 environment_initialization_code_filepath=f"interactive_gym/examples/cogrid/environments/{layout_name}_controllable_environment_initialization.py",
             )
-            .user_experience(
+            .content(
                 scene_body_filepath=f"interactive_gym/examples/cogrid/html_pages/nospec_{layout_name}.html",
             )
             .policies(policy_mapping=POLICY_MAPPING_BY_LAYOUT[layout_name])
@@ -528,10 +534,10 @@ def make_choice_scene(layout_name):
             experiment_config={},
         )
         .policies(policy_mapping=POLICY_MAPPING_BY_LAYOUT[layout_name])
-        .user_experience(
+        .content(
             scene_body_filepath=f"interactive_gym/examples/cogrid/html_pages/choice_{layout_name}.html",
         )
-        .pyodide(
+        .runtime(
             environment_initialization_code_filepath=f"interactive_gym/examples/cogrid/environments/{layout_name}_controllable_environment_initialization.py",
         )
         .rendering(

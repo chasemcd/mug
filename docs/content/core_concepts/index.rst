@@ -86,7 +86,7 @@ Common Patterns
 .. code-block:: python
 
     start_scene = static_scene.StartScene().display(...)
-    game_scene = gym_scene.GymScene().pyodide(run_through_pyodide=True)
+    game_scene = gym_scene.GymScene().runtime(run_through_pyodide=True)
     end_scene = static_scene.EndScene().display(...)
 
     stager = stager.Stager(scenes=[start_scene, game_scene, end_scene])
@@ -163,8 +163,8 @@ Interactive Gym uses a fluent API for configuration:
         .rendering(fps=30, game_width=600)    # How to display
         .gameplay(num_episodes=5)             # Game mechanics
         .policies(policy_mapping={...})       # Who plays
-        .user_experience(scene_header="...")  # UI text
-        .pyodide(run_through_pyodide=True)   # Execution mode
+        .content(scene_header="...")            # UI text
+        .runtime(run_through_pyodide=True)   # Execution mode
     )
 
 Each method returns the scene object, allowing you to chain configurations. This makes experiments readable and easy to modify.

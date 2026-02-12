@@ -1,14 +1,13 @@
 import setuptools
 
 setuptools.setup(
-    name="interactive-gym",
-    version="0.0.7",
+    name="interactive_gym",
+    version="0.1.1",
     description="A platform for running interactive experiments in the browser with standard simulation environments.",
     author="Chase McDonald",
-    author_email="chasemcd@andrew.cmu.edu",
+    author_email="chasecmcdonald@gmail.com",
     packages=setuptools.find_packages(),
     install_requires=[
-        "gymnasium==1.0.0",
         "numpy",
     ],
     extras_require={
@@ -19,6 +18,12 @@ setuptools.setup(
             "msgpack",
             "pandas",
             "flatten_dict",
+        ],
+        "test": [
+            "pytest>=8.0",
+            "playwright>=1.49",
+            "pytest-playwright>=0.6",
+            "pytest-timeout>=2.3",
         ],
     },
 )

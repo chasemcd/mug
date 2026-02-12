@@ -57,7 +57,7 @@ control_scene = (
 
 choice_scene = controllable_scenes.make_choice_scene(
     layout_name="cramped_room"
-).user_experience(
+).content(
     scene_body_filepath="interactive_gym/examples/cogrid/html_pages/demo_choice_cramped_room.html",
 )
 
@@ -66,10 +66,10 @@ stager = stager.Stager(
     scenes=[
         start_scene,
         control_scene,
-        # scenes.tutorial_gym_scene,
-        # controllable_scenes.tutorial_with_bot_scene,
-        # controllable_scenes.control_tutorial_scene,
-        # controllable_scenes.end_tutorial_static_scene,
+        scenes.tutorial_gym_scene,
+        controllable_scenes.tutorial_with_bot_scene,
+        controllable_scenes.control_tutorial_scene,
+        controllable_scenes.end_tutorial_static_scene,
         scene.RepeatScene(
             [choice_scene],
             n=3,

@@ -15,6 +15,7 @@ from interactive_gym.examples.cogrid import (
 from interactive_gym.scenes import gym_scene
 from interactive_gym.scenes import static_scene
 from interactive_gym.scenes import scene
+from interactive_gym.server.matchmaker import FIFOMatchmaker
 
 
 # Constants for controls/actions/etc.
@@ -121,11 +122,13 @@ tutorial_gym_scene = (
     .rendering(
         fps=30,
         env_to_state_fn=overcooked_utils.overcooked_env_to_render_fn,
-        assets_to_preload=overcooked_utils.overcooked_preload_assets_spec(),
         hud_text_fn=overcooked_utils.hud_text_fn,
         game_width=overcooked_utils.TILE_SIZE * 7,
         game_height=overcooked_utils.TILE_SIZE * 6,
         background="#e6b453",
+    )
+    .assets(
+        assets_to_preload=overcooked_utils.overcooked_preload_assets_spec(),
     )
     .gameplay(
         default_action=Noop,
@@ -134,16 +137,16 @@ tutorial_gym_scene = (
         max_steps=1000,
         input_mode=configuration_constants.InputModes.SingleKeystroke,
     )
-    .user_experience(
+    .content(
         scene_header="Overcooked Tutorial",
         scene_body_filepath="interactive_gym/server/static/templates/overcooked_controls.html",
         in_game_scene_body="""
         <center>
         <p>
-        Use the arrow keys <img src="static/assets/keys/arrow_keys_2.png" alt="Keyboard arrow keys" height="24" width="20" style="vertical-align:middle;"> 
-        to control your chef <img src="static/assets/overcooked/blue_chef.png" alt="Blue Chef" height="24" width="24" style="vertical-align:middle;"> 
-        and press <img src="static/assets/keys/icons8-w-key-50.png" alt="W key" height="24" width="24" style="vertical-align:middle;"> to pick up and 
-        drop objects. Try to deliver as many dishes as possible by combining onions in the pot, plating the cooked onions, 
+        Use the arrow keys <img src="static/assets/keys/arrow_keys_2.png" alt="Keyboard arrow keys" height="24" width="20" style="vertical-align:middle;">
+        to control your chef <img src="static/assets/overcooked/blue_chef.png" alt="Blue Chef" height="24" width="24" style="vertical-align:middle;">
+        and press <img src="static/assets/keys/icons8-w-key-50.png" alt="W key" height="24" width="24" style="vertical-align:middle;"> to pick up and
+        drop objects. Try to deliver as many dishes as possible by combining onions in the pot, plating the cooked onions,
         and delivering them to the grey delivery zone.
         </p>
         </center>
@@ -151,10 +154,10 @@ tutorial_gym_scene = (
         """,
         game_page_html_fn=overcooked_utils.overcooked_game_page_header_fn,
     )
-    .pyodide(
+    .runtime(
         run_through_pyodide=True,
         environment_initialization_code_filepath="interactive_gym/examples/cogrid/environments/tutorial_cramped_room_environment_initialization.py",
-        packages_to_install=["numpy", "cogrid==0.0.15", "opencv-python"],
+        packages_to_install=["numpy", "cogrid==0.1.2", "opencv-python"],
     )
 )
 
@@ -166,11 +169,13 @@ cramped_room_sp_0 = (
     .rendering(
         fps=30,
         env_to_state_fn=overcooked_utils.overcooked_env_to_render_fn,
-        assets_to_preload=overcooked_utils.overcooked_preload_assets_spec(),
         hud_text_fn=overcooked_utils.hud_text_fn,
         game_width=overcooked_utils.TILE_SIZE * 7,
         game_height=overcooked_utils.TILE_SIZE * 6,
         background="#e6b453",
+    )
+    .assets(
+        assets_to_preload=overcooked_utils.overcooked_preload_assets_spec(),
     )
     .gameplay(
         default_action=Noop,
@@ -179,7 +184,7 @@ cramped_room_sp_0 = (
         max_steps=1350,
         input_mode=configuration_constants.InputModes.SingleKeystroke,
     )
-    .user_experience(
+    .content(
         scene_header="Overcooked",
         scene_body="<center><p>"
         "You'll now play with a partner for a single round. "
@@ -194,17 +199,17 @@ cramped_room_sp_0 = (
         in_game_scene_body="""
         <center>
         <p>
-        Use the arrow keys <img src="static/assets/keys/arrow_keys_2.png" alt="Keyboard arrow keys" height="24" width="20" style="vertical-align:middle;"> 
-        to control your chef <img src="static/assets/overcooked/blue_chef.png" alt="Blue Chef" height="24" width="24" style="vertical-align:middle;"> 
-        and press <img src="static/assets/keys/icons8-w-key-50.png" alt="W key" height="24" width="24" style="vertical-align:middle;"> to pick up and 
-        drop objects. Try to deliver as many dishes as possible by combining onions in the pot, plating the cooked onions, 
+        Use the arrow keys <img src="static/assets/keys/arrow_keys_2.png" alt="Keyboard arrow keys" height="24" width="20" style="vertical-align:middle;">
+        to control your chef <img src="static/assets/overcooked/blue_chef.png" alt="Blue Chef" height="24" width="24" style="vertical-align:middle;">
+        and press <img src="static/assets/keys/icons8-w-key-50.png" alt="W key" height="24" width="24" style="vertical-align:middle;"> to pick up and
+        drop objects. Try to deliver as many dishes as possible by combining onions in the pot, plating the cooked onions,
         and delivering them to the grey delivery zone.
         </p>
         </center>
         <br><br>
         """,
     )
-    .pyodide(
+    .runtime(
         run_through_pyodide=True,
         environment_initialization_code_filepath="interactive_gym/examples/cogrid/environments/cramped_room_environment_initialization.py",
         packages_to_install=["numpy", "cogrid==0.0.15", "opencv-python"],
@@ -214,7 +219,7 @@ cramped_room_ibc_0 = (
     copy.deepcopy(cramped_room_sp_0)
     .scene(scene_id="cramped_room_ibc_0", experiment_config={})
     .policies(policy_mapping=IBC_POLICY_MAPPING_CRAMPED_ROOM)
-    .user_experience(
+    .content(
         scene_header="Overcooked",
         scene_body="<center><p>"
         "You'll now play another round on the same layout. "
@@ -244,10 +249,10 @@ cramped_room_options_scene_0 = (
 counter_circuit_sp_0 = (
     copy.deepcopy(cramped_room_sp_0)
     .scene(scene_id="counter_circuit_sp_0", experiment_config={})
-    .pyodide(
+    .runtime(
         environment_initialization_code_filepath="interactive_gym/examples/cogrid/environments/counter_circuit_environment_initialization.py"
     )
-    .user_experience(
+    .content(
         scene_header="Overcooked",
         scene_body="<center><p>"
         "You'll now play with a partner for a single round. "
@@ -269,7 +274,7 @@ counter_circuit_ibc_0 = (
     copy.deepcopy(counter_circuit_sp_0)
     .scene(scene_id="counter_circuit_ibc_0", experiment_config={})
     .policies(policy_mapping=IBC_POLICY_MAPPING_COUNTER_CIRCUIT)
-    .user_experience(
+    .content(
         scene_header="Overcooked",
         scene_body="<center><p>"
         "You'll now play another round on the same layout. "
@@ -288,10 +293,10 @@ counter_circuit_options_scene_0 = copy.deepcopy(
 forced_coordination_sp_0 = (
     copy.deepcopy(cramped_room_sp_0)
     .scene(scene_id="forced_coordination_sp_0", experiment_config={})
-    .pyodide(
+    .runtime(
         environment_initialization_code_filepath="interactive_gym/examples/cogrid/environments/forced_coordination_environment_initialization.py"
     )
-    .user_experience(
+    .content(
         scene_header="Overcooked",
         scene_body="<center><p>"
         "You'll now play with a partner for a single round. "
@@ -314,7 +319,7 @@ forced_coordination_ibc_0 = (
     copy.deepcopy(forced_coordination_sp_0)
     .scene(scene_id="forced_coordination_ibc_0", experiment_config={})
     .policies(policy_mapping=IBC_POLICY_MAPPING_FORCED_COORDINATION)
-    .user_experience(
+    .content(
         scene_header="Overcooked",
         scene_body="<center><p>"
         "You'll now play another round on the same layout. "
@@ -332,10 +337,10 @@ forced_coordination_options_scene_0 = copy.deepcopy(
 asymmetric_advantages_sp_0 = (
     copy.deepcopy(cramped_room_sp_0)
     .scene(scene_id="asymmetric_advantages_sp_0", experiment_config={})
-    .pyodide(
+    .runtime(
         environment_initialization_code_filepath="interactive_gym/examples/cogrid/environments/asymmetric_advantages_environment_initialization.py"
     )
-    .user_experience(
+    .content(
         scene_header="Overcooked",
         scene_body="<center><p>"
         "You'll now play with a partner for a single round. "
@@ -357,7 +362,7 @@ asymmetric_advantages_ibc_0 = (
     copy.deepcopy(asymmetric_advantages_sp_0)
     .scene(scene_id="asymmetric_advantages_ibc_0", experiment_config={})
     .policies(policy_mapping=IBC_POLICY_MAPPING_ASYMMETRIC_ADVANTAGES)
-    .user_experience(
+    .content(
         scene_header="Overcooked",
         scene_body="<center><p>"
         "You'll now play another round on the same layout. "
@@ -376,10 +381,10 @@ asymmetric_advantages_options_scene_0 = copy.deepcopy(
 coordination_ring_sp_0 = (
     copy.deepcopy(cramped_room_sp_0)
     .scene(scene_id="coordination_ring_sp_0", experiment_config={})
-    .pyodide(
+    .runtime(
         environment_initialization_code_filepath="interactive_gym/examples/cogrid/environments/coordination_ring_environment_initialization.py"
     )
-    .user_experience(
+    .content(
         scene_header="Overcooked",
         scene_body="<center><p>"
         "You'll now play with a partner for a single round. "
@@ -402,7 +407,7 @@ coordination_ring_ibc_0 = (
     copy.deepcopy(coordination_ring_sp_0)
     .policies(policy_mapping=IBC_POLICY_MAPPING_COORDINATION_RING)
     .scene(scene_id="coordination_ring_ibc_0", experiment_config={})
-    .user_experience(
+    .content(
         scene_header="Overcooked",
         scene_body="<center><p>"
         "You'll now play another round on the same layout. "
@@ -418,7 +423,196 @@ coordination_ring_options_scene_0 = copy.deepcopy(
     cramped_room_options_scene_0
 ).scene(scene_id="coordination_ring_options_scene_0", experiment_config={})
 
+HUMAN_HUMAN_POLICY_MAPPING = {
+    0: configuration_constants.PolicyTypes.Human,
+    1: configuration_constants.PolicyTypes.Human,
+}
 
+cramped_room_human_human = (
+    gym_scene.GymScene()
+    .scene(scene_id="cramped_room_hh", experiment_config={})
+    .policies(policy_mapping=HUMAN_HUMAN_POLICY_MAPPING)
+    .rendering(
+        fps=30,
+        env_to_state_fn=overcooked_utils.overcooked_env_to_render_fn,
+        hud_text_fn=overcooked_utils.hud_text_fn,
+        game_width=overcooked_utils.TILE_SIZE * 7,
+        game_height=overcooked_utils.TILE_SIZE * 6,
+        background="#e6b453",
+    )
+    .assets(
+        assets_to_preload=overcooked_utils.overcooked_preload_assets_spec(),
+    )
+    .gameplay(
+        default_action=Noop,
+        action_mapping=action_mapping,
+        num_episodes=5,
+        max_steps=1350,
+        input_mode=configuration_constants.InputModes.SingleKeystroke,
+    )
+    .content(
+        scene_header="Overcooked - Multiplayer",
+        scene_body="<center><p>"
+        "You'll now play with another human participant! "
+        "Please wait in the lobby for your partner to join. "
+        "<br><br> "
+        "You will be playing on the layout pictured below. "
+        '<center><img src="static/assets/overcooked/cramped_room.png" alt="Annotated Overcooked environment." height="270" width="315"></center>'
+        "Work together to prepare and deliver as many dishes as possible. "
+        "</p></center>",
+        game_page_html_fn=overcooked_utils.overcooked_game_page_header_fn,
+        in_game_scene_body="""
+        <center>
+        <p>
+        Use the arrow keys <img src="static/assets/keys/arrow_keys_2.png" alt="Keyboard arrow keys" height="24" width="20" style="vertical-align:middle;">
+        to control your chef and press <img src="static/assets/keys/icons8-w-key-50.png" alt="W key" height="24" width="24" style="vertical-align:middle;"> to pick up and
+        drop objects. Coordinate with your partner to deliver as many dishes as possible!
+        </p>
+        </center>
+        <br><br>
+        """,
+    )
+    .waitroom(
+        timeout=300000,  # 5 minutes
+        timeout_message="Sorry, we could not find enough players for this study. Please return the HIT now. You will be paid through a Compensation HIT.",
+    )
+    .matchmaking(
+        matchmaker=FIFOMatchmaker(
+            max_p2p_rtt_ms=100,      # only pair participants with <=100ms RTT
+        ),
+        hide_lobby_count=True,
+    )
+    .runtime(
+        run_through_pyodide=True,
+        environment_initialization_code_filepath="interactive_gym/examples/cogrid/environments/cramped_room_environment_initialization_hh.py",
+        packages_to_install=["numpy", "cogrid==0.1.2", "opencv-python"],
+    )
+    .multiplayer(
+        multiplayer=True,
+        state_broadcast_interval=15,
+        server_authoritative=False,
+        input_delay=3,
+        partner_disconnect_message="Your partner disconnected. The task will end here and you will be compensated for your performance so far. Please submit the completion code below.",
+        partner_disconnect_show_completion_code=True,
+    )
+)
+
+counter_circuit_human_human = (
+    copy.deepcopy(cramped_room_human_human)
+    .scene(scene_id="counter_circuit_hh", experiment_config={})
+    .runtime(
+        environment_initialization_code_filepath="interactive_gym/examples/cogrid/environments/counter_circuit_environment_initialization.py"
+    )
+    .content(
+        scene_body="<center><p>"
+        "You'll now play with another human participant! "
+        "Please wait in the lobby for your partner to join. "
+        "<br><br> "
+        "You will be playing on the layout pictured below. "
+        '<center><img src="static/assets/overcooked/counter_circuit.png" alt="Annotated Overcooked environment." height="270" width="315"></center>'
+        "Work together to prepare and deliver as many dishes as possible. "
+        "</p></center>",
+    )
+    .rendering(
+        game_width=overcooked_utils.TILE_SIZE * 9,
+        game_height=overcooked_utils.TILE_SIZE * 7,
+    )
+)
+
+forced_coordination_human_human = (
+    copy.deepcopy(cramped_room_human_human)
+    .scene(scene_id="forced_coordination_hh", experiment_config={})
+    .runtime(
+        environment_initialization_code_filepath="interactive_gym/examples/cogrid/environments/forced_coordination_environment_initialization.py"
+    )
+    .content(
+        scene_body="<center><p>"
+        "You'll now play with another human participant! "
+        "Please wait in the lobby for your partner to join. "
+        "<br><br> "
+        "You will be playing on the layout pictured below. "
+        '<center><img src="static/assets/overcooked/forced_coordination.png" alt="Annotated Overcooked environment." height="270" width="315"></center>'
+        "Work together to prepare and deliver as many dishes as possible. "
+        "</p></center>",
+    )
+    .rendering(
+        game_width=overcooked_utils.TILE_SIZE * 7,
+        game_height=overcooked_utils.TILE_SIZE * 7,
+    )
+)
+
+asymmetric_advantages_human_human = (
+    copy.deepcopy(cramped_room_human_human)
+    .scene(scene_id="asymmetric_advantages_hh", experiment_config={})
+    .runtime(
+        environment_initialization_code_filepath="interactive_gym/examples/cogrid/environments/asymmetric_advantages_environment_initialization.py"
+    )
+    .content(
+        scene_body="<center><p>"
+        "You'll now play with another human participant! "
+        "Please wait in the lobby for your partner to join. "
+        "<br><br> "
+        "You will be playing on the layout pictured below. "
+        '<center><img src="static/assets/overcooked/asymmetric_advantages.png" alt="Annotated Overcooked environment." height="270" width="315"></center>'
+        "Work together to prepare and deliver as many dishes as possible. "
+        "</p></center>",
+    )
+    .rendering(
+        game_width=overcooked_utils.TILE_SIZE * 11,
+        game_height=overcooked_utils.TILE_SIZE * 7,
+    )
+)
+
+coordination_ring_human_human = (
+    copy.deepcopy(cramped_room_human_human)
+    .scene(scene_id="coordination_ring_hh", experiment_config={})
+    .runtime(
+        environment_initialization_code_filepath="interactive_gym/examples/cogrid/environments/coordination_ring_environment_initialization.py"
+    )
+    .content(
+        scene_body="<center><p>"
+        "You'll now play with another human participant! "
+        "Please wait in the lobby for your partner to join. "
+        "<br><br> "
+        "You will be playing on the layout pictured below. "
+        '<center><img src="static/assets/overcooked/coordination_ring.png" alt="Annotated Overcooked environment." height="270" width="315"></center>'
+        "Work together to prepare and deliver as many dishes as possible. "
+        "</p></center>",
+    )
+    .rendering(
+        game_width=overcooked_utils.TILE_SIZE * 7,
+        game_height=overcooked_utils.TILE_SIZE * 7,
+    )
+)
+
+# Feedback scene for multiplayer
+multiplayer_feedback_scene = (
+    static_scene.ScalesAndTextBox(
+        pre_scale_header="",
+        scale_questions=[
+    "On a scale from 1-7, with 1 being detrimental and 7 being beneficial to your success, how effective was your partner as a teammate?",
+    "On a scale from 1-7, with 1 being not at all and 7 being very much, rate how much you enjoyed playing the game with your partner.",
+    "On a scale of 1-7, rate how much you think that your partner contributed to the success of your team. With 1 meaning they made your team worse off and 7 being that they made a very positive contribution.",
+    "On a scale of 1-7, rate how much you think that you contributed to the success of your team. With 1 meaning you made your team worse off and 7 being you made a very positive contribution.",
+    "On a scale from 1 to 7, where 1 is definitely a bot, 4 is unsure, and 7 is definitely a human, indicate how likely you think that your partner is a human or a bot build to play this game?",
+        ],
+        scale_labels=[
+            [str(i+1) for i in range(7)],
+            [str(i+1) for i in range(7)],
+            [str(i+1) for i in range(7)],
+            [str(i+1) for i in range(7)],
+            [str(i+1) for i in range(7)],
+        ],
+        text_box_header="Please provide any additional feedback you would like to share. If you had any technical issues with the task, please describe them here.",
+        scale_size=7,
+    )
+    .scene(scene_id="multiplayer_feedback_scene", experiment_config={})
+    .display(scene_header="Multiplayer Feedback")
+)
+
+# ============================================================================
+# SCENE WRAPPERS
+# ============================================================================
 
 cramped_room_0 = scene.SceneWrapper(
     scenes=[cramped_room_sp_0, cramped_room_ibc_0, cramped_room_options_scene_0]

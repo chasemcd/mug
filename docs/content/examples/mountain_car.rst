@@ -177,7 +177,7 @@ Configure the main gameplay scene:
             max_steps=200,
             input_mode=configuration_constants.InputModes.PressedKeys,
         )
-        .user_experience(
+        .content(
             scene_header="Mountain Car",
             scene_body="<center><p>On this page, Python is initializing...</p></center>",
             in_game_scene_body="""
@@ -186,7 +186,7 @@ Configure the main gameplay scene:
                 </center>
             """,
         )
-        .pyodide(
+        .runtime(
             run_through_pyodide=True,
             environment_initialization_code_filepath=(
                 "interactive_gym/examples/mountain_car/mountain_car_rgb_env.py"

@@ -2,6 +2,7 @@ import slime_volleyball.slimevolley_env as slimevolley_env
 from slime_volleyball.core import constants
 import math
 import typing
+from interactive_gym.configurations.object_contexts import Line, Circle, Polygon
 
 import dataclasses
 
@@ -15,145 +16,6 @@ def to_x(x):
 
 def to_y(y):
     return 1 - y / constants.REF_W
-
-
-@dataclasses.dataclass
-class Line:
-    """
-    Context for a line object to render it.
-
-    :param uuid: Unique identifier for the line
-    :type uuid: str
-    :param color: Color of the line
-    :type color: str
-    :param width: Width of the line
-    :type width: int
-    :param points: List of points defining the line
-    :type points: list[tuple[float, float]]
-
-    .. testcode::
-
-        line = Line(
-            uuid="line1",
-            color="#FF0000",
-            width=2,
-            points=[(0, 0), (100, 100), (200, 0)],
-            fill_below=True,
-            depth=1
-        )
-
-    """
-
-    uuid: str
-    color: str
-    width: int
-    points: list[tuple[float, float]]
-    object_type: str = "line"
-    fill_below: bool = False
-    fill_above: bool = False
-    depth: int = -1
-    permanent: bool = False
-
-    def as_dict(self) -> dict[str, typing.Any]:
-        return dataclasses.asdict(self)
-
-
-@dataclasses.dataclass
-class Circle:
-    """
-    Context for a circle object to render it.
-
-    :param uuid: Unique identifier for the circle
-    :type uuid: str
-    :param color: Color of the circle
-    :type color: str
-    :param x: X-coordinate of the circle's center
-    :type x: float
-    :param y: Y-coordinate of the circle's center
-    :type y: float
-    :param radius: Radius of the circle
-    :type radius: int
-    :param alpha: Alpha value for the circle's transparency
-    :type alpha: float
-    :param object_type: Type of the object
-    :type object_type: str
-    :param depth: Rendering depth of the circle. Higher values are rendered on top
-    :type depth: int
-    :param permanent: Whether the circle should persist across steps.
-
-    .. testcode::
-
-        circle = Circle(
-            uuid="circle1",
-            color="#00FF00",
-            x=150.0,
-            y=150.0,
-            radius=50,
-            alpha=0.8,
-            depth=2,
-            permanent=True
-        )
-    """
-
-    uuid: str
-    color: str
-    x: float
-    y: float
-    radius: int
-    alpha: float = 1
-    object_type: str = "circle"
-    depth: int = -1
-    permanent: bool = False
-
-    def as_dict(self) -> dict[str, typing.Any]:
-        return dataclasses.asdict(self)
-
-
-@dataclasses.dataclass
-class Polygon:
-    """
-    Context for a polygon object to render it.
-
-    :param uuid: Unique identifier for the polygon
-    :type uuid: str
-    :param color: Color of the polygon
-    :type color: str
-    :param points: List of points defining the polygon
-    :type points: list[tuple[float, float]]
-    :param alpha: Alpha value for the polygon's transparency
-    :type alpha: float
-    :param object_type: Type of the object
-    :type object_type: str
-    :param depth: Rendering depth of the polygon. Higher values are rendered on top
-    :type depth: int
-    :param permanent: Whether the polygon should persist across steps.
-    :type permanent: bool
-
-    .. testcode::
-
-        polygon = Polygon(
-            uuid="polygon1",
-            color="#0000FF",
-            points=[(0, 0), (100, 0), (100, 100), (0, 100)],
-            alpha=0.5,
-            depth=3,
-            permanent=False
-        )
-
-    """
-
-    uuid: str
-    color: str
-    points: list[tuple[float, float]]
-    alpha: float = 1
-    object_type: str = "polygon"
-    depth: int = -1
-    permanent: bool = False
-
-    def as_dict(self) -> dict[str, typing.Any]:
-        return dataclasses.asdict(self)
-
-
 def slime_volleyball_env_to_rendering(
     env: slimevolley_env.SlimeVolleyEnv,
 ) -> list:
@@ -219,7 +81,6 @@ def slime_volleyball_env_to_rendering(
         y=env.game.agent_left.y,
         dir=env.game.agent_left.dir,
         radius=env.game.agent_left.r,
-        is_boosting=False,
         color="#FF0000",
         env=env,
     )
@@ -230,7 +91,6 @@ def slime_volleyball_env_to_rendering(
         y=env.game.agent_right.y,
         dir=env.game.agent_right.dir,
         radius=env.game.agent_right.r,
-        is_boosting=False,
         color="#0000FF",
         env=env,
     )
@@ -254,7 +114,6 @@ def generate_slime_agent_objects(
     y: int,
     dir: int,
     radius: int,
-    is_boosting: bool,
     color: str,
     env: slimevolley_env.SlimeVolleyEnv,
     resolution: int = 30,
@@ -271,15 +130,7 @@ def generate_slime_agent_objects(
         Polygon(uuid=f"{identifier}_body", color=color, points=points, depth=-1)
     )
 
-    if is_boosting:
-        objects.append(
-            Polygon(
-                uuid=f"{identifier}_body_boost",
-                color="#FFFF00",
-                points=[p * 1.1 for p in points],
-                depth=-1,
-            )
-        )
+    # You can also render with sprites, which could be done like this:
     # objects.append(
     #     Sprite(
     #         uuid=f"{identifier}_body_sprite",
@@ -333,15 +184,109 @@ class SlimeVBEnvIG(slimevolley_env.SlimeVolleyEnv):
         assert self.render_mode == "interactive-gym"
         return slime_volleyball_env_to_rendering(self)
 
-    # def reset(self):
-    #     obs, infos = super().reset()
-    #     obs = {k: v["obs"] for k, v in obs.items()}
-    #     return obs, infos
+    def get_state(self) -> dict[str, int | float | str]:
+        """Return the state that fully describes the game for state syncing.
 
-    # def step(self, actions):
-    #     obs, rews, terminateds, truncateds, infos = super().step(actions)
-    #     obs = {k: v["obs"] for k, v in obs.items()}
-    #     return obs, rews, terminateds, truncateds, infos
+        :return: State that fully describes the game for state syncing.
+        :rtype: dict
+        """
+        return {
+            # Timestep
+            "t": self.t,
+            # Delay screen state (countdown before ball starts moving)
+            "delay_screen_life": self.game.delay_screen.life,
+            # Ball State
+            "ball_x": self.game.ball.x,
+            "ball_y": self.game.ball.y,
+            "ball_prev_x": self.game.ball.prev_x,
+            "ball_prev_y": self.game.ball.prev_y,
+            "ball_vx": self.game.ball.vx,
+            "ball_vy": self.game.ball.vy,
+            "ball_r": self.game.ball.r,
+            "ball_c": self.game.ball.c,
+            # Agent Left State
+            "agent_left_dir": self.game.agent_left.dir,
+            "agent_left_x": self.game.agent_left.x,
+            "agent_left_y": self.game.agent_left.y,
+            "agent_left_r": self.game.agent_left.r,
+            "agent_left_c": self.game.agent_left.c,
+            "agent_left_vx": self.game.agent_left.vx,
+            "agent_left_vy": self.game.agent_left.vy,
+            "agent_left_desired_vx": self.game.agent_left.desired_vx,
+            "agent_left_desired_vy": self.game.agent_left.desired_vy,
+            "agent_left_powerups_available": self.game.agent_left.powerups_available,
+            "agent_left_powered_up_timer": self.game.agent_left.powered_up_timer,
+            "agent_left_emotion": self.game.agent_left.emotion,
+            "agent_left_life": self.game.agent_left.life,
+            "agent_left_should_powerup": self.game.agent_left.should_powerup,
+            # Agent Right State
+            "agent_right_dir": self.game.agent_right.dir,
+            "agent_right_x": self.game.agent_right.x,
+            "agent_right_y": self.game.agent_right.y,
+            "agent_right_r": self.game.agent_right.r,
+            "agent_right_c": self.game.agent_right.c,
+            "agent_right_vx": self.game.agent_right.vx,
+            "agent_right_vy": self.game.agent_right.vy,
+            "agent_right_desired_vx": self.game.agent_right.desired_vx,
+            "agent_right_desired_vy": self.game.agent_right.desired_vy,
+            "agent_right_powerups_available": self.game.agent_right.powerups_available,
+            "agent_right_powered_up_timer": self.game.agent_right.powered_up_timer,
+            "agent_right_emotion": self.game.agent_right.emotion,
+            "agent_right_life": self.game.agent_right.life,
+            "agent_right_should_powerup": self.game.agent_right.should_powerup,
+        }
 
+    def set_state(self, state: dict[str, int | float | str]) -> None:
+        """Set the state of the environment from a state dictionary.
 
-env = SlimeVBEnvIG(config={"human_inputs": True}, render_mode="interactive-gym")
+        :param state: State dictionary containing the state of the environment.
+        :type state: dict[str, int | float | str]
+        """
+        # Timestep
+        self.t = state["t"]
+        # Delay screen state (countdown before ball starts moving)
+        self.game.delay_screen.life = state["delay_screen_life"]
+        # Ball State
+        self.game.ball.x = state["ball_x"]
+        self.game.ball.y = state["ball_y"]
+        self.game.ball.prev_x = state["ball_prev_x"]
+        self.game.ball.prev_y = state["ball_prev_y"]
+        self.game.ball.vx = state["ball_vx"]
+        self.game.ball.vy = state["ball_vy"]
+        self.game.ball.r = state["ball_r"]
+        self.game.ball.c = state["ball_c"]
+        # Agent Left State
+        self.game.agent_left.dir = state["agent_left_dir"]
+        self.game.agent_left.x = state["agent_left_x"]
+        self.game.agent_left.y = state["agent_left_y"]
+        self.game.agent_left.r = state["agent_left_r"]
+        self.game.agent_left.c = state["agent_left_c"]
+        self.game.agent_left.vx = state["agent_left_vx"]
+        self.game.agent_left.vy = state["agent_left_vy"]
+        self.game.agent_left.desired_vx = state["agent_left_desired_vx"]
+        self.game.agent_left.desired_vy = state["agent_left_desired_vy"]
+        self.game.agent_left.powerups_available = state["agent_left_powerups_available"]
+        self.game.agent_left.powered_up_timer = state["agent_left_powered_up_timer"]
+        self.game.agent_left.emotion = state["agent_left_emotion"]
+        self.game.agent_left.life = state["agent_left_life"]
+        self.game.agent_left.should_powerup = state["agent_left_should_powerup"]
+        # Agent Right State
+        self.game.agent_right.dir = state["agent_right_dir"]
+        self.game.agent_right.x = state["agent_right_x"]
+        self.game.agent_right.y = state["agent_right_y"]
+        self.game.agent_right.r = state["agent_right_r"]
+        self.game.agent_right.c = state["agent_right_c"]
+        self.game.agent_right.vx = state["agent_right_vx"]
+        self.game.agent_right.vy = state["agent_right_vy"]
+        self.game.agent_right.desired_vx = state["agent_right_desired_vx"]
+        self.game.agent_right.desired_vy = state["agent_right_desired_vy"]
+        self.game.agent_right.powerups_available = state["agent_right_powerups_available"]
+        self.game.agent_right.powered_up_timer = state["agent_right_powered_up_timer"]
+        self.game.agent_right.emotion = state["agent_right_emotion"]
+        self.game.agent_right.life = state["agent_right_life"]
+        self.game.agent_right.should_powerup = state["agent_right_should_powerup"]
+
+# Initialize the environment for use in the browser. SlimeVB uses a seed only in initialization
+# rather than on reset() so that each episode isn't identical; we want the sequence of episodes to 
+# be identical. 
+env = SlimeVBEnvIG(config={"human_inputs": True, "seed": 42}, render_mode="interactive-gym")

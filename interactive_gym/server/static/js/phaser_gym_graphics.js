@@ -30,18 +30,69 @@ let botActionBuffers = {};
 
 let humanKeyPressBuffer = [];
 const MAX_KEY_PRESS_BUFFER_SIZE = 1;
-export function addHumanKeyPressToBuffer(action) {
-    // TODO(chase): this should filter out actions that aren't allowed, 
+/**
+ * Add a keypress to the buffer with timestamp (DIAG-01, DIAG-02).
+ * @param {Object|string} input - Either {key, keypressTimestamp} object or legacy action string
+ */
+export function addHumanKeyPressToBuffer(input) {
+    // TODO(chase): this should filter out actions that aren't allowed,
     // otherwise hitting an unrelated key could cancel out previous actions.
-    if (humanKeyPressBuffer >= MAX_KEY_PRESS_BUFFER_SIZE) {
-        humanKeyPressBuffer.shift(); // remove the oldest state
+    // BUG FIX: Was comparing array to number, should compare length
+    if (humanKeyPressBuffer.length >= MAX_KEY_PRESS_BUFFER_SIZE) {
+        const dropped = humanKeyPressBuffer.shift(); // remove the oldest state
+        console.warn(`[INPUT-DROPPED] key=${dropped.key} age=${(performance.now() - dropped.keypressTimestamp).toFixed(1)}ms - buffer full`);
     }
-    humanKeyPressBuffer.push(action);
+    // Support both new format {key, keypressTimestamp} and legacy string format
+    if (typeof input === 'object' && input.key !== undefined) {
+        humanKeyPressBuffer.push({
+            key: input.key,
+            keypressTimestamp: input.keypressTimestamp
+        });
+    } else {
+        // Legacy format - use current time as timestamp
+        humanKeyPressBuffer.push({
+            key: input,
+            keypressTimestamp: performance.now()
+        });
+    }
 }
 
 export var pressedKeys = {};
-export function updatePressedKeys(updatedPressedKeys) {
+// DIAG-01: Track timestamps for when each key was first pressed
+export var pressedKeyTimestamps = {};
+
+/**
+ * Update pressed keys with optional timestamp tracking (DIAG-01).
+ * @param {Object} updatedPressedKeys - Map of key -> true for pressed keys
+ * @param {number} keypressTimestamp - Optional timestamp for newly pressed keys
+ */
+export function updatePressedKeys(updatedPressedKeys, keypressTimestamp = null) {
+    // Track timestamps for newly pressed keys
+    if (keypressTimestamp !== null) {
+        for (const key of Object.keys(updatedPressedKeys)) {
+            // Only set timestamp if key is newly pressed (not already in pressedKeyTimestamps)
+            if (pressedKeyTimestamps[key] === undefined) {
+                pressedKeyTimestamps[key] = keypressTimestamp;
+            }
+        }
+    }
+    // Remove timestamps for released keys
+    for (const key of Object.keys(pressedKeyTimestamps)) {
+        if (!updatedPressedKeys[key]) {
+            delete pressedKeyTimestamps[key];
+        }
+    }
     pressedKeys = updatedPressedKeys;
+}
+
+/**
+ * Clear all human input buffers.
+ * Called when game pauses (waiting for partner) to prevent input accumulation.
+ */
+export function clearHumanInputBuffers() {
+    humanKeyPressBuffer = [];
+    pressedKeys = {};
+    pressedKeyTimestamps = {};
 }
 
 // Contains the last action submitted at each step
@@ -59,9 +110,11 @@ class RemoteGameDataLogger {
             terminateds: {},
             truncateds: {},
             infos: {},
+            isFocused: {},  // Per-player focus state (true = focused, false = backgrounded)
             episode_num: [],
             t: [],
-            timestamp: []
+            timestamp: [],
+            player_subjects: null  // Set once when available (player_id -> subject_id mapping)
         };
     }
 
@@ -83,7 +136,7 @@ class RemoteGameDataLogger {
             }
         };
 
-        ['observations', 'actions', 'rewards', 'terminateds', 'truncateds'].forEach(logDataForField);
+        ['observations', 'actions', 'rewards', 'terminateds', 'truncateds', 'isFocused'].forEach(logDataForField);
         
         if (gameData.infos !== undefined) {
             const infos = gameData.infos instanceof Map ? Object.fromEntries(gameData.infos) : gameData.infos;
@@ -102,12 +155,16 @@ class RemoteGameDataLogger {
 
         if (gameData.episode_num !== undefined) {
             this.data.episode_num.push(gameData.episode_num);
-        } 
+        }
         if (gameData.t !== undefined) {
             this.data.t.push(gameData.t);
         }
 
-        
+        // Store player_subjects mapping (only needs to be set once, not per-frame)
+        if (gameData.player_subjects !== undefined && this.data.player_subjects === null) {
+            this.data.player_subjects = gameData.player_subjects;
+        }
+
         // Always add the current timestamp
         this.data.timestamp.push(Date.now());
     }
@@ -124,9 +181,11 @@ class RemoteGameDataLogger {
             terminateds: {},
             truncateds: {},
             infos: {},
+            isFocused: {},
             episode_num: [],
             t: [],
-            timestamp: []
+            timestamp: [],
+            player_subjects: null
         };
     }
 }
@@ -139,14 +198,69 @@ export function getRemoteGameData() {
     return data;
 }
 
+/**
+ * Emit episode data incrementally to avoid large payloads at scene end.
+ * Called at the end of each episode to send data in manageable chunks.
+ * @param {string} sceneId - The scene ID for file organization
+ * @param {number} episodeNum - The episode number (0-indexed)
+ */
+export function emitEpisodeData(sceneId, episodeNum) {
+    if (!window.socket) {
+        console.error('[emitEpisodeData] Socket not available');
+        return;
+    }
+
+    // Get current data and reset logger for next episode
+    const episodeData = remoteGameLogger.getData();
+    remoteGameLogger.reset();
+
+    // Skip if no data to send
+    if (!episodeData || episodeData.t.length === 0) {
+        console.log(`[emitEpisodeData] No data to emit for episode ${episodeNum}`);
+        return;
+    }
+
+    // Encode to msgpack for efficient transmission
+    const binaryData = msgpack.encode(episodeData);
+
+    console.log(`[emitEpisodeData] Emitting episode ${episodeNum} data: ${episodeData.t.length} frames, ${binaryData.byteLength} bytes`);
+
+    window.socket.emit("emit_episode_data", {
+        data: binaryData,
+        scene_id: sceneId,
+        episode_num: episodeNum,
+        session_id: window.sessionId,
+        interactiveGymGlobals: window.interactiveGymGlobals
+    });
+}
+
 export function graphics_start(graphics_config) {
+    // Clean up any existing game instance before creating a new one
+    // This prevents duplicate Phaser canvases from appearing
+    if (game_graphics && game_graphics.game) {
+        console.log("[graphics_start] Destroying existing game instance before creating new one");
+        try {
+            $("#gameContainer").empty();
+            game_graphics.game.destroy(true);
+        } catch (e) {
+            console.warn("[graphics_start] Error destroying existing game:", e);
+        }
+        stateBuffer = [];
+    }
     game_graphics = new GraphicsManager(game_config, graphics_config);
 }
 
 
 export function graphics_end() {
     $("#gameContainer").empty();
-    game_graphics.game.destroy(true);
+    if (game_graphics && game_graphics.game) {
+        try {
+            game_graphics.game.destroy(true);
+        } catch (e) {
+            console.warn("[graphics_end] Error destroying game:", e);
+        }
+    }
+    game_graphics = null;
     stateBuffer = [];
 }
 
@@ -208,6 +322,7 @@ class GymScene extends Phaser.Scene {
         this.pyodide_remote_game = config.pyodide_remote_game;
         this.isProcessingPyodide = false;
         this.stateImageSprite = null;
+
         if (this.pyodide_remote_game) {
             this.pyodide_remote_game.reinitialize_environment(this.pyodide_remote_game.config);
         }
@@ -265,7 +380,36 @@ class GymScene extends Phaser.Scene {
             this.state = stateBuffer.shift(); // get the oldest state from the buffer
             this.drawState()
         }
+
+        // Register Worker tick callback for multiplayer games (Phase 24)
+        // Worker timing ensures game logic advances even when tab is backgrounded
+        if (this.pyodide_remote_game?.registerTickCallback) {
+            this.pyodide_remote_game.registerTickCallback(() => this.onWorkerTick());
+        }
     };
+
+    /**
+     * Handle a tick from the Web Worker timer (Phase 24).
+     * Called by MultiplayerPyodideGame when Worker sends a tick.
+     * Triggers game logic processing and clears the processing flag when done.
+     */
+    async onWorkerTick() {
+        const tickProcessStart = performance.now();
+        await this.processPyodideGame();
+        const tickProcessTime = performance.now() - tickProcessStart;
+
+        // Clear the processing flag after game step completes
+        if (this.pyodide_remote_game) {
+            this.pyodide_remote_game.isProcessingTick = false;
+
+            // Warn if processing took longer than the frame budget
+            const frame = this.pyodide_remote_game.frameNumber;
+            const targetInterval = 1000 / (this.pyodide_remote_game.config?.fps || 10);
+            if (tickProcessTime > targetInterval) {
+                console.warn(`[TICK-OVERRUN] frame=${frame} processTime=${tickProcessTime.toFixed(1)}ms EXCEEDS budget=${targetInterval.toFixed(0)}ms - WILL CAUSE LAG`);
+            }
+        }
+    }
 
     update() {
 
@@ -274,10 +418,26 @@ class GymScene extends Phaser.Scene {
             return;
         };
 
-        if (this.pyodide_remote_game && !this.isProcessingPyodide && this.pyodide_remote_game.pyodideReady) {
-            this.processPyodideGame();
+        // For multiplayer games with Worker timing (Phase 24):
+        // Game logic (processPyodideGame) is triggered by Worker ticks, not Phaser's RAF loop.
+        // Worker ticks continue at full speed even when tab is backgrounded.
+        // Phaser's update() only handles rendering in this case.
+        const hasWorkerTiming = this.pyodide_remote_game?.timerWorker;
+
+        // For single-player games or games without Worker: use original RAF-driven processing
+        if (!hasWorkerTiming) {
+            // Check if game is ready to process:
+            // 1. pyodide_remote_game exists
+            // 2. Not already processing
+            // 3. Pyodide is ready
+            // 4. P2P is ready (for multiplayer - waits for WebRTC connection or timeout)
+            const p2pReady = !this.pyodide_remote_game?.isP2PReady || this.pyodide_remote_game.isP2PReady();
+            if (this.pyodide_remote_game && !this.isProcessingPyodide && this.pyodide_remote_game.pyodideReady && p2pReady) {
+                this.processPyodideGame();
+            }
         }
-        
+
+        // Rendering always happens (will pause naturally when tab is backgrounded via RAF)
         this.processRendering();
     };
 
@@ -291,30 +451,78 @@ class GymScene extends Phaser.Scene {
                 currentObservations = {};
                 clearStateBuffer();
                 this.removeAllObjects();
-                [currentObservations, infos, render_state] = await this.pyodide_remote_game.reset();
+                const resetResult = await this.pyodide_remote_game.reset();
+
+                // Handle null return (shouldn't happen for reset, but be safe)
+                if (resetResult === null) {
+                    this.isProcessingPyodide = false;
+                    return;
+                }
+
+                [currentObservations, infos, render_state] = resetResult;
+                console.debug("[MultiplayerPyodide] Reset result:", resetResult);
                 remoteGameLogger.logData(
                     {
                         observations: currentObservations,
-                        infos: infos, 
-                        episode_num: this.pyodide_remote_game.num_episodes, 
-                        t: this.pyodide_remote_game.step_num
+                        infos: infos,
+                        episode_num: this.pyodide_remote_game.num_episodes,
+                        t: this.pyodide_remote_game.step_num,
+                        player_subjects: this.pyodide_remote_game.playerSubjects,
+                        isFocused: this.pyodide_remote_game.getFocusStatePerPlayer?.() || {}
                     });
             } else {
                 const actions = await this.buildPyodideActionDict();
                 previousSubmittedActions = actions;
-                [currentObservations, rewards, terminateds, truncateds, infos, render_state] = await this.pyodide_remote_game.step(actions);
-                remoteGameLogger.logData(
-                    {
-                        observations: currentObservations, 
-                        actions: actions, 
-                        rewards: rewards, 
-                        terminateds: terminateds, 
-                        truncateds: truncateds, 
-                        infos: infos, 
-                        episode_num: this.pyodide_remote_game.num_episodes, 
-                        t: this.pyodide_remote_game.step_num
-                    });
-            }             
+
+                // DIAG-02: Pass input timestamps to step() for pipeline tracking
+                const inputTimestamps = this._pendingInputTimestamps;
+                this._pendingInputTimestamps = null;  // Clear after reading
+
+                // Pass timestamps to pyodide_remote_game for latency tracking
+                if (inputTimestamps && this.pyodide_remote_game.setInputTimestamps) {
+                    this.pyodide_remote_game.setInputTimestamps(inputTimestamps);
+                }
+
+                const stepResult = await this.pyodide_remote_game.step(actions);
+
+                // Handle null return (e.g., game paused for resync)
+                if (stepResult === null) {
+                    this.isProcessingPyodide = false;
+                    return;
+                }
+
+                // stepResult may include synchronized actions (7th element) from multiplayer games
+                let syncedActions;
+                if (stepResult.length >= 7) {
+                    [currentObservations, rewards, terminateds, truncateds, infos, render_state, syncedActions] = stepResult;
+                } else {
+                    [currentObservations, rewards, terminateds, truncateds, infos, render_state] = stepResult;
+                    syncedActions = actions;  // Fallback to local actions for single-player
+                }
+
+                // Check if this is a multiplayer game with rollback support
+                // For multiplayer, frame data is stored inside step() to ensure correct frame number
+                // Only use remoteGameLogger for single-player mode
+                const isMultiplayerWithRollback = this.pyodide_remote_game.storeFrameData !== undefined;
+
+                if (!isMultiplayerWithRollback) {
+                    // Single-player mode: use standard logger (no rollback concerns)
+                    remoteGameLogger.logData(
+                        {
+                            observations: currentObservations,
+                            actions: syncedActions,
+                            rewards: rewards,
+                            terminateds: terminateds,
+                            truncateds: truncateds,
+                            infos: infos,
+                            episode_num: this.pyodide_remote_game.num_episodes,
+                            t: this.pyodide_remote_game.step_num,
+                            player_subjects: this.pyodide_remote_game.playerSubjects,
+                            isFocused: this.pyodide_remote_game.getFocusStatePerPlayer?.() || {}
+                        });
+                }
+                // Note: For multiplayer, data is stored in step() before frameNumber++ to ensure correct frame
+            }
             addStateToBuffer(render_state);
         }
         this.isProcessingPyodide = false;
@@ -322,25 +530,50 @@ class GymScene extends Phaser.Scene {
 
     async buildPyodideActionDict() {
         let actions = {};
+        // DIAG-02: Store input timestamps for pipeline latency tracking
+        this._pendingInputTimestamps = null;
 
-        // Identify which policy corresponds to the human by checking for the human value in policy_mapping
-        let human_policy_agent_id = Object.keys(
-            this.scene_metadata.policy_mapping
-        ).find(
-                key => this.scene_metadata.policy_mapping[key] == "human"
-        );
+        // In multiplayer mode, only collect keyboard input for THIS player's agent
+        let isMultiplayer = this.pyodide_remote_game && this.pyodide_remote_game.myPlayerId !== undefined;
+        let myPlayerId = isMultiplayer ? String(this.pyodide_remote_game.myPlayerId) : null;
 
-        // Get the human action and populate the actions dictionary with corresponding agent id key
-        if (human_policy_agent_id !== undefined) {
-            actions[human_policy_agent_id] = this.getHumanAction();
-        }
-
-        // Loop over the policy mapping and populate the actions dictionary with bot actions
+        // Loop over all agents in the policy mapping
         for (let [agentID, policy] of Object.entries(this.scene_metadata.policy_mapping)) {
-            if (agentID == human_policy_agent_id) {
-                continue;
+            if (policy == "human") {
+                // In multiplayer, only get keyboard input for MY player
+                if (isMultiplayer) {
+                    if (agentID == myPlayerId) {
+                        const humanActionResult = this.getHumanAction();
+                        actions[agentID] = humanActionResult.action;
+                        // Store timestamps if this was a real input (not default action)
+                        if (humanActionResult.hasRealInput && humanActionResult.keypressTimestamp !== null) {
+                            this._pendingInputTimestamps = {
+                                playerId: agentID,
+                                keypressTimestamp: humanActionResult.keypressTimestamp,
+                                queueExitTimestamp: humanActionResult.queueExitTimestamp
+                            };
+                        }
+                    } else {
+                        // Other human players - use default action (will be replaced by server)
+                        actions[agentID] = this.scene_metadata.default_action || 0;
+                    }
+                } else {
+                    // Single player - get keyboard input for this human
+                    const humanActionResult = this.getHumanAction();
+                    actions[agentID] = humanActionResult.action;
+                    // Store timestamps if this was a real input (not default action)
+                    if (humanActionResult.hasRealInput && humanActionResult.keypressTimestamp !== null) {
+                        this._pendingInputTimestamps = {
+                            playerId: agentID,
+                            keypressTimestamp: humanActionResult.keypressTimestamp,
+                            queueExitTimestamp: humanActionResult.queueExitTimestamp
+                        };
+                    }
+                }
+            } else {
+                // Bot agent
+                actions[agentID] = this.getBotAction(agentID);
             }
-            actions[agentID] = this.getBotAction(agentID);
         }
 
         return actions;
@@ -393,15 +626,28 @@ class GymScene extends Phaser.Scene {
         botActionBuffers[agentID].push(action);
     }
 
+    /**
+     * Get the current human action with timestamps for latency tracking (DIAG-01, DIAG-02).
+     * @returns {Object} {action, keypressTimestamp, queueExitTimestamp, hasRealInput}
+     */
     getHumanAction() {
         let human_action;
+        let keypressTimestamp = null;
+        let hasRealInput = false;  // True if this is from actual user input (not default action)
+        const queueExitTimestamp = performance.now();  // DIAG-02: Capture exit time
 
         // If single_keystroke, we'll get the action that was added to the buffer when the key was pressed
         if (this.scene_metadata.input_mode === "single_keystroke") {
             if (humanKeyPressBuffer.length > 0) {
-                human_action = this.scene_metadata.action_mapping[humanKeyPressBuffer.shift()];
+                const bufferedInput = humanKeyPressBuffer.shift();
+                // Get keypress timestamp and key from the buffered object
+                keypressTimestamp = bufferedInput.keypressTimestamp;
+                const key = bufferedInput.key;
+                human_action = this.scene_metadata.action_mapping[key];
                 if (human_action == undefined) {
                     human_action = this.scene_metadata.default_action;
+                } else {
+                    hasRealInput = true;
                 }
             } else {
                 human_action = this.scene_metadata.default_action;
@@ -412,20 +658,36 @@ class GymScene extends Phaser.Scene {
                 // if no keys are pressed, we'll use the default action
                 human_action = this.scene_metadata.default_action;
             } else if (Object.keys(pressedKeys).length === 1) {
-                human_action = this.scene_metadata.action_mapping[Object.keys(pressedKeys)[0]];
+                const key = Object.keys(pressedKeys)[0];
+                human_action = this.scene_metadata.action_mapping[key];
+                // Get the earliest timestamp of currently pressed keys
+                keypressTimestamp = pressedKeyTimestamps[key] || null;
                 if (human_action == undefined) {
                     human_action = this.scene_metadata.default_action;
+                } else {
+                    hasRealInput = true;
                 }
             } else {
                 // multiple keys are pressed so check for a composite action
-                human_action = this.scene_metadata.action_mapping[this.generateCompositeAction()[0]];
+                const compositeKey = this.generateCompositeAction()[0];
+                human_action = this.scene_metadata.action_mapping[compositeKey];
+                // Get the earliest timestamp of all currently pressed keys
+                const timestamps = Object.values(pressedKeyTimestamps).filter(t => t !== undefined);
+                keypressTimestamp = timestamps.length > 0 ? Math.min(...timestamps) : null;
                 if (human_action == undefined) {
                     human_action = this.scene_metadata.default_action;
+                } else {
+                    hasRealInput = true;
                 }
             }
         }
 
-        return human_action;
+        return {
+            action: human_action,
+            keypressTimestamp: keypressTimestamp,
+            queueExitTimestamp: queueExitTimestamp,
+            hasRealInput: hasRealInput
+        };
     }
 
     generateCompositeAction() {
@@ -473,9 +735,41 @@ class GymScene extends Phaser.Scene {
     }
 
     processRendering() {
-        if (stateBuffer.length > 0) {
-            this.state = stateBuffer.shift(); // get the oldest state from the buffer
+        const frame = this.pyodide_remote_game?.frameNumber || 0;
+
+        // FIX: Drain buffer by rendering multiple states when behind
+        // This catches up without skipping visual frames
+        const targetBufferSize = 1;  // Ideal: always render the latest
+        const maxRenderPerFrame = 5; // Safety limit to avoid long frames
+
+        let renderCount = 0;
+        const startBufferLen = stateBuffer.length;
+
+        while (stateBuffer.length > targetBufferSize && renderCount < maxRenderPerFrame) {
+            this.state = stateBuffer.shift();
             this.drawState();
+            renderCount++;
+        }
+
+        if (renderCount > 1) {
+            console.log(`[RENDER-CATCHUP] frame=${frame} rendered ${renderCount} states to catch up (was ${startBufferLen} behind)`);
+        }
+
+        // Render the final state with latency tracking
+        if (stateBuffer.length > 0) {
+            // DIAG-05: Capture render begin timestamp
+            const renderBeginTimestamp = performance.now();
+
+            this.state = stateBuffer.shift();
+            this.drawState();
+
+            // DIAG-06: Capture render complete timestamp
+            const renderCompleteTimestamp = performance.now();
+
+            // DIAG-07: Log pipeline latency if pyodide_remote_game supports it
+            if (this.pyodide_remote_game?.logPipelineLatency) {
+                this.pyodide_remote_game.logPipelineLatency(renderBeginTimestamp, renderCompleteTimestamp);
+            }
         }
     }
 
@@ -488,7 +782,7 @@ class GymScene extends Phaser.Scene {
 
         // Retrieve the list of object contexts
         if (this.state == null || this.state == undefined) {
-            console.log("No state to render.");
+            console.debug("No state to render.");
             return;
         }
 
@@ -525,7 +819,7 @@ class GymScene extends Phaser.Scene {
             img.src = url;
 
             img.onload = () => {
-                console.log("Image loaded successfully:", img.width, img.height);
+                console.debug("Image loaded successfully:", img.width, img.height);
 
                 // Create a temporary canvas to ensure it's WebGL-compatible
                 const canvas = document.createElement("canvas");
@@ -817,26 +1111,71 @@ class GymScene extends Phaser.Scene {
     }
 
     _addCircle(circle_config, object_map) {
+        let x = circle_config.x * this.width;
+        let y = circle_config.y * this.height;
 
-        var graphics = this.add.graphics();
-        graphics.setDepth(circle_config.depth);
+        // Create a container at the target position
+        let container = this.add.container(x, y);
+        container.setDepth(circle_config.depth);
 
-        // Set the fill style (color and alpha)
-        graphics.fillStyle(this._strToHex(circle_config.color), circle_config.alpha); // Red color, fully opaque
+        // Create graphics and draw circle at origin (0,0) relative to container
+        let graphics = this.add.graphics();
+        graphics.fillStyle(this._strToHex(circle_config.color), circle_config.alpha);
+        graphics.fillCircle(0, 0, circle_config.radius);
 
-        // Draw a filled circle (x, y, radius)
-        object_map[circle_config.uuid] = graphics.fillCircle(
-            circle_config.x * this.width,
-            circle_config.y * this.height,
-            circle_config.radius,
-        );
+        container.add(graphics);
+
+        // Store container in object_map with tween tracking
+        container.tween = null;
+        container.graphics = graphics;  // Keep reference for redraws
+        container.lastConfig = circle_config;  // Store config for redraws
+        object_map[circle_config.uuid] = container;
     }
 
     _updateCircle(circle_config, object_map) {
         let uuid = circle_config.uuid;
-        let graphics = object_map[uuid];
-        graphics.clear();
-        this._addCircle(circle_config, object_map);
+        let container = object_map[uuid];
+
+        let new_x = circle_config.x * this.width;
+        let new_y = circle_config.y * this.height;
+
+        // Check if color or radius changed - need to redraw
+        let lastConfig = container.lastConfig;
+        if (lastConfig.color !== circle_config.color ||
+            lastConfig.radius !== circle_config.radius ||
+            lastConfig.alpha !== circle_config.alpha) {
+            container.graphics.clear();
+            container.graphics.fillStyle(this._strToHex(circle_config.color), circle_config.alpha);
+            container.graphics.fillCircle(0, 0, circle_config.radius);
+            container.lastConfig = circle_config;
+        }
+
+        // Update depth if changed
+        container.setDepth(circle_config.depth);
+
+        // Handle position update with optional tweening
+        if (
+            circle_config.tween === true &&
+            container.tween === null &&
+            (new_x !== container.x || new_y !== container.y)
+        ) {
+            container.tween = this.tweens.add({
+                targets: [container],
+                x: new_x,
+                y: new_y,
+                duration: circle_config.tween_duration || 100,
+                ease: 'Linear',
+                onComplete: () => {
+                    container.tween = null;
+                }
+            });
+        } else if (
+            container.tween === null &&
+            (new_x !== container.x || new_y !== container.y)
+        ) {
+            container.x = new_x;
+            container.y = new_y;
+        }
     }
 
     _addRectangle(rectangle_config, object_map) {
@@ -848,27 +1187,107 @@ class GymScene extends Phaser.Scene {
     }
 
     _addPolygon(polygon_config, object_map) {
+        // Calculate centroid of polygon for container position
+        let points = polygon_config.points;
+        let centroidX = points.reduce((sum, p) => sum + p[0], 0) / points.length * this.width;
+        let centroidY = points.reduce((sum, p) => sum + p[1], 0) / points.length * this.height;
 
+        // Create a container at the centroid
+        let container = this.add.container(centroidX, centroidY);
+        container.setDepth(polygon_config.depth);
+
+        // Create graphics and draw polygon relative to container origin
         let graphics = this.add.graphics();
-        var points = polygon_config.points.map((point) => new Phaser.Math.Vector2(point[0] * this.width, point[1] * this.height))
+        let relativePoints = points.map((point) =>
+            new Phaser.Math.Vector2(
+                point[0] * this.width - centroidX,
+                point[1] * this.height - centroidY
+            )
+        );
 
-        graphics.setDepth(polygon_config.depth);
-
-
-        // Set the fill style (color and alpha)
         graphics.fillStyle(this._strToHex(polygon_config.color), polygon_config.alpha);
+        graphics.fillPoints(relativePoints, true);
 
-        // Draw the filled polygon
-        graphics.fillPoints(points, true); // 'true' to close the polygon
+        container.add(graphics);
 
-        object_map[polygon_config.uuid] = graphics;
+        // Store container in object_map with tween tracking
+        container.tween = null;
+        container.graphics = graphics;
+        container.lastConfig = polygon_config;
+        container.lastCentroid = { x: centroidX, y: centroidY };
+        object_map[polygon_config.uuid] = container;
     }
 
     _updatePolygon(polygon_config, object_map) {
         let uuid = polygon_config.uuid;
-        let graphics = object_map[uuid];
-        graphics.clear();
-        this._addPolygon(polygon_config, object_map);
+        let container = object_map[uuid];
+
+        // Calculate new centroid
+        let points = polygon_config.points;
+        let newCentroidX = points.reduce((sum, p) => sum + p[0], 0) / points.length * this.width;
+        let newCentroidY = points.reduce((sum, p) => sum + p[1], 0) / points.length * this.height;
+
+        // Check if polygon shape changed (color, alpha, or relative point positions)
+        let lastConfig = container.lastConfig;
+        let shapeChanged = lastConfig.color !== polygon_config.color ||
+            lastConfig.alpha !== polygon_config.alpha ||
+            lastConfig.points.length !== polygon_config.points.length;
+
+        if (!shapeChanged) {
+            // Check if relative positions changed (shape deformation)
+            for (let i = 0; i < points.length; i++) {
+                let lastRelX = lastConfig.points[i][0] * this.width - container.lastCentroid.x;
+                let lastRelY = lastConfig.points[i][1] * this.height - container.lastCentroid.y;
+                let newRelX = points[i][0] * this.width - newCentroidX;
+                let newRelY = points[i][1] * this.height - newCentroidY;
+                if (Math.abs(lastRelX - newRelX) > 0.1 || Math.abs(lastRelY - newRelY) > 0.1) {
+                    shapeChanged = true;
+                    break;
+                }
+            }
+        }
+
+        if (shapeChanged) {
+            // Redraw the polygon
+            container.graphics.clear();
+            let relativePoints = points.map((point) =>
+                new Phaser.Math.Vector2(
+                    point[0] * this.width - newCentroidX,
+                    point[1] * this.height - newCentroidY
+                )
+            );
+            container.graphics.fillStyle(this._strToHex(polygon_config.color), polygon_config.alpha);
+            container.graphics.fillPoints(relativePoints, true);
+            container.lastConfig = polygon_config;
+            container.lastCentroid = { x: newCentroidX, y: newCentroidY };
+        }
+
+        // Update depth if changed
+        container.setDepth(polygon_config.depth);
+
+        // Handle position update with optional tweening
+        if (
+            polygon_config.tween === true &&
+            container.tween === null &&
+            (newCentroidX !== container.x || newCentroidY !== container.y)
+        ) {
+            container.tween = this.tweens.add({
+                targets: [container],
+                x: newCentroidX,
+                y: newCentroidY,
+                duration: polygon_config.tween_duration || 100,
+                ease: 'Linear',
+                onComplete: () => {
+                    container.tween = null;
+                }
+            });
+        } else if (
+            container.tween === null &&
+            (newCentroidX !== container.x || newCentroidY !== container.y)
+        ) {
+            container.x = newCentroidX;
+            container.y = newCentroidY;
+        }
     }
 
     _addText(text_config, object_map) {

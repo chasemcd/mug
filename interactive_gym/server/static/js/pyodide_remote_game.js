@@ -1,4 +1,5 @@
 import * as ui_utils from './ui_utils.js';
+import { emitEpisodeData } from './phaser_gym_graphics.js';
 
 
 
@@ -12,6 +13,7 @@ export class RemoteGame {
     setAttributes(config) {
         this.config = config;
         this.interactive_gym_globals = config.interactive_gym_globals;
+        this.sceneId = config.scene_id;  // Store scene ID for incremental data export
         this.micropip = null;
         this.pyodideReady = false;
         this.state = null;
@@ -24,6 +26,19 @@ export class RemoteGame {
         this.max_steps = config.max_steps;
         this.cumulative_rewards = {};
         this.shouldReset = true;
+
+        // Pipeline latency metrics (Phase 28 - DIAG-01 to DIAG-07)
+        // Tracks timestamps at each stage: keypress -> queue -> step -> render
+        this.pipelineMetrics = {
+            lastInputTimestamps: null,       // {keypressTimestamp, queueExitTimestamp}
+            stepCallTimestamp: null,         // DIAG-03: When step() called
+            stepReturnTimestamp: null,       // DIAG-04: When step() returns
+            enabled: true,                   // Can be toggled via console: window.pipelineMetricsEnabled = false
+            framesSinceLastLog: 0,           // Counter for throttled logging after initial frames
+            initialLogFrames: 50             // Log every frame for first N frames
+        };
+        // Frame counter for single-player (multiplayer has this.frameNumber)
+        this.frameNumber = 0;
     }
 
     isDone(){
@@ -31,17 +46,42 @@ export class RemoteGame {
     }
 
     async initialize() {
-        this.pyodide = await loadPyodide();
+        // Check for pre-loaded Pyodide instance from Phase 67 preload
+        if (window.pyodidePreloadStatus === 'ready' && window.pyodideInstance) {
+            console.log('[RemoteGame] Reusing pre-loaded Pyodide instance');
+            this.pyodide = window.pyodideInstance;
+            this.micropip = window.pyodideMicropip;
+            this.installed_packages = [...(window.pyodideInstalledPackages || [])];
+        } else {
+            console.log('[RemoteGame] Loading Pyodide fresh (no preload available)');
+            // Signal server BEFORE blocking the main thread (GRACE-02)
+            if (window.socket) {
+                window.socket.emit('pyodide_loading_start', {});
+                // Yield to event loop so the emit is sent before WASM compilation blocks
+                await new Promise(resolve => setTimeout(resolve, 50));
+            }
 
-        await this.pyodide.loadPackage("micropip");
-        this.micropip = this.pyodide.pyimport("micropip");
+            this.pyodide = await loadPyodide();
 
+            await this.pyodide.loadPackage("micropip");
+            this.micropip = this.pyodide.pyimport("micropip");
+
+            // Signal server loading is done (GRACE-03)
+            if (window.socket) {
+                window.socket.emit('pyodide_loading_complete', {});
+            }
+        }
+
+        // Install only packages not already installed (dedup against preload)
         if (this.config.packages_to_install !== undefined) {
-            console.log("Installing packages via micropip: ", this.config.packages_to_install);
-            await this.micropip.install(this.config.packages_to_install);
-
-            // Append the installed packages to the list of installed packages
-            this.installed_packages.push(...this.config.packages_to_install);
+            const newPackages = this.config.packages_to_install.filter(
+                pkg => !this.installed_packages.includes(pkg)
+            );
+            if (newPackages.length > 0) {
+                console.log("Installing new packages via micropip: ", newPackages);
+                await this.micropip.install(newPackages);
+                this.installed_packages.push(...newPackages);
+            }
         }
 
         this.pyodide.globals.set("interactive_gym_globals", this.interactive_gym_globals);
@@ -105,9 +145,40 @@ env
         this.pyodideReady = true;
     }
 
+    /**
+     * Show episode transition UI (waiting message and countdown).
+     * Called at the start of reset() for subsequent episodes.
+     *
+     * @param {string} waitingMessage - Message to show while waiting (optional)
+     * @returns {Promise} Resolves when countdown completes
+     */
+    async showEpisodeTransition(waitingMessage = null) {
+        // Check if this is a subsequent episode (not the first one)
+        const isSubsequentEpisode = this.num_episodes > 0;
+
+        if (!isSubsequentEpisode) {
+            // First episode - just ensure overlay is hidden
+            ui_utils.hideEpisodeOverlay();
+            return;
+        }
+
+        // Show waiting message if provided
+        if (waitingMessage) {
+            ui_utils.showEpisodeWaiting(waitingMessage);
+        }
+
+        // Show countdown before starting
+        const episodeNum = this.num_episodes + 1;
+        await ui_utils.showEpisodeCountdown(3, `Round ${episodeNum} starting!`);
+    }
+
     async reset() {
         this.shouldReset = false;
         console.log("Resetting the environment");
+
+        // Show episode transition for subsequent episodes
+        await this.showEpisodeTransition();
+
         const startTime = performance.now();
         const result = await this.pyodide.runPythonAsync(`
 import numpy as np
@@ -182,9 +253,13 @@ obs, infos, render_state
         this.step_num = 0;
         this.shouldReset = false;
 
-        // Iterate over the keys of obs and set cumulative rewards to be 0 for each ID
+        // Initialize or reset cumulative rewards based on hud_score_carry_over setting
+        // Convert keys to strings for consistent lookup (Python may send int or string keys)
+        const carryOver = this.config.hud_score_carry_over || false;
         for (let key of obs.keys()) {
-            this.cumulative_rewards[key] = 0;
+            if (!carryOver || this.cumulative_rewards[key] === undefined) {
+                this.cumulative_rewards[key] = 0;
+            }
         }
 
         ui_utils.showHUD();
@@ -197,7 +272,10 @@ obs, infos, render_state
 
     async step(actions) {
         const pyActions = this.pyodide.toPy(actions);
-        // const startTime = performance.now();
+
+        // DIAG-03: Capture timestamp when env.step() is called
+        this.pipelineMetrics.stepCallTimestamp = performance.now();
+
         const result = await this.pyodide.runPythonAsync(`
 ${this.config.on_game_step_code}
 agent_actions = {int(k) if k.isnumeric() or isinstance(k, (float, int)) else k: v for k, v in ${pyActions}.items()}
@@ -227,12 +305,13 @@ if not isinstance(truncateds, dict):
 
 obs, rewards, terminateds, truncateds, infos, render_state
         `);
-        // const endTime = performance.now();
-        // console.log(`Step operation took ${endTime - startTime} milliseconds`);
+
+        // DIAG-04: Capture timestamp when env.step() returns
+        this.pipelineMetrics.stepReturnTimestamp = performance.now();
 
         // Convert everything from python objects to JS objects
         let [obs, rewards, terminateds, truncateds, infos, render_state] = await this.pyodide.toPy(result).toJs();
-        
+
         for (let [key, value] of rewards.entries()) {
             this.cumulative_rewards[key] += value;
         }
@@ -289,10 +368,18 @@ obs, rewards, terminateds, truncateds, infos, render_state
         ui_utils.updateHUDText(this.getHUDText());
 
         // Check if the episode is complete
+        // Episode ends when: environment terminates/truncates OR max_steps reached
         const all_terminated = Array.from(terminateds.values()).every(value => value === true);
         const all_truncated = Array.from(truncateds.values()).every(value => value === true);
+        const max_steps_reached = this.step_num >= this.max_steps;
 
-        if (all_terminated || all_truncated) {
+        if (all_terminated || all_truncated || max_steps_reached) {
+            // Emit episode data incrementally to avoid large payloads at scene end
+            // This sends the current episode's data and resets the logger
+            if (this.sceneId) {
+                emitEpisodeData(this.sceneId, this.num_episodes);
+            }
+
             this.num_episodes += 1;
 
             if (this.num_episodes >= this.max_episodes) {
@@ -300,23 +387,90 @@ obs, rewards, terminateds, truncateds, infos, render_state
             } else {
                 this.shouldReset = true;
             }
-            
         }
+
+        // Increment frame number for latency logging (multiplayer has its own frameNumber)
+        this.frameNumber++;
 
         return [obs, rewards, terminateds, truncateds, infos, render_state]
     };
 
     getHUDText() {
-        let score = Object.values(this.cumulative_rewards)[0];
+        // Calculate score based on hud_display_mode
+        let score;
+
+        // For multiplayer, use myPlayerId; for single-player, use first available key or default to 0
+        if (this.myPlayerId !== undefined && this.cumulative_rewards[this.myPlayerId] !== undefined) {
+            score = this.cumulative_rewards[this.myPlayerId];
+        } else {
+            // Single-player fallback: use first reward value or 0
+            const rewardValues = Object.values(this.cumulative_rewards);
+            score = rewardValues.length > 0 ? rewardValues[0] : 0;
+        }
+
         let time_left = (this.max_steps - this.step_num) / this.config.fps;
 
-        let formatted_score = score.toString().padStart(2, '0');
+        let formatted_score = Math.round(score).toString().padStart(2, '0');
         let formatted_time_left = time_left.toFixed(1).toString().padStart(5, '0');
 
-        let hud_text = `Score: ${formatted_score} | Time left: ${formatted_time_left}s`;
+        // Round number is 1-indexed for display
+        // Cap at max to avoid showing "Round 3/2" after final episode increments num_episodes
+        let current_round = Math.min(this.num_episodes + 1, this.max_episodes);
+        let total_rounds = this.max_episodes;
+
+        let hud_text = `Round: ${current_round}/${total_rounds} | Score: ${formatted_score} | Time left: ${formatted_time_left}s`;
 
         return hud_text
     };
+
+    // ========== Pipeline Latency Instrumentation (Phase 28) ==========
+
+    /**
+     * Set input timestamps for pipeline latency tracking (DIAG-01, DIAG-02).
+     * Called by phaser_gym_graphics.js before step() with timestamps from keypress.
+     * @param {Object} timestamps - {playerId, keypressTimestamp, queueExitTimestamp}
+     */
+    setInputTimestamps(timestamps) {
+        if (!this.pipelineMetrics.enabled) return;
+        // Allow console override
+        if (typeof window !== 'undefined' && window.pipelineMetricsEnabled === false) return;
+
+        this.pipelineMetrics.lastInputTimestamps = {
+            keypressTimestamp: timestamps.keypressTimestamp,
+            queueExitTimestamp: timestamps.queueExitTimestamp
+        };
+    }
+
+    /**
+     * Log pipeline latency breakdown (DIAG-07).
+     * Called by phaser_gym_graphics.js after rendering completes with render timestamps.
+     * @param {number} renderBeginTimestamp - performance.now() when render started (DIAG-05)
+     * @param {number} renderCompleteTimestamp - performance.now() when render finished (DIAG-06)
+     */
+    logPipelineLatency(_renderBeginTimestamp, _renderCompleteTimestamp) {
+        // Check if metrics are enabled
+        if (!this.pipelineMetrics.enabled) return;
+        if (typeof window !== 'undefined' && window.pipelineMetricsEnabled === false) return;
+
+        // Skip if no input timestamps (no real user input this frame)
+        if (!this.pipelineMetrics.lastInputTimestamps) return;
+
+        // Throttle logging after initial frames
+        this.pipelineMetrics.framesSinceLastLog++;
+        const shouldLog = this.frameNumber <= this.pipelineMetrics.initialLogFrames ||
+                          this.pipelineMetrics.framesSinceLastLog >= 10;
+
+        if (!shouldLog) {
+            // Clear timestamps but don't log
+            this.pipelineMetrics.lastInputTimestamps = null;
+            return;
+        }
+
+        this.pipelineMetrics.framesSinceLastLog = 0;
+
+        // Clear for next input
+        this.pipelineMetrics.lastInputTimestamps = null;
+    }
 };
 
 
@@ -339,7 +493,7 @@ function convertProxyToObject(obj) {
 
 
 // Helper function to convert all `undefined` values in an object to `null`
-function convertUndefinedToNull(obj) {
+export function convertUndefinedToNull(obj) {
     if (typeof obj !== 'object' || obj === null) {
         // Return the value as is if it's not an object or is already null
         return obj;

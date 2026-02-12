@@ -13,7 +13,7 @@ ASSET_PATH = "static/assets/slime_volleyball/sprites"
 
 
 def slime_volleyball_game_page_header_fn(
-    game: remote_game.RemoteGame, player_name: str
+    game: remote_game.RemoteGameV2, player_name: str
 ) -> str:
     """Function that takes the game and a player name to determine the html that should be shown when the game active."""
     player_id = None
@@ -55,7 +55,7 @@ def slime_volleyball_preload_assets_spec() -> (
     return [slime_red.as_dict(), slime_blue.as_dict()]
 
 
-def hud_text_fn(game: remote_game.RemoteGame) -> str:
+def hud_text_fn(game: remote_game.RemoteGameV2) -> str:
     """Function to create HUD text to display"""
     left_red_score = game.total_positive_rewards["agent_left"]
     right_blue_score = game.total_positive_rewards["agent_right"]

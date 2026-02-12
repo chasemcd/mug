@@ -244,14 +244,14 @@ Define who/what controls each agent:
         frame_skip=4,                          # Actions applied every N frames
     )
 
-.user_experience()
-^^^^^^^^^^^^^^^^^^
+.content()
+^^^^^^^^^^
 
 Customize participant-facing text:
 
 .. code-block:: python
 
-    .user_experience(
+    .content(
         scene_header="Game Title",
         scene_body="<p>Loading...</p>",       # Shown before game starts
         in_game_scene_body="<p>Instructions during game</p>",
@@ -259,14 +259,14 @@ Customize participant-facing text:
         in_game_scene_body_filepath="hud.html",
     )
 
-.pyodide()
+.runtime()
 ^^^^^^^^^^
 
 Configure browser-based execution:
 
 .. code-block:: python
 
-    .pyodide(
+    .runtime(
         run_through_pyodide=True,              # Enable Pyodide mode
         environment_initialization_code="import gym\nenv = gym.make('CartPole-v1')",
         environment_initialization_code_filepath="path/to/env.py",
@@ -290,13 +290,13 @@ Each scene goes through a lifecycle:
 
     class CustomScene(gym_scene.GymScene):
 
-        def on_connect(self, sio, room):
+        def on_connect(self, socketio, room):
             """Called when participant connects to server"""
             pass
 
-        def activate(self, sio, room):
+        def activate(self, socketio, room):
             """Called when scene becomes active"""
-            super().activate(sio, room)
+            super().activate(socketio, room)
             # Custom activation logic
 
         def deactivate(self):
@@ -442,7 +442,7 @@ Common Patterns
 
 .. code-block:: python
 
-    .user_experience(
+    .content(
         game_page_html_fn=lambda game, subject_id:
             f"<p>Your current score: {game.total_rewards[subject_id]}</p>"
     )

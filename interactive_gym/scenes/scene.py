@@ -4,7 +4,7 @@ import copy
 import json
 import random
 from datetime import datetime
-from interactive_gym.scenes.utils import NotProvided
+from interactive_gym.utils.sentinels import NotProvided
 
 import flask_socketio
 
@@ -23,7 +23,8 @@ class Scene:
     def __init__(self, **kwargs):
         self.scene_id = None
         self.experiment_config: dict = {}
-        self.sio: flask_socketio.SocketIO | None = None
+        self.experiment_id: str | None = None
+        self.socketio: flask_socketio.SocketIO | None = None
         self.room: str | int | None = None
         self.status = SceneStatus.Inactive
 
@@ -65,25 +66,25 @@ class Scene:
         """
         return [self]
 
-    def activate(self, sio: flask_socketio.SocketIO, room: str | int):
+    def activate(self, socketio: flask_socketio.SocketIO, room: str | int):
         """
         Activate the current scene.
         """
         self.status = SceneStatus.Active
-        self.sio = sio
+        self.socketio = socketio
         self.room = room
-        self.sio.emit("activate_scene", {**self.scene_metadata}, room=room)
+        self.socketio.emit("activate_scene", {**self.scene_metadata}, room=room)
 
     def deactivate(self):
         """
         Deactivate the current scene.
         """
         self.status = SceneStatus.Done
-        self.sio.emit(
+        self.socketio.emit(
             "terminate_scene", {**self.scene_metadata}, room=self.room
         )
 
-    def on_connect(self, sio: flask_socketio.SocketIO, room: str | int):
+    def on_connect(self, socketio: flask_socketio.SocketIO, room: str | int):
         """
         A hook that is called when the client connects to the server.
         """
@@ -94,8 +95,8 @@ class Scene:
         """
         Return the metadata for the current scene that will be passed through the Flask app.
         """
-        vv = serialize_dict(vars(self))
-        metadata = copy.deepcopy(vv)
+        serialized_vars = serialize_dict(vars(self))
+        metadata = copy.deepcopy(serialized_vars)
         return {
             "scene_id": self.scene_id,
             "scene_type": self.__class__.__name__,
@@ -105,12 +106,16 @@ class Scene:
 
     def export_metadata(self, subject_id: str):
         """Save the metadata for the current scene."""
-        os.makedirs(f"data/{self.scene_id}", exist_ok=True)
-        with open(f"data/{self.scene_id}/{subject_id}_metadata.json", "w") as f:
+        if self.experiment_id:
+            base_dir = f"data/{self.experiment_id}/{self.scene_id}"
+        else:
+            base_dir = f"data/{self.scene_id}"
+        os.makedirs(base_dir, exist_ok=True)
+        with open(f"{base_dir}/{subject_id}_metadata.json", "w") as f:
             json.dump(self.scene_metadata, f)
 
     def on_client_callback(
-        self, data, sio: flask_socketio.SocketIO, room: str | int
+        self, data, socketio: flask_socketio.SocketIO, room: str | int
     ):
         """
         A hook that is called when the client sends a callback to the server.

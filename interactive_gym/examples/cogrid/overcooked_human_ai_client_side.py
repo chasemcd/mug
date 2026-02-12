@@ -1,3 +1,23 @@
+"""
+Overcooked Human-AI Comparison (Client-Side with Pyodide)
+
+This example demonstrates Human-AI experiments where:
+- One human participant plays with AI partners in the browser
+- Environment runs client-side using Pyodide (zero server computation)
+- Two AI partners (SP and BS) for within-subjects comparison
+- Participant provides preference feedback between partners
+
+Note: This example is fully compatible with the new multiplayer Pyodide
+implementation. While this is single-player from the server's perspective
+(one human + AI in one browser), the same infrastructure supports true
+multiplayer experiments. See overcooked_human_human_multiplayer.py for
+an example of two humans playing together with synchronized Pyodide
+environments.
+
+Usage:
+    python -m interactive_gym.examples.cogrid.overcooked_human_ai_client_side
+"""
+
 from __future__ import annotations
 
 import eventlet

@@ -102,8 +102,7 @@ File Structure
     ├── overcooked_human_human_server_side.py  # Main experiment file
     ├── scenes/
     │   └── scenes.py                          # Scene definitions
-    ├── overcooked_utils.py                    # Rendering functions
-    └── overcooked_callback.py                 # Game callbacks
+    └── overcooked_utils.py                    # Rendering functions
 
 Experiment Flow
 ---------------
@@ -259,7 +258,7 @@ Solo practice before playing with partner:
             max_steps=1000,
             input_mode=configuration_constants.InputModes.SingleKeystroke,
         )
-        .user_experience(
+        .content(
             scene_header="Overcooked Tutorial",
             scene_body_filepath="interactive_gym/server/static/templates/overcooked_controls.html",
             in_game_scene_body="""
