@@ -130,7 +130,9 @@ Plans:
   1. User can provide an inline JS function string via the Python builder API that handles ONNX inference
   2. The custom inference function receives the ONNX session, current observation, and model config as arguments
   3. When a custom inference function is specified for a policy, the declarative inference path is skipped entirely for that policy
-**Plans**: TBD
+**Plans:** 1 plan
+Plans:
+- [ ] 91-01-PLAN.md -- Custom inference fn on ModelConfig (Python) + JS compilation and invocation
 
 ### Phase 92: Verification
 **Goal**: All existing tests pass and no regressions were introduced by the inference configurability changes
