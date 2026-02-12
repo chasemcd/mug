@@ -205,6 +205,7 @@ class RemoteConfig:
         load_policy_fn: typing.Callable | None = None,
         policy_inference_fn: typing.Callable | None = None,
         frame_skip: int | None = None,
+        policy_configs: dict | None = None,
     ):
         if policy_mapping is not None:
             self.policy_mapping = policy_mapping
@@ -217,6 +218,9 @@ class RemoteConfig:
 
         if frame_skip is not None:
             self.frame_skip = frame_skip
+
+        if policy_configs is not None:
+            self.policy_configs = policy_configs
 
         return self
 

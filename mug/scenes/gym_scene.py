@@ -11,6 +11,7 @@ if TYPE_CHECKING:
 from mug.scenes import scene
 from mug.configurations import remote_config
 from mug.configurations import configuration_constants
+from mug.configurations.configuration_constants import ModelConfig
 from mug.utils.sentinels import NotProvided
 
 
@@ -361,10 +362,13 @@ class GymScene(scene.Scene):
         load_policy_fn: Callable = NotProvided,
         policy_inference_fn: Callable = NotProvided,
         frame_skip: int = NotProvided,
+        policy_configs: dict = NotProvided,
     ):
-        """_summary_
+        """Configure policy settings for the GymScene.
 
-        :param policy_mapping: A dictionary mapping agent IDs to policy names, defaults to NotProvided
+        :param policy_mapping: A dictionary mapping agent IDs to policy names or types.
+            Values that are strings ending with ".onnx" are treated as ONNX policies.
+            Defaults to NotProvided.
         :type policy_mapping: dict, optional
         :param load_policy_fn: A function to load policies, defaults to NotProvided
         :type load_policy_fn: Callable, optional
@@ -372,6 +376,11 @@ class GymScene(scene.Scene):
         :type policy_inference_fn: Callable, optional
         :param frame_skip: Number of frames to skip between actions, defaults to NotProvided
         :type frame_skip: int, optional
+        :param policy_configs: A dictionary mapping policy IDs to ModelConfig instances.
+            Each ONNX policy in ``policy_mapping`` must have a corresponding entry.
+            ModelConfig values are converted to plain dicts via ``to_dict()`` so they
+            serialize through ``scene_metadata`` automatically. Defaults to NotProvided.
+        :type policy_configs: dict[str, ModelConfig], optional
         :return: The GymScene instance
         :rtype: GymScene
         """
@@ -387,7 +396,60 @@ class GymScene(scene.Scene):
         if frame_skip is not NotProvided:
             self.frame_skip = frame_skip
 
+        _policy_configs_provided = policy_configs is not NotProvided
+        if _policy_configs_provided:
+            # Convert ModelConfig instances to plain dicts for JSON serialization
+            self.policy_configs = {
+                key: val.to_dict() if isinstance(val, ModelConfig) else val
+                for key, val in policy_configs.items()
+            }
+
+        # Run cross-validation when both policy_mapping and policy_configs have been
+        # explicitly set in this call. This catches mismatches eagerly -- e.g., an
+        # ONNX policy with no config entry, or a config for a nonexistent policy.
+        _policy_mapping_provided = policy_mapping is not NotProvided
+        if (
+            (_policy_mapping_provided or _policy_configs_provided)
+            and (self.policy_mapping or self.policy_configs)
+        ):
+            self._validate_policy_configs()
+
         return self
+
+    def _validate_policy_configs(self):
+        """Validate that policy_configs is consistent with policy_mapping.
+
+        Raises:
+            ValueError: If an ONNX policy has no config entry.
+            ValueError: If a policy_configs key doesn't match any policy in policy_mapping.
+            ValueError: If a human policy has a policy_config entry.
+        """
+        # Every key in policy_configs must exist in policy_mapping
+        for key in self.policy_configs:
+            if key not in self.policy_mapping:
+                raise ValueError(
+                    f"policy_configs key '{key}' does not match any policy "
+                    f"in policy_mapping."
+                )
+
+            # Human policies must not have config entries
+            if self.policy_mapping[key] == configuration_constants.PolicyTypes.Human:
+                raise ValueError(
+                    f"Policy '{key}' is a human policy and should not have "
+                    f"a policy_config entry."
+                )
+
+        # Every ONNX policy must have a corresponding config entry
+        for policy_id, policy_value in self.policy_mapping.items():
+            if (
+                isinstance(policy_value, str)
+                and policy_value.endswith(".onnx")
+                and policy_id not in self.policy_configs
+            ):
+                raise ValueError(
+                    f"ONNX policy '{policy_id}' has no entry in policy_configs. "
+                    f"Every ONNX policy requires a ModelConfig."
+                )
 
     def gameplay(
         self,
