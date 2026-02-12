@@ -8,7 +8,7 @@ Minimal test server for ONNX inference E2E testing:
 - Relaxed browser requirements for test automation
 
 Usage:
-    python -m mug.examples.cogrid.overcooked_human_ai_test
+    python -m tests.fixtures.overcooked_human_ai_test
 
 This is used by pytest E2E tests via the conftest.py flask_server_human_ai fixture.
 """

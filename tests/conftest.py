@@ -216,7 +216,7 @@ def flask_server():
         [
             "python",
             "-m",
-            "mug.examples.cogrid.overcooked_human_human_multiplayer_test",
+            "tests.fixtures.overcooked_human_human_multiplayer_test",
             "--port",
             str(port),
         ],
@@ -290,7 +290,7 @@ def flask_server_fresh():
         [
             "python",
             "-m",
-            "mug.examples.cogrid.overcooked_human_human_multiplayer_test",
+            "tests.fixtures.overcooked_human_human_multiplayer_test",
             "--port",
             str(port),
         ],
@@ -396,7 +396,7 @@ def flask_server_scene_isolation():
         [
             "python",
             "-m",
-            "mug.examples.cogrid.overcooked_human_human_multiplayer_scene_isolation_test",
+            "tests.fixtures.overcooked_human_human_multiplayer_scene_isolation_test",
             "--port",
             str(port),
         ],
@@ -464,7 +464,7 @@ def flask_server_multi_episode_fresh():
         [
             "python",
             "-m",
-            "mug.examples.cogrid.overcooked_human_human_multiplayer_multi_episode_test",
+            "tests.fixtures.overcooked_human_human_multiplayer_multi_episode_test",
             "--port",
             str(port),
         ],
@@ -540,7 +540,7 @@ def flask_server_focus_timeout():
         [
             "python",
             "-m",
-            "mug.examples.cogrid.overcooked_human_human_multiplayer_focus_timeout_test",
+            "tests.fixtures.overcooked_human_human_multiplayer_focus_timeout_test",
             "--port",
             str(port),
         ],
@@ -685,7 +685,7 @@ def flask_server_probe(tmp_path):
         [
             "python",
             "-m",
-            "mug.examples.cogrid.overcooked_human_human_multiplayer_probe_test",
+            "tests.fixtures.overcooked_human_human_multiplayer_probe_test",
             "--port",
             str(port),
         ],
@@ -821,7 +821,7 @@ def flask_server_human_ai():
         [
             "python",
             "-m",
-            "mug.examples.cogrid.overcooked_human_ai_test",
+            "tests.fixtures.overcooked_human_ai_test",
             "--port",
             str(port),
         ],

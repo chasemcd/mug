@@ -31,6 +31,15 @@ from mug.examples.cogrid.scenes import scenes as oc_scenes
 from mug.scenes import scene, stager
 from mug.server import app
 
+# NOTE(cm): This is temporary because we need to unify the cogrid
+# version. The latest version breaks the feature encoder contract
+# for the ONNX models we have, so we pin to an older version for now.
+# (human-human experiment is on the latest version).
+tutorial_scene = oc_scenes.tutorial_gym_scene.runtime(
+            packages_to_install=["numpy", "cogrid==0.0.15", "opencv-python"],
+
+)
+
 stager = stager.Stager(
     scenes=[
         oc_scenes.start_scene,
@@ -43,7 +52,7 @@ stager = stager.Stager(
                 oc_scenes.asymmetric_advantages_0,
                 oc_scenes.coordination_ring_0,
             ],
-            keep_n=1,  # Only select one of the five layouts
+            keep_n=2,  # Select two of the five layouts
         ),
         oc_scenes.feedback_scene,
         oc_scenes.end_scene,

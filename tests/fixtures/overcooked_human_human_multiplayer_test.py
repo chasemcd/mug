@@ -9,7 +9,7 @@ constraints suitable for E2E testing:
 - Higher input confirmation timeout (2000ms) for packet loss resilience
 
 Usage:
-    python -m mug.examples.cogrid.overcooked_human_human_multiplayer_test
+    python -m tests.fixtures.overcooked_human_human_multiplayer_test
 
 This is used by pytest E2E tests via the conftest.py flask_server fixture.
 """
