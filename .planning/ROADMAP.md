@@ -105,7 +105,10 @@
   3. User can set hidden state input/output tensor name pairs per policy (not locked to "state_in_0"/"state_out_0" convention)
   4. User can set hidden state tensor shapes per policy (not locked to [1, 256])
   5. Declarative model config specified in Python scene config is available in the JS client without manual JSON passing
-**Plans**: TBD
+**Plans:** 2 plans
+Plans:
+- [ ] 89-01-PLAN.md -- ModelConfig dataclass + builder API + validation (Python)
+- [ ] 89-02-PLAN.md -- JS inference consumes declarative model config
 
 ### Phase 90: LSTM State Persistence
 **Goal**: Hidden state tensors persist across inference steps so LSTM/GRU policies produce correct sequential behavior
