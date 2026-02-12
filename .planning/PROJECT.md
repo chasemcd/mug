@@ -37,14 +37,14 @@ Researchers can configure and deploy multiplayer browser experiments with minima
 
 ### Active
 
-## Current Milestone: v1.27 Principled Rollback Management
+## Current Milestone: v1.28 Configurable Inference
 
-**Goal:** Replace arbitrary hardcoded limits in the GGPO rollback system with principled, confirmedFrame-based resource management.
+**Goal:** Make client-side ONNX inference flexible and configurable instead of hardcoded to RLlib LSTM format.
 
 **Target features:**
-- Snapshot pruning tied to confirmedFrame (remove maxSnapshots=30 cap)
-- Input buffer pruning tied to confirmedFrame (remove hardcoded 60-frame threshold)
-- snapshotInterval configurable via existing GymScene.multiplayer() builder method
+- Declarative ONNX model config via Python builder API (input/output tensor names, hidden state config)
+- Fix LSTM state persistence (capture state_out and feed back as state_in)
+- Custom inference function escape hatch (inline JS string for full control)
 
 ### Out of Scope
 
@@ -77,6 +77,7 @@ Shipped v1.26 with 34,311 LOC Python across 86 phases on the `refactor/mug` bran
 | v1.24 Test Fix & Hardening | 79-82 | 2026-02-09 |
 | v1.25 Data Export Path Fix | 83 | 2026-02-09 |
 | v1.26 Project Rename | 84-86 | 2026-02-10 |
+| v1.27 Principled Rollback Management | 87-88 | 2026-02-11 |
 
 ## Constraints
 
@@ -96,4 +97,4 @@ Shipped v1.26 with 34,311 LOC Python across 86 phases on the `refactor/mug` bran
 | Exclude build artifacts from verification | build/, docs/_build/, __pycache__/ regenerate from source | ✓ Good |
 
 ---
-*Last updated: 2026-02-11 after v1.27 milestone started*
+*Last updated: 2026-02-11 after v1.28 milestone started*
