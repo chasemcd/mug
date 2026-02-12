@@ -28,9 +28,19 @@ class ModelConfig:
     Researchers use this to declare the observation input, logit output,
     and optional hidden state tensor names/shapes for each ONNX policy.
 
+    ModelConfig instances can be used directly as values in ``policy_mapping``
+    (with ``onnx_path`` set). The ``policies()`` method will automatically
+    decompose them into ONNX path strings and config dicts for the JS client.
+
     Required fields:
         obs_input: Name of the observation input tensor (e.g., "obs").
         logit_output: Name of the logit output tensor (e.g., "output").
+
+    Optional fields:
+        onnx_path: Path to the ONNX model file (e.g.,
+            "static/assets/overcooked/models/sp_cramped_room_00.onnx").
+            When set, the ModelConfig can be used directly as a
+            ``policy_mapping`` value instead of a bare path string.
 
     Optional fields (for recurrent models):
         state_inputs: Names of hidden state input tensors
@@ -38,6 +48,12 @@ class ModelConfig:
         state_outputs: Names of hidden state output tensors
             (e.g., ["state_out_0", "state_out_1"]).
         state_shape: Shape of each hidden state tensor (e.g., [1, 256]).
+
+    Optional fields (for fixed inputs):
+        fixed_inputs: A dictionary mapping input tensor names to their fixed
+            scalar values. These are passed to every inference call as
+            ``Float32Array([value])`` with shape ``[1]``. Useful for inputs
+            like ``seq_lens`` that are constant during single-step inference.
 
     Optional fields (for custom inference):
         custom_inference_fn: An inline JavaScript function body string that
@@ -50,14 +66,22 @@ class ModelConfig:
 
     Examples::
 
-        # Standard declarative config
-        ModelConfig(
+        # Template config (onnx_path=None, used as base for dataclasses.replace)
+        base = ModelConfig(
             obs_input="obs",
             logit_output="output",
             state_inputs=["state_in_0", "state_in_1"],
             state_outputs=["state_out_0", "state_out_1"],
             state_shape=[1, 256],
+            fixed_inputs={"seq_lens": 1},
         )
+
+        # Use in policy_mapping with onnx_path set
+        import dataclasses
+        policy_mapping = {
+            0: PolicyTypes.Human,
+            1: dataclasses.replace(base, onnx_path="static/assets/model.onnx"),
+        }
 
         # Custom inference escape hatch
         ModelConfig(
@@ -76,9 +100,11 @@ class ModelConfig:
 
     obs_input: str
     logit_output: str
+    onnx_path: str | None = None
     state_inputs: list[str] | None = None
     state_outputs: list[str] | None = None
     state_shape: list[int] | None = None
+    fixed_inputs: dict[str, float] | None = None
     custom_inference_fn: str | None = None
 
     def __post_init__(self):
@@ -87,6 +113,11 @@ class ModelConfig:
             raise ValueError("obs_input must be a non-empty string")
         if not isinstance(self.logit_output, str) or not self.logit_output.strip():
             raise ValueError("logit_output must be a non-empty string")
+
+        # Validate onnx_path when provided
+        if self.onnx_path is not None:
+            if not isinstance(self.onnx_path, str) or not self.onnx_path.strip():
+                raise ValueError("onnx_path must be a non-empty string when provided")
 
         # Validate state_inputs / state_outputs pairing
         has_inputs = self.state_inputs is not None

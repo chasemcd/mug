@@ -155,8 +155,15 @@ async function inferenceONNXPolicy(policyID, observation, modelConfig, agentID) 
                 }
                 feeds[name] = hiddenStates[agentID][name];
             });
+
         }
-        // Non-recurrent with config: no state feeds needed
+
+        // Add fixed inputs (e.g., seq_lens for recurrent models)
+        if (modelConfig.fixed_inputs) {
+            for (const [name, value] of Object.entries(modelConfig.fixed_inputs)) {
+                feeds[name] = new window.ort.Tensor('float32', new Float32Array([value]));
+            }
+        }
     } else {
         // Legacy fallback (no config): keep old hardcoded behavior
         feeds['obs'] = inputTensor;
