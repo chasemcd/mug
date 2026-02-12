@@ -1,3 +1,50 @@
 [build-system]
 requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "multi_user_gymnasium"
+version = "0.1.1"
+description = "A platform for running interactive experiments in the browser with standard simulation environments."
+readme = "README.rst"
+license = "MIT"
+requires-python = ">= 3.10"
+authors = [
+    { name = "Chase McDonald", email = "chasecmcdonald@gmail.com" },
+]
+dependencies = [
+    "numpy",
+]
+
+[project.optional-dependencies]
+server = [
+    "eventlet",
+    "flask",
+    "flask-login>=0.6.3",
+    "flask-socketio",
+    "gymnasium",
+    "msgpack",
+    "pandas",
+    "flatten_dict",
+]
+test = [
+    "pytest>=8.0",
+    "playwright>=1.49",
+    "pytest-playwright>=0.6",
+    "pytest-timeout>=2.3",
+]
+
+[tool.setuptools.packages.find]
+include = ["mug*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+addopts = "-v --tb=short"
+markers = [
+    "timeout: marks test with custom timeout",
+    "slow: marks tests as slow (may skip in CI)",
+    "e2e: marks end-to-end tests requiring a running server and browser",
+]

@@ -1,7 +1,7 @@
 Multi-User Gymnasium (MUG)
 ==========================
 
-.. image:: mug_logo.png
+.. image:: docs/content/mug_logo.png
     :alt: MUG Logo
     :align: center
 

@@ -1,6 +1,0 @@
-include README.rst
-include LICENSE
-include MANIFEST.in
-include mug/**/*.py
-recursive-include mypackage *
-recursive-include tests *

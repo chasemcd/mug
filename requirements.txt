@@ -1,9 +1,0 @@
-eventlet
-flask
-flask-login>=0.6.3
-flask_socketio
-flatten_dict
-gymnasium
-msgpack
-numpy
-pandas
