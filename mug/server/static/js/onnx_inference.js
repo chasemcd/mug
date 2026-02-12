@@ -37,7 +37,7 @@ export async function actionFromONNX(policyID, observation, agentID) {
     const modelConfig = getModelConfig(agentID);
 
     // Conduct forward inference
-    const logits = await inferenceONNXPolicy(policyID, observation, modelConfig);
+    const logits = await inferenceONNXPolicy(policyID, observation, modelConfig, agentID);
 
     // Apply softmax to convert logits to probabilities
     const probabilities = softmax(logits);
@@ -53,7 +53,7 @@ export async function actionFromONNX(policyID, observation, agentID) {
     return action;
 }
 
-async function inferenceONNXPolicy(policyID, observation, modelConfig) {
+async function inferenceONNXPolicy(policyID, observation, modelConfig, agentID) {
 
     // If the observation is an Array of Arrays or a dictionary with some values being Arrays of Arrays,
     // flatten them to a single Array
@@ -113,19 +113,19 @@ async function inferenceONNXPolicy(policyID, observation, modelConfig) {
 
         if (modelConfig.state_inputs && modelConfig.state_inputs.length > 0) {
             // Recurrent model: set up hidden state feeds
-            if (!hiddenStates[policyID]) {
-                hiddenStates[policyID] = {};
+            if (!hiddenStates[agentID]) {
+                hiddenStates[agentID] = {};
             }
 
             modelConfig.state_inputs.forEach(name => {
-                if (!hiddenStates[policyID][name]) {
+                if (!hiddenStates[agentID][name]) {
                     const shape = modelConfig.state_shape;
                     const size = shape.reduce((a, b) => a * b);
-                    hiddenStates[policyID][name] = new window.ort.Tensor(
+                    hiddenStates[agentID][name] = new window.ort.Tensor(
                         'float32', new Float32Array(size), shape
                     );
                 }
-                feeds[name] = hiddenStates[policyID][name];
+                feeds[name] = hiddenStates[agentID][name];
             });
         }
         // Non-recurrent with config: no state feeds needed
@@ -138,21 +138,21 @@ async function inferenceONNXPolicy(policyID, observation, modelConfig) {
         const isRecurrent = session.inputNames.some(name => name.startsWith('state_in_'));
 
         if (isRecurrent) {
-            if (!hiddenStates[policyID]) {
-                hiddenStates[policyID] = {};
+            if (!hiddenStates[agentID]) {
+                hiddenStates[agentID] = {};
             }
 
             session.inputNames.forEach(name => {
                 if (name.startsWith('state_in_')) {
-                    if (!hiddenStates[policyID][name]) {
+                    if (!hiddenStates[agentID][name]) {
                         const expectedShape = [1, 256];
-                        hiddenStates[policyID][name] = new window.ort.Tensor(
+                        hiddenStates[agentID][name] = new window.ort.Tensor(
                             'float32',
                             new Float32Array(expectedShape.reduce((a, b) => a * b)),
                             expectedShape
                         );
                     }
-                    feeds[name] = hiddenStates[policyID][name];
+                    feeds[name] = hiddenStates[agentID][name];
                 }
             });
 
@@ -169,14 +169,29 @@ async function inferenceONNXPolicy(policyID, observation, modelConfig) {
     const logitName = modelConfig ? modelConfig.logit_output : session.outputNames[0];
     const logits = results[logitName].data;
 
+    // Update hidden states from output (legacy path)
+    if (!modelConfig) {
+        const stateOutNames = session.outputNames.filter(name => name.startsWith('state_out_'));
+        if (stateOutNames.length > 0) {
+            if (!hiddenStates[agentID]) {
+                hiddenStates[agentID] = {};
+            }
+            stateOutNames.forEach(outName => {
+                // Map state_out_N -> state_in_N
+                const inName = outName.replace('state_out_', 'state_in_');
+                hiddenStates[agentID][inName] = results[outName];
+            });
+        }
+    }
+
     // Update hidden states from output (declarative path only)
     if (modelConfig && modelConfig.state_outputs) {
-        if (!hiddenStates[policyID]) {
-            hiddenStates[policyID] = {};
+        if (!hiddenStates[agentID]) {
+            hiddenStates[agentID] = {};
         }
         modelConfig.state_outputs.forEach((outputName, idx) => {
             const inputName = modelConfig.state_inputs[idx];
-            hiddenStates[policyID][inputName] = results[outputName];
+            hiddenStates[agentID][inputName] = results[outputName];
         });
     }
 
