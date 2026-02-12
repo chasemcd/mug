@@ -72,8 +72,7 @@ def compare_files(file1: Path, file2: Path, verbose: bool = False, row_tolerance
         file1: Path to first CSV file
         file2: Path to second CSV file
         verbose: Show detailed divergence info
-        row_tolerance: Allow up to this many row count differences (for episode boundary timing)
-                      Set to 0 for strict matching, 10 for E2E test tolerance
+        row_tolerance: Allow up to this many row count differences (default 0, strict)
 
     Returns exit code: 0 if identical (within tolerance), 1 if different.
     """

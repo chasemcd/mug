@@ -5,37 +5,40 @@
 See: .planning/PROJECT.md (updated 2026-02-11)
 
 **Core value:** Researchers can configure and deploy multiplayer browser experiments with minimal code
-**Current focus:** Planning next milestone
+**Current focus:** v1.27 Principled Rollback Management -- Phase 87
 
 ## Current Position
 
-Phase: 86 of 86 (all complete)
-Plan: All complete
-Status: v1.26 Project Rename shipped. All milestones complete.
-Last activity: 2026-02-11 — Milestone v1.26 archived
+Phase: 87 of 88 (ConfirmedFrame-Based Resource Management)
+Plan: 1 of 1 in current phase
+Status: Phase 87 complete
+Last activity: 2026-02-11 -- Completed 87-01 (ConfirmedFrame Resource Management)
 
-Progress: [██████████] 100%
+Progress: [█████░░░░░] 50%
 
 ## Performance Metrics
 
-**Velocity (v1.26):**
-- Total plans completed: 7
-- Average duration: 3.2min
-- Total execution time: 22.3min
+**Velocity:**
+- Total plans completed: 1 (v1.27)
+- Average duration: 2min
+- Total execution time: 2min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 84 | 2/2 | 5min | 2.5min |
-| 85 | 3/3 | 14.6min | 4.9min |
-| 86 | 2/2 | 2.7min | 1.4min |
+| 87 | 1/1 | 2min | 2min |
+| 88 | 0/TBD | -- | -- |
+
+*Updated after each plan completion*
 
 ## Accumulated Context
 
 ### Decisions
 
-(Cleared at milestone boundary — see PROJECT.md Key Decisions for full log)
+- [87-01] Anchor-based snapshot pruning: highest snapshot <= confirmedFrame retained, all before deleted
+- [87-01] Input buffer prunes at confirmedFrame boundary only, no hardcoded frame offset
+- [87-01] Removed maxSnapshots (30), inputBufferMaxSize (120), pruneThreshold (frameNumber-60)
 
 ### Pending Todos
 
@@ -48,6 +51,6 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-11
-Stopped at: Milestone v1.26 archived
+Stopped at: Completed 87-01-PLAN.md
 Resume file: None
-Next action: `/gsd:new-milestone` to start next milestone
+Next action: Plan phase 88 via /gsd:plan-phase 88

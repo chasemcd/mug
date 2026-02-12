@@ -150,6 +150,10 @@ class GymScene(scene.Scene):
         # Number of frames of input history to keep for potential replay
         self.input_buffer_size: int = 300  # ~10 sec at 30fps
 
+        # Snapshot interval: save a state snapshot every N frames for rollback
+        # Lower values = more snapshots = faster rollback recovery but more memory
+        self.snapshot_interval: int = 5
+
         # GGPO input delay (frames)
         # Both local and remote actions are delayed by this many frames
         # This gives time for actions to propagate before they're needed
@@ -681,6 +685,7 @@ class GymScene(scene.Scene):
         realtime_mode: bool = NotProvided,
         input_buffer_size: int = NotProvided,
         input_delay: int = NotProvided,
+        snapshot_interval: int = NotProvided,
         input_confirmation_timeout_ms: int = NotProvided,
         # Matchmaking params (from matchmaking)
         hide_lobby_count: bool = NotProvided,
@@ -734,6 +739,10 @@ class GymScene(scene.Scene):
         :type input_buffer_size: int, optional
         :param input_delay: GGPO input delay in frames, defaults to NotProvided
         :type input_delay: int, optional
+        :param snapshot_interval: Save a state snapshot every N frames for rollback.
+            Lower values = more snapshots = faster rollback recovery but more memory.
+            Defaults to NotProvided (uses class default of 5).
+        :type snapshot_interval: int, optional
         :param input_confirmation_timeout_ms: Time in ms to wait for partner input
             confirmation at episode boundaries, defaults to NotProvided
         :type input_confirmation_timeout_ms: int, optional
@@ -832,6 +841,10 @@ class GymScene(scene.Scene):
         if input_delay is not NotProvided:
             assert isinstance(input_delay, int) and input_delay >= 0
             self.input_delay = input_delay
+
+        if snapshot_interval is not NotProvided:
+            assert isinstance(snapshot_interval, int) and snapshot_interval >= 1
+            self.snapshot_interval = snapshot_interval
 
         if input_confirmation_timeout_ms is not NotProvided:
             if not isinstance(input_confirmation_timeout_ms, int) or input_confirmation_timeout_ms < 0:

@@ -165,7 +165,7 @@ def wait_for_export_files(
 
 
 def run_comparison(
-    file1: Path, file2: Path, verbose: bool = False, row_tolerance: int = 10
+    file1: Path, file2: Path, verbose: bool = False, row_tolerance: int = 0
 ) -> tuple:
     """
     Run the validate_action_sequences.py --compare script on two export files.
@@ -177,8 +177,7 @@ def run_comparison(
         file1: Path to first export CSV file
         file2: Path to second export CSV file
         verbose: If True, add --verbose flag for detailed divergence info
-        row_tolerance: Allow up to this many row count differences (default 10)
-                      Episode boundary timing under latency can cause differences
+        row_tolerance: Allow up to this many row count differences (default 0, strict)
 
     Returns:
         tuple: (exit_code, output_text)
@@ -219,7 +218,7 @@ def wait_for_episode_with_parity(
     episode_num: int = 0,
     episode_timeout_sec: int = 180,
     export_timeout_sec: int = 30,
-    parity_row_tolerance: int = 10,
+    parity_row_tolerance: int = 0,
     verbose: bool = True,
 ) -> tuple:
     """
@@ -242,7 +241,7 @@ def wait_for_episode_with_parity(
         episode_num: Episode number to validate (0-indexed: first episode = 0)
         episode_timeout_sec: Max seconds to wait for num_episodes increment
         export_timeout_sec: Max seconds to wait for export files
-        parity_row_tolerance: Allow up to N row count differences (default 10)
+        parity_row_tolerance: Allow up to N row count differences (default 0, strict)
         verbose: If True, print progress and comparison details
 
     Returns:

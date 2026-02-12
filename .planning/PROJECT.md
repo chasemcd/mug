@@ -37,7 +37,14 @@ Researchers can configure and deploy multiplayer browser experiments with minima
 
 ### Active
 
-(None — fresh milestone needed)
+## Current Milestone: v1.27 Principled Rollback Management
+
+**Goal:** Replace arbitrary hardcoded limits in the GGPO rollback system with principled, confirmedFrame-based resource management.
+
+**Target features:**
+- Snapshot pruning tied to confirmedFrame (remove maxSnapshots=30 cap)
+- Input buffer pruning tied to confirmedFrame (remove hardcoded 60-frame threshold)
+- snapshotInterval configurable via existing GymScene.multiplayer() builder method
 
 ### Out of Scope
 
@@ -89,4 +96,4 @@ Shipped v1.26 with 34,311 LOC Python across 86 phases on the `refactor/mug` bran
 | Exclude build artifacts from verification | build/, docs/_build/, __pycache__/ regenerate from source | ✓ Good |
 
 ---
-*Last updated: 2026-02-11 after v1.26 milestone*
+*Last updated: 2026-02-11 after v1.27 milestone started*

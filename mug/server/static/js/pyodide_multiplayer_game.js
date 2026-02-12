@@ -925,15 +925,15 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         // Input buffers: store inputs by frame number
         // inputBuffer[frame][playerId] = action
         this.inputBuffer = new Map();   // Map<frameNumber, Map<playerId, action>>
-        this.inputBufferMaxSize = 120;  // Keep ~4 seconds at 30 FPS
+        // Input buffer size adapts to unconfirmed window (confirmedFrame-based pruning)
 
         // Local input queue: inputs scheduled for future frames due to input delay
         this.localInputQueue = [];      // [{frame, action}] - sorted by frame
 
         // State snapshots for rollback (stored periodically)
         this.stateSnapshots = new Map();  // Map<frameNumber, envState>
-        this.snapshotInterval = 5;        // Save snapshot every N frames
-        this.maxSnapshots = 30;           // Keep ~5 seconds of snapshots
+        this.snapshotInterval = config.snapshot_interval ?? 5;  // Save snapshot every N frames
+        // Snapshot count adapts to unconfirmed window (anchor-based pruning)
 
         // Prediction tracking
         this.lastConfirmedActions = {};   // {playerId: lastAction} - for prediction
@@ -3131,7 +3131,7 @@ obs, rewards, terminateds, truncateds, infos, render_state
         const snapshotJson = this.stateSnapshots.get(frameNumber);
         if (!snapshotJson) {
             // No snapshot available for this frame - can happen if:
-            // - Frame is older than maxSnapshots
+            // - Frame was pruned (before anchor snapshot)
             // - Snapshot was never saved (shouldn't happen in normal flow)
             p2pLog.debug(`No snapshot for confirmed frame ${frameNumber}, skipping hash`);
             return;
@@ -4503,17 +4503,25 @@ json.dumps(_snapshot)
             ).join(' ');
             p2pLog.debug(`SAVE_SNAPSHOT: frame=${frameNumber} agents=[${agentSummary}]`);
 
-            // Prune old snapshots
-            if (this.stateSnapshots.size > this.maxSnapshots) {
-                const keysToDelete = [];
-                for (const key of this.stateSnapshots.keys()) {
-                    if (this.stateSnapshots.size - keysToDelete.length <= this.maxSnapshots) {
-                        break;
+            // Prune snapshots before the anchor snapshot (SNAP-01, SNAP-03)
+            // The anchor snapshot is the highest snapshot frame <= confirmedFrame.
+            // It serves as the recovery point for rollback. All snapshots before it
+            // are no longer needed because we'd never roll back past the anchor.
+            if (this.confirmedFrame >= 0) {
+                // Find anchor: highest snapshot frame <= confirmedFrame
+                let anchorFrame = -1;
+                for (const snapFrame of this.stateSnapshots.keys()) {
+                    if (snapFrame <= this.confirmedFrame && snapFrame > anchorFrame) {
+                        anchorFrame = snapFrame;
                     }
-                    keysToDelete.push(key);
                 }
-                for (const key of keysToDelete) {
-                    this.stateSnapshots.delete(key);
+                // Delete all snapshots strictly before the anchor
+                if (anchorFrame >= 0) {
+                    for (const snapFrame of this.stateSnapshots.keys()) {
+                        if (snapFrame < anchorFrame) {
+                            this.stateSnapshots.delete(snapFrame);
+                        }
+                    }
                 }
             }
         } catch (e) {
@@ -5208,11 +5216,20 @@ json.dumps({'cumulative_rewards': {str(k): v for k, v in _cumulative_rewards.ite
             // Update HUD to reflect fast-forwarded state
             ui_utils.updateHUDText(this.getHUDText());
 
-            // Clear old snapshots that are now before our confirmed frame
-            // This prevents rollback to pre-fast-forward state
-            for (const [snapFrame, _] of this.stateSnapshots) {
-                if (snapFrame < this.confirmedFrame - 30) {  // Keep some buffer
-                    this.stateSnapshots.delete(snapFrame);
+            // Prune snapshots using anchor-based approach (same as saveStateSnapshot)
+            if (this.confirmedFrame >= 0) {
+                let anchorFrame = -1;
+                for (const snapFrame of this.stateSnapshots.keys()) {
+                    if (snapFrame <= this.confirmedFrame && snapFrame > anchorFrame) {
+                        anchorFrame = snapFrame;
+                    }
+                }
+                if (anchorFrame >= 0) {
+                    for (const snapFrame of this.stateSnapshots.keys()) {
+                        if (snapFrame < anchorFrame) {
+                            this.stateSnapshots.delete(snapFrame);
+                        }
+                    }
                 }
             }
 
@@ -5259,6 +5276,28 @@ json.dumps({'cumulative_rewards': {str(k): v for k, v in _cumulative_rewards.ite
                 this.webrtcManager.send(packet);
             }
             p2pLog.info(`Sent ${catchUpInputs.length} catch-up inputs to partner (frames ${startFrame}-${this.frameNumber - 1})`);
+        }
+
+        // 8. Check for episode end immediately after fast-forward
+        // Without this, episode end detection waits for the next processTick() call,
+        // causing a visible delay where the fast-forwarded player appears to keep
+        // playing after the partner has already exited the scene.
+        if (!this.episodeComplete && !this.p2pEpisodeSync.localEpisodeEndDetected) {
+            const maxStepsReached = this.step_num >= this.max_steps;
+            if (maxStepsReached) {
+                p2pLog.info(`FAST-FORWARD: episode end detected at frame ${this.frameNumber} (step ${this.step_num}/${this.max_steps})`);
+                this._logEpisodeEndMetrics();
+
+                if (this.serverAuthoritative) {
+                    this.episodeComplete = true;
+                    this.signalEpisodeComplete();
+                } else if (this.webrtcManager?.isReady()) {
+                    this._broadcastEpisodeEnd();
+                } else {
+                    this.episodeComplete = true;
+                    this.signalEpisodeComplete();
+                }
+            }
         }
     }
 
@@ -5351,20 +5390,30 @@ json.dumps({'cumulative_rewards': {str(k): v for k, v in _cumulative_rewards.ite
     /**
      * Prune old entries from input buffer.
      * Removes frames we've already passed to prevent unbounded growth.
+     *
+     * Pruning boundary is aligned with snapshot pruning: only inputs strictly
+     * before the anchor snapshot are removed. The anchor is the highest snapshot
+     * at or below confirmedFrame — the earliest point any rollback replay can
+     * start from. Inputs from the anchor onward must be retained so that
+     * rollback replay has real (confirmed) inputs available instead of falling
+     * back to prediction.
      */
     pruneInputBuffer() {
-        // Remove entries for frames we've already simulated
-        // Keep a larger buffer behind for potential rollback (must be >= maxSnapshots * snapshotInterval)
-        // With snapshotInterval=5 and maxSnapshots=30, we need at least 150 frames of buffer
-        const pruneThreshold = this.frameNumber - 60;  // Keep ~2 seconds at 30 FPS
-        const keysToDelete = [];
+        if (this.confirmedFrame < 0) return;  // Nothing confirmed yet
 
+        // Find anchor snapshot (same logic as snapshot pruning in saveStateSnapshot)
+        let anchorFrame = -1;
+        for (const snapFrame of this.stateSnapshots.keys()) {
+            if (snapFrame <= this.confirmedFrame && snapFrame > anchorFrame) {
+                anchorFrame = snapFrame;
+            }
+        }
+
+        if (anchorFrame < 0) return;  // No anchor yet, nothing safe to prune
+
+        const keysToDelete = [];
         for (const key of this.inputBuffer.keys()) {
-            // Only prune frames that are confirmed AND old enough
-            // Unconfirmed frames must be retained for rollback replay correctness
-            // and to prevent gaps in the confirmation chain (_updateConfirmedFrame
-            // scans consecutively and breaks at the first missing frame)
-            if (key < pruneThreshold && key <= this.confirmedFrame) {
+            if (key < anchorFrame) {  // strictly before anchor
                 keysToDelete.push(key);
             }
         }
@@ -5372,16 +5421,6 @@ json.dumps({'cumulative_rewards': {str(k): v for k, v in _cumulative_rewards.ite
         for (const key of keysToDelete) {
             this.inputBuffer.delete(key);
             this.predictedFrames.delete(key);
-        }
-
-        // Also enforce max size limit - but still respect confirmedFrame
-        if (this.inputBuffer.size > this.inputBufferMaxSize) {
-            const sortedKeys = Array.from(this.inputBuffer.keys()).sort((a, b) => a - b);
-            const toRemove = sortedKeys.filter(k => k <= this.confirmedFrame).slice(0, this.inputBuffer.size - this.inputBufferMaxSize);
-            for (const key of toRemove) {
-                this.inputBuffer.delete(key);
-                this.predictedFrames.delete(key);
-            }
         }
     }
 

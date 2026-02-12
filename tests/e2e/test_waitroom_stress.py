@@ -237,7 +237,7 @@ def _validate_parity_for_matched_pairs(pages, expected_pairs, timeout_label=""):
             episode_num=0,
             episode_timeout_sec=300,
             export_timeout_sec=60,
-            parity_row_tolerance=10,
+            parity_row_tolerance=0,
             verbose=True,
         )
 

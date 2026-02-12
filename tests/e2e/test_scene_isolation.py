@@ -90,7 +90,7 @@ def test_partner_exit_on_survey_no_overlay(flask_server_scene_isolation, player_
         episode_num=0,
         episode_timeout_sec=10,  # Episode already complete
         export_timeout_sec=30,
-        parity_row_tolerance=10,
+        parity_row_tolerance=0,
         verbose=True,
     )
     assert success, f"Episode parity validation failed: {parity_msg}"
