@@ -88,7 +88,7 @@
 
 **Milestone Goal:** Make client-side ONNX inference flexible and configurable instead of hardcoded to RLlib LSTM format.
 
-- [ ] **Phase 89: Declarative Model Config** - Python builder API for ONNX tensor config with transport to JS client
+- [x] **Phase 89: Declarative Model Config** - Python builder API for ONNX tensor config with transport to JS client -- completed 2026-02-12
 - [ ] **Phase 90: LSTM State Persistence** - JS runtime captures output hidden states and feeds them back on next inference
 - [ ] **Phase 91: Custom Inference Escape Hatch** - Inline JS function override for full inference control
 - [ ] **Phase 92: Verification** - All existing tests pass with no regressions
@@ -107,8 +107,8 @@
   5. Declarative model config specified in Python scene config is available in the JS client without manual JSON passing
 **Plans:** 2 plans
 Plans:
-- [ ] 89-01-PLAN.md -- ModelConfig dataclass + builder API + validation (Python)
-- [ ] 89-02-PLAN.md -- JS inference consumes declarative model config
+- [x] 89-01-PLAN.md -- ModelConfig dataclass + builder API + validation (Python)
+- [x] 89-02-PLAN.md -- JS inference consumes declarative model config
 
 ### Phase 90: LSTM State Persistence
 **Goal**: Hidden state tensors persist across inference steps so LSTM/GRU policies produce correct sequential behavior
@@ -150,10 +150,10 @@ Plans:
 | 83 | v1.25 | 1/1 | Complete | 2026-02-09 |
 | 84-86 | v1.26 | 7/7 | Complete | 2026-02-10 |
 | 87-88 | v1.27 | 2/2 | Complete | 2026-02-11 |
-| 89 | v1.28 | 0/? | Not started | - |
+| 89 | v1.28 | 2/2 | Complete | 2026-02-12 |
 | 90 | v1.28 | 0/? | Not started | - |
 | 91 | v1.28 | 0/? | Not started | - |
 | 92 | v1.28 | 0/? | Not started | - |
 
 ---
-*Roadmap updated: 2026-02-11 for v1.28 Configurable Inference*
+*Roadmap updated: 2026-02-12 — Phase 89 complete*
