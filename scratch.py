@@ -1,4 +1,4 @@
-from interactive_gym.examples.mountain_car.mountain_car_rgb_env import (
+from mug.examples.mountain_car.mountain_car_rgb_env import (
     MountainCarRGBEnv,
 )
 import matplotlib.pyplot as plt

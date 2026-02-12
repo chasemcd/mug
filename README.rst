@@ -1,11 +1,11 @@
-Interactive Gym
-================
+Multi-User Gymnasium (MUG)
+==========================
 
-.. image:: interactive_gym_logo.png
-    :alt: Interactive Gym Logo
+.. image:: mug_logo.png
+    :alt: MUG Logo
     :align: center
 
-Interactive Gym is a library that provides a generalized interface for creating interactive, browser-based experiments from simulation environments. More specifically,
+Multi-User Gymnasium (MUG) is a library that provides a generalized interface for creating interactive, browser-based experiments from simulation environments. More specifically,
 it is meant to take Python-based Gymnasium or PettingZoo formatted environments and run them in the browser such that humans can interact with the
 environments either alone or alongside AI or other humans.
 
@@ -13,7 +13,7 @@ environments either alone or alongside AI or other humans.
 Multiplayer Configuration
 -------------------------
 
-For P2P multiplayer experiments, Interactive Gym uses WebRTC for low-latency peer-to-peer connections. When direct P2P connections fail (due to firewalls, NAT, or restrictive networks), a TURN server provides relay fallback.
+For P2P multiplayer experiments, MUG uses WebRTC for low-latency peer-to-peer connections. When direct P2P connections fail (due to firewalls, NAT, or restrictive networks), a TURN server provides relay fallback.
 
 **Setting up TURN credentials:**
 
@@ -30,7 +30,7 @@ For P2P multiplayer experiments, Interactive Gym uses WebRTC for low-latency pee
 
    .. code-block:: python
 
-       from interactive_gym.configurations import RemoteConfig
+       from mug.configurations import RemoteConfig
 
        config = RemoteConfig()
        config.webrtc()  # Auto-loads from TURN_USERNAME and TURN_CREDENTIAL env vars

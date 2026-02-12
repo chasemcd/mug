@@ -6,7 +6,7 @@ ok
 
 ``GymScene``
 ============
-There are two ways to run Interactive Gym, depending on your use cases and requirements:
+There are two ways to run MUG, depending on your use cases and requirements:
 
 1. Server based. 
 

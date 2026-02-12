@@ -110,7 +110,7 @@ Resync path: Server → All Clients (1 hop, parallel)
 
 #### 1.1 Create `AuthoritativeGameRunner` Class
 
-**File**: `interactive_gym/server/authoritative_game_runner.py`
+**File**: `mug/server/authoritative_game_runner.py`
 
 ```python
 """
@@ -369,7 +369,7 @@ class AuthoritativeGameRunner:
 
 #### 1.2 Extend PyodideGameCoordinator
 
-**File**: `interactive_gym/server/pyodide_game_coordinator.py`
+**File**: `mug/server/pyodide_game_coordinator.py`
 
 Add to `PyodideGameState` dataclass:
 
@@ -409,7 +409,7 @@ def create_game(
     game_state.server_authoritative = server_authoritative
 
     if server_authoritative and environment_code:
-        from interactive_gym.server.authoritative_game_runner import (
+        from mug.server.authoritative_game_runner import (
             AuthoritativeGameRunner,
         )
 
@@ -535,7 +535,7 @@ env.set_state(${JSON.stringify(state.env_state)})
 
 #### 3.1 Add Options to GymScene
 
-**File**: `interactive_gym/scenes/gym_scene.py`
+**File**: `mug/scenes/gym_scene.py`
 
 ```python
 def runtime(
@@ -580,7 +580,7 @@ def multiplayer(
 
 ### Phase 4: GameManager Integration
 
-**File**: `interactive_gym/server/game_manager.py`
+**File**: `mug/server/game_manager.py`
 
 In `_create_game()`:
 

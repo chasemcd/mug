@@ -1,9 +1,9 @@
 Examples
 ========
 
-Complete example experiments demonstrating various Interactive Gym features. Each example includes full source code, detailed documentation, and instructions for customization.
+Complete example experiments demonstrating various MUG features. Each example includes full source code, detailed documentation, and instructions for customization.
 
-All examples are located in the `interactive_gym/examples/ <https://github.com/chasemcd/interactive-gym/tree/main/interactive_gym/examples>`_ directory.
+All examples are located in the `mug/examples/ <https://github.com/chasemcd/interactive-gym/tree/main/mug/examples>`_ directory.
 
 Example Comparison
 ------------------
@@ -55,7 +55,7 @@ Prerequisites
        git clone https://github.com/chasemcd/interactive-gym.git
        cd interactive-gym
 
-2. **Install Interactive Gym with server dependencies**:
+2. **Install MUG with server dependencies**:
 
    .. code-block:: bash
 
@@ -74,26 +74,26 @@ Examples must be run as modules from the repository root to ensure correct asset
 
    .. code-block:: bash
 
-       python -m interactive_gym.examples.example_name.experiment_file
+       python -m mug.examples.example_name.experiment_file
 
    For example:
 
    .. code-block:: bash
 
        # Mountain Car
-       python -m interactive_gym.examples.mountain_car.mountain_car_experiment
+       python -m mug.examples.mountain_car.mountain_car_experiment
 
        # Slime Volleyball (Human vs AI, Pyodide mode)
-       python -m interactive_gym.examples.slime_volleyball.human_ai_pyodide
+       python -m mug.examples.slime_volleyball.human_ai_pyodide
 
        # Overcooked (Human vs AI, client-side)
-       python -m interactive_gym.examples.cogrid.overcooked_human_ai_client_side
+       python -m mug.examples.cogrid.overcooked_human_ai_client_side
 
        # Overcooked (Human vs Human, server-side)
-       python -m interactive_gym.examples.cogrid.overcooked_human_human_server_side
+       python -m mug.examples.cogrid.overcooked_human_human_server_side
 
        # Footsies
-       python -m interactive_gym.examples.footsies.footsies_experiment
+       python -m mug.examples.footsies.footsies_experiment
 
 2. **Open browser** to the specified port (usually http://localhost:5702 or http://localhost:5000)
 

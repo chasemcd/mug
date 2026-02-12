@@ -25,7 +25,7 @@ Basic Usage
 
 .. code-block:: python
 
-    from interactive_gym.scenes import stager, static_scene, gym_scene
+    from mug.scenes import stager, static_scene, gym_scene
 
     # Define your scenes
     start_scene = static_scene.StartScene().display(...)
@@ -166,7 +166,7 @@ Extend the Stager for custom behavior:
 
 .. code-block:: python
 
-    from interactive_gym.scenes.stager import Stager
+    from mug.scenes.stager import Stager
 
     class ConditionalStager(Stager):
 

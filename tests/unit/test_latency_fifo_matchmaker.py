@@ -7,7 +7,7 @@ Covers all four success criteria from the v1.21 roadmap:
 4. find_match() does NOT exclude candidates with rtt_ms=None (graceful fallback)
 """
 
-from interactive_gym.server.matchmaker import LatencyFIFOMatchmaker, MatchCandidate
+from mug.server.matchmaker import LatencyFIFOMatchmaker, MatchCandidate
 
 
 class TestLatencyFIFOMatchmaker:

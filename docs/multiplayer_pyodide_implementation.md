@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document describes the implementation of multiplayer support for Pyodide-based experiments in Interactive Gym. The system enables multiple human participants to play together in real-time, with each client running their own Pyodide environment in the browser while maintaining perfect synchronization.
+This document describes the implementation of multiplayer support for Pyodide-based experiments in Multi-User Gymnasium (MUG). The system enables multiple human participants to play together in real-time, with each client running their own Pyodide environment in the browser while maintaining perfect synchronization.
 
 **Key Achievement**: True peer-to-peer multiplayer gameplay where Python/Gymnasium environments run entirely in each participant's browser, with symmetric peer architecture and GGPO-style rollback netcode for local-feeling responsiveness.
 
@@ -27,7 +27,7 @@ This document describes the implementation of multiplayer support for Pyodide-ba
 
 ### The Challenge
 
-Interactive Gym uses Pyodide to run Gymnasium environments in participants' browsers, eliminating server-side computation requirements. This works perfectly for single-player experiments but presents challenges for multiplayer:
+MUG uses Pyodide to run Gymnasium environments in participants' browsers, eliminating server-side computation requirements. This works perfectly for single-player experiments but presents challenges for multiplayer:
 
 **Challenge 1: Action Synchronization**
 - Each client runs independently
@@ -1040,7 +1040,7 @@ CLIENT 1                                              CLIENT 2
 
 ```
 interactive-gym/
-├── interactive_gym/
+├── mug/
 │   ├── server/
 │   │   ├── app.py                           # SocketIO event handlers
 │   │   ├── game_manager.py                  # Matchmaking integration
@@ -1180,8 +1180,8 @@ RemoteGame (pyodide_remote_game.js)
 ### Creating a Multiplayer Scene
 
 ```python
-from interactive_gym.scenes import gym_scene
-from interactive_gym.configurations import configuration_constants
+from mug.scenes import gym_scene
+from mug.configurations import configuration_constants
 
 # Define action mapping
 MoveUp = 0
@@ -1287,9 +1287,9 @@ multiplayer_scene = (
 ### Running the Server
 
 ```python
-from interactive_gym.configurations import remote_config
-from interactive_gym.scenes import stager
-from interactive_gym.server import app
+from mug.configurations import remote_config
+from mug.scenes import stager
+from mug.server import app
 
 # Create stager with multiplayer scenes
 experiment_stager = stager.Stager(
@@ -1330,7 +1330,7 @@ app.run(config)
 
 ### Accessing Logged Data
 
-Data is saved in standard Interactive Gym format:
+Data is saved in standard MUG format:
 
 ```
 data/
@@ -1686,7 +1686,7 @@ console.log('P2P Stats:', {
 
 ## Conclusion
 
-This implementation provides a robust foundation for multiplayer Pyodide experiments in Interactive Gym. Key achievements:
+This implementation provides a robust foundation for multiplayer Pyodide experiments in MUG. Key achievements:
 
 - **Zero server computation** - Environments run entirely in browsers
 - **Local responsiveness** - GGPO rollback eliminates input delay
@@ -1704,12 +1704,12 @@ The system is production-ready for human-human and human-AI experiments requirin
 
 ### Implementation Files
 
-- `interactive_gym/server/static/js/seeded_random.js` - Deterministic RNG
-- `interactive_gym/server/static/js/webrtc_manager.js` - P2P DataChannel + TURN
-- `interactive_gym/server/static/js/pyodide_multiplayer_game.js` - GGPO sync
-- `interactive_gym/server/pyodide_game_coordinator.py` - Server signaling
-- `interactive_gym/server/app.py` - SocketIO handlers
-- `interactive_gym/configurations/remote_config.py` - TURN configuration
+- `mug/server/static/js/seeded_random.js` - Deterministic RNG
+- `mug/server/static/js/webrtc_manager.js` - P2P DataChannel + TURN
+- `mug/server/static/js/pyodide_multiplayer_game.js` - GGPO sync
+- `mug/server/pyodide_game_coordinator.py` - Server signaling
+- `mug/server/app.py` - SocketIO handlers
+- `mug/configurations/remote_config.py` - TURN configuration
 
 ### External Resources
 

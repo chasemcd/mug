@@ -7,8 +7,8 @@ Covers two v1.21 requirements:
 
 from unittest.mock import MagicMock
 
-from interactive_gym.scenes.gym_scene import GymScene
-from interactive_gym.server.matchmaker import LatencyFIFOMatchmaker, MatchCandidate
+from mug.scenes.gym_scene import GymScene
+from mug.server.matchmaker import LatencyFIFOMatchmaker, MatchCandidate
 
 
 class TestLatencyFIFOIntegration:

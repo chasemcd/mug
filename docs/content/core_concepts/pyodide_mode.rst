@@ -42,7 +42,7 @@ Basic Configuration
 
 .. code-block:: python
 
-    from interactive_gym.scenes import gym_scene
+    from mug.scenes import gym_scene
 
     game_scene = (
         gym_scene.GymScene()
@@ -133,7 +133,7 @@ The server aggregates and saves this data to CSV files.
 
 **Tracking Custom Data:**
 
-By default, Interactive Gym tracks observations, actions, and rewards. To track additional information, add it to the ``infos`` dictionary returned from ``step()``:
+By default, MUG tracks observations, actions, and rewards. To track additional information, add it to the ``infos`` dictionary returned from ``step()``:
 
 .. code-block:: python
 
@@ -187,7 +187,7 @@ Standard Gymnasium environments use pygame for rendering. Override with object c
 .. code-block:: python
 
     from gymnasium.envs.classic_control.cartpole import CartPoleEnv
-    from interactive_gym.configurations.object_contexts import Circle, Line, Polygon
+    from mug.configurations.object_contexts import Circle, Line, Polygon
 
     class PyodideCartPole(CartPoleEnv):
 
@@ -234,7 +234,7 @@ Pyodide environments must accept dict actions:
 
             return obs, reward, done, truncated, info
 
-This matches Interactive Gym's multi-agent format.
+This matches MUG's multi-agent format.
 
 Package Management
 ------------------
@@ -548,8 +548,8 @@ Example: Complete Pyodide Scene
 
 .. code-block:: python
 
-    from interactive_gym.scenes import gym_scene
-    from interactive_gym.configurations import configuration_constants
+    from mug.scenes import gym_scene
+    from mug.configurations import configuration_constants
 
     game_scene = (
         gym_scene.GymScene()

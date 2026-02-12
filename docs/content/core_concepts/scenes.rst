@@ -1,12 +1,12 @@
 Scenes
 ======
 
-Scenes are the building blocks of Interactive Gym experiments. Each scene represents a stage in your experiment, from welcome screens to interactive gameplay to final thank-you pages.
+Scenes are the building blocks of MUG experiments. Each scene represents a stage in your experiment, from welcome screens to interactive gameplay to final thank-you pages.
 
 Scene Types
 -----------
 
-Interactive Gym provides four types of scenes:
+MUG provides four types of scenes:
 
 StartScene
 ^^^^^^^^^^
@@ -15,7 +15,7 @@ The entry point for participants. Every experiment must begin with a StartScene.
 
 .. code-block:: python
 
-    from interactive_gym.scenes import static_scene
+    from mug.scenes import static_scene
 
     start_scene = (
         static_scene.StartScene()
@@ -45,8 +45,8 @@ Interactive environment where participants engage with a Gymnasium-based environ
 
 .. code-block:: python
 
-    from interactive_gym.scenes import gym_scene
-    from interactive_gym.configurations import configuration_constants
+    from mug.scenes import gym_scene
+    from mug.configurations import configuration_constants
 
     game_scene = (
         gym_scene.GymScene()
@@ -372,7 +372,7 @@ Experiments can have any number of scenes between Start and End:
 
 .. code-block:: python
 
-    from interactive_gym.scenes import stager
+    from mug.scenes import stager
 
     experiment = stager.Stager(scenes=[
         start_scene,                 # Required first

@@ -1,7 +1,7 @@
 Rendering System
 ================
 
-Interactive Gym's rendering system converts environment state into visual elements displayed in the browser. This page explains how the rendering pipeline works, coordinate systems, and optimization strategies.
+MUG's rendering system converts environment state into visual elements displayed in the browser. This page explains how the rendering pipeline works, coordinate systems, and optimization strategies.
 
 Overview
 --------
@@ -12,7 +12,7 @@ Overview
 
     Environment → RGB Array → Encode → Send → Display
 
-**Interactive Gym:**
+**MUG:**
 
 .. code-block:: text
 
@@ -56,7 +56,7 @@ Server-Side Flow
 
 .. code-block:: python
 
-    # interactive_gym/server/game_manager.py
+    # mug/server/game_manager.py
 
     class GameManager:
         def game_loop(self):
@@ -81,7 +81,7 @@ Client-Side Flow
 
 .. code-block:: javascript
 
-    // interactive_gym/server/static/js/game.js
+    // mug/server/static/js/game.js
 
     socket.on('render_state', (data) => {
         // Clear non-permanent objects
@@ -473,7 +473,7 @@ For sprite-based rendering, preload images:
 
 .. code-block:: python
 
-    from interactive_gym.configurations.object_contexts import ImgSpec
+    from mug.configurations.object_contexts import ImgSpec
 
     .rendering(
         fps=30,
@@ -600,7 +600,7 @@ Best Practices
 Rendering Comparison
 --------------------
 
-**Object-based (Interactive Gym):**
+**Object-based (MUG):**
 
 - ✅ Efficient (small data size)
 - ✅ Resolution-independent

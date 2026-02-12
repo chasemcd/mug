@@ -2,7 +2,7 @@
 
 ## Overview
 
-Interactive Gym provides a configurable, extensible system to exclude participants who don't meet experiment requirements. Exclusion checks happen at two levels:
+MUG provides a configurable, extensible system to exclude participants who don't meet experiment requirements. Exclusion checks happen at two levels:
 
 1. **Entry screening** (experiment-level): Runs once when a participant first connects, before any scene starts
 2. **Continuous monitoring** (scene-level): Runs during gameplay to detect connection issues or tab switching
@@ -20,8 +20,8 @@ This system enables researchers to:
 Entry screening is configured on `ExperimentConfig`, while continuous monitoring is configured on `GymScene` via `.multiplayer()`:
 
 ```python
-from interactive_gym.configurations import ExperimentConfig
-from interactive_gym.scenes import GymScene
+from mug.configurations import ExperimentConfig
+from mug.scenes import GymScene
 
 # Experiment-level entry screening (runs once at experiment start)
 config = ExperimentConfig().experiment(
@@ -318,8 +318,8 @@ This ensures researchers can identify and handle partial sessions in their analy
 ## Complete Example
 
 ```python
-from interactive_gym.configurations import ExperimentConfig
-from interactive_gym.scenes import GymScene
+from mug.configurations import ExperimentConfig
+from mug.scenes import GymScene
 
 def custom_entry_check(context: dict) -> dict:
     """Require fast connections for Safari users."""
@@ -391,4 +391,4 @@ scene = GymScene(
 
 ---
 
-*Documentation for Interactive Gym v1.3*
+*Documentation for MUG v1.3*

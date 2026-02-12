@@ -29,7 +29,7 @@ The dual-buffer data recording architecture ensures that both players export ide
 ### Software Requirements
 
 - Two browser windows (Chrome recommended for DevTools)
-- Server running locally (`python -m interactive_gym.server.app`)
+- Server running locally (`python -m mug.server.app`)
 - Chrome DevTools (F12 on Windows/Linux, Cmd+Option+I on macOS)
 
 ### Directory Structure
@@ -68,7 +68,7 @@ data/
 
 1. Start the server:
    ```bash
-   python -m interactive_gym.server.app
+   python -m mug.server.app
    ```
 
 2. Open two browser windows to the experiment URL (e.g., `http://localhost:5001`)
@@ -491,13 +491,13 @@ If a player is backgrounded for longer than the configured timeout (default: 30 
 |------|------|
 | Export files | `data/{scene_id}/{subject_id}_ep{N}.csv` |
 | Validation script | `scripts/validate_action_sequences.py` |
-| Server entry point | `interactive_gym/server/app.py` |
+| Server entry point | `mug/server/app.py` |
 
 ### Key Commands
 
 ```bash
 # Start server
-python -m interactive_gym.server.app
+python -m mug.server.app
 
 # Compare two files
 python scripts/validate_action_sequences.py --compare file1.csv file2.csv

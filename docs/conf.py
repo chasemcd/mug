@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.abspath("../"))
 
 # -- Project information -----------------------------------------------------
 
-project = "interactive_gym"
+project = "mug"
 copyright = "2024, Chase McDonald"
 author = "Chase McDonald"
 

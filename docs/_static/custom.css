@@ -4,6 +4,6 @@ img {
 }
 
 /* Specific style for the logo if needed */
-img[alt="Interactive Gym Logo"] {
+img[alt="MUG Logo"] {
     background-color: transparent !important;
 }

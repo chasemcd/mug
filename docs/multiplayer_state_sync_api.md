@@ -2,7 +2,7 @@
 
 ## Overview
 
-For deterministic multiplayer synchronization in Interactive Gym, environments **must** implement state serialization methods that allow perfect state reconstruction across clients.
+For deterministic multiplayer synchronization in MUG, environments **must** implement state serialization methods that allow perfect state reconstruction across clients.
 
 This is required for:
 - Detecting and correcting desyncs between players
@@ -242,7 +242,7 @@ def set_state(self, state: dict) -> None:
 
 ## Client-Side Validation
 
-When a multiplayer game starts, Interactive Gym will automatically validate that your environment implements these methods:
+When a multiplayer game starts, MUG will automatically validate that your environment implements these methods:
 
 ```javascript
 // Automatic validation on game start
@@ -427,7 +427,7 @@ A: Optimize it! State sync is infrequent, but should complete in <100ms. Cache e
 If you have questions about implementing these methods for your environment:
 
 1. Check the examples above
-2. Look at reference implementations in Interactive Gym
+2. Look at reference implementations in MUG
 3. Open an issue: https://github.com/anthropics/interactive-gym/issues
 4. Join discussions: https://github.com/anthropics/interactive-gym/discussions
 
