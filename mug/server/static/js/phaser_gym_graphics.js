@@ -1,4 +1,4 @@
-import {actionFromONNX} from './onnx_inference.js';
+import {actionFromONNX, initModelConfigs} from './onnx_inference.js';
 
 
 var game_config = {
@@ -319,6 +319,7 @@ class GymScene extends Phaser.Scene {
         this.background = config.background;
         this.last_rendered_step = -1;
         this.scene_metadata = config.scene_metadata;
+        initModelConfigs(this.scene_metadata);
         this.pyodide_remote_game = config.pyodide_remote_game;
         this.isProcessingPyodide = false;
         this.stateImageSprite = null;
@@ -622,7 +623,7 @@ class GymScene extends Phaser.Scene {
         }
 
         // Calculate the action and add it to the buffer
-        let action = await actionFromONNX(policyID, observation);
+        let action = await actionFromONNX(policyID, observation, agentID);
         botActionBuffers[agentID].push(action);
     }
 

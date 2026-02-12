@@ -6,9 +6,38 @@ import * as seeded_random from './seeded_random.js';
 const loadedModels = {};
 const hiddenStates = {};
 
-export async function actionFromONNX(policyID, observation) {
+// Store policy configs from scene_metadata (keyed by agent ID)
+let policyConfigs = {};
+
+/**
+ * Initialize model configs from scene_metadata.
+ * Called once during scene setup to store policy_configs for inference.
+ * @param {Object} sceneMetadata - The scene_metadata object from the server
+ */
+export function initModelConfigs(sceneMetadata) {
+    if (sceneMetadata && sceneMetadata.policy_configs) {
+        policyConfigs = sceneMetadata.policy_configs;
+    }
+}
+
+/**
+ * Look up the model config for a given agent ID.
+ * @param {string} agentID - The agent ID (same keys as policy_mapping)
+ * @returns {Object|null} The model config dict, or null if not found
+ */
+function getModelConfig(agentID) {
+    if (agentID !== undefined && policyConfigs[agentID]) {
+        return policyConfigs[agentID];
+    }
+    return null;
+}
+
+export async function actionFromONNX(policyID, observation, agentID) {
+    // Look up model config for this agent
+    const modelConfig = getModelConfig(agentID);
+
     // Conduct forward inference
-    const logits = await inferenceONNXPolicy(policyID, observation);
+    const logits = await inferenceONNXPolicy(policyID, observation, modelConfig);
 
     // Apply softmax to convert logits to probabilities
     const probabilities = softmax(logits);
@@ -24,7 +53,7 @@ export async function actionFromONNX(policyID, observation) {
     return action;
 }
 
-async function inferenceONNXPolicy(policyID, observation) {
+async function inferenceONNXPolicy(policyID, observation, modelConfig) {
 
     // If the observation is an Array of Arrays or a dictionary with some values being Arrays of Arrays,
     // flatten them to a single Array
@@ -76,50 +105,82 @@ async function inferenceONNXPolicy(policyID, observation) {
     // and convert to an ort.Tensor
     const inputTensor = new window.ort.Tensor('float32', observation, [1, observation.length]);
 
-    // TODO(chase): We need to add the onnx inputs to the configuration!
-    const feeds = {
-        'obs': inputTensor,
-        // 'seq_lens': new window.ort.Tensor('float32', new Float32Array([1])),
-        // 'state_ins': [new window.ort.Tensor('float32', new Float32Array([0]), [1])]
-    };
+    const feeds = {};
 
-    // Check if the model is recurrent by inspecting input names, we're following
-    // the RLlib convention of naming hidden states as 'state_in_0', 'state_in_1', etc.
-    const isRecurrent = session.inputNames.some(name => name.startsWith('state_in_'));
-    
-    if (isRecurrent) {
-        // Load hidden states if available, otherwise initialize them
-        if (!hiddenStates[policyID]) {
-            hiddenStates[policyID] = {};
-        }
+    if (modelConfig) {
+        // Declarative path: use config-driven tensor names and shapes
+        feeds[modelConfig.obs_input] = inputTensor;
 
-        session.inputNames.forEach(name => {
-            if (name.startsWith('state_in_')) {
-                if (!hiddenStates[policyID][name]) {
-
-                    // TODO(chase): retrieve the shape; this hardcodes hidden states to [1, 256]
-                    const expectedShape = [1, 256] // inputMetadata[name].dimensions;
-
-                    // Initialize the hidden state tensor with zeros
-                    hiddenStates[policyID][name] = new window.ort.Tensor('float32', new Float32Array(expectedShape.reduce((a, b) => a * b)), expectedShape);
-                } 
-                feeds[name] = hiddenStates[policyID][name];
+        if (modelConfig.state_inputs && modelConfig.state_inputs.length > 0) {
+            // Recurrent model: set up hidden state feeds
+            if (!hiddenStates[policyID]) {
+                hiddenStates[policyID] = {};
             }
-        });
 
-        feeds['seq_lens'] = new window.ort.Tensor('float32', new Float32Array([1]));
+            modelConfig.state_inputs.forEach(name => {
+                if (!hiddenStates[policyID][name]) {
+                    const shape = modelConfig.state_shape;
+                    const size = shape.reduce((a, b) => a * b);
+                    hiddenStates[policyID][name] = new window.ort.Tensor(
+                        'float32', new Float32Array(size), shape
+                    );
+                }
+                feeds[name] = hiddenStates[policyID][name];
+            });
+        }
+        // Non-recurrent with config: no state feeds needed
     } else {
-        feeds['state_ins'] = new window.ort.Tensor('float32', new Float32Array([1]));
+        // Legacy fallback (no config): keep old hardcoded behavior
+        feeds['obs'] = inputTensor;
 
+        // Check if the model is recurrent by inspecting input names, following
+        // the RLlib convention of naming hidden states as 'state_in_0', 'state_in_1', etc.
+        const isRecurrent = session.inputNames.some(name => name.startsWith('state_in_'));
+
+        if (isRecurrent) {
+            if (!hiddenStates[policyID]) {
+                hiddenStates[policyID] = {};
+            }
+
+            session.inputNames.forEach(name => {
+                if (name.startsWith('state_in_')) {
+                    if (!hiddenStates[policyID][name]) {
+                        const expectedShape = [1, 256];
+                        hiddenStates[policyID][name] = new window.ort.Tensor(
+                            'float32',
+                            new Float32Array(expectedShape.reduce((a, b) => a * b)),
+                            expectedShape
+                        );
+                    }
+                    feeds[name] = hiddenStates[policyID][name];
+                }
+            });
+
+            feeds['seq_lens'] = new window.ort.Tensor('float32', new Float32Array([1]));
+        } else {
+            feeds['state_ins'] = new window.ort.Tensor('float32', new Float32Array([1]));
+        }
     }
 
     // Run inference
     const results = await session.run(feeds);
 
-    // Get the output logits (assuming single output)
-    const logits = results[session.outputNames[0]].data;
+    // Extract output logits
+    const logitName = modelConfig ? modelConfig.logit_output : session.outputNames[0];
+    const logits = results[logitName].data;
 
-    return logits
+    // Update hidden states from output (declarative path only)
+    if (modelConfig && modelConfig.state_outputs) {
+        if (!hiddenStates[policyID]) {
+            hiddenStates[policyID] = {};
+        }
+        modelConfig.state_outputs.forEach((outputName, idx) => {
+            const inputName = modelConfig.state_inputs[idx];
+            hiddenStates[policyID][inputName] = results[outputName];
+        });
+    }
+
+    return logits;
 }
 
 // Softmax function to convert logits to probabilities
