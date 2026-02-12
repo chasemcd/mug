@@ -73,24 +73,24 @@ Requirements for configurable client-side ONNX inference -- replacing hardcoded 
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DECL-01 | TBD | Pending |
-| DECL-02 | TBD | Pending |
-| DECL-03 | TBD | Pending |
-| DECL-04 | TBD | Pending |
-| DECL-05 | TBD | Pending |
-| STATE-01 | TBD | Pending |
-| STATE-02 | TBD | Pending |
-| STATE-03 | TBD | Pending |
-| CUST-01 | TBD | Pending |
-| CUST-02 | TBD | Pending |
-| CUST-03 | TBD | Pending |
-| VER-01 | TBD | Pending |
+| DECL-01 | Phase 89 | Pending |
+| DECL-02 | Phase 89 | Pending |
+| DECL-03 | Phase 89 | Pending |
+| DECL-04 | Phase 89 | Pending |
+| DECL-05 | Phase 89 | Pending |
+| STATE-01 | Phase 90 | Pending |
+| STATE-02 | Phase 90 | Pending |
+| STATE-03 | Phase 90 | Pending |
+| CUST-01 | Phase 91 | Pending |
+| CUST-02 | Phase 91 | Pending |
+| CUST-03 | Phase 91 | Pending |
+| VER-01 | Phase 92 | Pending |
 
 **Coverage:**
 - v1.28 requirements: 12 total
-- Mapped to phases: 0
-- Unmapped: 12 (pending roadmap)
+- Mapped to phases: 12
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-11*
-*Last updated: 2026-02-11 after initial definition*
+*Last updated: 2026-02-11 after roadmap creation*

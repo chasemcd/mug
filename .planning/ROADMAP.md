@@ -3,7 +3,7 @@
 ## Milestones
 
 <details>
-<summary>Shipped milestones (v1.0-v1.26)</summary>
+<summary>Shipped milestones (v1.0-v1.27)</summary>
 
 - v1.0-v1.21 Feature Branch -- Phases 1-66 (shipped)
 - v1.22 GymScene Config Cleanup -- Phases 67-71 (shipped 2026-02-08)
@@ -11,10 +11,11 @@
 - v1.24 Test Fix & Hardening -- Phases 79-82 (shipped 2026-02-09)
 - v1.25 Data Export Path Fix -- Phase 83 (shipped 2026-02-09)
 - v1.26 Project Rename -- Phases 84-86 (shipped 2026-02-10)
+- v1.27 Principled Rollback Management -- Phases 87-88 (shipped 2026-02-11)
 
 </details>
 
-- **v1.27 Principled Rollback Management** -- Phases 87-88 (in progress)
+- **v1.28 Configurable Inference** -- Phases 89-92 (in progress)
 
 ## Phases
 
@@ -75,37 +76,65 @@
 
 </details>
 
-### v1.27 Principled Rollback Management (In Progress)
+<details>
+<summary>v1.27 Principled Rollback Management (Phases 87-88) -- SHIPPED 2026-02-11</summary>
 
-**Milestone Goal:** Replace arbitrary hardcoded limits in the GGPO rollback system with principled, confirmedFrame-based resource management.
+- [x] Phase 87: ConfirmedFrame-Based Resource Management (1/1 plans) -- completed 2026-02-11
+- [x] Phase 88: Verification (1/1 plans) -- completed 2026-02-11
 
-- [x] **Phase 87: ConfirmedFrame-Based Resource Management** (1/1 plans) -- completed 2026-02-11
-- [ ] **Phase 88: Verification** - Confirm all tests pass and rollback correctness is preserved
+</details>
+
+### v1.28 Configurable Inference (In Progress)
+
+**Milestone Goal:** Make client-side ONNX inference flexible and configurable instead of hardcoded to RLlib LSTM format.
+
+- [ ] **Phase 89: Declarative Model Config** - Python builder API for ONNX tensor config with transport to JS client
+- [ ] **Phase 90: LSTM State Persistence** - JS runtime captures output hidden states and feeds them back on next inference
+- [ ] **Phase 91: Custom Inference Escape Hatch** - Inline JS function override for full inference control
+- [ ] **Phase 92: Verification** - All existing tests pass with no regressions
 
 ## Phase Details
 
-### Phase 87: ConfirmedFrame-Based Resource Management
-**Goal**: Snapshot and input buffer pruning adapts to network conditions via confirmedFrame instead of arbitrary hardcoded limits
-**Depends on**: Nothing (first phase of v1.27)
-**Requirements**: SNAP-01, SNAP-02, SNAP-03, IBUF-01, IBUF-02, IBUF-03, CONF-01, CONF-02
+### Phase 89: Declarative Model Config
+**Goal**: Users can configure ONNX model tensor names and shapes per policy via Python, and that config arrives in the JS client automatically
+**Depends on**: Nothing (first phase of v1.28)
+**Requirements**: DECL-01, DECL-02, DECL-03, DECL-04, DECL-05
 **Success Criteria** (what must be TRUE):
-  1. Snapshots before the anchor snapshot (highest snapshot <= confirmedFrame) are automatically deleted during pruning
-  2. No hardcoded maxSnapshots cap exists -- snapshot count grows and shrinks based on unconfirmed input window
-  3. The anchor snapshot at or before confirmedFrame is never deleted (always available as rollback recovery point)
-  4. Input buffer entries at or before confirmedFrame are pruned instead of using a hardcoded frame offset
-  5. snapshotInterval is configurable via GymScene.multiplayer() in Python and read by the JS constructor with a default of 5
-**Plans**: 1 plan
-- [x] 87-01-PLAN.md -- Config plumbing + confirmedFrame-based snapshot and input buffer pruning
+  1. User can set observation input tensor name (e.g., "obs") per policy using the Python builder API and it is respected during inference
+  2. User can set logit output tensor name (e.g., "output") per policy using the Python builder API and it is respected during inference
+  3. User can set hidden state input/output tensor name pairs per policy (not locked to "state_in_0"/"state_out_0" convention)
+  4. User can set hidden state tensor shapes per policy (not locked to [1, 256])
+  5. Declarative model config specified in Python scene config is available in the JS client without manual JSON passing
+**Plans**: TBD
 
-### Phase 88: Verification
-**Goal**: All existing tests pass and rollback correctness is preserved after the pruning changes
-**Depends on**: Phase 87
-**Requirements**: VER-01, VER-02
+### Phase 90: LSTM State Persistence
+**Goal**: Hidden state tensors persist across inference steps so LSTM/GRU policies produce correct sequential behavior
+**Depends on**: Phase 89
+**Requirements**: STATE-01, STATE-02, STATE-03
 **Success Criteria** (what must be TRUE):
-  1. All 56 existing tests pass (27 unit + 29 E2E) with zero failures
-  2. Multiplayer E2E tests that exercise rollback scenarios complete successfully with correct game state
-**Plans**: 1 plan
-- [ ] 88-01-PLAN.md -- Run unit + E2E tests to verify no regressions from confirmedFrame pruning
+  1. After an ONNX inference call, the output state tensors (e.g., state_out) are captured and stored for the next step
+  2. On the next inference call, the previously captured state tensors are fed as input state tensors (e.g., state_in) instead of zeros
+  3. On the first inference call (no prior state), hidden states are initialized to zero tensors with the shape specified in the declarative config
+**Plans**: TBD
+
+### Phase 91: Custom Inference Escape Hatch
+**Goal**: Users who need non-standard inference logic can provide their own JS function and bypass the declarative path entirely
+**Depends on**: Phase 89
+**Requirements**: CUST-01, CUST-02, CUST-03
+**Success Criteria** (what must be TRUE):
+  1. User can provide an inline JS function string via the Python builder API that handles ONNX inference
+  2. The custom inference function receives the ONNX session, current observation, and model config as arguments
+  3. When a custom inference function is specified for a policy, the declarative inference path is skipped entirely for that policy
+**Plans**: TBD
+
+### Phase 92: Verification
+**Goal**: All existing tests pass and no regressions were introduced by the inference configurability changes
+**Depends on**: Phase 89, Phase 90, Phase 91
+**Requirements**: VER-01
+**Success Criteria** (what must be TRUE):
+  1. All unit tests pass with zero failures
+  2. All E2E tests pass with zero failures
+**Plans**: TBD
 
 ## Progress
 
@@ -117,8 +146,11 @@
 | 79-82 | v1.24 | 6/6 | Complete | 2026-02-09 |
 | 83 | v1.25 | 1/1 | Complete | 2026-02-09 |
 | 84-86 | v1.26 | 7/7 | Complete | 2026-02-10 |
-| 87 | v1.27 | 1/1 | Complete | 2026-02-11 |
-| 88 | v1.27 | 0/1 | Not started | - |
+| 87-88 | v1.27 | 2/2 | Complete | 2026-02-11 |
+| 89 | v1.28 | 0/? | Not started | - |
+| 90 | v1.28 | 0/? | Not started | - |
+| 91 | v1.28 | 0/? | Not started | - |
+| 92 | v1.28 | 0/? | Not started | - |
 
 ---
-*Roadmap created: 2026-02-11 for v1.27 Principled Rollback Management*
+*Roadmap updated: 2026-02-11 for v1.28 Configurable Inference*
