@@ -6,6 +6,9 @@ import * as seeded_random from './seeded_random.js';
 const loadedModels = {};
 const hiddenStates = {};
 
+// Cache compiled custom inference functions (keyed by agentID)
+const compiledCustomFns = {};
+
 // Store policy configs from scene_metadata (keyed by agent ID)
 let policyConfigs = {};
 
@@ -35,6 +38,31 @@ function getModelConfig(agentID) {
 export async function actionFromONNX(policyID, observation, agentID) {
     // Look up model config for this agent
     const modelConfig = getModelConfig(agentID);
+
+    // Custom inference escape hatch: if custom_inference_fn is set, compile and
+    // call it directly, bypassing inferenceONNXPolicy, softmax, and sampleAction.
+    if (modelConfig && modelConfig.custom_inference_fn) {
+        // Load the ONNX session if not already loaded
+        if (!loadedModels[policyID]) {
+            loadedModels[policyID] = await window.ort.InferenceSession.create(
+                policyID, {executionProviders: ["wasm"],}
+            );
+        }
+        const session = loadedModels[policyID];
+
+        // Compile the custom function once and cache it
+        if (!compiledCustomFns[agentID]) {
+            const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
+            compiledCustomFns[agentID] = new AsyncFunction(
+                'session', 'observation', 'modelConfig',
+                modelConfig.custom_inference_fn
+            );
+        }
+
+        // Call the custom function -- it has full control over inference
+        const action = await compiledCustomFns[agentID](session, observation, modelConfig);
+        return action;
+    }
 
     // Conduct forward inference
     const logits = await inferenceONNXPolicy(policyID, observation, modelConfig, agentID);
