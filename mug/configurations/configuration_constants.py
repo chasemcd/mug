@@ -39,14 +39,38 @@ class ModelConfig:
             (e.g., ["state_out_0", "state_out_1"]).
         state_shape: Shape of each hidden state tensor (e.g., [1, 256]).
 
-    Example::
+    Optional fields (for custom inference):
+        custom_inference_fn: An inline JavaScript function body string that
+            receives ``(session, observation, modelConfig)`` and must return
+            the selected action (integer). When set, this function completely
+            replaces the declarative inference path. The function body may
+            use ``await`` for async ONNX operations. obs_input and
+            logit_output remain required but may be ignored by the custom
+            function.
 
+    Examples::
+
+        # Standard declarative config
         ModelConfig(
             obs_input="obs",
             logit_output="output",
             state_inputs=["state_in_0", "state_in_1"],
             state_outputs=["state_out_0", "state_out_1"],
             state_shape=[1, 256],
+        )
+
+        # Custom inference escape hatch
+        ModelConfig(
+            obs_input="obs",
+            logit_output="output",
+            custom_inference_fn='''
+                const inputTensor = new ort.Tensor(
+                    'float32', observation, [1, observation.length]
+                );
+                const results = await session.run({obs: inputTensor});
+                const logits = results['output'].data;
+                return logits.indexOf(Math.max(...logits));
+            ''',
         )
     """
 
@@ -55,6 +79,7 @@ class ModelConfig:
     state_inputs: list[str] | None = None
     state_outputs: list[str] | None = None
     state_shape: list[int] | None = None
+    custom_inference_fn: str | None = None
 
     def __post_init__(self):
         # Validate required string fields
@@ -83,6 +108,13 @@ class ModelConfig:
             if self.state_shape is None:
                 raise ValueError(
                     "state_shape must be provided when state_inputs/state_outputs are set"
+                )
+
+        # Validate custom_inference_fn when provided
+        if self.custom_inference_fn is not None:
+            if not isinstance(self.custom_inference_fn, str) or not self.custom_inference_fn.strip():
+                raise ValueError(
+                    "custom_inference_fn must be a non-empty string when provided"
                 )
 
         # Validate state_shape contents when provided
