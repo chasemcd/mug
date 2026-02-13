@@ -3,10 +3,7 @@ Multi-User Gymnasium (MUG)
 ==========================
 
 .. image:: https://img.shields.io/pypi/dm/multi-user-gymnasium
-:alt: PyPI - Downloads
-
 .. image:: https://img.shields.io/pypi/v/multi-user-gymnasium
-:alt: PyPI - Version
 
 
 
