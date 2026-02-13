@@ -9,11 +9,11 @@ Multi-User Gymnasium (MUG)
       <img alt="PyPI - Downloads" src="https://img.shields.io/pypi/dm/multi-user-gymnasium">
    </div>
 
+.. raw:: html
 
-
-.. image:: docs/content/mug_logo.png
-    :alt: MUG Logo
-    :align: center
+   <div align="center">
+     <img src="docs/content/mug_logo.png" alt="MUG logo" width="300"/>
+   </div>
 
 Multi-User Gymnasium (MUG) is a library that provides a generalized interface for creating interactive, browser-based experiments from simulation environments. More specifically,
 it is meant to take Python-based Gymnasium or PettingZoo formatted environments and run them in the browser such that humans can interact with the
