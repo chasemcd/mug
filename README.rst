@@ -2,6 +2,14 @@
 Multi-User Gymnasium (MUG)
 ==========================
 
+.. raw:: HTML
+
+   <div style="display: flex">
+      <img alt="PyPI - Version" src="https://img.shields.io/pypi/v/multi-user-gymnasium">
+      <img alt="PyPI - Downloads" src="https://img.shields.io/pypi/dm/multi-user-gymnasium">
+   </div>
+
+
 .. list-table::
    :width: 100%
    :class: borderless
