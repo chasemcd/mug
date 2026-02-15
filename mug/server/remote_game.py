@@ -7,8 +7,11 @@ import threading
 import typing
 import uuid
 from enum import Enum, auto
+from typing import Any
 
 import eventlet
+
+from mug.configurations import configuration_constants
 
 logger = logging.getLogger(__name__)
 
@@ -206,6 +209,13 @@ class ServerGame:
         self.prev_rewards: dict[str | int, float] = {}
         self.prev_actions: dict[str | int, str | int] = {}
 
+        # Environment lifecycle (populated by _build_env / _load_policies)
+        self.env = None
+        self.observation = None
+        self.policies: dict[str, Any] = {}
+        self.pending_actions: dict[str | int, Any] = {}
+        self.tick_num: int = 0
+
     def set_reset_event(self) -> None:
         """Reinitialize the reset event."""
         self.reset_event = eventlet.event.Event()
@@ -322,5 +332,173 @@ class ServerGame:
         self.document_focus_status[player_identifier] = hidden_status
         self.current_ping[player_identifier] = ping
 
+    def _build_env(self) -> None:
+        """Create the environment from the scene's env_creator and env_config.
+
+        Sets render_mode to 'interactive_gym' in the env config so the env
+        produces Phaser-compatible state dicts from env.render().
+        """
+        env_config = dict(self.scene.env_config or {})
+        env_config["render_mode"] = "interactive_gym"
+        self.env = self.scene.env_creator(**env_config)
+        logger.info(
+            f"Game {self.game_id}: environment built via scene.env_creator"
+        )
+
+    def _load_policies(self) -> None:
+        """Load bot policies server-side.
+
+        Iterates policy_mapping; for each non-Human agent, loads the policy
+        using scene.load_policy_fn (if provided). Random agents store None.
+        """
+        self.policies = {}
+        for agent_id, policy_type in self.scene.policy_mapping.items():
+            if policy_type == configuration_constants.PolicyTypes.Human:
+                continue
+            if policy_type == configuration_constants.PolicyTypes.Random:
+                self.policies[agent_id] = None
+            elif self.scene.load_policy_fn is not None:
+                self.policies[agent_id] = self.scene.load_policy_fn(
+                    agent_id, policy_type
+                )
+            else:
+                logger.warning(
+                    f"Game {self.game_id}: no load_policy_fn for bot agent "
+                    f"{agent_id} with policy type {policy_type}"
+                )
+                self.policies[agent_id] = None
+        logger.info(
+            f"Game {self.game_id}: loaded policies for {list(self.policies.keys())}"
+        )
+
+    def _get_bot_action(self, agent_id: str | int) -> Any:
+        """Get an action for a bot agent.
+
+        If the agent has a policy and policy_inference_fn, uses those.
+        If the agent's policy type is Random, samples from the env action space.
+        """
+        policy_type = self.scene.policy_mapping.get(agent_id)
+        if policy_type == configuration_constants.PolicyTypes.Random:
+            # Sample random action from the env's action space for this agent
+            if hasattr(self.env, "action_space"):
+                action_space = self.env.action_space
+                # For multi-agent envs the action space may be a dict
+                if hasattr(action_space, "__getitem__"):
+                    try:
+                        return action_space[agent_id].sample()
+                    except (KeyError, TypeError):
+                        return action_space.sample()
+                return action_space.sample()
+            return self.scene.default_action
+
+        policy = self.policies.get(agent_id)
+        if policy is not None and self.scene.policy_inference_fn is not None:
+            return self.scene.policy_inference_fn(
+                agent_id, policy, self.observation
+            )
+
+        return self.scene.default_action
+
+    def reset(self) -> None:
+        """Reset the environment and prepare for a new episode."""
+        result = self.env.reset()
+        # env.reset() returns (obs, info) or just obs depending on API
+        if isinstance(result, tuple):
+            self.observation = result[0]
+        else:
+            self.observation = result
+
+        self.episode_num += 1
+        self.episode_rewards = collections.defaultdict(lambda: 0)
+        self.tick_num = 0
+        self.status = GameStatus.Active
+        self.prev_actions = {}
+        self.pending_actions = {}
+        logger.info(
+            f"Game {self.game_id}: reset for episode {self.episode_num}"
+        )
+
+    def step(self):
+        """Step the environment with current actions.
+
+        Builds action dict for all agents:
+        - Human agents: uses pending_actions or falls back per action_population_method
+        - Bot agents: calls _get_bot_action
+
+        Returns:
+            Tuple of (observations, rewards, terminated, truncated, infos)
+        """
+        actions = {}
+        for agent_id, policy_type in self.scene.policy_mapping.items():
+            if policy_type == configuration_constants.PolicyTypes.Human:
+                # Human agent: use pending action or fallback
+                action = self.pending_actions.get(agent_id)
+                if action is None:
+                    pop_method = self.scene.action_population_method
+                    if (
+                        pop_method
+                        == configuration_constants.ActionSettings.PreviousSubmittedAction
+                    ):
+                        action = self.prev_actions.get(
+                            agent_id, self.scene.default_action
+                        )
+                    else:
+                        # DefaultAction or any other
+                        action = self.scene.default_action
+                actions[agent_id] = action
+            else:
+                actions[agent_id] = self._get_bot_action(agent_id)
+
+        # Step the environment
+        observations, rewards, terminated, truncated, infos = self.env.step(
+            actions
+        )
+        self.observation = observations
+
+        # Update reward tracking
+        for agent_id in self.scene.policy_mapping:
+            reward = rewards.get(agent_id, 0) if isinstance(rewards, dict) else rewards
+            self.episode_rewards[agent_id] += reward
+            self.total_rewards[agent_id] += reward
+            if reward > 0:
+                self.total_positive_rewards[agent_id] += reward
+            elif reward < 0:
+                self.total_negative_rewards[agent_id] += reward
+
+        self.prev_actions = actions
+        self.prev_rewards = rewards if isinstance(rewards, dict) else {
+            aid: rewards for aid in self.scene.policy_mapping
+        }
+        self.tick_num += 1
+        self.pending_actions = {}
+
+        # Determine episode status
+        if isinstance(terminated, dict):
+            all_terminated = all(terminated.values())
+        else:
+            all_terminated = bool(terminated)
+
+        if isinstance(truncated, dict):
+            all_truncated = all(truncated.values())
+        else:
+            all_truncated = bool(truncated)
+
+        if all_terminated or all_truncated:
+            if self.episode_num < self.scene.num_episodes:
+                self.status = GameStatus.Reset
+            else:
+                self.status = GameStatus.Done
+
+        return (observations, rewards, terminated, truncated, infos)
+
+    def enqueue_action(self, agent_id: str | int, action: Any) -> None:
+        """Store a player's latest action for the next step."""
+        self.pending_actions[agent_id] = action
+
     def tear_down(self):
         self.status = GameStatus.Inactive
+        if self.env is not None:
+            try:
+                self.env.close()
+            except Exception as e:
+                logger.warning(f"Game {self.game_id}: error closing env: {e}")
