@@ -21,7 +21,7 @@ PLAYER_COLORS = {0: "blue", 1: "green"}
 
 
 def overcooked_game_page_header_fn(
-    game: remote_game.RemoteGameV2, player_name: str
+    game: remote_game.ServerGame, player_name: str
 ) -> str:
     """Function that takes the game and a player name to determine the html that should be shown when the game active."""
     player_id = None
@@ -56,7 +56,7 @@ def get_x_y(
     return x, y
 
 
-def hud_text_fn(game: remote_game.RemoteGameV2) -> str:
+def hud_text_fn(game: remote_game.ServerGame) -> str:
     """Function to create HUD text to display"""
     score = int(
         list(game.episode_rewards.values())[0]

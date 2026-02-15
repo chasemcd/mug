@@ -92,7 +92,7 @@ class GameManager:
         self.subject = thread_safe_collections.ThreadSafeDict()
 
         # Data structure to save subjects games in memory OBJECTS by their socket id
-        self.games: dict[GameID, remote_game.RemoteGameV2] = (
+        self.games: dict[GameID, remote_game.ServerGame] = (
             thread_safe_collections.ThreadSafeDict()
         )
 
@@ -188,16 +188,16 @@ class GameManager:
 
         return (True, None)  # All checks passed
 
-    def _create_game(self) -> remote_game.RemoteGameV2:
+    def _create_game(self) -> remote_game.ServerGame:
         """Create a Game object corresponding to the specified Scene."""
         try:
             game_id = str(uuid.uuid4())
 
-            # Even if we're using Pyodide, we'll still instantiate a RemoteGameV2, since
+            # Even if we're using Pyodide, we'll still instantiate a ServerGame, since
             # it'll track the players within a game.
             # TODO(chase): check if we actually do need this for Pyodide-based games...
-            # Game starts in SessionState.WAITING (set in RemoteGameV2.__init__)
-            game = remote_game.RemoteGameV2(
+            # Game starts in SessionState.WAITING (set in ServerGame.__init__)
+            game = remote_game.ServerGame(
                 self.scene,
                 experiment_config=self.experiment_config,
                 game_id=game_id,
@@ -281,7 +281,7 @@ class GameManager:
 
     def add_subject_to_game(
         self, subject_id: SubjectID
-    ) -> remote_game.RemoteGameV2 | None:
+    ) -> remote_game.ServerGame | None:
         """Add a subject to a game and return it.
 
         All games are created through the matchmaker path (FIFO queue by default).
@@ -308,7 +308,7 @@ class GameManager:
     def _add_subject_to_specific_game(
         self,
         subject_id: SubjectID,
-        game: remote_game.RemoteGameV2
+        game: remote_game.ServerGame
     ) -> bool:
         """Add a subject to a specific game (used for group matching).
 
@@ -390,7 +390,7 @@ class GameManager:
 
     def _add_to_fifo_queue(
         self, subject_id: SubjectID
-    ) -> remote_game.RemoteGameV2 | None:
+    ) -> remote_game.ServerGame | None:
         """Add a subject to the standard FIFO matching queue.
 
         Uses the matchmaker to decide when to form groups. If matchmaking_max_rtt
@@ -867,7 +867,7 @@ class GameManager:
     def _create_game_for_match_internal(
         self,
         matched: list[MatchCandidate],
-    ) -> remote_game.RemoteGameV2 | None:
+    ) -> remote_game.ServerGame | None:
         """Create game for matched candidates after probe success.
 
         Similar to _create_game_for_match but without handling arriving participant
@@ -875,7 +875,7 @@ class GameManager:
         """
         # Create a new game
         self._create_game()
-        game: remote_game.RemoteGameV2 = self.games[self.waiting_games[-1]]
+        game: remote_game.ServerGame = self.games[self.waiting_games[-1]]
 
         # Add each participant to the game
         added_subjects = []
@@ -947,7 +947,7 @@ class GameManager:
         self,
         matched: list[MatchCandidate],
         arriving_subject_id: SubjectID
-    ) -> remote_game.RemoteGameV2:
+    ) -> remote_game.ServerGame:
         """Create and start a game for matched participants.
 
         Phase 60+: All matched participants are in waitroom_participants (no pre-allocated games).
@@ -1056,7 +1056,7 @@ class GameManager:
 
     def get_subject_game(
         self, subject_id: SubjectID
-    ) -> remote_game.RemoteGameV2:
+    ) -> remote_game.ServerGame:
         """Get the game that a subject is in."""
         return self.games.get(self.subject_games.get(subject_id))
 
@@ -1215,7 +1215,7 @@ class GameManager:
         logger.info(f"[Countdown] Countdown complete, starting game {game.game_id}")
         self.start_game(game)
 
-    def start_game(self, game: remote_game.RemoteGameV2):
+    def start_game(self, game: remote_game.ServerGame):
         """Start a game."""
         # Safety validation: ensure correct number of players before starting
         expected_human_players = len([
@@ -1275,8 +1275,11 @@ class GameManager:
         # Note: For pyodide_multiplayer games, transition to VALIDATING/PLAYING
         # happens in PyodideGameCoordinator (see Task 3)
 
-    def run_server_game(self, game: remote_game.RemoteGameV2):
-        """Run a remote game on the server."""
+    def run_server_game(self, game: remote_game.ServerGame):
+        """Run a remote game on the server.
+
+        NOTE: tick/reset methods removed in Phase 92 cleanup. Phase 93 rebuilds server game loop.
+        """
         end_status = [
             remote_game.GameStatus.Inactive,
             remote_game.GameStatus.Done,
@@ -1470,7 +1473,7 @@ class GameManager:
 
         return pressed_keys
 
-    def render_server_game(self, game: remote_game.RemoteGameV2):
+    def render_server_game(self, game: remote_game.ServerGame):
         state = None
         encoded_image = None
         if self.scene.env_to_state_fn is not None:

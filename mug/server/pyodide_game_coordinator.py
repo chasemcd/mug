@@ -228,7 +228,7 @@ class PyodideGameCoordinator:
         game = self.games[game_id]
         game.is_active = True
 
-        # Transition RemoteGameV2 to PLAYING
+        # Transition ServerGame to PLAYING
         if self.get_game_manager:
             gm = self.get_game_manager(game_id)
             if gm:
@@ -612,7 +612,7 @@ class PyodideGameCoordinator:
             game.validation_start_time = time.time()
             game.p2p_validated_players = set()
 
-            # Transition RemoteGameV2 to VALIDATING if we have access
+            # Transition ServerGame to VALIDATING if we have access
             if self.get_game_manager:
                 gm = self.get_game_manager(game_id)
                 if gm:
