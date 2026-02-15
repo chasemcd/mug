@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import base64
 import itertools
 import logging
 import random
@@ -22,16 +21,6 @@ if not logger.handlers:
     logger.addHandler(_handler)
     logger.setLevel(logging.INFO)
 
-
-try:
-    import cv2
-except ImportError:
-    cv2 = None
-    print(
-        "cv2 not installed. This is required if you're not "
-        "defining a rendering function and want to (inefficiently) "
-        "have the canvas display whatever is returned from `env.render('rgb_array')`."
-    )
 
 from typing import TYPE_CHECKING
 
@@ -1276,53 +1265,55 @@ class GameManager:
         # happens in PyodideGameCoordinator (see Task 3)
 
     def run_server_game(self, game: remote_game.ServerGame):
-        """Run a remote game on the server.
+        """Run the server-authoritative game loop.
 
-        NOTE: tick/reset methods removed in Phase 92 cleanup. Phase 93 rebuilds server game loop.
+        Steps the environment at max speed (no FPS cap), renders via
+        env.render(render_mode="interactive_gym"), and broadcasts state
+        via the server_render_state socket event. Handles episode resets
+        with configurable pause and player acknowledgments.
         """
+        # Build env and load policies
+        game._build_env()
+        game._load_policies()
+
+        # First reset
+        with game.lock:
+            game.reset()
+            if self.scene.callback is not None:
+                self.scene.callback.on_episode_start(game)
+
+        # Initial render broadcast
+        self.render_server_game(game)
+
+        # Main game loop -- run at max speed (no FPS cap)
         end_status = [
             remote_game.GameStatus.Inactive,
             remote_game.GameStatus.Done,
         ]
 
-        with game.lock:
-            game.reset()
-
-            if self.scene.callback is not None:
-                self.scene.callback.on_episode_start(game)
-
-        self.render_server_game(game)
-
         while game.status not in end_status:
-
             with game.lock:
                 if self.scene.callback is not None:
                     self.scene.callback.on_game_tick_start(game)
 
-                game.tick()
+                game.step()
 
                 if self.scene.callback is not None:
                     self.scene.callback.on_game_tick_end(game)
 
             self.render_server_game(game)
 
-            if (
-                self.scene.input_mode
-                == configuration_constants.InputModes.PressedKeys
-            ):
-                self.socketio.emit("request_pressed_keys", {})
+            # Yield to eventlet to prevent starving other greenlets
+            eventlet.sleep(0)
 
-            self.socketio.sleep(1 / game.scene.fps)
-
-            if (
-                game.status == remote_game.GameStatus.Reset
-                or game.status == remote_game.GameStatus.Done
-            ):
+            # Handle episode transitions
+            if game.status == remote_game.GameStatus.Reset:
                 if self.scene.callback is not None:
                     self.scene.callback.on_episode_end(game)
 
-            if game.status == remote_game.GameStatus.Reset:
+                # Pause between episodes (matches P2P multiplayer flow)
                 eventlet.sleep(self.scene.reset_freeze_s)
+
                 self.socketio.emit(
                     "game_reset",
                     {
@@ -1333,15 +1324,14 @@ class GameManager:
                     room=game.game_id,
                 )
 
+                # Wait for all players to acknowledge reset
                 game.reset_event.wait()
 
-                # Replace the events for each player with new eventlet.event.Event instances
+                # Replace reset events for each player
                 for player_id in self.reset_events[game.game_id].keys():
                     self.reset_events[game.game_id][
                         player_id
                     ] = eventlet.event.Event()
-
-                # Clear the game reset event
                 game.set_reset_event()
 
                 with game.lock:
@@ -1351,22 +1341,20 @@ class GameManager:
 
                 self.render_server_game(game)
 
-                self.socketio.sleep(1 / game.scene.fps)
+            elif game.status == remote_game.GameStatus.Done:
+                if self.scene.callback is not None:
+                    self.scene.callback.on_episode_end(game)
 
+        # Cleanup after loop
         with game.lock:
             logger.info(
                 f"Game loop ended for {game.game_id}, ending and cleaning up."
             )
             if game.status != remote_game.GameStatus.Inactive:
                 game.tear_down()
-
             if self.scene.callback is not None:
                 self.scene.callback.on_game_end(game)
-            self.socketio.emit(
-                "end_game",
-                {},
-                room=game.game_id,
-            )
+            self.socketio.emit("end_game", {}, room=game.game_id)
             self.cleanup_game(game.game_id)
 
     def trigger_reset(self, subject_id: SubjectID):
@@ -1474,41 +1462,31 @@ class GameManager:
         return pressed_keys
 
     def render_server_game(self, game: remote_game.ServerGame):
-        state = None
-        encoded_image = None
-        if self.scene.env_to_state_fn is not None:
-            # generate a state object representation
-            state = self.scene.env_to_state_fn(game.env, self.scene)
-        else:
-            # Generate a base64 image of the game and send it to display
-            assert (
-                cv2 is not None
-            ), "Must install cv2 to use default image rendering!"
-            assert (
-                game.env.render_mode == "rgb_array"
-            ), "Env must be using render mode `rgb_array`!"
+        """Render and broadcast game state to all clients in the room.
 
-            game_image = game.env.render()
-            _, encoded_image = cv2.imencode(
-                ".jpg", game_image, [cv2.IMWRITE_JPEG_QUALITY, 75]
-            )
-            # encoded_image = base64.b64encode(encoded_image).decode()
+        Calls env.render() to get a Phaser-compatible state dict (the env was
+        created with render_mode="interactive_gym"), then broadcasts it with
+        metadata via the server_render_state socket event.
+        """
+        # Get render state from the environment
+        render_state = game.env.render()
 
+        # Build HUD text if configured
         hud_text = (
             self.scene.hud_text_fn(game)
             if self.scene.hud_text_fn is not None
             else None
         )
 
-        # TODO(chase): this emits the same state to every player in a room, but we may want
-        #   to have different observations for each player. Figure that out (maybe state is a dict
-        #   with player_ids and their respective observations?).
+        # Broadcast to all clients in the room
         self.socketio.emit(
-            "environment_state",
+            "server_render_state",
             {
-                "game_state_objects": state,
-                "game_image_binary": encoded_image.tobytes(),
+                "render_state": render_state,
                 "step": game.tick_num,
+                "episode": game.episode_num,
+                "rewards": dict(game.episode_rewards),
+                "cumulative_rewards": dict(game.total_rewards),
                 "hud_text": hud_text,
             },
             room=game.game_id,
