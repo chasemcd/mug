@@ -1750,6 +1750,52 @@ def handle_probe_result(data):
     PROBE_COORDINATOR.handle_result(probe_session_id, rtt_ms, success)
 
 
+@socketio.on("player_action")
+def on_player_action(data):
+    """Receive a player action from a server-authoritative game client.
+
+    The client sends the raw key press, and we map it to the action via
+    the scene's action_mapping, then enqueue it on the game.
+    """
+    subject_id = get_subject_id_from_session_id(flask.request.sid)
+    if subject_id is None:
+        return
+
+    key = data.get("key")
+    game_id = data.get("game_id")
+
+    if key is None or game_id is None:
+        return
+
+    # Find the game manager for this subject
+    for gm in GAME_MANAGERS.values():
+        if gm.subject_in_game(subject_id):
+            game = gm.get_subject_game(subject_id)
+            if game is None:
+                return
+
+            # Find which agent_id this subject controls
+            agent_id = None
+            for aid, sid in game.human_players.items():
+                if sid == subject_id:
+                    agent_id = aid
+                    break
+
+            if agent_id is None:
+                logger.warning(f"[PlayerAction] Subject {subject_id} not found in game players")
+                return
+
+            # Map key to action using the scene's action_mapping
+            scene = gm.scene
+            action = scene.action_mapping.get(key)
+            if action is None:
+                # Key not in action mapping -- ignore
+                return
+
+            game.enqueue_action(agent_id, action)
+            return
+
+
 @socketio.on("pyodide_player_action")
 def on_pyodide_player_action(data):
     """

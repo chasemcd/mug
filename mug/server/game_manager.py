@@ -205,7 +205,10 @@ class GameManager:
             self.reset_events[game_id] = thread_safe_collections.ThreadSafeDict()
 
             # If this is a multiplayer Pyodide game, create coordinator state
-            if self.scene.pyodide_multiplayer and self.pyodide_coordinator:
+            # Only for P2P multiplayer games, not server-authoritative
+            if (self.scene.pyodide_multiplayer
+                    and self.pyodide_coordinator
+                    and not getattr(self.scene, 'server_authoritative', False)):
                 num_players = len(self.scene.policy_mapping)  # Number of agents in the game
 
                 # WebRTC TURN configuration from experiment config
@@ -905,7 +908,10 @@ class GameManager:
         # Add players to Pyodide coordinator AFTER room joins and state transition.
         # The coordinator emits pyodide_game_ready when all players are added,
         # so clients must already be in the room to receive it.
-        if self.scene.pyodide_multiplayer and self.pyodide_coordinator:
+        # Only for P2P multiplayer games, not server-authoritative.
+        if (self.scene.pyodide_multiplayer
+                and self.pyodide_coordinator
+                and not getattr(self.scene, 'server_authoritative', False)):
             for player_id, subject_id in game.human_players.items():
                 if subject_id and subject_id != AvailableSlot:
                     socket_id = self._get_socket_id(subject_id)
@@ -1001,7 +1007,10 @@ class GameManager:
                 )
 
             # If multiplayer Pyodide, add player to coordinator
-            if self.scene.pyodide_multiplayer and self.pyodide_coordinator:
+            # Only for P2P multiplayer games, not server-authoritative.
+            if (self.scene.pyodide_multiplayer
+                    and self.pyodide_coordinator
+                    and not getattr(self.scene, 'server_authoritative', False)):
                 socket_id = flask.request.sid if subject_id == arriving_subject_id else self._get_socket_id(subject_id)
                 self.pyodide_coordinator.add_player(
                     game_id=game.game_id,
@@ -1134,24 +1143,33 @@ class GameManager:
 
             elif game_was_active and not game_is_empty:
                 exit_status = GameExitStatus.ActiveWithOtherPlayers
-                logger.info(
-                    f"Subject {subject_id} left game {game.game_id} with exit status {exit_status}. Cleaning up."
-                )
 
-                # Emit end_game to remaining players BEFORE cleanup
-                # so they receive the message before the room is closed
-                self.socketio.emit(
-                    "end_game",
-                    {
-                        "message": "Your game ended because another player disconnected."
-                    },
-                    room=game.game_id,
-                )
+                if getattr(self.scene, 'server_authoritative', False):
+                    # Server-auth: continue stepping with default actions for disconnected player
+                    logger.info(
+                        f"Subject {subject_id} left server-auth game {game.game_id}. "
+                        f"Continuing with default actions for their agent."
+                    )
+                    # No end_game emit -- game continues
+                else:
+                    logger.info(
+                        f"Subject {subject_id} left game {game.game_id} with exit status {exit_status}. Cleaning up."
+                    )
 
-                # Give clients a moment to receive the message before cleanup
-                eventlet.sleep(0.1)
+                    # Emit end_game to remaining players BEFORE cleanup
+                    # so they receive the message before the room is closed
+                    self.socketio.emit(
+                        "end_game",
+                        {
+                            "message": "Your game ended because another player disconnected."
+                        },
+                        room=game.game_id,
+                    )
 
-                self.cleanup_game(game_id)
+                    # Give clients a moment to receive the message before cleanup
+                    eventlet.sleep(0.1)
+
+                    self.cleanup_game(game_id)
 
             else:
                 raise NotImplementedError("Something went wrong on exit!")
@@ -1259,6 +1277,11 @@ class GameManager:
 
         if not self.scene.run_through_pyodide:
             # Non-pyodide games go straight to PLAYING (no validation phase)
+            is_server_auth = getattr(self.scene, 'server_authoritative', False)
+            logger.info(
+                f"Starting {'server-authoritative' if is_server_auth else 'legacy server'} "
+                f"game loop for {game.game_id}"
+            )
             game.transition_to(SessionState.PLAYING)
             self.socketio.start_background_task(self.run_server_game, game)
         # Note: For pyodide_multiplayer games, transition to VALIDATING/PLAYING
