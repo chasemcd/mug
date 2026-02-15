@@ -794,7 +794,6 @@ def leave_game(data):
                                 'players': list(game.players.keys()),
                                 'subject_ids': list(game.player_subjects.values()),
                                 'current_frame': game.frame_number,
-                                'is_server_authoritative': game.server_authoritative,
                                 'created_at': game.created_at,
                                 'game_type': 'multiplayer',
                                 'current_episode': None,
@@ -1848,7 +1847,6 @@ def on_mid_game_exclusion(data):
                 'players': players,
                 'subject_ids': subject_ids,
                 'current_frame': game.frame_number,
-                'is_server_authoritative': game.server_authoritative,
                 'created_at': game.created_at,
                 'game_type': 'multiplayer',
                 'current_episode': getattr(game, 'episode_number', None),
@@ -1954,7 +1952,6 @@ def handle_multiplayer_game_complete(data):
                 'players': players,
                 'subject_ids': subject_ids,
                 'current_frame': game.frame_number,
-                'is_server_authoritative': game.server_authoritative,
                 'created_at': game.created_at,
                 'game_type': 'multiplayer',
                 'current_episode': episode_num,
@@ -2220,7 +2217,6 @@ def handle_p2p_reconnection_timeout(data):
                 'players': players,
                 'subject_ids': subject_ids,
                 'current_frame': game.frame_number,
-                'is_server_authoritative': game.server_authoritative,
                 'created_at': game.created_at,
                 'game_type': 'multiplayer',
                 'current_episode': getattr(game, 'episode_number', None),
@@ -2408,7 +2404,7 @@ def on_pyodide_hud_update(data):
 @socketio.on("p2p_state_sync")
 def on_p2p_state_sync(data):
     """
-    Relay P2P state sync message from host to other players (non-server-authoritative mode).
+    Relay P2P state sync message from host to other players.
 
     Host broadcasts state hash periodically for non-host clients to compare
     and detect desyncs.
@@ -2435,10 +2431,6 @@ def on_p2p_state_sync(data):
     game = PYODIDE_COORDINATOR.games.get(game_id)
     if game is None:
         logger.warning(f"P2P state sync for non-existent game {game_id}")
-        return
-
-    # Don't relay in server-authoritative mode (server handles sync)
-    if game.server_authoritative:
         return
 
     # Relay to all other players in the game
@@ -2482,10 +2474,6 @@ def on_p2p_state_request(data):
         logger.warning(f"P2P state request for non-existent game {game_id}")
         return
 
-    # Only relay in non-server-authoritative mode
-    if game.server_authoritative:
-        return
-
     # Relay to the target player
     target_socket_id = game.players.get(target_id)
     if target_socket_id:
@@ -2523,10 +2511,6 @@ def on_p2p_state_response(data):
         logger.warning(f"P2P state response for non-existent game {game_id}")
         return
 
-    # Only relay in non-server-authoritative mode
-    if game.server_authoritative:
-        return
-
     # Relay to the target player
     target_socket_id = game.players.get(target_id)
     if target_socket_id:
@@ -2541,9 +2525,6 @@ def on_pyodide_state_hash(data):
 
     The coordinator collects hashes from all players and verifies
     they match (detecting desyncs).
-
-    In server-authoritative mode, state hashes are ignored since
-    the server broadcasts authoritative state instead.
 
     Args:
         data: {
@@ -2563,15 +2544,6 @@ def on_pyodide_state_hash(data):
     player_id = data.get("player_id")
     state_hash = data.get("hash")
     frame_number = data.get("frame_number")
-
-    # Skip early if game is in server-authoritative mode
-    game = PYODIDE_COORDINATOR.games.get(game_id)
-    if game and game.server_authoritative:
-        logger.debug(
-            f"Ignoring state hash from player {player_id} in game {game_id} "
-            f"(server-authoritative mode)"
-        )
-        return
 
     logger.debug(
         f"Received state hash from player {player_id} in game {game_id} "

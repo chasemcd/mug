@@ -219,18 +219,6 @@ class GameManager:
             if self.scene.pyodide_multiplayer and self.pyodide_coordinator:
                 num_players = len(self.scene.policy_mapping)  # Number of agents in the game
 
-                # Get server-authoritative config from scene
-                server_authoritative = getattr(self.scene, 'server_authoritative', False)
-                state_broadcast_interval = getattr(self.scene, 'state_broadcast_interval', 30)
-                environment_code = getattr(self.scene, 'environment_initialization_code', None)
-                fps = getattr(self.scene, 'fps', 30)
-                default_action = getattr(self.scene, 'default_action', 0) or 0
-                action_population_method = getattr(self.scene, 'action_population_method', 'previous_submitted_action')
-                realtime_mode = getattr(self.scene, 'realtime_mode', True)
-                input_buffer_size = getattr(self.scene, 'input_buffer_size', 300)
-                num_episodes = getattr(self.scene, 'num_episodes', 1)
-                max_steps = getattr(self.scene, 'max_steps', 10000)
-
                 # WebRTC TURN configuration from experiment config
                 turn_username = getattr(self.experiment_config, 'turn_username', None)
                 turn_credential = getattr(self.experiment_config, 'turn_credential', None)
@@ -244,16 +232,6 @@ class GameManager:
                 self.pyodide_coordinator.create_game(
                     game_id=game_id,
                     num_players=num_players,
-                    server_authoritative=server_authoritative,
-                    environment_code=environment_code,
-                    state_broadcast_interval=state_broadcast_interval,
-                    fps=fps,
-                    default_action=default_action,
-                    action_population_method=action_population_method,
-                    realtime_mode=realtime_mode,
-                    input_buffer_size=input_buffer_size,
-                    max_episodes=num_episodes,
-                    max_steps=max_steps,
                     turn_username=turn_username,
                     turn_credential=turn_credential,
                     force_turn_relay=force_turn_relay,
@@ -262,7 +240,6 @@ class GameManager:
                 logger.info(
                     f"Created multiplayer Pyodide game state for {game_id} "
                     f"with {num_players} players"
-                    f"{' (server-authoritative)' if server_authoritative else ''}"
                 )
 
         except Exception as e:

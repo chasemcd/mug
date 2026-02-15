@@ -875,7 +875,6 @@ class AdminEventAggregator:
                         'players': list(game_state.players.keys()),
                         'subject_ids': subject_ids,
                         'current_frame': game_state.frame_number,
-                        'is_server_authoritative': game_state.server_authoritative,
                         'created_at': game_state.created_at,
                         'game_type': 'multiplayer',
                         # Phase 33: P2P health data
@@ -923,7 +922,6 @@ class AdminEventAggregator:
                         'players': list(game.human_players.keys()) if hasattr(game, 'human_players') else [],
                         'subject_ids': subject_ids,
                         'current_frame': getattr(game, 'tick_num', None),
-                        'is_server_authoritative': False,
                         'created_at': None,
                         'game_type': 'single_player',
                         'scene_id': scene_id,

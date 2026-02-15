@@ -88,11 +88,16 @@ export class RemoteGame {
 
 
         // The code executed here must instantiate an environment `env`
+        // Hoist any "from __future__" imports to the top so they precede our injected preamble
+        const initCode = this.config.environment_initialization_code;
+        const futureImports = initCode.split('\n').filter(line => line.trimStart().startsWith('from __future__'));
+        const restCode = initCode.split('\n').filter(line => !line.trimStart().startsWith('from __future__')).join('\n');
         const env = await this.pyodide.runPythonAsync(`
+${futureImports.join('\n')}
 import js
 interactive_gym_globals = dict(js.window.interactiveGymGlobals.object_entries())
 
-${this.config.environment_initialization_code}
+${restCode}
 env
         `);
 
@@ -126,11 +131,16 @@ env
         }
 
         // The code executed here must instantiate an environment `env`
+        // Hoist any "from __future__" imports to the top so they precede our injected preamble
+        const reinitCode = config.environment_initialization_code;
+        const reinitFutureImports = reinitCode.split('\n').filter(line => line.trimStart().startsWith('from __future__'));
+        const reinitRestCode = reinitCode.split('\n').filter(line => !line.trimStart().startsWith('from __future__')).join('\n');
         const env = await this.pyodide.runPythonAsync(`
+${reinitFutureImports.join('\n')}
 import js
 interactive_gym_globals = dict(js.window.interactiveGymGlobals.object_entries())
 print("Globals on initialization: ", interactive_gym_globals)
-${config.environment_initialization_code}
+${reinitRestCode}
 env
         `);
 

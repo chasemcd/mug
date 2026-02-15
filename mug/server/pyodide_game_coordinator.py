@@ -43,13 +43,6 @@ class PyodideGameState:
     action_timeout_seconds: float
     created_at: float
 
-    # State broadcast/sync interval (frames between server broadcasts)
-    state_broadcast_interval: int = 30
-
-    # Server-authoritative mode fields
-    server_authoritative: bool = False
-    server_runner: Any = None  # ServerGameRunner instance when enabled
-
     # Diagnostics for lag tracking
     last_action_times: dict[str | int, float] = dataclasses.field(default_factory=dict)
     action_delays: dict[str | int, list] = dataclasses.field(default_factory=dict)
@@ -113,17 +106,6 @@ class PyodideGameCoordinator:
         self,
         game_id: str,
         num_players: int,
-        server_authoritative: bool = False,
-        environment_code: str | None = None,
-        state_broadcast_interval: int = 30,
-        # New config options for real-time mode
-        fps: int = 30,
-        default_action: int = 0,
-        action_population_method: str = "previous_submitted_action",
-        realtime_mode: bool = True,
-        input_buffer_size: int = 300,
-        max_episodes: int = 1,
-        max_steps: int = 10000,
         # WebRTC TURN configuration
         turn_username: str | None = None,
         turn_credential: str | None = None,
@@ -137,9 +119,6 @@ class PyodideGameCoordinator:
         Args:
             game_id: Unique identifier for the game
             num_players: Expected number of human players
-            server_authoritative: If True, server runs parallel env for state sync
-            environment_code: Python code to initialize environment (required if server_authoritative)
-            state_broadcast_interval: Frames between server state broadcasts
 
         Returns:
             PyodideGameState object
@@ -164,38 +143,11 @@ class PyodideGameCoordinator:
                 num_expected_players=num_players,
                 action_timeout_seconds=self.action_timeout,
                 created_at=time.time(),
-                state_broadcast_interval=state_broadcast_interval,
-                server_authoritative=server_authoritative,
                 turn_username=turn_username,
                 turn_credential=turn_credential,
                 force_turn_relay=force_turn_relay,
                 scene_metadata=scene_metadata or {},
             )
-
-            # Create server runner if server_authoritative mode enabled
-            if server_authoritative and environment_code:
-                from mug.server.server_game_runner import ServerGameRunner
-
-                game_state.server_runner = ServerGameRunner(
-                    game_id=game_id,
-                    environment_code=environment_code,
-                    num_players=num_players,
-                    state_broadcast_interval=state_broadcast_interval,
-                    socketio=self.socketio,
-                    # New config options
-                    fps=fps,
-                    default_action=default_action,
-                    action_population_method=action_population_method,
-                    realtime_mode=realtime_mode,
-                    input_buffer_size=input_buffer_size,
-                    max_episodes=max_episodes,
-                    max_steps=max_steps,
-                )
-                mode_str = "real-time" if realtime_mode else "frame-aligned"
-                logger.info(
-                    f"Created ServerGameRunner for game {game_id} "
-                    f"({mode_str} mode, {fps} FPS, broadcast every {state_broadcast_interval} frames)"
-                )
 
             self.games[game_id] = game_state
             self.total_games_created += 1
@@ -203,7 +155,6 @@ class PyodideGameCoordinator:
             logger.info(
                 f"Created Pyodide game {game_id} for {num_players} players "
                 f"with seed {rng_seed}"
-                f"{' (server-authoritative)' if server_authoritative else ''}"
             )
 
             return game_state
@@ -286,31 +237,8 @@ class PyodideGameCoordinator:
                     from mug.server.remote_game import SessionState
                     remote_game.transition_to(SessionState.PLAYING)
 
-        # Initialize server runner if enabled (this is CPU-bound, OK to do in lock)
-        server_runner = None
-        if game.server_authoritative and game.server_runner:
-            # Add all players to the server runner
-            for player_id in game.players.keys():
-                game.server_runner.add_player(player_id)
-
-            # Initialize with same seed as clients
-            success = game.server_runner.initialize_environment(game.rng_seed)
-            if success:
-                logger.info(
-                    f"Server runner initialized for game {game_id} "
-                    f"with seed {game.rng_seed}"
-                )
-                server_runner = game.server_runner
-            else:
-                logger.error(
-                    f"Failed to initialize server runner for game {game_id}"
-                )
-                game.server_authoritative = False
-                game.server_runner = None
-
         logger.info(
-            f"Emitting pyodide_game_ready to room {game_id} with players {list(game.players.keys())}, "
-            f"server_authoritative={game.server_authoritative}"
+            f"Emitting pyodide_game_ready to room {game_id} with players {list(game.players.keys())}"
         )
 
         # Return data for emit outside lock
@@ -320,7 +248,6 @@ class PyodideGameCoordinator:
                 'game_id': game_id,
                 'players': list(game.players.keys()),
                 'player_subjects': dict(game.player_subjects),  # Copy to avoid concurrent modification
-                'server_authoritative': game.server_authoritative,
                 # Include TURN config only if credentials are provided
                 'turn_config': {
                     'username': game.turn_username,
@@ -330,8 +257,6 @@ class PyodideGameCoordinator:
                 # Include scene metadata for client configuration
                 'scene_metadata': dict(game.scene_metadata) if game.scene_metadata else {},
             },
-            'server_runner': server_runner,
-            'server_authoritative': game.server_authoritative,
             'num_players': len(game.players),
         }
 
@@ -342,16 +267,8 @@ class PyodideGameCoordinator:
         # Emit game ready event
         self.socketio.emit('pyodide_game_ready', start_data['emit_payload'], room=game_id)
 
-        # Start real-time loop for server runner (this spawns eventlet greenlets)
-        if start_data['server_runner']:
-            start_data['server_runner'].start_realtime()
-            # Broadcast initial episode state
-            start_data['server_runner'].broadcast_state(event_type="server_episode_start")
-            logger.info(f"Broadcast initial episode state for game {game_id}")
-
         logger.info(
             f"Game {game_id} started with {start_data['num_players']} players"
-            f"{' (server-authoritative)' if start_data['server_authoritative'] else ' (host-based)'}"
         )
 
     def receive_action(
@@ -361,7 +278,6 @@ class PyodideGameCoordinator:
         action: Any,
         frame_number: int,
         client_timestamp: float | None = None,
-        sync_epoch: int | None = None
     ):
         """
         Receive action from a player and broadcast to others immediately.
@@ -369,16 +285,12 @@ class PyodideGameCoordinator:
         Action Queue approach: No waiting for all players. Each action is
         immediately relayed to other clients who queue it for their next step.
 
-        If server_authoritative mode is enabled, also feeds the action to
-        the server runner which steps when all actions for a frame are received.
-
         Args:
             game_id: Game identifier
             player_id: Player who sent the action
             action: The action value (int, dict, etc.)
             frame_number: Frame number (for logging/debugging)
             client_timestamp: Client-side timestamp when action was sent (for lag tracking)
-            sync_epoch: Sync epoch from client to prevent stale action matching
         """
         with self.lock:
             if game_id not in self.games:
@@ -433,12 +345,6 @@ class PyodideGameCoordinator:
                 f"to {len(game.players) - 1} other player(s)"
             )
 
-            # Feed action to server runner
-            if game.server_authoritative and game.server_runner:
-                game.server_runner.receive_action_realtime(
-                    player_id, action, frame_number, sync_epoch
-                )
-
     def remove_player(self, game_id: str, player_id: str | int, notify_others: bool = True, reason: str = 'partner_disconnected'):
         """
         Handle player disconnection.
@@ -485,16 +391,10 @@ class PyodideGameCoordinator:
 
             # If no players left, remove game
             if len(game.players) == 0:
-                # Stop server runner if it exists
-                if game.server_runner:
-                    game.server_runner.stop()
                 del self.games[game_id]
                 logger.info(f"Removed empty game {game_id}")
             # If there are remaining players, also remove the game since we ended it
             elif notify_others:
-                # Stop server runner if it exists
-                if game.server_runner:
-                    game.server_runner.stop()
                 del self.games[game_id]
                 logger.info(f"Removed game {game_id} after player disconnection")
 
@@ -532,10 +432,6 @@ class PyodideGameCoordinator:
                     f"Player {player_id}: avg={avg_delay*1000:.1f}ms, "
                     f"max={max_delay*1000:.1f}ms, min={min_delay*1000:.1f}ms"
                 )
-
-        # Server runner frame info
-        if game.server_runner and game.server_runner.is_initialized:
-            diagnostics.append(f"Server frame: {game.server_runner.frame_number}")
 
         if diagnostics:
             logger.info(
@@ -703,10 +599,6 @@ class PyodideGameCoordinator:
             eventlet.sleep(0.1)
 
             # Now clean up the game
-            # Stop server runner if it exists
-            if game.server_runner:
-                game.server_runner.stop()
-
             del self.games[game_id]
             logger.info(f"Cleaned up game {game_id} after player exclusion")
 
@@ -783,10 +675,6 @@ class PyodideGameCoordinator:
         """Remove a game from the coordinator (Phase 19)."""
         with self.lock:
             if game_id in self.games:
-                game = self.games[game_id]
-                # Stop server runner if exists
-                if game.server_authoritative and game.server_runner:
-                    game.server_runner.stop()
                 del self.games[game_id]
                 logger.info(f"Removed game {game_id} from coordinator")
 

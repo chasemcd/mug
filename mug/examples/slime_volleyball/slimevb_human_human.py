@@ -95,8 +95,6 @@ slime_scene = (
     )
     .multiplayer(
         multiplayer=True,
-        state_broadcast_interval=30,  # Sync state every 300 frames (~10s at 30fps), None to disable
-        server_authoritative=False,  # Server-authoritative mode
         input_delay=2,
     )
 )

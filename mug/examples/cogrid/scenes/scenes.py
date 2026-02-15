@@ -494,8 +494,6 @@ cramped_room_human_human = (
     )
     .multiplayer(
         multiplayer=True,
-        state_broadcast_interval=15,
-        server_authoritative=False,
         input_delay=3,
         partner_disconnect_message="Your partner disconnected. The task will end here and you will be compensated for your performance so far. Please submit the completion code below.",
         partner_disconnect_show_completion_code=True,
