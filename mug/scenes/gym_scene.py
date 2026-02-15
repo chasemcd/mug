@@ -120,6 +120,9 @@ class GymScene(scene.Scene):
         self.reset_timeout: int = 3000
         self.reset_freeze_s: int = 0
 
+        # Server-authoritative mode
+        self.server_authoritative: bool = False
+
         # pyodide
         self.run_through_pyodide: bool = False
         self.pyodide_multiplayer: bool = False  # Enable multiplayer Pyodide coordination
@@ -700,6 +703,8 @@ class GymScene(scene.Scene):
 
     def multiplayer(
         self,
+        # Architecture mode
+        mode: str = NotProvided,
         # Sync/rollback params (from pyodide)
         multiplayer: bool = NotProvided,
         input_delay: int = NotProvided,
@@ -739,6 +744,13 @@ class GymScene(scene.Scene):
         builder method. It accepts parameters from sync/rollback, matchmaking, player
         grouping, continuous monitoring, exclusion callbacks, reconnection, partner
         disconnect, and focus loss configuration.
+
+        **Architecture Mode:**
+
+        :param mode: Multiplayer architecture mode. 'p2p' (default) runs the environment
+            in each client's browser with P2P WebRTC sync. 'server_authoritative' runs the
+            environment on the server and streams render state to thin clients.
+        :type mode: str, optional
 
         **Sync/Rollback Configuration:**
 
@@ -824,6 +836,18 @@ class GymScene(scene.Scene):
         :return: This scene object
         :rtype: GymScene
         """
+        # --- Architecture mode ---
+        if mode is not NotProvided:
+            if mode not in ('p2p', 'server_authoritative'):
+                raise ValueError(f"mode must be 'p2p' or 'server_authoritative', got '{mode}'")
+            if mode == 'server_authoritative':
+                self.server_authoritative = True
+                self.run_through_pyodide = False  # Thin client -- no Pyodide needed
+                # Server-auth implies multiplayer coordination but NOT pyodide_multiplayer
+                # (pyodide_multiplayer is for P2P WebRTC coordination)
+            elif mode == 'p2p':
+                self.server_authoritative = False
+
         # --- Sync/rollback params ---
         if multiplayer is not NotProvided:
             assert isinstance(multiplayer, bool)
