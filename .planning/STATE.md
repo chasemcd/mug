@@ -2,19 +2,19 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-02-13)
+See: .planning/PROJECT.md (updated 2026-02-16)
 
 **Core value:** Researchers can deploy interactive simulation experiments to the browser with minimal friction
-**Current focus:** Phase 95 complete -- example and verification done
+**Current focus:** v1.2 Test Suite Green -- fix all 7 failing E2E tests
 
 ## Current Position
 
-Phase: 95 of 95 (Example and Verification)
-Plan: 2 of 2 in current phase (COMPLETE)
-Status: Phase 95 complete -- all plans executed
-Last activity: 2026-02-16 -- Phase 95-02 executed (2 tasks, 2 commits)
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements for v1.2
+Last activity: 2026-02-16 -- Milestone v1.2 started
 
-Progress: [██████████] 100% (Phase 95 complete)
+Progress: [░░░░░░░░░░] 0% (v1.2)
 
 ## Performance Metrics
 
@@ -82,5 +82,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-16
-Stopped at: Completed 95-02-PLAN.md (browser integration tests). Phase 95 complete -- all plans executed.
+Stopped at: Starting v1.2 Test Suite Green milestone
 Resume file: None
