@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-13)
 ## Current Position
 
 Phase: 94 of 95 (Client Rendering and Input)
-Plan: 1 of 2 in current phase -- DONE
-Status: Phase 94 Plan 01 complete, Plan 02 remaining
-Last activity: 2026-02-16 -- Phase 94-01 executed (2 tasks, 2 commits)
+Plan: 2 of 2 in current phase -- DONE
+Status: Phase 94 complete -- all plans executed
+Last activity: 2026-02-16 -- Phase 94-02 executed (2 tasks, 2 commits)
 
-Progress: [█████████░] 50% (Phase 94)
+Progress: [██████████] 100% (Phase 94)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 4
-- Average duration: ~4 min
-- Total execution time: ~4 sessions
+- Total plans completed: 5
+- Average duration: ~3 min
+- Total execution time: ~5 sessions
 
 **By Phase:**
 
@@ -29,11 +29,11 @@ Progress: [█████████░] 50% (Phase 94)
 |-------|-------|-------|----------|
 | 92 | 1 | 1 session | 1 session |
 | 93 | 2 | 9 min | 4.5 min |
-| 94 | 1 (of 2) | 2 min | 2 min |
+| 94 | 2 | 6 min | 3 min |
 
 **Recent Trend:**
-- Last 5 plans: 92-01, 93-01, 93-02, 94-01
-- Trend: Client rendering pipeline wired, input sending operational
+- Last 5 plans: 92-01, 93-01, 93-02, 94-01, 94-02
+- Trend: Server-auth pipeline complete -- rendering, input, episode transitions, reconnection
 
 *Updated after each plan completion*
 
@@ -61,6 +61,9 @@ Recent decisions affecting current work:
 - Freeze on last rendered frame when buffer empty (no jitter indicator)
 - Send actions immediately on keypress, no batching at render tick intervals
 - render_state normalized to game_state_objects in addStateToBuffer for shared drawState path
+- Server-auth episode reset flushes buffer but does NOT destroy/recreate Phaser (continuous rendering)
+- Server-auth disconnect: skip remove_subject, start configurable timeout (reconnection_timeout_ms)
+- Reconnection: rejoin socket room, cancel timeout, resume from current state (no history burst)
 
 ### Pending Todos
 
@@ -73,5 +76,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-16
-Stopped at: Completed 94-01-PLAN.md (client state buffer and input sending). Phase 94 Plan 02 remaining.
+Stopped at: Completed 94-02-PLAN.md (episode transitions and reconnection). Phase 94 complete.
 Resume file: None
