@@ -114,10 +114,11 @@ Plans:
   2. CSV data export files are written for both players after an episode completes under simulated network latency conditions
   3. CSV data export files are written for both players after an episode completes when one player's tab loses focus at the episode boundary
   4. All 5 currently-failing scene transition / CSV export E2E tests pass
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- (plans defined during phase planning)
+- [ ] 96-01-PLAN.md -- Event-driven scene advancement (onGameDone callback, MessageChannel watchdog, fast-forward episode detection)
+- [ ] 96-02-PLAN.md -- E2E test validation and regression fixes (run 5 target tests + full suite)
 
 ### Phase 97: Deep Rollback Depth
 **Goal**: P2P rollback reaches the expected frame depth after an extended tab-hide period
@@ -154,6 +155,6 @@ Phases 96, 97, 98 are independent and can execute in any order. Suggested: 96 ->
 | 93. Server Pipeline | v1.1 | 2/2 | Complete | 2026-02-15 |
 | 94. Client Rendering and Input | v1.1 | 2/2 | Complete | 2026-02-16 |
 | 95. Example and Verification | v1.1 | 2/2 | Complete | 2026-02-16 |
-| 96. Scene Transition on Focus Loss | v1.2 | 0/TBD | Not started | - |
+| 96. Scene Transition on Focus Loss | v1.2 | 0/2 | In progress | - |
 | 97. Deep Rollback Depth | v1.2 | 0/TBD | Not started | - |
 | 98. Server-Auth End-Game Flow | v1.2 | 0/TBD | Not started | - |
