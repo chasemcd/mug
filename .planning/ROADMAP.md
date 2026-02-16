@@ -3,7 +3,7 @@
 ## Milestones
 
 - v1.0 MVP - Phases 67-91 (shipped 2026-02-12)
-- v1.1 Server-Authoritative Cleanup - Phases 92-95 (in progress)
+- v1.1 Server-Authoritative Cleanup - Phases 92-95 (shipped 2026-02-16)
 
 ## Phases
 
@@ -16,7 +16,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 92: Remove Obsolete Server-Auth Code** - Strip out Pyodide server-auth sync and simplify RemoteGameV2
 - [x] **Phase 93: Server Pipeline** - Server runs env at max speed, renders, and broadcasts state to clients
 - [x] **Phase 94: Client Rendering and Input** - Client buffers server state, gates FPS, and sends actions
-- [ ] **Phase 95: Example and Verification** - CoGrid Overcooked example with full test coverage
+- [x] **Phase 95: Example and Verification** - CoGrid Overcooked example with full test coverage
 
 ## Phase Details
 
@@ -79,8 +79,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 95-01-PLAN.md -- CoGrid Overcooked server-auth example + unit/integration tests for ServerGame lifecycle and action-step-render-broadcast flow
-- [ ] 95-02-PLAN.md -- E2E Playwright tests for server-auth mode (two browser clients) and P2P regression test
+- [x] 95-01-PLAN.md -- CoGrid Overcooked server-auth example + unit/integration tests for ServerGame lifecycle and action-step-render-broadcast flow
+- [x] 95-02-PLAN.md -- E2E Playwright tests for server-auth mode (two browser clients) and P2P regression test
 
 ## Progress
 
@@ -92,4 +92,4 @@ Phases execute in numeric order: 92 -> 93 -> 94 -> 95
 | 92. Remove Obsolete Server-Auth Code | v1.1 | 1/1 | Complete | 2026-02-15 |
 | 93. Server Pipeline | v1.1 | 2/2 | Complete | 2026-02-15 |
 | 94. Client Rendering and Input | v1.1 | 2/2 | Complete | 2026-02-16 |
-| 95. Example and Verification | v1.1 | 0/2 | Not started | - |
+| 95. Example and Verification | v1.1 | 2/2 | Complete | 2026-02-16 |
