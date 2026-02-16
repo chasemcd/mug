@@ -767,6 +767,12 @@ socket.on('connect', function() {
     // Initialize ProbeManager for P2P RTT probing during matchmaking
     ProbeManager.init(socket, subjectName);
 
+    // Server-auth reconnection: if we were in a server-auth game, try to rejoin
+    if (window.serverAuthoritative && window.currentGameId) {
+        console.log("[Reconnect] Attempting to rejoin server-auth game:", window.currentGameId);
+        socket.emit('rejoin_server_auth', { game_id: window.currentGameId });
+    }
+
     $("#invalidSession").hide();
     $('#hudText').hide()
 });
@@ -1248,7 +1254,29 @@ socket.on('server_render_state', function(data) {
     addStateToBuffer(data);
 });
 
+// Server-auth reconnection handlers
+socket.on('rejoin_success', function(data) {
+    console.log("[Reconnect] Successfully rejoined server-auth game:", data.game_id);
+    window.currentGameId = data.game_id;
+    window.serverAuthoritative = true;
+    // Re-show game container and re-enable input -- state broadcasts will resume
+    $("#gameContainer").show();
+    if (data.scene_metadata) {
+        ui_utils.enableKeyListener(data.scene_metadata.input_mode);
+    }
+});
 
+socket.on('rejoin_failed', function() {
+    console.log("[Reconnect] Failed to rejoin server-auth game");
+    // Game is gone -- clean up and show error
+    window.serverAuthoritative = false;
+    window.currentGameId = null;
+    clearStateBuffer();
+    graphics_end();
+    $('#errorText').text('Your game session has ended. You will be redirected shortly.');
+    $('#errorText').show();
+    socket.emit('end_game_request_redirect', {waitroom_timeout: false});
+});
 
 
 

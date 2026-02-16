@@ -119,6 +119,13 @@ class GameManager:
         # this is not used when running with Pyodide
         self.reset_events = thread_safe_collections.ThreadSafeDict()
 
+        # Server-auth disconnect timeout tracking (Phase 94-02)
+        # Maps subject_id -> eventlet GreenThread for the timeout timer.
+        # When a player disconnects from a server-auth game, we start a timer.
+        # If they reconnect before expiry, the timer is cancelled.
+        # If the timer fires, the player is permanently dropped.
+        self._disconnect_timeouts: dict[SubjectID, eventlet.GreenThread] = {}
+
     def subject_in_game(self, subject_id: SubjectID) -> bool:
         return subject_id in self.subject_games
 
@@ -1086,12 +1093,6 @@ class GameManager:
             return False
 
         with game.lock:
-            self.remove_subject(subject_id)
-
-            # Reset participant state (Phase 54)
-            if self.participant_state_tracker:
-                self.participant_state_tracker.reset(subject_id)
-
             game_was_active = (
                 game.game_id in self.active_games
                 and game.status
@@ -1100,6 +1101,32 @@ class GameManager:
                     remote_game.GameStatus.Reset,
                 ]
             )
+
+            # Server-auth disconnect: DON'T remove the player -- start reconnection timeout.
+            # Player stays in subject_games/subject_rooms/human_players so the game loop
+            # continues with default actions for their agent slot.
+            is_server_auth = getattr(self.scene, 'server_authoritative', False)
+            if is_server_auth and game_was_active:
+                game.document_focus_status[subject_id] = False
+                timeout_s = getattr(self.scene, 'reconnection_timeout_ms', 5000) / 1000
+                logger.info(
+                    f"[ServerAuth] {subject_id} disconnected from game {game.game_id}. "
+                    f"Starting {timeout_s}s reconnection timeout. "
+                    f"Game continues with default actions."
+                )
+                timeout_thread = eventlet.spawn_after(
+                    timeout_s, self._permanent_drop, game.game_id, subject_id
+                )
+                self._disconnect_timeouts[subject_id] = timeout_thread
+                return GameExitStatus.ActiveWithOtherPlayers
+
+            # Normal path: fully remove the subject
+            self.remove_subject(subject_id)
+
+            # Reset participant state (Phase 54)
+            if self.participant_state_tracker:
+                self.participant_state_tracker.reset(subject_id)
+
             game_is_empty = game.cur_num_human_players() == 0
 
             if game_was_active and game_is_empty:
@@ -1143,33 +1170,26 @@ class GameManager:
 
             elif game_was_active and not game_is_empty:
                 exit_status = GameExitStatus.ActiveWithOtherPlayers
+                # Note: server-auth active games return early above (before remove_subject),
+                # so this branch is only reached for P2P games.
+                logger.info(
+                    f"Subject {subject_id} left game {game.game_id} with exit status {exit_status}. Cleaning up."
+                )
 
-                if getattr(self.scene, 'server_authoritative', False):
-                    # Server-auth: continue stepping with default actions for disconnected player
-                    logger.info(
-                        f"Subject {subject_id} left server-auth game {game.game_id}. "
-                        f"Continuing with default actions for their agent."
-                    )
-                    # No end_game emit -- game continues
-                else:
-                    logger.info(
-                        f"Subject {subject_id} left game {game.game_id} with exit status {exit_status}. Cleaning up."
-                    )
+                # Emit end_game to remaining players BEFORE cleanup
+                # so they receive the message before the room is closed
+                self.socketio.emit(
+                    "end_game",
+                    {
+                        "message": "Your game ended because another player disconnected."
+                    },
+                    room=game.game_id,
+                )
 
-                    # Emit end_game to remaining players BEFORE cleanup
-                    # so they receive the message before the room is closed
-                    self.socketio.emit(
-                        "end_game",
-                        {
-                            "message": "Your game ended because another player disconnected."
-                        },
-                        room=game.game_id,
-                    )
+                # Give clients a moment to receive the message before cleanup
+                eventlet.sleep(0.1)
 
-                    # Give clients a moment to receive the message before cleanup
-                    eventlet.sleep(0.1)
-
-                    self.cleanup_game(game_id)
+                self.cleanup_game(game_id)
 
             else:
                 raise NotImplementedError("Something went wrong on exit!")
@@ -1649,6 +1669,70 @@ class GameManager:
 
         logger.info(f"[RemoveQuietly] Successfully removed {subject_id} from game {game_id}")
         return True
+
+    def _permanent_drop(self, game_id: GameID, subject_id: SubjectID):
+        """Permanently drop a disconnected player after reconnection timeout expiry.
+
+        Called by eventlet.spawn_after when the disconnect timer fires.
+        The player's slot stays in the game with default actions, but they
+        can no longer reconnect.
+        """
+        game = self.games.get(game_id)
+        if game is None:
+            self._disconnect_timeouts.pop(subject_id, None)
+            return
+
+        # Only drop if still disconnected (not reconnected)
+        if subject_id in self._disconnect_timeouts:
+            del self._disconnect_timeouts[subject_id]
+            # Remove from subject tracking but leave game slot on default actions
+            if subject_id in self.subject_games:
+                del self.subject_games[subject_id]
+            if subject_id in self.subject_rooms:
+                del self.subject_rooms[subject_id]
+            logger.info(
+                f"[ServerAuth] Permanently dropped {subject_id} from game {game_id} "
+                f"after reconnection timeout"
+            )
+
+    def rejoin_server_auth_game(
+        self, subject_id: SubjectID, socket_id: str
+    ) -> remote_game.ServerGame | None:
+        """Rejoin a disconnected player to their running server-auth game.
+
+        Cancels any pending disconnect timeout and re-adds the player to
+        the socket room so they receive state broadcasts again.
+
+        Returns the game if rejoin succeeded, None otherwise.
+        """
+        game_id = self.subject_games.get(subject_id)
+        if game_id is None:
+            return None
+
+        game = self.games.get(game_id)
+        if game is None:
+            return None
+
+        if game.status not in (
+            remote_game.GameStatus.Active,
+            remote_game.GameStatus.Reset,
+        ):
+            return None
+
+        # Cancel disconnect timeout
+        timeout = self._disconnect_timeouts.pop(subject_id, None)
+        if timeout is not None:
+            timeout.cancel()
+
+        # Rejoin the socket room
+        flask_socketio.join_room(game_id, sid=socket_id)
+        self.subject_rooms[subject_id] = game_id
+
+        # Mark as focused again
+        game.document_focus_status[subject_id] = True
+
+        logger.info(f"[ServerAuth] {subject_id} rejoined game {game_id}")
+        return game
 
     def is_subject_in_active_game(self, subject_id: SubjectID) -> bool:
         """Check if a subject is currently in an active game.

@@ -1796,6 +1796,34 @@ def on_player_action(data):
             return
 
 
+@socketio.on("rejoin_server_auth")
+def on_rejoin_server_auth(data):
+    """Handle reconnection to a running server-authoritative game.
+
+    When a client reconnects and was previously in a server-auth game,
+    it emits this event. We look up their game across all GameManagers
+    and rejoin them to the socket room so state broadcasts resume.
+    """
+    subject_id = get_subject_id_from_session_id(flask.request.sid)
+    if subject_id is None:
+        return
+
+    for gm in GAME_MANAGERS.values():
+        game = gm.rejoin_server_auth_game(subject_id, flask.request.sid)
+        if game is not None:
+            socketio.emit(
+                "rejoin_success",
+                {
+                    "game_id": game.game_id,
+                    "scene_metadata": gm.scene.scene_metadata,
+                },
+                room=flask.request.sid,
+            )
+            return
+
+    socketio.emit("rejoin_failed", {}, room=flask.request.sid)
+
+
 @socketio.on("pyodide_player_action")
 def on_pyodide_player_action(data):
     """
