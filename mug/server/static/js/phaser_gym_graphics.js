@@ -12,10 +12,10 @@ var game_config = {
 
 var game_graphics;
 let stateBuffer = []
-const MAX_BUFFER_SIZE = 1;
 export function addStateToBuffer(state_data) {
-    if (stateBuffer >= MAX_BUFFER_SIZE) {
-        stateBuffer.shift(); // remove the oldest state
+    // Normalize: server_render_state sends render_state, existing path sends game_state_objects
+    if (state_data.render_state && !state_data.game_state_objects) {
+        state_data.game_state_objects = state_data.render_state;
     }
     stateBuffer.push(state_data);
 }

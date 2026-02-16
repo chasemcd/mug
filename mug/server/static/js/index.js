@@ -874,6 +874,14 @@ socket.on('start_game', function(gameStartData) {
     // Show the game container
     $("#gameContainer").show();
 
+    // Detect server-authoritative mode
+    if (scene_metadata.server_authoritative) {
+        window.serverAuthoritative = true;
+        console.log("[StartGame] Server-authoritative mode enabled");
+    } else {
+        window.serverAuthoritative = false;
+    }
+
     // Initialize game
     let graphics_config = {
         'parent': 'gameContainer',
@@ -888,7 +896,7 @@ socket.on('start_game', function(gameStartData) {
         'assets_dir': scene_metadata.assets_dir,
         'assets_to_preload': scene_metadata.assets_to_preload,
         'animation_configs': scene_metadata.animation_configs,
-        'pyodide_remote_game': pyodideRemoteGame,
+        'pyodide_remote_game': window.serverAuthoritative ? null : pyodideRemoteGame,
         'scene_metadata': scene_metadata,
     };
 
@@ -1211,6 +1219,15 @@ socket.on('environment_state', function(stateUpdate) {
     $('#hudText').show()
     $('#hudText').text(stateUpdate.hud_text)
     addStateToBuffer(stateUpdate);
+});
+
+// Server-authoritative mode: receive rendered state from server game loop
+socket.on('server_render_state', function(data) {
+    if (data.hud_text) {
+        $('#hudText').show();
+        $('#hudText').text(data.hud_text);
+    }
+    addStateToBuffer(data);
 });
 
 
