@@ -187,6 +187,16 @@ class ServerGame:
         self.human_players = {}
         self.bot_players = {}
 
+        # Initialize player slots from scene's policy_mapping so that
+        # add_player() / get_available_human_agent_ids() work correctly.
+        # Human agents get an AvailableSlot sentinel; bots are recorded separately.
+        if hasattr(scene, 'policy_mapping') and scene.policy_mapping:
+            for agent_id, policy_type in scene.policy_mapping.items():
+                if policy_type == configuration_constants.PolicyTypes.Human:
+                    self.human_players[agent_id] = AvailableSlot
+                else:
+                    self.bot_players[agent_id] = policy_type
+
         self.game_uuid: str = str(uuid.uuid4())
         self.game_id: int | str = (
             game_id if game_id is not None else self.game_uuid
