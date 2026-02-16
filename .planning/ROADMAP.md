@@ -76,11 +76,11 @@ Plans:
   3. Integration test runs action-to-step-to-render-to-broadcast flow and passes
   4. Playwright E2E test with two browser clients completes a server-auth CoGrid game
   5. Playwright E2E regression test confirms P2P mode still works
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 95-01: TBD
-- [ ] 95-02: TBD
+- [ ] 95-01-PLAN.md -- CoGrid Overcooked server-auth example + unit/integration tests for ServerGame lifecycle and action-step-render-broadcast flow
+- [ ] 95-02-PLAN.md -- E2E Playwright tests for server-auth mode (two browser clients) and P2P regression test
 
 ## Progress
 
@@ -92,4 +92,4 @@ Phases execute in numeric order: 92 -> 93 -> 94 -> 95
 | 92. Remove Obsolete Server-Auth Code | v1.1 | 1/1 | Complete | 2026-02-15 |
 | 93. Server Pipeline | v1.1 | 2/2 | Complete | 2026-02-15 |
 | 94. Client Rendering and Input | v1.1 | 2/2 | Complete | 2026-02-16 |
-| 95. Example and Verification | v1.1 | 0/TBD | Not started | - |
+| 95. Example and Verification | v1.1 | 0/2 | Not started | - |
