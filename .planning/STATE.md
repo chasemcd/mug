@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-13)
 
 **Core value:** Researchers can deploy interactive simulation experiments to the browser with minimal friction
-**Current focus:** Phase 95 in progress -- example and verification
+**Current focus:** Phase 95 complete -- example and verification done
 
 ## Current Position
 
 Phase: 95 of 95 (Example and Verification)
-Plan: 1 of 2 in current phase
-Status: Phase 95 in progress -- plan 01 complete
-Last activity: 2026-02-16 -- Phase 95-01 executed (2 tasks, 2 commits)
+Plan: 2 of 2 in current phase (COMPLETE)
+Status: Phase 95 complete -- all plans executed
+Last activity: 2026-02-16 -- Phase 95-02 executed (2 tasks, 2 commits)
 
-Progress: [█████████░] 90% (Phase 95)
+Progress: [██████████] 100% (Phase 95 complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 6
+- Total plans completed: 7
 - Average duration: ~3 min
-- Total execution time: ~6 sessions
+- Total execution time: ~7 sessions
 
 **By Phase:**
 
@@ -30,11 +30,11 @@ Progress: [█████████░] 90% (Phase 95)
 | 92 | 1 | 1 session | 1 session |
 | 93 | 2 | 9 min | 4.5 min |
 | 94 | 2 | 6 min | 3 min |
-| 95 | 1 | 3 min | 3 min |
+| 95 | 2 | 6 min | 3 min |
 
 **Recent Trend:**
-- Last 5 plans: 93-01, 93-02, 94-01, 94-02, 95-01
-- Trend: Server-auth example and unit/integration tests added
+- Last 5 plans: 93-02, 94-01, 94-02, 95-01, 95-02
+- Trend: Server-auth fully verified with E2E browser tests and P2P regression guard
 
 *Updated after each plan completion*
 
@@ -67,6 +67,9 @@ Recent decisions affecting current work:
 - Reconnection: rejoin socket room, cancel timeout, resume from current state (no history burst)
 - Lazy env_creator defers cogrid import to runtime -- server-auth example imports cleanly without cogrid
 - Mock scene/env pattern for testing ServerGame without running server (patched eventlet)
+- Server-auth episode completion detected via serverAuthoritative flag clearing (end_game handler)
+- flask_server_auth uses port 5710 to avoid conflicts with existing test ports (5702-5709)
+- P2P regression test reuses existing flask_server fixture -- no new P2P test fixture needed
 
 ### Pending Todos
 
@@ -79,5 +82,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-16
-Stopped at: Completed 95-01-PLAN.md (example and server game tests). Phase 95 plan 01 done, plan 02 remaining.
+Stopped at: Completed 95-02-PLAN.md (browser integration tests). Phase 95 complete -- all plans executed.
 Resume file: None
