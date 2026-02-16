@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-13)
 
 **Core value:** Researchers can deploy interactive simulation experiments to the browser with minimal friction
-**Current focus:** Phase 93 complete, ready for Phase 94
+**Current focus:** Phase 94 in progress -- client rendering and input
 
 ## Current Position
 
-Phase: 93 of 95 (Server Pipeline) -- COMPLETE
-Plan: 2 of 2 in current phase -- DONE
-Status: Phase 93 complete (all plans executed)
-Last activity: 2026-02-15 -- Phase 93-02 executed (2 tasks, 2 commits)
+Phase: 94 of 95 (Client Rendering and Input)
+Plan: 1 of 2 in current phase -- DONE
+Status: Phase 94 Plan 01 complete, Plan 02 remaining
+Last activity: 2026-02-16 -- Phase 94-01 executed (2 tasks, 2 commits)
 
-Progress: [██████████] 100% (Phase 93)
+Progress: [█████████░] 50% (Phase 94)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 3
-- Average duration: ~5 min
-- Total execution time: ~3 sessions
+- Total plans completed: 4
+- Average duration: ~4 min
+- Total execution time: ~4 sessions
 
 **By Phase:**
 
@@ -29,10 +29,11 @@ Progress: [██████████] 100% (Phase 93)
 |-------|-------|-------|----------|
 | 92 | 1 | 1 session | 1 session |
 | 93 | 2 | 9 min | 4.5 min |
+| 94 | 1 (of 2) | 2 min | 2 min |
 
 **Recent Trend:**
-- Last 5 plans: 92-01, 93-01, 93-02
-- Trend: Server pipeline complete, ready for client rendering
+- Last 5 plans: 92-01, 93-01, 93-02, 94-01
+- Trend: Client rendering pipeline wired, input sending operational
 
 *Updated after each plan completion*
 
@@ -56,6 +57,10 @@ Recent decisions affecting current work:
 - player_action handler maps client keys to actions via scene.action_mapping
 - Server-auth games skip Pyodide coordinator in all game creation paths
 - Server-auth disconnect continues game with default actions (no end_game to remaining players)
+- Unbounded FIFO buffer: play every frame in order, no dropping (client rendering)
+- Freeze on last rendered frame when buffer empty (no jitter indicator)
+- Send actions immediately on keypress, no batching at render tick intervals
+- render_state normalized to game_state_objects in addStateToBuffer for shared drawState path
 
 ### Pending Todos
 
@@ -67,6 +72,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-02-15
-Stopped at: Completed 93-02-PLAN.md (server-auth mode toggle and action reception). Phase 93 complete.
+Last session: 2026-02-16
+Stopped at: Completed 94-01-PLAN.md (client state buffer and input sending). Phase 94 Plan 02 remaining.
 Resume file: None
