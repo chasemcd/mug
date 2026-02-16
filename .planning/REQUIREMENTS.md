@@ -76,17 +76,17 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SCNE-01 | TBD | Pending |
-| SCNE-02 | TBD | Pending |
-| SCNE-03 | TBD | Pending |
-| RLBK-01 | TBD | Pending |
-| SAUTH-01 | TBD | Pending |
+| SCNE-01 | Phase 96 | Pending |
+| SCNE-02 | Phase 96 | Pending |
+| SCNE-03 | Phase 96 | Pending |
+| RLBK-01 | Phase 97 | Pending |
+| SAUTH-01 | Phase 98 | Pending |
 
 **Coverage:**
 - v1.2 requirements: 5 total
-- Mapped to phases: 0
-- Unmapped: 5 ⚠️
+- Mapped to phases: 5
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-13*
-*Last updated: 2026-02-16 after v1.2 milestone start*
+*Last updated: 2026-02-16 after v1.2 roadmap creation*

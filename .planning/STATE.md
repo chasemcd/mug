@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-02-16)
 
 **Core value:** Researchers can deploy interactive simulation experiments to the browser with minimal friction
-**Current focus:** v1.2 Test Suite Green -- fix all 7 failing E2E tests
+**Current focus:** v1.2 Test Suite Green -- fix all 7 failing E2E tests across 3 subsystems
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements for v1.2
-Last activity: 2026-02-16 -- Milestone v1.2 started
+Phase: 96 of 98 (Scene Transition on Focus Loss) -- ready to plan
+Plan: --
+Status: Roadmap created, ready to plan Phase 96
+Last activity: 2026-02-16 -- v1.2 roadmap created (3 phases: 96-98)
 
 Progress: [░░░░░░░░░░] 0% (v1.2)
 
@@ -34,7 +34,7 @@ Progress: [░░░░░░░░░░] 0% (v1.2)
 
 **Recent Trend:**
 - Last 5 plans: 93-02, 94-01, 94-02, 95-01, 95-02
-- Trend: Server-auth fully verified with E2E browser tests and P2P regression guard
+- Trend: Stable ~3 min/plan
 
 *Updated after each plan completion*
 
@@ -45,31 +45,9 @@ Progress: [░░░░░░░░░░] 0% (v1.2)
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
-- Treat phases 67-91 as v1.0 (Foundation Cleanup milestone)
-- Remove ServerGameRunner -- P2P rollback handles sync
-- Server steps at max speed, client gates FPS
-- Use env.render(render_mode="interactive_gym") for state output
-- ServerGame retains only socket/room plumbing (connection, room, player tracking)
-- Server game loop runs at max speed with eventlet.sleep(0) -- no FPS cap
-- render_server_game uses env.render() exclusively -- no env_to_state_fn or cv2 fallback
-- Socket event is server_render_state (not environment_state)
-- Removed cv2/base64 from game_manager -- no longer needed
-- server_authoritative attribute on GymScene with mode param on multiplayer() builder
-- player_action handler maps client keys to actions via scene.action_mapping
-- Server-auth games skip Pyodide coordinator in all game creation paths
-- Server-auth disconnect continues game with default actions (no end_game to remaining players)
-- Unbounded FIFO buffer: play every frame in order, no dropping (client rendering)
-- Freeze on last rendered frame when buffer empty (no jitter indicator)
-- Send actions immediately on keypress, no batching at render tick intervals
-- render_state normalized to game_state_objects in addStateToBuffer for shared drawState path
-- Server-auth episode reset flushes buffer but does NOT destroy/recreate Phaser (continuous rendering)
+- Server-auth episode completion detected via serverAuthoritative flag clearing (end_game handler)
 - Server-auth disconnect: skip remove_subject, start configurable timeout (reconnection_timeout_ms)
 - Reconnection: rejoin socket room, cancel timeout, resume from current state (no history burst)
-- Lazy env_creator defers cogrid import to runtime -- server-auth example imports cleanly without cogrid
-- Mock scene/env pattern for testing ServerGame without running server (patched eventlet)
-- Server-auth episode completion detected via serverAuthoritative flag clearing (end_game handler)
-- flask_server_auth uses port 5710 to avoid conflicts with existing test ports (5702-5709)
-- P2P regression test reuses existing flask_server fixture -- no new P2P test fixture needed
 
 ### Pending Todos
 
@@ -78,9 +56,10 @@ None.
 ### Blockers/Concerns
 
 - P2P multiplayer must not regress during any phase
+- Tests are correct -- fix root cause bugs, not tests
 
 ## Session Continuity
 
 Last session: 2026-02-16
-Stopped at: Starting v1.2 Test Suite Green milestone
+Stopped at: v1.2 roadmap created, ready to plan Phase 96
 Resume file: None
