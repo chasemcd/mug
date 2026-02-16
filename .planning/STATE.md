@@ -9,19 +9,19 @@ See: .planning/PROJECT.md (updated 2026-02-16)
 
 ## Current Position
 
-Phase: 96 of 98 (Scene Transition on Focus Loss) -- Plan 1 of 2 complete
-Plan: 02 (next)
-Status: Plan 96-01 complete, ready for Plan 96-02
-Last activity: 2026-02-16 -- completed 96-01 (event-driven scene advancement)
+Phase: 96 of 98 (Scene Transition on Focus Loss) -- Plan 2 of 2 complete (PHASE COMPLETE)
+Plan: Complete
+Status: Phase 96 complete, ready for Phase 97
+Last activity: 2026-02-16 -- completed 96-02 (test validation and bug fix)
 
-Progress: [█░░░░░░░░░] ~17% (v1.2) -- 1 of ~6 plans complete
+Progress: [███░░░░░░░] ~33% (v1.2) -- 3 of ~6 plans complete (Phase 96 done)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 8
-- Average duration: ~3 min
-- Total execution time: ~8 sessions
+- Total plans completed: 9
+- Average duration: ~13 min
+- Total execution time: ~9 sessions
 
 **By Phase:**
 
@@ -31,11 +31,11 @@ Progress: [█░░░░░░░░░] ~17% (v1.2) -- 1 of ~6 plans complete
 | 93 | 2 | 9 min | 4.5 min |
 | 94 | 2 | 6 min | 3 min |
 | 95 | 2 | 6 min | 3 min |
-| 96 | 1 | 3 min | 3 min |
+| 96 | 2 | 94 min | 47 min |
 
 **Recent Trend:**
-- Last 5 plans: 94-01, 94-02, 95-01, 95-02, 96-01
-- Trend: Stable ~3 min/plan
+- Last 5 plans: 94-02, 95-01, 95-02, 96-01, 96-02
+- Trend: 96-02 was 91 min (deep debugging of silent data loss)
 
 *Updated after each plan completion*
 
@@ -52,6 +52,9 @@ Recent decisions affecting current work:
 - onGameDone callback pattern for event-driven game completion notification (bypasses setInterval throttling)
 - MessageChannel watchdog for background-tab-safe countdown timing (setTimeout fallback with forced advance)
 - Fast-forward episode end: check both max_steps AND terminated/truncated environment flags
+- SocketIO ack-based retry (3 attempts, 2s interval) for reliable episode data delivery
+- Backwards-compatible parameter extraction: data.get('sync_epoch') or data.get('client_timestamp')
+- Pre-existing server-auth failure deferred to Phase 98 (not a regression)
 
 ### Pending Todos
 
@@ -65,5 +68,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-16
-Stopped at: Completed 96-01-PLAN.md (event-driven scene advancement)
+Stopped at: Completed 96-02-PLAN.md (test validation and bug fix -- Phase 96 complete)
 Resume file: None
