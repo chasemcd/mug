@@ -15,7 +15,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 92: Remove Obsolete Server-Auth Code** - Strip out Pyodide server-auth sync and simplify RemoteGameV2
 - [x] **Phase 93: Server Pipeline** - Server runs env at max speed, renders, and broadcasts state to clients
-- [ ] **Phase 94: Client Rendering and Input** - Client buffers server state, gates FPS, and sends actions
+- [x] **Phase 94: Client Rendering and Input** - Client buffers server state, gates FPS, and sends actions
 - [ ] **Phase 95: Example and Verification** - CoGrid Overcooked example with full test coverage
 
 ## Phase Details
@@ -63,8 +63,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 94-01-PLAN.md -- Server-auth state buffer, rendering pipeline, and input sending (buffer incoming states, render at FPS, send player_action on keypress)
-- [ ] 94-02-PLAN.md -- Episode transitions and reconnection (flush buffer on reset, game-complete flow, reconnect to running game with disconnect timeout)
+- [x] 94-01-PLAN.md -- Server-auth state buffer, rendering pipeline, and input sending (buffer incoming states, render at FPS, send player_action on keypress)
+- [x] 94-02-PLAN.md -- Episode transitions and reconnection (flush buffer on reset, game-complete flow, reconnect to running game with disconnect timeout)
 
 ### Phase 95: Example and Verification
 **Goal**: CoGrid Overcooked runs in server-authoritative mode end-to-end, with automated tests proving both server-auth and P2P modes work
@@ -91,5 +91,5 @@ Phases execute in numeric order: 92 -> 93 -> 94 -> 95
 |-------|-----------|----------------|--------|-----------|
 | 92. Remove Obsolete Server-Auth Code | v1.1 | 1/1 | Complete | 2026-02-15 |
 | 93. Server Pipeline | v1.1 | 2/2 | Complete | 2026-02-15 |
-| 94. Client Rendering and Input | v1.1 | 0/TBD | Not started | - |
+| 94. Client Rendering and Input | v1.1 | 2/2 | Complete | 2026-02-16 |
 | 95. Example and Verification | v1.1 | 0/TBD | Not started | - |
