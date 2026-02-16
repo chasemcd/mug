@@ -1,6 +1,6 @@
 import * as ui_utils from './ui_utils.js';
 import {startUnityScene, terminateUnityScene, shutdownUnityGame, preloadUnityGame} from './unity_utils.js';
-import {graphics_start, graphics_end, addStateToBuffer, getRemoteGameData, pressedKeys} from './phaser_gym_graphics.js';
+import {graphics_start, graphics_end, addStateToBuffer, clearStateBuffer, getRemoteGameData, pressedKeys} from './phaser_gym_graphics.js';
 import {RemoteGame} from './pyodide_remote_game.js';
 import {MultiplayerPyodideGame} from './pyodide_multiplayer_game.js';
 import {ProbeConnection} from './probe_connection.js';
@@ -1129,11 +1129,7 @@ function updateWaitroomText(waitroomConfig, timer) {
 }
 
 socket.on("game_reset", function(resetData) {
-    graphics_end()
-    $('#hudText').hide()
-    ui_utils.disableKeyListener();
-
-    let scene_metadata = resetData.scene_metadata
+    let scene_metadata = resetData.scene_metadata;
 
     if (!scene_metadata) {
         scene_metadata = resetData.config;
@@ -1143,6 +1139,23 @@ socket.on("game_reset", function(resetData) {
         console.log("scene_metadata is undefined on game reset!")
         return;
     }
+
+    // Server-authoritative mode: flush buffer and show countdown, but keep Phaser running
+    if (window.serverAuthoritative) {
+        console.log("[GameReset] Server-auth mode: flushing state buffer, showing countdown");
+        clearStateBuffer();
+
+        startResetCountdown(resetData.timeout, function() {
+            // After countdown, emit reset_complete so server can proceed
+            socket.emit("reset_complete", {room: resetData.room, session_id: window.sessionId});
+        });
+        return;
+    }
+
+    // P2P mode: destroy and recreate Phaser game instance
+    graphics_end()
+    $('#hudText').hide()
+    ui_utils.disableKeyListener();
 
     // Initialize game
     let graphics_config = {
@@ -1247,6 +1260,13 @@ socket.on('end_game', function(endGameInfo) {
     ui_utils.disableKeyListener();
     socket.emit("leave_game", {session_id: window.sessionId});
     $("#gameContainer").hide();
+
+    // Clean up server-auth state if applicable
+    if (window.serverAuthoritative) {
+        clearStateBuffer();
+        window.serverAuthoritative = false;
+        window.currentGameId = null;
+    }
 
     if (endGameInfo.message != undefined) {
         $('#errorText').text(endGameInfo.message);

@@ -21,7 +21,7 @@ export function addStateToBuffer(state_data) {
     stateBuffer.push(state_data);
 }
 
-function clearStateBuffer() {
+export function clearStateBuffer() {
     stateBuffer = [];
 }
 
