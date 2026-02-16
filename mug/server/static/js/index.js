@@ -1632,6 +1632,11 @@ function terminateGymScene(data) {
         clearInterval(refreshStartButton);
         refreshStartButton = null;
     }
+    // Phase 96: Clean up event-driven callback and countdown state
+    if (pyodideRemoteGame && pyodideRemoteGame.onGameDone) {
+        pyodideRemoteGame.onGameDone = null;
+    }
+    _startDoneCountdown._started = false;
 
     // Phase 77 (P2P-01, P2P-02): Clean up P2P resources when exiting GymScene
     // Must happen before data emission so sceneExited flag is set before any
@@ -1725,51 +1730,122 @@ function enableCheckPyodideDone() {
         clearInterval(checkPyodideDone);
         checkPyodideDone = null;
     }
+
+    // Phase 96: Event-driven path -- MultiplayerPyodideGame fires onGameDone immediately
+    // when signalEpisodeComplete() sets state="done". This bypasses browser throttling
+    // of setInterval in background tabs.
+    if (pyodideRemoteGame && typeof pyodideRemoteGame === 'object') {
+        pyodideRemoteGame.onGameDone = () => {
+            console.log('[GameDone] Received onGameDone callback');
+            // Clear fallback interval since callback fired
+            if (checkPyodideDone) {
+                clearInterval(checkPyodideDone);
+                checkPyodideDone = null;
+            }
+            if (refreshStartButton) {
+                clearInterval(refreshStartButton);
+                refreshStartButton = null;
+            }
+            _startDoneCountdown();
+        };
+    }
+
+    // Fallback polling: for RemoteGame (single-player) or if callback doesn't fire
     checkPyodideDone = setInterval(() => {
         if (pyodideRemoteGame !== undefined && pyodideRemoteGame.isDone()) {
             clearInterval(checkPyodideDone);
-            clearInterval(refreshStartButton);
-            // pyodideRemoteGame = undefined;
-
-            // Create and show the countdown popup
-            const popup = document.createElement('div');
-            popup.style.cssText = `
-                position: absolute;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%);
-                background: rgba(0, 0, 0, 0.8);
-                color: white;
-                padding: 20px 40px;
-                border-radius: 10px;
-                font-family: Arial, sans-serif;
-                font-size: 18px;
-                text-align: center;
-                z-index: 1000;
-                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            `;
-            const gameContainer = document.getElementById('gameContainer');
-            gameContainer.style.position = 'relative';
-            gameContainer.appendChild(popup);
-
-            let countdown = 3;
-            const updatePopup = () => {
-                popup.innerHTML = `
-                    <h2 style="margin-bottom: 10px; color: white;">Done!</h2>
-                    <p>Continuing in <span style="font-weight: bold; font-size: 24px;">${countdown}</span> seconds...</p>
-                `;
-                if (countdown === 0) {
-                    gameContainer.removeChild(popup);
-                    socket.emit("advance_scene", {session_id: window.sessionId});
-                } else {
-                    countdown--;
-                    setTimeout(updatePopup, 1000);
-                }
-            };
-            updatePopup();
+            checkPyodideDone = null;
+            if (refreshStartButton) {
+                clearInterval(refreshStartButton);
+                refreshStartButton = null;
+            }
+            _startDoneCountdown();
         }
     }, 100);
 }
+
+/**
+ * Show "Done!" countdown and advance scene.
+ * Uses setTimeout for the visual countdown (works when tab is focused) with a
+ * MessageChannel watchdog that ensures advance_scene fires even if setTimeout
+ * is throttled in background tabs.
+ *
+ * Phase 96: Extracted from enableCheckPyodideDone to support event-driven invocation.
+ */
+function _startDoneCountdown() {
+    // Guard against double invocation (callback + interval race)
+    if (_startDoneCountdown._started) return;
+    _startDoneCountdown._started = true;
+
+    // Create and show the countdown popup
+    const popup = document.createElement('div');
+    popup.style.cssText = `
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 20px 40px;
+        border-radius: 10px;
+        font-family: Arial, sans-serif;
+        font-size: 18px;
+        text-align: center;
+        z-index: 1000;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    `;
+    const gameContainer = document.getElementById('gameContainer');
+    if (gameContainer) {
+        gameContainer.style.position = 'relative';
+        gameContainer.appendChild(popup);
+    }
+
+    let countdown = 3;
+    const startTime = performance.now();
+    const TOTAL_DELAY_MS = 3000;
+
+    const updatePopup = () => {
+        popup.innerHTML = `
+            <h2 style="margin-bottom: 10px; color: white;">Done!</h2>
+            <p>Continuing in <span style="font-weight: bold; font-size: 24px;">${countdown}</span> seconds...</p>
+        `;
+        if (countdown <= 0 || performance.now() - startTime >= TOTAL_DELAY_MS) {
+            if (gameContainer && popup.parentNode === gameContainer) {
+                gameContainer.removeChild(popup);
+            }
+            _startDoneCountdown._started = false;  // Reset for next scene
+            socket.emit("advance_scene", {session_id: window.sessionId});
+        } else {
+            countdown--;
+            setTimeout(updatePopup, 1000);
+        }
+    };
+    updatePopup();
+
+    // Watchdog: ensure advance_scene fires even if setTimeout is fully throttled
+    // MessageChannel.onmessage is NOT throttled in background tabs, so the watchdog
+    // reliably detects when the total delay has elapsed and forces the advance.
+    const watchdogChannel = new MessageChannel();
+    watchdogChannel.port1.onmessage = () => {
+        if (performance.now() - startTime >= TOTAL_DELAY_MS + 500) {
+            // setTimeout didn't fire in time -- force advance
+            if (_startDoneCountdown._started) {
+                console.log('[GameDone] Watchdog: forcing advance_scene after throttled countdown');
+                if (gameContainer && popup.parentNode === gameContainer) {
+                    gameContainer.removeChild(popup);
+                }
+                _startDoneCountdown._started = false;
+                socket.emit("advance_scene", {session_id: window.sessionId});
+            }
+        } else if (_startDoneCountdown._started) {
+            // Keep watching -- check every ~200ms via setTimeout + MessageChannel
+            setTimeout(() => watchdogChannel.port2.postMessage(null), 200);
+        }
+    };
+    // Start watchdog after a short delay
+    setTimeout(() => watchdogChannel.port2.postMessage(null), 200);
+}
+_startDoneCountdown._started = false;
 
 
 
