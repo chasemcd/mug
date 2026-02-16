@@ -1181,6 +1181,8 @@ def receive_episode_data(data):
     - episode_num: The episode number (0-indexed)
     - scene_id: The scene ID for file organization
     - data: msgpack-encoded game data (observations, actions, rewards, etc.)
+
+    Returns acknowledgment dict for client-side delivery confirmation.
     """
     global PARTICIPANT_SESSIONS
 
@@ -1195,7 +1197,7 @@ def receive_episode_data(data):
         session.last_updated_at = time.time()
 
     if not CONFIG.save_experiment_data:
-        return
+        return {"status": "ok", "saved": False}
 
     # Decode the msgpack data
     decoded_data = msgpack.unpackb(data["data"])
@@ -1203,7 +1205,7 @@ def receive_episode_data(data):
     # Check if there's any data to save
     if not decoded_data or not decoded_data.get("t"):
         logger.info(f"No data to save for episode {episode_num}")
-        return
+        return {"status": "ok", "saved": False}
 
     # Flatten any nested dictionaries
     flattened_data = flatten_dict.flatten(decoded_data, reducer="dot")
@@ -1240,6 +1242,8 @@ def receive_episode_data(data):
     globals_filename = f"data/{CONFIG.experiment_id}/{data['scene_id']}/{subject_id}_globals.json"
     with open(globals_filename, "w") as f:
         json.dump(data.get("interactiveGymGlobals", {}), f)
+
+    return {"status": "ok", "saved": True}
 
 
 @socketio.on("emit_multiplayer_metrics")
@@ -1851,7 +1855,7 @@ def on_pyodide_player_action(data):
     player_id = data.get("player_id")
     action = data.get("action")
     frame_number = data.get("frame_number")
-    sync_epoch = data.get("sync_epoch")  # May be None for backwards compatibility
+    client_timestamp = data.get("sync_epoch") or data.get("client_timestamp")  # backwards compatible
 
     # logger.debug(
     #     f"Received action from player {player_id} in game {game_id} "
@@ -1863,7 +1867,7 @@ def on_pyodide_player_action(data):
         player_id=player_id,
         action=action,
         frame_number=frame_number,
-        sync_epoch=sync_epoch
+        client_timestamp=client_timestamp
     )
 
 

@@ -3609,6 +3609,9 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
     /**
      * Emit episode data from the rollback-safe frame buffer.
      * Uses msgpack encoding for efficient transmission.
+     * Includes server acknowledgment with retry to handle dropped messages
+     * (e.g., after background-tab fast-forward where the event loop may
+     * be congested with pending async operations).
      */
     _emitEpisodeDataFromBuffer() {
         if (!window.socket) {
@@ -3629,15 +3632,49 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
 
         console.log(`[_emitEpisodeDataFromBuffer] Emitting episode ${this.num_episodes} data: ${episodeData.t.length} frames, ${binaryData.byteLength} bytes`);
 
-        window.socket.emit("emit_episode_data", {
+        const payload = {
             data: binaryData,
             scene_id: this.sceneId,
             episode_num: this.num_episodes,
             session_id: window.sessionId,
             interactiveGymGlobals: window.interactiveGymGlobals
-        });
+        };
 
-        // Clear the buffers after emitting
+        // Track delivery confirmation
+        let delivered = false;
+        const MAX_RETRIES = 3;
+        let attempt = 0;
+
+        const emitWithAck = () => {
+            attempt++;
+            window.socket.emit("emit_episode_data", payload, (ack) => {
+                if (ack && ack.status === 'ok') {
+                    delivered = true;
+                    if (attempt > 1) {
+                        console.log(`[_emitEpisodeDataFromBuffer] Delivery confirmed on attempt ${attempt}`);
+                    }
+                }
+            });
+        };
+
+        // Initial emit with ack callback
+        emitWithAck();
+
+        // Schedule retries in case the initial emit doesn't get acknowledged
+        // This handles cases where the message is dropped due to event loop congestion
+        const retryInterval = setInterval(() => {
+            if (delivered || attempt >= MAX_RETRIES) {
+                clearInterval(retryInterval);
+                if (!delivered && attempt >= MAX_RETRIES) {
+                    console.warn(`[_emitEpisodeDataFromBuffer] No ack after ${MAX_RETRIES} attempts - data may not be saved`);
+                }
+                return;
+            }
+            console.log(`[_emitEpisodeDataFromBuffer] Retry ${attempt + 1}/${MAX_RETRIES} - no ack received`);
+            emitWithAck();
+        }, 2000);
+
+        // Clear the buffers after emitting (data is in payload now)
         this.frameDataBuffer.clear();
         this.speculativeFrameData.clear();
     }
