@@ -874,10 +874,15 @@ socket.on('start_game', function(gameStartData) {
     // Show the game container
     $("#gameContainer").show();
 
+    // Track game ID for server-auth action payloads
+    window.currentGameId = gameStartData.game_id || null;
+
     // Detect server-authoritative mode
     if (scene_metadata.server_authoritative) {
         window.serverAuthoritative = true;
-        console.log("[StartGame] Server-authoritative mode enabled");
+        window.serverAuthInputDelay = scene_metadata.input_delay || 0;
+        ui_utils.setServerAuthInputDelay(window.serverAuthInputDelay);
+        console.log("[StartGame] Server-authoritative mode enabled, input_delay:", window.serverAuthInputDelay);
     } else {
         window.serverAuthoritative = false;
     }

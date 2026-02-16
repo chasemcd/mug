@@ -1,4 +1,5 @@
 import {actionFromONNX, initModelConfigs} from './onnx_inference.js';
+import {drainInputDelayQueue} from './ui_utils.js';
 
 
 var game_config = {
@@ -737,6 +738,11 @@ class GymScene extends Phaser.Scene {
 
     processRendering() {
         const frame = this.pyodide_remote_game?.frameNumber || 0;
+
+        // Server-auth input delay: drain queued actions on each render tick
+        if (window.serverAuthoritative && window.serverAuthInputDelay > 0) {
+            drainInputDelayQueue();
+        }
 
         // FIX: Drain buffer by rendering multiple states when behind
         // This catches up without skipping visual frames
