@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-13)
 
 **Core value:** Researchers can deploy interactive simulation experiments to the browser with minimal friction
-**Current focus:** Phase 94 in progress -- client rendering and input
+**Current focus:** Phase 95 in progress -- example and verification
 
 ## Current Position
 
-Phase: 94 of 95 (Client Rendering and Input)
-Plan: 2 of 2 in current phase -- DONE
-Status: Phase 94 complete -- all plans executed
-Last activity: 2026-02-16 -- Phase 94-02 executed (2 tasks, 2 commits)
+Phase: 95 of 95 (Example and Verification)
+Plan: 1 of 2 in current phase
+Status: Phase 95 in progress -- plan 01 complete
+Last activity: 2026-02-16 -- Phase 95-01 executed (2 tasks, 2 commits)
 
-Progress: [██████████] 100% (Phase 94)
+Progress: [█████████░] 90% (Phase 95)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 5
+- Total plans completed: 6
 - Average duration: ~3 min
-- Total execution time: ~5 sessions
+- Total execution time: ~6 sessions
 
 **By Phase:**
 
@@ -30,10 +30,11 @@ Progress: [██████████] 100% (Phase 94)
 | 92 | 1 | 1 session | 1 session |
 | 93 | 2 | 9 min | 4.5 min |
 | 94 | 2 | 6 min | 3 min |
+| 95 | 1 | 3 min | 3 min |
 
 **Recent Trend:**
-- Last 5 plans: 92-01, 93-01, 93-02, 94-01, 94-02
-- Trend: Server-auth pipeline complete -- rendering, input, episode transitions, reconnection
+- Last 5 plans: 93-01, 93-02, 94-01, 94-02, 95-01
+- Trend: Server-auth example and unit/integration tests added
 
 *Updated after each plan completion*
 
@@ -64,6 +65,8 @@ Recent decisions affecting current work:
 - Server-auth episode reset flushes buffer but does NOT destroy/recreate Phaser (continuous rendering)
 - Server-auth disconnect: skip remove_subject, start configurable timeout (reconnection_timeout_ms)
 - Reconnection: rejoin socket room, cancel timeout, resume from current state (no history burst)
+- Lazy env_creator defers cogrid import to runtime -- server-auth example imports cleanly without cogrid
+- Mock scene/env pattern for testing ServerGame without running server (patched eventlet)
 
 ### Pending Todos
 
@@ -76,5 +79,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-02-16
-Stopped at: Completed 94-02-PLAN.md (episode transitions and reconnection). Phase 94 complete.
+Stopped at: Completed 95-01-PLAN.md (example and server game tests). Phase 95 plan 01 done, plan 02 remaining.
 Resume file: None
