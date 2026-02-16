@@ -1161,6 +1161,11 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         // Phase 77: Set true when scene exits to guard stale event handlers
         this.sceneExited = false;
 
+        // Phase 96: Event-driven game completion callback
+        // Set by index.js to receive immediate notification when signalEpisodeComplete()
+        // sets state="done", bypassing throttled setInterval polling in background tabs
+        this.onGameDone = null;
+
         // GGPO-style input queuing: inputs are queued during network reception
         // and processed synchronously at frame start to prevent race conditions
         this.pendingInputPackets = [];     // Queued P2P input packets
@@ -3571,6 +3576,12 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
         if (this.num_episodes >= this.max_episodes) {
             this.state = "done";
             this._destroyTimerWorker();  // Clean up Web Worker timer (Phase 24)
+
+            // Phase 96: Notify host (index.js) immediately -- bypasses throttled setInterval polling
+            if (this.onGameDone) {
+                try { this.onGameDone(); } catch (e) { console.error('[P2P] onGameDone callback error:', e); }
+            }
+
             // Always log for admin console visibility
             console.log('[P2P] Game complete - all episodes finished. Subject:',
                 window.subjectName || window.interactiveGymGlobals?.subjectName,
@@ -4990,10 +5001,28 @@ json.dumps({'cumulative_rewards': {str(k): v for k, v in _cumulative_rewards.ite
         // Without this, episode end detection waits for the next processTick() call,
         // causing a visible delay where the fast-forwarded player appears to keep
         // playing after the partner has already exited the scene.
+        // Phase 96: Also check terminated/truncated flags from Python step results,
+        // not just max_steps. Environments can end early via these flags.
         if (!this.episodeComplete && !this.p2pEpisodeSync.localEpisodeEndDetected) {
             const maxStepsReached = this.step_num >= this.max_steps;
-            if (maxStepsReached) {
-                p2pLog.info(`FAST-FORWARD: episode end detected at frame ${this.frameNumber} (step ${this.step_num}/${this.max_steps})`);
+
+            // Check if any frame in the batch returned terminated or truncated
+            let envEpisodeEnd = false;
+            if (ffResult.per_frame_data && ffResult.per_frame_data.length > 0) {
+                const lastFrame = ffResult.per_frame_data[ffResult.per_frame_data.length - 1];
+                // Check individual agent values (filter out Gymnasium's __all__ key)
+                const allTerminated = lastFrame.terminateds && Object.entries(lastFrame.terminateds)
+                    .filter(([k]) => k !== '__all__').every(([, v]) => v === true);
+                const allTruncated = lastFrame.truncateds && Object.entries(lastFrame.truncateds)
+                    .filter(([k]) => k !== '__all__').every(([, v]) => v === true);
+                // Also check Gymnasium standard __all__ key
+                const allKeyTerm = lastFrame.terminateds?.['__all__'] === true;
+                const allKeyTrunc = lastFrame.truncateds?.['__all__'] === true;
+                envEpisodeEnd = allTerminated || allTruncated || allKeyTerm || allKeyTrunc;
+            }
+
+            if (maxStepsReached || envEpisodeEnd) {
+                p2pLog.info(`FAST-FORWARD: episode end detected at frame ${this.frameNumber} (step ${this.step_num}/${this.max_steps}, envEnd=${envEpisodeEnd})`);
                 this._logEpisodeEndMetrics();
 
                 if (this.webrtcManager?.isReady()) {
