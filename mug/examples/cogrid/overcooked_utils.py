@@ -63,7 +63,8 @@ def hud_text_fn(game: remote_game.ServerGame) -> str:
         if len(game.episode_rewards) > 0
         else 0
     )
-    return f"Score: {score:03d}   |    Time Left: {(game.env.max_steps - game.tick_num) / game.config.fps:.1f}s"
+    fps = getattr(game, 'fps', None) or getattr(getattr(game, 'scene', None), 'fps', 30)
+    return f"Score: {score:03d}   |    Time Left: {(game.env.max_steps - game.tick_num) / fps:.1f}s"
 
 
 def overcooked_preload_assets_spec() -> (

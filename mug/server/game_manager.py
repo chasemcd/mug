@@ -14,12 +14,6 @@ import flask_socketio
 from mug.utils.typing import GameID, RoomID, SubjectID
 
 logger = logging.getLogger(__name__)
-# Add console handler to see game_manager logs
-if not logger.handlers:
-    _handler = logging.StreamHandler()
-    _handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-    logger.addHandler(_handler)
-    logger.setLevel(logging.INFO)
 
 
 from typing import TYPE_CHECKING
@@ -277,6 +271,7 @@ class GameManager:
         logger.info(
             f"Successfully removed game {game_id} and closed the associated room."
         )
+
 
     def add_subject_to_game(
         self, subject_id: SubjectID
@@ -1315,8 +1310,33 @@ class GameManager:
         via the server_render_state socket event. Handles episode resets
         with configurable pause and player acknowledgments.
         """
+        try:
+            self._run_server_game_inner(game)
+        except Exception as e:
+            import traceback
+            error_msg = traceback.format_exc()
+            logger.exception(
+                f"Server game loop crashed for {game.game_id}"
+            )
+            # Ensure clients are notified even on crash — include error for debugging
+            try:
+                self.socketio.emit(
+                    "end_game",
+                    {"error": str(e), "traceback": error_msg},
+                    room=game.game_id,
+                )
+                self.cleanup_game(game.game_id)
+            except Exception:
+                logger.exception(f"Cleanup after crash also failed for {game.game_id}")
+
+    def _run_server_game_inner(self, game: remote_game.ServerGame):
+        """Inner server game loop (separated for exception handling)."""
+        _t0 = time.monotonic()
+
         # Build env and load policies
+        logger.info(f"[ServerLoop:{game.game_id}] Building env...")
         game._build_env()
+
         game._load_policies()
 
         # First reset
@@ -1328,7 +1348,10 @@ class GameManager:
         # Initial render broadcast
         self.render_server_game(game)
 
-        # Main game loop -- run at max speed (no FPS cap)
+        # Throttle to scene FPS to avoid flooding SocketIO transport
+        step_interval = 1.0 / self.scene.fps if self.scene.fps > 0 else 0
+
+        # Main game loop
         end_status = [
             remote_game.GameStatus.Inactive,
             remote_game.GameStatus.Done,
@@ -1344,10 +1367,18 @@ class GameManager:
                 if self.scene.callback is not None:
                     self.scene.callback.on_game_tick_end(game)
 
+            # Log first few ticks and status changes
+            if game.tick_num <= 3 or game.tick_num % 50 == 0 or game.status in end_status:
+                logger.info(
+                    f"[ServerLoop:{game.game_id}] tick={game.tick_num}, "
+                    f"status={game.status}, episode={game.episode_num}, "
+                    f"elapsed={time.monotonic() - _t0:.2f}s"
+                )
+
             self.render_server_game(game)
 
-            # Yield to eventlet to prevent starving other greenlets
-            eventlet.sleep(0)
+            # Throttle to target FPS and yield to eventlet
+            eventlet.sleep(step_interval)
 
             # Handle episode transitions
             if game.status == remote_game.GameStatus.Reset:
@@ -1389,9 +1420,12 @@ class GameManager:
                     self.scene.callback.on_episode_end(game)
 
         # Cleanup after loop
+        _elapsed = time.monotonic() - _t0
         with game.lock:
             logger.info(
-                f"Game loop ended for {game.game_id}, ending and cleaning up."
+                f"[ServerLoop:{game.game_id}] Loop exited after {_elapsed:.2f}s. "
+                f"Final status={game.status}, tick_num={game.tick_num}, "
+                f"episode_num={game.episode_num}"
             )
             if game.status != remote_game.GameStatus.Inactive:
                 game.tear_down()

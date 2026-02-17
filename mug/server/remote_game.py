@@ -493,6 +493,10 @@ class ServerGame:
         else:
             all_truncated = bool(truncated)
 
+        # Enforce scene-level max_steps (mirrors client-side check in P2P mode)
+        if self.tick_num >= self.scene.max_steps:
+            all_truncated = True
+
         if all_terminated or all_truncated:
             if self.episode_num < self.scene.num_episodes:
                 self.status = GameStatus.Reset

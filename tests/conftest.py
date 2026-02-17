@@ -35,17 +35,19 @@ def _is_port_free(port):
     """
     Check if a TCP port is available for binding.
 
-    Uses socket.bind() with SO_REUSEADDR as the authoritative check.
-    A connect-based check can succeed during TCP TIME_WAIT, giving false
-    negatives. Binding is the definitive test.
+    Uses connect-based check: if something is LISTENING, the port is NOT free.
+    Do NOT use SO_REUSEADDR bind check — on macOS, SO_REUSEADDR allows
+    multiple processes to bind the same port simultaneously, which causes
+    connection routing issues where new test connections hit stale servers.
     """
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        s.settimeout(1)
         try:
-            s.bind(("localhost", port))
-            return True
-        except OSError:
-            return False
+            s.connect(("localhost", port))
+            s.close()
+            return False  # Something is listening — port is NOT free
+        except (ConnectionRefusedError, OSError):
+            return True  # Nothing listening — port is free
 
 
 def _ensure_port_available(port):

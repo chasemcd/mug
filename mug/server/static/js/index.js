@@ -1281,6 +1281,10 @@ socket.on('rejoin_failed', function() {
 
 
 socket.on('end_game', function(endGameInfo) {
+    if (endGameInfo && endGameInfo.error) {
+        console.error("[end_game] Server game loop crashed:", endGameInfo.error);
+        console.error("[end_game] Traceback:", endGameInfo.traceback);
+    }
     console.log("game ended!")
     // Hide game data and display game-over html
     graphics_end();

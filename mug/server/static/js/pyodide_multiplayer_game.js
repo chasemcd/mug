@@ -3637,15 +3637,20 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
             scene_id: this.sceneId,
             episode_num: this.num_episodes,
             session_id: window.sessionId,
+            subject_id: window.subjectName || window.interactiveGymGlobals?.subjectName,
             interactiveGymGlobals: window.interactiveGymGlobals
         };
 
-        // Track delivery confirmation
+        // Track delivery confirmation via ack callback
         let delivered = false;
-        const MAX_RETRIES = 3;
+        const MAX_RETRIES = 5;
         let attempt = 0;
 
         const emitWithAck = () => {
+            if (!window.socket?.connected) {
+                console.warn(`[_emitEpisodeDataFromBuffer] Socket not connected on attempt ${attempt + 1}, will retry`);
+                return;
+            }
             attempt++;
             window.socket.emit("emit_episode_data", payload, (ack) => {
                 if (ack && ack.status === 'ok') {
@@ -3660,19 +3665,23 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
         // Initial emit with ack callback
         emitWithAck();
 
-        // Schedule retries in case the initial emit doesn't get acknowledged
-        // This handles cases where the message is dropped due to event loop congestion
-        const retryInterval = setInterval(() => {
-            if (delivered || attempt >= MAX_RETRIES) {
-                clearInterval(retryInterval);
-                if (!delivered && attempt >= MAX_RETRIES) {
-                    console.warn(`[_emitEpisodeDataFromBuffer] No ack after ${MAX_RETRIES} attempts - data may not be saved`);
+        // Schedule retries in case the initial emit doesn't get acknowledged.
+        // Uses chained setTimeout instead of setInterval for more reliable timing
+        // under system load (setInterval can drift or be coalesced).
+        const scheduleRetry = () => {
+            setTimeout(() => {
+                if (delivered || attempt >= MAX_RETRIES) {
+                    if (!delivered && attempt >= MAX_RETRIES) {
+                        console.warn(`[_emitEpisodeDataFromBuffer] No ack after ${MAX_RETRIES} attempts - data may not be saved`);
+                    }
+                    return;
                 }
-                return;
-            }
-            console.log(`[_emitEpisodeDataFromBuffer] Retry ${attempt + 1}/${MAX_RETRIES} - no ack received`);
-            emitWithAck();
-        }, 2000);
+                console.log(`[_emitEpisodeDataFromBuffer] Retry ${attempt + 1}/${MAX_RETRIES} - no ack received`);
+                emitWithAck();
+                scheduleRetry();
+            }, 2000);
+        };
+        scheduleRetry();
 
         // Clear the buffers after emitting (data is in payload now)
         this.frameDataBuffer.clear();

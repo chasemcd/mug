@@ -105,5 +105,3 @@ def test_server_auth_two_players_complete_episode(flask_server_auth, player_cont
     # Step 10: Verify server process is still running (no crash)
     assert flask_server_auth["process"].poll() is None, \
         "Server should still be running after episode completion"
-
-    print(f"Server-auth test passed: game_id={game_id1}")

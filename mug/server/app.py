@@ -605,7 +605,6 @@ def advance_scene(data):
 
 @socketio.on("join_game")
 def join_game(data):
-
     subject_id = get_subject_id_from_session_id(flask.request.sid)
     client_session_id = data.get("session_id")  # Client sends "session_id"
 
@@ -1187,6 +1186,12 @@ def receive_episode_data(data):
     global PARTICIPANT_SESSIONS
 
     subject_id = get_subject_id_from_session_id(flask.request.sid)
+    # Fall back to client-provided subject_id if session mapping is missing
+    # (can happen under heavy load when session state is cleared between emit and ack)
+    if subject_id is None and data.get("subject_id"):
+        subject_id = data["subject_id"]
+        logger.warning(f"[EpisodeData] Session mapping missing for sid={flask.request.sid}, "
+                       f"using client-provided subject_id={subject_id}")
     episode_num = data.get("episode_num", 0)
 
     # Sync interactiveGymGlobals to session for persistence
