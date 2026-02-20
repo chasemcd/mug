@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-20)
 ## Current Position
 
 Phase: 99 of 99 (Example Migration)
-Plan: 2 of 2 in current phase
-Status: In Progress
-Last activity: 2026-02-20 — Completed 99-01 (Surface Asset Registration + Slime Volleyball Migration)
+Plan: 2 of 2 in current phase (COMPLETE)
+Status: Phase Complete
+Last activity: 2026-02-20 — Completed 99-02 (Overcooked Migration to Surface API)
 
-Progress: [████████░░] 88%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 7
+- Total plans completed: 8
 - Average duration: 3min
-- Total execution time: 0.35 hours
+- Total execution time: 0.38 hours
 
 **By Phase:**
 
@@ -29,10 +29,10 @@ Progress: [████████░░] 88%
 |-------|-------|-------|----------|
 | 97 | 3 | 5min | 2min |
 | 98 | 3 | 14min | 5min |
-| 99 | 1 | 3min | 3min |
+| 99 | 2 | 5min | 3min |
 
 **Recent Trend:**
-- Last 5 plans: 97-03 (2min), 98-01 (1min), 98-03 (3min), 98-02 (10min), 99-01 (3min)
+- Last 5 plans: 98-01 (1min), 98-03 (3min), 98-02 (10min), 99-01 (3min), 99-02 (2min)
 - Trend: Stable
 
 *Updated after each plan completion*
@@ -66,6 +66,9 @@ Recent decisions affecting current work:
 - [99-01] Asset specs stored as list of dicts on Surface._asset_specs, not cleared on reset()
 - [99-01] All Slime VB draw calls use relative=True to match old ObjectContext coordinate convention
 - [99-01] Agent drawing logic moved to _draw_agent() private method on env class
+- [99-02] Overcooked envs use relative=True for all draw calls since get_x_y() returns 0-1 normalized coordinates
+- [99-02] Surface creation and atlas registration in OvercookedRewardEnv base class __init__
+- [99-02] Dynamic objects drawn via _draw_dynamic_object() private method for code reuse
 
 ### Prior Milestones
 
@@ -81,5 +84,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-02-20
-Stopped at: Completed 99-01-PLAN.md
-Resume file: .planning/phases/99-example-migration/99-01-SUMMARY.md
+Stopped at: Completed 99-02-PLAN.md
+Resume file: .planning/phases/99-example-migration/99-02-SUMMARY.md

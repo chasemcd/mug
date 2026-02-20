@@ -56,7 +56,7 @@ Requirements for Rendering API Redesign. Each maps to roadmap phases.
 ### Example Migration
 
 - [x] **MIGR-01**: Slime Volleyball example migrated from ObjectContext to Surface API
-- [ ] **MIGR-02**: Overcooked example migrated from ObjectContext to Surface API
+- [x] **MIGR-02**: Overcooked example migrated from ObjectContext to Surface API
 
 ## Future Requirements
 
@@ -124,7 +124,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | RENDER-04 | Phase 98 | Complete |
 | RENDER-05 | Phase 98 | Complete |
 | MIGR-01 | Phase 99 | Complete |
-| MIGR-02 | Phase 99 | Pending |
+| MIGR-02 | Phase 99 | Complete |
 
 **Coverage:**
 - v1.3 requirements: 30 total
