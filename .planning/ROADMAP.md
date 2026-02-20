@@ -60,11 +60,11 @@ Plans:
   1. Slime Volleyball example runs in the browser using the Surface API with tweened ball/player movement, persistent fence/net objects, and relative coordinates
   2. Overcooked example runs in the browser using the Surface API with persistent static tiles, pixel coordinates, and multi-agent rendering
   3. Both migrated examples render correctly through the server-authoritative path (Flask/SocketIO) without visual regressions compared to the ObjectContext version
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 99-01: TBD
-- [ ] 99-02: TBD
+- [ ] 99-01-PLAN.md — Surface asset registration + Slime Volleyball migration to Surface API
+- [ ] 99-02-PLAN.md — Overcooked migration (13 env init files, utils, scene configs, server-auth)
 
 ## Progress
 
@@ -75,4 +75,4 @@ Phases execute in numeric order: 97 -> 98 -> 99
 |-------|----------------|--------|-----------|
 | 97. Python Surface Core | 3/3 | Complete    | 2026-02-20 |
 | 98. JS Renderer Update | 3/3 | Complete    | 2026-02-20 |
-| 99. Example Migration | 0/? | Not started | - |
+| 99. Example Migration | 0/2 | Not started | - |
