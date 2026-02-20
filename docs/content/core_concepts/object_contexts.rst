@@ -279,7 +279,7 @@ Your environment's ``render()`` method returns a list of object dictionaries:
 .. code-block:: python
 
     def render(self):
-        assert self.render_mode == "interactive-gym"
+        assert self.render_mode == "mug"
 
         # Create objects
         player = Circle(uuid="player", x=self.player_x, y=self.player_y, radius=20, color="#FF0000")
@@ -532,7 +532,7 @@ Troubleshooting
 
 **Objects not appearing**
 
-- Check ``render_mode="interactive-gym"`` is set
+- Check ``render_mode="mug"`` is set
 - Verify coordinates are in valid range (0-1 or valid pixels)
 - Make sure ``.as_dict()`` is called
 - Check browser console (F12) for errors

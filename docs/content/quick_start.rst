@@ -53,7 +53,7 @@ Create a file called ``mountain_car_rgb_env.py``:
 
         def render(self):
             """Return a list of visual objects to render in the browser"""
-            assert self.render_mode == "interactive-gym"
+            assert self.render_mode == "mug"
 
             # Get environment bounds for coordinate normalization
             y_offset = 0.05
@@ -125,11 +125,11 @@ Create a file called ``mountain_car_rgb_env.py``:
 
 
     # Create the environment instance (must be named 'env')
-    env = MountainCarEnv(render_mode="interactive-gym")
+    env = MountainCarEnv(render_mode="mug")
 
 **Key Points:**
 
-- Use ``render_mode="interactive-gym"`` when creating the environment
+- Use ``render_mode="mug"`` when creating the environment
 - The ``render()`` method returns a list of object dictionaries
 - Objects are created using classes from ``mug.configurations.object_contexts``
 - Coordinates are typically normalized to 0-1 range (relative to canvas size)

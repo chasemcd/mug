@@ -80,7 +80,7 @@ The file should end with:
         # ... environment implementation
 
     # IMPORTANT: Must create instance named 'env'
-    env = MyEnv(render_mode="interactive-gym")
+    env = MyEnv(render_mode="mug")
 
 How Pyodide Mode Works
 -----------------------
@@ -192,7 +192,7 @@ Standard Gymnasium environments use pygame for rendering. Override with object c
     class PyodideCartPole(CartPoleEnv):
 
         def render(self):
-            assert self.render_mode == "interactive-gym"
+            assert self.render_mode == "mug"
 
             # Extract state
             x, x_dot, theta, theta_dot = self.state
@@ -213,7 +213,7 @@ Standard Gymnasium environments use pygame for rendering. Override with object c
 
             return [cart.as_dict(), pole.as_dict()]
 
-    env = PyodideCartPole(render_mode="interactive-gym")
+    env = PyodideCartPole(render_mode="mug")
 
 Multi-Agent Format
 ^^^^^^^^^^^^^^^^^^
@@ -418,7 +418,7 @@ Common Issues
 
 **Blank canvas or no rendering**
 
-- Verify ``render_mode="interactive-gym"``
+- Verify ``render_mode="mug"``
 - Check ``render()`` returns list of dicts
 - Look for JavaScript errors in console
 
