@@ -72,6 +72,6 @@ Phases execute in numeric order: 97 -> 98 -> 99
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 97. Python Surface Core | 0/3 | Planned | - |
+| 97. Python Surface Core | 1/3 | In Progress|  |
 | 98. JS Renderer Update | 0/? | Not started | - |
 | 99. Example Migration | 0/? | Not started | - |
