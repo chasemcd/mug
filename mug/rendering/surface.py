@@ -46,7 +46,7 @@ class Surface:
         :param json_path: Path to the atlas JSON descriptor.
         """
         self._asset_specs.append({
-            "type": "atlas",
+            "object_type": "atlas_spec",
             "name": name,
             "img_path": img_path,
             "atlas_path": json_path,
@@ -59,7 +59,7 @@ class Surface:
         :param path: Path to the image file.
         """
         self._asset_specs.append({
-            "type": "image",
+            "object_type": "img_spec",
             "name": name,
             "img_path": path,
         })

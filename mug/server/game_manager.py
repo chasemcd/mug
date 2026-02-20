@@ -1280,6 +1280,15 @@ class GameManager:
 
         self.active_games.add(game.game_id)
 
+        # Build env early so asset specs are available in scene_metadata
+        # before the start_game event is sent to the client.
+        if getattr(self.scene, 'server_authoritative', False):
+            game._build_env()
+            if hasattr(game.env, 'surface') and hasattr(game.env.surface, 'get_asset_specs'):
+                asset_specs = game.env.surface.get_asset_specs()
+                if asset_specs:
+                    self.scene.assets_to_preload = asset_specs
+
         self.socketio.emit(
             "start_game",
             {
@@ -1333,9 +1342,11 @@ class GameManager:
         """Inner server game loop (separated for exception handling)."""
         _t0 = time.monotonic()
 
-        # Build env and load policies
-        logger.info(f"[ServerLoop:{game.game_id}] Building env...")
-        game._build_env()
+        # Build env and load policies (may already be built if assets were
+        # extracted in start_game_for_room)
+        if game.env is None:
+            logger.info(f"[ServerLoop:{game.game_id}] Building env...")
+            game._build_env()
 
         game._load_policies()
 
