@@ -35,7 +35,7 @@ Requirements for Rendering API Redesign. Each maps to roadmap phases.
 ### Identity & Tweening
 
 - [x] **IDENT-01**: User can provide optional `id=` parameter on any draw call for object identity
-- [ ] **IDENT-02**: Objects with `id=` are tweened smoothly between frames in the browser
+- [x] **IDENT-02**: Objects with `id=` are tweened smoothly between frames in the browser
 - [x] **IDENT-03**: User can control tween duration via `tween_duration=` parameter
 
 ### Persistence & Deltas
@@ -47,11 +47,11 @@ Requirements for Rendering API Redesign. Each maps to roadmap phases.
 
 ### JS Renderer
 
-- [ ] **RENDER-01**: Phaser JS renderer implements rectangle creation and update (currently empty stubs)
-- [ ] **RENDER-02**: Phaser JS renderer handles stroke (outline) paths for circle, rect, polygon
+- [x] **RENDER-01**: Phaser JS renderer implements rectangle creation and update (currently empty stubs)
+- [x] **RENDER-02**: Phaser JS renderer handles stroke (outline) paths for circle, rect, polygon
 - [x] **RENDER-03**: Phaser JS renderer processes delta wire format (objects list + removed list)
 - [x] **RENDER-04**: `addStateToBuffer()` normalization handles new RenderPacket format
-- [ ] **RENDER-05**: Text color is configurable in JS (currently hardcoded to `#000`)
+- [x] **RENDER-05**: Text color is configurable in JS (currently hardcoded to `#000`)
 
 ### Example Migration
 
@@ -112,17 +112,17 @@ Which phases cover which requirements. Updated during roadmap creation.
 | COORD-01 | Phase 97 | Complete |
 | COORD-02 | Phase 97 | Complete |
 | IDENT-01 | Phase 97 | Complete |
-| IDENT-02 | Phase 98 | Pending |
+| IDENT-02 | Phase 98 | Complete |
 | IDENT-03 | Phase 97 | Complete |
 | DELTA-01 | Phase 97 | Complete |
 | DELTA-02 | Phase 97 | Complete |
 | DELTA-03 | Phase 97 | Complete |
 | DELTA-04 | Phase 97 | Complete |
-| RENDER-01 | Phase 98 | Pending |
-| RENDER-02 | Phase 98 | Pending |
+| RENDER-01 | Phase 98 | Complete |
+| RENDER-02 | Phase 98 | Complete |
 | RENDER-03 | Phase 98 | Complete |
 | RENDER-04 | Phase 98 | Complete |
-| RENDER-05 | Phase 98 | Pending |
+| RENDER-05 | Phase 98 | Complete |
 | MIGR-01 | Phase 99 | Pending |
 | MIGR-02 | Phase 99 | Pending |
 

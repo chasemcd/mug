@@ -11,27 +11,27 @@ See: .planning/PROJECT.md (updated 2026-02-20)
 
 Phase: 98 of 99 (JS Renderer Update)
 Plan: 3 of 3 in current phase
-Status: In Progress
-Last activity: 2026-02-20 — Completed 98-03 (Pyodide Render Wrapping)
+Status: Phase Complete
+Last activity: 2026-02-20 — Completed 98-02 (JS Renderer Overhaul)
 
 Progress: [██████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 5
-- Average duration: 2min
-- Total execution time: 0.13 hours
+- Total plans completed: 6
+- Average duration: 3min
+- Total execution time: 0.30 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 97 | 3 | 5min | 2min |
-| 98 | 2 | 4min | 2min |
+| 98 | 3 | 14min | 5min |
 
 **Recent Trend:**
-- Last 5 plans: 97-01 (1min), 97-02 (2min), 97-03 (2min), 98-01 (1min), 98-03 (3min)
+- Last 5 plans: 97-02 (2min), 97-03 (2min), 98-01 (1min), 98-03 (3min), 98-02 (10min)
 - Trend: Stable
 
 *Updated after each plan completion*
@@ -58,6 +58,10 @@ Recent decisions affecting current work:
 - [98-03] Handle both Map and plain Object from Pyodide toJs() for RenderPacket format
 - [98-03] Preserve legacy flat array fallback for backward compatibility
 - [98-03] Forward removed list in all render_state constructions
+- [98-02] Single Map replaces dual temp/perm object maps -- permanent flag on each object
+- [98-02] Circle radius scaled by max(width, height) per Surface API normalization
+- [98-02] Alpha defaults to 1 via nullish coalescing (config.alpha ?? 1)
+- [98-02] Tween cancel-and-restart via shared _applyPositionTween helper
 
 ### Prior Milestones
 
@@ -73,5 +77,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-02-20
-Stopped at: Completed 98-03-PLAN.md
-Resume file: .planning/phases/98-js-renderer-update/98-03-SUMMARY.md
+Stopped at: Completed 98-02-PLAN.md (Phase 98 complete)
+Resume file: .planning/phases/98-js-renderer-update/98-02-SUMMARY.md
