@@ -32,6 +32,47 @@ class Surface:
         self._persistent_current: dict[str, DrawCommand] = {}
         self._committed_persistent: dict[str, dict] = {}
         self._pending_removals: set[str] = set()
+        self._asset_specs: list[dict] = []
+
+    # ------------------------------------------------------------------
+    # Asset registration
+    # ------------------------------------------------------------------
+
+    def register_atlas(self, name: str, *, img_path: str, json_path: str) -> None:
+        """Register a sprite atlas for preloading.
+
+        :param name: Logical name used to reference this atlas in draw calls.
+        :param img_path: Path to the atlas image file.
+        :param json_path: Path to the atlas JSON descriptor.
+        """
+        self._asset_specs.append({
+            "type": "atlas",
+            "name": name,
+            "img_path": img_path,
+            "atlas_path": json_path,
+        })
+
+    def register_image(self, name: str, *, path: str) -> None:
+        """Register a standalone image for preloading.
+
+        :param name: Logical name used to reference this image.
+        :param path: Path to the image file.
+        """
+        self._asset_specs.append({
+            "type": "image",
+            "name": name,
+            "img_path": path,
+        })
+
+    def get_asset_specs(self) -> list[dict]:
+        """Return registered asset specs for the ``assets_to_preload`` config.
+
+        Each entry is a dict with at minimum ``name`` and ``img_path`` keys.
+        Atlas entries also include an ``atlas_path`` key.
+
+        :returns: A shallow copy of the internal asset spec list.
+        """
+        return list(self._asset_specs)
 
     # ------------------------------------------------------------------
     # Internal helpers
