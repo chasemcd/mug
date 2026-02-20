@@ -20,7 +20,7 @@ from cogrid.envs.overcooked import (overcooked, overcooked_features,
 from cogrid.envs.overcooked import rewards as overcooked_rewards
 from cogrid.feature_space import feature, feature_space, features
 
-from mug.configurations.object_contexts import Sprite, Text
+from mug.rendering import Surface
 
 
 class BehaviorFeatures(feature.Feature):
@@ -289,9 +289,16 @@ class OvercookedRewardEnv(overcooked.Overcooked):
             "enable_weight_randomization", True
         )
 
+        # Surface rendering setup
+        self.surface = Surface(width=WIDTH, height=HEIGHT)
+        self.surface.register_atlas("terrain", img_path=f"{ASSET_PATH}/terrain.png", json_path=f"{ASSET_PATH}/terrain.json")
+        self.surface.register_atlas("chefs", img_path=f"{ASSET_PATH}/chefs.png", json_path=f"{ASSET_PATH}/chefs.json")
+        self.surface.register_atlas("objects", img_path=f"{ASSET_PATH}/objects.png", json_path=f"{ASSET_PATH}/objects.json")
+
     def on_reset(self) -> None:
         """Generate new reward weights every reset."""
         super().on_reset()
+        self.surface.reset()
 
         if not self.enable_weight_randomization:
             self.reward_weights = {
@@ -397,262 +404,8 @@ DIR_TO_CARDINAL_DIRECTION = {
 PLAYER_COLORS = {0: "blue", 1: "green"}
 
 
-def generate_counter_objects(env: overcooked.Overcooked) -> list[Sprite]:
-    objs = []
-    for obj in env.grid.grid:
-        if not (
-            isinstance(obj, grid_object.Counter)
-            or isinstance(obj, grid_object.Wall)
-            or isinstance(obj, overcooked_grid_objects.Pot)
-        ):
-            continue
-
-        x, y = get_x_y(obj.pos, HEIGHT, WIDTH)
-
-        objs.append(
-            Sprite(
-                obj.uuid,
-                x=x,
-                y=y,
-                height=TILE_SIZE,
-                width=TILE_SIZE,
-                image_name="terrain",
-                frame="counter.png",
-                permanent=True,
-                depth=-2,
-            )
-        )
-    return objs
-
-
-def generate_delivery_areas(
-    env: overcooked.Overcooked,
-) -> list[Sprite]:
-    objs = []
-    for obj in env.grid.grid:
-        if not isinstance(obj, overcooked_grid_objects.DeliveryZone):
-            continue
-        x, y = get_x_y(obj.pos, HEIGHT, WIDTH)
-
-        objs.append(
-            Sprite(
-                obj.uuid,
-                x=x,
-                y=y,
-                height=TILE_SIZE,
-                width=TILE_SIZE,
-                image_name="terrain",
-                frame="serve.png",
-                permanent=True,
-            )
-        )
-    return objs
-
-
-def generate_static_tools(
-    env: overcooked.Overcooked,
-) -> list[Sprite]:
-    objs = []
-    for obj in env.grid.grid:
-        if isinstance(obj, overcooked_grid_objects.PlateStack):
-            x, y = get_x_y(obj.pos, HEIGHT, WIDTH)
-            objs.append(
-                Sprite(
-                    obj.uuid,
-                    x=x,
-                    y=y,
-                    height=TILE_SIZE,
-                    width=TILE_SIZE,
-                    image_name="terrain",
-                    frame="dishes.png",
-                    permanent=True,
-                )
-            )
-        elif isinstance(obj, overcooked_grid_objects.OnionStack):
-            x, y = get_x_y(obj.pos, HEIGHT, WIDTH)
-            objs.append(
-                Sprite(
-                    obj.uuid,
-                    x=x,
-                    y=y,
-                    height=TILE_SIZE,
-                    width=TILE_SIZE,
-                    image_name="terrain",
-                    frame="onions.png",
-                    permanent=True,
-                )
-            )
-        elif isinstance(obj, overcooked_grid_objects.Pot):
-            x, y = get_x_y(obj.pos, HEIGHT, WIDTH)
-            objs.append(
-                Sprite(
-                    obj.uuid,
-                    x=x,
-                    y=y,
-                    height=TILE_SIZE,
-                    width=TILE_SIZE,
-                    image_name="terrain",
-                    frame="pot.png",
-                    permanent=True,
-                )
-            )
-
-    return objs
-
-
-def generate_agent_sprites(env: overcooked.Overcooked) -> list[Sprite]:
-    objs = []
-    for i, agent_obj in enumerate(env.grid.grid_agents.values()):
-        x, y = get_x_y(agent_obj.pos, HEIGHT, WIDTH)
-        held_object_name = ""
-        if agent_obj.inventory:
-            assert (
-                len(agent_obj.inventory) == 1
-            ), "Rendering not supported for inventory > 1."
-
-            held_obj = agent_obj.inventory[0]
-            if isinstance(held_obj, overcooked_grid_objects.Onion):
-                held_object_name = "-onion"
-            elif isinstance(held_obj, overcooked_grid_objects.OnionSoup):
-                held_object_name = "-soup-onion"
-            elif isinstance(held_obj, overcooked_grid_objects.Plate):
-                held_object_name = "-dish"
-
-        dir = DIR_TO_CARDINAL_DIRECTION[agent_obj.dir]
-
-        objs.append(
-            Sprite(
-                f"agent-{i}-sprite",
-                x=x,
-                y=y,
-                height=TILE_SIZE,
-                width=TILE_SIZE,
-                image_name="chefs",
-                tween=True,
-                tween_duration=75,
-                frame=f"{dir}{held_object_name}.png",
-            )
-        )
-
-        objs.append(
-            Sprite(
-                f"agent-{i}-hat-sprite",
-                x=x,
-                y=y,
-                height=TILE_SIZE,
-                width=TILE_SIZE,
-                image_name="chefs",
-                frame=f"{dir}-{PLAYER_COLORS[i]}hat.png",
-                tween=True,
-                tween_duration=75,
-                depth=2,
-            )
-        )
-    return objs
-
-
-def generate_objects(
-    env: overcooked.Overcooked,
-) -> list[Sprite]:
-    objs = []
-    for obj in env.grid.grid:
-        if obj is None:
-            continue
-
-        if obj.can_place_on and obj.obj_placed_on is not None:
-            objs += temp_object_creation(obj=obj.obj_placed_on)
-
-        objs += temp_object_creation(obj=obj)
-
-    return objs
-
-
-def temp_object_creation(obj: grid_object.GridObj):
-    if isinstance(obj, overcooked_grid_objects.Pot):
-        x, y = get_x_y(obj.pos, HEIGHT, WIDTH)
-        if not obj.objects_in_pot:
-            return []
-        status = "cooked" if obj.cooking_timer == 0 else "cooking"
-        if status == "cooking":
-            frame = f"soup-onion-{len(obj.objects_in_pot)}-cooking.png"
-        else:
-            frame = "soup-onion-cooked.png"
-
-        pot_sprite = [
-            Sprite(
-                obj.uuid,
-                x=x,
-                y=y,
-                height=TILE_SIZE,
-                width=TILE_SIZE,
-                image_name="objects",
-                frame=frame,
-                depth=-1,
-            )
-        ]
-
-        if status == "cooking" and len(obj.objects_in_pot) == 3:
-            pot_sprite.append(
-                Text(
-                    uuid="time_left",
-                    text=f"{obj.cooking_timer:02d}",
-                    x=x,
-                    y=y,
-                    size=14,
-                    color="red",
-                )
-            )
-
-        return pot_sprite
-    elif isinstance(obj, overcooked_grid_objects.Onion):
-        x, y = get_x_y(obj.pos, HEIGHT, WIDTH)
-        return [
-            Sprite(
-                obj.uuid,
-                x=x,
-                y=y,
-                height=TILE_SIZE,
-                width=TILE_SIZE,
-                image_name="objects",
-                frame="onion.png",
-                depth=-1,
-            )
-        ]
-
-    elif isinstance(obj, overcooked_grid_objects.Plate):
-        x, y = get_x_y(obj.pos, HEIGHT, WIDTH)
-        return [
-            Sprite(
-                obj.uuid,
-                x=x,
-                y=y,
-                height=TILE_SIZE,
-                width=TILE_SIZE,
-                image_name="objects",
-                frame="dish.png",
-                depth=-1,
-            )
-        ]
-    elif isinstance(obj, overcooked_grid_objects.OnionSoup):
-        x, y = get_x_y(obj.pos, HEIGHT, WIDTH)
-        return [
-            Sprite(
-                obj.uuid,
-                x=x,
-                y=y,
-                height=TILE_SIZE,
-                width=TILE_SIZE,
-                image_name="objects",
-                frame="soup-onion-dish.png",
-                depth=-1,
-            )
-        ]
-    return []
-
 
 class OvercookedEnv(OvercookedRewardEnv):
-    def render(self):
-        return self.env_to_render_fn()
 
     def get_infos(self, **kwargs):
         """Add the agent positions and directions to the infos dictionary"""
@@ -667,19 +420,133 @@ class OvercookedEnv(OvercookedRewardEnv):
 
         return infos
 
-    def env_to_render_fn(self):
-        render_objects = []
+    def render(self):
+        # Static objects (persistent, only sent on first frame or change)
+        for obj in self.grid.grid:
+            if obj is None:
+                continue
 
-        if self.t == 0:
-            render_objects += generate_counter_objects(env=self)
-            render_objects += generate_delivery_areas(env=self)
-            render_objects += generate_static_tools(env=self)
+            if isinstance(obj, grid_object.Counter) or isinstance(obj, grid_object.Wall) or isinstance(obj, overcooked_grid_objects.Pot):
+                x, y = get_x_y(obj.pos, HEIGHT, WIDTH)
+                self.surface.image(
+                    id=obj.uuid, x=x, y=y, w=TILE_SIZE, h=TILE_SIZE,
+                    image_name="terrain", frame="counter.png",
+                    persistent=True, relative=True, depth=-2,
+                )
 
-        render_objects += generate_agent_sprites(env=self)
-        render_objects += generate_objects(env=self)
+            if isinstance(obj, overcooked_grid_objects.DeliveryZone):
+                x, y = get_x_y(obj.pos, HEIGHT, WIDTH)
+                self.surface.image(
+                    id=obj.uuid, x=x, y=y, w=TILE_SIZE, h=TILE_SIZE,
+                    image_name="terrain", frame="serve.png",
+                    persistent=True, relative=True,
+                )
 
-        return [obj.as_dict() for obj in render_objects]
+            if isinstance(obj, overcooked_grid_objects.PlateStack):
+                x, y = get_x_y(obj.pos, HEIGHT, WIDTH)
+                self.surface.image(
+                    id=obj.uuid, x=x, y=y, w=TILE_SIZE, h=TILE_SIZE,
+                    image_name="terrain", frame="dishes.png",
+                    persistent=True, relative=True,
+                )
+            elif isinstance(obj, overcooked_grid_objects.OnionStack):
+                x, y = get_x_y(obj.pos, HEIGHT, WIDTH)
+                self.surface.image(
+                    id=obj.uuid, x=x, y=y, w=TILE_SIZE, h=TILE_SIZE,
+                    image_name="terrain", frame="onions.png",
+                    persistent=True, relative=True,
+                )
+            elif isinstance(obj, overcooked_grid_objects.Pot):
+                x, y = get_x_y(obj.pos, HEIGHT, WIDTH)
+                self.surface.image(
+                    id=f"{obj.uuid}-pot", x=x, y=y, w=TILE_SIZE, h=TILE_SIZE,
+                    image_name="terrain", frame="pot.png",
+                    persistent=True, relative=True,
+                )
 
+        # Dynamic objects
+        for obj in self.grid.grid:
+            if obj is None:
+                continue
+
+            if obj.can_place_on and obj.obj_placed_on is not None:
+                placed_obj = obj.obj_placed_on
+                self._draw_dynamic_object(placed_obj)
+
+            self._draw_dynamic_object(obj)
+
+        # Agent sprites
+        for i, agent_obj in enumerate(self.grid.grid_agents.values()):
+            x, y = get_x_y(agent_obj.pos, HEIGHT, WIDTH)
+            held_object_name = ""
+            if agent_obj.inventory:
+                assert len(agent_obj.inventory) == 1, "Rendering not supported for inventory > 1."
+                held_obj = agent_obj.inventory[0]
+                if isinstance(held_obj, overcooked_grid_objects.Onion):
+                    held_object_name = "-onion"
+                elif isinstance(held_obj, overcooked_grid_objects.OnionSoup):
+                    held_object_name = "-soup-onion"
+                elif isinstance(held_obj, overcooked_grid_objects.Plate):
+                    held_object_name = "-dish"
+
+            dir = DIR_TO_CARDINAL_DIRECTION[agent_obj.dir]
+            self.surface.image(
+                id=f"agent-{i}-sprite", x=x, y=y, w=TILE_SIZE, h=TILE_SIZE,
+                image_name="chefs", frame=f"{dir}{held_object_name}.png",
+                tween_duration=75, relative=True,
+            )
+            self.surface.image(
+                id=f"agent-{i}-hat-sprite", x=x, y=y, w=TILE_SIZE, h=TILE_SIZE,
+                image_name="chefs", frame=f"{dir}-{PLAYER_COLORS[i]}hat.png",
+                tween_duration=75, relative=True, depth=2,
+            )
+
+        return self.surface.commit().to_dict()
+
+    def _draw_dynamic_object(self, obj):
+        """Draw a dynamic (non-persistent) object onto the surface."""
+        if isinstance(obj, overcooked_grid_objects.Pot):
+            x, y = get_x_y(obj.pos, HEIGHT, WIDTH)
+            if not obj.objects_in_pot:
+                return
+            status = "cooked" if obj.cooking_timer == 0 else "cooking"
+            if status == "cooking":
+                frame = f"soup-onion-{len(obj.objects_in_pot)}-cooking.png"
+            else:
+                frame = "soup-onion-cooked.png"
+
+            self.surface.image(
+                id=obj.uuid, x=x, y=y, w=TILE_SIZE, h=TILE_SIZE,
+                image_name="objects", frame=frame,
+                relative=True, depth=-1,
+            )
+
+            if status == "cooking" and len(obj.objects_in_pot) == 3:
+                self.surface.text(
+                    id="time_left", text=f"{obj.cooking_timer:02d}",
+                    x=x, y=y, size=14, color="red", relative=True,
+                )
+        elif isinstance(obj, overcooked_grid_objects.Onion):
+            x, y = get_x_y(obj.pos, HEIGHT, WIDTH)
+            self.surface.image(
+                id=obj.uuid, x=x, y=y, w=TILE_SIZE, h=TILE_SIZE,
+                image_name="objects", frame="onion.png",
+                relative=True, depth=-1,
+            )
+        elif isinstance(obj, overcooked_grid_objects.Plate):
+            x, y = get_x_y(obj.pos, HEIGHT, WIDTH)
+            self.surface.image(
+                id=obj.uuid, x=x, y=y, w=TILE_SIZE, h=TILE_SIZE,
+                image_name="objects", frame="dish.png",
+                relative=True, depth=-1,
+            )
+        elif isinstance(obj, overcooked_grid_objects.OnionSoup):
+            x, y = get_x_y(obj.pos, HEIGHT, WIDTH)
+            self.surface.image(
+                id=obj.uuid, x=x, y=y, w=TILE_SIZE, h=TILE_SIZE,
+                image_name="objects", frame="soup-onion-dish.png",
+                relative=True, depth=-1,
+            )
 
 class ScaledFullMapEncoding(features.FullMapEncoding):
     def generate(self, env, player_id, **kwargs):
