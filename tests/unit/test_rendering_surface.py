@@ -92,8 +92,8 @@ class TestDrawMethods:
         assert obj["image_name"] == "player"
         assert obj["x"] == pytest.approx(0.0)
         assert obj["y"] == pytest.approx(0.0)
-        assert obj["w"] == pytest.approx(64 / 800)
-        assert obj["h"] == pytest.approx(64 / 600)
+        assert obj["width"] == pytest.approx(64 / 800)
+        assert obj["height"] == pytest.approx(64 / 600)
 
     def test_arc_basic(self) -> None:
         s = Surface(800, 600)

@@ -158,6 +158,13 @@ class Surface:
                 p["rx"] = p["rx"] / self.width
                 p["ry"] = p["ry"] / self.height
 
+        # -- alias w/h → width/height for JS sprite renderer compatibility --
+        if cmd.object_type == "sprite":
+            if "w" in p:
+                p["width"] = p.pop("w")
+            if "h" in p:
+                p["height"] = p.pop("h")
+
         # -- assemble wire dict -------------------------------------------
         wire: dict = {
             "uuid": cmd.id,
