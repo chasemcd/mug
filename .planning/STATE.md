@@ -5,32 +5,33 @@
 See: .planning/PROJECT.md (updated 2026-02-20)
 
 **Core value:** Researchers can deploy interactive simulation experiments to the browser with minimal friction, supporting both single-player and multiplayer configurations.
-**Current focus:** v1.3 Rendering API Redesign — Phase 97: Python Surface Core
+**Current focus:** v1.3 Rendering API Redesign — Phase 98: JS Renderer Update
 
 ## Current Position
 
-Phase: 97 of 99 (Python Surface Core)
-Plan: 3 of 3 in current phase
-Status: Phase Complete
-Last activity: 2026-02-20 — Completed 97-03 (Unit Tests)
+Phase: 98 of 99 (JS Renderer Update)
+Plan: 1 of 3 in current phase
+Status: In Progress
+Last activity: 2026-02-20 — Completed 98-01 (Legacy ObjectContext Deprecation Stubs)
 
-Progress: [██████████] 100%
+Progress: [███░░░░░░░] 33%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 3
+- Total plans completed: 4
 - Average duration: 2min
-- Total execution time: 0.08 hours
+- Total execution time: 0.10 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 97 | 3 | 5min | 2min |
+| 98 | 1 | 1min | 1min |
 
 **Recent Trend:**
-- Last 5 plans: 97-01 (1min), 97-02 (2min), 97-03 (2min)
+- Last 5 plans: 97-01 (1min), 97-02 (2min), 97-03 (2min), 98-01 (1min)
 - Trend: Stable
 
 *Updated after each plan completion*
@@ -52,6 +53,8 @@ Recent decisions affecting current work:
 - [97-03] pytest.approx used for floating-point coordinate comparisons
 - [97-03] Parametrized NAMED_COLORS tests auto-cover all 20 entries
 - [97-03] Test classes organized by requirement ID groups for traceability
+- [98-01] Dynamic class stubs via type() preserve __name__ for clear deprecation errors
+- [98-01] Error messages include class name + migration target (mug.rendering.Surface)
 
 ### Prior Milestones
 
@@ -67,5 +70,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-02-20
-Stopped at: Completed 97-03-PLAN.md (Phase 97 complete)
-Resume file: .planning/phases/97-python-surface-core/97-03-SUMMARY.md
+Stopped at: Completed 98-01-PLAN.md
+Resume file: .planning/phases/98-js-renderer-update/98-01-SUMMARY.md

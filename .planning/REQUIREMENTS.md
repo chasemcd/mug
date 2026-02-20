@@ -49,7 +49,7 @@ Requirements for Rendering API Redesign. Each maps to roadmap phases.
 
 - [ ] **RENDER-01**: Phaser JS renderer implements rectangle creation and update (currently empty stubs)
 - [ ] **RENDER-02**: Phaser JS renderer handles stroke (outline) paths for circle, rect, polygon
-- [ ] **RENDER-03**: Phaser JS renderer processes delta wire format (objects list + removed list)
+- [x] **RENDER-03**: Phaser JS renderer processes delta wire format (objects list + removed list)
 - [ ] **RENDER-04**: `addStateToBuffer()` normalization handles new RenderPacket format
 - [ ] **RENDER-05**: Text color is configurable in JS (currently hardcoded to `#000`)
 
@@ -120,7 +120,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DELTA-04 | Phase 97 | Complete |
 | RENDER-01 | Phase 98 | Pending |
 | RENDER-02 | Phase 98 | Pending |
-| RENDER-03 | Phase 98 | Pending |
+| RENDER-03 | Phase 98 | Complete |
 | RENDER-04 | Phase 98 | Pending |
 | RENDER-05 | Phase 98 | Pending |
 | MIGR-01 | Phase 99 | Pending |
