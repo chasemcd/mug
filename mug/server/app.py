@@ -605,7 +605,6 @@ def advance_scene(data):
 
 @socketio.on("join_game")
 def join_game(data):
-
     subject_id = get_subject_id_from_session_id(flask.request.sid)
     client_session_id = data.get("session_id")  # Client sends "session_id"
 
@@ -794,7 +793,6 @@ def leave_game(data):
                                 'players': list(game.players.keys()),
                                 'subject_ids': list(game.player_subjects.values()),
                                 'current_frame': game.frame_number,
-                                'is_server_authoritative': game.server_authoritative,
                                 'created_at': game.created_at,
                                 'game_type': 'multiplayer',
                                 'current_episode': None,
@@ -1182,10 +1180,18 @@ def receive_episode_data(data):
     - episode_num: The episode number (0-indexed)
     - scene_id: The scene ID for file organization
     - data: msgpack-encoded game data (observations, actions, rewards, etc.)
+
+    Returns acknowledgment dict for client-side delivery confirmation.
     """
     global PARTICIPANT_SESSIONS
 
     subject_id = get_subject_id_from_session_id(flask.request.sid)
+    # Fall back to client-provided subject_id if session mapping is missing
+    # (can happen under heavy load when session state is cleared between emit and ack)
+    if subject_id is None and data.get("subject_id"):
+        subject_id = data["subject_id"]
+        logger.warning(f"[EpisodeData] Session mapping missing for sid={flask.request.sid}, "
+                       f"using client-provided subject_id={subject_id}")
     episode_num = data.get("episode_num", 0)
 
     # Sync interactiveGymGlobals to session for persistence
@@ -1196,7 +1202,7 @@ def receive_episode_data(data):
         session.last_updated_at = time.time()
 
     if not CONFIG.save_experiment_data:
-        return
+        return {"status": "ok", "saved": False}
 
     # Decode the msgpack data
     decoded_data = msgpack.unpackb(data["data"])
@@ -1204,7 +1210,7 @@ def receive_episode_data(data):
     # Check if there's any data to save
     if not decoded_data or not decoded_data.get("t"):
         logger.info(f"No data to save for episode {episode_num}")
-        return
+        return {"status": "ok", "saved": False}
 
     # Flatten any nested dictionaries
     flattened_data = flatten_dict.flatten(decoded_data, reducer="dot")
@@ -1241,6 +1247,8 @@ def receive_episode_data(data):
     globals_filename = f"data/{CONFIG.experiment_id}/{data['scene_id']}/{subject_id}_globals.json"
     with open(globals_filename, "w") as f:
         json.dump(data.get("interactiveGymGlobals", {}), f)
+
+    return {"status": "ok", "saved": True}
 
 
 @socketio.on("emit_multiplayer_metrics")
@@ -1751,6 +1759,80 @@ def handle_probe_result(data):
     PROBE_COORDINATOR.handle_result(probe_session_id, rtt_ms, success)
 
 
+@socketio.on("player_action")
+def on_player_action(data):
+    """Receive a player action from a server-authoritative game client.
+
+    The client sends the raw key press, and we map it to the action via
+    the scene's action_mapping, then enqueue it on the game.
+    """
+    subject_id = get_subject_id_from_session_id(flask.request.sid)
+    if subject_id is None:
+        return
+
+    key = data.get("key")
+    game_id = data.get("game_id")
+
+    if key is None or game_id is None:
+        return
+
+    # Find the game manager for this subject
+    for gm in GAME_MANAGERS.values():
+        if gm.subject_in_game(subject_id):
+            game = gm.get_subject_game(subject_id)
+            if game is None:
+                return
+
+            # Find which agent_id this subject controls
+            agent_id = None
+            for aid, sid in game.human_players.items():
+                if sid == subject_id:
+                    agent_id = aid
+                    break
+
+            if agent_id is None:
+                logger.warning(f"[PlayerAction] Subject {subject_id} not found in game players")
+                return
+
+            # Map key to action using the scene's action_mapping
+            scene = gm.scene
+            action = scene.action_mapping.get(key)
+            if action is None:
+                # Key not in action mapping -- ignore
+                return
+
+            game.enqueue_action(agent_id, action)
+            return
+
+
+@socketio.on("rejoin_server_auth")
+def on_rejoin_server_auth(data):
+    """Handle reconnection to a running server-authoritative game.
+
+    When a client reconnects and was previously in a server-auth game,
+    it emits this event. We look up their game across all GameManagers
+    and rejoin them to the socket room so state broadcasts resume.
+    """
+    subject_id = get_subject_id_from_session_id(flask.request.sid)
+    if subject_id is None:
+        return
+
+    for gm in GAME_MANAGERS.values():
+        game = gm.rejoin_server_auth_game(subject_id, flask.request.sid)
+        if game is not None:
+            socketio.emit(
+                "rejoin_success",
+                {
+                    "game_id": game.game_id,
+                    "scene_metadata": gm.scene.scene_metadata,
+                },
+                room=flask.request.sid,
+            )
+            return
+
+    socketio.emit("rejoin_failed", {}, room=flask.request.sid)
+
+
 @socketio.on("pyodide_player_action")
 def on_pyodide_player_action(data):
     """
@@ -1778,7 +1860,7 @@ def on_pyodide_player_action(data):
     player_id = data.get("player_id")
     action = data.get("action")
     frame_number = data.get("frame_number")
-    sync_epoch = data.get("sync_epoch")  # May be None for backwards compatibility
+    client_timestamp = data.get("sync_epoch") or data.get("client_timestamp")  # backwards compatible
 
     # logger.debug(
     #     f"Received action from player {player_id} in game {game_id} "
@@ -1790,7 +1872,7 @@ def on_pyodide_player_action(data):
         player_id=player_id,
         action=action,
         frame_number=frame_number,
-        sync_epoch=sync_epoch
+        client_timestamp=client_timestamp
     )
 
 
@@ -1848,7 +1930,6 @@ def on_mid_game_exclusion(data):
                 'players': players,
                 'subject_ids': subject_ids,
                 'current_frame': game.frame_number,
-                'is_server_authoritative': game.server_authoritative,
                 'created_at': game.created_at,
                 'game_type': 'multiplayer',
                 'current_episode': getattr(game, 'episode_number', None),
@@ -1954,7 +2035,6 @@ def handle_multiplayer_game_complete(data):
                 'players': players,
                 'subject_ids': subject_ids,
                 'current_frame': game.frame_number,
-                'is_server_authoritative': game.server_authoritative,
                 'created_at': game.created_at,
                 'game_type': 'multiplayer',
                 'current_episode': episode_num,
@@ -2220,7 +2300,6 @@ def handle_p2p_reconnection_timeout(data):
                 'players': players,
                 'subject_ids': subject_ids,
                 'current_frame': game.frame_number,
-                'is_server_authoritative': game.server_authoritative,
                 'created_at': game.created_at,
                 'game_type': 'multiplayer',
                 'current_episode': getattr(game, 'episode_number', None),
@@ -2408,7 +2487,7 @@ def on_pyodide_hud_update(data):
 @socketio.on("p2p_state_sync")
 def on_p2p_state_sync(data):
     """
-    Relay P2P state sync message from host to other players (non-server-authoritative mode).
+    Relay P2P state sync message from host to other players.
 
     Host broadcasts state hash periodically for non-host clients to compare
     and detect desyncs.
@@ -2435,10 +2514,6 @@ def on_p2p_state_sync(data):
     game = PYODIDE_COORDINATOR.games.get(game_id)
     if game is None:
         logger.warning(f"P2P state sync for non-existent game {game_id}")
-        return
-
-    # Don't relay in server-authoritative mode (server handles sync)
-    if game.server_authoritative:
         return
 
     # Relay to all other players in the game
@@ -2482,10 +2557,6 @@ def on_p2p_state_request(data):
         logger.warning(f"P2P state request for non-existent game {game_id}")
         return
 
-    # Only relay in non-server-authoritative mode
-    if game.server_authoritative:
-        return
-
     # Relay to the target player
     target_socket_id = game.players.get(target_id)
     if target_socket_id:
@@ -2523,10 +2594,6 @@ def on_p2p_state_response(data):
         logger.warning(f"P2P state response for non-existent game {game_id}")
         return
 
-    # Only relay in non-server-authoritative mode
-    if game.server_authoritative:
-        return
-
     # Relay to the target player
     target_socket_id = game.players.get(target_id)
     if target_socket_id:
@@ -2541,9 +2608,6 @@ def on_pyodide_state_hash(data):
 
     The coordinator collects hashes from all players and verifies
     they match (detecting desyncs).
-
-    In server-authoritative mode, state hashes are ignored since
-    the server broadcasts authoritative state instead.
 
     Args:
         data: {
@@ -2563,15 +2627,6 @@ def on_pyodide_state_hash(data):
     player_id = data.get("player_id")
     state_hash = data.get("hash")
     frame_number = data.get("frame_number")
-
-    # Skip early if game is in server-authoritative mode
-    game = PYODIDE_COORDINATOR.games.get(game_id)
-    if game and game.server_authoritative:
-        logger.debug(
-            f"Ignoring state hash from player {player_id} in game {game_id} "
-            f"(server-authoritative mode)"
-        )
-        return
 
     logger.debug(
         f"Received state hash from player {player_id} in game {game_id} "

@@ -1,4 +1,5 @@
 import {actionFromONNX, initModelConfigs} from './onnx_inference.js';
+import {drainInputDelayQueue} from './ui_utils.js';
 
 
 var game_config = {
@@ -12,15 +13,15 @@ var game_config = {
 
 var game_graphics;
 let stateBuffer = []
-const MAX_BUFFER_SIZE = 1;
 export function addStateToBuffer(state_data) {
-    if (stateBuffer >= MAX_BUFFER_SIZE) {
-        stateBuffer.shift(); // remove the oldest state
+    // Normalize: server_render_state sends render_state, existing path sends game_state_objects
+    if (state_data.render_state && !state_data.game_state_objects) {
+        state_data.game_state_objects = state_data.render_state;
     }
     stateBuffer.push(state_data);
 }
 
-function clearStateBuffer() {
+export function clearStateBuffer() {
     stateBuffer = [];
 }
 
@@ -737,6 +738,11 @@ class GymScene extends Phaser.Scene {
 
     processRendering() {
         const frame = this.pyodide_remote_game?.frameNumber || 0;
+
+        // Server-auth input delay: drain queued actions on each render tick
+        if (window.serverAuthoritative && window.serverAuthInputDelay > 0) {
+            drainInputDelayQueue();
+        }
 
         // FIX: Drain buffer by rendering multiple states when behind
         // This catches up without skipping visual frames

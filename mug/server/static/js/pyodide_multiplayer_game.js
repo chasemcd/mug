@@ -961,18 +961,12 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         // Episode completion tracking
         this.episodeComplete = false;
 
-        // Server-authoritative mode (always true in current implementation)
-        this.serverAuthoritative = false;
-
         // Rollback smoothing settings (for visual stability after corrections)
         // null/undefined disables smoothing, positive integer enables with that duration (ms)
         this.rollbackSmoothingDuration = config.rollback_smoothing_duration ?? 100;
 
         // Episode start synchronization
         // Client waits for server_episode_start before beginning each episode
-        this.waitingForEpisodeStart = false;
-        this.episodeStartResolve = null;
-        this.pendingEpisodeState = null;
 
         // Diagnostics for lag tracking
         this.diagnostics = {
@@ -1040,10 +1034,6 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
 
         // Sync epoch - received from server, included in actions to prevent stale action matching
         this.syncEpoch = 0;
-
-        // Server step tracking - prevents client from getting too far ahead of server
-        this.lastKnownServerStepNum = 0;
-        this.maxStepsAheadOfServer = 5;
 
         // Confirmed state (last server-verified state)
         this.confirmedFrame = 0;
@@ -1171,6 +1161,11 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
         // Phase 77: Set true when scene exits to guard stale event handlers
         this.sceneExited = false;
 
+        // Phase 96: Event-driven game completion callback
+        // Set by index.js to receive immediate notification when signalEpisodeComplete()
+        // sets state="done", bypassing throttled setInterval polling in background tabs
+        this.onGameDone = null;
+
         // GGPO-style input queuing: inputs are queued during network reception
         // and processed synchronously at frame start to prevent race conditions
         this.pendingInputPackets = [];     // Queued P2P input packets
@@ -1269,9 +1264,8 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
             // Always log for admin console visibility
             console.log('[P2P] Game ready - multiplayer session starting. Subject:',
                 window.subjectName || window.interactiveGymGlobals?.subjectName,
-                'GameID:', data.game_id, 'Players:', data.players.length,
-                'ServerAuth:', data.server_authoritative || false);
-            p2pLog.debug(`Game ready: ${data.players.length} players, server_auth=${data.server_authoritative || false}`);
+                'GameID:', data.game_id, 'Players:', data.players.length);
+            p2pLog.debug(`Game ready: ${data.players.length} players`);
 
             // Build player ID <-> index mapping for binary protocol
             // Sort players to ensure deterministic index assignment across clients
@@ -1290,9 +1284,6 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
 
             // Store player-to-subject mapping for data logging
             this.playerSubjects = data.player_subjects || {};
-
-            // Server-authoritative mode
-            this.serverAuthoritative = data.server_authoritative || false;
 
             // Initialize continuous monitoring if configured (Phase 16)
             if (data.scene_metadata?.continuous_monitoring_enabled) {
@@ -1408,14 +1399,9 @@ export class MultiplayerPyodideGame extends pyodide_remote_game.RemoteGame {
             this.lastConfirmedActions[String(player_id)] = action;
         });
 
-        // P2P state hash sync (non-server-authoritative mode)
+        // P2P state hash sync
         // Both peers broadcast state hash for symmetric desync detection
         socket.on('p2p_state_sync', async (data) => {
-            // Only process in non-server-authoritative mode
-            if (this.serverAuthoritative) {
-                return;
-            }
-
             // Skip hash comparison if state sync not supported (no get_state/set_state)
             if (!this.stateSyncSupported) {
                 return;
@@ -1537,120 +1523,6 @@ env.get_state()
                 p2pLog.debug(`State resync complete, now at frame ${this.frameNumber}`);
             } catch (err) {
                 p2pLog.error('Failed to apply peer state:', err);
-            }
-        });
-
-        // Server-authoritative state broadcast
-        // Server periodically broadcasts authoritative state for verification/correction
-        socket.on('server_authoritative_state', async (data) => {
-            if (!this.serverAuthoritative) {
-                return;
-            }
-
-            const { game_id, state } = data;
-            if (game_id !== this.gameId) {
-                return;
-            }
-
-            // Calculate sync metrics
-            const frameDiff = this.frameNumber - state.frame_number;
-            this.diagnostics.syncCount++;
-            this.diagnostics.frameDriftHistory.push(frameDiff);
-            if (this.diagnostics.frameDriftHistory.length > 20) {
-                this.diagnostics.frameDriftHistory.shift();
-            }
-
-            // Calculate step time stats
-            const stepTimes = this.diagnostics.stepTimes;
-            const avgStepTime = stepTimes.length > 0
-                ? (stepTimes.reduce((a, b) => a + b, 0) / stepTimes.length).toFixed(1)
-                : 'N/A';
-            const maxStepTime = stepTimes.length > 0
-                ? Math.max(...stepTimes).toFixed(1)
-                : 'N/A';
-
-            // Calculate FPS since last sync
-            const now = Date.now();
-            const targetFPS = this.config.fps || 10;
-            const framesSinceLastSync = this.frameNumber - this.diagnostics.lastSyncFrame;
-            const timeSinceLastSync = now - this.diagnostics.lastSyncTime;
-            const effectiveFPS = framesSinceLastSync > 0 && this.diagnostics.lastSyncTime > 0 && timeSinceLastSync > 0
-                ? ((framesSinceLastSync / timeSinceLastSync) * 1000).toFixed(1)
-                : 'N/A';
-
-            // Log sync info (verbose - debug only)
-            p2pLog.debug(
-                `Sync #${this.diagnostics.syncCount}: ` +
-                `Server=${state.frame_number} Client=${this.frameNumber} Drift=${frameDiff > 0 ? '+' : ''}${frameDiff} ` +
-                `FPS=${effectiveFPS}/${targetFPS} Step=${avgStepTime}/${maxStepTime}ms ` +
-                `Buf=${this.inputBuffer.size} Pred=${this.predictedFrames.size}`
-            );
-
-            // NOTE: Server reconciliation disabled - GGPO rollback handles sync.
-            // Just sync rewards/metadata without state correction.
-            if (state.cumulative_rewards) {
-                this.cumulative_rewards = state.cumulative_rewards;
-                ui_utils.updateHUDText(this.getHUDText());
-            }
-
-            // Update tracking
-            if (state.step_num !== undefined) {
-                this.lastKnownServerStepNum = state.step_num;
-            }
-            this.diagnostics.lastSyncFrame = state.frame_number;
-            this.diagnostics.lastSyncTime = now;
-        });
-
-        // Server episode start (server-authoritative mode)
-        // Server broadcasts this at the start of each episode so all clients begin from identical state
-        socket.on('server_episode_start', async (data) => {
-            if (!this.serverAuthoritative) {
-                return;  // Ignore if not in server-authoritative mode
-            }
-
-            const { game_id, state } = data;
-            if (game_id !== this.gameId) {
-                return;  // Not for this game
-            }
-
-            p2pLog.debug(`Received server_episode_start for episode ${state.episode_num}`);
-
-            // Store the state for when reset() is called
-            this.pendingEpisodeState = state;
-
-            // If we're waiting for the episode start, resolve the promise
-            if (this.waitingForEpisodeStart && this.episodeStartResolve) {
-                this.episodeStartResolve(state);
-                this.episodeStartResolve = null;
-                this.waitingForEpisodeStart = false;
-            }
-        });
-
-        // Server game complete (server-authoritative mode)
-        // Server broadcasts this when all configured episodes have been completed
-        socket.on('server_game_complete', (data) => {
-            if (!this.serverAuthoritative) {
-                return;
-            }
-
-            const { game_id, episode_num, max_episodes } = data;
-            if (game_id !== this.gameId) {
-                return;
-            }
-
-            p2pLog.debug(`Server game complete: ${episode_num}/${max_episodes} episodes`);
-
-            // Mark game as complete - this stops the game loop
-            this.state = "done";
-            this.episodeComplete = true;
-            this.num_episodes = episode_num;
-
-            // Clean up Web Worker timer (Phase 24)
-            this._destroyTimerWorker();
-
-            // Sync final rewards if provided
-            if (data.cumulative_rewards) {
-                this.cumulative_rewards = data.cumulative_rewards;
             }
         });
 
@@ -1873,127 +1745,6 @@ print(f"[Python] Seeded RNG with {${seed}}")
         // Clear P2P episode sync state for fresh episode
         this._clearEpisodeSyncState();
 
-        // In server-authoritative mode, wait for server to broadcast episode start state
-        if (this.serverAuthoritative) {
-            // Check if this is a subsequent episode (not the first one)
-            const isSubsequentEpisode = this.num_episodes > 0;
-
-            // Show waiting message for subsequent episodes
-            if (isSubsequentEpisode) {
-                ui_utils.showEpisodeWaiting("Next round will begin shortly...");
-            }
-
-            p2pLog.debug("Waiting for server episode start state...");
-
-            // Check if we already have pending state (server sent it before we called reset)
-            let serverState = this.pendingEpisodeState;
-
-            if (!serverState) {
-                // Wait for the server to send the episode start state
-                serverState = await this.waitForEpisodeStart();
-            }
-
-            // Clear pending state
-            this.pendingEpisodeState = null;
-
-            if (serverState && serverState.env_state) {
-                p2pLog.debug(`Applying server episode state (episode ${serverState.episode_num})`);
-
-                // Do a local reset FIRST to initialize internal structures (like env_agents),
-                // THEN apply set_state() to sync with server's state.
-                // This ensures env.get_obs() works correctly (relies on env_agents being populated).
-                // NOTE: We do NOT call applyServerState() here because it would try to call
-                // set_state() on an uninitialized env, causing errors in environments like cogrid
-                // where get_obs() relies on env_agents being set up during reset().
-
-                // Convert env_state to JSON string for safe passing to Python
-                const envStateJson = JSON.stringify(serverState.env_state);
-
-                const result = await this.pyodide.runPythonAsync(`
-import numpy as np
-import json
-
-# First reset to initialize internal structures (env_agents, etc.)
-obs, infos = env.reset(seed=${this.gameSeed || 'None'})
-
-# Now apply server state to overwrite with authoritative values
-env_state = json.loads('''${envStateJson.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}''')
-env.set_state(env_state)
-
-# Re-get observations after state is applied (internal structures now initialized)
-if hasattr(env, 'get_obs'):
-    obs = env.get_obs()
-elif hasattr(env, '_get_obs'):
-    obs = env._get_obs()
-
-# Render with the correct state
-render_state = env.render()
-
-if not isinstance(obs, dict):
-    obs = obs.reshape(-1).astype(np.float32)
-elif isinstance(obs, dict) and isinstance([*obs.values()][0], dict):
-    obs = {k: {kk: vv.reshape(-1).astype(np.float32) for kk, vv in v.items()} for k, v in obs.items()}
-elif isinstance(obs, dict):
-    obs = {k: v.reshape(-1).astype(np.float32) for k, v in obs.items()}
-
-if not isinstance(obs, dict):
-    obs = {"human": obs}
-
-obs, infos, render_state
-                `);
-
-                let [obs, infos, render_state] = await this.pyodide.toPy(result).toJs();
-
-                // Handle RGB array rendering if needed
-                let game_image_binary = null;
-                if (Array.isArray(render_state) && Array.isArray(render_state[0])) {
-                    game_image_binary = this.convertRGBArrayToImage(render_state);
-                }
-
-                render_state = {
-                    "game_state_objects": game_image_binary ? null : render_state.map(item => convertUndefinedToNull(item)),
-                    "game_image_base64": game_image_binary,
-                    "step": this.step_num,
-                };
-
-                // State is already synced from server
-                this.step_num = serverState.step_num || 0;
-                this.frameNumber = serverState.frame_number || 0;
-                this.lastKnownServerStepNum = serverState.step_num || 0;  // Track server step count
-                this.shouldReset = false;
-                this.episodeComplete = false;
-
-                // Use server's cumulative rewards
-                if (serverState.cumulative_rewards) {
-                    this.cumulative_rewards = serverState.cumulative_rewards;
-                }
-
-                // Sync epoch is critical for preventing stale action matching
-                if (serverState.sync_epoch !== undefined) {
-                    this.syncEpoch = serverState.sync_epoch;
-                }
-
-                // Show and update HUD
-                ui_utils.showHUD();
-                ui_utils.updateHUDText(this.getHUDText());
-
-                // Show countdown for subsequent episodes before starting
-                // Use inherited method (which checks isSubsequentEpisode internally)
-                await this.showEpisodeTransition();
-
-                // Clear action queues AFTER countdown to discard any actions received during transition
-                // This prevents stale actions from the previous episode or countdown from executing
-                this.clearActionQueues();
-
-                p2pLog.debug(`Reset complete from server state (episode ${serverState.episode_num})`);
-                return [obs, infos, render_state];
-            } else {
-                // No server state received (timeout or error) - hide overlay and fall through to normal reset
-                ui_utils.hideEpisodeOverlay();
-            }
-        }
-
-        // Non-server-authoritative mode or fallback: do normal reset
         // Show episode transition for subsequent episodes
         await this.showEpisodeTransition();
 
@@ -2064,7 +1815,7 @@ obs, infos, render_state
 
         // P2P per-round health check (Phase 21 - ROUND-01, ROUND-02)
         // Verify DataChannel connection is healthy before starting round
-        if (!this.serverAuthoritative && this.webrtcManager) {
+        if (this.webrtcManager) {
             try {
                 await this._waitForHealthyConnection(10000);  // 10 second timeout
             } catch (e) {
@@ -2077,7 +1828,7 @@ obs, infos, render_state
 
         // P2P episode start synchronization
         // Compute state hash and wait for peer to be ready before starting
-        if (!this.serverAuthoritative && this.webrtcManager?.isReady()) {
+        if (this.webrtcManager?.isReady()) {
             try {
                 // Compute state hash for verification
                 const stateHash = await this.pyodide.runPythonAsync(`
@@ -2100,34 +1851,6 @@ hashlib.md5(json.dumps(_state, sort_keys=True).encode()).hexdigest()[:8]
         }
 
         return [obs, infos, render_state];
-    }
-
-    /**
-     * Wait for the server to send the episode start state.
-     * Returns a promise that resolves when server_episode_start is received.
-     */
-    waitForEpisodeStart(timeoutMs = 10000) {
-        return new Promise((resolve, reject) => {
-            this.waitingForEpisodeStart = true;
-            this.episodeStartResolve = resolve;
-
-            // Timeout to prevent hanging forever
-            const timeout = setTimeout(() => {
-                if (this.waitingForEpisodeStart) {
-                    p2pLog.warn(`Timeout waiting for server episode start`);
-                    this.waitingForEpisodeStart = false;
-                    this.episodeStartResolve = null;
-                    resolve(null);  // Resolve with null to allow fallback
-                }
-            }, timeoutMs);
-
-            // Store timeout so we can clear it if resolved
-            const originalResolve = this.episodeStartResolve;
-            this.episodeStartResolve = (state) => {
-                clearTimeout(timeout);
-                originalResolve(state);
-            };
-        });
     }
 
     /**
@@ -2165,7 +1888,7 @@ hashlib.md5(json.dumps(_state, sort_keys=True).encode()).hexdigest()[:8]
 
         // For P2P multiplayer, wait for partner to be focused before showing countdown
         // Only do this if WebRTC is ready and we have a focus manager
-        if (!this.serverAuthoritative && this.webrtcManager?.isReady() && this.focusManager) {
+        if (this.webrtcManager?.isReady() && this.focusManager) {
             const localFocused = !this.focusManager.isBackgrounded;
             const partnerFocused = this.p2pEpisodeSync.partnerFocused;
 
@@ -2273,7 +1996,7 @@ hashlib.md5(json.dumps(_state, sort_keys=True).encode()).hexdigest()[:8]
 
         // 1. Store current local input for future execution (INPUT_DELAY frames ahead)
         // This must happen BEFORE we build finalActions so the input is available
-        const inEpisodeTransition = this.episodeComplete || this.waitingForEpisodeStart || this.shouldReset;
+        const inEpisodeTransition = this.episodeComplete || this.shouldReset;
         if (!inEpisodeTransition) {
             const myCurrentAction = allActionsDict[this.myPlayerId] ?? this.defaultAction;
             const targetFrame = this.frameNumber + this.INPUT_DELAY;
@@ -2529,23 +2252,18 @@ hashlib.md5(json.dumps(_st, sort_keys=True).encode()).hexdigest()[:8]
 
         const episodeEndDetected = all_terminated || all_truncated || max_steps_reached;
 
-        // In P2P mode (non-server-authoritative), use synchronized episode end
-        // Both peers must agree before resetting to prevent desync
+        // P2P synchronized episode end - both peers must agree before resetting to prevent desync
         if (episodeEndDetected && !this.episodeComplete && !this.p2pEpisodeSync.localEpisodeEndDetected) {
             // Log episode end detection (metrics logged here, actual completion when both peers agree)
             this._logEpisodeEndMetrics();
 
-            if (this.serverAuthoritative) {
-                // Server-authoritative mode: immediately complete (server coordinates)
-                this.episodeComplete = true;
-                this.signalEpisodeComplete();
-            } else if (this.webrtcManager?.isReady()) {
+            if (this.webrtcManager?.isReady()) {
                 // P2P mode with active connection: broadcast and wait for peer
                 p2pLog.debug(`Episode end detected at frame ${this.frameNumber}, broadcasting to peer...`);
                 this._broadcastEpisodeEnd();
                 // Don't set episodeComplete yet - _checkEpisodeSyncAndReset will do it when both agree
             } else {
-                // P2P mode but no WebRTC connection: fallback to immediate completion
+                // No WebRTC connection: fallback to immediate completion
                 p2pLog.debug(`Episode end at frame ${this.frameNumber}, no P2P - completing immediately`);
                 this.episodeComplete = true;
                 this.signalEpisodeComplete();
@@ -3019,8 +2737,8 @@ obs, rewards, terminateds, truncateds, infos, render_state
      * @returns {Promise<boolean>} True if all inputs confirmed, false if timeout
      */
     async _waitForInputConfirmation(timeoutMs) {
-        // Skip if not P2P mode or no timeout configured
-        if (this.serverAuthoritative || timeoutMs <= 0) {
+        // Skip if no timeout configured
+        if (timeoutMs <= 0) {
             return true;
         }
 
@@ -3469,8 +3187,6 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
         }
         if (state.step_num !== undefined) {
             this.step_num = state.step_num;
-            // Track server step count to prevent client from getting too far ahead
-            this.lastKnownServerStepNum = state.step_num;
         }
         if (state.frame_number !== undefined) {
             this.frameNumber = state.frame_number;
@@ -3541,9 +3257,6 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
 
         // Helper to sync metadata from server without applying full state
         const syncMetadata = () => {
-            if (serverState.step_num !== undefined) {
-                this.lastKnownServerStepNum = serverState.step_num;
-            }
             if (serverState.cumulative_rewards) {
                 this.cumulative_rewards = serverState.cumulative_rewards;
                 ui_utils.updateHUDText(this.getHUDText());
@@ -3863,6 +3576,12 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
         if (this.num_episodes >= this.max_episodes) {
             this.state = "done";
             this._destroyTimerWorker();  // Clean up Web Worker timer (Phase 24)
+
+            // Phase 96: Notify host (index.js) immediately -- bypasses throttled setInterval polling
+            if (this.onGameDone) {
+                try { this.onGameDone(); } catch (e) { console.error('[P2P] onGameDone callback error:', e); }
+            }
+
             // Always log for admin console visibility
             console.log('[P2P] Game complete - all episodes finished. Subject:',
                 window.subjectName || window.interactiveGymGlobals?.subjectName,
@@ -3890,6 +3609,9 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
     /**
      * Emit episode data from the rollback-safe frame buffer.
      * Uses msgpack encoding for efficient transmission.
+     * Includes server acknowledgment with retry to handle dropped messages
+     * (e.g., after background-tab fast-forward where the event loop may
+     * be congested with pending async operations).
      */
     _emitEpisodeDataFromBuffer() {
         if (!window.socket) {
@@ -3910,15 +3632,58 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
 
         console.log(`[_emitEpisodeDataFromBuffer] Emitting episode ${this.num_episodes} data: ${episodeData.t.length} frames, ${binaryData.byteLength} bytes`);
 
-        window.socket.emit("emit_episode_data", {
+        const payload = {
             data: binaryData,
             scene_id: this.sceneId,
             episode_num: this.num_episodes,
             session_id: window.sessionId,
+            subject_id: window.subjectName || window.interactiveGymGlobals?.subjectName,
             interactiveGymGlobals: window.interactiveGymGlobals
-        });
+        };
 
-        // Clear the buffers after emitting
+        // Track delivery confirmation via ack callback
+        let delivered = false;
+        const MAX_RETRIES = 5;
+        let attempt = 0;
+
+        const emitWithAck = () => {
+            if (!window.socket?.connected) {
+                console.warn(`[_emitEpisodeDataFromBuffer] Socket not connected on attempt ${attempt + 1}, will retry`);
+                return;
+            }
+            attempt++;
+            window.socket.emit("emit_episode_data", payload, (ack) => {
+                if (ack && ack.status === 'ok') {
+                    delivered = true;
+                    if (attempt > 1) {
+                        console.log(`[_emitEpisodeDataFromBuffer] Delivery confirmed on attempt ${attempt}`);
+                    }
+                }
+            });
+        };
+
+        // Initial emit with ack callback
+        emitWithAck();
+
+        // Schedule retries in case the initial emit doesn't get acknowledged.
+        // Uses chained setTimeout instead of setInterval for more reliable timing
+        // under system load (setInterval can drift or be coalesced).
+        const scheduleRetry = () => {
+            setTimeout(() => {
+                if (delivered || attempt >= MAX_RETRIES) {
+                    if (!delivered && attempt >= MAX_RETRIES) {
+                        console.warn(`[_emitEpisodeDataFromBuffer] No ack after ${MAX_RETRIES} attempts - data may not be saved`);
+                    }
+                    return;
+                }
+                console.log(`[_emitEpisodeDataFromBuffer] Retry ${attempt + 1}/${MAX_RETRIES} - no ack received`);
+                emitWithAck();
+                scheduleRetry();
+            }, 2000);
+        };
+        scheduleRetry();
+
+        // Clear the buffers after emitting (data is in payload now)
         this.frameDataBuffer.clear();
         this.speculativeFrameData.clear();
     }
@@ -5282,16 +5047,31 @@ json.dumps({'cumulative_rewards': {str(k): v for k, v in _cumulative_rewards.ite
         // Without this, episode end detection waits for the next processTick() call,
         // causing a visible delay where the fast-forwarded player appears to keep
         // playing after the partner has already exited the scene.
+        // Phase 96: Also check terminated/truncated flags from Python step results,
+        // not just max_steps. Environments can end early via these flags.
         if (!this.episodeComplete && !this.p2pEpisodeSync.localEpisodeEndDetected) {
             const maxStepsReached = this.step_num >= this.max_steps;
-            if (maxStepsReached) {
-                p2pLog.info(`FAST-FORWARD: episode end detected at frame ${this.frameNumber} (step ${this.step_num}/${this.max_steps})`);
+
+            // Check if any frame in the batch returned terminated or truncated
+            let envEpisodeEnd = false;
+            if (ffResult.per_frame_data && ffResult.per_frame_data.length > 0) {
+                const lastFrame = ffResult.per_frame_data[ffResult.per_frame_data.length - 1];
+                // Check individual agent values (filter out Gymnasium's __all__ key)
+                const allTerminated = lastFrame.terminateds && Object.entries(lastFrame.terminateds)
+                    .filter(([k]) => k !== '__all__').every(([, v]) => v === true);
+                const allTruncated = lastFrame.truncateds && Object.entries(lastFrame.truncateds)
+                    .filter(([k]) => k !== '__all__').every(([, v]) => v === true);
+                // Also check Gymnasium standard __all__ key
+                const allKeyTerm = lastFrame.terminateds?.['__all__'] === true;
+                const allKeyTrunc = lastFrame.truncateds?.['__all__'] === true;
+                envEpisodeEnd = allTerminated || allTruncated || allKeyTerm || allKeyTrunc;
+            }
+
+            if (maxStepsReached || envEpisodeEnd) {
+                p2pLog.info(`FAST-FORWARD: episode end detected at frame ${this.frameNumber} (step ${this.step_num}/${this.max_steps}, envEnd=${envEpisodeEnd})`);
                 this._logEpisodeEndMetrics();
 
-                if (this.serverAuthoritative) {
-                    this.episodeComplete = true;
-                    this.signalEpisodeComplete();
-                } else if (this.webrtcManager?.isReady()) {
+                if (this.webrtcManager?.isReady()) {
                     this._broadcastEpisodeEnd();
                 } else {
                     this.episodeComplete = true;
