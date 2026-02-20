@@ -33,7 +33,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 Plans:
 - [ ] 97-01-PLAN.md — Foundation: rendering package, types (DrawCommand, RenderPacket), color normalization
 - [ ] 97-02-PLAN.md — Surface class: all draw methods, coordinate handling, commit/delta/reset
-- [ ] 97-03-PLAN.md — TDD: comprehensive unit tests for color and Surface
+- [ ] 97-03-PLAN.md — Tests: comprehensive unit tests for color and Surface
 
 ### Phase 98: JS Renderer Update
 **Goal**: The Phaser JS renderer correctly interprets and renders the new delta wire format, supporting object creation, update, removal, and tweened smooth movement for identified objects
