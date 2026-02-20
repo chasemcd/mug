@@ -254,11 +254,41 @@ obs, infos, render_state
         }
 
 
-        render_state = {
-            "game_state_objects": game_image_binary ? null : render_state.map(item => convertUndefinedToNull(item)),
-            "game_image_base64": game_image_binary,
-            "step": this.step_num,
-        };
+        // Handle new RenderPacket dict format from Surface API
+        // env.render() returns {game_state_objects: [...], removed: [...]} via Pyodide toJs()
+        if (!game_image_binary) {
+            let gameStateObjects;
+            let removed = [];
+            if (render_state && typeof render_state === 'object' && !Array.isArray(render_state)) {
+                // New RenderPacket format: dict/Map with game_state_objects key
+                if (render_state instanceof Map) {
+                    gameStateObjects = render_state.get('game_state_objects');
+                    removed = render_state.get('removed') || [];
+                } else {
+                    gameStateObjects = render_state.game_state_objects;
+                    removed = render_state.removed || [];
+                }
+                // Convert each object in the list
+                if (Array.isArray(gameStateObjects)) {
+                    gameStateObjects = gameStateObjects.map(item => convertUndefinedToNull(item));
+                }
+            } else if (Array.isArray(render_state)) {
+                // Legacy flat array format (fallback)
+                gameStateObjects = render_state.map(item => convertUndefinedToNull(item));
+            }
+            render_state = {
+                "game_state_objects": gameStateObjects,
+                "removed": removed,
+                "step": this.step_num,
+            };
+        } else {
+            render_state = {
+                "game_state_objects": null,
+                "removed": [],
+                "game_image_binary": game_image_binary,
+                "step": this.step_num,
+            };
+        }
 
         this.step_num = 0;
         this.shouldReset = false;
@@ -369,11 +399,41 @@ obs, rewards, terminateds, truncateds, infos, render_state
 
 
 
-        render_state = {
-            "game_state_objects": game_image_base64 ? null : render_state.map(item => convertUndefinedToNull(item)),
-            "game_image_base64": game_image_base64,
-            "step": this.step_num,
-        };
+        // Handle new RenderPacket dict format from Surface API
+        // env.render() returns {game_state_objects: [...], removed: [...]} via Pyodide toJs()
+        if (!game_image_base64) {
+            let gameStateObjects;
+            let removed = [];
+            if (render_state && typeof render_state === 'object' && !Array.isArray(render_state)) {
+                // New RenderPacket format: dict/Map with game_state_objects key
+                if (render_state instanceof Map) {
+                    gameStateObjects = render_state.get('game_state_objects');
+                    removed = render_state.get('removed') || [];
+                } else {
+                    gameStateObjects = render_state.game_state_objects;
+                    removed = render_state.removed || [];
+                }
+                // Convert each object in the list
+                if (Array.isArray(gameStateObjects)) {
+                    gameStateObjects = gameStateObjects.map(item => convertUndefinedToNull(item));
+                }
+            } else if (Array.isArray(render_state)) {
+                // Legacy flat array format (fallback)
+                gameStateObjects = render_state.map(item => convertUndefinedToNull(item));
+            }
+            render_state = {
+                "game_state_objects": gameStateObjects,
+                "removed": removed,
+                "step": this.step_num,
+            };
+        } else {
+            render_state = {
+                "game_state_objects": null,
+                "removed": [],
+                "game_image_base64": game_image_base64,
+                "step": this.step_num,
+            };
+        }
 
         ui_utils.updateHUDText(this.getHUDText());
 
