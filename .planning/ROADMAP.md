@@ -45,11 +45,12 @@ Plans:
   3. The `addStateToBuffer()` normalization shim correctly routes both legacy ObjectContext format and new RenderPacket format, with a console warning when game state is null
   4. Stroke/outline rendering works for circle, rect, and polygon when `width > 0` is specified in the draw command
   5. Text color is configurable from the wire format (not hardcoded to `#000`)
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 98-01: TBD
-- [ ] 98-02: TBD
+- [ ] 98-01-PLAN.md — Python ObjectContext stubs: replace legacy classes with NotImplementedError stubs
+- [ ] 98-02-PLAN.md — JS Renderer overhaul: drawState rewrite, rect implementation, stroke, text color, tween fix, unified objectMap
+- [ ] 98-03-PLAN.md — Pyodide render wrapping: update single-player and multiplayer paths for RenderPacket dict format
 
 ### Phase 99: Example Migration
 **Goal**: The reference environments use the new Surface API, proving it is ergonomic for real Gymnasium/PettingZoo environments and validating both render paths end-to-end
@@ -73,5 +74,5 @@ Phases execute in numeric order: 97 -> 98 -> 99
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 97. Python Surface Core | 3/3 | Complete    | 2026-02-20 |
-| 98. JS Renderer Update | 0/? | Not started | - |
+| 98. JS Renderer Update | 0/3 | Not started | - |
 | 99. Example Migration | 0/? | Not started | - |
