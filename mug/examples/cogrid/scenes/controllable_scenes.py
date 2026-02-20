@@ -114,9 +114,6 @@ control_tutorial_scene = (
         game_height=overcooked_utils.TILE_SIZE * 6,
         background="#e6b453",
     )
-    .assets(
-        assets_to_preload=overcooked_utils.overcooked_preload_assets_spec(),
-    )
     .gameplay(
         default_action=Noop,
         action_mapping=action_mapping,
@@ -145,14 +142,10 @@ tutorial_with_bot_scene = (
     .policies(policy_mapping=IBC_POLICY_MAPPING_CRAMPED_ROOM, frame_skip=5)
     .rendering(
         fps=30,
-        env_to_state_fn=overcooked_utils.overcooked_env_to_render_fn,
         hud_text_fn=overcooked_utils.hud_text_fn,
         game_width=overcooked_utils.TILE_SIZE * 7,
         game_height=overcooked_utils.TILE_SIZE * 6,
         background="#e6b453",
-    )
-    .assets(
-        assets_to_preload=overcooked_utils.overcooked_preload_assets_spec(),
     )
     .gameplay(
         default_action=Noop,
@@ -226,9 +219,6 @@ base_controllable_ = (
         game_width=overcooked_utils.TILE_SIZE * 7,
         game_height=overcooked_utils.TILE_SIZE * 6,
         background="#e6b453",
-    )
-    .assets(
-        assets_to_preload=overcooked_utils.overcooked_preload_assets_spec(),
     )
     .gameplay(
         default_action=Noop,
