@@ -75,4 +75,4 @@ Phases execute in numeric order: 97 -> 98 -> 99
 |-------|----------------|--------|-----------|
 | 97. Python Surface Core | 3/3 | Complete    | 2026-02-20 |
 | 98. JS Renderer Update | 3/3 | Complete    | 2026-02-20 |
-| 99. Example Migration | 0/2 | Not started | - |
+| 99. Example Migration | 1/2 | In Progress|  |
