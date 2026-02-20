@@ -183,7 +183,7 @@ def generate_slime_agent_objects(
 
 class SlimeVBEnvIG(slimevolley_env.SlimeVolleyEnv):
     def render(self):
-        assert self.render_mode == "interactive-gym"
+        assert self.render_mode == "mug"
         return slime_volleyball_env_to_rendering(self)
 
     def get_state(self) -> dict[str, int | float | str]:
@@ -291,4 +291,4 @@ class SlimeVBEnvIG(slimevolley_env.SlimeVolleyEnv):
 # Initialize the environment for use in the browser. SlimeVB uses a seed only in initialization
 # rather than on reset() so that each episode isn't identical; we want the sequence of episodes to
 # be identical.
-env = SlimeVBEnvIG(config={"human_inputs": True, "seed": 42}, render_mode="interactive-gym")
+env = SlimeVBEnvIG(config={"human_inputs": True, "seed": 42}, render_mode="mug")

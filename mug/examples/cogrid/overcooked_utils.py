@@ -21,7 +21,7 @@ PLAYER_COLORS = {0: "blue", 1: "green"}
 
 
 def overcooked_game_page_header_fn(
-    game: remote_game.RemoteGameV2, player_name: str
+    game: remote_game.ServerGame, player_name: str
 ) -> str:
     """Function that takes the game and a player name to determine the html that should be shown when the game active."""
     player_id = None
@@ -56,14 +56,15 @@ def get_x_y(
     return x, y
 
 
-def hud_text_fn(game: remote_game.RemoteGameV2) -> str:
+def hud_text_fn(game: remote_game.ServerGame) -> str:
     """Function to create HUD text to display"""
     score = int(
         list(game.episode_rewards.values())[0]
         if len(game.episode_rewards) > 0
         else 0
     )
-    return f"Score: {score:03d}   |    Time Left: {(game.env.max_steps - game.tick_num) / game.config.fps:.1f}s"
+    fps = getattr(game, 'fps', None) or getattr(getattr(game, 'scene', None), 'fps', 30)
+    return f"Score: {score:03d}   |    Time Left: {(game.env.max_steps - game.tick_num) / fps:.1f}s"
 
 
 def overcooked_preload_assets_spec() -> (

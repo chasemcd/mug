@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import base64
 import itertools
 import logging
 import random
@@ -15,23 +14,7 @@ import flask_socketio
 from mug.utils.typing import GameID, RoomID, SubjectID
 
 logger = logging.getLogger(__name__)
-# Add console handler to see game_manager logs
-if not logger.handlers:
-    _handler = logging.StreamHandler()
-    _handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-    logger.addHandler(_handler)
-    logger.setLevel(logging.INFO)
 
-
-try:
-    import cv2
-except ImportError:
-    cv2 = None
-    print(
-        "cv2 not installed. This is required if you're not "
-        "defining a rendering function and want to (inefficiently) "
-        "have the canvas display whatever is returned from `env.render('rgb_array')`."
-    )
 
 from typing import TYPE_CHECKING
 
@@ -92,7 +75,7 @@ class GameManager:
         self.subject = thread_safe_collections.ThreadSafeDict()
 
         # Data structure to save subjects games in memory OBJECTS by their socket id
-        self.games: dict[GameID, remote_game.RemoteGameV2] = (
+        self.games: dict[GameID, remote_game.ServerGame] = (
             thread_safe_collections.ThreadSafeDict()
         )
 
@@ -129,6 +112,13 @@ class GameManager:
         # holds reset events so we only continue in game loop when triggered
         # this is not used when running with Pyodide
         self.reset_events = thread_safe_collections.ThreadSafeDict()
+
+        # Server-auth disconnect timeout tracking (Phase 94-02)
+        # Maps subject_id -> eventlet GreenThread for the timeout timer.
+        # When a player disconnects from a server-auth game, we start a timer.
+        # If they reconnect before expiry, the timer is cancelled.
+        # If the timer fires, the player is permanently dropped.
+        self._disconnect_timeouts: dict[SubjectID, eventlet.GreenThread] = {}
 
     def subject_in_game(self, subject_id: SubjectID) -> bool:
         return subject_id in self.subject_games
@@ -188,16 +178,16 @@ class GameManager:
 
         return (True, None)  # All checks passed
 
-    def _create_game(self) -> remote_game.RemoteGameV2:
+    def _create_game(self) -> remote_game.ServerGame:
         """Create a Game object corresponding to the specified Scene."""
         try:
             game_id = str(uuid.uuid4())
 
-            # Even if we're using Pyodide, we'll still instantiate a RemoteGameV2, since
+            # Even if we're using Pyodide, we'll still instantiate a ServerGame, since
             # it'll track the players within a game.
             # TODO(chase): check if we actually do need this for Pyodide-based games...
-            # Game starts in SessionState.WAITING (set in RemoteGameV2.__init__)
-            game = remote_game.RemoteGameV2(
+            # Game starts in SessionState.WAITING (set in ServerGame.__init__)
+            game = remote_game.ServerGame(
                 self.scene,
                 experiment_config=self.experiment_config,
                 game_id=game_id,
@@ -216,20 +206,11 @@ class GameManager:
             self.reset_events[game_id] = thread_safe_collections.ThreadSafeDict()
 
             # If this is a multiplayer Pyodide game, create coordinator state
-            if self.scene.pyodide_multiplayer and self.pyodide_coordinator:
+            # Only for P2P multiplayer games, not server-authoritative
+            if (self.scene.pyodide_multiplayer
+                    and self.pyodide_coordinator
+                    and not getattr(self.scene, 'server_authoritative', False)):
                 num_players = len(self.scene.policy_mapping)  # Number of agents in the game
-
-                # Get server-authoritative config from scene
-                server_authoritative = getattr(self.scene, 'server_authoritative', False)
-                state_broadcast_interval = getattr(self.scene, 'state_broadcast_interval', 30)
-                environment_code = getattr(self.scene, 'environment_initialization_code', None)
-                fps = getattr(self.scene, 'fps', 30)
-                default_action = getattr(self.scene, 'default_action', 0) or 0
-                action_population_method = getattr(self.scene, 'action_population_method', 'previous_submitted_action')
-                realtime_mode = getattr(self.scene, 'realtime_mode', True)
-                input_buffer_size = getattr(self.scene, 'input_buffer_size', 300)
-                num_episodes = getattr(self.scene, 'num_episodes', 1)
-                max_steps = getattr(self.scene, 'max_steps', 10000)
 
                 # WebRTC TURN configuration from experiment config
                 turn_username = getattr(self.experiment_config, 'turn_username', None)
@@ -244,16 +225,6 @@ class GameManager:
                 self.pyodide_coordinator.create_game(
                     game_id=game_id,
                     num_players=num_players,
-                    server_authoritative=server_authoritative,
-                    environment_code=environment_code,
-                    state_broadcast_interval=state_broadcast_interval,
-                    fps=fps,
-                    default_action=default_action,
-                    action_population_method=action_population_method,
-                    realtime_mode=realtime_mode,
-                    input_buffer_size=input_buffer_size,
-                    max_episodes=num_episodes,
-                    max_steps=max_steps,
                     turn_username=turn_username,
                     turn_credential=turn_credential,
                     force_turn_relay=force_turn_relay,
@@ -262,7 +233,6 @@ class GameManager:
                 logger.info(
                     f"Created multiplayer Pyodide game state for {game_id} "
                     f"with {num_players} players"
-                    f"{' (server-authoritative)' if server_authoritative else ''}"
                 )
 
         except Exception as e:
@@ -302,9 +272,10 @@ class GameManager:
             f"Successfully removed game {game_id} and closed the associated room."
         )
 
+
     def add_subject_to_game(
         self, subject_id: SubjectID
-    ) -> remote_game.RemoteGameV2 | None:
+    ) -> remote_game.ServerGame | None:
         """Add a subject to a game and return it.
 
         All games are created through the matchmaker path (FIFO queue by default).
@@ -331,7 +302,7 @@ class GameManager:
     def _add_subject_to_specific_game(
         self,
         subject_id: SubjectID,
-        game: remote_game.RemoteGameV2
+        game: remote_game.ServerGame
     ) -> bool:
         """Add a subject to a specific game (used for group matching).
 
@@ -413,7 +384,7 @@ class GameManager:
 
     def _add_to_fifo_queue(
         self, subject_id: SubjectID
-    ) -> remote_game.RemoteGameV2 | None:
+    ) -> remote_game.ServerGame | None:
         """Add a subject to the standard FIFO matching queue.
 
         Uses the matchmaker to decide when to form groups. If matchmaking_max_rtt
@@ -890,7 +861,7 @@ class GameManager:
     def _create_game_for_match_internal(
         self,
         matched: list[MatchCandidate],
-    ) -> remote_game.RemoteGameV2 | None:
+    ) -> remote_game.ServerGame | None:
         """Create game for matched candidates after probe success.
 
         Similar to _create_game_for_match but without handling arriving participant
@@ -898,7 +869,7 @@ class GameManager:
         """
         # Create a new game
         self._create_game()
-        game: remote_game.RemoteGameV2 = self.games[self.waiting_games[-1]]
+        game: remote_game.ServerGame = self.games[self.waiting_games[-1]]
 
         # Add each participant to the game
         added_subjects = []
@@ -939,7 +910,10 @@ class GameManager:
         # Add players to Pyodide coordinator AFTER room joins and state transition.
         # The coordinator emits pyodide_game_ready when all players are added,
         # so clients must already be in the room to receive it.
-        if self.scene.pyodide_multiplayer and self.pyodide_coordinator:
+        # Only for P2P multiplayer games, not server-authoritative.
+        if (self.scene.pyodide_multiplayer
+                and self.pyodide_coordinator
+                and not getattr(self.scene, 'server_authoritative', False)):
             for player_id, subject_id in game.human_players.items():
                 if subject_id and subject_id != AvailableSlot:
                     socket_id = self._get_socket_id(subject_id)
@@ -970,7 +944,7 @@ class GameManager:
         self,
         matched: list[MatchCandidate],
         arriving_subject_id: SubjectID
-    ) -> remote_game.RemoteGameV2:
+    ) -> remote_game.ServerGame:
         """Create and start a game for matched participants.
 
         Phase 60+: All matched participants are in waitroom_participants (no pre-allocated games).
@@ -1035,7 +1009,10 @@ class GameManager:
                 )
 
             # If multiplayer Pyodide, add player to coordinator
-            if self.scene.pyodide_multiplayer and self.pyodide_coordinator:
+            # Only for P2P multiplayer games, not server-authoritative.
+            if (self.scene.pyodide_multiplayer
+                    and self.pyodide_coordinator
+                    and not getattr(self.scene, 'server_authoritative', False)):
                 socket_id = flask.request.sid if subject_id == arriving_subject_id else self._get_socket_id(subject_id)
                 self.pyodide_coordinator.add_player(
                     game_id=game.game_id,
@@ -1079,7 +1056,7 @@ class GameManager:
 
     def get_subject_game(
         self, subject_id: SubjectID
-    ) -> remote_game.RemoteGameV2:
+    ) -> remote_game.ServerGame:
         """Get the game that a subject is in."""
         return self.games.get(self.subject_games.get(subject_id))
 
@@ -1111,12 +1088,6 @@ class GameManager:
             return False
 
         with game.lock:
-            self.remove_subject(subject_id)
-
-            # Reset participant state (Phase 54)
-            if self.participant_state_tracker:
-                self.participant_state_tracker.reset(subject_id)
-
             game_was_active = (
                 game.game_id in self.active_games
                 and game.status
@@ -1125,6 +1096,32 @@ class GameManager:
                     remote_game.GameStatus.Reset,
                 ]
             )
+
+            # Server-auth disconnect: DON'T remove the player -- start reconnection timeout.
+            # Player stays in subject_games/subject_rooms/human_players so the game loop
+            # continues with default actions for their agent slot.
+            is_server_auth = getattr(self.scene, 'server_authoritative', False)
+            if is_server_auth and game_was_active:
+                game.document_focus_status[subject_id] = False
+                timeout_s = getattr(self.scene, 'reconnection_timeout_ms', 5000) / 1000
+                logger.info(
+                    f"[ServerAuth] {subject_id} disconnected from game {game.game_id}. "
+                    f"Starting {timeout_s}s reconnection timeout. "
+                    f"Game continues with default actions."
+                )
+                timeout_thread = eventlet.spawn_after(
+                    timeout_s, self._permanent_drop, game.game_id, subject_id
+                )
+                self._disconnect_timeouts[subject_id] = timeout_thread
+                return GameExitStatus.ActiveWithOtherPlayers
+
+            # Normal path: fully remove the subject
+            self.remove_subject(subject_id)
+
+            # Reset participant state (Phase 54)
+            if self.participant_state_tracker:
+                self.participant_state_tracker.reset(subject_id)
+
             game_is_empty = game.cur_num_human_players() == 0
 
             if game_was_active and game_is_empty:
@@ -1168,6 +1165,8 @@ class GameManager:
 
             elif game_was_active and not game_is_empty:
                 exit_status = GameExitStatus.ActiveWithOtherPlayers
+                # Note: server-auth active games return early above (before remove_subject),
+                # so this branch is only reached for P2P games.
                 logger.info(
                     f"Subject {subject_id} left game {game.game_id} with exit status {exit_status}. Cleaning up."
                 )
@@ -1238,7 +1237,7 @@ class GameManager:
         logger.info(f"[Countdown] Countdown complete, starting game {game.game_id}")
         self.start_game(game)
 
-    def start_game(self, game: remote_game.RemoteGameV2):
+    def start_game(self, game: remote_game.ServerGame):
         """Start a game."""
         # Safety validation: ensure correct number of players before starting
         expected_human_players = len([
@@ -1293,56 +1292,102 @@ class GameManager:
 
         if not self.scene.run_through_pyodide:
             # Non-pyodide games go straight to PLAYING (no validation phase)
+            is_server_auth = getattr(self.scene, 'server_authoritative', False)
+            logger.info(
+                f"Starting {'server-authoritative' if is_server_auth else 'legacy server'} "
+                f"game loop for {game.game_id}"
+            )
             game.transition_to(SessionState.PLAYING)
             self.socketio.start_background_task(self.run_server_game, game)
         # Note: For pyodide_multiplayer games, transition to VALIDATING/PLAYING
         # happens in PyodideGameCoordinator (see Task 3)
 
-    def run_server_game(self, game: remote_game.RemoteGameV2):
-        """Run a remote game on the server."""
+    def run_server_game(self, game: remote_game.ServerGame):
+        """Run the server-authoritative game loop.
+
+        Steps the environment at max speed (no FPS cap), renders via
+        env.render(render_mode="interactive_gym"), and broadcasts state
+        via the server_render_state socket event. Handles episode resets
+        with configurable pause and player acknowledgments.
+        """
+        try:
+            self._run_server_game_inner(game)
+        except Exception as e:
+            import traceback
+            error_msg = traceback.format_exc()
+            logger.exception(
+                f"Server game loop crashed for {game.game_id}"
+            )
+            # Ensure clients are notified even on crash — include error for debugging
+            try:
+                self.socketio.emit(
+                    "end_game",
+                    {"error": str(e), "traceback": error_msg},
+                    room=game.game_id,
+                )
+                self.cleanup_game(game.game_id)
+            except Exception:
+                logger.exception(f"Cleanup after crash also failed for {game.game_id}")
+
+    def _run_server_game_inner(self, game: remote_game.ServerGame):
+        """Inner server game loop (separated for exception handling)."""
+        _t0 = time.monotonic()
+
+        # Build env and load policies
+        logger.info(f"[ServerLoop:{game.game_id}] Building env...")
+        game._build_env()
+
+        game._load_policies()
+
+        # First reset
+        with game.lock:
+            game.reset()
+            if self.scene.callback is not None:
+                self.scene.callback.on_episode_start(game)
+
+        # Initial render broadcast
+        self.render_server_game(game)
+
+        # Throttle to scene FPS to avoid flooding SocketIO transport
+        step_interval = 1.0 / self.scene.fps if self.scene.fps > 0 else 0
+
+        # Main game loop
         end_status = [
             remote_game.GameStatus.Inactive,
             remote_game.GameStatus.Done,
         ]
 
-        with game.lock:
-            game.reset()
-
-            if self.scene.callback is not None:
-                self.scene.callback.on_episode_start(game)
-
-        self.render_server_game(game)
-
         while game.status not in end_status:
-
             with game.lock:
                 if self.scene.callback is not None:
                     self.scene.callback.on_game_tick_start(game)
 
-                game.tick()
+                game.step()
 
                 if self.scene.callback is not None:
                     self.scene.callback.on_game_tick_end(game)
 
+            # Log first few ticks and status changes
+            if game.tick_num <= 3 or game.tick_num % 50 == 0 or game.status in end_status:
+                logger.info(
+                    f"[ServerLoop:{game.game_id}] tick={game.tick_num}, "
+                    f"status={game.status}, episode={game.episode_num}, "
+                    f"elapsed={time.monotonic() - _t0:.2f}s"
+                )
+
             self.render_server_game(game)
 
-            if (
-                self.scene.input_mode
-                == configuration_constants.InputModes.PressedKeys
-            ):
-                self.socketio.emit("request_pressed_keys", {})
+            # Throttle to target FPS and yield to eventlet
+            eventlet.sleep(step_interval)
 
-            self.socketio.sleep(1 / game.scene.fps)
-
-            if (
-                game.status == remote_game.GameStatus.Reset
-                or game.status == remote_game.GameStatus.Done
-            ):
+            # Handle episode transitions
+            if game.status == remote_game.GameStatus.Reset:
                 if self.scene.callback is not None:
                     self.scene.callback.on_episode_end(game)
 
-            if game.status == remote_game.GameStatus.Reset:
+                # Pause between episodes (matches P2P multiplayer flow)
                 eventlet.sleep(self.scene.reset_freeze_s)
+
                 self.socketio.emit(
                     "game_reset",
                     {
@@ -1353,15 +1398,14 @@ class GameManager:
                     room=game.game_id,
                 )
 
+                # Wait for all players to acknowledge reset
                 game.reset_event.wait()
 
-                # Replace the events for each player with new eventlet.event.Event instances
+                # Replace reset events for each player
                 for player_id in self.reset_events[game.game_id].keys():
                     self.reset_events[game.game_id][
                         player_id
                     ] = eventlet.event.Event()
-
-                # Clear the game reset event
                 game.set_reset_event()
 
                 with game.lock:
@@ -1371,22 +1415,23 @@ class GameManager:
 
                 self.render_server_game(game)
 
-                self.socketio.sleep(1 / game.scene.fps)
+            elif game.status == remote_game.GameStatus.Done:
+                if self.scene.callback is not None:
+                    self.scene.callback.on_episode_end(game)
 
+        # Cleanup after loop
+        _elapsed = time.monotonic() - _t0
         with game.lock:
             logger.info(
-                f"Game loop ended for {game.game_id}, ending and cleaning up."
+                f"[ServerLoop:{game.game_id}] Loop exited after {_elapsed:.2f}s. "
+                f"Final status={game.status}, tick_num={game.tick_num}, "
+                f"episode_num={game.episode_num}"
             )
             if game.status != remote_game.GameStatus.Inactive:
                 game.tear_down()
-
             if self.scene.callback is not None:
                 self.scene.callback.on_game_end(game)
-            self.socketio.emit(
-                "end_game",
-                {},
-                room=game.game_id,
-            )
+            self.socketio.emit("end_game", {}, room=game.game_id)
             self.cleanup_game(game.game_id)
 
     def trigger_reset(self, subject_id: SubjectID):
@@ -1493,42 +1538,32 @@ class GameManager:
 
         return pressed_keys
 
-    def render_server_game(self, game: remote_game.RemoteGameV2):
-        state = None
-        encoded_image = None
-        if self.scene.env_to_state_fn is not None:
-            # generate a state object representation
-            state = self.scene.env_to_state_fn(game.env, self.scene)
-        else:
-            # Generate a base64 image of the game and send it to display
-            assert (
-                cv2 is not None
-            ), "Must install cv2 to use default image rendering!"
-            assert (
-                game.env.render_mode == "rgb_array"
-            ), "Env must be using render mode `rgb_array`!"
+    def render_server_game(self, game: remote_game.ServerGame):
+        """Render and broadcast game state to all clients in the room.
 
-            game_image = game.env.render()
-            _, encoded_image = cv2.imencode(
-                ".jpg", game_image, [cv2.IMWRITE_JPEG_QUALITY, 75]
-            )
-            # encoded_image = base64.b64encode(encoded_image).decode()
+        Calls env.render() to get a Phaser-compatible state dict (the env was
+        created with render_mode="interactive_gym"), then broadcasts it with
+        metadata via the server_render_state socket event.
+        """
+        # Get render state from the environment
+        render_state = game.env.render()
 
+        # Build HUD text if configured
         hud_text = (
             self.scene.hud_text_fn(game)
             if self.scene.hud_text_fn is not None
             else None
         )
 
-        # TODO(chase): this emits the same state to every player in a room, but we may want
-        #   to have different observations for each player. Figure that out (maybe state is a dict
-        #   with player_ids and their respective observations?).
+        # Broadcast to all clients in the room
         self.socketio.emit(
-            "environment_state",
+            "server_render_state",
             {
-                "game_state_objects": state,
-                "game_image_binary": encoded_image.tobytes(),
+                "render_state": render_state,
                 "step": game.tick_num,
+                "episode": game.episode_num,
+                "rewards": dict(game.episode_rewards),
+                "cumulative_rewards": dict(game.total_rewards),
                 "hud_text": hud_text,
             },
             room=game.game_id,
@@ -1668,6 +1703,70 @@ class GameManager:
 
         logger.info(f"[RemoveQuietly] Successfully removed {subject_id} from game {game_id}")
         return True
+
+    def _permanent_drop(self, game_id: GameID, subject_id: SubjectID):
+        """Permanently drop a disconnected player after reconnection timeout expiry.
+
+        Called by eventlet.spawn_after when the disconnect timer fires.
+        The player's slot stays in the game with default actions, but they
+        can no longer reconnect.
+        """
+        game = self.games.get(game_id)
+        if game is None:
+            self._disconnect_timeouts.pop(subject_id, None)
+            return
+
+        # Only drop if still disconnected (not reconnected)
+        if subject_id in self._disconnect_timeouts:
+            del self._disconnect_timeouts[subject_id]
+            # Remove from subject tracking but leave game slot on default actions
+            if subject_id in self.subject_games:
+                del self.subject_games[subject_id]
+            if subject_id in self.subject_rooms:
+                del self.subject_rooms[subject_id]
+            logger.info(
+                f"[ServerAuth] Permanently dropped {subject_id} from game {game_id} "
+                f"after reconnection timeout"
+            )
+
+    def rejoin_server_auth_game(
+        self, subject_id: SubjectID, socket_id: str
+    ) -> remote_game.ServerGame | None:
+        """Rejoin a disconnected player to their running server-auth game.
+
+        Cancels any pending disconnect timeout and re-adds the player to
+        the socket room so they receive state broadcasts again.
+
+        Returns the game if rejoin succeeded, None otherwise.
+        """
+        game_id = self.subject_games.get(subject_id)
+        if game_id is None:
+            return None
+
+        game = self.games.get(game_id)
+        if game is None:
+            return None
+
+        if game.status not in (
+            remote_game.GameStatus.Active,
+            remote_game.GameStatus.Reset,
+        ):
+            return None
+
+        # Cancel disconnect timeout
+        timeout = self._disconnect_timeouts.pop(subject_id, None)
+        if timeout is not None:
+            timeout.cancel()
+
+        # Rejoin the socket room
+        flask_socketio.join_room(game_id, sid=socket_id)
+        self.subject_rooms[subject_id] = game_id
+
+        # Mark as focused again
+        game.document_focus_status[subject_id] = True
+
+        logger.info(f"[ServerAuth] {subject_id} rejoined game {game_id}")
+        return game
 
     def is_subject_in_active_game(self, subject_id: SubjectID) -> bool:
         """Check if a subject is currently in an active game.

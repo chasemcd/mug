@@ -120,6 +120,9 @@ class GymScene(scene.Scene):
         self.reset_timeout: int = 3000
         self.reset_freeze_s: int = 0
 
+        # Server-authoritative mode
+        self.server_authoritative: bool = False
+
         # pyodide
         self.run_through_pyodide: bool = False
         self.pyodide_multiplayer: bool = False  # Enable multiplayer Pyodide coordination
@@ -128,26 +131,6 @@ class GymScene(scene.Scene):
         self.packages_to_install: list[str] = [GymScene.DEFAULT_MUG_PACKAGE]
         self.restart_pyodide: bool = False
 
-        # Multiplayer sync settings (for pyodide_multiplayer=True)
-        # state_broadcast_interval: Frames between state broadcasts/syncs
-        # - In server-authoritative mode: server broadcasts authoritative state at this interval
-        # - In host-based mode: clients verify state hashes at this interval
-        # Set to None to disable periodic sync (not recommended)
-        self.state_broadcast_interval: int = 30  # Frames between broadcasts (~1s at 30fps)
-
-        # Server-authoritative multiplayer settings
-        # When enabled, server runs a parallel Python environment that steps in sync with clients
-        # and broadcasts authoritative state periodically, eliminating host dependency
-        self.server_authoritative: bool = False
-
-        # Real-time mode (for server-authoritative)
-        # When True, server steps on a timer (not blocked by slow players)
-        # Clients use prediction + rollback for smooth gameplay
-        self.realtime_mode: bool = True
-
-        # Input buffer size for rollback/replay (real-time mode)
-        # Number of frames of input history to keep for potential replay
-        self.input_buffer_size: int = 300  # ~10 sec at 30fps
 
         # Snapshot interval: save a state snapshot every N frames for rollback
         # Lower values = more snapshots = faster rollback recovery but more memory
@@ -720,12 +703,10 @@ class GymScene(scene.Scene):
 
     def multiplayer(
         self,
+        # Architecture mode
+        mode: str = NotProvided,
         # Sync/rollback params (from pyodide)
         multiplayer: bool = NotProvided,
-        server_authoritative: bool = NotProvided,
-        state_broadcast_interval: int = NotProvided,
-        realtime_mode: bool = NotProvided,
-        input_buffer_size: int = NotProvided,
         input_delay: int = NotProvided,
         snapshot_interval: int = NotProvided,
         input_confirmation_timeout_ms: int = NotProvided,
@@ -764,21 +745,17 @@ class GymScene(scene.Scene):
         grouping, continuous monitoring, exclusion callbacks, reconnection, partner
         disconnect, and focus loss configuration.
 
+        **Architecture Mode:**
+
+        :param mode: Multiplayer architecture mode. 'p2p' (default) runs the environment
+            in each client's browser with P2P WebRTC sync. 'server_authoritative' runs the
+            environment on the server and streams render state to thin clients.
+        :type mode: str, optional
+
         **Sync/Rollback Configuration:**
 
         :param multiplayer: Enable multiplayer Pyodide coordination, defaults to NotProvided
         :type multiplayer: bool, optional
-        :param server_authoritative: If True, server runs a parallel environment that
-            broadcasts authoritative state periodically, defaults to NotProvided
-        :type server_authoritative: bool, optional
-        :param state_broadcast_interval: Frames between state broadcasts/syncs, defaults to NotProvided
-        :type state_broadcast_interval: int, optional
-        :param realtime_mode: If True, server steps on a timer rather than waiting for
-            all player actions, defaults to NotProvided
-        :type realtime_mode: bool, optional
-        :param input_buffer_size: Number of frames of input history to keep for
-            rollback/replay, defaults to NotProvided
-        :type input_buffer_size: int, optional
         :param input_delay: GGPO input delay in frames, defaults to NotProvided
         :type input_delay: int, optional
         :param snapshot_interval: Save a state snapshot every N frames for rollback.
@@ -859,26 +836,22 @@ class GymScene(scene.Scene):
         :return: This scene object
         :rtype: GymScene
         """
+        # --- Architecture mode ---
+        if mode is not NotProvided:
+            if mode not in ('p2p', 'server_authoritative'):
+                raise ValueError(f"mode must be 'p2p' or 'server_authoritative', got '{mode}'")
+            if mode == 'server_authoritative':
+                self.server_authoritative = True
+                self.run_through_pyodide = False  # Thin client -- no Pyodide needed
+                # Server-auth implies multiplayer coordination but NOT pyodide_multiplayer
+                # (pyodide_multiplayer is for P2P WebRTC coordination)
+            elif mode == 'p2p':
+                self.server_authoritative = False
+
         # --- Sync/rollback params ---
         if multiplayer is not NotProvided:
             assert isinstance(multiplayer, bool)
             self.pyodide_multiplayer = multiplayer
-
-        if server_authoritative is not NotProvided:
-            assert isinstance(server_authoritative, bool)
-            self.server_authoritative = server_authoritative
-
-        if state_broadcast_interval is not NotProvided:
-            assert isinstance(state_broadcast_interval, int) and state_broadcast_interval > 0
-            self.state_broadcast_interval = state_broadcast_interval
-
-        if realtime_mode is not NotProvided:
-            assert isinstance(realtime_mode, bool)
-            self.realtime_mode = realtime_mode
-
-        if input_buffer_size is not NotProvided:
-            assert isinstance(input_buffer_size, int) and input_buffer_size > 0
-            self.input_buffer_size = input_buffer_size
 
         if input_delay is not NotProvided:
             assert isinstance(input_delay, int) and input_delay >= 0

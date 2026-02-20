@@ -831,7 +831,6 @@ class GymScene(scene.Scene):
     def multiplayer(
         self,
         multiplayer: bool = NotProvided,
-        server_authoritative: bool = NotProvided,
         # ... multiplayer/sync params ...
     ):
         if multiplayer is not NotProvided:

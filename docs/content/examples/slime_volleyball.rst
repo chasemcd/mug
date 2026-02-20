@@ -388,13 +388,13 @@ Wrap the SlimeVolley environment with custom rendering:
 
     class SlimeVBEnvIG(slimevolley_env.SlimeVolleyEnv):
         def render(self):
-            assert self.render_mode == "interactive-gym"
+            assert self.render_mode == "mug"
             return slime_volleyball_env_to_rendering(self)
 
     # Create instance for Pyodide
     env = SlimeVBEnvIG(
         config={"human_inputs": True},
-        render_mode="interactive-gym"
+        render_mode="mug"
     )
 
 Server Mode Differences

@@ -43,7 +43,7 @@ Frame-by-Frame Process
 
     # In your environment
     def render(self):
-        assert self.render_mode == "interactive-gym"
+        assert self.render_mode == "mug"
 
         # Create visual objects
         player = Circle(uuid="player", x=self.x, y=self.y, radius=20, color="#FF0000")
@@ -558,7 +558,7 @@ Common Issues
 
 **Objects not appearing**
 
-- Verify ``render_mode="interactive-gym"``
+- Verify ``render_mode="mug"``
 - Check coordinates are in valid range (0-1 for relative)
 - Ensure ``.as_dict()`` is called
 - Look for JavaScript errors in browser console
