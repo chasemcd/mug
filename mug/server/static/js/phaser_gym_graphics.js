@@ -14,9 +14,20 @@ var game_config = {
 var game_graphics;
 let stateBuffer = []
 export function addStateToBuffer(state_data) {
-    // Normalize: server_render_state sends render_state, existing path sends game_state_objects
-    if (state_data.render_state && !state_data.game_state_objects) {
-        state_data.game_state_objects = state_data.render_state;
+    // Server-auth path: render_state contains the RenderPacket dict
+    if (state_data.render_state) {
+        if (state_data.render_state.game_state_objects !== undefined) {
+            // New RenderPacket format: unwrap
+            state_data.game_state_objects = state_data.render_state.game_state_objects;
+            state_data.removed = state_data.render_state.removed || [];
+        } else {
+            // Fallback: treat render_state as flat list (legacy compat during transition)
+            state_data.game_state_objects = state_data.render_state;
+        }
+    }
+    if (state_data.game_state_objects == null) {
+        console.warn("game_state is null, skipping frame");
+        return;
     }
     stateBuffer.push(state_data);
 }
@@ -311,8 +322,7 @@ class GymScene extends Phaser.Scene {
 
     constructor(config) {
         super({key: "GymScene"});
-        this.temp_object_map = {};
-        this.perm_object_map = {};
+        this.objectMap = new Map();
         this.state = config.state_init;
         this.assets_dir = config.assets_dir;
         this.assets_to_preload = config.assets_to_preload;
@@ -804,23 +814,7 @@ class GymScene extends Phaser.Scene {
             const blob = new Blob([game_state_image], { type: 'image/jpeg' });
             const url = URL.createObjectURL(blob);
 
-            // // This will trigger when the new texture is added
-            // this.textures.once('addtexture', function () {
-
-            //     this.stateImageSprite.setTexture("curStateImage");
-            //     console.log("set texture curstateImage");
-
-            // }, this);
-
-            // this.textures.addImage("curStateImage", url, () => {
-            //     URL.revokeObjectURL(url);
-            //     if (this.stateImageSprite) {
-            //         this.stateImageSprite.setTexture("curStateImage");
-            //     }
-            //     console.log("set texture curstateImage in addBase64");
-            //  });
-
-                // Create an image element to load Blob URL
+            // Create an image element to load Blob URL
             const img = new Image();
             img.crossOrigin = "anonymous"; // Prevent CORS issues
             img.src = url;
@@ -837,13 +831,12 @@ class GymScene extends Phaser.Scene {
                 canvas.height = img.height;
                 ctx.drawImage(img, 0, 0);
 
-                // ✅ **Do NOT remove the old texture immediately!**
-                // ✅ **Ensure old texture is removed first**
+                // Ensure old texture is removed first
                 if (this.textures.exists("curStateImage")) {
                     this.textures.remove("curStateImage");
                 }
 
-                // ✅ **Now safely add the new texture**
+                // Now safely add the new texture
                 this.textures.addImage("curStateImage", canvas);
 
                 if (this.stateImageSprite) {
@@ -861,128 +854,82 @@ class GymScene extends Phaser.Scene {
                 console.error("Failed to load image:", err);
             };
 
-            // // Remove the current image
-            // let oldImage;
+        } else if (game_state_objects != null) {
+            let removedIds = this.state.removed || [];
 
-            // if (this.temp_object_map.hasOwnProperty("curStateImage")) {
-            //     oldImage = this.temp_object_map['curStateImage'];
-            // }
-
-            // // This will trigger when the new texture is added
-            // this.textures.once('addtexture', function () {
-
-            //     // Place the updated image and store so we can remove later
-            //     this.temp_object_map['curStateImage'] = this.add.image(
-            //         0,
-            //         0,
-            //         `curStateImage_${this.state.step}`
-            //     );
-            //     this.temp_object_map['curStateImage'].setOrigin(0, 0);
-
-            //     // Remove the old image
-            //     if (!(oldImage == null)) {
-            //         oldImage.destroy();
-            //     }
-
-            // }, this);
-
-            // // Load the new image
-            // var base64String = this.state.game_image_base64.startsWith('data:image/png;base64,') ?
-            //     this.state.game_image_binary :
-            //     'data:image/png;base64,' + this.state.game_image_binary;
-
-            // // Success here will trigger the `addtexture` callback
-            // this.textures.addBase64(`curStateImage_${this.state.step}`, base64String);
-
-
-
-
-        } else if (!(game_state_objects == null)) {
-            // If we have game state objects, we'll render and update each object as necessary.
-            game_state_objects.forEach((game_obj) => {
-
-                var object_map;
-                let permanent = game_obj.permanent;
-                if (permanent === true) {
-                    object_map = this.perm_object_map;
-                } else {
-                    object_map = this.temp_object_map;
-                };
-
-
-                // Check if we need to add a new object
-                if (!object_map.hasOwnProperty(game_obj.uuid)) {
-                    this._addObject(game_obj, object_map);
+            // 1. Process explicit removals (persistent objects removed by Surface.remove())
+            for (const id of removedIds) {
+                if (this.objectMap.has(id)) {
+                    this.objectMap.get(id).destroy();
+                    this.objectMap.delete(id);
                 }
+            }
 
-
-                this._updateObject(game_obj, object_map);
-            });
-
-            // Remove any existing temporary objects that are no longer present
-            let game_state_object_ids = game_state_objects.map(obj_config => obj_config.uuid)
-            Object.keys(this.temp_object_map).forEach(obj_uuid => {
-                if (!game_state_object_ids.includes(obj_uuid)) {
-                    this.temp_object_map[obj_uuid].destroy();
-                    delete this.temp_object_map[obj_uuid];
+            // 2. Destroy non-permanent objects from previous frame that aren't in current frame
+            let currentFrameIds = new Set(game_state_objects.map(o => o.uuid));
+            for (const [id, obj] of this.objectMap) {
+                if (!obj.permanent && !currentFrameIds.has(id)) {
+                    obj.destroy();
+                    this.objectMap.delete(id);
                 }
-            })
+            }
 
+            // 3. Add or update each object
+            for (const objConfig of game_state_objects) {
+                if (!this.objectMap.has(objConfig.uuid)) {
+                    this._addObject(objConfig);
+                }
+                this._updateObject(objConfig);
+            }
         }
     };
 
     removeAllObjects() {
-        Object.keys(this.temp_object_map).forEach(obj_uuid => {
-            this.temp_object_map[obj_uuid].destroy();
-            delete this.temp_object_map[obj_uuid];
-        })
-
-        Object.keys(this.perm_object_map).forEach(obj_uuid => {
-            this.perm_object_map[obj_uuid].destroy();
-            delete this.perm_object_map[obj_uuid];
-        })
+        for (const [uuid, obj] of this.objectMap) {
+            obj.destroy();
+        }
+        this.objectMap.clear();
     }
 
-    _addObject(object_config, object_map) {
+    _addObject(object_config) {
         if (object_config.object_type === "sprite") {
-            this._addSprite(object_config, object_map);
+            this._addSprite(object_config);
         } else if (object_config.object_type === "animation") {
-            this._addAnimation(object_config, object_map)
+            this._addAnimation(object_config);
         } else if (object_config.object_type === "line") {
-            this._addLine(object_config, object_map)
+            this._addLine(object_config);
         } else if (object_config.object_type === "circle") {
-            this._addCircle(object_config, object_map)
-        } else if (object_config.object_type === "rectangle") {
-            this._addRectangle(object_config, object_map)
+            this._addCircle(object_config);
+        } else if (object_config.object_type === "rect" || object_config.object_type === "rectangle") {
+            this._addRectangle(object_config);
         } else if (object_config.object_type === "polygon") {
-            this._addPolygon(object_config, object_map)
+            this._addPolygon(object_config);
         } else if (object_config.object_type === "text") {
-            this._addText(object_config, object_map)
+            this._addText(object_config);
         } else {
-            console.warn("Unrecognized object type in _addObject:", object_config.object_type)
+            console.warn("Unrecognized object type in _addObject:", object_config.object_type);
         }
     }
 
-    _updateObject(object_config, object_map) {
-
+    _updateObject(object_config) {
         if (object_config.object_type === "sprite") {
-            this._updateSprite(object_config, object_map);
+            this._updateSprite(object_config);
         } else if (object_config.object_type === "line") {
-            this._updateLine(object_config, object_map)
+            this._updateLine(object_config);
         } else if (object_config.object_type === "circle") {
-            this._updateCircle(object_config, object_map)
-        } else if (object_config.object_type === "rectangle") {
-            this._updateRectangle(object_config, object_map)
+            this._updateCircle(object_config);
+        } else if (object_config.object_type === "rect" || object_config.object_type === "rectangle") {
+            this._updateRectangle(object_config);
         } else if (object_config.object_type === "polygon") {
-            this._updatePolygon(object_config, object_map)
+            this._updatePolygon(object_config);
         } else if (object_config.object_type === "text") {
-            this._updateText(object_config, object_map)
+            this._updateText(object_config);
         } else {
-            console.warn("Unrecognized object type in _updateObject:", object_config.object_type)
+            console.warn("Unrecognized object type in _updateObject:", object_config.object_type);
         }
     }
 
-    _addSprite(object_config, object_map) {
+    _addSprite(object_config) {
         let uuid = object_config.uuid;
 
         let x = Math.floor(object_config.x * this.width);
@@ -990,7 +937,7 @@ class GymScene extends Phaser.Scene {
 
         // Add a blank sprite to the specified location, everything else
         // will be updated in _updateObject
-        object_map[uuid] = this.add.sprite(
+        let sprite = this.add.sprite(
             {
                 x: x,
                 y: y,
@@ -998,18 +945,17 @@ class GymScene extends Phaser.Scene {
             }
         );
 
-        object_map[uuid].tween = null;
-        object_map[uuid].x = x;
-        object_map[uuid].y = y;
-
+        sprite.tween = null;
+        sprite.x = x;
+        sprite.y = y;
+        sprite.permanent = object_config.permanent || false;
+        this.objectMap.set(uuid, sprite);
     };
 
-    _updateSprite(object_config, object_map) {
-        let sprite = object_map[object_config.uuid];
+    _updateSprite(object_config) {
+        let sprite = this.objectMap.get(object_config.uuid);
 
         sprite.angle = object_config.angle;
-
-        // this._addTexture(object_config.image_name)
 
         // TODO(chase): enable animation playing
         // if (object_config.cur_animation !== null && obj.anims.getCurrentKey() !== object_config.cur_animation) {
@@ -1029,30 +975,7 @@ class GymScene extends Phaser.Scene {
         let new_x = Math.floor(object_config.x * this.width);
         let new_y = Math.floor(object_config.y * this.height);
 
-        if (
-            object_config.tween == true &&
-            sprite.tween == null &&
-            (new_x !== sprite.x || new_y !== sprite.y)
-            ) {
-
-            sprite.tween = this.tweens.add({
-                targets: [sprite],
-                x: new_x,
-                y: new_y,
-                duration: object_config.tween_duration,
-                ease: 'Linear',
-                onComplete: (tween, target, player) => {
-                    sprite.tween = null;
-                }
-            })
-        } else if (
-            sprite.tween == null &&
-            (new_x !== sprite.x || new_y !== sprite.y)
-        ) {
-            sprite.x = new_x;
-            sprite.y = new_y;
-        }
-
+        this._applyPositionTween(sprite, new_x, new_y, object_config);
     }
 
     // _addTexture(texture_name) {
@@ -1067,7 +990,7 @@ class GymScene extends Phaser.Scene {
         // TODO: from an animation config, define an animation.
     }
 
-    _addLine(line_config, object_map) {
+    _addLine(line_config) {
 
         var graphics = this.add.graphics()
         var points = line_config.points.map((point) => new Phaser.Math.Vector2(point[0] * this.width, point[1] * this.height))
@@ -1109,51 +1032,68 @@ class GymScene extends Phaser.Scene {
             graphics.fillPath();
         }
 
-
-        object_map[line_config.uuid] = graphics;
+        graphics.permanent = line_config.permanent || false;
+        this.objectMap.set(line_config.uuid, graphics);
     }
 
-    _updateLine(line_config, object_map) {
+    _updateLine(line_config) {
         // TODO
     }
 
-    _addCircle(circle_config, object_map) {
-        let x = circle_config.x * this.width;
-        let y = circle_config.y * this.height;
+    _addCircle(config) {
+        let x = config.x * this.width;
+        let y = config.y * this.height;
+        let radius = config.radius * Math.max(this.width, this.height);
+        let alpha = config.alpha ?? 1;
 
         // Create a container at the target position
         let container = this.add.container(x, y);
-        container.setDepth(circle_config.depth);
+        container.setDepth(config.depth);
 
         // Create graphics and draw circle at origin (0,0) relative to container
         let graphics = this.add.graphics();
-        graphics.fillStyle(this._strToHex(circle_config.color), circle_config.alpha);
-        graphics.fillCircle(0, 0, circle_config.radius);
+        graphics.fillStyle(this._strToHex(config.color), alpha);
+        graphics.fillCircle(0, 0, radius);
+
+        if (config.stroke_color && config.stroke_width > 0) {
+            graphics.lineStyle(config.stroke_width, this._strToHex(config.stroke_color), alpha);
+            graphics.strokeCircle(0, 0, radius);
+        }
 
         container.add(graphics);
 
-        // Store container in object_map with tween tracking
+        // Store container in objectMap with tween tracking
         container.tween = null;
         container.graphics = graphics;  // Keep reference for redraws
-        container.lastConfig = circle_config;  // Store config for redraws
-        object_map[circle_config.uuid] = container;
+        container.lastConfig = config;  // Store config for redraws
+        container.permanent = config.permanent || false;
+        this.objectMap.set(config.uuid, container);
     }
 
-    _updateCircle(circle_config, object_map) {
-        let uuid = circle_config.uuid;
-        let container = object_map[uuid];
+    _updateCircle(circle_config) {
+        let container = this.objectMap.get(circle_config.uuid);
 
         let new_x = circle_config.x * this.width;
         let new_y = circle_config.y * this.height;
+        let radius = circle_config.radius * Math.max(this.width, this.height);
+        let alpha = circle_config.alpha ?? 1;
 
-        // Check if color or radius changed - need to redraw
+        // Check if color, radius, alpha, or stroke changed - need to redraw
         let lastConfig = container.lastConfig;
         if (lastConfig.color !== circle_config.color ||
             lastConfig.radius !== circle_config.radius ||
-            lastConfig.alpha !== circle_config.alpha) {
+            lastConfig.alpha !== circle_config.alpha ||
+            lastConfig.stroke_color !== circle_config.stroke_color ||
+            lastConfig.stroke_width !== circle_config.stroke_width) {
             container.graphics.clear();
-            container.graphics.fillStyle(this._strToHex(circle_config.color), circle_config.alpha);
-            container.graphics.fillCircle(0, 0, circle_config.radius);
+            container.graphics.fillStyle(this._strToHex(circle_config.color), alpha);
+            container.graphics.fillCircle(0, 0, radius);
+
+            if (circle_config.stroke_color && circle_config.stroke_width > 0) {
+                container.graphics.lineStyle(circle_config.stroke_width, this._strToHex(circle_config.stroke_color), alpha);
+                container.graphics.strokeCircle(0, 0, radius);
+            }
+
             container.lastConfig = circle_config;
         }
 
@@ -1161,43 +1101,77 @@ class GymScene extends Phaser.Scene {
         container.setDepth(circle_config.depth);
 
         // Handle position update with optional tweening
-        if (
-            circle_config.tween === true &&
-            container.tween === null &&
-            (new_x !== container.x || new_y !== container.y)
-        ) {
-            container.tween = this.tweens.add({
-                targets: [container],
-                x: new_x,
-                y: new_y,
-                duration: circle_config.tween_duration || 100,
-                ease: 'Linear',
-                onComplete: () => {
-                    container.tween = null;
-                }
-            });
-        } else if (
-            container.tween === null &&
-            (new_x !== container.x || new_y !== container.y)
-        ) {
-            container.x = new_x;
-            container.y = new_y;
+        this._applyPositionTween(container, new_x, new_y, circle_config);
+    }
+
+    _addRectangle(config) {
+        let x = config.x * this.width;
+        let y = config.y * this.height;
+        let w = (config.w || 0) * this.width;
+        let h = (config.h || 0) * this.height;
+        let alpha = config.alpha ?? 1;
+
+        let container = this.add.container(x, y);
+        container.setDepth(config.depth || 0);
+
+        let graphics = this.add.graphics();
+
+        if (config.color) {
+            graphics.fillStyle(this._strToHex(config.color), alpha);
+            graphics.fillRect(0, 0, w, h);
         }
+
+        if (config.stroke_color && config.stroke_width > 0) {
+            graphics.lineStyle(config.stroke_width, this._strToHex(config.stroke_color), alpha);
+            graphics.strokeRect(0, 0, w, h);
+        }
+
+        container.add(graphics);
+        container.tween = null;
+        container.graphics = graphics;
+        container.lastConfig = config;
+        container.permanent = config.permanent || false;
+        this.objectMap.set(config.uuid, container);
     }
 
-    _addRectangle(rectangle_config, object_map) {
-        // TODO
+    _updateRectangle(config) {
+        let container = this.objectMap.get(config.uuid);
+        let newX = config.x * this.width;
+        let newY = config.y * this.height;
+        let newW = (config.w || 0) * this.width;
+        let newH = (config.h || 0) * this.height;
+        let alpha = config.alpha ?? 1;
+
+        let lastConfig = container.lastConfig;
+        // Redraw if color, size, stroke, or alpha changed
+        if (lastConfig.color !== config.color ||
+            lastConfig.w !== config.w ||
+            lastConfig.h !== config.h ||
+            lastConfig.alpha !== config.alpha ||
+            lastConfig.stroke_color !== config.stroke_color ||
+            lastConfig.stroke_width !== config.stroke_width) {
+            container.graphics.clear();
+            if (config.color) {
+                container.graphics.fillStyle(this._strToHex(config.color), alpha);
+                container.graphics.fillRect(0, 0, newW, newH);
+            }
+            if (config.stroke_color && config.stroke_width > 0) {
+                container.graphics.lineStyle(config.stroke_width, this._strToHex(config.stroke_color), alpha);
+                container.graphics.strokeRect(0, 0, newW, newH);
+            }
+            container.lastConfig = config;
+        }
+
+        container.setDepth(config.depth || 0);
+        this._applyPositionTween(container, newX, newY, config);
     }
 
-    _updateRectangle(rectangle_config, object_map) {
-        // TODO
-    }
-
-    _addPolygon(polygon_config, object_map) {
+    _addPolygon(polygon_config) {
         // Calculate centroid of polygon for container position
         let points = polygon_config.points;
         let centroidX = points.reduce((sum, p) => sum + p[0], 0) / points.length * this.width;
         let centroidY = points.reduce((sum, p) => sum + p[1], 0) / points.length * this.height;
+        let alpha = polygon_config.alpha ?? 1;
 
         // Create a container at the centroid
         let container = this.add.container(centroidX, centroidY);
@@ -1212,33 +1186,41 @@ class GymScene extends Phaser.Scene {
             )
         );
 
-        graphics.fillStyle(this._strToHex(polygon_config.color), polygon_config.alpha);
+        graphics.fillStyle(this._strToHex(polygon_config.color), alpha);
         graphics.fillPoints(relativePoints, true);
+
+        if (polygon_config.stroke_color && polygon_config.stroke_width > 0) {
+            graphics.lineStyle(polygon_config.stroke_width, this._strToHex(polygon_config.stroke_color), alpha);
+            graphics.strokePoints(relativePoints, true);  // true = auto-close
+        }
 
         container.add(graphics);
 
-        // Store container in object_map with tween tracking
+        // Store container in objectMap with tween tracking
         container.tween = null;
         container.graphics = graphics;
         container.lastConfig = polygon_config;
         container.lastCentroid = { x: centroidX, y: centroidY };
-        object_map[polygon_config.uuid] = container;
+        container.permanent = polygon_config.permanent || false;
+        this.objectMap.set(polygon_config.uuid, container);
     }
 
-    _updatePolygon(polygon_config, object_map) {
-        let uuid = polygon_config.uuid;
-        let container = object_map[uuid];
+    _updatePolygon(polygon_config) {
+        let container = this.objectMap.get(polygon_config.uuid);
 
         // Calculate new centroid
         let points = polygon_config.points;
         let newCentroidX = points.reduce((sum, p) => sum + p[0], 0) / points.length * this.width;
         let newCentroidY = points.reduce((sum, p) => sum + p[1], 0) / points.length * this.height;
+        let alpha = polygon_config.alpha ?? 1;
 
-        // Check if polygon shape changed (color, alpha, or relative point positions)
+        // Check if polygon shape changed (color, alpha, stroke, or relative point positions)
         let lastConfig = container.lastConfig;
         let shapeChanged = lastConfig.color !== polygon_config.color ||
             lastConfig.alpha !== polygon_config.alpha ||
-            lastConfig.points.length !== polygon_config.points.length;
+            lastConfig.points.length !== polygon_config.points.length ||
+            lastConfig.stroke_color !== polygon_config.stroke_color ||
+            lastConfig.stroke_width !== polygon_config.stroke_width;
 
         if (!shapeChanged) {
             // Check if relative positions changed (shape deformation)
@@ -1263,8 +1245,14 @@ class GymScene extends Phaser.Scene {
                     point[1] * this.height - newCentroidY
                 )
             );
-            container.graphics.fillStyle(this._strToHex(polygon_config.color), polygon_config.alpha);
+            container.graphics.fillStyle(this._strToHex(polygon_config.color), alpha);
             container.graphics.fillPoints(relativePoints, true);
+
+            if (polygon_config.stroke_color && polygon_config.stroke_width > 0) {
+                container.graphics.lineStyle(polygon_config.stroke_width, this._strToHex(polygon_config.stroke_color), alpha);
+                container.graphics.strokePoints(relativePoints, true);  // true = auto-close
+            }
+
             container.lastConfig = polygon_config;
             container.lastCentroid = { x: newCentroidX, y: newCentroidY };
         }
@@ -1273,45 +1261,60 @@ class GymScene extends Phaser.Scene {
         container.setDepth(polygon_config.depth);
 
         // Handle position update with optional tweening
-        if (
-            polygon_config.tween === true &&
-            container.tween === null &&
-            (newCentroidX !== container.x || newCentroidY !== container.y)
-        ) {
+        this._applyPositionTween(container, newCentroidX, newCentroidY, polygon_config);
+    }
+
+    _addText(text_config) {
+        let text = this.add.text(
+            text_config.x * this.width,
+            text_config.y * this.height,
+            text_config.text,
+            { fontFamily: text_config.font, fontSize: text_config.size || 16, color: text_config.color || "#000000"}
+        );
+        text.setDepth(text_config.depth || 0);
+        text.permanent = text_config.permanent || false;
+        this.objectMap.set(text_config.uuid, text);
+    }
+
+    _updateText(text_config) {
+        let text = this.objectMap.get(text_config.uuid);
+        text.x = text_config.x * this.width;
+        text.y = text_config.y * this.height;
+        text.setText(text_config.text);
+        text.setColor(text_config.color || "#000000");
+        text.setFontSize(text_config.size || 16);
+    }
+
+    /**
+     * Shared helper for applying position tweens with cancel-and-restart behavior.
+     * First appearance places object at target (no tween from origin).
+     * If tween=true and a tween is in progress, cancels old and starts new from current position.
+     * If no tween requested and no tween in progress, snaps to position.
+     */
+    _applyPositionTween(container, newX, newY, config) {
+        if (newX === container.x && newY === container.y) return;
+
+        if (config.tween === true && config.tween_duration > 0) {
+            // Cancel existing tween if in progress (locked decision)
+            if (container.tween) {
+                container.tween.stop();
+                container.tween = null;
+            }
             container.tween = this.tweens.add({
                 targets: [container],
-                x: newCentroidX,
-                y: newCentroidY,
-                duration: polygon_config.tween_duration || 100,
+                x: newX,
+                y: newY,
+                duration: config.tween_duration,
                 ease: 'Linear',
                 onComplete: () => {
                     container.tween = null;
                 }
             });
-        } else if (
-            container.tween === null &&
-            (newCentroidX !== container.x || newCentroidY !== container.y)
-        ) {
-            container.x = newCentroidX;
-            container.y = newCentroidY;
+        } else if (!container.tween) {
+            // No tween requested and no tween in progress: snap
+            container.x = newX;
+            container.y = newY;
         }
-    }
-
-    _addText(text_config, object_map) {
-        object_map[text_config.uuid] = this.add.text(
-            text_config.x * this.width,
-            text_config.y * this.height,
-            text_config.text,
-            { fontFamily: text_config.font, fontSize: text_config.size, color: "#000"}
-        );
-        object_map[text_config.uuid].setDepth(3)
-    }
-
-    _updateText(text_config, object_map) {
-        let text = object_map[text_config.uuid];
-        text.x = text_config.x * this.width;
-        text.y = text_config.y * this.height;
-        text.setText(text_config.text);
     }
 
     _checkIfHex(string_to_test) {
