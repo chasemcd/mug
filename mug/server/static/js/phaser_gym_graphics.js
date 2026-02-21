@@ -378,6 +378,9 @@ class GymScene extends Phaser.Scene {
         this.width = this.canvas.width;
         this.stateImageSprite = this.add.image(0, 0, "curStateImage").setOrigin(0, 0);
 
+        // Expose scene for debugging and E2E test introspection
+        window._phaserScene = this;
+
         // Check if the background is just a color, if so fill
         if (this._checkIfHex(this.background)) {
             this.cameras.main.setBackgroundColor(this._strToHex(this.background));

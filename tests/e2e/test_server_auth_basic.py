@@ -29,15 +29,17 @@ from tests.fixtures.network_helpers import set_tab_visibility
 def test_server_auth_two_players_complete_episode(flask_server_auth, player_contexts):
     """
     Test that two players can connect to a server-authoritative game and
-    complete an episode.
+    complete an episode with validated rendering.
 
     Verifies:
     1. Both players connect via socket and progress through start scene
     2. Server-auth GymScene starts without Pyodide loading
     3. window.serverAuthoritative is true for both players
     4. Game canvas renders (Phaser is running)
-    5. Episode completes via server timer (max_steps=200)
-    6. Server process remains healthy throughout
+    5. Objects actually render on canvas (objectMap populated)
+    6. No texture errors in console logs
+    7. Episode completes via server timer (max_steps=200)
+    8. Server process remains healthy throughout
     """
     page1, page2 = player_contexts
     base_url = flask_server_auth["url"]
@@ -45,6 +47,22 @@ def test_server_auth_two_players_complete_episode(flask_server_auth, player_cont
     # Step 1: Both players navigate to game
     page1.goto(base_url)
     page2.goto(base_url)
+
+    # Install console error collectors after navigation
+    for page in (page1, page2):
+        page.evaluate("""() => {
+            window._consoleErrors = [];
+            const origError = console.error;
+            console.error = function(...args) {
+                window._consoleErrors.push(args.map(a => String(a)).join(' '));
+                origError.apply(console, args);
+            };
+            const origWarn = console.warn;
+            console.warn = function(...args) {
+                window._consoleErrors.push(args.map(a => String(a)).join(' '));
+                origWarn.apply(console, args);
+            };
+        }""")
 
     # Step 2: Wait for socket connections
     wait_for_socket_connected(page1)
@@ -79,13 +97,34 @@ def test_server_auth_two_players_complete_episode(flask_server_auth, player_cont
     assert game_id1 is not None, "Player 1 should have a game ID"
     assert game_id1 == game_id2, "Players should be in the same game"
 
-    # Step 9: Wait for the episode to complete
+    # Step 9: Validate that objects are actually being rendered
+    # window._phaserScene is exposed by GymScene.create() for introspection
+    page1.wait_for_function(
+        """() => {
+            const scene = window._phaserScene;
+            return scene && scene.objectMap && scene.objectMap.size > 10;
+        }""",
+        timeout=30000,
+    )
+    obj_count = page1.evaluate(
+        "() => window._phaserScene?.objectMap?.size || 0"
+    )
+    assert obj_count > 10, (
+        f"Expected >10 rendered objects (tiles, agents, etc.), got {obj_count}"
+    )
+
+    # Step 10: Check for texture errors in console logs
+    for i, page in enumerate((page1, page2), 1):
+        errors = page.evaluate("() => window._consoleErrors || []")
+        texture_errors = [e for e in errors if "__MISSING" in e or "has no frame" in e]
+        assert not texture_errors, (
+            f"Player {i} has texture errors in console: {texture_errors[:5]}"
+        )
+
+    # Step 11: Wait for the episode to complete
     # Server-auth games with max_steps=200 complete in ~7 seconds.
     # The server emits end_game when all episodes are done.
     # The client's end_game handler clears serverAuthoritative.
-    # Wait for either:
-    # - serverAuthoritative cleared (end_game received)
-    # - OR the end scene to appear (completion code or sceneHeader change)
     page1.wait_for_function(
         """() => {
             // end_game clears serverAuthoritative
@@ -102,6 +141,6 @@ def test_server_auth_two_players_complete_episode(flask_server_auth, player_cont
         timeout=120000,
     )
 
-    # Step 10: Verify server process is still running (no crash)
+    # Step 12: Verify server process is still running (no crash)
     assert flask_server_auth["process"].poll() is None, \
         "Server should still be running after episode completion"
