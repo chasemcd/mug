@@ -73,7 +73,7 @@ server_auth_scene = (
     .policies(policy_mapping=HUMAN_HUMAN_POLICY_MAPPING)
     .environment(
         env_creator=_create_overcooked_env,
-        env_config={"render_mode": "interactive_gym"},
+        env_config={"render_mode": "mug"},
     )
     .rendering(
         fps=30,

@@ -298,7 +298,7 @@ class OvercookedRewardEnv(overcooked.Overcooked):
     def on_reset(self) -> None:
         """Generate new reward weights every reset."""
         super().on_reset()
-        self.surface.reset()
+        self._pending_surface_reset = True
 
         if not self.enable_weight_randomization:
             self.reward_weights = {
@@ -501,7 +501,17 @@ class OvercookedEnv(OvercookedRewardEnv):
                 tween_duration=75, relative=True, depth=2,
             )
 
-        return self.surface.commit().to_dict()
+        result = self.surface.commit().to_dict()
+
+        # After commit, if a reset is pending, clear the committed persistent
+        # cache so the NEXT render() call retransmits all objects.
+        # This handles the cogrid base class calling render() during reset().
+        if getattr(self, '_pending_surface_reset', False):
+            self.surface._committed_persistent.clear()
+            self.surface._ephemeral_buffer.clear()
+            self._pending_surface_reset = False
+
+        return result
 
     def _draw_dynamic_object(self, obj):
         """Draw a dynamic (non-persistent) object onto the surface."""
