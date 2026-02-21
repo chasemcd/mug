@@ -707,4 +707,6 @@ registry.register(
     env_class=functools.partial(OvercookedEnv, config=overcooked_config),
 )
 
-env = registry.make("Overcooked-BehaviorFeatures-CrampedRoom-EnvToRender")
+env = registry.make(
+    "Overcooked-BehaviorFeatures-CrampedRoom-EnvToRender", render_mode="mug"
+)

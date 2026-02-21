@@ -55,11 +55,28 @@ class MockEnvWithRender:
         return obs, rewards, terminated, truncated, infos
 
     def render(self):
-        """Return Phaser-compatible state list of dicts."""
-        return [
-            {"id": "agent-0", "x": 0.1 * self._step_count, "y": 0.2},
-            {"id": "agent-1", "x": 0.5, "y": 0.3 * self._step_count},
-        ]
+        """Return Phaser-compatible state dict (matches Surface.commit().to_dict())."""
+        return {
+            "game_state_objects": [
+                {
+                    "uuid": "agent-0", "object_type": "sprite",
+                    "x": 0.1 * self._step_count, "y": 0.2,
+                    "width": 0.1, "height": 0.1,
+                    "image_name": "chefs", "frame": "NORTH.png",
+                    "depth": 2, "tween": True, "tween_duration": 75,
+                    "permanent": False,
+                },
+                {
+                    "uuid": "agent-1", "object_type": "sprite",
+                    "x": 0.5, "y": 0.3 * self._step_count,
+                    "width": 0.1, "height": 0.1,
+                    "image_name": "chefs", "frame": "SOUTH.png",
+                    "depth": 2, "tween": True, "tween_duration": 75,
+                    "permanent": False,
+                },
+            ],
+            "removed": [],
+        }
 
     def close(self):
         self.closed = True
@@ -121,12 +138,15 @@ def test_action_step_render_broadcast():
     # Verify tick incremented
     assert game.tick_num == 1
 
-    # Verify render returns expected state
+    # Verify render returns expected state (Surface wire format)
     render_state = game.env.render()
-    assert isinstance(render_state, list)
-    assert len(render_state) == 2
-    assert render_state[0]["id"] == "agent-0"
-    assert render_state[1]["id"] == "agent-1"
+    assert isinstance(render_state, dict)
+    assert "game_state_objects" in render_state
+    assert "removed" in render_state
+    objects = render_state["game_state_objects"]
+    assert len(objects) == 2
+    assert objects[0]["uuid"] == "agent-0"
+    assert objects[1]["uuid"] == "agent-1"
 
     # Verify rewards were tracked
     assert game.episode_rewards[0] == 1.0

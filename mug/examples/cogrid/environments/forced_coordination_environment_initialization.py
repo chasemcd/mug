@@ -291,9 +291,21 @@ class OvercookedRewardEnv(overcooked.Overcooked):
 
         # Surface rendering setup
         self.surface = Surface(width=WIDTH, height=HEIGHT)
-        self.surface.register_atlas("terrain", img_path=f"{ASSET_PATH}/terrain.png", json_path=f"{ASSET_PATH}/terrain.json")
-        self.surface.register_atlas("chefs", img_path=f"{ASSET_PATH}/chefs.png", json_path=f"{ASSET_PATH}/chefs.json")
-        self.surface.register_atlas("objects", img_path=f"{ASSET_PATH}/objects.png", json_path=f"{ASSET_PATH}/objects.json")
+        self.surface.register_atlas(
+            "terrain",
+            img_path=f"{ASSET_PATH}/terrain.png",
+            json_path=f"{ASSET_PATH}/terrain.json",
+        )
+        self.surface.register_atlas(
+            "chefs",
+            img_path=f"{ASSET_PATH}/chefs.png",
+            json_path=f"{ASSET_PATH}/chefs.json",
+        )
+        self.surface.register_atlas(
+            "objects",
+            img_path=f"{ASSET_PATH}/objects.png",
+            json_path=f"{ASSET_PATH}/objects.json",
+        )
 
     def on_reset(self) -> None:
         """Generate new reward weights every reset."""
@@ -404,7 +416,6 @@ DIR_TO_CARDINAL_DIRECTION = {
 PLAYER_COLORS = {0: "blue", 1: "green"}
 
 
-
 class OvercookedEnv(OvercookedRewardEnv):
 
     def get_infos(self, **kwargs):
@@ -426,42 +437,77 @@ class OvercookedEnv(OvercookedRewardEnv):
             if obj is None:
                 continue
 
-            if isinstance(obj, grid_object.Counter) or isinstance(obj, grid_object.Wall) or isinstance(obj, overcooked_grid_objects.Pot):
+            if (
+                isinstance(obj, grid_object.Counter)
+                or isinstance(obj, grid_object.Wall)
+                or isinstance(obj, overcooked_grid_objects.Pot)
+            ):
                 x, y = get_x_y(obj.pos, HEIGHT, WIDTH)
                 self.surface.image(
-                    id=obj.uuid, x=x, y=y, w=TILE_SIZE, h=TILE_SIZE,
-                    image_name="terrain", frame="counter.png",
-                    persistent=True, relative=True, depth=-2,
+                    id=obj.uuid,
+                    x=x,
+                    y=y,
+                    w=TILE_SIZE,
+                    h=TILE_SIZE,
+                    image_name="terrain",
+                    frame="counter.png",
+                    persistent=True,
+                    relative=True,
+                    depth=-2,
                 )
 
             if isinstance(obj, overcooked_grid_objects.DeliveryZone):
                 x, y = get_x_y(obj.pos, HEIGHT, WIDTH)
                 self.surface.image(
-                    id=obj.uuid, x=x, y=y, w=TILE_SIZE, h=TILE_SIZE,
-                    image_name="terrain", frame="serve.png",
-                    persistent=True, relative=True,
+                    id=obj.uuid,
+                    x=x,
+                    y=y,
+                    w=TILE_SIZE,
+                    h=TILE_SIZE,
+                    image_name="terrain",
+                    frame="serve.png",
+                    persistent=True,
+                    relative=True,
                 )
 
             if isinstance(obj, overcooked_grid_objects.PlateStack):
                 x, y = get_x_y(obj.pos, HEIGHT, WIDTH)
                 self.surface.image(
-                    id=obj.uuid, x=x, y=y, w=TILE_SIZE, h=TILE_SIZE,
-                    image_name="terrain", frame="dishes.png",
-                    persistent=True, relative=True,
+                    id=obj.uuid,
+                    x=x,
+                    y=y,
+                    w=TILE_SIZE,
+                    h=TILE_SIZE,
+                    image_name="terrain",
+                    frame="dishes.png",
+                    persistent=True,
+                    relative=True,
                 )
             elif isinstance(obj, overcooked_grid_objects.OnionStack):
                 x, y = get_x_y(obj.pos, HEIGHT, WIDTH)
                 self.surface.image(
-                    id=obj.uuid, x=x, y=y, w=TILE_SIZE, h=TILE_SIZE,
-                    image_name="terrain", frame="onions.png",
-                    persistent=True, relative=True,
+                    id=obj.uuid,
+                    x=x,
+                    y=y,
+                    w=TILE_SIZE,
+                    h=TILE_SIZE,
+                    image_name="terrain",
+                    frame="onions.png",
+                    persistent=True,
+                    relative=True,
                 )
             elif isinstance(obj, overcooked_grid_objects.Pot):
                 x, y = get_x_y(obj.pos, HEIGHT, WIDTH)
                 self.surface.image(
-                    id=f"{obj.uuid}-pot", x=x, y=y, w=TILE_SIZE, h=TILE_SIZE,
-                    image_name="terrain", frame="pot.png",
-                    persistent=True, relative=True,
+                    id=f"{obj.uuid}-pot",
+                    x=x,
+                    y=y,
+                    w=TILE_SIZE,
+                    h=TILE_SIZE,
+                    image_name="terrain",
+                    frame="pot.png",
+                    persistent=True,
+                    relative=True,
                 )
 
         # Dynamic objects
@@ -480,7 +526,9 @@ class OvercookedEnv(OvercookedRewardEnv):
             x, y = get_x_y(agent_obj.pos, HEIGHT, WIDTH)
             held_object_name = ""
             if agent_obj.inventory:
-                assert len(agent_obj.inventory) == 1, "Rendering not supported for inventory > 1."
+                assert (
+                    len(agent_obj.inventory) == 1
+                ), "Rendering not supported for inventory > 1."
                 held_obj = agent_obj.inventory[0]
                 if isinstance(held_obj, overcooked_grid_objects.Onion):
                     held_object_name = "-onion"
@@ -491,14 +539,27 @@ class OvercookedEnv(OvercookedRewardEnv):
 
             dir = DIR_TO_CARDINAL_DIRECTION[agent_obj.dir]
             self.surface.image(
-                id=f"agent-{i}-sprite", x=x, y=y, w=TILE_SIZE, h=TILE_SIZE,
-                image_name="chefs", frame=f"{dir}{held_object_name}.png",
-                tween_duration=75, relative=True,
+                id=f"agent-{i}-sprite",
+                x=x,
+                y=y,
+                w=TILE_SIZE,
+                h=TILE_SIZE,
+                image_name="chefs",
+                frame=f"{dir}{held_object_name}.png",
+                tween_duration=75,
+                relative=True,
             )
             self.surface.image(
-                id=f"agent-{i}-hat-sprite", x=x, y=y, w=TILE_SIZE, h=TILE_SIZE,
-                image_name="chefs", frame=f"{dir}-{PLAYER_COLORS[i]}hat.png",
-                tween_duration=75, relative=True, depth=2,
+                id=f"agent-{i}-hat-sprite",
+                x=x,
+                y=y,
+                w=TILE_SIZE,
+                h=TILE_SIZE,
+                image_name="chefs",
+                frame=f"{dir}-{PLAYER_COLORS[i]}hat.png",
+                tween_duration=75,
+                relative=True,
+                depth=2,
             )
 
         result = self.surface.commit().to_dict()
@@ -506,7 +567,7 @@ class OvercookedEnv(OvercookedRewardEnv):
         # After commit, if a reset is pending, clear the committed persistent
         # cache so the NEXT render() call retransmits all objects.
         # This handles the cogrid base class calling render() during reset().
-        if getattr(self, '_pending_surface_reset', False):
+        if getattr(self, "_pending_surface_reset", False):
             self.surface._committed_persistent.clear()
             self.surface._ephemeral_buffer.clear()
             self._pending_surface_reset = False
@@ -526,37 +587,67 @@ class OvercookedEnv(OvercookedRewardEnv):
                 frame = "soup-onion-cooked.png"
 
             self.surface.image(
-                id=f"{obj.uuid}-contents", x=x, y=y, w=TILE_SIZE, h=TILE_SIZE,
-                image_name="objects", frame=frame,
-                relative=True, depth=1,
+                id=f"{obj.uuid}-contents",
+                x=x,
+                y=y,
+                w=TILE_SIZE,
+                h=TILE_SIZE,
+                image_name="objects",
+                frame=frame,
+                relative=True,
+                depth=1,
             )
 
             if status == "cooking" and len(obj.objects_in_pot) == 3:
                 self.surface.text(
-                    id="time_left", text=f"{obj.cooking_timer:02d}",
-                    x=x, y=y, size=14, color="red", relative=True,
+                    id="time_left",
+                    text=f"{obj.cooking_timer:02d}",
+                    x=x,
+                    y=y,
+                    size=14,
+                    color="red",
+                    relative=True,
                 )
         elif isinstance(obj, overcooked_grid_objects.Onion):
             x, y = get_x_y(obj.pos, HEIGHT, WIDTH)
             self.surface.image(
-                id=obj.uuid, x=x, y=y, w=TILE_SIZE, h=TILE_SIZE,
-                image_name="objects", frame="onion.png",
-                relative=True, depth=1,
+                id=obj.uuid,
+                x=x,
+                y=y,
+                w=TILE_SIZE,
+                h=TILE_SIZE,
+                image_name="objects",
+                frame="onion.png",
+                relative=True,
+                depth=1,
             )
         elif isinstance(obj, overcooked_grid_objects.Plate):
             x, y = get_x_y(obj.pos, HEIGHT, WIDTH)
             self.surface.image(
-                id=obj.uuid, x=x, y=y, w=TILE_SIZE, h=TILE_SIZE,
-                image_name="objects", frame="dish.png",
-                relative=True, depth=1,
+                id=obj.uuid,
+                x=x,
+                y=y,
+                w=TILE_SIZE,
+                h=TILE_SIZE,
+                image_name="objects",
+                frame="dish.png",
+                relative=True,
+                depth=1,
             )
         elif isinstance(obj, overcooked_grid_objects.OnionSoup):
             x, y = get_x_y(obj.pos, HEIGHT, WIDTH)
             self.surface.image(
-                id=obj.uuid, x=x, y=y, w=TILE_SIZE, h=TILE_SIZE,
-                image_name="objects", frame="soup-onion-dish.png",
-                relative=True, depth=1,
+                id=obj.uuid,
+                x=x,
+                y=y,
+                w=TILE_SIZE,
+                h=TILE_SIZE,
+                image_name="objects",
+                frame="soup-onion-dish.png",
+                relative=True,
+                depth=1,
             )
+
 
 class ScaledFullMapEncoding(features.FullMapEncoding):
     def generate(self, env, player_id, **kwargs):
@@ -605,11 +696,10 @@ overcooked_config = {
 
 registry.register(
     environment_id="Overcooked-BehaviorFeatures-ForcedCoordination-EnvToRender",
-    env_class=functools.partial(
-        OvercookedEnv, config=overcooked_config
-    ),
+    env_class=functools.partial(OvercookedEnv, config=overcooked_config),
 )
 
 env = registry.make(
-    "Overcooked-BehaviorFeatures-ForcedCoordination-EnvToRender"
+    "Overcooked-BehaviorFeatures-ForcedCoordination-EnvToRender",
+    render_mode="mug",
 )

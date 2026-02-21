@@ -66,7 +66,20 @@ class MockEnv:
         self.closed = True
 
     def render(self):
-        return [{"id": "sprite-1", "x": 0.5, "y": 0.5}]
+        """Return Phaser-compatible state dict (matches Surface.commit().to_dict())."""
+        return {
+            "game_state_objects": [
+                {
+                    "uuid": "sprite-1", "object_type": "sprite",
+                    "x": 0.5, "y": 0.5,
+                    "width": 0.1, "height": 0.1,
+                    "image_name": "terrain", "frame": "counter.png",
+                    "depth": 0, "tween": False, "tween_duration": 0,
+                    "permanent": True,
+                },
+            ],
+            "removed": [],
+        }
 
 
 class MockScene:
