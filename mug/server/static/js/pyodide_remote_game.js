@@ -12,7 +12,7 @@ export class RemoteGame {
 
     setAttributes(config) {
         this.config = config;
-        this.interactive_gym_globals = config.interactive_gym_globals;
+        this.mug_globals = config.mug_globals;
         this.sceneId = config.scene_id;  // Store scene ID for incremental data export
         this.micropip = null;
         this.pyodideReady = false;
@@ -84,7 +84,7 @@ export class RemoteGame {
             }
         }
 
-        this.pyodide.globals.set("interactive_gym_globals", this.interactive_gym_globals);
+        this.pyodide.globals.set("mug_globals", this.mug_globals);
 
 
         // The code executed here must instantiate an environment `env`
@@ -95,7 +95,7 @@ export class RemoteGame {
         const env = await this.pyodide.runPythonAsync(`
 ${futureImports.join('\n')}
 import js
-interactive_gym_globals = dict(js.window.interactiveGymGlobals.object_entries())
+mug_globals = dict(js.window.interactiveGymGlobals.object_entries())
 
 ${restCode}
 env
@@ -138,8 +138,8 @@ env
         const env = await this.pyodide.runPythonAsync(`
 ${reinitFutureImports.join('\n')}
 import js
-interactive_gym_globals = dict(js.window.interactiveGymGlobals.object_entries())
-print("Globals on initialization: ", interactive_gym_globals)
+mug_globals = dict(js.window.interactiveGymGlobals.object_entries())
+print("Globals on initialization: ", mug_globals)
 ${reinitRestCode}
 env
         `);
@@ -567,6 +567,17 @@ export function convertUndefinedToNull(obj) {
     if (typeof obj !== 'object' || obj === null) {
         // Return the value as is if it's not an object or is already null
         return obj;
+    }
+
+    // Pyodide's toJs() converts Python dicts to JS Maps by default.
+    // Maps don't support property access (map.key returns undefined),
+    // so convert them to plain objects for the Phaser renderer.
+    if (obj instanceof Map) {
+        const plain = {};
+        for (const [key, value] of obj.entries()) {
+            plain[key] = value === undefined ? null : convertUndefinedToNull(value);
+        }
+        return plain;
     }
 
     for (let key in obj) {

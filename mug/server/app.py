@@ -43,7 +43,7 @@ class ParticipantSession:
 
     subject_id: str
     stager_state: dict | None  # Serialized stager state (current_scene_index, etc.)
-    interactive_gym_globals: dict  # Client-side metadata (interactiveGymGlobals)
+    mug_globals: dict  # Client-side metadata (interactiveGymGlobals)
     current_scene_id: str | None  # ID of the current scene
     socket_id: str | None  # Current socket ID if connected
     is_connected: bool  # Whether currently connected
@@ -264,7 +264,7 @@ def user_index(subject_id):
         PARTICIPANT_SESSIONS[subject_id] = ParticipantSession(
             subject_id=subject_id,
             stager_state=None,
-            interactive_gym_globals={"subjectName": subject_id},
+            mug_globals={"subjectName": subject_id},
             current_scene_id=None,
             socket_id=None,
             is_connected=False,
@@ -387,13 +387,13 @@ def register_subject(data):
     if is_restored_session:
         # Returning participant - merge globals (server wins for conflicts)
         # Start with client globals, then overlay server-stored globals
-        merged_globals = {**client_globals, **existing_session.interactive_gym_globals}
+        merged_globals = {**client_globals, **existing_session.mug_globals}
 
         # Update session state
         existing_session.socket_id = sid
         existing_session.is_connected = True
         existing_session.last_updated_at = time.time()
-        existing_session.interactive_gym_globals = merged_globals
+        existing_session.mug_globals = merged_globals
 
         logger.info(
             f"Session restored for {subject_id}, "
@@ -421,7 +421,7 @@ def register_subject(data):
             existing_session.is_connected = True
             existing_session.last_updated_at = time.time()
             # Merge client globals into the session
-            existing_session.interactive_gym_globals.update(client_globals)
+            existing_session.mug_globals.update(client_globals)
 
         participant_stager.start(socketio, room=sid)
 
@@ -470,7 +470,7 @@ def sync_globals(data):
 
     if session is not None:
         # Update the stored globals with client values
-        session.interactive_gym_globals.update(client_globals)
+        session.mug_globals.update(client_globals)
         session.last_updated_at = time.time()
         logger.debug(f"Synced globals for {subject_id}: {list(client_globals.keys())}")
 
@@ -1051,7 +1051,7 @@ def data_emission(data):
     client_globals = data.get("interactiveGymGlobals", {})
     session = PARTICIPANT_SESSIONS.get(subject_id)
     if session is not None and client_globals:
-        session.interactive_gym_globals.update(client_globals)
+        session.mug_globals.update(client_globals)
         session.last_updated_at = time.time()
 
     if not CONFIG.save_experiment_data:
@@ -1099,7 +1099,7 @@ def receive_remote_game_data(data):
     client_globals = data.get("interactiveGymGlobals", {})
     session = PARTICIPANT_SESSIONS.get(subject_id)
     if session is not None and client_globals:
-        session.interactive_gym_globals.update(client_globals)
+        session.mug_globals.update(client_globals)
         session.last_updated_at = time.time()
 
     if not CONFIG.save_experiment_data:
@@ -1198,7 +1198,7 @@ def receive_episode_data(data):
     client_globals = data.get("interactiveGymGlobals", {})
     session = PARTICIPANT_SESSIONS.get(subject_id)
     if session is not None and client_globals:
-        session.interactive_gym_globals.update(client_globals)
+        session.mug_globals.update(client_globals)
         session.last_updated_at = time.time()
 
     if not CONFIG.save_experiment_data:

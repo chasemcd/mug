@@ -3,6 +3,21 @@ from __future__ import annotations
 from mug.server import remote_game
 
 ASSET_PATH = "static/assets/overcooked/sprites"
+
+
+def overcooked_preload_assets_spec() -> list[dict]:
+    """Return the Phaser asset specs for Overcooked atlases.
+
+    These must be passed via ``.rendering(assets_to_preload=...)`` for
+    P2P / Pyodide scenes so that Phaser preloads the textures before the
+    environment starts rendering.  Server-authoritative scenes collect
+    these automatically from the Surface.
+    """
+    return [
+        {"object_type": "atlas_spec", "name": "terrain", "img_path": f"{ASSET_PATH}/terrain.png", "atlas_path": f"{ASSET_PATH}/terrain.json"},
+        {"object_type": "atlas_spec", "name": "chefs", "img_path": f"{ASSET_PATH}/chefs.png", "atlas_path": f"{ASSET_PATH}/chefs.json"},
+        {"object_type": "atlas_spec", "name": "objects", "img_path": f"{ASSET_PATH}/objects.png", "atlas_path": f"{ASSET_PATH}/objects.json"},
+    ]
 TILE_SIZE = 45
 DIR_TO_CARDINAL_DIRECTION = {
     0: "EAST",

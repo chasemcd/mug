@@ -233,7 +233,7 @@ class ServerGame:
     # Valid session state transitions (SESS-01)
     VALID_TRANSITIONS = {
         SessionState.WAITING: {SessionState.MATCHED, SessionState.ENDED},
-        SessionState.MATCHED: {SessionState.VALIDATING, SessionState.ENDED},
+        SessionState.MATCHED: {SessionState.VALIDATING, SessionState.PLAYING, SessionState.ENDED},
         SessionState.VALIDATING: {SessionState.PLAYING, SessionState.WAITING, SessionState.ENDED},
         SessionState.PLAYING: {SessionState.ENDED},
         SessionState.ENDED: set(),  # Terminal state
@@ -345,11 +345,11 @@ class ServerGame:
     def _build_env(self) -> None:
         """Create the environment from the scene's env_creator and env_config.
 
-        Sets render_mode to 'interactive_gym' in the env config so the env
+        Sets render_mode to 'mug' in the env config so the env
         produces Phaser-compatible state dicts from env.render().
         """
         env_config = dict(self.scene.env_config or {})
-        env_config["render_mode"] = "interactive_gym"
+        env_config["render_mode"] = "mug"
         self.env = self.scene.env_creator(**env_config)
         logger.info(
             f"Game {self.game_id}: environment built via scene.env_creator"

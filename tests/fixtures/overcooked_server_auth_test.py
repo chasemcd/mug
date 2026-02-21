@@ -78,7 +78,7 @@ server_auth_test_scene = (
         default_action=Noop,
         action_mapping=action_mapping,
         num_episodes=1,
-        max_steps=200,  # ~7 seconds at 30fps for fast tests
+        max_steps=200,  # ~7 seconds at 30fps for fast test completion
         input_mode=configuration_constants.InputModes.SingleKeystroke,
     )
     .content(

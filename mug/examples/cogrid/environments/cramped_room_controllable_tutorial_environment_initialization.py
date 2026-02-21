@@ -527,9 +527,9 @@ class OvercookedEnv(OvercookedRewardEnv):
                 frame = "soup-onion-cooked.png"
 
             self.surface.image(
-                id=obj.uuid, x=x, y=y, w=TILE_SIZE, h=TILE_SIZE,
+                id=f"{obj.uuid}-contents", x=x, y=y, w=TILE_SIZE, h=TILE_SIZE,
                 image_name="objects", frame=frame,
-                relative=True, depth=-1,
+                relative=True, depth=1,
             )
 
             if status == "cooking" and len(obj.objects_in_pot) == 3:
@@ -542,21 +542,21 @@ class OvercookedEnv(OvercookedRewardEnv):
             self.surface.image(
                 id=obj.uuid, x=x, y=y, w=TILE_SIZE, h=TILE_SIZE,
                 image_name="objects", frame="onion.png",
-                relative=True, depth=-1,
+                relative=True, depth=1,
             )
         elif isinstance(obj, overcooked_grid_objects.Plate):
             x, y = get_x_y(obj.pos, HEIGHT, WIDTH)
             self.surface.image(
                 id=obj.uuid, x=x, y=y, w=TILE_SIZE, h=TILE_SIZE,
                 image_name="objects", frame="dish.png",
-                relative=True, depth=-1,
+                relative=True, depth=1,
             )
         elif isinstance(obj, overcooked_grid_objects.OnionSoup):
             x, y = get_x_y(obj.pos, HEIGHT, WIDTH)
             self.surface.image(
                 id=obj.uuid, x=x, y=y, w=TILE_SIZE, h=TILE_SIZE,
                 image_name="objects", frame="soup-onion-dish.png",
-                relative=True, depth=-1,
+                relative=True, depth=1,
             )
 
 class ScaledFullMapEncoding(features.FullMapEncoding):
@@ -598,13 +598,13 @@ overcooked_config = {
     "behavior_weights": {
         agent_id: {
             "delivery_reward": 1,
-            "delivery_act_reward": interactive_gym_globals.get(
+            "delivery_act_reward": mug_globals.get(
                 "delivery_act_reward", 0
             ),
-            "onion_in_pot_reward": interactive_gym_globals.get(
+            "onion_in_pot_reward": mug_globals.get(
                 "onion_in_pot_reward", 0
             ),
-            "soup_in_dish_reward": interactive_gym_globals.get(
+            "soup_in_dish_reward": mug_globals.get(
                 "delivery_act_reward", 0
             ),
         }

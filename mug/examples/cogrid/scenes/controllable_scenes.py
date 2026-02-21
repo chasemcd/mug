@@ -94,8 +94,8 @@ start_scene = (
 
 on_game_step_code = """
 import js
-interactive_gym_globals = dict(js.window.interactiveGymGlobals.object_entries())
-env.reward_weights[1] = {k: interactive_gym_globals.get(k, 0.0) for k in env.reward_weights[1].keys()}
+mug_globals = dict(js.window.interactiveGymGlobals.object_entries())
+env.reward_weights[1] = {k: mug_globals.get(k, 0.0) for k in env.reward_weights[1].keys()}
 """
 control_tutorial_scene = (
     gym_scene.GymScene()
@@ -113,6 +113,9 @@ control_tutorial_scene = (
         game_width=overcooked_utils.TILE_SIZE * 7,
         game_height=overcooked_utils.TILE_SIZE * 6,
         background="#e6b453",
+    )
+    .assets(
+        assets_to_preload=overcooked_utils.overcooked_preload_assets_spec(),
     )
     .gameplay(
         default_action=Noop,
@@ -146,6 +149,9 @@ tutorial_with_bot_scene = (
         game_width=overcooked_utils.TILE_SIZE * 7,
         game_height=overcooked_utils.TILE_SIZE * 6,
         background="#e6b453",
+    )
+    .assets(
+        assets_to_preload=overcooked_utils.overcooked_preload_assets_spec(),
     )
     .gameplay(
         default_action=Noop,
@@ -219,6 +225,9 @@ base_controllable_ = (
         game_width=overcooked_utils.TILE_SIZE * 7,
         game_height=overcooked_utils.TILE_SIZE * 6,
         background="#e6b453",
+    )
+    .assets(
+        assets_to_preload=overcooked_utils.overcooked_preload_assets_spec(),
     )
     .gameplay(
         default_action=Noop,

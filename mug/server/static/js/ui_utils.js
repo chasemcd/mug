@@ -1,9 +1,12 @@
 import * as phaserGraphics  from './phaser_gym_graphics.js';
 
-var socket = io({
-    transports: ['websocket'],
-    upgrade: false
-});
+// Use the shared socket from index.js (window.socket) to ensure the same
+// session ID is used for both registration and gameplay events.
+// A separate io() call would create a second connection with a different SID,
+// causing player_action and send_pressed_keys to fail subject lookup.
+function _getSocket() {
+    return window.socket;
+}
 
 
 // HUD
@@ -42,8 +45,10 @@ export function enableKeyListener(input_mode) {
         // If we're using the single keystroke input method, we just send the key when it's pressed.
         // This means no composite actions.
         if (input_mode == "single_keystroke") {
-            phaserGraphics.addHumanKeyPressToBuffer({key: event.key, keypressTimestamp: keypressTimestamp});
-            socket.emit('send_pressed_keys', {'pressed_keys': Array(event.key), session_id: window.sessionId});
+            if (!window.serverAuthoritative) {
+                phaserGraphics.addHumanKeyPressToBuffer({key: event.key, keypressTimestamp: keypressTimestamp});
+            }
+            _getSocket().emit('send_pressed_keys', {'pressed_keys': Array(event.key), session_id: window.sessionId});
             if (window.serverAuthoritative) {
                 _emitOrQueueAction(event.key);
             }
@@ -89,7 +94,7 @@ export function disableKeyListener() {
 function _emitOrQueueAction(keyName) {
     if (serverAuthInputDelay === 0) {
         // Default: emit immediately, no delay
-        socket.emit('player_action', {
+        _getSocket().emit('player_action', {
             key: keyName,
             game_id: window.currentGameId
         });
@@ -121,7 +126,7 @@ export function drainInputDelayQueue() {
     let i = 0;
     while (i < inputDelayQueue.length) {
         if (inputDelayQueue[i].emitAtFrame <= serverAuthFrameCounter) {
-            socket.emit('player_action', {
+            _getSocket().emit('player_action', {
                 key: inputDelayQueue[i].key,
                 game_id: window.currentGameId
             });

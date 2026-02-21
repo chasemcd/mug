@@ -104,7 +104,7 @@ class MockScene:
                 terminate_after=_terminate_after, **kwargs
             )
 
-        self.env_config = env_config or {"render_mode": "interactive_gym"}
+        self.env_config = env_config or {"render_mode": "mug"}
 
 
 def _make_game(scene=None, game_id=0):
@@ -124,7 +124,7 @@ class TestServerGameLifecycle:
     """Unit tests for ServerGame lifecycle methods."""
 
     def test_build_env_creates_environment(self):
-        """_build_env creates the env from scene.env_creator with render_mode='interactive_gym'."""
+        """_build_env creates the env from scene.env_creator with render_mode='mug'."""
         game = _make_game()
         assert game.env is None
 
@@ -132,7 +132,7 @@ class TestServerGameLifecycle:
 
         assert game.env is not None
         assert isinstance(game.env, MockEnv)
-        assert game.env.render_mode == "interactive_gym"
+        assert game.env.render_mode == "mug"
 
     def test_reset_initializes_episode(self):
         """After _build_env, reset() initializes episode state correctly."""

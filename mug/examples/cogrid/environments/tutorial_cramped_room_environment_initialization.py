@@ -480,9 +480,9 @@ class OvercookedEnv(OvercookedRewardEnv):
                 frame = "soup-onion-cooked.png"
 
             self.surface.image(
-                id=obj.uuid, x=x, y=y, w=TILE_SIZE, h=TILE_SIZE,
+                id=f"{obj.uuid}-contents", x=x, y=y, w=TILE_SIZE, h=TILE_SIZE,
                 image_name="objects", frame=frame,
-                relative=True, depth=-1,
+                relative=True, depth=1,
             )
 
             if status == "cooking" and len(obj.objects_in_pot) == 3:
@@ -495,21 +495,21 @@ class OvercookedEnv(OvercookedRewardEnv):
             self.surface.image(
                 id=obj.uuid, x=x, y=y, w=TILE_SIZE, h=TILE_SIZE,
                 image_name="objects", frame="onion.png",
-                relative=True, depth=-1,
+                relative=True, depth=1,
             )
         elif isinstance(obj, overcooked_grid_objects.Plate):
             x, y = get_x_y(obj.pos, HEIGHT, WIDTH)
             self.surface.image(
                 id=obj.uuid, x=x, y=y, w=TILE_SIZE, h=TILE_SIZE,
                 image_name="objects", frame="dish.png",
-                relative=True, depth=-1,
+                relative=True, depth=1,
             )
         elif isinstance(obj, overcooked_grid_objects.OnionSoup):
             x, y = get_x_y(obj.pos, HEIGHT, WIDTH)
             self.surface.image(
                 id=obj.uuid, x=x, y=y, w=TILE_SIZE, h=TILE_SIZE,
                 image_name="objects", frame="soup-onion-dish.png",
-                relative=True, depth=-1,
+                relative=True, depth=1,
             )
 
 class ScaledFullMapEncoding(features.FullMapEncoding):

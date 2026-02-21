@@ -89,7 +89,7 @@ class MockScene:
         self.env_creator = lambda **kwargs: MockEnvWithRender(
             terminate_after=_term, **kwargs
         )
-        self.env_config = {"render_mode": "interactive_gym"}
+        self.env_config = {"render_mode": "mug"}
 
 
 def _make_game(scene=None, game_id=0):

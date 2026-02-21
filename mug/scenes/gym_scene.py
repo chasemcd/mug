@@ -56,7 +56,7 @@ class GymScene(scene.Scene):
         queue_resync_threshold (int): Trigger state resync if action queue exceeds this size (default 50).
     """
 
-    DEFAULT_MUG_PACKAGE = "multi-user-gymnasium==0.1.1"
+    DEFAULT_MUG_PACKAGE = "multi-user-gymnasium==0.1.2"
 
     def __init__(
         self,
@@ -97,7 +97,9 @@ class GymScene(scene.Scene):
         self.env_to_state_fn: Callable | None = None
         self.preload_specs: list[dict[str, str | int | float]] | None = None
         self.hud_text_fn: Callable | None = None
-        self.hud_score_carry_over: bool = False  # If True, cumulative rewards carry over between episodes
+        self.hud_score_carry_over: bool = (
+            False  # If True, cumulative rewards carry over between episodes
+        )
         self.location_representation: str = "relative"  # "relative" or "pixels"
         self.game_width: int | None = 600
         self.game_height: int | None = 400
@@ -113,9 +115,13 @@ class GymScene(scene.Scene):
         self.scene_body: str = None
         self.in_game_scene_body: str = None
         self.waitroom_timeout_redirect_url: str = None
-        self.waitroom_timeout_scene_id: str = None  # Scene to jump to on waitroom timeout
+        self.waitroom_timeout_scene_id: str = (
+            None  # Scene to jump to on waitroom timeout
+        )
         self.waitroom_timeout: int = 120000
-        self.waitroom_timeout_message: str | None = None  # Custom message when waitroom times out
+        self.waitroom_timeout_message: str | None = (
+            None  # Custom message when waitroom times out
+        )
         self.game_page_html_fn: Callable = None
         self.reset_timeout: int = 3000
         self.reset_freeze_s: int = 0
@@ -125,12 +131,13 @@ class GymScene(scene.Scene):
 
         # pyodide
         self.run_through_pyodide: bool = False
-        self.pyodide_multiplayer: bool = False  # Enable multiplayer Pyodide coordination
+        self.pyodide_multiplayer: bool = (
+            False  # Enable multiplayer Pyodide coordination
+        )
         self.environment_initialization_code: str = ""
         self.on_game_step_code: str = ""
         self.packages_to_install: list[str] = [GymScene.DEFAULT_MUG_PACKAGE]
         self.restart_pyodide: bool = False
-
 
         # Snapshot interval: save a state snapshot every N frames for rollback
         # Lower values = more snapshots = faster rollback recovery but more memory
@@ -148,28 +155,44 @@ class GymScene(scene.Scene):
         self.input_confirmation_timeout_ms: int = 500
 
         # Lobby/waitroom display settings
-        self.hide_lobby_count: bool = False  # If True, hide participant count in waitroom
+        self.hide_lobby_count: bool = (
+            False  # If True, hide participant count in waitroom
+        )
 
         # Matchmaking settings
-        self.matchmaking_max_rtt: int | None = None  # Max RTT difference (ms) between paired participants
-        self._matchmaker: Matchmaker | None = None  # Custom matchmaker, None uses default FIFO
+        self.matchmaking_max_rtt: int | None = (
+            None  # Max RTT difference (ms) between paired participants
+        )
+        self._matchmaker: Matchmaker | None = (
+            None  # Custom matchmaker, None uses default FIFO
+        )
 
         # Player group settings (for multiplayer games)
         # Groups are always tracked automatically after each game completes.
         # wait_for_known_group controls whether to require the same group members in this scene.
-        self.wait_for_known_group: bool = False  # If True, wait for existing group; if False, use FIFO matching
-        self.group_wait_timeout: int = 60000  # ms to wait for known group members before timeout
+        self.wait_for_known_group: bool = (
+            False  # If True, wait for existing group; if False, use FIFO matching
+        )
+        self.group_wait_timeout: int = (
+            60000  # ms to wait for known group members before timeout
+        )
 
         # Rollback smoothing settings (for multiplayer games with GGPO)
         # When enabled, objects smoothly tween to their new positions after rollback corrections
         # instead of snapping/teleporting. This hides visual "jank" from state corrections.
         # Set to None to disable, or a positive integer (ms) to enable with that duration.
-        self.rollback_smoothing_duration: int | None = 100  # Tween duration in ms, None to disable
+        self.rollback_smoothing_duration: int | None = (
+            100  # Tween duration in ms, None to disable
+        )
 
         # Continuous monitoring (Phase 16)
-        self.continuous_max_ping: int | None = None  # Max ping during gameplay (ms)
+        self.continuous_max_ping: int | None = (
+            None  # Max ping during gameplay (ms)
+        )
         self.continuous_ping_violation_window: int = 5  # Measurements to track
-        self.continuous_ping_required_violations: int = 3  # Consecutive violations for exclusion
+        self.continuous_ping_required_violations: int = (
+            3  # Consecutive violations for exclusion
+        )
         self.continuous_tab_warning_ms: int = 3000  # Warn after 3s hidden
         self.continuous_tab_exclude_ms: int = 10000  # Exclude after 10s hidden
         self.continuous_monitoring_enabled: bool = False  # Master enable flag
@@ -177,24 +200,36 @@ class GymScene(scene.Scene):
             "ping_warning": "Your connection is unstable. Please close other applications.",
             "ping_exclude": "Your connection became too slow. The game has ended.",
             "tab_warning": "Please return to the experiment window to continue.",
-            "tab_exclude": "You left the experiment window for too long. The game has ended."
+            "tab_exclude": "You left the experiment window for too long. The game has ended.",
         }
 
         # Custom exclusion callbacks (Phase 18)
-        self.continuous_exclusion_callback: Callable | None = None  # Called during gameplay
-        self.continuous_callback_interval_frames: int = 30  # Frames between callback checks (~1s at 30fps)
+        self.continuous_exclusion_callback: Callable | None = (
+            None  # Called during gameplay
+        )
+        self.continuous_callback_interval_frames: int = (
+            30  # Frames between callback checks (~1s at 30fps)
+        )
 
         # Mid-game reconnection config
         self.reconnection_timeout_ms: int = 5000  # Default 5 seconds (RECON-04)
 
         # Partner disconnection message (Phase 23)
-        self.partner_disconnect_message: str | None = None  # Custom message, None uses default
-        self.partner_disconnect_show_completion_code: bool = True  # Show completion code on partner disconnect
+        self.partner_disconnect_message: str | None = (
+            None  # Custom message, None uses default
+        )
+        self.partner_disconnect_show_completion_code: bool = (
+            True  # Show completion code on partner disconnect
+        )
 
         # Focus loss handling (Phase 27)
         self.focus_loss_timeout_ms: int = 30000  # Default 30 seconds
-        self.focus_loss_message: str | None = None  # Custom message, None uses default
-        self.pause_on_partner_background: bool = False  # If True, pause game when partner backgrounds
+        self.focus_loss_message: str | None = (
+            None  # Custom message, None uses default
+        )
+        self.pause_on_partner_background: bool = (
+            False  # If True, pause game when partner backgrounds
+        )
 
     def environment(
         self,
@@ -291,8 +326,13 @@ class GymScene(scene.Scene):
             self.background = background
 
         if rollback_smoothing_duration is not NotProvided:
-            if rollback_smoothing_duration is not None and rollback_smoothing_duration < 0:
-                raise ValueError("rollback_smoothing_duration must be None or >= 0")
+            if (
+                rollback_smoothing_duration is not None
+                and rollback_smoothing_duration < 0
+            ):
+                raise ValueError(
+                    "rollback_smoothing_duration must be None or >= 0"
+                )
             self.rollback_smoothing_duration = rollback_smoothing_duration
 
         return self
@@ -630,8 +670,11 @@ class GymScene(scene.Scene):
         if matchmaker is not NotProvided:
             # Runtime import to avoid circular dependency
             from mug.server.matchmaker import Matchmaker as MatchmakerABC
+
             if not isinstance(matchmaker, MatchmakerABC):
-                raise TypeError("matchmaker must be a Matchmaker subclass instance")
+                raise TypeError(
+                    "matchmaker must be a Matchmaker subclass instance"
+                )
             self._matchmaker = matchmaker
 
         return self
@@ -690,7 +733,9 @@ class GymScene(scene.Scene):
 
         if packages_to_install is not NotProvided:
             self.packages_to_install = packages_to_install
-            if not any("multi-user-gymnasium" in pkg for pkg in packages_to_install):
+            if not any(
+                "multi-user-gymnasium" in pkg for pkg in packages_to_install
+            ):
                 self.packages_to_install.append(self.DEFAULT_MUG_PACKAGE)
 
         if restart_pyodide is not NotProvided:
@@ -838,14 +883,18 @@ class GymScene(scene.Scene):
         """
         # --- Architecture mode ---
         if mode is not NotProvided:
-            if mode not in ('p2p', 'server_authoritative'):
-                raise ValueError(f"mode must be 'p2p' or 'server_authoritative', got '{mode}'")
-            if mode == 'server_authoritative':
+            if mode not in ("p2p", "server_authoritative"):
+                raise ValueError(
+                    f"mode must be 'p2p' or 'server_authoritative', got '{mode}'"
+                )
+            if mode == "server_authoritative":
                 self.server_authoritative = True
-                self.run_through_pyodide = False  # Thin client -- no Pyodide needed
+                self.run_through_pyodide = (
+                    False  # Thin client -- no Pyodide needed
+                )
                 # Server-auth implies multiplayer coordination but NOT pyodide_multiplayer
                 # (pyodide_multiplayer is for P2P WebRTC coordination)
-            elif mode == 'p2p':
+            elif mode == "p2p":
                 self.server_authoritative = False
 
         # --- Sync/rollback params ---
@@ -862,8 +911,13 @@ class GymScene(scene.Scene):
             self.snapshot_interval = snapshot_interval
 
         if input_confirmation_timeout_ms is not NotProvided:
-            if not isinstance(input_confirmation_timeout_ms, int) or input_confirmation_timeout_ms < 0:
-                raise ValueError("input_confirmation_timeout_ms must be a non-negative integer")
+            if (
+                not isinstance(input_confirmation_timeout_ms, int)
+                or input_confirmation_timeout_ms < 0
+            ):
+                raise ValueError(
+                    "input_confirmation_timeout_ms must be a non-negative integer"
+                )
             self.input_confirmation_timeout_ms = input_confirmation_timeout_ms
 
         # --- Matchmaking params ---
@@ -878,8 +932,11 @@ class GymScene(scene.Scene):
         if matchmaker is not NotProvided:
             # Runtime import to avoid circular dependency
             from mug.server.matchmaker import Matchmaker as MatchmakerABC
+
             if not isinstance(matchmaker, MatchmakerABC):
-                raise TypeError("matchmaker must be a Matchmaker subclass instance")
+                raise TypeError(
+                    "matchmaker must be a Matchmaker subclass instance"
+                )
             self._matchmaker = matchmaker
 
         # --- Player grouping params ---
@@ -888,7 +945,9 @@ class GymScene(scene.Scene):
             self.wait_for_known_group = wait_for_known_group
 
         if group_wait_timeout is not NotProvided:
-            assert isinstance(group_wait_timeout, int) and group_wait_timeout > 0
+            assert (
+                isinstance(group_wait_timeout, int) and group_wait_timeout > 0
+            )
             self.group_wait_timeout = group_wait_timeout
 
         # --- Continuous monitoring params ---
@@ -896,39 +955,56 @@ class GymScene(scene.Scene):
         _monitoring_param_provided = False
 
         if continuous_max_ping is not NotProvided:
-            assert continuous_max_ping is None or (isinstance(continuous_max_ping, int) and continuous_max_ping > 0), \
-                "continuous_max_ping must be None or a positive integer"
+            assert continuous_max_ping is None or (
+                isinstance(continuous_max_ping, int) and continuous_max_ping > 0
+            ), "continuous_max_ping must be None or a positive integer"
             self.continuous_max_ping = continuous_max_ping
             _monitoring_param_provided = True
 
         if continuous_ping_violation_window is not NotProvided:
-            assert isinstance(continuous_ping_violation_window, int) and continuous_ping_violation_window >= 1, \
-                "continuous_ping_violation_window must be a positive integer"
-            self.continuous_ping_violation_window = continuous_ping_violation_window
+            assert (
+                isinstance(continuous_ping_violation_window, int)
+                and continuous_ping_violation_window >= 1
+            ), "continuous_ping_violation_window must be a positive integer"
+            self.continuous_ping_violation_window = (
+                continuous_ping_violation_window
+            )
             _monitoring_param_provided = True
 
         if continuous_ping_required_violations is not NotProvided:
-            assert isinstance(continuous_ping_required_violations, int) and continuous_ping_required_violations >= 1, \
-                "continuous_ping_required_violations must be a positive integer"
-            self.continuous_ping_required_violations = continuous_ping_required_violations
+            assert (
+                isinstance(continuous_ping_required_violations, int)
+                and continuous_ping_required_violations >= 1
+            ), "continuous_ping_required_violations must be a positive integer"
+            self.continuous_ping_required_violations = (
+                continuous_ping_required_violations
+            )
             _monitoring_param_provided = True
 
         if continuous_tab_warning_ms is not NotProvided:
-            assert continuous_tab_warning_ms is None or (isinstance(continuous_tab_warning_ms, int) and continuous_tab_warning_ms >= 0), \
-                "continuous_tab_warning_ms must be None or a non-negative integer"
+            assert continuous_tab_warning_ms is None or (
+                isinstance(continuous_tab_warning_ms, int)
+                and continuous_tab_warning_ms >= 0
+            ), "continuous_tab_warning_ms must be None or a non-negative integer"
             self.continuous_tab_warning_ms = continuous_tab_warning_ms
             _monitoring_param_provided = True
 
         if continuous_tab_exclude_ms is not NotProvided:
-            assert continuous_tab_exclude_ms is None or (isinstance(continuous_tab_exclude_ms, int) and continuous_tab_exclude_ms >= 0), \
-                "continuous_tab_exclude_ms must be None or a non-negative integer"
+            assert continuous_tab_exclude_ms is None or (
+                isinstance(continuous_tab_exclude_ms, int)
+                and continuous_tab_exclude_ms >= 0
+            ), "continuous_tab_exclude_ms must be None or a non-negative integer"
             self.continuous_tab_exclude_ms = continuous_tab_exclude_ms
             _monitoring_param_provided = True
 
         if continuous_exclusion_messages is not NotProvided:
-            assert isinstance(continuous_exclusion_messages, dict), \
-                "continuous_exclusion_messages must be a dictionary"
-            self.continuous_exclusion_messages = {**self.continuous_exclusion_messages, **continuous_exclusion_messages}
+            assert isinstance(
+                continuous_exclusion_messages, dict
+            ), "continuous_exclusion_messages must be a dictionary"
+            self.continuous_exclusion_messages = {
+                **self.continuous_exclusion_messages,
+                **continuous_exclusion_messages,
+            }
             _monitoring_param_provided = True
 
         # Handle continuous_monitoring_enabled: explicit setting or auto-enable
@@ -938,7 +1014,10 @@ class GymScene(scene.Scene):
             self.continuous_monitoring_enabled = True
 
         # Cross-validation: required_violations must not exceed window
-        if self.continuous_ping_required_violations > self.continuous_ping_violation_window:
+        if (
+            self.continuous_ping_required_violations
+            > self.continuous_ping_violation_window
+        ):
             raise ValueError(
                 f"ping_required_violations ({self.continuous_ping_required_violations}) "
                 f"cannot exceed ping_violation_window ({self.continuous_ping_violation_window})"
@@ -946,18 +1025,30 @@ class GymScene(scene.Scene):
 
         # --- Exclusion callback params ---
         if continuous_callback is not NotProvided:
-            if continuous_callback is not None and not callable(continuous_callback):
+            if continuous_callback is not None and not callable(
+                continuous_callback
+            ):
                 raise ValueError("continuous_callback must be callable or None")
             self.continuous_exclusion_callback = continuous_callback
 
         if continuous_callback_interval_frames is not NotProvided:
-            if not isinstance(continuous_callback_interval_frames, int) or continuous_callback_interval_frames < 1:
-                raise ValueError("continuous_callback_interval_frames must be a positive integer")
-            self.continuous_callback_interval_frames = continuous_callback_interval_frames
+            if (
+                not isinstance(continuous_callback_interval_frames, int)
+                or continuous_callback_interval_frames < 1
+            ):
+                raise ValueError(
+                    "continuous_callback_interval_frames must be a positive integer"
+                )
+            self.continuous_callback_interval_frames = (
+                continuous_callback_interval_frames
+            )
 
         # --- Reconnection params ---
         if reconnection_timeout_ms is not NotProvided:
-            if not isinstance(reconnection_timeout_ms, int) or reconnection_timeout_ms <= 0:
+            if (
+                not isinstance(reconnection_timeout_ms, int)
+                or reconnection_timeout_ms <= 0
+            ):
                 raise ValueError("timeout_ms must be a positive integer")
             self.reconnection_timeout_ms = reconnection_timeout_ms
 
@@ -966,11 +1057,16 @@ class GymScene(scene.Scene):
             self.partner_disconnect_message = partner_disconnect_message
 
         if partner_disconnect_show_completion_code is not NotProvided:
-            self.partner_disconnect_show_completion_code = partner_disconnect_show_completion_code
+            self.partner_disconnect_show_completion_code = (
+                partner_disconnect_show_completion_code
+            )
 
         # --- Focus loss params ---
         if focus_loss_timeout_ms is not NotProvided:
-            if not isinstance(focus_loss_timeout_ms, int) or focus_loss_timeout_ms < 0:
+            if (
+                not isinstance(focus_loss_timeout_ms, int)
+                or focus_loss_timeout_ms < 0
+            ):
                 raise ValueError("timeout_ms must be a non-negative integer")
             self.focus_loss_timeout_ms = focus_loss_timeout_ms
 

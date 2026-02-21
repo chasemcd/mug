@@ -131,6 +131,9 @@ tutorial_gym_scene = (
         game_height=overcooked_utils.TILE_SIZE * 6,
         background="#e6b453",
     )
+    .assets(
+        assets_to_preload=overcooked_utils.overcooked_preload_assets_spec(),
+    )
     .gameplay(
         default_action=Noop,
         action_mapping=action_mapping,
@@ -173,6 +176,9 @@ cramped_room_sp_0 = (
         game_width=overcooked_utils.TILE_SIZE * 7,
         game_height=overcooked_utils.TILE_SIZE * 6,
         background="#e6b453",
+    )
+    .assets(
+        assets_to_preload=overcooked_utils.overcooked_preload_assets_spec(),
     )
     .gameplay(
         default_action=Noop,
@@ -435,6 +441,9 @@ cramped_room_human_human = (
         game_width=overcooked_utils.TILE_SIZE * 7,
         game_height=overcooked_utils.TILE_SIZE * 6,
         background="#e6b453",
+    )
+    .assets(
+        assets_to_preload=overcooked_utils.overcooked_preload_assets_spec(),
     )
     .gameplay(
         default_action=Noop,

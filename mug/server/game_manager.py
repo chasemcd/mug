@@ -1315,7 +1315,7 @@ class GameManager:
         """Run the server-authoritative game loop.
 
         Steps the environment at max speed (no FPS cap), renders via
-        env.render(render_mode="interactive_gym"), and broadcasts state
+        env.render(render_mode="mug"), and broadcasts state
         via the server_render_state socket event. Handles episode resets
         with configurable pause and player acknowledgments.
         """
@@ -1553,7 +1553,7 @@ class GameManager:
         """Render and broadcast game state to all clients in the room.
 
         Calls env.render() to get a Phaser-compatible state dict (the env was
-        created with render_mode="interactive_gym"), then broadcasts it with
+        created with render_mode="mug"), then broadcasts it with
         metadata via the server_render_state socket event.
         """
         # Get render state from the environment

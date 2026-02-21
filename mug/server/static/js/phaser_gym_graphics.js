@@ -750,6 +750,8 @@ class GymScene extends Phaser.Scene {
     }
 
     processRendering() {
+        if (stateBuffer.length === 0) return;
+
         const frame = this.pyodide_remote_game?.frameNumber || 0;
 
         // Server-auth input delay: drain queued actions on each render tick
@@ -757,10 +759,18 @@ class GymScene extends Phaser.Scene {
             drainInputDelayQueue();
         }
 
-        // FIX: Drain buffer by rendering multiple states when behind
-        // This catches up without skipping visual frames
-        const targetBufferSize = 1;  // Ideal: always render the latest
-        const maxRenderPerFrame = 5; // Safety limit to avoid long frames
+        // Server-authoritative mode: the client controls the frame rate.
+        // Consume exactly 1 state per frame for smooth tweening, even if
+        // the server produces states faster than the client renders them.
+        if (window.serverAuthoritative) {
+            this.state = stateBuffer.shift();
+            this.drawState();
+            return;
+        }
+
+        // P2P mode: drain buffer by rendering multiple states when behind
+        const targetBufferSize = 1;
+        const maxRenderPerFrame = 5;
 
         let renderCount = 0;
         const startBufferLen = stateBuffer.length;
@@ -938,19 +948,16 @@ class GymScene extends Phaser.Scene {
         let x = Math.floor(object_config.x * this.width);
         let y = Math.floor(object_config.y * this.height);
 
-        // Add a blank sprite to the specified location, everything else
-        // will be updated in _updateObject
-        let sprite = this.add.sprite(
-            {
-                x: x,
-                y: y,
-                depth: object_config.depth,
-            }
-        );
+        // Pass texture and frame in the constructor so the WebGL pipeline
+        // is fully initialised — sprites created without a texture may
+        // never render even after a later setTexture() call.
+        let texKey = object_config.image_name || "__DEFAULT";
+        let frame = object_config.frame || undefined;
+        let sprite = this.add.sprite(x, y, texKey, frame);
+        sprite.setDepth(object_config.depth || 0);
+        sprite.setOrigin(0);
 
         sprite.tween = null;
-        sprite.x = x;
-        sprite.y = y;
         sprite.permanent = object_config.permanent || false;
         this.objectMap.set(uuid, sprite);
     };
@@ -958,7 +965,7 @@ class GymScene extends Phaser.Scene {
     _updateSprite(object_config) {
         let sprite = this.objectMap.get(object_config.uuid);
 
-        sprite.angle = object_config.angle;
+        sprite.angle = object_config.angle || 0;
 
         // TODO(chase): enable animation playing
         // if (object_config.cur_animation !== null && obj.anims.getCurrentKey() !== object_config.cur_animation) {
@@ -1289,20 +1296,26 @@ class GymScene extends Phaser.Scene {
     }
 
     /**
-     * Shared helper for applying position tweens with cancel-and-restart behavior.
-     * First appearance places object at target (no tween from origin).
-     * If tween=true and a tween is in progress, cancels old and starts new from current position.
-     * If no tween requested and no tween in progress, snaps to position.
+     * Shared helper for applying position tweens.
+     * If a tween is already heading to the same target, let it finish.
+     * If the target changed, cancel the old tween and start a new one
+     * from the current (interpolated) position.
      */
     _applyPositionTween(container, newX, newY, config) {
         if (newX === container.x && newY === container.y) return;
 
         if (config.tween === true && config.tween_duration > 0) {
-            // Cancel existing tween if in progress (locked decision)
+            // Already tweening to this exact target — let it finish
+            if (container.tween && container._tweenTargetX === newX && container._tweenTargetY === newY) {
+                return;
+            }
+            // Cancel existing tween heading to a different target
             if (container.tween) {
                 container.tween.stop();
                 container.tween = null;
             }
+            container._tweenTargetX = newX;
+            container._tweenTargetY = newY;
             container.tween = this.tweens.add({
                 targets: [container],
                 x: newX,
