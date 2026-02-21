@@ -5,14 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-21)
 
 **Core value:** Researchers can deploy interactive simulation experiments to the browser with minimal friction, supporting both single-player and multiplayer configurations.
-**Current focus:** v1.4 Documentation Update -- Not started (defining requirements)
+**Current focus:** Phase 100 -- Rendering System Docs (v1.4 Documentation Update)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: --
-Status: Defining requirements
-Last activity: 2026-02-21 -- Milestone v1.4 started
+Phase: 100 of 105 (Rendering System Docs)
+Plan: -- (not yet planned)
+Status: Ready to plan
+Last activity: 2026-02-21 -- Roadmap created for v1.4
+
+Progress: [..........] 0%
 
 ## Performance Metrics
 
@@ -32,6 +34,7 @@ Recent decisions affecting current work:
 - No emojis in docs -- author preference
 - Tables for key comparisons and differences
 - render_mode="mug" is the correct mode throughout
+- Rendering docs first because mode docs and quick start reference rendering concepts
 - Surface API replaces ObjectContext classes (now stubs)
 
 ### Prior Milestones
@@ -48,5 +51,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-02-21
-Stopped at: Defining v1.4 requirements
+Stopped at: Roadmap created for v1.4 Documentation Update
 Resume file: --
