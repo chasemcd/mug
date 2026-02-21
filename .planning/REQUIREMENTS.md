@@ -9,7 +9,7 @@ Requirements for Documentation Update. Each maps to one roadmap phase.
 
 ### Rendering Docs
 
-- [ ] **RDOC-01**: `rendering_system.rst` rewritten to describe the Surface-based rendering pipeline with correct code examples, tables for comparisons, no emojis
+- [x] **RDOC-01**: `rendering_system.rst` rewritten to describe the Surface-based rendering pipeline with correct code examples, tables for comparisons, no emojis
 - [ ] **RDOC-02**: `object_contexts.rst` replaced with a Surface API reference page documenting all draw methods, parameters, and usage patterns
 - [ ] **RDOC-03**: `quick_start.rst` Mountain Car tutorial updated to use Surface API instead of ObjectContext imports
 
@@ -51,7 +51,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| RDOC-01 | Phase 100 | Pending |
+| RDOC-01 | Phase 100 | Complete |
 | RDOC-02 | Phase 101 | Pending |
 | RDOC-03 | Phase 102 | Pending |
 | MDOC-01 | Phase 103 | Pending |
