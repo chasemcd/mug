@@ -293,7 +293,7 @@ Next Steps
 
 Now that you've built your first experiment:
 
-- **Learn more about rendering**: :doc:`core_concepts/object_contexts` explains all available object types
+- **Learn more about rendering**: :doc:`core_concepts/surface_api` documents all Surface draw methods
 - **Understand the architecture**: :doc:`core_concepts/index` covers scenes, stagers, and more
 - **See more examples**: :doc:`examples/index` shows complete experiments
 - **Add AI opponents**: :doc:`guides/policies/ai_policies` for human-AI experiments

@@ -593,5 +593,5 @@ Next Steps
 ----------
 
 - **Compare with server mode**: :doc:`server_mode`
-- **Learn about rendering**: :doc:`object_contexts`
+- **Learn about rendering**: :doc:`surface_api`
 - **See complete example**: :doc:`../quick_start`

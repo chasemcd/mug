@@ -238,7 +238,7 @@ The Surface provides eight draw methods covering common shapes, text, and images
      - Draw an ellipse
      - ``x``, ``y``, ``rx``, ``ry``, ``color``
 
-For full parameter details, types, and default values, see the :doc:`object_contexts` page (Surface API Reference).
+For full parameter details, types, and default values, see the :doc:`surface_api` page.
 
 
 Common Parameters
@@ -380,7 +380,7 @@ Key points in this example:
 Next Steps
 ----------
 
-- :doc:`object_contexts` -- Surface API Reference with full parameter details for every draw method
+- :doc:`surface_api` -- Full parameter details for every Surface draw method
 - :doc:`../quick_start` -- Quick Start tutorial demonstrating a complete environment with rendering
 - :doc:`server_mode` -- Server Mode: how the server-authoritative pipeline transmits render packets to thin clients
 - :doc:`pyodide_mode` -- Pyodide Mode: how rendering works when the environment runs client-side in the browser
