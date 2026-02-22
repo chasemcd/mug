@@ -13,7 +13,7 @@ Install MUG with server dependencies:
     pip install multi-user-gymnasium[server]
 
 Step 1: Create the Custom Environment
---------------------------------------
+-------------------------------------
 
 The standard Mountain Car uses pygame for rendering, which is not available in the browser. We override the ``render()`` method to use MUG's Surface API instead.
 
@@ -101,7 +101,7 @@ The ``_to_pixel`` helper maps environment state to pixel coordinates on a 600x40
 - Surface is created once in ``__init__`` with pixel dimensions matching ``game_width`` / ``game_height``
 
 Step 2: Create the Experiment Script
--------------------------------------
+------------------------------------
 
 Create the main experiment file ``mountain_car_experiment.py``:
 
@@ -200,7 +200,7 @@ Create the main experiment file ``mountain_car_experiment.py``:
 - **Policy mapping** assigns "human" control to the participant
 
 Step 3: Run Your Experiment
-----------------------------
+---------------------------
 
 Start the server:
 
