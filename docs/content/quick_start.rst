@@ -1,19 +1,7 @@
 Quick Start
 ===========
 
-This guide will walk you through building your first MUG experiment. We'll create a Mountain Car experiment where participants control a car trying to reach a flag on a hill.
-
-What You'll Build
------------------
-
-A browser-based experiment where participants:
-
-1. See a welcome screen with instructions
-2. Play 5 episodes of Mountain Car using arrow keys
-3. See custom graphics (car, hill, flag) rendered in the browser
-4. See a thank you screen when finished
-
-The environment runs entirely in the participant's browser using Pyodide.
+Build a Mountain Car experiment where participants control a car trying to reach a flag on a hill. The environment runs in the participant's browser using Pyodide.
 
 Prerequisites
 -------------
@@ -27,118 +15,95 @@ Install MUG with server dependencies:
 Step 1: Create the Custom Environment
 --------------------------------------
 
-First, we'll create a custom Mountain Car environment with MUG's rendering system. The standard Mountain Car uses pygame for rendering, which isn't available in the browser. We'll override the ``render()`` method to use MUG's object-based rendering instead.
+The standard Mountain Car uses pygame for rendering, which is not available in the browser. We override the ``render()`` method to use MUG's Surface API instead.
 
 Create a file called ``mountain_car_rgb_env.py``:
 
 .. code-block:: python
 
-    """
-    Custom Mountain Car that renders using MUG's object contexts.
-    This allows it to run in the browser via Pyodide.
-    """
-
     import numpy as np
     from gymnasium.envs.classic_control.mountain_car import MountainCarEnv as _BaseMountainCarEnv
-    from mug.configurations.object_contexts import Circle, Line, Polygon
+    from mug.rendering import Surface
 
 
     class MountainCarEnv(_BaseMountainCarEnv):
 
+        def __init__(self, **kwargs):
+            super().__init__(**kwargs)
+            self.surface = Surface(width=600, height=400)
+
         def step(self, actions: dict[str, int | float]):
-            """Override step to accept dict of actions (required for multi-agent format)"""
+            """Accept dict of actions (required for multi-agent format)."""
             assert "human" in actions, "Must be using human agent ID!"
             action = actions["human"]
             return super().step(action)
 
+        def reset(self, **kwargs):
+            self.surface.reset()
+            return super().reset(**kwargs)
+
+        def _to_pixel(self, pos):
+            """Map environment x-position to pixel (x, y) on a 600x400 canvas."""
+            min_pos = self.unwrapped.min_position
+            max_pos = self.unwrapped.max_position
+            px = (pos - min_pos) / (max_pos - min_pos) * 600
+            py = (1.0 - self.unwrapped._height(pos)) * 350 + 20
+            return px, py
+
         def render(self):
-            """Return a list of visual objects to render in the browser"""
             assert self.render_mode == "mug"
 
-            # Get environment bounds for coordinate normalization
-            y_offset = 0.05
             min_pos = self.unwrapped.min_position
             max_pos = self.unwrapped.max_position
 
-            def _normalize_x(vals):
-                """Normalize x coordinates to 0-1 range for rendering"""
-                vals = vals - min_pos
-                return vals / (max_pos - min_pos)
-
-            # 1. Create the car (rendered as a black circle)
-            car_x = self.state[0]
-            car_y = 1 - self._height(car_x) + y_offset
-            car_x = _normalize_x(car_x)
-
-            car = Circle(
-                uuid="car",
-                color="#000000",
-                x=car_x,
-                y=car_y,
-                radius=16,
-            )
-
-            # 2. Create the ground (brown line with fill)
+            # persistent: ground doesn't change between frames
             xs = np.linspace(min_pos, max_pos, 100)
-            ys = 1 - self._height(xs) + y_offset
-            xs = _normalize_x(xs)
-            points = list(zip(xs, ys))
-
-            ground = Line(
-                uuid="ground_line",
-                color="#964B00",
-                points=points,
-                width=1,
-                fill_below=True,
+            ground_points = [self._to_pixel(x) for x in xs]
+            self.surface.line(
+                points=ground_points, color="#964B00", width=1,
+                persistent=True, id="ground",
             )
 
-            # 3. Create the flag pole (black vertical line)
-            flag_x = _normalize_x(self.goal_position)
-            flag_y1 = 1 - self._height(self.goal_position)
-            flag_y2 = 0.05
-
-            flag_pole = Line(
-                uuid="flag_pole",
-                color="#000000",
-                points=[(flag_x, flag_y1), (flag_x, flag_y2)],
-                width=3,
+            # persistent: flag pole and flag don't move
+            flag_px, flag_py = self._to_pixel(self.unwrapped.goal_position)
+            self.surface.line(
+                points=[(flag_px, flag_py), (flag_px, 20)],
+                color="#000000", width=3,
+                persistent=True, id="flag_pole",
             )
-
-            # 4. Create the flag (green triangle)
-            flag = Polygon(
-                uuid="flag",
-                color="#00FF00",
+            self.surface.polygon(
                 points=[
-                    (flag_x, flag_y1),
-                    (flag_x, flag_y1 + 0.03),
-                    (flag_x - 0.02, flag_y1 + 0.015),
+                    (flag_px, flag_py),
+                    (flag_px, flag_py - 12),
+                    (flag_px - 16, flag_py - 6),
                 ],
+                color="#00ff00",
+                persistent=True, id="flag",
             )
 
-            # Return list of objects as dictionaries
-            return [
-                car.as_dict(),
-                ground.as_dict(),
-                flag_pole.as_dict(),
-                flag.as_dict(),
-            ]
+            # transient: car moves each frame
+            car_x, car_y = self._to_pixel(self.state[0])
+            self.surface.circle(x=car_x, y=car_y, radius=16, color="#000000")
+
+            return self.surface.commit()
 
 
-    # Create the environment instance (must be named 'env')
+    # Environment instance loaded by Pyodide (must be named 'env')
     env = MountainCarEnv(render_mode="mug")
+
+The ``_to_pixel`` helper maps environment state to pixel coordinates on a 600x400 canvas. If you prefer normalized 0--1 coordinates, pass ``relative=True`` to any draw call -- see :doc:`core_concepts/surface_api` for details.
 
 **Key Points:**
 
 - Use ``render_mode="mug"`` when creating the environment
-- The ``render()`` method returns a list of object dictionaries
-- Objects are created using classes from ``mug.configurations.object_contexts``
-- Coordinates are typically normalized to 0-1 range (relative to canvas size)
-- Each object needs a unique ``uuid`` identifier
+- The ``render()`` method calls Surface draw methods and returns ``surface.commit()``
+- ``persistent=True`` objects (ground, flag) are only sent once; transient objects (car) are sent every frame
+- Surface is created once in ``__init__`` with pixel dimensions matching ``game_width`` / ``game_height``
 
 Step 2: Create the Experiment Script
 -------------------------------------
 
-Now create the main experiment file ``mountain_car_experiment.py``:
+Create the main experiment file ``mountain_car_experiment.py``:
 
 .. code-block:: python
 
@@ -245,74 +210,7 @@ Start the server:
 
 Open your browser to ``http://localhost:8000`` and play!
 
-What Just Happened?
--------------------
-
-You've created a complete browser-based experiment with:
-
-1. **Custom rendering**: Objects (Circle, Line, Polygon) define the visuals
-2. **Client-side execution**: The environment runs in the participant's browser via Pyodide
-3. **Scene flow**: Welcome → Game → Thank you
-4. **Human control**: Arrow keys map to environment actions
-
-Quick Customizations
---------------------
-
-**Change the number of episodes:**
-
-.. code-block:: python
-
-    .gameplay(
-        num_episodes=10,  # Play 10 episodes
-        # ...
-    )
-
-**Change keyboard controls:**
-
-.. code-block:: python
-
-    action_mapping = {
-        "a": LEFT_ACCELERATION,
-        "d": RIGHT_ACCELERATION,
-    }
-
-**Change colors:**
-
-.. code-block:: python
-
-    car = Circle(
-        uuid="car",
-        color="#FF0000",  # Red car
-        x=car_x,
-        y=car_y,
-        radius=16,
-    )
-
-Next Steps
-----------
-
-Now that you've built your first experiment:
-
-- **Learn more about rendering**: :doc:`core_concepts/surface_api` documents all Surface draw methods
-- **Understand the architecture**: :doc:`core_concepts/index` covers scenes, stagers, and more
-- **See more examples**: :doc:`examples/index` shows complete experiments
-- **Add AI opponents**: :doc:`guides/policies/ai_policies` for human-AI experiments
-
-Run Built-in Examples
-----------------------
-
-MUG includes several complete examples you can try:
-
-.. code-block:: bash
-
-    # Mountain Car (similar to what we built)
-    python -m mug.examples.mountain_car.mountain_car_experiment
-
-    # Slime Volleyball (human vs AI)
-    python -m mug.examples.slime_volleyball.human_ai_server
-
-    # Overcooked (two-player cooperation)
-    python -m mug.examples.cogrid.overcooked_human_human_server_side
+For draw method details see :doc:`core_concepts/surface_api`. For an overview of the rendering pipeline see :doc:`core_concepts/rendering_system`.
 
 Troubleshooting
 ---------------
@@ -331,7 +229,7 @@ Make sure the file path in ``.runtime()`` is relative to where you run the scrip
 
 **Browser shows blank page or loading forever**
 
-1. Check browser console (F12 → Console) for errors
+1. Check browser console (F12 then Console) for errors
 2. First load takes 30-60 seconds to download Pyodide packages
 3. Make sure you have a stable internet connection
 
@@ -342,11 +240,3 @@ Change the port:
 .. code-block:: python
 
     .hosting(port=8080, host="0.0.0.0")
-
-Get Help
---------
-
-- **Core Concepts**: :doc:`core_concepts/index` for detailed explanations
-- **Full Documentation**: Browse all docs at the main page
-- **GitHub Issues**: Report bugs at `github.com/chasemcd/interactive-gym/issues <https://github.com/chasemcd/interactive-gym/issues>`_
-- **Examples**: Check ``mug/examples/`` in the repository
