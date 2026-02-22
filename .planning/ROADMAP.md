@@ -66,7 +66,9 @@ Plans:
   2. The tutorial uses `render_mode="mug"` (not `"interactive-gym"` or `"interactive_gym"`) in all environment configuration
   3. The tutorial demonstrates a complete render function using Surface (create surface, draw shapes, commit, return packet) that a researcher can adapt for their own environment
   4. The page contains no emojis, no references to ObjectContext classes, and uses tables where appropriate
-**Plans**: TBD
+**Plans:** 1 plan
+Plans:
+- [ ] 102-01-PLAN.md -- Rewrite quick_start.rst for Surface API
 
 ### Phase 103: Server Mode Docs
 **Goal**: A researcher reading the server mode page understands how to run environments in server-authoritative mode with correct Surface rendering examples
