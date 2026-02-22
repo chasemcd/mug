@@ -53,7 +53,9 @@ Plans:
   3. The page includes usage examples showing color input formats (RGB tuple, hex string, named color), the `id=` parameter, and `persistent=True`
   4. The page title and filename reflect "Surface API Reference" (not "Object Contexts") and the old object_contexts.rst content is fully replaced
   5. The page uses tables to present method parameters and their descriptions
-**Plans**: TBD
+**Plans:** 1 plan
+Plans:
+- [ ] 101-01-PLAN.md -- Create surface_api.rst and update all cross-references
 
 ### Phase 102: Quick Start Tutorial
 **Goal**: A new researcher can follow the quick start tutorial end-to-end and run a Mountain Car example using the Surface API
@@ -106,7 +108,7 @@ Phases execute in numeric order: 100 -> 101 -> 102 -> 103 -> 104 -> 105
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 100. Rendering System Docs | 1/1 | Complete    | 2026-02-21 |
-| 101. Surface API Reference | 0/0 | Not started | - |
+| 101. Surface API Reference | 0/1 | In progress | - |
 | 102. Quick Start Tutorial | 0/0 | Not started | - |
 | 103. Server Mode Docs | 0/0 | Not started | - |
 | 104. Pyodide Mode Docs | 0/0 | Not started | - |
