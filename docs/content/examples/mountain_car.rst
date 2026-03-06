@@ -275,7 +275,7 @@ MUG passes actions as dictionaries with agent IDs as keys.
 .. code-block:: python
 
         def render(self):
-            assert self.render_mode == "interactive-gym"
+            assert self.render_mode == "mug"
 
             y_offset = 0.05
             env_ = self.unwrapped
@@ -369,9 +369,9 @@ All objects are converted to dictionaries and returned for rendering.
 
 .. code-block:: python
 
-    env = MountainCarEnv(render_mode="interactive-gym")
+    env = MountainCarEnv(render_mode="mug")
 
-The environment must be created with ``render_mode="interactive-gym"`` and assigned to a variable named ``env``.
+The environment must be created with ``render_mode="mug"`` and assigned to a variable named ``env``.
 
 How It Works
 ------------

@@ -126,7 +126,6 @@ tutorial_gym_scene = (
     )
     .rendering(
         fps=30,
-        env_to_state_fn=overcooked_utils.overcooked_env_to_render_fn,
         hud_text_fn=overcooked_utils.hud_text_fn,
         game_width=overcooked_utils.TILE_SIZE * 7,
         game_height=overcooked_utils.TILE_SIZE * 6,
@@ -173,7 +172,6 @@ cramped_room_sp_0 = (
     .policies(policy_mapping=SP_POLICY_MAPPING_CRAMPED_ROOM, frame_skip=5)
     .rendering(
         fps=30,
-        env_to_state_fn=overcooked_utils.overcooked_env_to_render_fn,
         hud_text_fn=overcooked_utils.hud_text_fn,
         game_width=overcooked_utils.TILE_SIZE * 7,
         game_height=overcooked_utils.TILE_SIZE * 6,
@@ -439,7 +437,6 @@ cramped_room_human_human = (
     .policies(policy_mapping=HUMAN_HUMAN_POLICY_MAPPING)
     .rendering(
         fps=30,
-        env_to_state_fn=overcooked_utils.overcooked_env_to_render_fn,
         hud_text_fn=overcooked_utils.hud_text_fn,
         game_width=overcooked_utils.TILE_SIZE * 7,
         game_height=overcooked_utils.TILE_SIZE * 6,
@@ -494,8 +491,6 @@ cramped_room_human_human = (
     )
     .multiplayer(
         multiplayer=True,
-        state_broadcast_interval=15,
-        server_authoritative=False,
         input_delay=3,
         partner_disconnect_message="Your partner disconnected. The task will end here and you will be compensated for your performance so far. Please submit the completion code below.",
         partner_disconnect_show_completion_code=True,

@@ -94,8 +94,8 @@ start_scene = (
 
 on_game_step_code = """
 import js
-interactive_gym_globals = dict(js.window.interactiveGymGlobals.object_entries())
-env.reward_weights[1] = {k: interactive_gym_globals.get(k, 0.0) for k in env.reward_weights[1].keys()}
+mug_globals = dict(js.window.interactiveGymGlobals.object_entries())
+env.reward_weights[1] = {k: mug_globals.get(k, 0.0) for k in env.reward_weights[1].keys()}
 """
 control_tutorial_scene = (
     gym_scene.GymScene()
@@ -145,7 +145,6 @@ tutorial_with_bot_scene = (
     .policies(policy_mapping=IBC_POLICY_MAPPING_CRAMPED_ROOM, frame_skip=5)
     .rendering(
         fps=30,
-        env_to_state_fn=overcooked_utils.overcooked_env_to_render_fn,
         hud_text_fn=overcooked_utils.hud_text_fn,
         game_width=overcooked_utils.TILE_SIZE * 7,
         game_height=overcooked_utils.TILE_SIZE * 6,

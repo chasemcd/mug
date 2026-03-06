@@ -1,9 +1,12 @@
 import * as phaserGraphics  from './phaser_gym_graphics.js';
 
-var socket = io({
-    transports: ['websocket'],
-    upgrade: false
-});
+// Use the shared socket from index.js (window.socket) to ensure the same
+// session ID is used for both registration and gameplay events.
+// A separate io() call would create a second connection with a different SID,
+// causing player_action and send_pressed_keys to fail subject lookup.
+function _getSocket() {
+    return window.socket;
+}
 
 
 // HUD
@@ -18,6 +21,13 @@ export function updateHUDText(text) {
 // Key Listeners
 
 var pressedKeys = {};
+
+// Server-auth input delay queue (CLNT-03)
+// When inputDelay > 0, actions are queued and emitted N render frames later.
+// When inputDelay === 0 (default), actions emit immediately.
+var serverAuthInputDelay = 0;       // Set from scene_metadata in start_game
+var inputDelayQueue = [];            // Items: {key: string, emitAtFrame: number}
+var serverAuthFrameCounter = 0;     // Incremented each processRendering() call
 
 export function enableKeyListener(input_mode) {
     pressedKeys = {};
@@ -35,8 +45,13 @@ export function enableKeyListener(input_mode) {
         // If we're using the single keystroke input method, we just send the key when it's pressed.
         // This means no composite actions.
         if (input_mode == "single_keystroke") {
-            phaserGraphics.addHumanKeyPressToBuffer({key: event.key, keypressTimestamp: keypressTimestamp});
-            socket.emit('send_pressed_keys', {'pressed_keys': Array(event.key), session_id: window.sessionId});
+            if (!window.serverAuthoritative) {
+                phaserGraphics.addHumanKeyPressToBuffer({key: event.key, keypressTimestamp: keypressTimestamp});
+            }
+            _getSocket().emit('send_pressed_keys', {'pressed_keys': Array(event.key), session_id: window.sessionId});
+            if (window.serverAuthoritative) {
+                _emitOrQueueAction(event.key);
+            }
             return;
         }
 
@@ -47,6 +62,9 @@ export function enableKeyListener(input_mode) {
 
         pressedKeys[event.key] = true; // Add key to pressedKeys when it is pressed
         phaserGraphics.updatePressedKeys(pressedKeys, keypressTimestamp);
+        if (window.serverAuthoritative) {
+            _emitOrQueueAction(event.key);
+        }
     });
 
     $(document).on('keyup', function(event) {
@@ -65,6 +83,58 @@ export function disableKeyListener() {
         $(document).off('keydown');
         $(document).off('keyup');
         pressedKeys = {};
+}
+
+// Server-auth input helpers
+
+/**
+ * Route a keypress to immediate emit or delayed queue based on serverAuthInputDelay.
+ * @param {string} keyName - The key name (e.g., "ArrowUp", "a")
+ */
+function _emitOrQueueAction(keyName) {
+    if (serverAuthInputDelay === 0) {
+        // Default: emit immediately, no delay
+        _getSocket().emit('player_action', {
+            key: keyName,
+            game_id: window.currentGameId
+        });
+    } else {
+        // Queue for delayed emission
+        inputDelayQueue.push({
+            key: keyName,
+            emitAtFrame: serverAuthFrameCounter + serverAuthInputDelay
+        });
+    }
+}
+
+/**
+ * Configure the server-auth input delay (called from index.js start_game handler).
+ * @param {number} delayFrames - Number of render frames to delay input (0 = immediate)
+ */
+export function setServerAuthInputDelay(delayFrames) {
+    serverAuthInputDelay = delayFrames;
+    inputDelayQueue = [];
+    serverAuthFrameCounter = 0;
+}
+
+/**
+ * Drain the input delay queue, emitting any actions whose delay has elapsed.
+ * Called from phaser_gym_graphics.js processRendering on each render tick.
+ */
+export function drainInputDelayQueue() {
+    serverAuthFrameCounter++;
+    let i = 0;
+    while (i < inputDelayQueue.length) {
+        if (inputDelayQueue[i].emitAtFrame <= serverAuthFrameCounter) {
+            _getSocket().emit('player_action', {
+                key: inputDelayQueue[i].key,
+                game_id: window.currentGameId
+            });
+            inputDelayQueue.splice(i, 1);
+        } else {
+            i++;
+        }
+    }
 }
 
 // Episode Transition Overlay

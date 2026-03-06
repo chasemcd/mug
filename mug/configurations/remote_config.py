@@ -69,7 +69,7 @@ class RemoteConfig:
         self.redirect_timeout: int = 5_000  # 5k ms = 5 seconds default
         self.instructions_html_file: str | None = None
         self.waitroom_time_randomization_interval_s: tuple[int, int] = (0, 0)
-        self.page_title: str = "interactive-gym"
+        self.page_title: str = "mug"
         self.game_header_text: str = ""
         self.welcome_header_text: str = ""
         self.welcome_text: str = ""

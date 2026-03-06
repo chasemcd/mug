@@ -32,8 +32,8 @@ Key Components
 :doc:`stager`
     The Stager manages participants' progression through a sequence of scenes. Each participant gets their own Stager instance to track their progress independently.
 
-:doc:`object_contexts`
-    Object contexts are lightweight dataclasses that define visual elements for rendering. Available types: Circle, Line, Polygon, Text, and Sprite.
+:doc:`surface_api`
+    The Surface API provides imperative draw methods for rendering visual elements. Methods: rect, circle, line, polygon, text, image, arc, ellipse.
 
 :doc:`rendering_system`
     Understanding how MUG renders environments: coordinate systems, depth ordering, object lifecycle, and the frame-by-frame rendering process.
@@ -194,7 +194,7 @@ Next Steps
 
    scenes
    stager
-   object_contexts
+   surface_api
    rendering_system
    pyodide_mode
    server_mode
