@@ -365,7 +365,7 @@ class GymScene extends Phaser.Scene {
         this.canvas.id = "phaser-canvas";
         this.height = this.canvas.height;
         this.width = this.canvas.width;
-        this.stateImageSprite = this.add.image(0, 0, "curStateImage").setOrigin(0, 0);
+        this.stateImageSprite = null;
 
         // Check if the background is just a color, if so fill
         if (this._checkIfHex(this.background)) {
@@ -1304,7 +1304,8 @@ class GymScene extends Phaser.Scene {
     _updateText(text_config, object_map) {
         let text = object_map[text_config.uuid];
         text.x = text_config.x * this.width;
-        text.y = text_config.y * this.height;
+        text.y = text_config.y * this.height
+
         text.setText(text_config.text);
     }
 
