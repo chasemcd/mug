@@ -376,7 +376,7 @@ class GymScene extends Phaser.Scene {
         this.canvas.id = "phaser-canvas";
         this.height = this.canvas.height;
         this.width = this.canvas.width;
-        this.stateImageSprite = this.add.image(0, 0, "curStateImage").setOrigin(0, 0);
+        this.stateImageSprite = null;
 
         // Expose scene for debugging and E2E test introspection
         window._phaserScene = this;
