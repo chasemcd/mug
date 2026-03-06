@@ -4,9 +4,9 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "multi_user_gymnasium"
-version = "0.1.1"
+version = "0.1.2"
 description = "A platform for running interactive experiments in the browser with standard simulation environments."
-readme = "README.rst"
+readme = "README.md"
 license = "MIT"
 requires-python = ">= 3.10"
 authors = [

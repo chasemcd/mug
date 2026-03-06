@@ -469,5 +469,5 @@ Next Steps
 ----------
 
 - **Learn about the Stager**: :doc:`stager` to sequence scenes
-- **Explore rendering**: :doc:`object_contexts` for visual elements
+- **Explore rendering**: :doc:`surface_api` for draw method reference
 - **See examples**: :doc:`../examples/index` for complete experiments

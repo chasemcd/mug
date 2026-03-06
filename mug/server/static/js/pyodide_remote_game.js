@@ -12,7 +12,7 @@ export class RemoteGame {
 
     setAttributes(config) {
         this.config = config;
-        this.interactive_gym_globals = config.interactive_gym_globals;
+        this.mug_globals = config.mug_globals;
         this.sceneId = config.scene_id;  // Store scene ID for incremental data export
         this.micropip = null;
         this.pyodideReady = false;
@@ -84,15 +84,20 @@ export class RemoteGame {
             }
         }
 
-        this.pyodide.globals.set("interactive_gym_globals", this.interactive_gym_globals);
+        this.pyodide.globals.set("mug_globals", this.mug_globals);
 
 
         // The code executed here must instantiate an environment `env`
+        // Hoist any "from __future__" imports to the top so they precede our injected preamble
+        const initCode = this.config.environment_initialization_code;
+        const futureImports = initCode.split('\n').filter(line => line.trimStart().startsWith('from __future__'));
+        const restCode = initCode.split('\n').filter(line => !line.trimStart().startsWith('from __future__')).join('\n');
         const env = await this.pyodide.runPythonAsync(`
+${futureImports.join('\n')}
 import js
-interactive_gym_globals = dict(js.window.interactiveGymGlobals.object_entries())
+mug_globals = dict(js.window.interactiveGymGlobals.object_entries())
 
-${this.config.environment_initialization_code}
+${restCode}
 env
         `);
 
@@ -126,11 +131,16 @@ env
         }
 
         // The code executed here must instantiate an environment `env`
+        // Hoist any "from __future__" imports to the top so they precede our injected preamble
+        const reinitCode = config.environment_initialization_code;
+        const reinitFutureImports = reinitCode.split('\n').filter(line => line.trimStart().startsWith('from __future__'));
+        const reinitRestCode = reinitCode.split('\n').filter(line => !line.trimStart().startsWith('from __future__')).join('\n');
         const env = await this.pyodide.runPythonAsync(`
+${reinitFutureImports.join('\n')}
 import js
-interactive_gym_globals = dict(js.window.interactiveGymGlobals.object_entries())
-print("Globals on initialization: ", interactive_gym_globals)
-${config.environment_initialization_code}
+mug_globals = dict(js.window.interactiveGymGlobals.object_entries())
+print("Globals on initialization: ", mug_globals)
+${reinitRestCode}
 env
         `);
 
@@ -244,11 +254,41 @@ obs, infos, render_state
         }
 
 
-        render_state = {
-            "game_state_objects": game_image_binary ? null : render_state.map(item => convertUndefinedToNull(item)),
-            "game_image_base64": game_image_binary,
-            "step": this.step_num,
-        };
+        // Handle new RenderPacket dict format from Surface API
+        // env.render() returns {game_state_objects: [...], removed: [...]} via Pyodide toJs()
+        if (!game_image_binary) {
+            let gameStateObjects;
+            let removed = [];
+            if (render_state && typeof render_state === 'object' && !Array.isArray(render_state)) {
+                // New RenderPacket format: dict/Map with game_state_objects key
+                if (render_state instanceof Map) {
+                    gameStateObjects = render_state.get('game_state_objects');
+                    removed = render_state.get('removed') || [];
+                } else {
+                    gameStateObjects = render_state.game_state_objects;
+                    removed = render_state.removed || [];
+                }
+                // Convert each object in the list
+                if (Array.isArray(gameStateObjects)) {
+                    gameStateObjects = gameStateObjects.map(item => convertUndefinedToNull(item));
+                }
+            } else if (Array.isArray(render_state)) {
+                // Legacy flat array format (fallback)
+                gameStateObjects = render_state.map(item => convertUndefinedToNull(item));
+            }
+            render_state = {
+                "game_state_objects": gameStateObjects,
+                "removed": removed,
+                "step": this.step_num,
+            };
+        } else {
+            render_state = {
+                "game_state_objects": null,
+                "removed": [],
+                "game_image_binary": game_image_binary,
+                "step": this.step_num,
+            };
+        }
 
         this.step_num = 0;
         this.shouldReset = false;
@@ -359,11 +399,41 @@ obs, rewards, terminateds, truncateds, infos, render_state
 
 
 
-        render_state = {
-            "game_state_objects": game_image_base64 ? null : render_state.map(item => convertUndefinedToNull(item)),
-            "game_image_base64": game_image_base64,
-            "step": this.step_num,
-        };
+        // Handle new RenderPacket dict format from Surface API
+        // env.render() returns {game_state_objects: [...], removed: [...]} via Pyodide toJs()
+        if (!game_image_base64) {
+            let gameStateObjects;
+            let removed = [];
+            if (render_state && typeof render_state === 'object' && !Array.isArray(render_state)) {
+                // New RenderPacket format: dict/Map with game_state_objects key
+                if (render_state instanceof Map) {
+                    gameStateObjects = render_state.get('game_state_objects');
+                    removed = render_state.get('removed') || [];
+                } else {
+                    gameStateObjects = render_state.game_state_objects;
+                    removed = render_state.removed || [];
+                }
+                // Convert each object in the list
+                if (Array.isArray(gameStateObjects)) {
+                    gameStateObjects = gameStateObjects.map(item => convertUndefinedToNull(item));
+                }
+            } else if (Array.isArray(render_state)) {
+                // Legacy flat array format (fallback)
+                gameStateObjects = render_state.map(item => convertUndefinedToNull(item));
+            }
+            render_state = {
+                "game_state_objects": gameStateObjects,
+                "removed": removed,
+                "step": this.step_num,
+            };
+        } else {
+            render_state = {
+                "game_state_objects": null,
+                "removed": [],
+                "game_image_base64": game_image_base64,
+                "step": this.step_num,
+            };
+        }
 
         ui_utils.updateHUDText(this.getHUDText());
 
@@ -497,6 +567,17 @@ export function convertUndefinedToNull(obj) {
     if (typeof obj !== 'object' || obj === null) {
         // Return the value as is if it's not an object or is already null
         return obj;
+    }
+
+    // Pyodide's toJs() converts Python dicts to JS Maps by default.
+    // Maps don't support property access (map.key returns undefined),
+    // so convert them to plain objects for the Phaser renderer.
+    if (obj instanceof Map) {
+        const plain = {};
+        for (const [key, value] of obj.entries()) {
+            plain[key] = value === undefined ? null : convertUndefinedToNull(value);
+        }
+        return plain;
     }
 
     for (let key in obj) {

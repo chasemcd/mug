@@ -108,7 +108,6 @@ This document analyzes the current multiplayer Pyodide game synchronization arch
 
 ```python
 .multiplayer(
-    state_broadcast_interval=20,  # Hash verification every N frames
 ).gameplay(
     queue_resync_threshold=50,       # Trigger resync if queue > threshold
     action_population_method='previous_submitted_action',  # Fallback for missing actions
@@ -469,12 +468,7 @@ env.t if hasattr(env, 't') else 0
 ### 4. Reduce Sync Frequency for Stable Games (5 minutes)
 **File:** Scene configuration
 
-If games are staying in sync, increase `state_sync_frequency_frames`:
-```python
-.multiplayer(
-    state_broadcast_interval=60,  # Was 20, now every 2 seconds at 30fps
-)
-```
+If games are staying in sync, P2P hash verification frequency can be tuned via the client-side `p2pSyncInterval` setting.
 
 ### 5. Add Frame Rate Independence (1 hour)
 **File:** `mug/server/static/js/phaser_gym_graphics.js`

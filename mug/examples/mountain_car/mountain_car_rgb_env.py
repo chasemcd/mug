@@ -22,7 +22,7 @@ class MountainCarEnv(_BaseMountainCarEnv):
         return super().step(action)
 
     def render(self):
-        assert self.render_mode == "interactive-gym"
+        assert self.render_mode == "mug"
 
         y_offset = 0.05
         min_pos, max_pos = (
@@ -92,5 +92,5 @@ class MountainCarEnv(_BaseMountainCarEnv):
         ]
 
 
-env = MountainCarEnv(render_mode="interactive-gym")
+env = MountainCarEnv(render_mode="mug")
 env

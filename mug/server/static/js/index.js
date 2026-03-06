@@ -1,6 +1,6 @@
 import * as ui_utils from './ui_utils.js';
 import {startUnityScene, terminateUnityScene, shutdownUnityGame, preloadUnityGame} from './unity_utils.js';
-import {graphics_start, graphics_end, addStateToBuffer, getRemoteGameData, pressedKeys} from './phaser_gym_graphics.js';
+import {graphics_start, graphics_end, addStateToBuffer, clearStateBuffer, getRemoteGameData, pressedKeys} from './phaser_gym_graphics.js';
 import {RemoteGame} from './pyodide_remote_game.js';
 import {MultiplayerPyodideGame} from './pyodide_multiplayer_game.js';
 import {ProbeConnection} from './probe_connection.js';
@@ -767,6 +767,12 @@ socket.on('connect', function() {
     // Initialize ProbeManager for P2P RTT probing during matchmaking
     ProbeManager.init(socket, subjectName);
 
+    // Server-auth reconnection: if we were in a server-auth game, try to rejoin
+    if (window.serverAuthoritative && window.currentGameId) {
+        console.log("[Reconnect] Attempting to rejoin server-auth game:", window.currentGameId);
+        socket.emit('rejoin_server_auth', { game_id: window.currentGameId });
+    }
+
     $("#invalidSession").hide();
     $('#hudText').hide()
 });
@@ -874,6 +880,19 @@ socket.on('start_game', function(gameStartData) {
     // Show the game container
     $("#gameContainer").show();
 
+    // Track game ID for server-auth action payloads
+    window.currentGameId = gameStartData.game_id || null;
+
+    // Detect server-authoritative mode
+    if (scene_metadata.server_authoritative) {
+        window.serverAuthoritative = true;
+        window.serverAuthInputDelay = scene_metadata.input_delay || 0;
+        ui_utils.setServerAuthInputDelay(window.serverAuthInputDelay);
+        console.log("[StartGame] Server-authoritative mode enabled, input_delay:", window.serverAuthInputDelay);
+    } else {
+        window.serverAuthoritative = false;
+    }
+
     // Initialize game
     let graphics_config = {
         'parent': 'gameContainer',
@@ -888,7 +907,7 @@ socket.on('start_game', function(gameStartData) {
         'assets_dir': scene_metadata.assets_dir,
         'assets_to_preload': scene_metadata.assets_to_preload,
         'animation_configs': scene_metadata.animation_configs,
-        'pyodide_remote_game': pyodideRemoteGame,
+        'pyodide_remote_game': window.serverAuthoritative ? null : pyodideRemoteGame,
         'scene_metadata': scene_metadata,
     };
 
@@ -1116,11 +1135,7 @@ function updateWaitroomText(waitroomConfig, timer) {
 }
 
 socket.on("game_reset", function(resetData) {
-    graphics_end()
-    $('#hudText').hide()
-    ui_utils.disableKeyListener();
-
-    let scene_metadata = resetData.scene_metadata
+    let scene_metadata = resetData.scene_metadata;
 
     if (!scene_metadata) {
         scene_metadata = resetData.config;
@@ -1130,6 +1145,23 @@ socket.on("game_reset", function(resetData) {
         console.log("scene_metadata is undefined on game reset!")
         return;
     }
+
+    // Server-authoritative mode: flush buffer and show countdown, but keep Phaser running
+    if (window.serverAuthoritative) {
+        console.log("[GameReset] Server-auth mode: flushing state buffer, showing countdown");
+        clearStateBuffer();
+
+        startResetCountdown(resetData.timeout, function() {
+            // After countdown, emit reset_complete so server can proceed
+            socket.emit("reset_complete", {room: resetData.room, session_id: window.sessionId});
+        });
+        return;
+    }
+
+    // P2P mode: destroy and recreate Phaser game instance
+    graphics_end()
+    $('#hudText').hide()
+    ui_utils.disableKeyListener();
 
     // Initialize game
     let graphics_config = {
@@ -1213,11 +1245,46 @@ socket.on('environment_state', function(stateUpdate) {
     addStateToBuffer(stateUpdate);
 });
 
+// Server-authoritative mode: receive rendered state from server game loop
+socket.on('server_render_state', function(data) {
+    if (data.hud_text) {
+        $('#hudText').show();
+        $('#hudText').text(data.hud_text);
+    }
+    addStateToBuffer(data);
+});
 
+// Server-auth reconnection handlers
+socket.on('rejoin_success', function(data) {
+    console.log("[Reconnect] Successfully rejoined server-auth game:", data.game_id);
+    window.currentGameId = data.game_id;
+    window.serverAuthoritative = true;
+    // Re-show game container and re-enable input -- state broadcasts will resume
+    $("#gameContainer").show();
+    if (data.scene_metadata) {
+        ui_utils.enableKeyListener(data.scene_metadata.input_mode);
+    }
+});
+
+socket.on('rejoin_failed', function() {
+    console.log("[Reconnect] Failed to rejoin server-auth game");
+    // Game is gone -- clean up and show error
+    window.serverAuthoritative = false;
+    window.currentGameId = null;
+    clearStateBuffer();
+    graphics_end();
+    $('#errorText').text('Your game session has ended. You will be redirected shortly.');
+    $('#errorText').show();
+    socket.emit('end_game_request_redirect', {waitroom_timeout: false});
+});
 
 
 
 socket.on('end_game', function(endGameInfo) {
+    if (endGameInfo && endGameInfo.error) {
+        console.error("[end_game] Server game loop crashed:", endGameInfo.error);
+        console.error("[end_game] Traceback:", endGameInfo.traceback);
+    }
     console.log("game ended!")
     // Hide game data and display game-over html
     graphics_end();
@@ -1225,6 +1292,13 @@ socket.on('end_game', function(endGameInfo) {
     ui_utils.disableKeyListener();
     socket.emit("leave_game", {session_id: window.sessionId});
     $("#gameContainer").hide();
+
+    // Clean up server-auth state if applicable
+    if (window.serverAuthoritative) {
+        clearStateBuffer();
+        window.serverAuthoritative = false;
+        window.currentGameId = null;
+    }
 
     if (endGameInfo.message != undefined) {
         $('#errorText').text(endGameInfo.message);
@@ -1562,6 +1636,11 @@ function terminateGymScene(data) {
         clearInterval(refreshStartButton);
         refreshStartButton = null;
     }
+    // Phase 96: Clean up event-driven callback and countdown state
+    if (pyodideRemoteGame && pyodideRemoteGame.onGameDone) {
+        pyodideRemoteGame.onGameDone = null;
+    }
+    _startDoneCountdown._started = false;
 
     // Phase 77 (P2P-01, P2P-02): Clean up P2P resources when exiting GymScene
     // Must happen before data emission so sceneExited flag is set before any
@@ -1655,51 +1734,122 @@ function enableCheckPyodideDone() {
         clearInterval(checkPyodideDone);
         checkPyodideDone = null;
     }
+
+    // Phase 96: Event-driven path -- MultiplayerPyodideGame fires onGameDone immediately
+    // when signalEpisodeComplete() sets state="done". This bypasses browser throttling
+    // of setInterval in background tabs.
+    if (pyodideRemoteGame && typeof pyodideRemoteGame === 'object') {
+        pyodideRemoteGame.onGameDone = () => {
+            console.log('[GameDone] Received onGameDone callback');
+            // Clear fallback interval since callback fired
+            if (checkPyodideDone) {
+                clearInterval(checkPyodideDone);
+                checkPyodideDone = null;
+            }
+            if (refreshStartButton) {
+                clearInterval(refreshStartButton);
+                refreshStartButton = null;
+            }
+            _startDoneCountdown();
+        };
+    }
+
+    // Fallback polling: for RemoteGame (single-player) or if callback doesn't fire
     checkPyodideDone = setInterval(() => {
         if (pyodideRemoteGame !== undefined && pyodideRemoteGame.isDone()) {
             clearInterval(checkPyodideDone);
-            clearInterval(refreshStartButton);
-            // pyodideRemoteGame = undefined;
-
-            // Create and show the countdown popup
-            const popup = document.createElement('div');
-            popup.style.cssText = `
-                position: absolute;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%);
-                background: rgba(0, 0, 0, 0.8);
-                color: white;
-                padding: 20px 40px;
-                border-radius: 10px;
-                font-family: Arial, sans-serif;
-                font-size: 18px;
-                text-align: center;
-                z-index: 1000;
-                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            `;
-            const gameContainer = document.getElementById('gameContainer');
-            gameContainer.style.position = 'relative';
-            gameContainer.appendChild(popup);
-
-            let countdown = 3;
-            const updatePopup = () => {
-                popup.innerHTML = `
-                    <h2 style="margin-bottom: 10px; color: white;">Done!</h2>
-                    <p>Continuing in <span style="font-weight: bold; font-size: 24px;">${countdown}</span> seconds...</p>
-                `;
-                if (countdown === 0) {
-                    gameContainer.removeChild(popup);
-                    socket.emit("advance_scene", {session_id: window.sessionId});
-                } else {
-                    countdown--;
-                    setTimeout(updatePopup, 1000);
-                }
-            };
-            updatePopup();
+            checkPyodideDone = null;
+            if (refreshStartButton) {
+                clearInterval(refreshStartButton);
+                refreshStartButton = null;
+            }
+            _startDoneCountdown();
         }
     }, 100);
 }
+
+/**
+ * Show "Done!" countdown and advance scene.
+ * Uses setTimeout for the visual countdown (works when tab is focused) with a
+ * MessageChannel watchdog that ensures advance_scene fires even if setTimeout
+ * is throttled in background tabs.
+ *
+ * Phase 96: Extracted from enableCheckPyodideDone to support event-driven invocation.
+ */
+function _startDoneCountdown() {
+    // Guard against double invocation (callback + interval race)
+    if (_startDoneCountdown._started) return;
+    _startDoneCountdown._started = true;
+
+    // Create and show the countdown popup
+    const popup = document.createElement('div');
+    popup.style.cssText = `
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 20px 40px;
+        border-radius: 10px;
+        font-family: Arial, sans-serif;
+        font-size: 18px;
+        text-align: center;
+        z-index: 1000;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    `;
+    const gameContainer = document.getElementById('gameContainer');
+    if (gameContainer) {
+        gameContainer.style.position = 'relative';
+        gameContainer.appendChild(popup);
+    }
+
+    let countdown = 3;
+    const startTime = performance.now();
+    const TOTAL_DELAY_MS = 3000;
+
+    const updatePopup = () => {
+        popup.innerHTML = `
+            <h2 style="margin-bottom: 10px; color: white;">Done!</h2>
+            <p>Continuing in <span style="font-weight: bold; font-size: 24px;">${countdown}</span> seconds...</p>
+        `;
+        if (countdown <= 0 || performance.now() - startTime >= TOTAL_DELAY_MS) {
+            if (gameContainer && popup.parentNode === gameContainer) {
+                gameContainer.removeChild(popup);
+            }
+            _startDoneCountdown._started = false;  // Reset for next scene
+            socket.emit("advance_scene", {session_id: window.sessionId});
+        } else {
+            countdown--;
+            setTimeout(updatePopup, 1000);
+        }
+    };
+    updatePopup();
+
+    // Watchdog: ensure advance_scene fires even if setTimeout is fully throttled
+    // MessageChannel.onmessage is NOT throttled in background tabs, so the watchdog
+    // reliably detects when the total delay has elapsed and forces the advance.
+    const watchdogChannel = new MessageChannel();
+    watchdogChannel.port1.onmessage = () => {
+        if (performance.now() - startTime >= TOTAL_DELAY_MS + 500) {
+            // setTimeout didn't fire in time -- force advance
+            if (_startDoneCountdown._started) {
+                console.log('[GameDone] Watchdog: forcing advance_scene after throttled countdown');
+                if (gameContainer && popup.parentNode === gameContainer) {
+                    gameContainer.removeChild(popup);
+                }
+                _startDoneCountdown._started = false;
+                socket.emit("advance_scene", {session_id: window.sessionId});
+            }
+        } else if (_startDoneCountdown._started) {
+            // Keep watching -- check every ~200ms via setTimeout + MessageChannel
+            setTimeout(() => watchdogChannel.port2.postMessage(null), 200);
+        }
+    };
+    // Start watchdog after a short delay
+    setTimeout(() => watchdogChannel.port2.postMessage(null), 200);
+}
+_startDoneCountdown._started = false;
 
 
 
