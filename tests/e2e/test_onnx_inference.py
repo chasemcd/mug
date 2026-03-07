@@ -6,8 +6,6 @@ Verifies that a human+AI game with an ONNX model:
 2. Runs inference each frame (AI partner takes actions)
 3. Completes the episode without fatal JS errors
 
-This exercises the Phase 89 ModelConfig declarative path end-to-end.
-
 Usage:
     pytest tests/e2e/test_onnx_inference.py --headed -v
 """
@@ -42,6 +40,11 @@ def test_onnx_inference_episode_completes(
     """
     page = single_player_context
     base_url = flask_server_human_ai["url"]
+
+    # Collect console errors during the test
+    console_errors = []
+    page.on("console", lambda msg: console_errors.append(msg.text) if msg.type == "error" else None)
+    page.on("pageerror", lambda exc: console_errors.append(str(exc)))
 
     # Navigate to server
     page.goto(base_url)
@@ -81,10 +84,20 @@ def test_onnx_inference_episode_completes(
         f"Expected frames to advance, got frameNumber={state['frameNumber']}"
     )
 
-    # 3. No fatal JS console errors
-    # Check for errors that would indicate ONNX load failure or inference crash
+    # 3. No JS console errors (catches ONNX inference failures like RangeError, TypeError)
+    onnx_errors = [e for e in console_errors if any(
+        keyword in e for keyword in [
+            "RangeError", "Float32Array", "flattenObservation",
+            "inferenceONNXPolicy", "actionFromONNX", "onnx",
+        ]
+    )]
+    assert not onnx_errors, (
+        f"ONNX inference errors detected in browser console:\n"
+        + "\n".join(onnx_errors)
+    )
+
+    # 4. No uncaught exceptions
     has_fatal_errors = page.evaluate("""() => {
-        // Check if there were any uncaught errors stored by the game
         if (window._uncaughtErrors && window._uncaughtErrors.length > 0) {
             return window._uncaughtErrors;
         }

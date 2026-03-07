@@ -13,12 +13,12 @@ pip install git+https://github.com/chasemcd/cogrid.git
 Or install a specific version:
 
 ```bash
-pip install cogrid==0.0.15
+pip install cogrid==0.2.1
 ```
 
 ## Examples
 
-### 1. Human-AI Comparison (`overcooked_human_ai_client_side.py`)
+### 1. Human-AI Comparison (`overcooked_human_ai.py`)
 
 **Description**: Within-subjects experiment comparing two AI partners (Self-Play vs Behavior Shaping).
 
@@ -31,7 +31,7 @@ pip install cogrid==0.0.15
 
 **Usage**:
 ```bash
-python -m mug.examples.cogrid.overcooked_human_ai_client_side
+python -m mug.examples.cogrid.overcooked_human_ai
 ```
 
 Navigate to `http://localhost:5702` in your browser.
@@ -106,27 +106,13 @@ All scenes are defined in `scenes/scenes.py`:
 
 ### Single-Player Scenes (Human-AI)
 - `cramped_room_sp_0` / `cramped_room_ibc_0`
-- `counter_circuit_sp_0` / `counter_circuit_ibc_0`
-- `forced_coordination_sp_0` / `forced_coordination_ibc_0`
-- `asymmetric_advantages_sp_0` / `asymmetric_advantages_ibc_0`
-- `coordination_ring_sp_0` / `coordination_ring_ibc_0`
 
 ### Multiplayer Scenes (Human-Human)
 - `cramped_room_human_human`
-- `counter_circuit_human_human`
-- `forced_coordination_human_human`
-- `asymmetric_advantages_human_human`
-- `coordination_ring_human_human`
 
-## Layouts
+## Layout
 
-All five Overcooked layouts are included:
-
-1. **Cramped Room** (5×3) - Tight coordination, high conflict
-2. **Asymmetric Advantages** (9×5) - Asymmetric roles
-3. **Counter Circuit** (7×5) - Large space, specialization
-4. **Forced Coordination** (5×5) - Required division of labor
-5. **Coordination Ring** (5×5) - Circular layout, central cooking
+The Cramped Room layout (5×4) is included as the example environment.
 
 ## Configuration
 

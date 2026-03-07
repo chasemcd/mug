@@ -96,16 +96,21 @@ async function inferenceONNXPolicy(policyID, observation, modelConfig, agentID) 
     }
 
     // Ensure observation is a Float32Array
-    if (typeof observation === 'object' && !Array.isArray(observation)) {
-        // If observation is a dictionary
+    if (ArrayBuffer.isView(observation)) {
+        // Already a TypedArray (e.g., Float32Array from Pyodide toJs())
+        if (!(observation instanceof Float32Array)) {
+            observation = new Float32Array(observation);
+        }
+    } else if (Array.isArray(observation)) {
+        // Plain JS array
+        observation = new Float32Array(observation);
+    } else if (typeof observation === 'object') {
+        // Dictionary of arrays
         for (let key in observation) {
             if (Array.isArray(observation[key])) {
                 observation[key] = new Float32Array(observation[key]);
             }
         }
-    } else if (Array.isArray(observation)) {
-        // If observation is already an array
-        observation = new Float32Array(observation);
     } else {
         throw new Error('Observation must be either an object or an array');
     }
@@ -123,7 +128,7 @@ async function inferenceONNXPolicy(policyID, observation, modelConfig, agentID) 
     const session = loadedModels[policyID];
 
     // If the observation is a dictionary, flatten all the values into a single array
-    if (typeof observation === 'object' && !Array.isArray(observation)) {
+    if (typeof observation === 'object' && !Array.isArray(observation) && !ArrayBuffer.isView(observation)) {
         observation = flattenObservation(observation);
     }
 

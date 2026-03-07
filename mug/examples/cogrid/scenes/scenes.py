@@ -25,64 +25,30 @@ Noop = 6
 
 
 OVERCOOKED_MODEL_CONFIG = ModelConfig(
-    obs_input="obs",
-    logit_output="output",
-    state_inputs=["state_in_0", "state_in_1"],
-    state_outputs=["state_out_0", "state_out_1"],
-    state_shape=[1, 256],
-    fixed_inputs={"seq_lens": 1},
+    obs_input="input",
+    logit_output="logits",
 )
 
 SP_POLICY_MAPPING_CRAMPED_ROOM = {
     0: configuration_constants.PolicyTypes.Human,
-    1: dataclasses.replace(OVERCOOKED_MODEL_CONFIG, onnx_path="static/assets/overcooked/models/sp_cramped_room_00.onnx"),
+    1: dataclasses.replace(
+        OVERCOOKED_MODEL_CONFIG,
+        onnx_path="static/assets/overcooked/models/cogrid-0.2.1-cramped-room.onnx",
+    ),
 }
 
 IBC_POLICY_MAPPING_CRAMPED_ROOM = {
     0: configuration_constants.PolicyTypes.Human,
-    1: dataclasses.replace(OVERCOOKED_MODEL_CONFIG, onnx_path="static/assets/overcooked/models/ibc_cramped_room_00.onnx"),
+    1: dataclasses.replace(
+        OVERCOOKED_MODEL_CONFIG,
+        onnx_path="static/assets/overcooked/models/cogrid-0.2.1-cramped-room.onnx",
+    ),
 }
 
-SP_POLICY_MAPPING_ASYMMETRIC_ADVANTAGES = {
+HUMAN_HUMAN_POLICY_MAPPING = {
     0: configuration_constants.PolicyTypes.Human,
-    1: dataclasses.replace(OVERCOOKED_MODEL_CONFIG, onnx_path="static/assets/overcooked/models/sp_asymmetric_advantages_00.onnx"),
+    1: configuration_constants.PolicyTypes.Human,
 }
-
-IBC_POLICY_MAPPING_ASYMMETRIC_ADVANTAGES = {
-    0: configuration_constants.PolicyTypes.Human,
-    1: dataclasses.replace(OVERCOOKED_MODEL_CONFIG, onnx_path="static/assets/overcooked/models/ibc_asymmetric_advantages_00.onnx"),
-}
-
-SP_POLICY_MAPPING_COUNTER_CIRCUIT = {
-    0: configuration_constants.PolicyTypes.Human,
-    1: dataclasses.replace(OVERCOOKED_MODEL_CONFIG, onnx_path="static/assets/overcooked/models/sp_counter_circuit_00.onnx"),
-}
-
-IBC_POLICY_MAPPING_COUNTER_CIRCUIT = {
-    0: configuration_constants.PolicyTypes.Human,
-    1: dataclasses.replace(OVERCOOKED_MODEL_CONFIG, onnx_path="static/assets/overcooked/models/ibc_counter_circuit_00.onnx"),
-}
-
-SP_POLICY_MAPPING_FORCED_COORDINATION = {
-    0: configuration_constants.PolicyTypes.Human,
-    1: dataclasses.replace(OVERCOOKED_MODEL_CONFIG, onnx_path="static/assets/overcooked/models/sp_forced_coordination_00.onnx"),
-}
-
-IBC_POLICY_MAPPING_FORCED_COORDINATION = {
-    0: configuration_constants.PolicyTypes.Human,
-    1: dataclasses.replace(OVERCOOKED_MODEL_CONFIG, onnx_path="static/assets/overcooked/models/ibc_forced_coordination_00.onnx"),
-}
-
-SP_POLICY_MAPPING_COORDINATION_RING = {
-    0: configuration_constants.PolicyTypes.Human,
-    1: dataclasses.replace(OVERCOOKED_MODEL_CONFIG, onnx_path="static/assets/overcooked/models/sp_coordination_ring_00.onnx"),
-}
-
-IBC_POLICY_MAPPING_COORDINATION_RING = {
-    0: configuration_constants.PolicyTypes.Human,
-    1: dataclasses.replace(OVERCOOKED_MODEL_CONFIG, onnx_path="static/assets/overcooked/models/ibc_coordination_ring_00.onnx"),
-}
-
 
 # Map the actions to the arrow keys. The keys are Javascript key press events (all others ignored)
 action_mapping = {
@@ -127,8 +93,8 @@ tutorial_gym_scene = (
     .rendering(
         fps=30,
         hud_text_fn=overcooked_utils.hud_text_fn,
-        game_width=overcooked_utils.TILE_SIZE * 7,
-        game_height=overcooked_utils.TILE_SIZE * 6,
+        game_width=overcooked_utils.TILE_SIZE * 5,
+        game_height=overcooked_utils.TILE_SIZE * 4,
         background="#e6b453",
     )
     .assets(
@@ -161,7 +127,7 @@ tutorial_gym_scene = (
     .runtime(
         run_through_pyodide=True,
         environment_initialization_code_filepath="mug/examples/cogrid/environments/tutorial_cramped_room_environment_initialization.py",
-        packages_to_install=["numpy", "cogrid==0.1.2", "opencv-python"],
+        packages_to_install=["numpy", "cogrid==0.2.1", "opencv-python"],
     )
 )
 
@@ -173,8 +139,8 @@ cramped_room_sp_0 = (
     .rendering(
         fps=30,
         hud_text_fn=overcooked_utils.hud_text_fn,
-        game_width=overcooked_utils.TILE_SIZE * 7,
-        game_height=overcooked_utils.TILE_SIZE * 6,
+        game_width=overcooked_utils.TILE_SIZE * 5,
+        game_height=overcooked_utils.TILE_SIZE * 4,
         background="#e6b453",
     )
     .assets(
@@ -215,7 +181,7 @@ cramped_room_sp_0 = (
     .runtime(
         run_through_pyodide=True,
         environment_initialization_code_filepath="mug/examples/cogrid/environments/cramped_room_environment_initialization.py",
-        packages_to_install=["numpy", "cogrid==0.0.15", "opencv-python"],
+        packages_to_install=["numpy", "cogrid==0.2.1", "opencv-python"],
     )
 )
 cramped_room_ibc_0 = (
@@ -249,187 +215,7 @@ cramped_room_options_scene_0 = (
     .scene(scene_id="cramped_room_options_scene_0", experiment_config={})
     .display(scene_subheader="Partner Feedback")
 )
-counter_circuit_sp_0 = (
-    copy.deepcopy(cramped_room_sp_0)
-    .scene(scene_id="counter_circuit_sp_0", experiment_config={})
-    .runtime(
-        environment_initialization_code_filepath="mug/examples/cogrid/environments/counter_circuit_environment_initialization.py"
-    )
-    .content(
-        scene_header="Overcooked",
-        scene_body="<center><p>"
-        "You'll now play with a partner for a single round. "
-        "This will be followed by a round with a different partner "
-        "in the same environment layout."
-        "<br><br> "
-        "You will be playing on the layout pictured below. "
-        '<center><img src="static/assets/overcooked/counter_circuit.png" alt="Annotated Overcooked environment." height="270" width="315"></center>'
-        "When the button activates, click it to begin. "
-        "</p></center>",
-    )
-    .rendering(
-        game_width=overcooked_utils.TILE_SIZE * 9,
-        game_height=overcooked_utils.TILE_SIZE * 7,
-    )
-    .policies(policy_mapping=SP_POLICY_MAPPING_COUNTER_CIRCUIT)
-)
-counter_circuit_ibc_0 = (
-    copy.deepcopy(counter_circuit_sp_0)
-    .scene(scene_id="counter_circuit_ibc_0", experiment_config={})
-    .policies(policy_mapping=IBC_POLICY_MAPPING_COUNTER_CIRCUIT)
-    .content(
-        scene_header="Overcooked",
-        scene_body="<center><p>"
-        "You'll now play another round on the same layout. "
-        "After this round, you will provide your preference "
-        "between the two partners you interacted with. "
-        "When the button activates, click it to begin. "
-        "</p></center>",
-    )
-)
 
-
-counter_circuit_options_scene_0 = copy.deepcopy(
-    cramped_room_options_scene_0
-).scene(scene_id="counter_circuit_options_scene_0", experiment_config={})
-
-forced_coordination_sp_0 = (
-    copy.deepcopy(cramped_room_sp_0)
-    .scene(scene_id="forced_coordination_sp_0", experiment_config={})
-    .runtime(
-        environment_initialization_code_filepath="mug/examples/cogrid/environments/forced_coordination_environment_initialization.py"
-    )
-    .content(
-        scene_header="Overcooked",
-        scene_body="<center><p>"
-        "You'll now play with a partner for a single round. "
-        "This will be followed by a round with a different partner "
-        "in the same environment layout."
-        "<br><br> "
-        "You will be playing on the layout pictured below. "
-        '<center><img src="static/assets/overcooked/forced_coordination.png" alt="Annotated Overcooked environment." height="270" width="315"></center>'
-        "When the button activates, click it to begin. "
-        "</p></center>",
-    )
-    .rendering(
-        game_width=overcooked_utils.TILE_SIZE * 7,
-        game_height=overcooked_utils.TILE_SIZE * 7,
-    )
-    .policies(policy_mapping=SP_POLICY_MAPPING_FORCED_COORDINATION)
-)
-
-forced_coordination_ibc_0 = (
-    copy.deepcopy(forced_coordination_sp_0)
-    .scene(scene_id="forced_coordination_ibc_0", experiment_config={})
-    .policies(policy_mapping=IBC_POLICY_MAPPING_FORCED_COORDINATION)
-    .content(
-        scene_header="Overcooked",
-        scene_body="<center><p>"
-        "You'll now play another round on the same layout. "
-        "After this round, you will provide your preference "
-        "between the two partners you interacted with. "
-        "When the button activates, click it to begin. "
-        "</p></center>",
-    )
-)
-
-
-forced_coordination_options_scene_0 = copy.deepcopy(
-    cramped_room_options_scene_0
-).scene(scene_id="forced_coordination_options_scene_0", experiment_config={})
-asymmetric_advantages_sp_0 = (
-    copy.deepcopy(cramped_room_sp_0)
-    .scene(scene_id="asymmetric_advantages_sp_0", experiment_config={})
-    .runtime(
-        environment_initialization_code_filepath="mug/examples/cogrid/environments/asymmetric_advantages_environment_initialization.py"
-    )
-    .content(
-        scene_header="Overcooked",
-        scene_body="<center><p>"
-        "You'll now play with a partner for a single round. "
-        "This will be followed by a round with a different partner "
-        "in the same environment layout."
-        "<br><br> "
-        "You will be playing on the layout pictured below. "
-        '<center><img src="static/assets/overcooked/asymmetric_advantages.png" alt="Annotated Overcooked environment." height="270" width="315"></center>'
-        "When the button activates, click it to begin. "
-        "</p></center>",
-    )
-    .rendering(
-        game_width=overcooked_utils.TILE_SIZE * 11,
-        game_height=overcooked_utils.TILE_SIZE * 7,
-    )
-    .policies(policy_mapping=SP_POLICY_MAPPING_ASYMMETRIC_ADVANTAGES)
-)
-asymmetric_advantages_ibc_0 = (
-    copy.deepcopy(asymmetric_advantages_sp_0)
-    .scene(scene_id="asymmetric_advantages_ibc_0", experiment_config={})
-    .policies(policy_mapping=IBC_POLICY_MAPPING_ASYMMETRIC_ADVANTAGES)
-    .content(
-        scene_header="Overcooked",
-        scene_body="<center><p>"
-        "You'll now play another round on the same layout. "
-        "After this round, you will provide your preference "
-        "between the two partners you interacted with. "
-        "When the button activates, click it to begin. "
-        "</p></center>",
-    )
-)
-
-
-asymmetric_advantages_options_scene_0 = copy.deepcopy(
-    cramped_room_options_scene_0
-).scene(scene_id="asymmetric_advantages_options_scene_0", experiment_config={})
-
-coordination_ring_sp_0 = (
-    copy.deepcopy(cramped_room_sp_0)
-    .scene(scene_id="coordination_ring_sp_0", experiment_config={})
-    .runtime(
-        environment_initialization_code_filepath="mug/examples/cogrid/environments/coordination_ring_environment_initialization.py"
-    )
-    .content(
-        scene_header="Overcooked",
-        scene_body="<center><p>"
-        "You'll now play with a partner for a single round. "
-        "This will be followed by a round with a different partner "
-        "in the same environment layout."
-        "<br><br> "
-        "You will be playing on the layout pictured below. "
-        '<center><img src="static/assets/overcooked/coordination_ring.png" alt="Annotated Overcooked environment." height="270" width="315"></center>'
-        "When the button activates, click it to begin. "
-        "</p></center>",
-    )
-    .rendering(
-        game_width=overcooked_utils.TILE_SIZE * 7,
-        game_height=overcooked_utils.TILE_SIZE * 7,
-    )
-    .policies(policy_mapping=SP_POLICY_MAPPING_COORDINATION_RING)
-)
-
-coordination_ring_ibc_0 = (
-    copy.deepcopy(coordination_ring_sp_0)
-    .policies(policy_mapping=IBC_POLICY_MAPPING_COORDINATION_RING)
-    .scene(scene_id="coordination_ring_ibc_0", experiment_config={})
-    .content(
-        scene_header="Overcooked",
-        scene_body="<center><p>"
-        "You'll now play another round on the same layout. "
-        "After this round, you will provide your preference "
-        "between the two partners you interacted with. "
-        "When the button activates, click it to begin. "
-        "</p></center>",
-    )
-)
-
-
-coordination_ring_options_scene_0 = copy.deepcopy(
-    cramped_room_options_scene_0
-).scene(scene_id="coordination_ring_options_scene_0", experiment_config={})
-
-HUMAN_HUMAN_POLICY_MAPPING = {
-    0: configuration_constants.PolicyTypes.Human,
-    1: configuration_constants.PolicyTypes.Human,
-}
 
 cramped_room_human_human = (
     gym_scene.GymScene()
@@ -438,8 +224,8 @@ cramped_room_human_human = (
     .rendering(
         fps=30,
         hud_text_fn=overcooked_utils.hud_text_fn,
-        game_width=overcooked_utils.TILE_SIZE * 7,
-        game_height=overcooked_utils.TILE_SIZE * 6,
+        game_width=overcooked_utils.TILE_SIZE * 5,
+        game_height=overcooked_utils.TILE_SIZE * 4,
         background="#e6b453",
     )
     .assets(
@@ -480,14 +266,14 @@ cramped_room_human_human = (
     )
     .matchmaking(
         matchmaker=FIFOMatchmaker(
-            max_p2p_rtt_ms=100,      # only pair participants with <=100ms RTT
+            max_p2p_rtt_ms=100,  # only pair participants with <=100ms RTT
         ),
         hide_lobby_count=True,
     )
     .runtime(
         run_through_pyodide=True,
         environment_initialization_code_filepath="mug/examples/cogrid/environments/cramped_room_environment_initialization_hh.py",
-        packages_to_install=["numpy", "cogrid==0.1.2", "opencv-python"],
+        packages_to_install=["numpy", "cogrid==0.2.1", "opencv-python"],
     )
     .multiplayer(
         multiplayer=True,
@@ -497,111 +283,23 @@ cramped_room_human_human = (
     )
 )
 
-counter_circuit_human_human = (
-    copy.deepcopy(cramped_room_human_human)
-    .scene(scene_id="counter_circuit_hh", experiment_config={})
-    .runtime(
-        environment_initialization_code_filepath="mug/examples/cogrid/environments/counter_circuit_environment_initialization.py"
-    )
-    .content(
-        scene_body="<center><p>"
-        "You'll now play with another human participant! "
-        "Please wait in the lobby for your partner to join. "
-        "<br><br> "
-        "You will be playing on the layout pictured below. "
-        '<center><img src="static/assets/overcooked/counter_circuit.png" alt="Annotated Overcooked environment." height="270" width="315"></center>'
-        "Work together to prepare and deliver as many dishes as possible. "
-        "</p></center>",
-    )
-    .rendering(
-        game_width=overcooked_utils.TILE_SIZE * 9,
-        game_height=overcooked_utils.TILE_SIZE * 7,
-    )
-)
-
-forced_coordination_human_human = (
-    copy.deepcopy(cramped_room_human_human)
-    .scene(scene_id="forced_coordination_hh", experiment_config={})
-    .runtime(
-        environment_initialization_code_filepath="mug/examples/cogrid/environments/forced_coordination_environment_initialization.py"
-    )
-    .content(
-        scene_body="<center><p>"
-        "You'll now play with another human participant! "
-        "Please wait in the lobby for your partner to join. "
-        "<br><br> "
-        "You will be playing on the layout pictured below. "
-        '<center><img src="static/assets/overcooked/forced_coordination.png" alt="Annotated Overcooked environment." height="270" width="315"></center>'
-        "Work together to prepare and deliver as many dishes as possible. "
-        "</p></center>",
-    )
-    .rendering(
-        game_width=overcooked_utils.TILE_SIZE * 7,
-        game_height=overcooked_utils.TILE_SIZE * 7,
-    )
-)
-
-asymmetric_advantages_human_human = (
-    copy.deepcopy(cramped_room_human_human)
-    .scene(scene_id="asymmetric_advantages_hh", experiment_config={})
-    .runtime(
-        environment_initialization_code_filepath="mug/examples/cogrid/environments/asymmetric_advantages_environment_initialization.py"
-    )
-    .content(
-        scene_body="<center><p>"
-        "You'll now play with another human participant! "
-        "Please wait in the lobby for your partner to join. "
-        "<br><br> "
-        "You will be playing on the layout pictured below. "
-        '<center><img src="static/assets/overcooked/asymmetric_advantages.png" alt="Annotated Overcooked environment." height="270" width="315"></center>'
-        "Work together to prepare and deliver as many dishes as possible. "
-        "</p></center>",
-    )
-    .rendering(
-        game_width=overcooked_utils.TILE_SIZE * 11,
-        game_height=overcooked_utils.TILE_SIZE * 7,
-    )
-)
-
-coordination_ring_human_human = (
-    copy.deepcopy(cramped_room_human_human)
-    .scene(scene_id="coordination_ring_hh", experiment_config={})
-    .runtime(
-        environment_initialization_code_filepath="mug/examples/cogrid/environments/coordination_ring_environment_initialization.py"
-    )
-    .content(
-        scene_body="<center><p>"
-        "You'll now play with another human participant! "
-        "Please wait in the lobby for your partner to join. "
-        "<br><br> "
-        "You will be playing on the layout pictured below. "
-        '<center><img src="static/assets/overcooked/coordination_ring.png" alt="Annotated Overcooked environment." height="270" width="315"></center>'
-        "Work together to prepare and deliver as many dishes as possible. "
-        "</p></center>",
-    )
-    .rendering(
-        game_width=overcooked_utils.TILE_SIZE * 7,
-        game_height=overcooked_utils.TILE_SIZE * 7,
-    )
-)
-
 # Feedback scene for multiplayer
 multiplayer_feedback_scene = (
     static_scene.ScalesAndTextBox(
         pre_scale_header="",
         scale_questions=[
-    "On a scale from 1-7, with 1 being detrimental and 7 being beneficial to your success, how effective was your partner as a teammate?",
-    "On a scale from 1-7, with 1 being not at all and 7 being very much, rate how much you enjoyed playing the game with your partner.",
-    "On a scale of 1-7, rate how much you think that your partner contributed to the success of your team. With 1 meaning they made your team worse off and 7 being that they made a very positive contribution.",
-    "On a scale of 1-7, rate how much you think that you contributed to the success of your team. With 1 meaning you made your team worse off and 7 being you made a very positive contribution.",
-    "On a scale from 1 to 7, where 1 is definitely a bot, 4 is unsure, and 7 is definitely a human, indicate how likely you think that your partner is a human or a bot build to play this game?",
+            "On a scale from 1-7, with 1 being detrimental and 7 being beneficial to your success, how effective was your partner as a teammate?",
+            "On a scale from 1-7, with 1 being not at all and 7 being very much, rate how much you enjoyed playing the game with your partner.",
+            "On a scale of 1-7, rate how much you think that your partner contributed to the success of your team. With 1 meaning they made your team worse off and 7 being that they made a very positive contribution.",
+            "On a scale of 1-7, rate how much you think that you contributed to the success of your team. With 1 meaning you made your team worse off and 7 being you made a very positive contribution.",
+            "On a scale from 1 to 7, where 1 is definitely a bot, 4 is unsure, and 7 is definitely a human, indicate how likely you think that your partner is a human or a bot build to play this game?",
         ],
         scale_labels=[
-            [str(i+1) for i in range(7)],
-            [str(i+1) for i in range(7)],
-            [str(i+1) for i in range(7)],
-            [str(i+1) for i in range(7)],
-            [str(i+1) for i in range(7)],
+            [str(i + 1) for i in range(7)],
+            [str(i + 1) for i in range(7)],
+            [str(i + 1) for i in range(7)],
+            [str(i + 1) for i in range(7)],
+            [str(i + 1) for i in range(7)],
         ],
         text_box_header="Please provide any additional feedback you would like to share. If you had any technical issues with the task, please describe them here.",
         scale_size=7,
@@ -616,34 +314,6 @@ multiplayer_feedback_scene = (
 
 cramped_room_0 = scene.SceneWrapper(
     scenes=[cramped_room_sp_0, cramped_room_ibc_0, cramped_room_options_scene_0]
-)
-counter_circuit_0 = scene.SceneWrapper(
-    scenes=[
-        counter_circuit_sp_0,
-        counter_circuit_ibc_0,
-        counter_circuit_options_scene_0,
-    ]
-)
-forced_coordination_0 = scene.SceneWrapper(
-    scenes=[
-        forced_coordination_sp_0,
-        forced_coordination_ibc_0,
-        forced_coordination_options_scene_0,
-    ]
-)
-asymmetric_advantages_0 = scene.SceneWrapper(
-    scenes=[
-        asymmetric_advantages_sp_0,
-        asymmetric_advantages_ibc_0,
-        asymmetric_advantages_options_scene_0,
-    ]
-)
-coordination_ring_0 = scene.SceneWrapper(
-    scenes=[
-        coordination_ring_sp_0,
-        coordination_ring_ibc_0,
-        coordination_ring_options_scene_0,
-    ]
 )
 
 
