@@ -3,7 +3,7 @@ Examples
 
 MUG includes several complete example experiments that demonstrate different features and use cases. These examples provide working code you can run, modify, and learn from.
 
-All examples are located in the `mug/examples/ <https://github.com/chasemcd/interactive-gym/tree/main/mug/examples>`_ directory. Each example includes:
+All examples are located in the `examples/ <https://github.com/chasemcd/interactive-gym/tree/main/examples>`_ directory. Each example includes:
 
 - Complete experiment code
 - Environment implementation

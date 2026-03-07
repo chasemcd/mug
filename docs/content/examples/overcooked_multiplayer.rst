@@ -76,7 +76,7 @@ From the repository root, run as a module:
 
 .. code-block:: bash
 
-    python -m mug.examples.cogrid.overcooked_human_human_server_side
+    python -m examples.cogrid.overcooked_human_human_server_side
 
 Then:
 
@@ -112,7 +112,7 @@ The experiment uses a Stager to manage scene progression for both players:
 .. code-block:: python
 
     from mug.scenes import stager, scene
-    from mug.examples.cogrid.scenes import scenes as oc_scenes
+    from examples.cogrid.scenes import scenes as oc_scenes
 
     stager = stager.Stager(
         scenes=[
@@ -210,8 +210,8 @@ Each layout scene is configured for two human players:
             env_to_state_fn=overcooked_utils.overcooked_env_to_render_fn,
             assets_to_preload=overcooked_utils.overcooked_preload_assets_spec(),
             hud_text_fn=overcooked_utils.hud_text_fn,
-            game_width=overcooked_utils.TILE_SIZE * 7,
-            game_height=overcooked_utils.TILE_SIZE * 6,
+            game_width=overcooked_utils.TILE_SIZE * 5,
+            game_height=overcooked_utils.TILE_SIZE * 4,
             background="#e6b453",
         )
         .gameplay(
@@ -247,8 +247,8 @@ Solo practice before playing with partner:
             env_to_state_fn=overcooked_utils.overcooked_env_to_render_fn,
             assets_to_preload=overcooked_utils.overcooked_preload_assets_spec(),
             hud_text_fn=overcooked_utils.hud_text_fn,
-            game_width=overcooked_utils.TILE_SIZE * 7,
-            game_height=overcooked_utils.TILE_SIZE * 6,
+            game_width=overcooked_utils.TILE_SIZE * 5,
+            game_height=overcooked_utils.TILE_SIZE * 4,
             background="#e6b453",
         )
         .gameplay(

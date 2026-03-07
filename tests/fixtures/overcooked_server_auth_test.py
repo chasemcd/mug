@@ -23,10 +23,10 @@ eventlet.monkey_patch()
 
 import argparse
 
+from examples.cogrid import overcooked_utils
+from examples.cogrid.scenes.scenes import (HUMAN_HUMAN_POLICY_MAPPING, Noop,
+                                           action_mapping, end_scene)
 from mug.configurations import configuration_constants, experiment_config
-from mug.examples.cogrid import overcooked_utils
-from mug.examples.cogrid.scenes.scenes import (HUMAN_HUMAN_POLICY_MAPPING,
-                                               Noop, action_mapping, end_scene)
 from mug.scenes import gym_scene, stager, static_scene
 from mug.server import app
 from mug.server.matchmaker import FIFOMatchmaker
@@ -38,7 +38,7 @@ def _create_overcooked_env(**kwargs):
     Defers the heavy cogrid import to runtime so this module can be imported
     without cogrid installed (same pattern as overcooked_server_auth.py).
     """
-    from mug.examples.cogrid.environments.cramped_room_environment_initialization_hh import (
+    from examples.cogrid.environments.cramped_room_environment_initialization_hh import (
         OvercookedEnv, overcooked_config)
 
     return OvercookedEnv(config=overcooked_config, **kwargs)
@@ -70,8 +70,8 @@ server_auth_test_scene = (
     .rendering(
         fps=30,
         hud_text_fn=overcooked_utils.hud_text_fn,
-        game_width=overcooked_utils.TILE_SIZE * 7,
-        game_height=overcooked_utils.TILE_SIZE * 6,
+        game_width=overcooked_utils.TILE_SIZE * 5,
+        game_height=overcooked_utils.TILE_SIZE * 4,
         background="#e6b453",
     )
     .gameplay(

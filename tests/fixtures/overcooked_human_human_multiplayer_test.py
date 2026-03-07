@@ -22,8 +22,8 @@ eventlet.monkey_patch()
 
 import argparse
 
+from examples.cogrid.scenes import scenes as oc_scenes
 from mug.configurations import experiment_config
-from mug.examples.cogrid.scenes import scenes as oc_scenes
 from mug.scenes import stager, static_scene
 from mug.server import app
 from mug.server.matchmaker import FIFOMatchmaker

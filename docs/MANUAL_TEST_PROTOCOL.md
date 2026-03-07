@@ -91,7 +91,7 @@ data/
 
 8. Run comparison:
    ```bash
-   python scripts/validate_action_sequences.py --compare \
+   python tests/validate_action_sequences.py --compare \
      data/cramped_room_hh/{subject1}_ep1.csv \
      data/cramped_room_hh/{subject2}_ep1.csv
    ```
@@ -127,7 +127,7 @@ data/
 
 6. After episode completes, run comparison:
    ```bash
-   python scripts/validate_action_sequences.py --compare \
+   python tests/validate_action_sequences.py --compare \
      data/cramped_room_hh/{subject1}_ep1.csv \
      data/cramped_room_hh/{subject2}_ep1.csv
    ```
@@ -158,7 +158,7 @@ data/
 
 6. Run comparison:
    ```bash
-   python scripts/validate_action_sequences.py --compare \
+   python tests/validate_action_sequences.py --compare \
      data/cramped_room_hh/{player1}_ep1.csv \
      data/cramped_room_hh/{player2}_ep1.csv
    ```
@@ -188,7 +188,7 @@ data/
 
 5. Run comparison:
    ```bash
-   python scripts/validate_action_sequences.py --compare \
+   python tests/validate_action_sequences.py --compare \
      data/cramped_room_hh/{subject1}_ep1.csv \
      data/cramped_room_hh/{subject2}_ep1.csv
    ```
@@ -222,7 +222,7 @@ data/
 
 6. Run comparison with verbose output:
    ```bash
-   python scripts/validate_action_sequences.py --compare \
+   python tests/validate_action_sequences.py --compare \
      data/cramped_room_hh/{subject1}_ep1.csv \
      data/cramped_room_hh/{subject2}_ep1.csv \
      --verbose
@@ -260,7 +260,7 @@ data/
 
 6. Run comparison:
    ```bash
-   python scripts/validate_action_sequences.py --compare \
+   python tests/validate_action_sequences.py --compare \
      data/cramped_room_hh/{subject1}_ep1.csv \
      data/cramped_room_hh/{subject2}_ep1.csv
    ```
@@ -280,7 +280,7 @@ The validation script compares two export files and reports any divergences.
 #### Basic Comparison
 
 ```bash
-python scripts/validate_action_sequences.py --compare file1.csv file2.csv
+python tests/validate_action_sequences.py --compare file1.csv file2.csv
 ```
 
 Output on success:
@@ -296,7 +296,7 @@ FILES ARE IDENTICAL
 #### Verbose Mode (Show Divergence Details)
 
 ```bash
-python scripts/validate_action_sequences.py --compare file1.csv file2.csv --verbose
+python tests/validate_action_sequences.py --compare file1.csv file2.csv --verbose
 ```
 
 Output on failure:
@@ -318,7 +318,7 @@ DIVERGENCES FOUND:
 To validate all pairs in a scene directory:
 
 ```bash
-python scripts/validate_action_sequences.py data/cramped_room_hh
+python tests/validate_action_sequences.py data/cramped_room_hh
 ```
 
 This automatically finds paired files and validates all episodes.
@@ -449,7 +449,7 @@ When reporting a divergence bug, collect:
 
 3. **Comparison output** - full verbose output:
    ```bash
-   python scripts/validate_action_sequences.py --compare file1.csv file2.csv --verbose > comparison_report.txt 2>&1
+   python tests/validate_action_sequences.py --compare file1.csv file2.csv --verbose > comparison_report.txt 2>&1
    ```
 
 4. **Test scenario description** - which scenario was being tested and any deviations from the protocol
@@ -490,7 +490,7 @@ If a player is backgrounded for longer than the configured timeout (default: 30 
 | Item | Path |
 |------|------|
 | Export files | `data/{scene_id}/{subject_id}_ep{N}.csv` |
-| Validation script | `scripts/validate_action_sequences.py` |
+| Validation script | `tests/validate_action_sequences.py` |
 | Server entry point | `mug/server/app.py` |
 
 ### Key Commands
@@ -500,13 +500,13 @@ If a player is backgrounded for longer than the configured timeout (default: 30 
 python -m mug.server.app
 
 # Compare two files
-python scripts/validate_action_sequences.py --compare file1.csv file2.csv
+python tests/validate_action_sequences.py --compare file1.csv file2.csv
 
 # Compare with details
-python scripts/validate_action_sequences.py --compare file1.csv file2.csv --verbose
+python tests/validate_action_sequences.py --compare file1.csv file2.csv --verbose
 
 # Validate entire scene
-python scripts/validate_action_sequences.py data/cramped_room_hh
+python tests/validate_action_sequences.py data/cramped_room_hh
 ```
 
 ### Validation Checklist

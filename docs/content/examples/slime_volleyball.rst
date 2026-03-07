@@ -65,7 +65,7 @@ Run the game entirely in the browser:
 
 .. code-block:: bash
 
-    python -m mug.examples.slime_volleyball.human_ai_pyodide
+    python -m examples.slime_volleyball.human_ai_pyodide
 
 **Server Mode**
 
@@ -73,7 +73,7 @@ Run with server-side environment execution:
 
 .. code-block:: bash
 
-    python -m mug.examples.slime_volleyball.human_ai_server
+    python -m examples.slime_volleyball.human_ai_server
 
 Both modes:
 
@@ -178,7 +178,7 @@ Tuple keys ``("ArrowLeft", "ArrowUp")`` represent simultaneous key presses.
         .runtime(
             run_through_pyodide=True,
             environment_initialization_code_filepath=(
-                "mug/examples/slime_volleyball/slimevb_env.py"
+                "examples/slime_volleyball/slimevb_env.py"
             ),
             packages_to_install=[
                 "slimevb==0.0.2",

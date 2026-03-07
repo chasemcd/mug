@@ -188,7 +188,7 @@ def run_comparison(
     """
     cmd = [
         "python",
-        "scripts/validate_action_sequences.py",
+        "tests/validate_action_sequences.py",
         "--compare",
         str(file1),
         str(file2),

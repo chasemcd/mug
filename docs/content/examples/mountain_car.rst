@@ -58,7 +58,7 @@ From the repository root, run as a module:
 
 .. code-block:: bash
 
-    python -m mug.examples.mountain_car.mountain_car_experiment
+    python -m examples.mountain_car.mountain_car_experiment
 
 Then:
 
@@ -189,7 +189,7 @@ Configure the main gameplay scene:
         .runtime(
             run_through_pyodide=True,
             environment_initialization_code_filepath=(
-                "mug/examples/mountain_car/mountain_car_rgb_env.py"
+                "examples/mountain_car/mountain_car_rgb_env.py"
             ),
         )
     )
