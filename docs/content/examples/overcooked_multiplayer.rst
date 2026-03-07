@@ -140,6 +140,30 @@ Each participant pair experiences:
 4. **Feedback Survey** - Questions about the collaboration
 5. **End Scene** - Thank you message
 
+Serving Assets
+^^^^^^^^^^^^^^
+
+Because sprites and images live outside the MUG package (under
+``examples/cogrid/assets/``), the experiment config registers them with
+``static_files()`` so the server can serve them to the browser:
+
+.. code-block:: python
+
+    config = (
+        experiment_config.ExperimentConfig()
+        .experiment(stager=stager, experiment_id="overcooked_hh")
+        .hosting(port=5702, host="0.0.0.0")
+        .static_files(directories=[
+            "examples/cogrid/assets",
+            "examples/shared/assets",   # shared keyboard icon images
+        ])
+    )
+
+    app.run(config)
+
+Each directory is served at a URL that matches its filesystem path — the same
+path used in Python rendering code and HTML ``<img>`` tags.
+
 Kitchen Layouts
 ---------------
 

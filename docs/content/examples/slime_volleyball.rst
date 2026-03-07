@@ -121,6 +121,23 @@ Define human and AI players:
 
 The human controls ``agent_right`` (blue slime on the right), while an ONNX model controls ``agent_left`` (red slime on the left).
 
+Because the ONNX model and other assets live outside the MUG package, the
+experiment config registers them with ``static_files()``:
+
+.. code-block:: python
+
+    config = (
+        experiment_config.ExperimentConfig()
+        .experiment(stager=stager, experiment_id="slime_vb_demo")
+        .hosting(port=5702, host="0.0.0.0")
+        .static_files(directories=[
+            "examples/slime_volleyball/assets",
+            "examples/shared/assets",
+        ])
+    )
+
+Each directory is served at a URL that matches its filesystem path.
+
 **2. Multi-Action Controls**
 
 Slime Volleyball supports diagonal movement:

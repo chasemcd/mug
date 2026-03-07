@@ -127,6 +127,32 @@ Each participant experiences:
 4. **Feedback Survey** - Questions about the AI teammate
 5. **End Scene** - Thank you message
 
+Serving Assets
+^^^^^^^^^^^^^^
+
+Because sprites, ONNX models, and images live outside the MUG package (under
+``examples/cogrid/assets/``), the experiment config registers them with
+``static_files()`` so the server can serve them to the browser:
+
+.. code-block:: python
+
+    config = (
+        experiment_config.ExperimentConfig()
+        .experiment(stager=stager, experiment_id="overcooked_test")
+        .hosting(port=5702, host="0.0.0.0")
+        .static_files(directories=[
+            "examples/cogrid/assets",
+            "examples/shared/assets",   # shared keyboard icon images
+        ])
+    )
+
+    app.run(config)
+
+Each directory is served at a URL that matches its filesystem path. For example,
+``examples/cogrid/assets/overcooked/sprites/terrain.png`` is available at
+``/examples/cogrid/assets/overcooked/sprites/terrain.png`` in the browser —
+the same path used in Python rendering code, HTML ``<img>`` tags, and atlas specs.
+
 Kitchen Layouts
 ---------------
 

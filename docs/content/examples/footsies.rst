@@ -127,6 +127,21 @@ Experiment Flow
 
 This creates a between-subjects design where each participant experiences one of seven training conditions.
 
+Because GIF assets and keyboard icon images live outside the MUG package, the
+experiment config registers them with ``static_files()``:
+
+.. code-block:: python
+
+    config = (
+        experiment_config.ExperimentConfig()
+        .experiment(stager=stager, experiment_id="footsies_test")
+        .hosting(port=5702, host="0.0.0.0")
+        .static_files(directories=[
+            "examples/footsies/assets",
+            "examples/shared/assets",
+        ])
+    )
+
 Unity WebGL Scene
 ^^^^^^^^^^^^^^^^^
 

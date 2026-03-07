@@ -199,6 +199,24 @@ Create the main experiment file ``mountain_car_experiment.py``:
 - **Pyodide** runs the environment in the browser (``run_through_pyodide=True``)
 - **Policy mapping** assigns "human" control to the participant
 
+.. tip::
+
+   If your experiment uses custom assets (sprites, ONNX models, images) stored outside the MUG
+   package, register their directories with ``static_files()``:
+
+   .. code-block:: python
+
+       config = (
+           experiment_config.ExperimentConfig()
+           .experiment(stager=stager, experiment_id="my_experiment")
+           .hosting(port=8000, host="0.0.0.0")
+           .static_files(directories=["path/to/my/assets"])
+       )
+
+   Each directory is served at a URL matching its filesystem path. For example,
+   a file at ``path/to/my/assets/sprite.png`` is available at
+   ``/path/to/my/assets/sprite.png`` in the browser.
+
 Step 3: Run Your Experiment
 ---------------------------
 
