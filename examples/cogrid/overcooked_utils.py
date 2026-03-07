@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from mug.server import remote_game
 
-ASSET_PATH = "static/assets/overcooked/sprites"
+ASSET_PATH = "examples/cogrid/assets/overcooked/sprites"
 
 
 def overcooked_preload_assets_spec() -> list[dict]:
@@ -42,9 +42,9 @@ def overcooked_game_page_header_fn(
         return ""
 
     if player_id == 1:
-        html_path = "mug/server/static/templates/overcooked_agent_1_header.html"
+        html_path = "examples/cogrid/html_pages/overcooked_agent_1_header.html"
     else:
-        html_path = "mug/server/static/templates/overcooked_agent_0_header.html"
+        html_path = "examples/cogrid/html_pages/overcooked_agent_0_header.html"
 
     try:
         with open(html_path, encoding="utf-8") as f:

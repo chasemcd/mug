@@ -2961,9 +2961,17 @@ def run(config):
     ADMIN_AGGREGATOR.start_broadcast_loop(interval_seconds=1.0)
     logger.info("Admin event aggregator initialized and broadcast loop started")
 
+    # Register external static file directories
+    for rel_path, abs_path in CONFIG.static_directories:
+        def make_route(directory, prefix):
+            @app.route(f"/{prefix}/<path:filename>")
+            def serve(filename, _dir=directory):
+                return flask.send_from_directory(_dir, filename)
+            serve.__name__ = f"static_files_{prefix.replace('/', '_')}"
+        make_route(abs_path, rel_path)
+        logger.info(f"Registered static file route: /{rel_path}/ -> {abs_path}")
+
     atexit.register(on_exit)
-
-
 
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)

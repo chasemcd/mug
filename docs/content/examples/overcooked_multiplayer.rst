@@ -260,7 +260,7 @@ Solo practice before playing with partner:
         )
         .content(
             scene_header="Overcooked Tutorial",
-            scene_body_filepath="mug/server/static/templates/overcooked_controls.html",
+            scene_body_filepath="examples/cogrid/html_pages/overcooked_controls.html",
             in_game_scene_body="""
                 <center>
                 <p>Use arrow keys and W to pick up/drop. Try delivering a dish!</p>
@@ -296,18 +296,18 @@ Overcooked uses texture atlases for efficient rendering:
     def overcooked_preload_assets_spec():
         terrain = object_contexts.AtlasSpec(
             name="terrain",
-            img_path="static/assets/overcooked/sprites/terrain.png",
-            atlas_path="static/assets/overcooked/sprites/terrain.json",
+            img_path="examples/cogrid/assets/overcooked/sprites/terrain.png",
+            atlas_path="examples/cogrid/assets/overcooked/sprites/terrain.json",
         )
         chefs = object_contexts.AtlasSpec(
             name="chefs",
-            img_path="static/assets/overcooked/sprites/chefs.png",
-            atlas_path="static/assets/overcooked/sprites/chefs.json",
+            img_path="examples/cogrid/assets/overcooked/sprites/chefs.png",
+            atlas_path="examples/cogrid/assets/overcooked/sprites/chefs.json",
         )
         objects = object_contexts.AtlasSpec(
             name="objects",
-            img_path="static/assets/overcooked/sprites/objects.png",
-            atlas_path="static/assets/overcooked/sprites/objects.json",
+            img_path="examples/cogrid/assets/overcooked/sprites/objects.png",
+            atlas_path="examples/cogrid/assets/overcooked/sprites/objects.json",
         )
         return [terrain.as_dict(), chefs.as_dict(), objects.as_dict()]
 

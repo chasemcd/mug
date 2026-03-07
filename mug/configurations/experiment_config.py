@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import json
+import os
 from typing import Callable
 
 from mug.scenes.stager import Stager
@@ -14,6 +15,9 @@ class ExperimentConfig:
         # Experiment
         self.experiment_id: str = None
         self.stager: Stager = None
+
+        # Static file directories: list of (rel_path, abs_path) tuples
+        self.static_directories: list[tuple[str, str]] = []
 
         # Hosting
         self.host = None
@@ -78,6 +82,23 @@ class ExperimentConfig:
         if max_ping is not NotProvided:
             self.max_ping = max_ping
 
+        return self
+
+    def static_files(self, directories: list[str]) -> ExperimentConfig:
+        """Register external directories to serve as static files.
+
+        Each directory is served at a URL path matching its filesystem path
+        (relative to CWD). For example, if you pass "examples/cogrid/assets",
+        a file at examples/cogrid/assets/foo.png is served at
+        /examples/cogrid/assets/foo.png.
+
+        :param directories: List of directory paths (relative or absolute)
+        :return: self
+        """
+        for d in directories:
+            rel_path = d.rstrip("/")
+            abs_path = os.path.abspath(rel_path)
+            self.static_directories.append((rel_path, abs_path))
         return self
 
     def webrtc(

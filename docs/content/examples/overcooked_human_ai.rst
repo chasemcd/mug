@@ -165,12 +165,12 @@ Each layout has two policy variants defined in ``scenes/scenes.py``. The Behavio
     # Cramped Room policies
     SP_POLICY_MAPPING_CRAMPED_ROOM = {
         0: configuration_constants.PolicyTypes.Human,
-        1: "static/assets/overcooked/models/sp_cramped_room_00.onnx",
+        1: "examples/cogrid/assets/overcooked/models/sp_cramped_room_00.onnx",
     }
 
     BS_POLICY_MAPPING_CRAMPED_ROOM = {
         0: configuration_constants.PolicyTypes.Human,
-        1: "static/assets/overcooked/models/ibc_cramped_room_00.onnx",
+        1: "examples/cogrid/assets/overcooked/models/ibc_cramped_room_00.onnx",
     }
 
     # Similarly for other layouts...
@@ -245,7 +245,7 @@ Solo practice before playing with AI:
         )
         .content(
             scene_header="Overcooked Tutorial",
-            scene_body_filepath="mug/server/static/templates/overcooked_controls.html",
+            scene_body_filepath="examples/cogrid/html_pages/overcooked_controls.html",
             in_game_scene_body="""
                 <center>
                 <p>Use arrow keys and W to pick up/drop. Try delivering a dish!</p>
@@ -281,18 +281,18 @@ Overcooked uses texture atlases for efficient rendering:
     def overcooked_preload_assets_spec():
         terrain = object_contexts.AtlasSpec(
             name="terrain",
-            img_path="static/assets/overcooked/sprites/terrain.png",
-            atlas_path="static/assets/overcooked/sprites/terrain.json",
+            img_path="examples/cogrid/assets/overcooked/sprites/terrain.png",
+            atlas_path="examples/cogrid/assets/overcooked/sprites/terrain.json",
         )
         chefs = object_contexts.AtlasSpec(
             name="chefs",
-            img_path="static/assets/overcooked/sprites/chefs.png",
-            atlas_path="static/assets/overcooked/sprites/chefs.json",
+            img_path="examples/cogrid/assets/overcooked/sprites/chefs.png",
+            atlas_path="examples/cogrid/assets/overcooked/sprites/chefs.json",
         )
         objects = object_contexts.AtlasSpec(
             name="objects",
-            img_path="static/assets/overcooked/sprites/objects.png",
-            atlas_path="static/assets/overcooked/sprites/objects.json",
+            img_path="examples/cogrid/assets/overcooked/sprites/objects.png",
+            atlas_path="examples/cogrid/assets/overcooked/sprites/objects.json",
         )
         return [terrain.as_dict(), chefs.as_dict(), objects.as_dict()]
 

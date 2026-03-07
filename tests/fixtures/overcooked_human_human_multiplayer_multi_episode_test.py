@@ -41,7 +41,7 @@ hh_start_scene = (
     )
     .display(
         scene_header="Welcome",
-        scene_body_filepath="mug/server/static/templates/overcooked_hh_instructions.html",
+        scene_body_filepath="examples/cogrid/html_pages/overcooked_hh_instructions.html",
     )
 )
 
@@ -86,6 +86,7 @@ if __name__ == "__main__":
         # Relaxed browser requirements for test automation
         .entry_screening(browser_requirements=["Chrome"], browser_blocklist=[], max_ping=500)
         .webrtc(force_relay=False)
+        .static_files(directories=["examples/cogrid/assets"])
     )
 
     app.run(experiment_config)

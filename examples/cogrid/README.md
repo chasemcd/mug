@@ -122,7 +122,7 @@ The Cramped Room layout (5×4) is included as the example environment.
 ```python
 {
     0: configuration_constants.PolicyTypes.Human,
-    1: "static/assets/overcooked/models/sp_cramped_room_00.onnx"
+    1: "examples/cogrid/assets/overcooked/models/sp_cramped_room_00.onnx"
 }
 ```
 

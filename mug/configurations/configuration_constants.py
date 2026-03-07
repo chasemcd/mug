@@ -38,7 +38,7 @@ class ModelConfig:
 
     Optional fields:
         onnx_path: Path to the ONNX model file (e.g.,
-            "static/assets/overcooked/models/sp_cramped_room_00.onnx").
+            "examples/cogrid/assets/overcooked/models/sp_cramped_room_00.onnx").
             When set, the ModelConfig can be used directly as a
             ``policy_mapping`` value instead of a bare path string.
 

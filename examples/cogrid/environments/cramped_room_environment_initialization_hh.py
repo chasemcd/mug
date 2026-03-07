@@ -17,7 +17,7 @@ from cogrid.envs.overcooked.rewards import DeliveryReward
 
 from mug.rendering import Surface
 
-ASSET_PATH = "static/assets/overcooked/sprites"
+ASSET_PATH = "examples/cogrid/assets/overcooked/sprites"
 TILE_SIZE = 45
 WIDTH = 5 * TILE_SIZE
 HEIGHT = 4 * TILE_SIZE

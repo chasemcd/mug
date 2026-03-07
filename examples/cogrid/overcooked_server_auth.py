@@ -58,7 +58,7 @@ hh_start_scene = (
     )
     .display(
         scene_header="Welcome",
-        scene_body_filepath="mug/server/static/templates/overcooked_hh_instructions.html",
+        scene_body_filepath="examples/cogrid/html_pages/overcooked_hh_instructions.html",
     )
 )
 
@@ -96,7 +96,7 @@ server_auth_scene = (
         "Please wait in the lobby for your partner to join. "
         "<br><br> "
         "You will be playing on the layout pictured below. "
-        '<center><img src="static/assets/overcooked/cramped_room.png" alt="Annotated Overcooked environment." height="270" width="315"></center>'
+        '<center><img src="examples/cogrid/assets/overcooked/cramped_room.png" alt="Annotated Overcooked environment." height="270" width="315"></center>'
         "Work together to prepare and deliver as many dishes as possible. "
         "</p></center>",
         game_page_html_fn=overcooked_utils.overcooked_game_page_header_fn,
@@ -140,6 +140,7 @@ if __name__ == "__main__":
         experiment_config.ExperimentConfig()
         .experiment(stager=stager, experiment_id=args.experiment_id)
         .hosting(port=args.port, host="0.0.0.0")
+        .static_files(directories=["examples/cogrid/assets"])
     )
 
     app.run(experiment_config)

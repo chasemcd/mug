@@ -53,6 +53,7 @@ if __name__ == "__main__":
         .experiment(stager=stager, experiment_id="overcooked_human_ai_test")
         .hosting(port=args.port, host="0.0.0.0")
         .entry_screening(browser_requirements=["Chrome"], browser_blocklist=[], max_ping=500)
+        .static_files(directories=["examples/cogrid/assets"])
     )
 
     app.run(experiment_config)

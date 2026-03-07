@@ -33,7 +33,7 @@ SP_POLICY_MAPPING_CRAMPED_ROOM = {
     0: configuration_constants.PolicyTypes.Human,
     1: dataclasses.replace(
         OVERCOOKED_MODEL_CONFIG,
-        onnx_path="static/assets/overcooked/models/cogrid-0.2.1-cramped-room.onnx",
+        onnx_path="examples/cogrid/assets/overcooked/models/cogrid-0.2.1-cramped-room.onnx",
     ),
 }
 
@@ -41,7 +41,7 @@ IBC_POLICY_MAPPING_CRAMPED_ROOM = {
     0: configuration_constants.PolicyTypes.Human,
     1: dataclasses.replace(
         OVERCOOKED_MODEL_CONFIG,
-        onnx_path="static/assets/overcooked/models/cogrid-0.2.1-cramped-room.onnx",
+        onnx_path="examples/cogrid/assets/overcooked/models/cogrid-0.2.1-cramped-room.onnx",
     ),
 }
 
@@ -73,7 +73,7 @@ start_scene = (
     )
     .display(
         scene_header="Welcome",
-        scene_body_filepath="mug/server/static/templates/overcooked_instructions.html",
+        scene_body_filepath="examples/cogrid/html_pages/overcooked_instructions.html",
     )
 )
 
@@ -109,12 +109,12 @@ tutorial_gym_scene = (
     )
     .content(
         scene_header="Overcooked Tutorial",
-        scene_body_filepath="mug/server/static/templates/overcooked_controls.html",
+        scene_body_filepath="examples/cogrid/html_pages/overcooked_controls.html",
         in_game_scene_body="""
         <center>
         <p>
         Use the arrow keys <img src="static/assets/keys/arrow_keys_2.png" alt="Keyboard arrow keys" height="24" width="20" style="vertical-align:middle;">
-        to control your chef <img src="static/assets/overcooked/blue_chef.png" alt="Blue Chef" height="24" width="24" style="vertical-align:middle;">
+        to control your chef <img src="examples/cogrid/assets/overcooked/blue_chef.png" alt="Blue Chef" height="24" width="24" style="vertical-align:middle;">
         and press <img src="static/assets/keys/icons8-w-key-50.png" alt="W key" height="24" width="24" style="vertical-align:middle;"> to pick up and
         drop objects. Try to deliver as many dishes as possible by combining onions in the pot, plating the cooked onions,
         and delivering them to the grey delivery zone.
@@ -161,7 +161,7 @@ cramped_room_sp_0 = (
         "in the same environment layout."
         "<br><br> "
         "You will be playing on the layout pictured below. "
-        '<center><img src="static/assets/overcooked/cramped_room.png" alt="Annotated Overcooked environment." height="270" width="315"></center>'
+        '<center><img src="examples/cogrid/assets/overcooked/cramped_room.png" alt="Annotated Overcooked environment." height="270" width="315"></center>'
         "When the button activates, click it to begin. "
         "</p></center>",
         game_page_html_fn=overcooked_utils.overcooked_game_page_header_fn,
@@ -169,7 +169,7 @@ cramped_room_sp_0 = (
         <center>
         <p>
         Use the arrow keys <img src="static/assets/keys/arrow_keys_2.png" alt="Keyboard arrow keys" height="24" width="20" style="vertical-align:middle;">
-        to control your chef <img src="static/assets/overcooked/blue_chef.png" alt="Blue Chef" height="24" width="24" style="vertical-align:middle;">
+        to control your chef <img src="examples/cogrid/assets/overcooked/blue_chef.png" alt="Blue Chef" height="24" width="24" style="vertical-align:middle;">
         and press <img src="static/assets/keys/icons8-w-key-50.png" alt="W key" height="24" width="24" style="vertical-align:middle;"> to pick up and
         drop objects. Try to deliver as many dishes as possible by combining onions in the pot, plating the cooked onions,
         and delivering them to the grey delivery zone.
@@ -245,7 +245,7 @@ cramped_room_human_human = (
         "Please wait in the lobby for your partner to join. "
         "<br><br> "
         "You will be playing on the layout pictured below. "
-        '<center><img src="static/assets/overcooked/cramped_room.png" alt="Annotated Overcooked environment." height="270" width="315"></center>'
+        '<center><img src="examples/cogrid/assets/overcooked/cramped_room.png" alt="Annotated Overcooked environment." height="270" width="315"></center>'
         "Work together to prepare and deliver as many dishes as possible. "
         "</p></center>",
         game_page_html_fn=overcooked_utils.overcooked_game_page_header_fn,
