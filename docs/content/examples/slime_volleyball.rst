@@ -116,7 +116,7 @@ Define human and AI players:
 
     POLICY_MAPPING = {
         "agent_right": configuration_constants.PolicyTypes.Human,
-        "agent_left": "static/assets/slime_volleyball/models/model.onnx",
+        "agent_left": "examples/slime_volleyball/assets/slime_volleyball/models/model.onnx",
     }
 
 The human controls ``agent_right`` (blue slime on the right), while an ONNX model controls ``agent_left`` (red slime on the left).
@@ -492,7 +492,7 @@ The ONNX model is loaded in the browser:
 .. code-block:: python
 
     POLICY_MAPPING = {
-        "agent_left": "static/assets/slime_volleyball/models/model.onnx",
+        "agent_left": "examples/slime_volleyball/assets/slime_volleyball/models/model.onnx",
     }
 
 MUG automatically:

@@ -15,9 +15,9 @@ def slime_volleyball_game_page_header_fn(
     assert player_id is not None
 
     if player_id == "agent_right":
-        html_path = "mug/server/static/templates/slime_vb_agent_right_header.html"
+        html_path = "examples/slime_volleyball/html_pages/slime_vb_agent_right_header.html"
     else:
-        html_path = "mug/server/static/templates/slime_vb_agent_left_header.html"
+        html_path = "examples/slime_volleyball/html_pages/slime_vb_agent_left_header.html"
 
     try:
         with open(html_path, encoding="utf-8") as f:

@@ -46,7 +46,7 @@ if __name__ == "__main__":
         experiment_config.ExperimentConfig()
         .experiment(stager=stager, experiment_id="overcooked_test")
         .hosting(port=args.port, host="0.0.0.0")
-        .static_files(directories=["examples/cogrid/assets"])
+        .static_files(directories=["examples/cogrid/assets", "examples/shared/assets"])
     )
 
     app.run(experiment_config)

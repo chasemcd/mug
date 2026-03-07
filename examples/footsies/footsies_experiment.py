@@ -52,6 +52,7 @@ if __name__ == "__main__":
         experiment_config.ExperimentConfig()
         .experiment(stager=stager, experiment_id="footsies_test")
         .hosting(port=5702, host="0.0.0.0")
+        .static_files(directories=["examples/footsies/assets", "examples/shared/assets"])
     )
 
     app.run(experiment_config)

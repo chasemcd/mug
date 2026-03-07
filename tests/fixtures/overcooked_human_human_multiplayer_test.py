@@ -80,7 +80,7 @@ if __name__ == "__main__":
         # Relaxed browser requirements for test automation
         .entry_screening(browser_requirements=["Chrome"], browser_blocklist=[], max_ping=500)
         .webrtc(force_relay=False)
-        .static_files(directories=["examples/cogrid/assets"])
+        .static_files(directories=["examples/cogrid/assets", "examples/shared/assets"])
     )
 
     app.run(experiment_config)

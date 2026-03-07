@@ -376,8 +376,8 @@ Survey Collection
                 # ... choices for each question
             ],
             images=[
-                "static/assets/footsies/gifs/backward_dash.gif",
-                "static/assets/footsies/gifs/kick_ko.gif",
+                "examples/footsies/assets/footsies/gifs/backward_dash.gif",
+                "examples/footsies/assets/footsies/gifs/kick_ko.gif",
                 # ... GIFs showing moves
             ],
             multi_select=True,

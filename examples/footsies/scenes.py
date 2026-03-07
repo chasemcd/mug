@@ -63,10 +63,10 @@ footsies_tutorial_scene = (
 CONTROLS_SUBHEADER = """
         <div style="text-align: center; font-family: 'Press Start 2P', cursive; padding: 8px; color: #000;">
         <p style="margin: 10px;">
-        MOVE WITH <img src="static/assets/keys/icons8-a-key-50.png" alt="A key" height="24" width="24" style="vertical-align:middle;"> AND <img src="static/assets/keys/icons8-d-key-50.png" alt="D key" height="24" width="24" style="vertical-align:middle;">
+        MOVE WITH <img src="examples/shared/assets/keys/icons8-a-key-50.png" alt="A key" height="24" width="24" style="vertical-align:middle;"> AND <img src="examples/shared/assets/keys/icons8-d-key-50.png" alt="D key" height="24" width="24" style="vertical-align:middle;">
         </p>
         <p style="margin: 5px;">
-        ATTACK WITH THE SPACE BAR <img src="static/assets/keys/icons8-space-key-50.png" alt="Space key" height="24" width="24" style="vertical-align:middle;">
+        ATTACK WITH THE SPACE BAR <img src="examples/shared/assets/keys/icons8-space-key-50.png" alt="Space key" height="24" width="24" style="vertical-align:middle;">
         </p>
         </div>
 """
@@ -504,8 +504,8 @@ footsies_mc_survey = (
     <br>
     <br>
     The answer correspond to key press sequence or single pressses. For example
-    <img src='static/assets/keys/icons8-d-key-50.png' alt='D key' height='24' width='24' style='vertical-align:middle;'> -> <img src='static/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'>
-    means pressing the "D" key followed by the space bar. On the other hand, <img src='static/assets/keys/icons8-d-key-50.png' alt='D key' height='24' width='24' style='vertical-align:middle;'> + <img src='static/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'> means
+    <img src='examples/shared/assets/keys/icons8-d-key-50.png' alt='D key' height='24' width='24' style='vertical-align:middle;'> -> <img src='examples/shared/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'>
+    means pressing the "D" key followed by the space bar. On the other hand, <img src='examples/shared/assets/keys/icons8-d-key-50.png' alt='D key' height='24' width='24' style='vertical-align:middle;'> + <img src='examples/shared/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'> means
     pressing the "D" key and the space bar at the same time.
     """,
         questions=[
@@ -520,77 +520,77 @@ footsies_mc_survey = (
         ],
         choices=[
             [
-                "<img src='static/assets/keys/icons8-a-key-50.png' alt='A key' height='24' width='24' style='vertical-align:middle;'> -> <img src='static/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'>",
-                "<img src='static/assets/keys/icons8-a-key-50.png' alt='A key' height='24' width='24' style='vertical-align:middle;'> -> <img src='static/assets/keys/icons8-a-key-50.png' alt='A key' height='24' width='24' style='vertical-align:middle;'>",
-                "<img src='static/assets/keys/icons8-a-key-50.png' alt='A key' height='24' width='24' style='vertical-align:middle;'> (Held then released)",
-                "<img src='static/assets/keys/icons8-d-key-50.png' alt='D key' height='24' width='24' style='vertical-align:middle;'> -> <img src='static/assets/keys/icons8-d-key-50.png' alt='D key' height='24' width='24' style='vertical-align:middle;'>",
-                "<img src='static/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'> -> <img src='static/assets/keys/icons8-a-key-50.png' alt='A key' height='24' width='24' style='vertical-align:middle;'>",
+                "<img src='examples/shared/assets/keys/icons8-a-key-50.png' alt='A key' height='24' width='24' style='vertical-align:middle;'> -> <img src='examples/shared/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'>",
+                "<img src='examples/shared/assets/keys/icons8-a-key-50.png' alt='A key' height='24' width='24' style='vertical-align:middle;'> -> <img src='examples/shared/assets/keys/icons8-a-key-50.png' alt='A key' height='24' width='24' style='vertical-align:middle;'>",
+                "<img src='examples/shared/assets/keys/icons8-a-key-50.png' alt='A key' height='24' width='24' style='vertical-align:middle;'> (Held then released)",
+                "<img src='examples/shared/assets/keys/icons8-d-key-50.png' alt='D key' height='24' width='24' style='vertical-align:middle;'> -> <img src='examples/shared/assets/keys/icons8-d-key-50.png' alt='D key' height='24' width='24' style='vertical-align:middle;'>",
+                "<img src='examples/shared/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'> -> <img src='examples/shared/assets/keys/icons8-a-key-50.png' alt='A key' height='24' width='24' style='vertical-align:middle;'>",
             ],
             [
-                "<img src='static/assets/keys/icons8-d-key-50.png' alt='D key' height='24' width='24' style='vertical-align:middle;'> -> <img src='static/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'>",
-                "<img src='static/assets/keys/icons8-a-key-50.png' alt='A key' height='24' width='24' style='vertical-align:middle;'> -> <img src='static/assets/keys/icons8-a-key-50.png' alt='A key' height='24' width='24' style='vertical-align:middle;'>",
-                "<img src='static/assets/keys/icons8-d-key-50.png' alt='D key' height='24' width='24' style='vertical-align:middle;'> (Held then released)",
-                "<img src='static/assets/keys/icons8-d-key-50.png' alt='D key' height='24' width='24' style='vertical-align:middle;'> -> <img src='static/assets/keys/icons8-d-key-50.png' alt='D key' height='24' width='24' style='vertical-align:middle;'>",
-                "<img src='static/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'> -> <img src='static/assets/keys/icons8-d-key-50.png' alt='D key' height='24' width='24' style='vertical-align:middle;'>",
+                "<img src='examples/shared/assets/keys/icons8-d-key-50.png' alt='D key' height='24' width='24' style='vertical-align:middle;'> -> <img src='examples/shared/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'>",
+                "<img src='examples/shared/assets/keys/icons8-a-key-50.png' alt='A key' height='24' width='24' style='vertical-align:middle;'> -> <img src='examples/shared/assets/keys/icons8-a-key-50.png' alt='A key' height='24' width='24' style='vertical-align:middle;'>",
+                "<img src='examples/shared/assets/keys/icons8-d-key-50.png' alt='D key' height='24' width='24' style='vertical-align:middle;'> (Held then released)",
+                "<img src='examples/shared/assets/keys/icons8-d-key-50.png' alt='D key' height='24' width='24' style='vertical-align:middle;'> -> <img src='examples/shared/assets/keys/icons8-d-key-50.png' alt='D key' height='24' width='24' style='vertical-align:middle;'>",
+                "<img src='examples/shared/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'> -> <img src='examples/shared/assets/keys/icons8-d-key-50.png' alt='D key' height='24' width='24' style='vertical-align:middle;'>",
             ],
             [
-                "<img src='static/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'>",
-                "<img src='static/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'> (Held then released)",
-                "<img src='static/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'> (Held then released) + <img src='static/assets/keys/icons8-a-key-50.png' alt='A key' height='24' width='24' style='vertical-align:middle;'>",
-                "<img src='static/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'> (Held then released) + <img src='static/assets/keys/icons8-d-key-50.png' alt='D key' height='24' width='24' style='vertical-align:middle;'>",
-                "<img src='static/assets/keys/icons8-d-key-50.png' alt='D key' height='24' width='24' style='vertical-align:middle;'> + <img src='static/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'>",
-                "<img src='static/assets/keys/icons8-a-key-50.png' alt='A key' height='24' width='24' style='vertical-align:middle;'> + <img src='static/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'>",
+                "<img src='examples/shared/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'>",
+                "<img src='examples/shared/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'> (Held then released)",
+                "<img src='examples/shared/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'> (Held then released) + <img src='examples/shared/assets/keys/icons8-a-key-50.png' alt='A key' height='24' width='24' style='vertical-align:middle;'>",
+                "<img src='examples/shared/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'> (Held then released) + <img src='examples/shared/assets/keys/icons8-d-key-50.png' alt='D key' height='24' width='24' style='vertical-align:middle;'>",
+                "<img src='examples/shared/assets/keys/icons8-d-key-50.png' alt='D key' height='24' width='24' style='vertical-align:middle;'> + <img src='examples/shared/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'>",
+                "<img src='examples/shared/assets/keys/icons8-a-key-50.png' alt='A key' height='24' width='24' style='vertical-align:middle;'> + <img src='examples/shared/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'>",
             ],
             [
-                "<img src='static/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'>",
-                "<img src='static/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'> (Held then released)",
-                "<img src='static/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'> (Held then released) + <img src='static/assets/keys/icons8-a-key-50.png' alt='A key' height='24' width='24' style='vertical-align:middle;'>",
-                "<img src='static/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'> (Held then released) + <img src='static/assets/keys/icons8-d-key-50.png' alt='D key' height='24' width='24' style='vertical-align:middle;'>",
-                "<img src='static/assets/keys/icons8-d-key-50.png' alt='D key' height='24' width='24' style='vertical-align:middle;'> + <img src='static/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'>",
-                "<img src='static/assets/keys/icons8-a-key-50.png' alt='A key' height='24' width='24' style='vertical-align:middle;'> + <img src='static/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'>",
+                "<img src='examples/shared/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'>",
+                "<img src='examples/shared/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'> (Held then released)",
+                "<img src='examples/shared/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'> (Held then released) + <img src='examples/shared/assets/keys/icons8-a-key-50.png' alt='A key' height='24' width='24' style='vertical-align:middle;'>",
+                "<img src='examples/shared/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'> (Held then released) + <img src='examples/shared/assets/keys/icons8-d-key-50.png' alt='D key' height='24' width='24' style='vertical-align:middle;'>",
+                "<img src='examples/shared/assets/keys/icons8-d-key-50.png' alt='D key' height='24' width='24' style='vertical-align:middle;'> + <img src='examples/shared/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'>",
+                "<img src='examples/shared/assets/keys/icons8-a-key-50.png' alt='A key' height='24' width='24' style='vertical-align:middle;'> + <img src='examples/shared/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'>",
             ],
             [
-                "<img src='static/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'>",
-                "<img src='static/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'> (Held then released)",
-                "<img src='static/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'> (Held then released) + <img src='static/assets/keys/icons8-a-key-50.png' alt='A key' height='24' width='24' style='vertical-align:middle;'>",
-                "<img src='static/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'> (Held then released) + <img src='static/assets/keys/icons8-d-key-50.png' alt='D key' height='24' width='24' style='vertical-align:middle;'>",
-                "<img src='static/assets/keys/icons8-d-key-50.png' alt='D key' height='24' width='24' style='vertical-align:middle;'> + <img src='static/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'>",
-                "<img src='static/assets/keys/icons8-a-key-50.png' alt='A key' height='24' width='24' style='vertical-align:middle;'> + <img src='static/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'>",
+                "<img src='examples/shared/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'>",
+                "<img src='examples/shared/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'> (Held then released)",
+                "<img src='examples/shared/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'> (Held then released) + <img src='examples/shared/assets/keys/icons8-a-key-50.png' alt='A key' height='24' width='24' style='vertical-align:middle;'>",
+                "<img src='examples/shared/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'> (Held then released) + <img src='examples/shared/assets/keys/icons8-d-key-50.png' alt='D key' height='24' width='24' style='vertical-align:middle;'>",
+                "<img src='examples/shared/assets/keys/icons8-d-key-50.png' alt='D key' height='24' width='24' style='vertical-align:middle;'> + <img src='examples/shared/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'>",
+                "<img src='examples/shared/assets/keys/icons8-a-key-50.png' alt='A key' height='24' width='24' style='vertical-align:middle;'> + <img src='examples/shared/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'>",
             ],
             [
-                "<img src='static/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'>",
-                "<img src='static/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'> (Held then released)",
-                "<img src='static/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'> (Held then released) + <img src='static/assets/keys/icons8-a-key-50.png' alt='A key' height='24' width='24' style='vertical-align:middle;'>",
-                "<img src='static/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'> (Held then released) + <img src='static/assets/keys/icons8-d-key-50.png' alt='D key' height='24' width='24' style='vertical-align:middle;'>",
-                "<img src='static/assets/keys/icons8-d-key-50.png' alt='D key' height='24' width='24' style='vertical-align:middle;'> + <img src='static/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'>",
-                "<img src='static/assets/keys/icons8-a-key-50.png' alt='A key' height='24' width='24' style='vertical-align:middle;'> + <img src='static/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'>",
+                "<img src='examples/shared/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'>",
+                "<img src='examples/shared/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'> (Held then released)",
+                "<img src='examples/shared/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'> (Held then released) + <img src='examples/shared/assets/keys/icons8-a-key-50.png' alt='A key' height='24' width='24' style='vertical-align:middle;'>",
+                "<img src='examples/shared/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'> (Held then released) + <img src='examples/shared/assets/keys/icons8-d-key-50.png' alt='D key' height='24' width='24' style='vertical-align:middle;'>",
+                "<img src='examples/shared/assets/keys/icons8-d-key-50.png' alt='D key' height='24' width='24' style='vertical-align:middle;'> + <img src='examples/shared/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'>",
+                "<img src='examples/shared/assets/keys/icons8-a-key-50.png' alt='A key' height='24' width='24' style='vertical-align:middle;'> + <img src='examples/shared/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'>",
             ],
             [
-                "<img src='static/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'>",
-                "<img src='static/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'> (Held then released)",
-                "<img src='static/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'> (Held then released) + <img src='static/assets/keys/icons8-a-key-50.png' alt='A key' height='24' width='24' style='vertical-align:middle;'>",
-                "<img src='static/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'> (Held then released) + <img src='static/assets/keys/icons8-d-key-50.png' alt='D key' height='24' width='24' style='vertical-align:middle;'>",
-                "<img src='static/assets/keys/icons8-d-key-50.png' alt='D key' height='24' width='24' style='vertical-align:middle;'> + <img src='static/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'>",
-                "<img src='static/assets/keys/icons8-a-key-50.png' alt='A key' height='24' width='24' style='vertical-align:middle;'> + <img src='static/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'>",
+                "<img src='examples/shared/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'>",
+                "<img src='examples/shared/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'> (Held then released)",
+                "<img src='examples/shared/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'> (Held then released) + <img src='examples/shared/assets/keys/icons8-a-key-50.png' alt='A key' height='24' width='24' style='vertical-align:middle;'>",
+                "<img src='examples/shared/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'> (Held then released) + <img src='examples/shared/assets/keys/icons8-d-key-50.png' alt='D key' height='24' width='24' style='vertical-align:middle;'>",
+                "<img src='examples/shared/assets/keys/icons8-d-key-50.png' alt='D key' height='24' width='24' style='vertical-align:middle;'> + <img src='examples/shared/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'>",
+                "<img src='examples/shared/assets/keys/icons8-a-key-50.png' alt='A key' height='24' width='24' style='vertical-align:middle;'> + <img src='examples/shared/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'>",
             ],
             [
-                "<img src='static/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'>",
-                "<img src='static/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'> (Held then released)",
-                "<img src='static/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'> (Held then released) + <img src='static/assets/keys/icons8-a-key-50.png' alt='A key' height='24' width='24' style='vertical-align:middle;'>",
-                "<img src='static/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'> (Held then released) + <img src='static/assets/keys/icons8-d-key-50.png' alt='D key' height='24' width='24' style='vertical-align:middle;'>",
-                "<img src='static/assets/keys/icons8-d-key-50.png' alt='D key' height='24' width='24' style='vertical-align:middle;'> + <img src='static/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'>",
-                "<img src='static/assets/keys/icons8-a-key-50.png' alt='A key' height='24' width='24' style='vertical-align:middle;'> + <img src='static/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'>",
+                "<img src='examples/shared/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'>",
+                "<img src='examples/shared/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'> (Held then released)",
+                "<img src='examples/shared/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'> (Held then released) + <img src='examples/shared/assets/keys/icons8-a-key-50.png' alt='A key' height='24' width='24' style='vertical-align:middle;'>",
+                "<img src='examples/shared/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'> (Held then released) + <img src='examples/shared/assets/keys/icons8-d-key-50.png' alt='D key' height='24' width='24' style='vertical-align:middle;'>",
+                "<img src='examples/shared/assets/keys/icons8-d-key-50.png' alt='D key' height='24' width='24' style='vertical-align:middle;'> + <img src='examples/shared/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'>",
+                "<img src='examples/shared/assets/keys/icons8-a-key-50.png' alt='A key' height='24' width='24' style='vertical-align:middle;'> + <img src='examples/shared/assets/keys/icons8-space-key-50.png' alt='Space key' height='24' width='24' style='vertical-align:middle;'>",
             ],
         ],
         images=[
-            "static/assets/footsies/gifs/backward_dash.gif",
-            "static/assets/footsies/gifs/forward_dash.gif",
-            "static/assets/footsies/gifs/kick_ko.gif",
-            "static/assets/footsies/gifs/kick_no_ko.gif",
-            "static/assets/footsies/gifs/knee_no_ko.gif",
-            "static/assets/footsies/gifs/low_kick.gif",
-            "static/assets/footsies/gifs/uppercut_miss.gif",
-            "static/assets/footsies/gifs/uppercut.gif",
+            "examples/footsies/assets/footsies/gifs/backward_dash.gif",
+            "examples/footsies/assets/footsies/gifs/forward_dash.gif",
+            "examples/footsies/assets/footsies/gifs/kick_ko.gif",
+            "examples/footsies/assets/footsies/gifs/kick_no_ko.gif",
+            "examples/footsies/assets/footsies/gifs/knee_no_ko.gif",
+            "examples/footsies/assets/footsies/gifs/low_kick.gif",
+            "examples/footsies/assets/footsies/gifs/uppercut_miss.gif",
+            "examples/footsies/assets/footsies/gifs/uppercut.gif",
         ],
         multi_select=True,
     )

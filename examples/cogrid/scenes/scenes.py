@@ -113,9 +113,9 @@ tutorial_gym_scene = (
         in_game_scene_body="""
         <center>
         <p>
-        Use the arrow keys <img src="static/assets/keys/arrow_keys_2.png" alt="Keyboard arrow keys" height="24" width="20" style="vertical-align:middle;">
+        Use the arrow keys <img src="examples/shared/assets/keys/arrow_keys_2.png" alt="Keyboard arrow keys" height="24" width="20" style="vertical-align:middle;">
         to control your chef <img src="examples/cogrid/assets/overcooked/blue_chef.png" alt="Blue Chef" height="24" width="24" style="vertical-align:middle;">
-        and press <img src="static/assets/keys/icons8-w-key-50.png" alt="W key" height="24" width="24" style="vertical-align:middle;"> to pick up and
+        and press <img src="examples/shared/assets/keys/icons8-w-key-50.png" alt="W key" height="24" width="24" style="vertical-align:middle;"> to pick up and
         drop objects. Try to deliver as many dishes as possible by combining onions in the pot, plating the cooked onions,
         and delivering them to the grey delivery zone.
         </p>
@@ -168,9 +168,9 @@ cramped_room_sp_0 = (
         in_game_scene_body="""
         <center>
         <p>
-        Use the arrow keys <img src="static/assets/keys/arrow_keys_2.png" alt="Keyboard arrow keys" height="24" width="20" style="vertical-align:middle;">
+        Use the arrow keys <img src="examples/shared/assets/keys/arrow_keys_2.png" alt="Keyboard arrow keys" height="24" width="20" style="vertical-align:middle;">
         to control your chef <img src="examples/cogrid/assets/overcooked/blue_chef.png" alt="Blue Chef" height="24" width="24" style="vertical-align:middle;">
-        and press <img src="static/assets/keys/icons8-w-key-50.png" alt="W key" height="24" width="24" style="vertical-align:middle;"> to pick up and
+        and press <img src="examples/shared/assets/keys/icons8-w-key-50.png" alt="W key" height="24" width="24" style="vertical-align:middle;"> to pick up and
         drop objects. Try to deliver as many dishes as possible by combining onions in the pot, plating the cooked onions,
         and delivering them to the grey delivery zone.
         </p>
@@ -252,8 +252,8 @@ cramped_room_human_human = (
         in_game_scene_body="""
         <center>
         <p>
-        Use the arrow keys <img src="static/assets/keys/arrow_keys_2.png" alt="Keyboard arrow keys" height="24" width="20" style="vertical-align:middle;">
-        to control your chef and press <img src="static/assets/keys/icons8-w-key-50.png" alt="W key" height="24" width="24" style="vertical-align:middle;"> to pick up and
+        Use the arrow keys <img src="examples/shared/assets/keys/arrow_keys_2.png" alt="Keyboard arrow keys" height="24" width="20" style="vertical-align:middle;">
+        to control your chef and press <img src="examples/shared/assets/keys/icons8-w-key-50.png" alt="W key" height="24" width="24" style="vertical-align:middle;"> to pick up and
         drop objects. Coordinate with your partner to deliver as many dishes as possible!
         </p>
         </center>

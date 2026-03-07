@@ -135,7 +135,7 @@ if __name__ == "__main__":
             max_ping=500,
         )
         .webrtc(force_relay=False)
-        .static_files(directories=["examples/cogrid/assets"])
+        .static_files(directories=["examples/cogrid/assets", "examples/shared/assets"])
     )
 
     app.run(experiment_config)

@@ -103,8 +103,8 @@ server_auth_scene = (
         in_game_scene_body="""
         <center>
         <p>
-        Use the arrow keys <img src="static/assets/keys/arrow_keys_2.png" alt="Keyboard arrow keys" height="24" width="20" style="vertical-align:middle;">
-        to control your chef and press <img src="static/assets/keys/icons8-w-key-50.png" alt="W key" height="24" width="24" style="vertical-align:middle;"> to pick up and
+        Use the arrow keys <img src="examples/shared/assets/keys/arrow_keys_2.png" alt="Keyboard arrow keys" height="24" width="20" style="vertical-align:middle;">
+        to control your chef and press <img src="examples/shared/assets/keys/icons8-w-key-50.png" alt="W key" height="24" width="24" style="vertical-align:middle;"> to pick up and
         drop objects. Coordinate with your partner to deliver as many dishes as possible!
         </p>
         </center>
@@ -140,7 +140,7 @@ if __name__ == "__main__":
         experiment_config.ExperimentConfig()
         .experiment(stager=stager, experiment_id=args.experiment_id)
         .hosting(port=args.port, host="0.0.0.0")
-        .static_files(directories=["examples/cogrid/assets"])
+        .static_files(directories=["examples/cogrid/assets", "examples/shared/assets"])
     )
 
     app.run(experiment_config)

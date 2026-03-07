@@ -77,7 +77,7 @@ slime_scene = (
         in_game_scene_body="""
         <center>
         <p>
-        Use the arrow keys <img src="static/assets/keys/arrow_keys_2.png" alt="Keyboard arrow keys" height="24" width="20" style="vertical-align:middle;">
+        Use the arrow keys <img src="examples/shared/assets/keys/arrow_keys_2.png" alt="Keyboard arrow keys" height="24" width="20" style="vertical-align:middle;">
         to control the slime on the right!
         </p>
         </center>
@@ -119,6 +119,7 @@ if __name__ == "__main__":
         experiment_config.ExperimentConfig()
         .experiment(stager=stager, experiment_id="slime_vb_demo")
         .hosting(port=5702, host="0.0.0.0")
+        .static_files(directories=["examples/slime_volleyball/assets", "examples/shared/assets"])
     )
 
     app.run(experiment_config)
