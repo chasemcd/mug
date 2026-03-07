@@ -210,8 +210,8 @@ Each layout scene is configured for two human players:
             env_to_state_fn=overcooked_utils.overcooked_env_to_render_fn,
             assets_to_preload=overcooked_utils.overcooked_preload_assets_spec(),
             hud_text_fn=overcooked_utils.hud_text_fn,
-            game_width=overcooked_utils.TILE_SIZE * 7,
-            game_height=overcooked_utils.TILE_SIZE * 6,
+            game_width=overcooked_utils.TILE_SIZE * 5,
+            game_height=overcooked_utils.TILE_SIZE * 4,
             background="#e6b453",
         )
         .gameplay(
@@ -247,8 +247,8 @@ Solo practice before playing with partner:
             env_to_state_fn=overcooked_utils.overcooked_env_to_render_fn,
             assets_to_preload=overcooked_utils.overcooked_preload_assets_spec(),
             hud_text_fn=overcooked_utils.hud_text_fn,
-            game_width=overcooked_utils.TILE_SIZE * 7,
-            game_height=overcooked_utils.TILE_SIZE * 6,
+            game_width=overcooked_utils.TILE_SIZE * 5,
+            game_height=overcooked_utils.TILE_SIZE * 4,
             background="#e6b453",
         )
         .gameplay(
