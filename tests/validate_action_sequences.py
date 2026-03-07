@@ -9,13 +9,13 @@ This script loads all CSV data files from a scene directory and:
 4. Plots the four reward columns from infos to confirm parity between paired participants
 
 Usage:
-    python scripts/validate_action_sequences.py data/cramped_room_hh
-    python scripts/validate_action_sequences.py data/cramped_room_hh --verbose
-    python scripts/validate_action_sequences.py data/cramped_room_hh --no-plot
+    python tests/validate_action_sequences.py data/cramped_room_hh
+    python tests/validate_action_sequences.py data/cramped_room_hh --verbose
+    python tests/validate_action_sequences.py data/cramped_room_hh --no-plot
 
 Compare mode (Phase 39: VERIFY-01):
-    python scripts/validate_action_sequences.py --compare file1.csv file2.csv
-    python scripts/validate_action_sequences.py --compare file1.csv file2.csv --verbose
+    python tests/validate_action_sequences.py --compare file1.csv file2.csv
+    python tests/validate_action_sequences.py --compare file1.csv file2.csv --verbose
 """
 
 from __future__ import annotations
