@@ -1,32 +1,21 @@
 from __future__ import annotations
 
-import dataclasses
-
 import eventlet
 
 eventlet.monkey_patch()
 
 import argparse
 
+from examples.cogrid.scenes import scenes as oc_scenes
 from mug.configurations import configuration_constants, experiment_config
-from mug.configurations.configuration_constants import ModelConfig
-from mug.examples.cogrid.scenes import scenes as oc_scenes
 from mug.scenes import gym_scene, scene, stager, static_scene
 from mug.server import app
 
-SLIMEVB_MODEL_CONFIG = ModelConfig(
-    obs_input="obs",
-    logit_output="output",
-    state_inputs=["state_ins"],
-    state_outputs=["state_outs"],
-    state_shape=[1],
-    onnx_path="static/assets/slime_volleyball/models/model.onnx"
-)
-
 POLICY_MAPPING = {
-    "agent_right": SLIMEVB_MODEL_CONFIG,
+    "agent_right": configuration_constants.PolicyTypes.Human,
     "agent_left": configuration_constants.PolicyTypes.Human,
 }
+
 
 NOOP = 0
 LEFT = 1
@@ -43,6 +32,7 @@ ACTION_MAPPING = {
     ("ArrowRight", "ArrowUp"): UPRIGHT,
     "ArrowRight": RIGHT,
 }
+
 
 # Define the start scene, which is the landing page for participants.
 start_scene = (
@@ -70,13 +60,16 @@ slime_scene = (
         fps=30,
         game_width=600,
         game_height=250,
+        hud_score_carry_over=True,
+        rollback_smoothing_duration=300,
     )
     .gameplay(
         default_action=NOOP,
         action_mapping=ACTION_MAPPING,
-        num_episodes=5,
+        num_episodes=10,
         max_steps=3000,
         input_mode=configuration_constants.InputModes.PressedKeys,
+        action_population_method=configuration_constants.ActionSettings.PreviousSubmittedAction,
     )
     .content(
         scene_header="Slime Volleyball",
@@ -91,16 +84,20 @@ slime_scene = (
         <br><br>
         """,
     )
+    .waitroom(timeout=120000)  # 2 minutes
     .runtime(
         run_through_pyodide=True,
-        environment_initialization_code_filepath="mug/examples/slime_volleyball/slimevb_env.py",
+        environment_initialization_code_filepath="examples/slime_volleyball/slimevb_env.py",
         packages_to_install=[
             "slimevb==0.0.4",
             "opencv-python",
         ],
     )
+    .multiplayer(
+        multiplayer=True,
+        input_delay=2,
+    )
 )
-
 
 stager = stager.Stager(
     scenes=[

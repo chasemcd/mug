@@ -8,9 +8,9 @@ import eventlet
 eventlet.monkey_patch()
 
 
+from examples.cogrid import overcooked_utils
 from mug.configurations import configuration_constants
 from mug.configurations.configuration_constants import ModelConfig
-from mug.examples.cogrid import overcooked_utils
 from mug.scenes import gym_scene, scene, static_scene
 from mug.server.matchmaker import FIFOMatchmaker
 
@@ -126,7 +126,7 @@ tutorial_gym_scene = (
     )
     .runtime(
         run_through_pyodide=True,
-        environment_initialization_code_filepath="mug/examples/cogrid/environments/tutorial_cramped_room_environment_initialization.py",
+        environment_initialization_code_filepath="examples/cogrid/environments/tutorial_cramped_room_environment_initialization.py",
         packages_to_install=["numpy", "cogrid==0.2.1", "opencv-python"],
     )
 )
@@ -180,7 +180,7 @@ cramped_room_sp_0 = (
     )
     .runtime(
         run_through_pyodide=True,
-        environment_initialization_code_filepath="mug/examples/cogrid/environments/cramped_room_environment_initialization.py",
+        environment_initialization_code_filepath="examples/cogrid/environments/cramped_room_environment_initialization.py",
         packages_to_install=["numpy", "cogrid==0.2.1", "opencv-python"],
     )
 )
@@ -272,7 +272,7 @@ cramped_room_human_human = (
     )
     .runtime(
         run_through_pyodide=True,
-        environment_initialization_code_filepath="mug/examples/cogrid/environments/cramped_room_environment_initialization_hh.py",
+        environment_initialization_code_filepath="examples/cogrid/environments/cramped_room_environment_initialization_hh.py",
         packages_to_install=["numpy", "cogrid==0.2.1", "opencv-python"],
     )
     .multiplayer(

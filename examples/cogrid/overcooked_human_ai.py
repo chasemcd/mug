@@ -8,7 +8,7 @@ This example demonstrates Human-AI experiments where:
 - Participant provides preference feedback between partners
 
 Usage:
-    python -m mug.examples.cogrid.overcooked_human_ai
+    python -m examples.cogrid.overcooked_human_ai
 """
 
 from __future__ import annotations
@@ -19,8 +19,8 @@ eventlet.monkey_patch()
 
 import argparse
 
+from examples.cogrid.scenes import scenes as oc_scenes
 from mug.configurations import experiment_config
-from mug.examples.cogrid.scenes import scenes as oc_scenes
 from mug.scenes import stager
 from mug.server import app
 

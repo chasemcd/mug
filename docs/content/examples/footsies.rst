@@ -58,7 +58,7 @@ From the repository root, run as a module:
 
 .. code-block:: bash
 
-    python -m mug.examples.footsies.footsies_experiment
+    python -m examples.footsies.footsies_experiment
 
 Then:
 
@@ -94,7 +94,7 @@ Experiment Flow
 .. code-block:: python
 
     from mug.scenes import stager, scene
-    from mug.examples.footsies import scenes
+    from examples.footsies import scenes
 
     stager = stager.Stager(
         scenes=[
@@ -134,7 +134,7 @@ Unity WebGL Scene
 
 .. code-block:: python
 
-    from mug.examples.footsies import footsies_scene
+    from examples.footsies import footsies_scene
 
     FOOTSIES_BUILD_NAME = "footsies_webgl_47f26fc"
 
@@ -296,7 +296,7 @@ Player controls difficulty via slider:
     footsies_controllable_difficulty_scene = (
         footsies_scene.FootsiesControllableDifficultyScene()
         .display(
-            scene_body_filepath="mug/examples/footsies/static/controllable_difficulty.html",
+            scene_body_filepath="examples/footsies/static/controllable_difficulty.html",
         )
         .game(num_episodes=45)
     )

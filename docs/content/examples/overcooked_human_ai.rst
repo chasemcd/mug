@@ -63,7 +63,7 @@ From the repository root, run as a module:
 
 .. code-block:: bash
 
-    python -m mug.examples.cogrid.overcooked_human_ai_client_side
+    python -m examples.cogrid.overcooked_human_ai_client_side
 
 Then:
 
@@ -98,7 +98,7 @@ The experiment uses a Stager to manage scene progression:
 .. code-block:: python
 
     from mug.scenes import stager, scene
-    from mug.examples.cogrid.scenes import scenes as oc_scenes
+    from examples.cogrid.scenes import scenes as oc_scenes
 
     stager = stager.Stager(
         scenes=[

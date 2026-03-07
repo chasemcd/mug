@@ -31,7 +31,7 @@ pip install cogrid==0.2.1
 
 **Usage**:
 ```bash
-python -m mug.examples.cogrid.overcooked_human_ai
+python -m examples.cogrid.overcooked_human_ai
 ```
 
 Navigate to `http://localhost:5702` in your browser.
@@ -60,7 +60,7 @@ Navigate to `http://localhost:5702` in your browser.
 
 **Usage**:
 ```bash
-python -m mug.examples.cogrid.overcooked_human_human_multiplayer
+python -m examples.cogrid.overcooked_human_human_multiplayer
 ```
 
 Open **TWO** browser windows to `http://localhost:5702`.

@@ -7,8 +7,8 @@ eventlet.monkey_patch()
 import argparse
 import copy
 
+from examples.footsies import footsies_scene
 from mug.configurations import configuration_constants, experiment_config
-from mug.examples.footsies import footsies_scene
 from mug.scenes import scene, stager, static_scene, unity_scene
 from mug.server import app
 
@@ -25,7 +25,7 @@ start_scene = (
     )
     .display(
         scene_header="Welcome",
-        scene_body_filepath="mug/examples/footsies/static/introduction.html",
+        scene_body_filepath="examples/footsies/static/introduction.html",
     )
 )
 
@@ -56,7 +56,7 @@ footsies_tutorial_scene = (
     .scene("footsies_tutorial_scene")
     .display(
         scene_header="Footsies Tutorial",
-        scene_body_filepath="mug/examples/footsies/static/tutorial_static.html",
+        scene_body_filepath="examples/footsies/static/tutorial_static.html",
     )
 )
 
@@ -445,7 +445,7 @@ footsies_controllable_difficulty_scene = (
         </div>
         """
         + CONTROLS_SUBHEADER,
-        scene_body_filepath="mug/examples/footsies/static/controllable_difficulty.html",
+        scene_body_filepath="examples/footsies/static/controllable_difficulty.html",
     )
     .scene(scene_id="footsies_controllable_difficulty", experiment_config={})
     .webgl(

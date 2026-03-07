@@ -6,8 +6,8 @@ eventlet.monkey_patch()
 
 import argparse
 
+from examples.footsies import scenes
 from mug.configurations import experiment_config
-from mug.examples.footsies import scenes
 from mug.scenes import scene, stager
 from mug.server import app
 

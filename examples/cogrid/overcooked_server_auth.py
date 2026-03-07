@@ -14,7 +14,7 @@ copy of the environment. Server-authoritative mode is useful when:
 - You want to prevent client-side cheating
 
 Usage:
-    python -m mug.examples.cogrid.overcooked_server_auth --experiment-id my_experiment
+    python -m examples.cogrid.overcooked_server_auth --experiment-id my_experiment
 
 Then open two browser windows to http://localhost:5703 and play together!
 """
@@ -27,11 +27,11 @@ eventlet.monkey_patch()
 
 import argparse
 
+from examples.cogrid import overcooked_utils
+from examples.cogrid.scenes.scenes import (HUMAN_HUMAN_POLICY_MAPPING, Noop,
+                                           action_mapping, end_scene,
+                                           multiplayer_feedback_scene)
 from mug.configurations import configuration_constants, experiment_config
-from mug.examples.cogrid import overcooked_utils
-from mug.examples.cogrid.scenes.scenes import (HUMAN_HUMAN_POLICY_MAPPING,
-                                               Noop, action_mapping, end_scene,
-                                               multiplayer_feedback_scene)
 from mug.scenes import gym_scene, stager, static_scene
 from mug.server import app
 
@@ -43,7 +43,7 @@ def _create_overcooked_env(**kwargs):
     import time, which allows the example to be imported for inspection without
     requiring cogrid to be installed.
     """
-    from mug.examples.cogrid.environments.cramped_room_environment_initialization_hh import (
+    from examples.cogrid.environments.cramped_room_environment_initialization_hh import (
         OvercookedEnv, overcooked_config)
 
     return OvercookedEnv(config=overcooked_config, **kwargs)

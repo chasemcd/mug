@@ -15,7 +15,7 @@ Sync Architecture:
 - Fallback: State Verification (periodic hash comparison with full state resync if needed)
 
 Usage:
-    python -m mug.examples.cogrid.overcooked_human_human_multiplayer
+    python -m examples.cogrid.overcooked_human_human_multiplayer
 
 Then open two browser windows to http://localhost:5702 and play together!
 """
@@ -33,8 +33,8 @@ eventlet.monkey_patch()
 
 import argparse
 
+from examples.cogrid.scenes import scenes as oc_scenes
 from mug.configurations import experiment_config
-from mug.examples.cogrid.scenes import scenes as oc_scenes
 from mug.scenes import stager, static_scene
 from mug.server import app
 
