@@ -76,7 +76,8 @@ export function preloadUnityGame(config) {
         return Promise.resolve(unityCachedAssets.get(buildName));
     }
 
-    const buildUrl = `static/web_gl/${buildName}/Build`;
+    const baseUrl = config.webgl_base_url || "static/web_gl";
+    const buildUrl = `${baseUrl}/${buildName}/Build`;
 
     // Create promises for all asset downloads
     const assetPromises = {

@@ -2964,10 +2964,10 @@ def run(config):
     # Register external static file directories
     for rel_path, abs_path in CONFIG.static_directories:
         def make_route(directory, prefix):
-            @app.route(f"/{prefix}/<path:filename>")
+            endpoint = f"static_files_{prefix.replace('/', '_')}"
             def serve(filename, _dir=directory):
                 return flask.send_from_directory(_dir, filename)
-            serve.__name__ = f"static_files_{prefix.replace('/', '_')}"
+            app.add_url_rule(f"/{prefix}/<path:filename>", endpoint=endpoint, view_func=serve)
         make_route(abs_path, rel_path)
         logger.info(f"Registered static file route: /{rel_path}/ -> {abs_path}")
 

@@ -13,6 +13,7 @@ from mug.scenes import scene, stager, static_scene, unity_scene
 from mug.server import app
 
 FOOTSIES_BUILD_NAME = "footsies_webgl_47f26fc"
+FOOTSIES_WEBGL_BASE_URL = "examples/footsies/assets/web_gl"
 BONUS_PER_WIN = 0.20
 
 # Define the start scene, which is the landing page for participants.
@@ -111,6 +112,7 @@ footsies_initial_challenge_scene = (
         height=1080 / 3,
         width=1960 / 3,
         preload_game=True,
+        webgl_base_url=FOOTSIES_WEBGL_BASE_URL,
     )
     .game(
         num_episodes=10 // EPISODES_SCALE_DOWN,
@@ -250,6 +252,7 @@ footsies_fixed_high_skill_rounds = (
         height=1080 / 3,
         width=1960 / 3,
         preload_game=True,
+        webgl_base_url=FOOTSIES_WEBGL_BASE_URL,
     )
     .game(
         num_episodes=45 // EPISODES_SCALE_DOWN,
@@ -290,6 +293,7 @@ footsies_fixed_low_skill_rounds = (
         height=1080 / 3,
         width=1960 / 3,
         preload_game=True,
+        webgl_base_url=FOOTSIES_WEBGL_BASE_URL,
     )
     .game(
         num_episodes=45 // EPISODES_SCALE_DOWN,
@@ -352,6 +356,7 @@ footsies_dynamic_empowerment_scene = (
         height=1080 / 3,
         width=1960 / 3,
         preload_game=True,
+        webgl_base_url=FOOTSIES_WEBGL_BASE_URL,
     )
     .game(
         num_episodes=45 // EPISODES_SCALE_DOWN,
@@ -380,6 +385,7 @@ footsies_dynamic_difficulty_scene = (
         height=1080 / 3,
         width=1960 / 3,
         preload_game=True,
+        webgl_base_url=FOOTSIES_WEBGL_BASE_URL,
     )
     .game(
         num_episodes=45 // EPISODES_SCALE_DOWN,
@@ -409,6 +415,7 @@ footsies_random_difficulty_scene = (
         height=1080 / 3,
         width=1960 / 3,
         preload_game=True,
+        webgl_base_url=FOOTSIES_WEBGL_BASE_URL,
     )
     .game(
         num_episodes=45 // EPISODES_SCALE_DOWN,
@@ -453,6 +460,7 @@ footsies_controllable_difficulty_scene = (
         height=1080 / 3,
         width=1960 / 3,
         preload_game=True,
+        webgl_base_url=FOOTSIES_WEBGL_BASE_URL,
     )
     .game(
         num_episodes=45 // EPISODES_SCALE_DOWN,

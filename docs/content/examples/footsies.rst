@@ -78,6 +78,11 @@ File Structure
     ├── footsies_experiment.py           # Main experiment with full flow
     ├── scenes.py                        # All scene definitions
     ├── footsies_scene.py                # Custom FootsiesScene class
+    ├── assets/
+    │   ├── footsies/                    # GIFs, images
+    │   └── web_gl/                      # Unity WebGL builds
+    │       ├── footsies_webgl_47f26fc/
+    │       └── footsies_webgl_ff9e3d3/
     └── static/
         ├── introduction.html            # Welcome instructions
         ├── tutorial_static.html         # Tutorial content
@@ -152,6 +157,7 @@ Unity WebGL Scene
     from examples.footsies import footsies_scene
 
     FOOTSIES_BUILD_NAME = "footsies_webgl_47f26fc"
+    FOOTSIES_WEBGL_BASE_URL = "examples/footsies/assets/web_gl"
 
     footsies_initial_challenge_scene = (
         footsies_scene.FootsiesScene()
@@ -169,6 +175,7 @@ Unity WebGL Scene
             height=1080 / 3,
             width=1960 / 3,
             preload_game=True,
+            webgl_base_url=FOOTSIES_WEBGL_BASE_URL,
         )
         .game(
             num_episodes=10,
@@ -191,7 +198,7 @@ Unity WebGL Scene
 
 **Key Methods:**
 
-- ``.webgl(build_name, height, width)``: Loads Unity WebGL build
+- ``.webgl(build_name, height, width, webgl_base_url)``: Loads Unity WebGL build from a custom path
 - ``.game(num_episodes, score_fn)``: Defines episode count and scoring
 - ``.set_opponent_sequence([configs])``: Configures AI opponents
 
