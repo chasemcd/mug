@@ -7,58 +7,64 @@
   <img src="docs/content/mug_logo.png" alt="MUG logo" width="300"/>
 </div>
 
-Multi-User Gymnasium (MUG) converts Gymnasium and PettingZoo environments into browser-based, multi-user experiments. It enables Python simulation environments to be accessed online, allowing humans to interact with them individually or alongside AI agents and other participants.
+Multi-User Gymnasium (MUG) converts [Gymnasium](https://gymnasium.farama.org/) and [PettingZoo](https://pettingzoo.farama.org/) environments into browser-based, multi-user experiments. It enables Python simulation environments to be accessed online, allowing humans to interact with them individually or alongside AI agents and other participants.
 
-## Multiplayer Configuration
+## Installation
 
-For P2P multiplayer experiments, MUG uses WebRTC for low-latency peer-to-peer connections. When direct P2P connections fail (due to firewalls, NAT, or restrictive networks), a TURN server provides relay fallback.
-
-**Setting up TURN credentials:**
-
-1. Sign up for a free TURN server at [Open Relay (metered.ca)](https://www.metered.ca/tools/openrelay/) (free tier: 20GB/month)
-
-2. Set environment variables with your credentials:
-
-   ```bash
-   export TURN_USERNAME="your-openrelay-username"
-   export TURN_CREDENTIAL="your-openrelay-api-key"
-   ```
-
-3. Enable WebRTC in your experiment configuration:
-
-   ```python
-   from mug.configurations import RemoteConfig
-
-   config = RemoteConfig()
-   config.webrtc()  # Auto-loads from TURN_USERNAME and TURN_CREDENTIAL env vars
-   ```
-
-**Alternative: Using a .env file**
-
-Create a `.env` file (add to `.gitignore`):
-
-```text
-TURN_USERNAME=your-openrelay-username
-TURN_CREDENTIAL=your-openrelay-api-key
+```bash
+pip install multi-user-gymnasium
 ```
 
-Then load it in your experiment:
+## Quick Start
 
 ```python
-from dotenv import load_dotenv
-load_dotenv()
+import eventlet
+eventlet.monkey_patch()
 
-config = RemoteConfig()
-config.webrtc()
+from mug.configurations import configuration_constants, experiment_config
+from mug.scenes import gym_scene, stager, static_scene
+from mug.server import app
+
+start = static_scene.StartScene().scene(scene_id="start").display(
+    scene_header="Welcome",
+    scene_body="Press continue to begin.",
+)
+
+game = (
+    gym_scene.GymScene()
+    .scene(scene_id="game")
+    .rendering(fps=30, game_width=600, game_height=400)
+    .gameplay(num_episodes=1)
+    .runtime(
+        run_through_pyodide=True,
+        environment_initialization_code_filepath="my_env.py",
+    )
+)
+
+end = static_scene.EndScene().scene(scene_id="end").display(
+    scene_header="Thanks!",
+    scene_body="You're all done.",
+)
+
+config = (
+    experiment_config.ExperimentConfig()
+    .experiment(
+        stager=stager.Stager(scenes=[start, game, end]),
+        experiment_id="my_experiment",
+    )
+    .hosting(port=5000)
+)
+
+app.run(config)
 ```
 
-**Testing TURN relay:**
+## Documentation
 
-To force all connections through TURN (useful for testing):
+Full documentation is available at [mug.readthedocs.io](https://mug.readthedocs.io/).
 
-```python
-config.webrtc(force_relay=True)
-```
+- [Getting Started](https://mug.readthedocs.io/en/latest/content/quick_start.html)
+- [Core Concepts](https://mug.readthedocs.io/en/latest/content/core_concepts/index.html)
+- [Examples](https://mug.readthedocs.io/en/latest/content/examples/index.html)
 
 ## Acknowledgements
 

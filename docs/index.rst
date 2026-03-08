@@ -7,7 +7,8 @@
    :target: https://github.com/chasemcd/interactive-gym
    :alt: GitHub Repo stars
 
-.. include:: ../README.rst
+.. include:: ../README.md
+   :parser: myst_parser.sphinx_
 
 
 .. toctree::

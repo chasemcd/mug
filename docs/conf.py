@@ -39,7 +39,13 @@ extensions = [
     "IPython.sphinxext.ipython_console_highlighting",
     "IPython.sphinxext.ipython_directive",
     "sphinx_copybutton",
+    "myst_parser",
 ]
+
+source_suffix = {
+    ".rst": "restructuredtext",
+    ".md": "markdown",
+}
 
 
 # Add any paths that contain templates here, relative to this directory.
