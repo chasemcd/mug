@@ -77,6 +77,9 @@ mountain_car_scene = (
     .runtime(
         run_through_pyodide=True,
         environment_initialization_code_filepath="examples/mountain_car/mountain_car_rgb_env.py",
+        packages_to_install=[
+            "gymnasium",
+        ],
     )
 )
 
