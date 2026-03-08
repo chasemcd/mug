@@ -182,36 +182,46 @@ Pyodide only supports pure Python packages:
 Custom Rendering
 ^^^^^^^^^^^^^^^^
 
-Standard Gymnasium environments use pygame for rendering. Override with object contexts:
+Standard Gymnasium environments use pygame for rendering. Override with the Surface API:
 
 .. code-block:: python
 
     from gymnasium.envs.classic_control.cartpole import CartPoleEnv
-    from mug.configurations.object_contexts import Circle, Line, Polygon
+    from mug.rendering import Surface
+    import numpy as np
 
     class PyodideCartPole(CartPoleEnv):
+
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.surface = Surface(width=600, height=400)
+
+        def reset(self, *args, **kwargs):
+            obs, info = super().reset(*args, **kwargs)
+            self.surface.reset()
+            return obs, info
 
         def render(self):
             assert self.render_mode == "mug"
 
-            # Extract state
             x, x_dot, theta, theta_dot = self.state
 
-            # Create visual objects
-            cart = Polygon(
-                uuid="cart",
+            self.surface.polygon(
+                id="cart",
                 color="#333333",
                 points=[(x-0.25, 0.5), (x+0.25, 0.5), (x+0.25, 0.6), (x-0.25, 0.6)],
+                relative=True,
             )
 
-            pole = Line(
-                uuid="pole",
+            self.surface.line(
+                id="pole",
                 color="#964B00",
                 points=[(x, 0.55), (x + np.sin(theta)*0.3, 0.55 - np.cos(theta)*0.3)],
                 width=5,
+                relative=True,
             )
 
-            return [cart.as_dict(), pole.as_dict()]
+            return self.surface.commit().to_dict()
 
     env = PyodideCartPole(render_mode="mug")
 
