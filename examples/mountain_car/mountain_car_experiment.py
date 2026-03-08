@@ -62,7 +62,9 @@ mountain_car_scene = (
     )
     .content(
         scene_header="Mountain Car",
-        scene_body="<center><p>" "On this page, Python is initializing and loading packages in the background. With a decent internet connection, it should only be a few moments. If it takes longer than inspected, right click on the page and select 'Inspect -> Console' to see if an error was logged. <br> <br> When it has initialized, the button will become active and you can continue on in the experiment." "</p></center>",
+        scene_body="<center><p>"
+        "On this page, Python is initializing and loading packages in the background. With a decent internet connection, it should only be a few moments. If it takes longer than inspected, right click on the page and select 'Inspect -> Console' to see if an error was logged. <br> <br> When it has initialized, the button will become active and you can continue on in the experiment."
+        "</p></center>",
         in_game_scene_body="""
         <center>
         <p>
@@ -84,7 +86,7 @@ end_scene = (
     .scene(scene_id="mountain_car_end_scene")
     .display(
         scene_header="Thanks for playing!",
-        scene_body="For more information on MUG or to contact us with any questions, visit interactive-gym.readthedocs.io!",
+        scene_body="For more information on MUG or to contact us with any questions, visit multi-user-gymnasium.readthedocs.io!",
     )
 )
 

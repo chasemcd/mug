@@ -91,12 +91,13 @@ File Structure
 .. code-block:: text
 
     slime_volleyball/
-    ├── human_ai_pyodide.py          # Pyodide experiment (recommended)
-    ├── human_ai_server.py           # Server-side experiment
+    ├── slimvb_human_ai.py           # Human vs AI experiment (Pyodide)
+    ├── slimevb_human_human.py       # Human vs Human experiment (Pyodide)
     ├── slimevb_env.py               # Environment with custom rendering
     ├── slime_volleyball_utils.py    # Rendering helper functions
-    └── policies/
-        └── model.onnx               # Trained AI policy
+    └── assets/
+        └── models/
+            └── slimevb_policy.onnx  # Trained AI policy
 
 Code Walkthrough
 ----------------
@@ -113,13 +114,20 @@ Define human and AI players:
 .. code-block:: python
 
     from mug.configurations import configuration_constants
+    from mug.configurations.configuration_constants import ModelConfig
+
+    SLIMEVB_MODEL_CONFIG = ModelConfig(
+        obs_input="input",
+        logit_output="logits",
+        onnx_path="examples/slime_volleyball/assets/models/slimevb_policy.onnx",
+    )
 
     POLICY_MAPPING = {
-        "agent_right": configuration_constants.PolicyTypes.Human,
-        "agent_left": "examples/slime_volleyball/assets/slime_volleyball/models/model.onnx",
+        "agent_right": SLIMEVB_MODEL_CONFIG,
+        "agent_left": configuration_constants.PolicyTypes.Human,
     }
 
-The human controls ``agent_right`` (blue slime on the right), while an ONNX model controls ``agent_left`` (red slime on the left).
+The human controls ``agent_left`` (red slime on the left), while an ONNX model controls ``agent_right`` (blue slime on the right).
 
 Because the ONNX model and other assets live outside the MUG package, the
 experiment config registers them with ``static_files()``:
@@ -198,8 +206,7 @@ Tuple keys ``("ArrowLeft", "ArrowUp")`` represent simultaneous key presses.
                 "examples/slime_volleyball/slimevb_env.py"
             ),
             packages_to_install=[
-                "slimevb==0.0.2",
-                "opencv-python",
+                "slimevb==0.1.1",
             ],
         )
     )
@@ -504,20 +511,28 @@ The AI opponent is a neural network exported to ONNX format.
 
 **In Pyodide Mode:**
 
-The ONNX model is loaded in the browser:
+The ONNX model is loaded in the browser using a ``ModelConfig``:
 
 .. code-block:: python
 
+    from mug.configurations.configuration_constants import ModelConfig
+
+    SLIMEVB_MODEL_CONFIG = ModelConfig(
+        obs_input="input",
+        logit_output="logits",
+        onnx_path="examples/slime_volleyball/assets/models/slimevb_policy.onnx",
+    )
+
     POLICY_MAPPING = {
-        "agent_left": "examples/slime_volleyball/assets/slime_volleyball/models/model.onnx",
+        "agent_right": SLIMEVB_MODEL_CONFIG,
     }
 
 MUG automatically:
 
 1. Downloads the ONNX file to the browser
 2. Loads it with ONNX Runtime Web
-3. Runs inference each step
-4. Passes output as ``agent_left`` action
+3. Runs inference each step using the configured tensor names
+4. Passes output as ``agent_right`` action
 
 **In Server Mode:**
 

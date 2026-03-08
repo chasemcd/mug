@@ -933,6 +933,120 @@ def flask_server_auth():
 
 
 @pytest.fixture(scope="function")
+def flask_server_slimevb_human_ai():
+    """
+    Start Flask server for slime volleyball human-AI testing.
+
+    Scope: function (fresh server per test)
+    Port: 5711
+    """
+    port = 5711
+    base_url = f"http://localhost:{port}"
+
+    _ensure_port_available(port)
+
+    process = subprocess.Popen(
+        [
+            "python",
+            "-m",
+            "tests.fixtures.slimevb_human_ai_test",
+            "--port",
+            str(port),
+        ],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        start_new_session=True,
+    )
+
+    max_retries = 30
+    for attempt in range(max_retries):
+        try:
+            conn = HTTPConnection("localhost", port, timeout=1)
+            conn.request("GET", "/")
+            response = conn.getresponse()
+            conn.close()
+            if response.status < 500:
+                break
+        except (ConnectionRefusedError, OSError, TimeoutError):
+            pass
+
+        if process.poll() is not None:
+            stderr = process.stderr.read() if process.stderr else b""
+            raise RuntimeError(
+                f"SlimeVB human-AI server exited unexpectedly (code {process.returncode}).\n"
+                f"stderr: {stderr.decode()}"
+            )
+
+        time.sleep(1)
+    else:
+        _teardown_server(process, port)
+        raise RuntimeError(
+            f"SlimeVB human-AI server failed to start after {max_retries} retries"
+        )
+
+    yield {"url": base_url, "process": process}
+
+    _teardown_server(process, port)
+
+
+@pytest.fixture(scope="function")
+def flask_server_slimevb_human_human():
+    """
+    Start Flask server for slime volleyball human-human testing.
+
+    Scope: function (fresh server per test)
+    Port: 5712
+    """
+    port = 5712
+    base_url = f"http://localhost:{port}"
+
+    _ensure_port_available(port)
+
+    process = subprocess.Popen(
+        [
+            "python",
+            "-m",
+            "tests.fixtures.slimevb_human_human_test",
+            "--port",
+            str(port),
+        ],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        start_new_session=True,
+    )
+
+    max_retries = 30
+    for attempt in range(max_retries):
+        try:
+            conn = HTTPConnection("localhost", port, timeout=1)
+            conn.request("GET", "/")
+            response = conn.getresponse()
+            conn.close()
+            if response.status < 500:
+                break
+        except (ConnectionRefusedError, OSError, TimeoutError):
+            pass
+
+        if process.poll() is not None:
+            stderr = process.stderr.read() if process.stderr else b""
+            raise RuntimeError(
+                f"SlimeVB human-human server exited unexpectedly (code {process.returncode}).\n"
+                f"stderr: {stderr.decode()}"
+            )
+
+        time.sleep(1)
+    else:
+        _teardown_server(process, port)
+        raise RuntimeError(
+            f"SlimeVB human-human server failed to start after {max_retries} retries"
+        )
+
+    yield {"url": base_url, "process": process}
+
+    _teardown_server(process, port)
+
+
+@pytest.fixture(scope="function")
 def single_player_context(browser):
     """
     Create a single browser context for human-AI testing.

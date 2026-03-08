@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import dataclasses
-
 import eventlet
 
 eventlet.monkey_patch()
@@ -15,12 +13,9 @@ from mug.scenes import gym_scene, scene, stager, static_scene
 from mug.server import app
 
 SLIMEVB_MODEL_CONFIG = ModelConfig(
-    obs_input="obs",
-    logit_output="output",
-    state_inputs=["state_ins"],
-    state_outputs=["state_outs"],
-    state_shape=[1],
-    onnx_path="examples/slime_volleyball/assets/slime_volleyball/models/model.onnx"
+    obs_input="input",
+    logit_output="logits",
+    onnx_path="examples/slime_volleyball/assets/models/slimevb_policy.onnx",
 )
 
 POLICY_MAPPING = {
@@ -94,10 +89,7 @@ slime_scene = (
     .runtime(
         run_through_pyodide=True,
         environment_initialization_code_filepath="examples/slime_volleyball/slimevb_env.py",
-        packages_to_install=[
-            "slimevb==0.0.4",
-            "opencv-python",
-        ],
+        packages_to_install=["slimevb==0.1.1"],
     )
 )
 
@@ -122,7 +114,12 @@ if __name__ == "__main__":
         experiment_config.ExperimentConfig()
         .experiment(stager=stager, experiment_id="slime_vb_demo")
         .hosting(port=5702, host="0.0.0.0")
-        .static_files(directories=["examples/slime_volleyball/assets", "examples/shared/assets"])
+        .static_files(
+            directories=[
+                "examples/slime_volleyball/assets",
+                "examples/shared/assets",
+            ]
+        )
     )
 
     app.run(experiment_config)
