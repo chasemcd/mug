@@ -289,6 +289,60 @@ Mixed Human-AI
 
 Two humans cooperate with two AI teammates.
 
+WebRTC / TURN Configuration
+----------------------------
+
+For P2P multiplayer experiments, MUG uses WebRTC for low-latency peer-to-peer connections. When direct P2P connections fail (due to firewalls, NAT, or restrictive networks), a TURN server provides relay fallback.
+
+Setting up TURN credentials
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+1. Sign up for a free TURN server at `Open Relay (metered.ca) <https://www.metered.ca/tools/openrelay/>`_ (free tier: 20GB/month)
+
+2. Set environment variables with your credentials:
+
+   .. code-block:: bash
+
+       export TURN_USERNAME="your-openrelay-username"
+       export TURN_CREDENTIAL="your-openrelay-api-key"
+
+3. Enable WebRTC in your experiment configuration:
+
+   .. code-block:: python
+
+       from mug.configurations import RemoteConfig
+
+       config = RemoteConfig()
+       config.webrtc()  # Auto-loads from TURN_USERNAME and TURN_CREDENTIAL env vars
+
+**Alternative: Using a .env file**
+
+Create a ``.env`` file (add to ``.gitignore``):
+
+.. code-block:: text
+
+    TURN_USERNAME=your-openrelay-username
+    TURN_CREDENTIAL=your-openrelay-api-key
+
+Then load it in your experiment:
+
+.. code-block:: python
+
+    from dotenv import load_dotenv
+    load_dotenv()
+
+    config = RemoteConfig()
+    config.webrtc()
+
+Testing TURN relay
+^^^^^^^^^^^^^^^^^^^
+
+To force all connections through TURN (useful for testing):
+
+.. code-block:: python
+
+    config.webrtc(force_relay=True)
+
 Action Handling
 ---------------
 
