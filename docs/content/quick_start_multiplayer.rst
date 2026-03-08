@@ -136,10 +136,10 @@ Step 2: Create the Experiment Script
 
 The key differences from a single-player experiment are:
 
-1. **Two human policies** in the policy mapping
-2. **``.multiplayer()``** configuration for P2P sync
-3. **``.waitroom()``** so players wait for a partner
-4. **``.runtime()``** with Pyodide and the environment's pip package
+1. More than one human policy in the policy mapping
+2. ``.multiplayer()`` configuration for P2P sync
+3. ``.waitroom()`` so players wait for a partner
+4. ``.runtime()`` with Pyodide and the environment's pip package
 
 Create ``slimevb_human_human.py``:
 

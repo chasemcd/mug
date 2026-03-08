@@ -21,7 +21,6 @@ eventlet.monkey_patch()
 
 import argparse
 
-from examples.cogrid.scenes import scenes as oc_scenes
 from mug.configurations import configuration_constants, experiment_config
 from mug.scenes import gym_scene, stager, static_scene
 from mug.server import app
@@ -91,8 +90,17 @@ slime_scene = (
     )
 )
 
+end_scene = (
+    static_scene.EndScene()
+    .scene(scene_id="slimevb_end_scene")
+    .display(
+        scene_header="Thanks for playing!",
+        scene_body="For more information, visit interactive-gym.readthedocs.io!",
+    )
+)
+
 stager = stager.Stager(
-    scenes=[start_scene, slime_scene, oc_scenes.end_scene]
+    scenes=[start_scene, slime_scene, end_scene]
 )
 
 if __name__ == "__main__":
