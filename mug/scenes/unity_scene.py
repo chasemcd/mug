@@ -30,6 +30,8 @@ class UnityScene(scene.Scene):
 
         # The path to the WebGL build
         self.build_path: str | None = None
+        # The base URL for WebGL builds (relative to server root)
+        self.webgl_base_url: str = "static/web_gl"
         # The condition(s) under which the user can continue on to the next scene
         self.allow_continue_on: list[str] = []
 
@@ -102,6 +104,7 @@ class UnityScene(scene.Scene):
         width: int = NotProvided,
         allow_continue_on: str | list[str] = NotProvided,
         preload_game: bool = NotProvided,
+        webgl_base_url: str = NotProvided,
     ) -> UnityScene:
         """
         Specify the settings for the WebGL build.
@@ -114,11 +117,16 @@ class UnityScene(scene.Scene):
         :type width: int, optional
         :param allow_continue_on: The condition(s) under which the user can continue on to the next scene, defaults to NotProvided
         :type allow_continue_on: str | list[str], optional
+        :param webgl_base_url: Base URL path for WebGL builds, defaults to NotProvided
+        :type webgl_base_url: str, optional
         :return: The current UnityScene instance for method chaining
         :rtype: UnityScene
         """
         if build_name is not NotProvided:
             self.build_name = build_name
+
+        if webgl_base_url is not NotProvided:
+            self.webgl_base_url = webgl_base_url
 
         if height is not NotProvided:
             self.height = height
