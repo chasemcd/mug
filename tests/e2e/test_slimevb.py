@@ -22,6 +22,7 @@ from tests.fixtures.game_helpers import (click_advance_button,
                                          click_start_button, get_game_state,
                                          wait_for_episode_complete,
                                          wait_for_game_canvas,
+                                         wait_for_scene_header_contains,
                                          wait_for_socket_connected)
 from tests.fixtures.network_helpers import set_tab_visibility
 
@@ -125,8 +126,8 @@ def test_slimevb_human_ai_exports_data(
     set_tab_visibility(page, visible=True)
     wait_for_episode_complete(page, episode_num=1, timeout=120000)
 
-    # Advance through end scene to trigger export
-    click_advance_button(page, timeout=30000)
+    # Wait for auto-advance to EndScene (3-second countdown after game done)
+    wait_for_scene_header_contains(page, "Thanks for playing", timeout=30000)
 
     # Check data export
     export_dir = "data/slimevb_human_ai_test/slime_gym_scene"
