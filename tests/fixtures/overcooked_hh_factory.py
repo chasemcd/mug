@@ -50,8 +50,9 @@ def make_hh_config(
             (
                 oc_scenes.cramped_room_human_human
                 .gameplay(num_episodes=num_episodes, max_steps=max_steps)
-                .matchmaking(max_rtt=None, matchmaker=matchmaker)
                 .multiplayer(
+                    max_rtt=None,
+                    matchmaker=matchmaker,
                     focus_loss_timeout_ms=focus_loss_timeout_ms,
                     pause_on_partner_background=False,
                     input_confirmation_timeout_ms=2000,

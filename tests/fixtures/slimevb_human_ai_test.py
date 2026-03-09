@@ -79,7 +79,6 @@ slime_scene = (
         in_game_scene_body="<center><p>Use arrow keys!</p></center>",
     )
     .runtime(
-        run_through_pyodide=True,
         environment_initialization_code_filepath="examples/slime_volleyball/slimevb_env.py",
         packages_to_install=["slimevb==0.1.1"],
     )

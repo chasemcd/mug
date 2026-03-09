@@ -80,12 +80,10 @@ slime_scene = (
     )
     .waitroom(timeout=120000)
     .runtime(
-        run_through_pyodide=True,
         environment_initialization_code_filepath="examples/slime_volleyball/slimevb_env.py",
         packages_to_install=["slimevb==0.1.1"],
     )
     .multiplayer(
-        multiplayer=True,
         input_delay=2,
     )
 )
