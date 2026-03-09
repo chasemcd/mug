@@ -19,7 +19,6 @@ import msgpack
 import pandas as pd
 from flask_login import LoginManager
 
-from mug.configurations import remote_config
 from mug.scenes import gym_scene, stager, unity_scene
 from mug.server import (game_manager, player_pairing_manager,
                         pyodide_game_coordinator, thread_safe_collections)
@@ -76,7 +75,7 @@ def setup_logger(name, log_file, level=logging.INFO):
 
 logger = setup_logger(__name__, "./iglog.log", level=logging.DEBUG)
 
-CONFIG = remote_config.RemoteConfig()
+CONFIG = None
 
 
 # Generic stager is the "base" Stager that we'll build for each

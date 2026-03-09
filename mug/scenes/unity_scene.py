@@ -6,7 +6,7 @@ from typing import Any, Callable
 
 import flask_socketio
 
-from mug.configurations import configuration_constants, remote_config
+from mug.configurations import configuration_constants
 from mug.scenes import scene
 from mug.utils.sentinels import NotProvided
 

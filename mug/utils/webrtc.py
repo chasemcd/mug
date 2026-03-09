@@ -19,7 +19,7 @@ def configure_webrtc(
     if credentials are not provided directly.
 
     Args:
-        config: The configuration object to update (ExperimentConfig or RemoteConfig).
+        config: The configuration object to update (ExperimentConfig).
         turn_username: TURN server username (from metered.ca or similar).
                        Falls back to TURN_USERNAME env var if not provided.
         turn_credential: TURN server credential/password.

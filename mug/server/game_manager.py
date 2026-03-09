@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 from typing import TYPE_CHECKING
 
-from mug.configurations import configuration_constants, remote_config
+from mug.configurations import configuration_constants
 from mug.scenes import gym_scene, scene, stager
 from mug.server import (player_pairing_manager, pyodide_game_coordinator,
                         remote_game, thread_safe_collections)
@@ -43,7 +43,7 @@ class GameManager:
     def __init__(
         self,
         scene: gym_scene.GymScene,
-        experiment_config: remote_config.RemoteConfig,
+        experiment_config,
         socketio: flask_socketio.SocketIO,
         pyodide_coordinator: pyodide_game_coordinator.PyodideGameCoordinator | None = None,
         pairing_manager: player_pairing_manager.PlayerGroupManager | None = None,

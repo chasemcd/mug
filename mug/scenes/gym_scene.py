@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any, Callable
 if TYPE_CHECKING:
     from mug.server.matchmaker import Matchmaker
 
-from mug.configurations import configuration_constants, remote_config
+from mug.configurations import configuration_constants
 from mug.configurations.configuration_constants import ModelConfig
 from mug.scenes import scene
 from mug.utils.sentinels import NotProvided
