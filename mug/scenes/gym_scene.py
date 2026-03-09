@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import copy
 import json
+import warnings
+from datetime import datetime
 from typing import TYPE_CHECKING, Any, Callable
 
 if TYPE_CHECKING:
     from mug.server.matchmaker import Matchmaker
 
-from mug.configurations import configuration_constants, remote_config
+from mug.configurations import configuration_constants
 from mug.configurations.configuration_constants import ModelConfig
 from mug.scenes import scene
 from mug.utils.sentinels import NotProvided
@@ -131,9 +133,11 @@ class GymScene(scene.Scene):
 
         # pyodide
         self.run_through_pyodide: bool = False
+        self._run_through_pyodide_explicit: bool = False
         self.pyodide_multiplayer: bool = (
             False  # Enable multiplayer Pyodide coordination
         )
+        self._pyodide_multiplayer_explicit: bool = False
         self.environment_initialization_code: str = ""
         self.on_game_step_code: str = ""
         self.packages_to_install: list[str] = [GymScene.DEFAULT_MUG_PACKAGE]
@@ -230,6 +234,21 @@ class GymScene(scene.Scene):
         self.pause_on_partner_background: bool = (
             False  # If True, pause game when partner backgrounds
         )
+
+    @property
+    def scene_metadata(self) -> dict:
+        """Return scene metadata, excluding private attributes."""
+        public_vars = {
+            k: v for k, v in vars(self).items() if not k.startswith("_")
+        }
+        serialized = scene.serialize_dict(public_vars)
+        metadata = copy.deepcopy(serialized)
+        return {
+            "scene_id": self.scene_id,
+            "scene_type": self.__class__.__name__,
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            **metadata,
+        }
 
     def environment(
         self,
@@ -419,6 +438,7 @@ class GymScene(scene.Scene):
             self._decompose_model_configs()
             self._validate_policy_configs()
 
+        self._auto_infer_multiplayer()
         return self
 
     def _decompose_model_configs(self):
@@ -453,6 +473,22 @@ class GymScene(scene.Scene):
                     f"ONNX policy '{policy_id}' has no entry in policy_configs. "
                     f"Use a ModelConfig with onnx_path set as the policy_mapping value."
                 )
+
+    def _auto_infer_multiplayer(self):
+        """Auto-set pyodide_multiplayer if inferable from policy_mapping and runtime config.
+
+        If the user hasn't explicitly set multiplayer=True/False, this infers it:
+        pyodide_multiplayer=True when there are 2+ human policies AND run_through_pyodide=True
+        AND the scene is not server_authoritative.
+        """
+        if self._pyodide_multiplayer_explicit or self.server_authoritative:
+            return
+        human_count = sum(
+            1
+            for v in self.policy_mapping.values()
+            if v == configuration_constants.PolicyTypes.Human
+        )
+        self.pyodide_multiplayer = human_count >= 2 and self.run_through_pyodide
 
     def gameplay(
         self,
@@ -634,31 +670,26 @@ class GymScene(scene.Scene):
     ):
         """Configure matchmaking and lobby settings for the GymScene.
 
+        .. deprecated::
+            Use :meth:`multiplayer` instead. The ``matchmaking()`` parameters
+            (``hide_lobby_count``, ``max_rtt``, ``matchmaker``) are all available
+            on ``multiplayer()``.
+
         :param hide_lobby_count: If True, hides the participant count display in the waitroom.
-            Participants will only see the countdown timer, not how many are waiting.
-            Defaults to NotProvided (False).
         :type hide_lobby_count: bool, optional
-        :param max_rtt: Maximum RTT difference (in milliseconds) allowed between participants
-            when pairing. If a participant's RTT differs from another by more than this value,
-            they will not be paired together. Set to None to disable RTT-based pairing.
-            Defaults to NotProvided (None).
+        :param max_rtt: Maximum RTT difference (ms) allowed between paired participants.
         :type max_rtt: int, optional
         :param matchmaker: Custom Matchmaker instance for participant grouping logic.
-            Must be a subclass of Matchmaker with find_match() implemented.
-            Defaults to NotProvided (uses FIFOMatchmaker).
         :type matchmaker: Matchmaker, optional
         :return: The GymScene instance
         :rtype: GymScene
-
-        Example:
-            from mug.server.matchmaker import FIFOMatchmaker
-
-            scene.matchmaking(
-                hide_lobby_count=True,  # Don't show "2/4 players in lobby"
-                max_rtt=50,  # Only pair participants within 50ms RTT of each other
-                matchmaker=FIFOMatchmaker(),  # or custom subclass
-            )
         """
+        warnings.warn(
+            "matchmaking() is deprecated, use multiplayer() instead. "
+            "All matchmaking parameters are available on multiplayer().",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         if hide_lobby_count is not NotProvided:
             self.hide_lobby_count = hide_lobby_count
 
@@ -716,6 +747,7 @@ class GymScene(scene.Scene):
         if run_through_pyodide is not NotProvided:
             assert isinstance(run_through_pyodide, bool)
             self.run_through_pyodide = run_through_pyodide
+            self._run_through_pyodide_explicit = True
 
         if environment_initialization_code is not NotProvided:
             self.environment_initialization_code = (
@@ -744,6 +776,20 @@ class GymScene(scene.Scene):
         if on_game_step_code is not NotProvided:
             self.on_game_step_code = on_game_step_code
 
+        # Auto-infer run_through_pyodide if any Pyodide-specific param was set
+        if not self._run_through_pyodide_explicit:
+            pyodide_params_set = any(
+                [
+                    environment_initialization_code is not NotProvided,
+                    environment_initialization_code_filepath is not NotProvided,
+                    on_game_step_code is not NotProvided,
+                    packages_to_install is not NotProvided,
+                ]
+            )
+            if pyodide_params_set:
+                self.run_through_pyodide = True
+
+        self._auto_infer_multiplayer()
         return self
 
     def multiplayer(
@@ -901,6 +947,7 @@ class GymScene(scene.Scene):
         if multiplayer is not NotProvided:
             assert isinstance(multiplayer, bool)
             self.pyodide_multiplayer = multiplayer
+            self._pyodide_multiplayer_explicit = True
 
         if input_delay is not NotProvided:
             assert isinstance(input_delay, int) and input_delay >= 0
@@ -1076,4 +1123,5 @@ class GymScene(scene.Scene):
         if pause_on_partner_background is not NotProvided:
             self.pause_on_partner_background = pause_on_partner_background
 
+        self._auto_infer_multiplayer()
         return self

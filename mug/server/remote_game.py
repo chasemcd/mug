@@ -336,12 +336,6 @@ class ServerGame:
         )
         return True
 
-    def update_document_focus_status_and_ping(
-        self, player_identifier: str | int, hidden_status: bool, ping: int
-    ) -> None:
-        self.document_focus_status[player_identifier] = hidden_status
-        self.current_ping[player_identifier] = ping
-
     def _build_env(self) -> None:
         """Create the environment from the scene's env_creator and env_config.
 

@@ -6,10 +6,11 @@ eventlet.monkey_patch()
 
 import argparse
 
-from examples.cogrid.scenes import scenes as oc_scenes
+from examples.slime_volleyball.slime_volleyball_constants import (
+    ACTION_MAPPING, NOOP)
 from mug.configurations import configuration_constants, experiment_config
 from mug.configurations.configuration_constants import ModelConfig
-from mug.scenes import gym_scene, scene, stager, static_scene
+from mug.scenes import gym_scene, stager, static_scene
 from mug.server import app
 
 SLIMEVB_MODEL_CONFIG = ModelConfig(
@@ -21,22 +22,6 @@ SLIMEVB_MODEL_CONFIG = ModelConfig(
 POLICY_MAPPING = {
     "agent_right": SLIMEVB_MODEL_CONFIG,
     "agent_left": configuration_constants.PolicyTypes.Human,
-}
-
-NOOP = 0
-LEFT = 1
-UPLEFT = 2
-UP = 3
-UPRIGHT = 4
-RIGHT = 5
-
-# Map the actions to the arrow keys. The keys are Javascript key press events (all others ignored)
-ACTION_MAPPING = {
-    "ArrowLeft": LEFT,
-    ("ArrowLeft", "ArrowUp"): UPLEFT,
-    "ArrowUp": UP,
-    ("ArrowRight", "ArrowUp"): UPRIGHT,
-    "ArrowRight": RIGHT,
 }
 
 # Define the start scene, which is the landing page for participants.
@@ -87,18 +72,26 @@ slime_scene = (
         """,
     )
     .runtime(
-        run_through_pyodide=True,
         environment_initialization_code_filepath="examples/slime_volleyball/slimevb_env.py",
         packages_to_install=["slimevb==0.1.1"],
     )
 )
 
 
+end_scene = (
+    static_scene.EndScene()
+    .scene(scene_id="slimevb_end_scene")
+    .display(
+        scene_header="Thanks for playing!",
+        scene_body="For more information, visit interactive-gym.readthedocs.io!",
+    )
+)
+
 stager = stager.Stager(
     scenes=[
         start_scene,
         slime_scene,
-        oc_scenes.end_scene,
+        end_scene,
     ]
 )
 

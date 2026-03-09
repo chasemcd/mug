@@ -205,7 +205,6 @@ class RandomizeOrder(SceneWrapper):
         self,
         scenes: Scene | SceneWrapper | list[Scene],
         keep_n: int | None = None,
-        seed: int | None = None,
         **kwargs,
     ):
         super().__init__(scenes, **kwargs)

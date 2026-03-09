@@ -125,7 +125,6 @@ tutorial_gym_scene = (
         game_page_html_fn=overcooked_utils.overcooked_game_page_header_fn,
     )
     .runtime(
-        run_through_pyodide=True,
         environment_initialization_code_filepath="examples/cogrid/environments/tutorial_cramped_room_environment_initialization.py",
         packages_to_install=["numpy", "cogrid==0.2.1", "opencv-python"],
     )
@@ -179,7 +178,6 @@ cramped_room_sp_0 = (
         """,
     )
     .runtime(
-        run_through_pyodide=True,
         environment_initialization_code_filepath="examples/cogrid/environments/cramped_room_environment_initialization.py",
         packages_to_install=["numpy", "cogrid==0.2.1", "opencv-python"],
     )
@@ -264,20 +262,16 @@ cramped_room_human_human = (
         timeout=300000,  # 5 minutes
         timeout_message="Sorry, we could not find enough players for this study. Please return the HIT now. You will be paid through a Compensation HIT.",
     )
-    .matchmaking(
-        matchmaker=FIFOMatchmaker(
-            max_p2p_rtt_ms=100,  # only pair participants with <=100ms RTT
-        ),
-        hide_lobby_count=True,
-    )
     .runtime(
-        run_through_pyodide=True,
         environment_initialization_code_filepath="examples/cogrid/environments/cramped_room_environment_initialization_hh.py",
         packages_to_install=["numpy", "cogrid==0.2.1", "opencv-python"],
     )
     .multiplayer(
-        multiplayer=True,
         input_delay=3,
+        matchmaker=FIFOMatchmaker(
+            max_p2p_rtt_ms=100,  # only pair participants with <=100ms RTT
+        ),
+        hide_lobby_count=True,
         partner_disconnect_message="Your partner disconnected. The task will end here and you will be compensated for your performance so far. Please submit the completion code below.",
         partner_disconnect_show_completion_code=True,
     )

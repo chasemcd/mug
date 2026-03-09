@@ -19,7 +19,6 @@ import msgpack
 import pandas as pd
 from flask_login import LoginManager
 
-from mug.configurations import remote_config
 from mug.scenes import gym_scene, stager, unity_scene
 from mug.server import (game_manager, player_pairing_manager,
                         pyodide_game_coordinator, thread_safe_collections)
@@ -76,7 +75,7 @@ def setup_logger(name, log_file, level=logging.INFO):
 
 logger = setup_logger(__name__, "./iglog.log", level=logging.DEBUG)
 
-CONFIG = remote_config.RemoteConfig()
+CONFIG = None
 
 
 # Generic stager is the "base" Stager that we'll build for each
@@ -956,27 +955,6 @@ def on_unity_episode_start(data):
     current_scene.on_unity_episode_start(
         data,
         socketio=socketio,
-        room=flask.request.sid,
-    )
-
-
-@socketio.on("request_redirect")
-def on_request_redirect(data):
-    waitroom_timeout = data.get("waitroom_timeout", False)
-    if waitroom_timeout:
-        redirect_url = CONFIG.waitroom_timeout_redirect_url
-    else:
-        redirect_url = CONFIG.experiment_end_redirect_url
-
-    if CONFIG.append_subject_id_to_redirect:
-        redirect_url += get_subject_id_from_session_id(flask.request.sid)
-
-    socketio.emit(
-        "redirect",
-        {
-            "redirect_url": redirect_url,
-            "redirect_timeout": CONFIG.redirect_timeout,
-        },
         room=flask.request.sid,
     )
 

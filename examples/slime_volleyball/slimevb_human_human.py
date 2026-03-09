@@ -6,31 +6,15 @@ eventlet.monkey_patch()
 
 import argparse
 
-from examples.cogrid.scenes import scenes as oc_scenes
+from examples.slime_volleyball.slime_volleyball_constants import (
+    ACTION_MAPPING, NOOP)
 from mug.configurations import configuration_constants, experiment_config
-from mug.scenes import gym_scene, scene, stager, static_scene
+from mug.scenes import gym_scene, stager, static_scene
 from mug.server import app
 
 POLICY_MAPPING = {
     "agent_right": configuration_constants.PolicyTypes.Human,
     "agent_left": configuration_constants.PolicyTypes.Human,
-}
-
-
-NOOP = 0
-LEFT = 1
-UPLEFT = 2
-UP = 3
-UPRIGHT = 4
-RIGHT = 5
-
-# Map the actions to the arrow keys. The keys are Javascript key press events (all others ignored)
-ACTION_MAPPING = {
-    "ArrowLeft": LEFT,
-    ("ArrowLeft", "ArrowUp"): UPLEFT,
-    "ArrowUp": UP,
-    ("ArrowRight", "ArrowUp"): UPRIGHT,
-    "ArrowRight": RIGHT,
 }
 
 
@@ -86,15 +70,22 @@ slime_scene = (
     )
     .waitroom(timeout=120000)  # 2 minutes
     .runtime(
-        run_through_pyodide=True,
         environment_initialization_code_filepath="examples/slime_volleyball/slimevb_env.py",
         packages_to_install=[
             "slimevb==0.1.1",
         ],
     )
     .multiplayer(
-        multiplayer=True,
         input_delay=2,
+    )
+)
+
+end_scene = (
+    static_scene.EndScene()
+    .scene(scene_id="slimevb_end_scene")
+    .display(
+        scene_header="Thanks for playing!",
+        scene_body="For more information, visit interactive-gym.readthedocs.io!",
     )
 )
 
@@ -102,7 +93,7 @@ stager = stager.Stager(
     scenes=[
         start_scene,
         slime_scene,
-        oc_scenes.end_scene,
+        end_scene,
     ]
 )
 

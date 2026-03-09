@@ -97,8 +97,6 @@ server_auth_test_scene = (
     .multiplayer(
         mode="server_authoritative",
         focus_loss_timeout_ms=0,  # Disable focus timeout for test automation
-    )
-    .matchmaking(
         max_rtt=None,  # No RTT limit for testing
         matchmaker=FIFOMatchmaker(),
     )

@@ -311,29 +311,50 @@ Rendering System
 Sprite Atlases
 ^^^^^^^^^^^^^^
 
-Overcooked uses texture atlases for efficient rendering:
+Overcooked uses texture atlases for efficient rendering. Atlases are registered
+via the ``Surface`` API, which handles loading sprite sheets and their
+accompanying JSON frame maps.
+
+In client-side/Pyodide environments, atlases are registered directly on the
+``Surface`` instance:
 
 .. code-block:: python
 
-    from mug.configurations import object_contexts
+    from mug.rendering import Surface
 
-    def overcooked_preload_assets_spec():
-        terrain = object_contexts.AtlasSpec(
-            name="terrain",
-            img_path="examples/cogrid/assets/overcooked/sprites/terrain.png",
-            atlas_path="examples/cogrid/assets/overcooked/sprites/terrain.json",
-        )
-        chefs = object_contexts.AtlasSpec(
-            name="chefs",
-            img_path="examples/cogrid/assets/overcooked/sprites/chefs.png",
-            atlas_path="examples/cogrid/assets/overcooked/sprites/chefs.json",
-        )
-        objects = object_contexts.AtlasSpec(
-            name="objects",
-            img_path="examples/cogrid/assets/overcooked/sprites/objects.png",
-            atlas_path="examples/cogrid/assets/overcooked/sprites/objects.json",
-        )
-        return [terrain.as_dict(), chefs.as_dict(), objects.as_dict()]
+    ASSET_PATH = "examples/cogrid/assets/overcooked/sprites"
+
+    self.surface = Surface(width=WIDTH, height=HEIGHT)
+    self.surface.register_atlas(
+        "terrain",
+        img_path=f"{ASSET_PATH}/terrain.png",
+        json_path=f"{ASSET_PATH}/terrain.json",
+    )
+    self.surface.register_atlas(
+        "chefs",
+        img_path=f"{ASSET_PATH}/chefs.png",
+        json_path=f"{ASSET_PATH}/chefs.json",
+    )
+    self.surface.register_atlas(
+        "objects",
+        img_path=f"{ASSET_PATH}/objects.png",
+        json_path=f"{ASSET_PATH}/objects.json",
+    )
+
+For server-authoritative scenes that need to tell the browser which atlases to
+preload, the ``overcooked_preload_assets_spec()`` helper returns a list of atlas
+descriptors:
+
+.. code-block:: python
+
+    ASSET_PATH = "examples/cogrid/assets/overcooked/sprites"
+
+    def overcooked_preload_assets_spec() -> list[dict]:
+        return [
+            {"object_type": "atlas_spec", "name": "terrain", "img_path": f"{ASSET_PATH}/terrain.png", "atlas_path": f"{ASSET_PATH}/terrain.json"},
+            {"object_type": "atlas_spec", "name": "chefs", "img_path": f"{ASSET_PATH}/chefs.png", "atlas_path": f"{ASSET_PATH}/chefs.json"},
+            {"object_type": "atlas_spec", "name": "objects", "img_path": f"{ASSET_PATH}/objects.png", "atlas_path": f"{ASSET_PATH}/objects.json"},
+        ]
 
 Tile-Based Coordinates
 ^^^^^^^^^^^^^^^^^^^^^^

@@ -250,29 +250,3 @@ class ProbeCoordinator:
             f"Probe {probe_session_id} complete: "
             f"{'success' if success else 'failed'}, rtt={rtt_ms}ms"
         )
-
-    def cleanup_stale_probes(self) -> int:
-        """Remove probes that have exceeded the timeout.
-
-        Should be called periodically (e.g., every few seconds) to clean
-        up abandoned probe sessions.
-
-        Returns:
-            Number of probes cleaned up
-        """
-        now = time.time()
-        stale_ids = [
-            probe_id for probe_id, session in self.probe_sessions.items()
-            if now - session['created_at'] > self.probe_timeout_s
-        ]
-
-        for probe_session_id in stale_ids:
-            session = self.probe_sessions[probe_session_id]
-            on_complete = session.get('on_complete')
-            if on_complete:
-                # Call callback with None RTT to indicate timeout
-                on_complete(session['subject_a'], session['subject_b'], None)
-            del self.probe_sessions[probe_session_id]
-            logger.warning(f"Probe {probe_session_id} timed out and was cleaned up")
-
-        return len(stale_ids)

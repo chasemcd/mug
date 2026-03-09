@@ -1,7 +1,7 @@
 """Integration tests for LatencyFIFOMatchmaker scene API and P2P probe wiring.
 
 Covers two v1.21 requirements:
-- MATCH-05: scene.matchmaking() stores and returns LatencyFIFOMatchmaker
+- MATCH-05: scene.multiplayer() stores and returns LatencyFIFOMatchmaker
 - MATCH-03: P2P probe integration (needs_probe, should_reject_for_rtt, full flow)
 """
 
@@ -21,28 +21,28 @@ class TestLatencyFIFOIntegration:
     # ------------------------------------------------------------------ #
 
     def test_scene_stores_latency_fifo_matchmaker(self):
-        """MATCH-05: scene.matchmaking() stores LatencyFIFOMatchmaker with both thresholds."""
+        """MATCH-05: scene.multiplayer() stores LatencyFIFOMatchmaker with both thresholds."""
         matchmaker = LatencyFIFOMatchmaker(max_server_rtt_ms=200, max_p2p_rtt_ms=150)
-        scene = GymScene().matchmaking(matchmaker=matchmaker)
+        scene = GymScene().multiplayer(matchmaker=matchmaker)
 
         assert scene.matchmaker is matchmaker
         assert scene.matchmaker.max_server_rtt_ms == 200
         assert scene.matchmaker.max_p2p_rtt_ms == 150
 
     def test_scene_stores_latency_fifo_without_p2p(self):
-        """MATCH-05: scene.matchmaking() stores LatencyFIFOMatchmaker without P2P threshold."""
+        """MATCH-05: scene.multiplayer() stores LatencyFIFOMatchmaker without P2P threshold."""
         matchmaker = LatencyFIFOMatchmaker(max_server_rtt_ms=200)
-        scene = GymScene().matchmaking(matchmaker=matchmaker)
+        scene = GymScene().multiplayer(matchmaker=matchmaker)
 
         assert scene.matchmaker is matchmaker
         assert scene.matchmaker.max_server_rtt_ms == 200
         assert scene.matchmaker.max_p2p_rtt_ms is None
 
     def test_scene_matchmaker_type_validation(self):
-        """MATCH-05: scene.matchmaking() rejects non-Matchmaker instances."""
+        """MATCH-05: scene.multiplayer() rejects non-Matchmaker instances."""
         scene = GymScene()
         try:
-            scene.matchmaking(matchmaker="not_a_matchmaker")
+            scene.multiplayer(matchmaker="not_a_matchmaker")
             assert False, "Should have raised TypeError"
         except TypeError:
             pass  # Expected
