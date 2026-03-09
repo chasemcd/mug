@@ -959,27 +959,6 @@ def on_unity_episode_start(data):
     )
 
 
-@socketio.on("request_redirect")
-def on_request_redirect(data):
-    waitroom_timeout = data.get("waitroom_timeout", False)
-    if waitroom_timeout:
-        redirect_url = CONFIG.waitroom_timeout_redirect_url
-    else:
-        redirect_url = CONFIG.experiment_end_redirect_url
-
-    if CONFIG.append_subject_id_to_redirect:
-        redirect_url += get_subject_id_from_session_id(flask.request.sid)
-
-    socketio.emit(
-        "redirect",
-        {
-            "redirect_url": redirect_url,
-            "redirect_timeout": CONFIG.redirect_timeout,
-        },
-        room=flask.request.sid,
-    )
-
-
 @socketio.on("client_callback")
 def on_client_callback(data):
     subject_id = get_subject_id_from_session_id(flask.request.sid)
