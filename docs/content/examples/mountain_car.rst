@@ -10,7 +10,7 @@ In this experiment, participants control a car trying to reach a flag on top of 
 
 **What you'll learn:**
 
-- Setting up Pyodide mode for client-side execution
+- Setting up browser-side execution
 - Converting RGB array environments to Surface-based rendering
 - Configuring keyboard controls
 - Creating a complete three-scene experiment
@@ -196,7 +196,7 @@ Configure the main gameplay scene:
 
 Key configuration points:
 
-- **Pyodide mode**: ``run_through_pyodide=True`` runs the environment in the browser
+- **Browser-side execution**: The environment runs directly in the participant's browser
 - **Environment file**: Path to the custom environment implementation
 - **Input mode**: ``PressedKeys`` means actions are sent while keys are held down
 - **Episodes**: Participant plays 5 rounds with max 200 steps each

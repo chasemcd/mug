@@ -83,7 +83,7 @@ Examples must be run as modules from the repository root to ensure correct asset
        # Mountain Car
        python -m examples.mountain_car.mountain_car_experiment
 
-       # Slime Volleyball (Human vs AI, Pyodide mode)
+       # Slime Volleyball (Human vs AI, browser-side)
        python -m examples.slime_volleyball.human_ai_pyodide
 
        # Overcooked (Human vs AI, client-side)

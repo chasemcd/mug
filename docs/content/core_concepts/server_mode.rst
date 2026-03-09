@@ -1,7 +1,7 @@
 Server Mode
 ===========
 
-Server mode runs your environment on a server, with state streamed to participants' browsers in real-time. This mode is required for multi-player experiments and provides more flexibility than Pyodide mode.
+Server mode runs your environment on a server, with state streamed to participants' browsers in real-time. Use server mode when your environment has dependencies that are incompatible with browser-side execution (e.g., compiled C/C++ extensions or GPU-based inference).
 
 When to Use Server Mode
 ------------------------
@@ -667,22 +667,24 @@ Best Practices
 7. **Handle disconnections**: Participants may lose connection
 8. **Test at scale**: Simulate max concurrent load
 
-Comparison: Server vs Pyodide
-------------------------------
+Comparison: Server-Side vs Browser-Side
+-----------------------------------------
+
+Browser-side execution is preferred whenever the environment is compatible. Use server-side execution only when your environment has dependencies that cannot run in Pyodide.
 
 .. list-table::
    :header-rows: 1
    :widths: 30 35 35
 
    * - Feature
-     - Server Mode
-     - Pyodide Mode
+     - Server-Side
+     - Browser-Side (Preferred)
    * - **Players**
-     - Multiple humans + AI
-     - 1 human + AI
+     - Multiplayer
+     - Single or multiplayer (via GGPO)
    * - **Latency**
      - Network-dependent
-     - None (local)
+     - None (local) + GGPO rollback for multiplayer
    * - **Initial Load**
      - Instant
      - 30-90 seconds
@@ -694,9 +696,9 @@ Comparison: Server vs Pyodide
      - Pure Python only
    * - **AI Inference**
      - On server (can use GPU)
-     - In browser
-   * - **Data Security**
-     - Real-time validation
+     - In browser (ONNX)
+   * - **Data Collection**
+     - Real-time
      - Sent periodically
    * - **Debugging**
      - Server logs

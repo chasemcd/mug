@@ -1,41 +1,29 @@
-Pyodide Mode
-============
+Browser-Side Execution
+======================
 
-Pyodide mode runs your environment entirely in the participant's browser using `Pyodide <https://pyodide.org/>`_, a WebAssembly-based Python runtime. This eliminates server-side computation and network latency for single-player experiments.
+By default, MUG runs your environment directly in the participant's browser using `Pyodide <https://pyodide.org/>`_, a WebAssembly-based Python runtime. This is the preferred execution mode because it eliminates network latency from the game loop and enables GGPO-based rollback netcode for multiplayer experiments.
 
 What is Pyodide?
 ----------------
 
 Pyodide is Python compiled to WebAssembly that runs in web browsers:
 
-- Full Python 3.11 interpreter
+- Full Python interpreter
 - Includes NumPy, SciPy, scikit-learn, and more
 - Can install pure Python packages via micropip
 - Sandboxed and secure
 
-When your experiment uses Pyodide mode, the Python environment runs in each participant's browser, not on your server.
+When your experiment uses browser-side execution, the Python environment runs in each participant's browser, not on your server.
 
-When to Use Pyodide Mode
--------------------------
+Environment Compatibility
+--------------------------
 
-✅ **Use Pyodide when:**
+Browser-side execution is preferred whenever the environment is compatible. The only reason to fall back to server-side execution is if your environment has dependencies that cannot run in Pyodide (e.g., compiled C/C++ extensions, GPU-based inference, or system-level libraries). If your environment is pure Python, use browser-side execution.
 
-- Single-player experiments (one human, any number of AI policies)
-- Environment is pure Python (no compiled dependencies)
-- Want zero network latency
-- Want to reduce server load
-- Participants have decent internet (for initial package download)
+Enabling Browser-Side Execution
+---------------------------------
 
-❌ **Don't use Pyodide when:**
-
-- Multi-player experiments (multiple humans)
-- Environment requires compiled libraries (e.g., pygame, OpenGL)
-- Complex AI policies need GPU inference
-- Need centralized data validation
-- Environment has non-Python dependencies
-
-Enabling Pyodide Mode
-----------------------
+Browser-side execution is automatically enabled when you provide any Pyodide-specific runtime parameter (e.g., ``environment_initialization_code``, ``environment_initialization_code_filepath``, or ``packages_to_install``).
 
 Basic Configuration
 ^^^^^^^^^^^^^^^^^^^
@@ -48,7 +36,6 @@ Basic Configuration
         gym_scene.GymScene()
         .scene(scene_id="my_game")
         .runtime(
-            run_through_pyodide=True,
             environment_initialization_code=(
                 "import gymnasium as gym\n"
                 "env = gym.make('CartPole-v1', render_mode='interactive-gym')"
@@ -65,7 +52,6 @@ For complex environments, use a separate file:
 .. code-block:: python
 
     .runtime(
-        run_through_pyodide=True,
         environment_initialization_code_filepath="my_environment.py",
         packages_to_install=["gymnasium==1.0.0", "numpy"],
     )
@@ -82,8 +68,8 @@ The file should end with:
     # IMPORTANT: Must create instance named 'env'
     env = MyEnv(render_mode="mug")
 
-How Pyodide Mode Works
------------------------
+How Browser-Side Execution Works
+----------------------------------
 
 Initialization Flow
 ^^^^^^^^^^^^^^^^^^^
@@ -161,23 +147,11 @@ Environment Requirements
 Pure Python Only
 ^^^^^^^^^^^^^^^^
 
-Pyodide only supports pure Python packages:
+Pyodide only supports pure Python packages. Environments with compiled C/C++ dependencies cannot run in the browser.
 
-✅ **Works:**
+**Compatible packages** include gymnasium, numpy, scipy, scikit-learn, pandas, and pillow.
 
-- gymnasium
-- numpy
-- scipy
-- scikit-learn
-- pandas
-- pillow (pure Python mode)
-
-❌ **Doesn't work:**
-
-- pygame (C dependencies)
-- OpenCV (C++ dependencies)
-- TensorFlow/PyTorch (too large, compiled)
-- Custom C extensions
+**Incompatible packages** include pygame (C dependencies), OpenCV (C++ dependencies), TensorFlow/PyTorch (too large, compiled), and custom C extensions.
 
 Custom Rendering
 ^^^^^^^^^^^^^^^^
@@ -398,8 +372,8 @@ Users should check browser console (F12) for Python errors:
 
 Encourage participants to report errors or provide fallback instructions.
 
-Debugging Pyodide Mode
-----------------------
+Debugging Browser-Side Execution
+----------------------------------
 
 Test Locally First
 ^^^^^^^^^^^^^^^^^^
@@ -500,27 +474,26 @@ By default, Pyodide persists across scenes. To restart:
 .. code-block:: python
 
     .runtime(
-        run_through_pyodide=True,
         restart_pyodide=True,  # Restart between scenes
     )
 
 This is useful if you want a clean state for each scene.
 
-Comparison: Pyodide vs Server
-------------------------------
+Comparison: Browser-Side vs Server-Side
+-----------------------------------------
 
 .. list-table::
    :header-rows: 1
    :widths: 30 35 35
 
    * - Feature
-     - Pyodide Mode
-     - Server Mode
+     - Browser-Side (Preferred)
+     - Server-Side
    * - **Players**
-     - 1 human + AI
-     - Multiple humans + AI
+     - Single or multiplayer (via GGPO)
+     - Multiplayer
    * - **Latency**
-     - None (local)
+     - None (local) + GGPO rollback for multiplayer
      - Network-dependent
    * - **Initial Load**
      - 30-90 seconds
@@ -532,11 +505,11 @@ Comparison: Pyodide vs Server
      - Pure Python only
      - Any Python code
    * - **AI Inference**
-     - In browser
+     - In browser (ONNX)
      - On server (can use GPU)
-   * - **Data Security**
+   * - **Data Collection**
      - Sent periodically
-     - Real-time validation
+     - Real-time
    * - **Debugging**
      - Browser console
      - Server logs
@@ -553,8 +526,8 @@ Best Practices
 7. **Provide fallback instructions**: For when loading fails
 8. **Monitor browser console**: Catch errors early during testing
 
-Example: Complete Pyodide Scene
---------------------------------
+Example: Complete Browser-Side Scene
+--------------------------------------
 
 .. code-block:: python
 
@@ -593,7 +566,6 @@ Example: Complete Pyodide Scene
             in_game_scene_body="<center><p>Use arrow keys to reach the flag!</p></center>",
         )
         .runtime(
-            run_through_pyodide=True,
             environment_initialization_code_filepath="environments/mountain_car.py",
             packages_to_install=["gymnasium==1.0.0", "numpy"],
         )
@@ -602,6 +574,6 @@ Example: Complete Pyodide Scene
 Next Steps
 ----------
 
-- **Compare with server mode**: :doc:`server_mode`
+- **Server-side execution**: :doc:`server_mode`
 - **Learn about rendering**: :doc:`surface_api`
 - **See complete example**: :doc:`../quick_start`

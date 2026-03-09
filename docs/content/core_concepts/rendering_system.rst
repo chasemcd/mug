@@ -34,7 +34,7 @@ The rendering pipeline has four stages, from your Python code to the browser can
 
 **Stage 2 -- RenderPacket Delta.** Calling ``surface.commit()`` compares persistent objects against their last committed state. Only new or changed objects are included in the output ``RenderPacket``. Ephemeral (temporary) objects are always included.
 
-**Stage 3 -- Wire Transmission.** The ``RenderPacket`` is serialized to JSON and sent to the browser. In server mode, this happens over SocketIO. In Pyodide mode, it passes directly within the browser runtime.
+**Stage 3 -- Wire Transmission.** The ``RenderPacket`` is serialized to JSON and sent to the browser. In server mode, this happens over SocketIO. In browser-side mode, it passes directly within the browser runtime.
 
 **Stage 4 -- Phaser JS Rendering.** The browser-side JavaScript receives the packet, creates or updates Phaser game objects on the canvas, and applies tweened animations for objects whose positions changed.
 
@@ -383,4 +383,4 @@ Next Steps
 - :doc:`surface_api` -- Full parameter details for every Surface draw method
 - :doc:`../quick_start` -- Quick Start tutorial demonstrating a complete environment with rendering
 - :doc:`server_mode` -- Server Mode: how the server-authoritative pipeline transmits render packets to thin clients
-- :doc:`pyodide_mode` -- Pyodide Mode: how rendering works when the environment runs client-side in the browser
+- :doc:`pyodide_mode` -- Browser-Side Execution: how rendering works when the environment runs client-side in the browser

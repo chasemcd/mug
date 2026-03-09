@@ -59,7 +59,7 @@ Running the Example
 
 From the repository root, run as a module:
 
-**Pyodide Mode (Recommended)**
+**Browser-Side (Recommended)**
 
 Run the game entirely in the browser:
 
@@ -462,7 +462,7 @@ Server mode requires:
 How It Works
 ------------
 
-Pyodide Mode Flow
+Browser-Side Flow
 ^^^^^^^^^^^^^^^^^
 
 .. code-block:: text
@@ -509,7 +509,7 @@ ONNX Policy Integration
 
 The AI opponent is a neural network exported to ONNX format.
 
-**In Pyodide Mode:**
+**In Browser-Side Mode:**
 
 The ONNX model is loaded in the browser using a ``ModelConfig``:
 

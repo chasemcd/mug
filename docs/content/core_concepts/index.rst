@@ -123,7 +123,7 @@ Common Patterns
 Data Flow
 ---------
 
-**Pyodide Mode:**
+**Browser-Side Execution:**
 
 .. code-block:: text
 

@@ -267,7 +267,7 @@ Configure browser-based execution:
 .. code-block:: python
 
     .runtime(
-        run_through_pyodide=True,              # Enable Pyodide mode
+        run_through_pyodide=True,              # Enable browser-side execution
         environment_initialization_code="import gym\nenv = gym.make('CartPole-v1')",
         environment_initialization_code_filepath="path/to/env.py",
         packages_to_install=["gymnasium==1.0.0", "numpy"],
