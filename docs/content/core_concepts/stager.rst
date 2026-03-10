@@ -312,60 +312,62 @@ Practice + Main Game
 Multiple Conditions
 ^^^^^^^^^^^^^^^^^^^
 
+Use ``RandomizeOrder`` with ``keep_n=1`` to randomly assign each participant to one condition. The wrapper selects one scene at random when building the sequence for each participant:
+
 .. code-block:: python
 
-    import random
-
-    condition = random.choice(["control", "treatment"])
-
-    if condition == "control":
-        game_scene = control_game_scene
-    else:
-        game_scene = treatment_game_scene
+    from mug.scenes import scene
 
     stager = stager.Stager(scenes=[
         start_scene,
-        game_scene,  # Different based on condition
+        scene.RandomizeOrder(
+            [control_game_scene, treatment_game_scene],
+            keep_n=1,  # Each participant sees exactly one
+        ),
+        survey_scene,
         end_scene,
     ])
-
-    # Save condition to scene metadata
-    game_scene.experiment_config["condition"] = condition
 
 Repeated Measures
 ^^^^^^^^^^^^^^^^^
 
+Use ``RandomizeOrder`` to counterbalance the order of conditions across participants:
+
 .. code-block:: python
 
-    # Same participant plays multiple game versions
+    from mug.scenes import scene
+
+    # Each participant plays all versions in a random order
     stager = stager.Stager(scenes=[
         start_scene,
-        game_version_a,
-        survey_1,
-        game_version_b,
-        survey_2,
-        game_version_c,
-        survey_3,
+        scene.RandomizeOrder([
+            game_version_a,
+            game_version_b,
+            game_version_c,
+        ]),
+        survey_scene,
         end_scene,
     ])
 
 Between-Subjects Design
 ^^^^^^^^^^^^^^^^^^^^^^^
 
+Use ``RandomizeOrder`` with ``keep_n=1`` to implement between-subjects designs. Each participant is randomly assigned to one condition:
+
 .. code-block:: python
 
-    # Different participants get different scene sequences
-    participant_id = get_participant_id()
-    condition = assign_condition(participant_id)
+    from mug.scenes import scene
 
-    if condition == "A":
-        scenes = [start, game_a, survey, end]
-    elif condition == "B":
-        scenes = [start, game_b, survey, end]
-    else:
-        scenes = [start, game_c, survey, end]
-
-    stager = stager.Stager(scenes=scenes)
+    # Each participant sees exactly one game version
+    stager = stager.Stager(scenes=[
+        start,
+        scene.RandomizeOrder(
+            [game_a, game_b, game_c],
+            keep_n=1,
+        ),
+        survey,
+        end,
+    ])
 
 Debugging and Testing
 ---------------------

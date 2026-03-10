@@ -471,21 +471,21 @@ Common Patterns
 
 **Multiple Conditions:**
 
+Use ``RandomizeOrder`` with ``keep_n=1`` to randomly assign each participant to one condition. Each condition is a separate scene, and the wrapper selects one at random when the Stager builds the scene sequence for a participant:
+
 .. code-block:: python
 
-    # Assign conditions in your experiment script
-    import random
+    from mug.scenes import scene, stager
 
-    condition = random.choice(["A", "B"])
-
-    game_scene = (
-        gym_scene.GymScene()
-        .scene(
-            scene_id=f"game_condition_{condition}",
-            experiment_config={"condition": condition}
-        )
-        # Different config based on condition
-    )
+    stager = stager.Stager(scenes=[
+        start_scene,
+        scene.RandomizeOrder(
+            [condition_a_scene, condition_b_scene, condition_c_scene],
+            keep_n=1,  # Each participant sees exactly one
+        ),
+        survey_scene,
+        end_scene,
+    ])
 
 Next Steps
 ----------
