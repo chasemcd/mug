@@ -421,44 +421,6 @@ Wrap the SlimeVolley environment with custom rendering:
         render_mode="mug"
     )
 
-Server Mode Differences
-^^^^^^^^^^^^^^^^^^^^^^^
-
-**human_ai_server.py** runs the environment on the server instead of the browser.
-
-Key differences:
-
-.. code-block:: python
-
-    # No .runtime() configuration
-    # Environment runs server-side
-
-    from mug.utils import onnx_inference_utils
-
-    config = (
-        remote_config.RemoteConfig()
-        .policies(
-            policy_mapping=POLICY_MAPPING,
-            policy_inference_fn=onnx_inference_utils.onnx_model_inference_fn,
-            load_policy_fn=onnx_inference_utils.load_onnx_policy_fn,
-        )
-        .environment(
-            env_creator=env_creator,
-            env_name="slime_volleyball"
-        )
-        .rendering(
-            fps=35,
-            env_to_state_fn=slime_volleyball_utils.slime_volleyball_env_to_rendering,
-        )
-        # ... rest of configuration
-    )
-
-Server mode requires:
-
-- ``env_creator`` function to instantiate environment
-- ``env_to_state_fn`` for converting environment state to rendering objects
-- Policy loading and inference functions for ONNX
-
 How It Works
 ------------
 

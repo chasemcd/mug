@@ -6,23 +6,7 @@ Server mode runs your environment on a server, with state streamed to participan
 When to Use Server Mode
 ------------------------
 
-✅ **Use Server mode when:**
-
-- Multi-player experiments (multiple humans together)
-- Environment has compiled dependencies (C/C++ libraries)
-- Using complex AI policies with GPU inference
-- Need centralized data validation
-- Want to ensure consistent performance across all participants
-- Environment is computationally intensive
-
-❌ **Don't need Server mode when:**
-
-- Single-player experiment with pure Python environment
-- Want to minimize server costs/load
-- Want zero network latency
-- Participants have reliable internet for Pyodide download
-
-**Note:** Server mode is automatically used when your experiment requires it (e.g., multiple human players).
+Server mode is the fallback when your environment is not compatible with browser-side execution. Use it when your environment has compiled C/C++ dependencies, requires GPU-based inference, or otherwise cannot run in Pyodide. For all other cases, prefer browser-side execution (see :doc:`pyodide_mode`).
 
 How Server Mode Works
 ----------------------
@@ -176,21 +160,7 @@ Responsibilities
 Concurrent Games
 ^^^^^^^^^^^^^^^^
 
-Multiple games can run simultaneously:
-
-.. code-block:: python
-
-    .hosting(
-        max_concurrent_games=5,  # Up to 5 games at once
-    )
-
-**Example with 10 participants in a 2-player game:**
-
-- Game 1: Participant 1 & 2
-- Game 2: Participant 3 & 4
-- Game 3: Participant 5 & 6
-- Game 4: Participant 7 & 8
-- Game 5: Participant 9 & 10
+Multiple games run simultaneously. When participants connect and are matched, new game instances are created automatically. For example, with 10 participants in a 2-player game, 5 games run in parallel.
 
 Each game runs independently with its own environment instance.
 
@@ -310,9 +280,9 @@ Setting up TURN credentials
 
    .. code-block:: python
 
-       from mug.configurations import RemoteConfig
+       from mug.configurations import experiment_config
 
-       config = RemoteConfig()
+       config = experiment_config.ExperimentConfig()
        config.webrtc()  # Auto-loads from TURN_USERNAME and TURN_CREDENTIAL env vars
 
 **Alternative: Using a .env file**
@@ -331,7 +301,7 @@ Then load it in your experiment:
     from dotenv import load_dotenv
     load_dotenv()
 
-    config = RemoteConfig()
+    config = experiment_config.ExperimentConfig()
     config.webrtc()
 
 Testing TURN relay
@@ -603,11 +573,12 @@ Monitor for:
 - Performance warnings
 - Data saving issues
 
+MUG uses Python's standard ``logging`` module. Configure it in your experiment script:
+
 .. code-block:: python
 
-    .experiment(
-        logfile="experiment.log",
-    )
+    import logging
+    logging.basicConfig(level=logging.INFO)
 
 Metrics
 ^^^^^^^
@@ -719,7 +690,6 @@ Common Issues
 
 **Games not starting**
 
-- Check ``max_concurrent_games`` setting
 - Verify all players have connected
 - Look for environment initialization errors
 
@@ -744,6 +714,5 @@ Common Issues
 Next Steps
 ----------
 
-- **Compare with Pyodide**: :doc:`pyodide_mode`
-- **Learn about policies**: :doc:`../guides/policies/ai_policies`
-- **See multiplayer example**: :doc:`../examples/cogrid_overcooked`
+- **Browser-side execution**: :doc:`pyodide_mode`
+- **See multiplayer example**: :doc:`../examples/overcooked_multiplayer`

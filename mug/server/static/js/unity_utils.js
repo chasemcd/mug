@@ -31,25 +31,25 @@ export function startUnityScene(data) {
 
 
     // Initialize or increment the gym scene counter
-    if (typeof window.interactiveGymGlobals === 'undefined') {
-        window.interactiveGymGlobals = {};
+    if (typeof window.mugGlobals === 'undefined') {
+        window.mugGlobals = {};
     }
 
-    window.interactiveGymGlobals.unityEpisodeCounter = 0;
-    window.interactiveGymGlobals.unityScore = null;
+    window.mugGlobals.unityEpisodeCounter = 0;
+    window.mugGlobals.unityScore = null;
     if (data.score !== null) {
-        window.interactiveGymGlobals.unityScore = 0;
+        window.mugGlobals.unityScore = 0;
     }
-    console.log(window.interactiveGymGlobals.unityScore);
+    console.log(window.mugGlobals.unityScore);
 
     let hudText = '';
     if (data.num_episodes && data.num_episodes > 1) {
-        hudText += `Round ${window.interactiveGymGlobals.unityEpisodeCounter + 1}/${data.num_episodes}`;
+        hudText += `Round ${window.mugGlobals.unityEpisodeCounter + 1}/${data.num_episodes}`;
     }
 
-    if (window.interactiveGymGlobals.unityScore !== null) {
+    if (window.mugGlobals.unityScore !== null) {
         if (hudText) hudText += ' | ';
-        hudText += `Score: ${window.interactiveGymGlobals.unityScore}`;
+        hudText += `Score: ${window.mugGlobals.unityScore}`;
     }
 
     $("#hudText").html(hudText);

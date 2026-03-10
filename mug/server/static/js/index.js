@@ -624,7 +624,7 @@ function pyodideReadyIfUsing() {
 
 $(function() {
     $('#startButton').click( () => {
-        console.log("[StartButton] Clicked - attempting to join game. Session:", window.sessionId, "Subject:", window.subjectName || interactiveGymGlobals?.subjectName);
+        console.log("[StartButton] Clicked - attempting to join game. Session:", window.sessionId, "Subject:", window.subjectName || mugGlobals?.subjectName);
         $("#startButton").hide();
         $("#startButton").attr("disabled", true);
         $("#startButtonLoader").removeClass("visible");
@@ -757,11 +757,11 @@ function processPendingScene() {
 
 socket.on('connect', function() {
     console.debug("connecting")
-    // Emit an event to the server with the subject_id and current interactiveGymGlobals
+    // Emit an event to the server with the subject_id and current mugGlobals
     // This allows session restoration if reconnecting
     socket.emit('register_subject', {
         subject_id: subjectName,
-        interactiveGymGlobals: window.interactiveGymGlobals || {}
+        mugGlobals: window.mugGlobals || {}
     });
 
     // Initialize ProbeManager for P2P RTT probing during matchmaking
@@ -787,10 +787,10 @@ socket.on('session_restored', function(restoredSession) {
         return;
     }
 
-    // Restore interactiveGymGlobals from server (server state is authoritative)
-    if (restoredSession.interactiveGymGlobals) {
-        window.interactiveGymGlobals = restoredSession.interactiveGymGlobals;
-        console.log("Restored interactiveGymGlobals:", window.interactiveGymGlobals);
+    // Restore mugGlobals from server (server state is authoritative)
+    if (restoredSession.mugGlobals) {
+        window.mugGlobals = restoredSession.mugGlobals;
+        console.log("Restored mugGlobals:", window.mugGlobals);
     }
 
     // Reset UI state to ensure clean slate before scene activation
@@ -850,7 +850,7 @@ socket.on('start_game', function(gameStartData) {
         return;
     }
 
-    console.log("[StartGame] Game starting. Subject:", window.subjectName || interactiveGymGlobals?.subjectName,
+    console.log("[StartGame] Game starting. Subject:", window.subjectName || mugGlobals?.subjectName,
         "GameID:", gameStartData.game_id || 'N/A',
         "Scene:", gameStartData.scene_metadata?.scene_id || 'unknown');
 
@@ -947,7 +947,7 @@ socket.on('match_found_countdown', function(countdownInfo) {
 });
 
 socket.on("waiting_room", function(waitroomState) {
-    console.log("[WaitingRoom] Added to waiting room. Subject:", window.subjectName || interactiveGymGlobals?.subjectName,
+    console.log("[WaitingRoom] Added to waiting room. Subject:", window.subjectName || mugGlobals?.subjectName,
         "Players:", waitroomState.cur_num_players, "/", (waitroomState.cur_num_players + waitroomState.players_needed),
         "Timeout:", Math.floor(waitroomState.ms_remaining / 1000), "seconds");
 
@@ -978,7 +978,7 @@ socket.on("waiting_room", function(waitroomState) {
             if (refreshStartButton) {
                 clearInterval(refreshStartButton);
             }
-            console.log("[WaitroomTimeout] Waiting room timed out. Subject:", window.subjectName || interactiveGymGlobals?.subjectName, "Session:", window.sessionId);
+            console.log("[WaitroomTimeout] Waiting room timed out. Subject:", window.subjectName || mugGlobals?.subjectName, "Session:", window.sessionId);
             socket.emit("leave_game", {session_id: window.sessionId})
 
             // Display custom message if configured, otherwise use default
@@ -1344,13 +1344,13 @@ var currentSceneMetadata = {};
 
 socket.on("activate_scene", function(sceneData) {
     console.log("Activating scene", sceneData.scene_id)
-    // Retrieve interactiveGymGlobals from the global scope
-    console.log("interactiveGymGlobals", interactiveGymGlobals)
-    if (typeof interactiveGymGlobals !== 'undefined') {
-        // Add interactiveGymGlobals to sceneData.globals
-        console.log("interactiveGymGlobals", interactiveGymGlobals)
+    // Retrieve mugGlobals from the global scope
+    console.log("mugGlobals", mugGlobals)
+    if (typeof mugGlobals !== 'undefined') {
+        // Add mugGlobals to sceneData.globals
+        console.log("mugGlobals", mugGlobals)
         sceneData.globals = sceneData.globals || {};
-        Object.assign(sceneData.globals, interactiveGymGlobals);
+        Object.assign(sceneData.globals, mugGlobals);
     }
     activateScene(sceneData);
 });
@@ -1358,11 +1358,11 @@ socket.on("activate_scene", function(sceneData) {
 
 socket.on("terminate_scene", function(terminationData) {
     // Sync globals to server before terminating scene
-    socket.emit("sync_globals", {interactiveGymGlobals: window.interactiveGymGlobals});
+    socket.emit("sync_globals", {mugGlobals: window.mugGlobals});
 
     if (terminationData.element_ids && terminationData.element_ids.length > 0) {
         let retrievedData = getData(terminationData.element_ids);
-        socket.emit("static_scene_data_emission", {data: retrievedData, scene_id: terminationData.scene_id, session_id: window.sessionId, interactiveGymGlobals: window.interactiveGymGlobals});
+        socket.emit("static_scene_data_emission", {data: retrievedData, scene_id: terminationData.scene_id, session_id: window.sessionId, mugGlobals: window.mugGlobals});
     }
 
     terminateScene(terminationData);
@@ -1421,12 +1421,12 @@ function activateScene(data) {
     // $("#debugValue").text(`scene: ${data.scene_id}`);
     // $("#debugContainer").show();
 
-    // Add interactiveGymGlobals to the data object
-    if (typeof window.interactiveGymGlobals !== 'undefined') {
-        data.interactiveGymGlobals = window.interactiveGymGlobals;
+    // Add mugGlobals to the data object
+    if (typeof window.mugGlobals !== 'undefined') {
+        data.mugGlobals = window.mugGlobals;
     } else {
-        console.warn('interactiveGymGlobals is not defined in the window object');
-        data.interactiveGymGlobals = {};
+        console.warn('mugGlobals is not defined in the window object');
+        data.mugGlobals = {};
     }
 
     console.log(data);
@@ -1554,13 +1554,13 @@ async function startGymScene(data) {
     }
 
     // Initialize or increment the gym scene counter
-    if (typeof window.interactiveGymGlobals === 'undefined') {
-        window.interactiveGymGlobals = {};
+    if (typeof window.mugGlobals === 'undefined') {
+        window.mugGlobals = {};
     }
-    if (typeof window.interactiveGymGlobals.gymSceneCounter === 'undefined') {
-        window.interactiveGymGlobals.gymSceneCounter = 1;
+    if (typeof window.mugGlobals.gymSceneCounter === 'undefined') {
+        window.mugGlobals.gymSceneCounter = 1;
     } else {
-        window.interactiveGymGlobals.gymSceneCounter++;
+        window.mugGlobals.gymSceneCounter++;
     }
 
     // First, check if we need to initialize Pyodide
@@ -1650,7 +1650,7 @@ function terminateGymScene(data) {
     }
 
     // Sync globals to server before emitting game data
-    socket.emit("sync_globals", {interactiveGymGlobals: window.interactiveGymGlobals});
+    socket.emit("sync_globals", {mugGlobals: window.mugGlobals});
 
     // Emit multiplayer metrics separately if this is a multiplayer game
     // Metrics are sent via dedicated socket event for proper JSON storage (not bundled with game CSV)
@@ -1660,7 +1660,7 @@ function terminateGymScene(data) {
 
     let remoteGameData = getRemoteGameData();
     const binaryData = msgpack.encode(remoteGameData);
-    socket.emit("emit_remote_game_data", {data: binaryData, scene_id: data.scene_id, session_id: window.sessionId, interactiveGymGlobals: window.interactiveGymGlobals});
+    socket.emit("emit_remote_game_data", {data: binaryData, scene_id: data.scene_id, session_id: window.sessionId, mugGlobals: window.mugGlobals});
 
     $("#sceneHeader").show();
     $("#sceneHeader").html("");
@@ -1694,7 +1694,7 @@ $(function() {
         }
         $("#advanceButton").hide();
         $("#advanceButton").attr("disabled", true);
-        console.log("[AdvanceScene] Continue button clicked. Subject:", window.subjectName || interactiveGymGlobals?.subjectName);
+        console.log("[AdvanceScene] Continue button clicked. Subject:", window.subjectName || mugGlobals?.subjectName);
         socket.emit("advance_scene", {session_id: window.sessionId});
     })
 })
@@ -1912,17 +1912,17 @@ const startButton = window.document.getElementById('startButton');
 
 socket.on("update_unity_score", function(scoreUpdate) {
     console.log("Updating Unity score", scoreUpdate.score);
-    window.interactiveGymGlobals.unityScore = scoreUpdate.score;
+    window.mugGlobals.unityScore = scoreUpdate.score;
 
 
     let hudText = '';
     if (scoreUpdate.num_episodes && scoreUpdate.num_episodes > 1) {
-        hudText += `Round ${window.interactiveGymGlobals.unityEpisodeCounter + 1}/${scoreUpdate.num_episodes}`;
+        hudText += `Round ${window.mugGlobals.unityEpisodeCounter + 1}/${scoreUpdate.num_episodes}`;
     }
 
-    if (window.interactiveGymGlobals.unityScore !== null) {
+    if (window.mugGlobals.unityScore !== null) {
         if (hudText) hudText += ' | ';
-        hudText += `Score: ${window.interactiveGymGlobals.unityScore}`;
+        hudText += `Score: ${window.mugGlobals.unityScore}`;
     }
 
     $("#hudText").html(hudText);
@@ -1932,16 +1932,16 @@ socket.on("update_unity_score", function(scoreUpdate) {
 socket.on("unity_episode_end", function(episodeEndData) {
 
     // Update the HUD text to show the round progress and score
-    window.interactiveGymGlobals.unityEpisodeCounter++;
+    window.mugGlobals.unityEpisodeCounter++;
 
     let hudText = '';
     if (episodeEndData.num_episodes && episodeEndData.num_episodes > 1) {
-        hudText += `Round ${window.interactiveGymGlobals.unityEpisodeCounter + 1}/${episodeEndData.num_episodes}`;
+        hudText += `Round ${window.mugGlobals.unityEpisodeCounter + 1}/${episodeEndData.num_episodes}`;
     }
 
-    if (window.interactiveGymGlobals.unityScore !== null) {
+    if (window.mugGlobals.unityScore !== null) {
         if (hudText) hudText += ' | ';
-        hudText += `Score: ${window.interactiveGymGlobals.unityScore}`;
+        hudText += `Score: ${window.mugGlobals.unityScore}`;
     }
 
     $("#hudText").html(hudText);

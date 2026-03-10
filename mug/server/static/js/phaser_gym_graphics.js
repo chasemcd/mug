@@ -242,7 +242,7 @@ export function emitEpisodeData(sceneId, episodeNum) {
         scene_id: sceneId,
         episode_num: episodeNum,
         session_id: window.sessionId,
-        interactiveGymGlobals: window.interactiveGymGlobals
+        mugGlobals: window.mugGlobals
     });
 }
 

@@ -135,7 +135,7 @@ Custom HTML pages for non-interactive content.
 
 - Full HTML/CSS/JavaScript support
 - Can disable "Continue" button until form completion
-- Data can be collected via custom callbacks
+- Form data is automatically collected via ``element_ids``
 
 Scene Configuration
 -------------------
@@ -361,9 +361,31 @@ StartScene, EndScene, and StaticScene support full HTML:
         )
     )
 
-**Accessing form data:**
+**Collecting form data:**
 
-Use client callbacks to capture custom data (see :doc:`../guides/data_collection/callbacks`).
+To capture data from HTML form elements, add their ``id`` attributes to the scene's ``element_ids`` list. When the participant advances past the scene, MUG automatically reads the value of each listed element from the DOM and saves it to a CSV file at ``data/{experiment_id}/{scene_id}/{subject_id}.csv``.
+
+.. code-block:: python
+
+    scene = (
+        static_scene.StaticScene()
+        .scene(scene_id="survey")
+        .display(
+            scene_header="Quick Survey",
+            scene_body="""
+                <p>How much did you enjoy the game?</p>
+                <input type="range" id="enjoyment" min="1" max="7" value="4">
+
+                <p>Any comments?</p>
+                <textarea id="comments"></textarea>
+            """
+        )
+    )
+    scene.element_ids = ["enjoyment", "comments"]
+
+The built-in survey scene classes (e.g., ``OptionBoxesWithScalesAndTextBox``, ``ScalesAndTextBox``, ``MultipleChoice``) set ``element_ids`` automatically based on the form elements they generate. See ``mug/scenes/static_scene.py`` for available survey components.
+
+You can also store arbitrary client-side data by writing to the ``window.mugGlobals`` JavaScript object from within your ``scene_body`` HTML. These globals are synced to the server and saved alongside the form data as ``{subject_id}_globals.json``.
 
 Multi-Scene Experiments
 ------------------------
@@ -449,21 +471,21 @@ Common Patterns
 
 **Multiple Conditions:**
 
+Use ``RandomizeOrder`` with ``keep_n=1`` to randomly assign each participant to one condition. Each condition is a separate scene, and the wrapper selects one at random when the Stager builds the scene sequence for a participant:
+
 .. code-block:: python
 
-    # Assign conditions in your experiment script
-    import random
+    from mug.scenes import scene, stager
 
-    condition = random.choice(["A", "B"])
-
-    game_scene = (
-        gym_scene.GymScene()
-        .scene(
-            scene_id=f"game_condition_{condition}",
-            experiment_config={"condition": condition}
-        )
-        # Different config based on condition
-    )
+    stager = stager.Stager(scenes=[
+        start_scene,
+        scene.RandomizeOrder(
+            [condition_a_scene, condition_b_scene, condition_c_scene],
+            keep_n=1,  # Each participant sees exactly one
+        ),
+        survey_scene,
+        end_scene,
+    ])
 
 Next Steps
 ----------
