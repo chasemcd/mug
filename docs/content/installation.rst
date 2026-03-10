@@ -186,7 +186,6 @@ Next Steps
 Now that you have MUG installed, you can:
 
 1. Follow the :doc:`quick_start` to create your first experiment
-2. Explore the :doc:`tutorials/basic_single_player` for a complete walkthrough
-3. Check out the :doc:`examples/index` to see what's possible
+2. Check out the :doc:`examples/index` to see what's possible
 
 For questions or issues, visit the `GitHub repository <https://github.com/chasemcd/interactive-gym>`_ or open an issue.

@@ -43,15 +43,22 @@ Basic Usage
 - Last scene must be an ``EndScene``
 - Any number of scenes can be between them
 
-With Options
-^^^^^^^^^^^^
+With Scene Wrappers
+^^^^^^^^^^^^^^^^^^^
+
+Scenes can be wrapped with ``RandomizeOrder`` or ``RepeatScene`` to control ordering and repetition:
 
 .. code-block:: python
 
+    from mug.scenes import scene
+
     experiment_stager = stager.Stager(
-        scenes=[start_scene, game_scene, end_scene],
-        stager_id="my_experiment_v1",              # Optional: identifier
-        allow_scene_skipping=False,                 # Optional: prevent skipping
+        scenes=[
+            start_scene,
+            scene.RandomizeOrder([game_a, game_b], keep_n=1),
+            survey_scene,
+            end_scene,
+        ],
     )
 
 How Staging Works
@@ -447,4 +454,4 @@ Next Steps
 
 - **Learn about scenes**: :doc:`scenes` for detailed scene documentation
 - **Explore examples**: :doc:`../examples/index` for complete experiments
-- **Data collection**: :doc:`../guides/data_collection/automatic_logging`
+- **Learn about rendering**: :doc:`surface_api`

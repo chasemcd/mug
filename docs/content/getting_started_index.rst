@@ -26,7 +26,7 @@ Next Steps
 After completing the installation and quick start guides:
 
 - **Learn the architecture**: :doc:`core_concepts/index` explains how MUG works
-- **Explore examples**: :doc:`examples` shows complete experiments
+- **Explore examples**: :doc:`examples/index` shows complete experiments
 - **Read detailed guides**: Browse the Core Concepts section for in-depth documentation
 
 .. toctree::
