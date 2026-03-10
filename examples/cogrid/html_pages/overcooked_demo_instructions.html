@@ -37,13 +37,13 @@
 
 <script>
 
-    if (typeof window.interactiveGymGlobals === 'undefined') {
-            window.interactiveGymGlobals = {};
+    if (typeof window.mugGlobals === 'undefined') {
+            window.mugGlobals = {};
         }
 
     // Initialize the values to 0
-    window.interactiveGymGlobals.delivery_act_reward = 0;
-    window.interactiveGymGlobals.onion_in_pot_reward = 0;
+    window.mugGlobals.delivery_act_reward = 0;
+    window.mugGlobals.onion_in_pot_reward = 0;
 
 
     // Initialize fixedControls with random values
@@ -67,35 +67,35 @@
     }
 
     // Initialize fixedControls with random values
-    window.interactiveGymGlobals.fixedControls = generateRandomPair();
+    window.mugGlobals.fixedControls = generateRandomPair();
 
     // Initialize hiddenControls with random values
-    window.interactiveGymGlobals.hiddenControls = generateRandomPair();
+    window.mugGlobals.hiddenControls = generateRandomPair();
 
         // Function to randomly select initial radio values and highlight selected buttons
     function setFixedValues() {
-        const deliveryValue = window.interactiveGymGlobals.fixedControls.delivery_act_reward;
-        const onionValue = window.interactiveGymGlobals.fixedControls.onion_in_pot_reward;
+        const deliveryValue = window.mugGlobals.fixedControls.delivery_act_reward;
+        const onionValue = window.mugGlobals.fixedControls.onion_in_pot_reward;
 
         // Set delivery radio and highlight
         const deliveryRadio = document.querySelector(`input[name="delivery_act_reward"][value="${deliveryValue}"]`);
         deliveryRadio.checked = true;
         deliveryRadio.nextElementSibling.style.background = 'rgba(0, 123, 255, 0.3)';
-        window.interactiveGymGlobals.delivery_act_reward = deliveryValue;
+        window.mugGlobals.delivery_act_reward = deliveryValue;
 
         // Set onion radio and highlight
         const onionRadio = document.querySelector(`input[name="onion_in_pot_reward"][value="${onionValue}"]`);
         onionRadio.checked = true;
         onionRadio.nextElementSibling.style.background = 'rgba(0, 123, 255, 0.3)';
-        window.interactiveGymGlobals.onion_in_pot_reward = onionValue;
+        window.mugGlobals.onion_in_pot_reward = onionValue;
     }
 
     // Function to randomly select initial radio values and highlight selected buttons
     function setHiddenValues() {
-        const deliveryValue = window.interactiveGymGlobals.hiddenControls.delivery_act_reward;
-        const onionValue = window.interactiveGymGlobals.hiddenControls.onion_in_pot_reward;
-        window.interactiveGymGlobals.delivery_act_reward = deliveryValue;
-        window.interactiveGymGlobals.onion_in_pot_reward = onionValue;
+        const deliveryValue = window.mugGlobals.hiddenControls.delivery_act_reward;
+        const onionValue = window.mugGlobals.hiddenControls.onion_in_pot_reward;
+        window.mugGlobals.delivery_act_reward = deliveryValue;
+        window.mugGlobals.onion_in_pot_reward = onionValue;
     }
 
 

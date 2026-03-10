@@ -95,7 +95,7 @@ export class RemoteGame {
         const env = await this.pyodide.runPythonAsync(`
 ${futureImports.join('\n')}
 import js
-mug_globals = dict(js.window.interactiveGymGlobals.object_entries())
+mug_globals = dict(js.window.mugGlobals.object_entries())
 
 ${restCode}
 env
@@ -138,7 +138,7 @@ env
         const env = await this.pyodide.runPythonAsync(`
 ${reinitFutureImports.join('\n')}
 import js
-mug_globals = dict(js.window.interactiveGymGlobals.object_entries())
+mug_globals = dict(js.window.mugGlobals.object_entries())
 print("Globals on initialization: ", mug_globals)
 ${reinitRestCode}
 env

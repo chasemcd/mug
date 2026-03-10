@@ -385,7 +385,7 @@ To capture data from HTML form elements, add their ``id`` attributes to the scen
 
 The built-in survey scene classes (e.g., ``OptionBoxesWithScalesAndTextBox``, ``ScalesAndTextBox``, ``MultipleChoice``) set ``element_ids`` automatically based on the form elements they generate. See ``mug/scenes/static_scene.py`` for available survey components.
 
-You can also store arbitrary client-side data by writing to the ``window.interactiveGymGlobals`` JavaScript object from within your ``scene_body`` HTML. These globals are synced to the server and saved alongside the form data as ``{subject_id}_globals.json``.
+You can also store arbitrary client-side data by writing to the ``window.mugGlobals`` JavaScript object from within your ``scene_body`` HTML. These globals are synced to the server and saved alongside the form data as ``{subject_id}_globals.json``.
 
 Multi-Scene Experiments
 ------------------------

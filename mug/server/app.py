@@ -42,7 +42,7 @@ class ParticipantSession:
 
     subject_id: str
     stager_state: dict | None  # Serialized stager state (current_scene_index, etc.)
-    mug_globals: dict  # Client-side metadata (interactiveGymGlobals)
+    mug_globals: dict  # Client-side metadata (mugGlobals)
     current_scene_id: str | None  # ID of the current scene
     socket_id: str | None  # Current socket ID if connected
     is_connected: bool  # Whether currently connected
@@ -351,8 +351,8 @@ def register_subject(data):
     if ADMIN_AGGREGATOR:
         ADMIN_AGGREGATOR.log_activity("join", subject_id, {"socket_id": sid})
 
-    # Get client-sent interactiveGymGlobals (if any)
-    client_globals = data.get("interactiveGymGlobals", {})
+    # Get client-sent mugGlobals (if any)
+    client_globals = data.get("mugGlobals", {})
 
     # Send server session ID to client
     flask_socketio.emit(
@@ -403,7 +403,7 @@ def register_subject(data):
         flask_socketio.emit(
             "session_restored",
             {
-                "interactiveGymGlobals": merged_globals,
+                "mugGlobals": merged_globals,
                 "scene_id": existing_session.current_scene_id,
                 "is_restored": True,
             },
@@ -453,7 +453,7 @@ def request_current_scene(data):
 @socketio.on("sync_globals")
 def sync_globals(data):
     """
-    Receive and store interactiveGymGlobals from the client.
+    Receive and store mugGlobals from the client.
 
     This is called periodically by the client to keep the server-side
     session state in sync with client-side globals.
@@ -464,7 +464,7 @@ def sync_globals(data):
     if subject_id is None:
         return
 
-    client_globals = data.get("interactiveGymGlobals", {})
+    client_globals = data.get("mugGlobals", {})
     session = PARTICIPANT_SESSIONS.get(subject_id)
 
     if session is not None:
@@ -934,7 +934,7 @@ def on_unity_episode_end(data):
 
     # TODO(chase): Make sure the globals are propagated here
     # so we don't have to fill it.
-    wrapped_data["interactiveGymGlobals"] = {}
+    wrapped_data["mugGlobals"] = {}
 
     data_emission(wrapped_data)
 
@@ -1025,8 +1025,8 @@ def data_emission(data):
 
     subject_id = get_subject_id_from_session_id(flask.request.sid)
 
-    # Sync interactiveGymGlobals to session for persistence
-    client_globals = data.get("interactiveGymGlobals", {})
+    # Sync mugGlobals to session for persistence
+    client_globals = data.get("mugGlobals", {})
     session = PARTICIPANT_SESSIONS.get(subject_id)
     if session is not None and client_globals:
         session.mug_globals.update(client_globals)
@@ -1064,7 +1064,7 @@ def data_emission(data):
         df.to_csv(filename, index=False)
 
         with open(globals_filename, "w") as f:
-            json.dump(data["interactiveGymGlobals"], f)
+            json.dump(data["mugGlobals"], f)
 
 
 @socketio.on("emit_remote_game_data")
@@ -1073,8 +1073,8 @@ def receive_remote_game_data(data):
 
     subject_id = get_subject_id_from_session_id(flask.request.sid)
 
-    # Sync interactiveGymGlobals to session for persistence
-    client_globals = data.get("interactiveGymGlobals", {})
+    # Sync mugGlobals to session for persistence
+    client_globals = data.get("mugGlobals", {})
     session = PARTICIPANT_SESSIONS.get(subject_id)
     if session is not None and client_globals:
         session.mug_globals.update(client_globals)
@@ -1124,7 +1124,7 @@ def receive_remote_game_data(data):
     if CONFIG.save_experiment_data:
         df.to_csv(filename, index=False)
         with open(globals_filename, "w") as f:
-            json.dump(data["interactiveGymGlobals"], f)
+            json.dump(data["mugGlobals"], f)
 
     # Also get the current scene for this participant and save the metadata
     # TODO(chase): this has issues where the data may not be received before the
@@ -1172,8 +1172,8 @@ def receive_episode_data(data):
                        f"using client-provided subject_id={subject_id}")
     episode_num = data.get("episode_num", 0)
 
-    # Sync interactiveGymGlobals to session for persistence
-    client_globals = data.get("interactiveGymGlobals", {})
+    # Sync mugGlobals to session for persistence
+    client_globals = data.get("mugGlobals", {})
     session = PARTICIPANT_SESSIONS.get(subject_id)
     if session is not None and client_globals:
         session.mug_globals.update(client_globals)
@@ -1224,7 +1224,7 @@ def receive_episode_data(data):
     # Also save globals (overwrite each episode to keep latest)
     globals_filename = f"data/{CONFIG.experiment_id}/{data['scene_id']}/{subject_id}_globals.json"
     with open(globals_filename, "w") as f:
-        json.dump(data.get("interactiveGymGlobals", {}), f)
+        json.dump(data.get("mugGlobals", {}), f)
 
     return {"status": "ok", "saved": True}
 
@@ -2664,7 +2664,7 @@ def on_disconnect():
     - If player is in a different scene (e.g., survey), remove quietly without notification
 
     Session persistence:
-    - Saves stager state and interactiveGymGlobals to PARTICIPANT_SESSIONS
+    - Saves stager state and mugGlobals to PARTICIPANT_SESSIONS
     - Allows session restoration if participant reconnects with same URL
     """
     global PYODIDE_COORDINATOR, GROUP_MANAGER, PARTICIPANT_SESSIONS

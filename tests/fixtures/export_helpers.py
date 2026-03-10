@@ -62,10 +62,10 @@ def get_subject_ids_from_pages(page1: Page, page2: Page) -> tuple:
     """
     # Try various locations where subject ID/name may be stored
     subject1 = page1.evaluate(
-        "() => window.subjectName || window.interactiveGymGlobals?.subjectName || window.subjectId || null"
+        "() => window.subjectName || window.mugGlobals?.subjectName || window.subjectId || null"
     )
     subject2 = page2.evaluate(
-        "() => window.subjectName || window.interactiveGymGlobals?.subjectName || window.subjectId || null"
+        "() => window.subjectName || window.mugGlobals?.subjectName || window.subjectId || null"
     )
 
     if not subject1:
