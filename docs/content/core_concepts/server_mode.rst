@@ -715,4 +715,5 @@ Next Steps
 ----------
 
 - **Browser-side execution**: :doc:`pyodide_mode`
-- **See multiplayer example**: :doc:`../examples/overcooked_multiplayer`
+- **Server-authoritative example**: :doc:`../examples/overcooked_multiplayer`
+- **Client-side P2P example**: :doc:`../examples/overcooked_client_side`

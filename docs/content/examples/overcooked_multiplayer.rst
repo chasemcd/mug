@@ -1,35 +1,23 @@
 Overcooked: Human-Human (Server-Side)
 ======================================
 
-Multi-player coordination experiment where two human players collaborate to prepare and deliver dishes. The environment runs server-side with synchronized gameplay and matchmaking.
+Two-player cooperative experiment where the environment runs on the server and streams render state to both participants' browsers. The browsers are thin clients that display the game and capture input. Use server-authoritative mode when your environment has compiled dependencies, requires GPU inference, or cannot run in Pyodide.
 
-.. raw:: html
-
-   <div style="background-color: #f0f0f0; border: 2px solid #ff0000; padding: 10px; margin: 10px 0;">
-   <h3 style="color: #ff0000;">⚠️ Warning</h3>
-
-.. warning::
-    Server-side multi-player experiments are currently being refactored to be more robust. They are currently out of date. For the current status on multi-human
-    experiments, please see `Issue #14 <https://github.com/chasemcd/interactive-gym/issues/14>`_.
-.. raw:: html
-
-   </div>
-
-
+For the client-side (P2P/GGPO) version of this example, see :doc:`overcooked_client_side`.
 
 Overview
 --------
 
-Two participants work together as chefs to complete cooking tasks in various kitchen layouts. This example demonstrates server-side execution with player matchmaking, synchronized multi-player gameplay, and collaborative task completion.
+Two human participants collaborate as chefs to prepare and deliver dishes in the Cramped Room kitchen layout. The server runs the environment, collects actions from both browsers, steps the environment, renders the state, and streams it back to both clients.
 
 **What you'll learn:**
 
-- Server-side multi-player coordination experiments
+- Server-authoritative multiplayer configuration
+- Using ``.multiplayer(mode="server_authoritative")``
+- Using ``.environment()`` for server-side environment creation
 - Player matchmaking and waitroom functionality
-- Synchronized gameplay between two browsers
-- Tutorial scenes for participant onboarding
-- Randomized layout selection for between-subjects designs
-- Complex sprite-based rendering with atlases
+- Sprite-based rendering with atlas preloading
+- Post-game feedback surveys
 
 Features Demonstrated
 ---------------------
@@ -38,17 +26,17 @@ Features Demonstrated
    :widths: 30 70
 
    * - **Execution Mode**
-     - Server-side (required for multiplayer)
+     - Server-authoritative
    * - **Players**
      - 2 humans
    * - **Environment**
-     - CoGrid Overcooked with 5 kitchen layouts
+     - CoGrid Overcooked (Cramped Room layout)
    * - **Rendering**
      - Sprite atlases with tile-based rendering
    * - **Input**
      - Arrow keys + action keys (W, Q)
    * - **Matchmaking**
-     - Automatic player pairing in waitroom
+     - Automatic FIFO player pairing in waitroom
    * - **Complexity**
      - Advanced
 
@@ -67,25 +55,24 @@ Prerequisites
 
    .. code-block:: bash
 
-       pip install git+https://github.com/chasemcd/cogrid.git
+       pip install cogrid==0.2.1
 
 Running the Example
 -------------------
 
-From the repository root, run as a module:
+From the repository root:
 
 .. code-block:: bash
 
-    python -m examples.cogrid.overcooked_human_human_server_side
+    python -m examples.cogrid.overcooked_server_auth --experiment-id my_experiment
 
 Then:
 
-1. **Open two browser windows** to http://localhost:5702
-2. **Wait for matchmaking** - Both players must connect before game starts
-3. **Read instructions** on the start screen
-4. **Complete tutorial** - Each player practices solo to learn controls
-5. **Play main game** - Collaborate with partner on one randomly-selected layout
-6. **Provide feedback** - Complete survey about teammate collaboration
+1. **Open two browser windows** to http://localhost:5703
+2. **Read instructions** on the start screen
+3. **Wait for partner** - Both players wait in the lobby until matched
+4. **Play together** - Collaborate on the Cramped Room layout for 5 episodes
+5. **Provide feedback** - Complete survey about your partner
 
 **Controls:**
 
@@ -99,177 +86,98 @@ File Structure
 .. code-block:: text
 
     cogrid/
-    ├── overcooked_human_human_server_side.py  # Main experiment file
+    ├── overcooked_server_auth.py       # Main experiment file
     ├── scenes/
-    │   └── scenes.py                          # Scene definitions
-    └── overcooked_utils.py                    # Rendering functions
+    │   └── scenes.py                   # Shared scene definitions
+    ├── environments/
+    │   └── cramped_room_environment_initialization_hh.py  # Environment setup
+    └── overcooked_utils.py             # Rendering and HUD functions
+
+Architecture
+------------
+
+In server-authoritative mode, the server is the single source of truth. Both browsers are thin clients:
+
+.. code-block:: text
+
+    Browser 1 (Thin client)       Server                   Browser 2 (Thin client)
+    ───────────────────────      ──────                   ───────────────────────
+    Display game state      ←    Environment instance  →   Display game state
+    Capture input           →    Collect both actions  ←   Capture input
+                                 env.step(actions)
+                                 env.render()
+                                 Stream state to both
+
+The server:
+
+1. **Matches players** when two connect to the waitroom
+2. **Creates the environment** using the ``env_creator`` function
+3. **Runs the game loop** at the configured FPS (30)
+4. **Collects actions** from both browsers each frame
+5. **Steps the environment** with both actions simultaneously
+6. **Renders and streams** the visual state to both browsers
+7. **Saves data** at the end of each episode
 
 Experiment Flow
 ---------------
 
-The experiment uses a Stager to manage scene progression for both players:
-
 .. code-block:: python
 
-    from mug.scenes import stager, scene
     from examples.cogrid.scenes import scenes as oc_scenes
+    from mug.scenes import stager, static_scene
 
     stager = stager.Stager(
         scenes=[
-            oc_scenes.start_scene,           # Welcome and instructions
-            oc_scenes.tutorial_gym_scene,    # Solo practice (each player)
-            scene.RandomizeOrder(            # Random layout selection
-                scenes=[
-                    oc_scenes.cramped_room_human_human,
-                    oc_scenes.counter_circuit_human_human,
-                    oc_scenes.forced_coordination_human_human,
-                    oc_scenes.asymmetric_advantages_human_human,
-                    oc_scenes.coordination_ring_human_human,
-                ],
-            ),
-            oc_scenes.feedback_scene,        # Survey
-            oc_scenes.end_scene,             # Thank you
+            hh_start_scene,                 # Welcome and instructions
+            server_auth_scene,              # Server-authoritative gameplay
+            oc_scenes.multiplayer_feedback_scene,  # Partner survey
+            oc_scenes.end_scene,            # Completion code
         ]
     )
 
 Each participant pair experiences:
 
 1. **Start Scene** - Instructions and consent
-2. **Tutorial** - Solo practice in a simple layout (each player individually)
-3. **One Random Layout** - Collaboration with human partner
-4. **Feedback Survey** - Questions about the collaboration
-5. **End Scene** - Thank you message
+2. **Gameplay** - 5 episodes of collaboration on the Cramped Room layout
+3. **Feedback Survey** - Questions about partner effectiveness
+4. **End Scene** - Completion code
 
-Serving Assets
-^^^^^^^^^^^^^^
+Scene Configuration
+-------------------
 
-Because sprites and images live outside the MUG package (under
-``examples/cogrid/assets/``), the experiment config registers them with
-``static_files()`` so the server can serve them to the browser:
+The server-authoritative scene differs from the P2P version in three key ways:
 
-.. code-block:: python
-
-    config = (
-        experiment_config.ExperimentConfig()
-        .experiment(stager=stager, experiment_id="overcooked_hh")
-        .hosting(port=5702, host="0.0.0.0")
-        .static_files(directories=[
-            "examples/cogrid/assets",
-            "examples/shared/assets",   # shared keyboard icon images
-        ])
-    )
-
-    app.run(config)
-
-Each directory is served at a URL that matches its filesystem path — the same
-path used in Python rendering code and HTML ``<img>`` tags.
-
-Kitchen Layouts
----------------
-
-Five layouts with different coordination challenges:
-
-**Cramped Room**
-  Small kitchen requiring tight coordination and turn-taking
-
-**Asymmetric Advantages**
-  Asymmetric layout where players have different optimal roles
-
-**Counter Circuit**
-  Large kitchen with circular counter layout promoting specialization
-
-**Forced Coordination**
-  Layout requiring specific division of labor to succeed
-
-**Coordination Ring**
-  Ring-shaped kitchen with central cooking area
-
-Each layout tests different aspects of human-human coordination and task allocation.
-
-Multi-Player Scene Configuration
----------------------------------
-
-Scene Creation for Two Humans
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-Each layout scene is configured for two human players:
+1. **``.multiplayer(mode="server_authoritative")``** instead of P2P mode
+2. **``.environment(env_creator=..., env_config=...)``** since the server creates the environment
+3. **No ``.runtime()``** call since there is no Pyodide
 
 .. code-block:: python
 
     from mug.scenes import gym_scene
     from mug.configurations import configuration_constants
 
-    # Action definitions
-    MoveUp = 0
-    MoveDown = 1
-    MoveLeft = 2
-    MoveRight = 3
-    PickupDrop = 4
-    Toggle = 5
-    Noop = 6
-
-    # Both players are human
     HUMAN_HUMAN_POLICY_MAPPING = {
         0: configuration_constants.PolicyTypes.Human,
         1: configuration_constants.PolicyTypes.Human,
     }
 
-    action_mapping = {
-        "ArrowLeft": MoveLeft,
-        "ArrowRight": MoveRight,
-        "ArrowUp": MoveUp,
-        "ArrowDown": MoveDown,
-        "w": PickupDrop,
-        "W": PickupDrop,
-        "q": Toggle,
-        "Q": Toggle,
-    }
+    def _create_overcooked_env(**kwargs):
+        """Lazy env_creator — imports cogrid only when the server creates the env."""
+        from examples.cogrid.environments.cramped_room_environment_initialization_hh import (
+            OvercookedEnv, overcooked_config,
+        )
+        return OvercookedEnv(config=overcooked_config, **kwargs)
 
-    cramped_room_human_human = (
+    server_auth_scene = (
         gym_scene.GymScene()
-        .scene(scene_id="cramped_room_hh", experiment_config={})
+        .scene(scene_id="cramped_room_server_auth", experiment_config={})
         .policies(policy_mapping=HUMAN_HUMAN_POLICY_MAPPING)
-        .rendering(
-            fps=30,
-            env_to_state_fn=overcooked_utils.overcooked_env_to_render_fn,
-            assets_to_preload=overcooked_utils.overcooked_preload_assets_spec(),
-            hud_text_fn=overcooked_utils.hud_text_fn,
-            game_width=overcooked_utils.TILE_SIZE * 5,
-            game_height=overcooked_utils.TILE_SIZE * 4,
-            background="#e6b453",
-        )
-        .gameplay(
-            default_action=Noop,
-            action_mapping=action_mapping,
-            num_episodes=3,
-            max_steps=30 * 60,  # 60 seconds at 30 FPS
-            input_mode=configuration_constants.InputModes.SingleKeystroke,
-        )
         .environment(
-            env_creator=make_cramped_room_env,
-            env_name="cramped_room",
-        )
-    )
-
-Tutorial Scene
---------------
-
-Solo practice before playing with partner:
-
-.. code-block:: python
-
-    tutorial_gym_scene = (
-        gym_scene.GymScene()
-        .scene(scene_id="overcooked_tutorial", experiment_config={})
-        .policies(
-            policy_mapping={
-                0: configuration_constants.PolicyTypes.Human,
-            },
+            env_creator=_create_overcooked_env,
+            env_config={"render_mode": "mug"},
         )
         .rendering(
             fps=30,
-            env_to_state_fn=overcooked_utils.overcooked_env_to_render_fn,
-            assets_to_preload=overcooked_utils.overcooked_preload_assets_spec(),
             hud_text_fn=overcooked_utils.hud_text_fn,
             game_width=overcooked_utils.TILE_SIZE * 5,
             game_height=overcooked_utils.TILE_SIZE * 4,
@@ -278,134 +186,79 @@ Solo practice before playing with partner:
         .gameplay(
             default_action=Noop,
             action_mapping=action_mapping,
-            num_episodes=1,
-            max_steps=1000,
+            num_episodes=5,
+            max_steps=1350,
             input_mode=configuration_constants.InputModes.SingleKeystroke,
         )
         .content(
-            scene_header="Overcooked Tutorial",
-            scene_body_filepath="examples/cogrid/html_pages/overcooked_controls.html",
-            in_game_scene_body="""
-                <center>
-                <p>Use arrow keys and W to pick up/drop. Try delivering a dish!</p>
-                </center>
-            """,
+            scene_header="Overcooked - Server Authoritative",
+            scene_body="...",
+            game_page_html_fn=overcooked_utils.overcooked_game_page_header_fn,
+            in_game_scene_body="...",
         )
-        .environment(
-            env_creator=make_tutorial_env,
-            env_name="tutorial",
-        )
+        .multiplayer(mode="server_authoritative")
     )
 
-The tutorial allows each participant to independently learn:
+Key Configuration Details
+^^^^^^^^^^^^^^^^^^^^^^^^^
 
-- Movement with arrow keys
-- Picking up onions with W
-- Dropping onions in pots with W
-- Picking up plates
-- Delivering completed dishes
+``.environment()`` — Server-Side Environment Creation
+""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
-Rendering System
-----------------
-
-Sprite Atlases
-^^^^^^^^^^^^^^
-
-Overcooked uses texture atlases for efficient rendering. Atlases are registered
-via the ``Surface`` API, which handles loading sprite sheets and their
-accompanying JSON frame maps.
-
-In client-side/Pyodide environments, atlases are registered directly on the
-``Surface`` instance:
+In server-authoritative mode, the server creates the environment. The ``env_creator`` is a callable that returns a Gymnasium-compatible environment:
 
 .. code-block:: python
 
-    from mug.rendering import Surface
-
-    ASSET_PATH = "examples/cogrid/assets/overcooked/sprites"
-
-    self.surface = Surface(width=WIDTH, height=HEIGHT)
-    self.surface.register_atlas(
-        "terrain",
-        img_path=f"{ASSET_PATH}/terrain.png",
-        json_path=f"{ASSET_PATH}/terrain.json",
-    )
-    self.surface.register_atlas(
-        "chefs",
-        img_path=f"{ASSET_PATH}/chefs.png",
-        json_path=f"{ASSET_PATH}/chefs.json",
-    )
-    self.surface.register_atlas(
-        "objects",
-        img_path=f"{ASSET_PATH}/objects.png",
-        json_path=f"{ASSET_PATH}/objects.json",
+    .environment(
+        env_creator=_create_overcooked_env,
+        env_config={"render_mode": "mug"},
     )
 
-For server-authoritative scenes that need to tell the browser which atlases to
-preload, the ``overcooked_preload_assets_spec()`` helper returns a list of atlas
-descriptors:
+Using a lazy creator function (as shown above) avoids importing heavy dependencies at module load time, which is useful when the example is imported for inspection.
+
+``.multiplayer(mode="server_authoritative")``
+"""""""""""""""""""""""""""""""""""""""""""""
+
+This single parameter switches the scene to server-authoritative mode:
 
 .. code-block:: python
 
-    ASSET_PATH = "examples/cogrid/assets/overcooked/sprites"
+    .multiplayer(mode="server_authoritative")
 
-    def overcooked_preload_assets_spec() -> list[dict]:
-        return [
-            {"object_type": "atlas_spec", "name": "terrain", "img_path": f"{ASSET_PATH}/terrain.png", "atlas_path": f"{ASSET_PATH}/terrain.json"},
-            {"object_type": "atlas_spec", "name": "chefs", "img_path": f"{ASSET_PATH}/chefs.png", "atlas_path": f"{ASSET_PATH}/chefs.json"},
-            {"object_type": "atlas_spec", "name": "objects", "img_path": f"{ASSET_PATH}/objects.png", "atlas_path": f"{ASSET_PATH}/objects.json"},
-        ]
+When ``mode="server_authoritative"``:
 
-Tile-Based Coordinates
-^^^^^^^^^^^^^^^^^^^^^^
+- The environment runs on the server, not in Pyodide
+- No ``get_state()``/``set_state()`` required (no rollback)
+- No GGPO — the server is the single source of truth
+- Both browsers receive the same rendered state each frame
+- Every input round-trips through the server
 
-.. code-block:: python
+**No ``.runtime()``** — since there is no Pyodide, you do not call ``.runtime()``. Dependencies are installed on the server.
 
-    TILE_SIZE = 45
-
-    def get_x_y(pos: tuple[int, int], game_height: int, game_width: int):
-        col, row = pos
-        x = row * TILE_SIZE / game_width
-        y = col * TILE_SIZE / game_height
-        return x, y
-
-Static vs Dynamic Rendering
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-Permanent objects (counters, stacks, delivery zones) are rendered once:
+Experiment Configuration
+^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: python
 
-    def overcooked_env_to_render_fn(env, config):
-        render_objects = []
+    experiment_config = (
+        experiment_config.ExperimentConfig()
+        .experiment(stager=stager, experiment_id=args.experiment_id)
+        .hosting(port=args.port, host="0.0.0.0")
+        .static_files(directories=[
+            "examples/cogrid/assets",
+            "examples/shared/assets",
+        ])
+    )
 
-        # Static objects rendered only on first frame
-        if env.t == 0:
-            render_objects += generate_counter_objects(env, config)
-            render_objects += generate_delivery_areas(env, config)
-            render_objects += generate_static_tools(env, config)
+    app.run(experiment_config)
 
-        # Dynamic objects every frame
-        render_objects += generate_agent_sprites(env, config)
-        render_objects += generate_objects(env, config)
+Serving Assets
+""""""""""""""
 
-        return [obj.as_dict() for obj in render_objects]
-
-HUD Display
-^^^^^^^^^^^
-
-.. code-block:: python
-
-    def hud_text_fn(game):
-        score = int(list(game.episode_rewards.values())[0])
-        time_left = (game.env.max_steps - game.tick_num) / game.config.fps
-        return f"Score: {score:03d}   |    Time Left: {time_left:.1f}s"
-
-How It Works
-------------
+Because sprites and images live outside the MUG package (under ``examples/cogrid/assets/``), the experiment config registers them with ``.static_files()`` so the server can serve them to the browser. Each directory is served at a URL that matches its filesystem path.
 
 Server-Side Multiplayer Flow
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+-----------------------------
 
 .. code-block:: text
 
@@ -423,43 +276,14 @@ Server-Side Multiplayer Flow
     10. Display state      ←    Send to both       →   10. Display state
     (Repeat 4-10)
 
-The server coordinates both players and ensures synchronized gameplay.
-
-Matchmaking and Waitroom
-^^^^^^^^^^^^^^^^^^^^^^^^^
-
-When the first player connects:
-
-.. code-block:: text
-
-    Player 1                    Server
-    ────────                    ──────
-
-    1. Connect to server   →    2. Create waitroom
-                           ←    3. Show "Waiting for partner..."
-    4. Wait
-
-When the second player connects:
-
-.. code-block:: text
-
-    Player 2                    Server                  Player 1
-    ────────                    ──────                  ────────
-
-    1. Connect            →     2. Match with P1
-                          →     3. Start experiment →   Start game
-    Start game            ←     4. Send start signal
-
-Both players proceed through scenes together, with synchronized scene transitions.
-
 Synchronized Gameplay
 ^^^^^^^^^^^^^^^^^^^^^
 
 During gameplay:
 
-1. **Action Collection**: Server waits for actions from both players
+1. **Action Collection**: Server waits for actions from both players each frame
 2. **Simultaneous Step**: Environment steps with both actions at once
-3. **State Broadcasting**: Same rendered state sent to both browsers
+3. **State Broadcasting**: Rendered state sent to both browsers
 4. **Frame Synchronization**: Both players see identical game state
 
 This ensures:
@@ -468,44 +292,37 @@ This ensures:
 - Both players always see the same game state
 - Fair gameplay with no timing advantages
 
+Latency Considerations
+^^^^^^^^^^^^^^^^^^^^^^
+
+In server-authoritative mode, every input round-trips through the server. A player close to the server has lower latency than a player farther away. For experiments where equal responsiveness matters, you can add input delay:
+
+.. code-block:: python
+
+    .multiplayer(
+        mode="server_authoritative",
+        input_delay=2,  # ~66ms at 30fps
+    )
+
+This adds a fixed delay for all players, equalizing perceived latency regardless of network distance.
+
 Data Collection
 ---------------
 
-MUG automatically tracks for both players:
+Server-authoritative mode automatically logs:
 
-- Each player's observations
-- Actions taken by both players
+- Each player's actions per frame
 - Shared team reward (dishes delivered)
 - Episode score and time
 - Timestamped event logs
 - Individual player metrics
 
+Data is saved server-side at the end of each episode.
+
 Feedback Survey
 ^^^^^^^^^^^^^^^
 
-The experiment includes a post-game survey:
-
-.. code-block:: python
-
-    feedback_scene = (
-        static_scene.ScalesAndTextBox(
-            scale_questions=[
-                "My teammate was helpful.",
-                "I enjoyed working with my teammate.",
-                "My teammate and I coordinated well.",
-                "I understood my teammate's intentions.",
-            ],
-            scale_labels=[
-                ["Strongly Disagree", "Neutral", "Strongly Agree"],
-                ["Strongly Disagree", "Neutral", "Strongly Agree"],
-                ["Strongly Disagree", "Neutral", "Strongly Agree"],
-                ["Strongly Disagree", "Neutral", "Strongly Agree"],
-            ],
-            text_box_header="Please describe your experience working with your teammate.",
-            scale_size=7,
-        )
-        .scene(scene_id="feedback_scene", experiment_config={})
-    )
+The experiment includes a post-game survey asking about partner effectiveness, enjoyment, contribution, and whether the partner seemed human. See the source at ``examples/cogrid/scenes/scenes.py`` for the full survey configuration.
 
 Research Applications
 ---------------------
@@ -521,11 +338,47 @@ This example is designed for research on:
 **Task Allocation**
   Analyze how pairs divide labor spontaneously
 
-**Learning and Adaptation**
-  Track strategy evolution across episodes
+**Environments with Complex Dependencies**
+  Run experiments with environments that can't run in Pyodide (compiled extensions, GPU inference)
 
-**Layout Effects**
-  Compare coordination difficulty across kitchen designs
+Comparison with Client-Side (P2P)
+----------------------------------
 
-**Individual Differences**
-  Study personality and skill effects on teamwork
+.. list-table::
+   :header-rows: 1
+   :widths: 30 35 35
+
+   * - Feature
+     - Server-Authoritative - This Example
+     - Client-Side (P2P)
+   * - **Environment runs**
+     - On the server
+     - In each browser (Pyodide)
+   * - **Perceived latency**
+     - Higher (input round-trips server)
+     - Low (local sim + GGPO)
+   * - **Server load**
+     - Proportional to active games
+     - Minimal (matchmaking only)
+   * - **Dependencies**
+     - Any Python code
+     - Pure Python only
+   * - **Requires get_state/set_state**
+     - No
+     - Yes
+   * - **Initial load time**
+     - Instant
+     - 30-90s (Pyodide startup)
+   * - **Single source of truth**
+     - Yes (server)
+     - No (eventual consistency via GGPO)
+
+For the client-side version of this example, see :doc:`overcooked_client_side`.
+
+Next Steps
+----------
+
+- **Client-side version**: :doc:`overcooked_client_side` for P2P multiplayer with GGPO
+- **Human-AI version**: :doc:`overcooked_human_ai` for single-player with trained AI partners
+- **Server mode details**: :doc:`../core_concepts/server_mode` for deployment, scaling, and TURN configuration
+- **Multiplayer quickstart**: :doc:`../quick_start_multiplayer` for a simpler P2P example

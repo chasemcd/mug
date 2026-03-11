@@ -485,4 +485,5 @@ Next Steps
 - **Full slime volleyball example**: See ``examples/slime_volleyball/`` for the complete implementation including rendering, human-AI, and human-human configurations
 - **State sync API**: See ``docs/multiplayer_state_sync_api.md`` for the full API documentation
 - **Server mode details**: :doc:`core_concepts/server_mode` covers server-authoritative deployment, TURN setup, and scaling
-- **Overcooked multiplayer**: ``examples/cogrid/`` demonstrates a more complex multiplayer environment with sprites and atlas rendering
+- **Overcooked multiplayer (P2P)**: :doc:`examples/overcooked_client_side` demonstrates P2P multiplayer with GGPO, latency-aware matchmaking, and sprite rendering
+- **Overcooked multiplayer (server)**: :doc:`examples/overcooked_multiplayer` demonstrates server-authoritative multiplayer

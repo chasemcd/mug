@@ -11,7 +11,7 @@ All examples are located in the `examples/ <https://github.com/chasemcd/interact
 - Demonstration of specific MUG features
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
    :hidden:
 
    mountain_car

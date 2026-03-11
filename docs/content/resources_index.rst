@@ -32,11 +32,16 @@ Example Comparison
      - Client
      - Advanced
      - Human-AI coordination, SP and BS policies, randomized layouts
+   * - :doc:`examples/overcooked_client_side`
+     - Human-Human
+     - Client (P2P/GGPO)
+     - Advanced
+     - P2P multiplayer, GGPO rollback, latency-aware matchmaking
    * - :doc:`examples/overcooked_multiplayer`
      - Human-Human
      - Server
      - Advanced
-     - Multi-player coordination, matchmaking, synchronized gameplay
+     - Server-authoritative multiplayer, synchronized gameplay
    * - :doc:`examples/footsies`
      - Human-AI
      - Client (WebGL)
@@ -89,8 +94,11 @@ Examples must be run as modules from the repository root to ensure correct asset
        # Overcooked (Human vs AI, client-side)
        python -m examples.cogrid.overcooked_human_ai_client_side
 
-       # Overcooked (Human vs Human, server-side)
-       python -m examples.cogrid.overcooked_human_human_server_side
+       # Overcooked (Human vs Human, client-side P2P)
+       python -m examples.cogrid.overcooked_human_human_multiplayer --experiment-id test
+
+       # Overcooked (Human vs Human, server-authoritative)
+       python -m examples.cogrid.overcooked_server_auth --experiment-id test
 
        # Footsies
        python -m examples.footsies.footsies_experiment
@@ -118,5 +126,6 @@ Each example directory typically contains:
    examples/mountain_car
    examples/slime_volleyball
    examples/overcooked_human_ai
+   examples/overcooked_client_side
    examples/overcooked_multiplayer
    examples/footsies
