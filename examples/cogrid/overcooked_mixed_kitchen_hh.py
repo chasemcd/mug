@@ -10,7 +10,7 @@ synchronization. Each client runs its own Pyodide environment in the
 browser.
 
 Usage:
-    python -m examples.cogrid.overcooked_mixed_kitchen_human_human_multiplayer
+    python -m examples.cogrid.overcooked_mixed_kitchen_hh
 
 Then open two browser windows to http://localhost:5703 and play together!
 """

@@ -87,10 +87,10 @@ Examples must be run as modules from the repository root to ensure correct asset
        python -m examples.slime_volleyball.human_ai_pyodide
 
        # Overcooked (Human vs AI, client-side)
-       python -m examples.cogrid.overcooked_human_ai_client_side
+       python -m examples.cogrid.overcooked_hai
 
-       # Overcooked (Human vs Human, server-side)
-       python -m examples.cogrid.overcooked_human_human_server_side
+       # Overcooked (Human vs Human, multiplayer)
+       python -m examples.cogrid.overcooked_cramped_room_hh
 
        # Footsies
        python -m examples.footsies.footsies_experiment

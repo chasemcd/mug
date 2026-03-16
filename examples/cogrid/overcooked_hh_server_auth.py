@@ -14,7 +14,7 @@ copy of the environment. Server-authoritative mode is useful when:
 - You want to prevent client-side cheating
 
 Usage:
-    python -m examples.cogrid.overcooked_server_auth --experiment-id my_experiment
+    python -m examples.cogrid.overcooked_hh_server_auth --experiment-id my_experiment
 
 Then open two browser windows to http://localhost:5703 and play together!
 """

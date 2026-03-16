@@ -63,7 +63,7 @@ From the repository root, run as a module:
 
 .. code-block:: bash
 
-    python -m examples.cogrid.overcooked_human_ai_client_side
+    python -m examples.cogrid.overcooked_hai
 
 Then:
 
@@ -85,7 +85,7 @@ File Structure
 .. code-block:: text
 
     cogrid/
-    ├── overcooked_human_ai_client_side.py  # Main experiment file
+    ├── overcooked_hai.py                   # Main experiment file
     ├── scenes/
     │   └── scenes.py                       # Scene definitions
     └── overcooked_utils.py                 # Rendering functions
