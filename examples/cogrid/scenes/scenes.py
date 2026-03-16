@@ -277,6 +277,75 @@ cramped_room_human_human = (
     )
 )
 
+# Mixed Kitchen scene: 5x5 grid with onions, tomatoes, and an order queue.
+# The order bar adds 30px above the 5x5 tile grid.
+MIXED_KITCHEN_ORDER_BAR_HEIGHT = 45
+
+cramped_mixed_kitchen_human_human = (
+    gym_scene.GymScene()
+    .scene(scene_id="cramped_mixed_kitchen_hh", experiment_config={})
+    .policies(policy_mapping=HUMAN_HUMAN_POLICY_MAPPING)
+    .rendering(
+        fps=30,
+        hud_text_fn=overcooked_utils.hud_text_fn,
+        game_width=overcooked_utils.TILE_SIZE * 5,
+        game_height=overcooked_utils.TILE_SIZE * 5 + MIXED_KITCHEN_ORDER_BAR_HEIGHT,
+        background="#e6b453",
+    )
+    .assets(
+        assets_to_preload=overcooked_utils.overcooked_preload_assets_spec(),
+    )
+    .gameplay(
+        default_action=Noop,
+        action_mapping=action_mapping,
+        num_episodes=5,
+        max_steps=4000,
+        input_mode=configuration_constants.InputModes.SingleKeystroke,
+    )
+    .content(
+        scene_header="Overcooked - Mixed Kitchen Multiplayer",
+        scene_body="<center><p>"
+        "You'll now play with another human participant! "
+        "Please wait in the lobby for your partner to join. "
+        "<br><br> "
+        "In this kitchen you can prepare <b>onion soup</b> or <b>tomato soup</b>. "
+        "Watch the <b>order bar</b> at the top of the screen to see which soups "
+        "are requested. Orders expire over time, so act quickly! "
+        "<br><br>"
+        "Work together to fulfill as many orders as possible. "
+        "</p></center>",
+        game_page_html_fn=overcooked_utils.overcooked_game_page_header_fn,
+        in_game_scene_body="""
+        <center>
+        <p>
+        Use the arrow keys <img src="examples/shared/assets/keys/arrow_keys_2.png" alt="Keyboard arrow keys" height="24" width="20" style="vertical-align:middle;">
+        to control your chef and press <img src="examples/shared/assets/keys/icons8-w-key-50.png" alt="W key" height="24" width="24" style="vertical-align:middle;"> to pick up and
+        drop objects. Watch the order bar for which soup to prepare &mdash; <span style="color:#FFC832;font-weight:bold;">gold = onion</span>,
+        <span style="color:#DC3232;font-weight:bold;">red = tomato</span>. Coordinate with your partner!
+        </p>
+        </center>
+        <br><br>
+        """,
+    )
+    .waitroom(
+        timeout=300000,  # 5 minutes
+        timeout_message="Sorry, we could not find enough players for this study. Please return the HIT now. You will be paid through a Compensation HIT.",
+    )
+    .runtime(
+        environment_initialization_code_filepath="examples/cogrid/environments/cramped_mixed_kitchen_environment_initialization_hh.py",
+        packages_to_install=["numpy", "cogrid==0.2.2", "opencv-python"],
+    )
+    .multiplayer(
+        input_delay=3,
+        matchmaker=FIFOMatchmaker(
+            max_p2p_rtt_ms=100,
+        ),
+        hide_lobby_count=True,
+        partner_disconnect_message="Your partner disconnected. The task will end here and you will be compensated for your performance so far. Please submit the completion code below.",
+        partner_disconnect_show_completion_code=True,
+    )
+)
+
 # Feedback scene for multiplayer
 multiplayer_feedback_scene = (
     static_scene.ScalesAndTextBox(
