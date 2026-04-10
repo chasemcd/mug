@@ -4,7 +4,7 @@
 ![PyPI - Downloads](https://img.shields.io/pypi/dm/multi-user-gymnasium)
 
 <div align="center">
-  <img src="docs/content/mug_logo.png" alt="MUG logo" width="300"/>
+  <img src="https://raw.githubusercontent.com/chasemcd/mug/main/docs/content/mug_logo.png" alt="MUG logo" width="300"/>
 </div>
 
 Multi-User Gymnasium (MUG) converts [Gymnasium](https://gymnasium.farama.org/) and [PettingZoo](https://pettingzoo.farama.org/) environments into browser-based, multi-user experiments. It enables Python simulation environments to be accessed online, allowing humans to interact with them individually or alongside AI agents and other participants.
@@ -14,6 +14,11 @@ Multi-User Gymnasium (MUG) converts [Gymnasium](https://gymnasium.farama.org/) a
 ```bash
 pip install multi-user-gymnasium
 ```
+
+## Documentation 
+
+Full documentation is available at [multi-user-gymnasium.readthedocs.io](https://multi-user-gymnasium.readthedocs.io/).
+
 
 ## Quick Start
 
@@ -57,14 +62,6 @@ config = (
 
 app.run(config)
 ```
-
-## Documentation
-
-Full documentation is available at [mug.readthedocs.io](https://mug.readthedocs.io/).
-
-- [Getting Started](https://mug.readthedocs.io/en/latest/content/quick_start.html)
-- [Core Concepts](https://mug.readthedocs.io/en/latest/content/core_concepts/index.html)
-- [Examples](https://mug.readthedocs.io/en/latest/content/examples/index.html)
 
 ## Acknowledgements
 
