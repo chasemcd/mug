@@ -33,6 +33,9 @@ test = [
     "pytest-playwright>=0.6",
     "pytest-timeout>=2.3",
 ]
+docs = [
+    "zensical",
+]
 
 [tool.setuptools.packages.find]
 include = ["mug*"]

@@ -1,5 +1,0 @@
-ipython
-myst-parser
-sphinx-book-theme
-sphinx-copybutton
-sphinx-rtd-theme==2.0.0

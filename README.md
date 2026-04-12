@@ -4,7 +4,7 @@
 ![PyPI - Downloads](https://img.shields.io/pypi/dm/multi-user-gymnasium)
 
 <div align="center">
-  <img src="docs/content/mug_logo.png" alt="MUG logo" width="300"/>
+  <img src="docs/assets/images/mug_logo.png" alt="MUG logo" width="300"/>
 </div>
 
 Multi-User Gymnasium (MUG) converts [Gymnasium](https://gymnasium.farama.org/) and [PettingZoo](https://pettingzoo.farama.org/) environments into browser-based, multi-user experiments. It enables Python simulation environments to be accessed online, allowing humans to interact with them individually or alongside AI agents and other participants.

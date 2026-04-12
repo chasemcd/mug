@@ -1,0 +1,71 @@
+site_name: MUG
+site_url: https://interactive-gym.readthedocs.io
+repo_url: https://github.com/chasemcd/interactive-gym
+repo_name: chasemcd/interactive-gym
+
+theme:
+  name: material
+  logo: assets/images/mug_logo.png
+  favicon: assets/images/mug_logo.png
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.sections
+    - navigation.expand
+    - content.code.copy
+    - toc.follow
+
+extra_css:
+  - assets/css/custom.css
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - toc:
+      permalink: true
+  - attr_list
+  - md_in_html
+  - tables
+
+plugins:
+  - search
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Installation: getting-started/installation.md
+    - "Quick Start: Single Player": getting-started/quick-start.md
+    - "Quick Start: Multiplayer": getting-started/quick-start-multiplayer.md
+  - Core Concepts:
+    - Scenes: core-concepts/scenes.md
+    - Stager: core-concepts/stager.md
+    - Surface API: core-concepts/surface-api.md
+    - Rendering System: core-concepts/rendering-system.md
+    - Browser-Side Execution: core-concepts/pyodide-mode.md
+    - Server Mode: core-concepts/server-mode.md
+  - Examples:
+    - Overview: examples/index.md
+    - Mountain Car: examples/mountain-car.md
+    - Slime Volleyball: examples/slime-volleyball.md
+    - "Overcooked: Overview": examples/overcooked.md
+    - "Overcooked: Human-AI": examples/overcooked-human-ai.md
+    - "Overcooked: Client-Side P2P": examples/overcooked-client-side.md
+    - "Overcooked: Server-Side": examples/overcooked-multiplayer.md
+    - Footsies: examples/footsies.md
