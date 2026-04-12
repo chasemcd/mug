@@ -4,16 +4,10 @@ This directory contains MUG examples using the CoGrid Overcooked environment. Th
 
 ## Prerequisites
 
-Install the CoGrid Overcooked environment:
+Install CoGrid:
 
 ```bash
-pip install git+https://github.com/chasemcd/cogrid.git
-```
-
-Or install a specific version:
-
-```bash
-pip install cogrid==0.2.1
+pip install cogrid
 ```
 
 ## Examples

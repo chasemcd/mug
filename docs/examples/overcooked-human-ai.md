@@ -41,7 +41,7 @@ Participants work alongside an AI chef to complete cooking tasks in various kitc
 2. Install the CoGrid Overcooked environment:
 
     ```bash
-    pip install git+https://github.com/chasemcd/cogrid.git
+    pip install cogrid
     ```
 
 ## Running the Example

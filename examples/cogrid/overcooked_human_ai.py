@@ -27,7 +27,7 @@ from mug.server import app
 stager = stager.Stager(
     scenes=[
         oc_scenes.start_scene,
-        oc_scenes.tutorial_gym_scene,
+        # oc_scenes.tutorial_gym_scene,
         oc_scenes.cramped_room_0,
         oc_scenes.feedback_scene,
         oc_scenes.end_scene,
@@ -46,7 +46,9 @@ if __name__ == "__main__":
         experiment_config.ExperimentConfig()
         .experiment(stager=stager, experiment_id="overcooked_test")
         .hosting(port=args.port, host="0.0.0.0")
-        .static_files(directories=["examples/cogrid/assets", "examples/shared/assets"])
+        .static_files(
+            directories=["examples/cogrid/assets", "examples/shared/assets"]
+        )
     )
 
     app.run(experiment_config)

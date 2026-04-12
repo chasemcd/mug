@@ -7,3 +7,25 @@ img {
 img[alt="MUG Logo"] {
     background-color: transparent !important;
 }
+
+/* Tabbed content: faint background so the panel stands out while scrolling */
+.tabbed-set {
+    background-color: var(--md-code-bg-color);
+    border-radius: 0.2rem;
+    padding: 0.4rem 0.8rem 0.2rem;
+    margin: 1em 0;
+}
+
+.tabbed-set > .tabbed-content {
+    padding: 0 0.4rem;
+}
+
+/* Nested code fences inherit a slightly different shade so they remain distinct */
+.tabbed-set .highlight {
+    background-color: var(--md-default-bg-color);
+    border-radius: 0.15rem;
+}
+
+[data-md-color-scheme="slate"] .tabbed-set {
+    background-color: rgba(255, 255, 255, 0.04);
+}

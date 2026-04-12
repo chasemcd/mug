@@ -42,7 +42,7 @@ Two human participants collaborate as chefs to prepare and deliver dishes in the
 2. Install the CoGrid Overcooked environment:
 
     ```bash
-    pip install cogrid==0.2.1
+    pip install cogrid
     ```
 
 ## Running the Example
