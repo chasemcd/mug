@@ -24,7 +24,7 @@ pip install multi-user-gymnasium
 - **Same environment, training to deployment.** Run user experiments in the browser against the exact same simulation environments you use to train your AI agents without any rewrites or ports.
 - **In-browser execution.** Python environments and AI policies can run client-side for zero-latency experiences for participants. Heavier environments---or those that can't be compiled to run in the browser---can be run on the server.
 - **Multi-human Experiments.** Built-in networking, rollback netcode, and waiting rooms for multi-participant experiments.
-- **Experiment orchestration.** Scene flow, participant management, and data collection out of the box.
+- **Experiment orchestration.** Scene flow, [participant management, and data collection](https://multi-user-gymnasium.readthedocs.io/en/latest/core-concepts/participants-and-data/) out of the box.
 - **Extensive customizability.** Advanced hooks and configuration for custom rendering, matchmaking, scene logic, and more.
 
 For full explanations of each feature, see the [documentation](https://multi-user-gymnasium.readthedocs.io/).

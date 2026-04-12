@@ -56,6 +56,7 @@ nav:
   - Core Concepts:
     - Scenes: core-concepts/scenes.md
     - Stager: core-concepts/stager.md
+    - Participants & Data Collection: core-concepts/participants-and-data.md
     - Surface API: core-concepts/surface-api.md
     - Rendering System: core-concepts/rendering-system.md
     - Browser-Side Execution: core-concepts/pyodide-mode.md
