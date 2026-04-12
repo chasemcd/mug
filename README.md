@@ -9,23 +9,27 @@
 
 Multi-User Gymnasium (MUG) converts [Gymnasium](https://gymnasium.farama.org/) and [PettingZoo](https://pettingzoo.farama.org/) environments into browser-based, multi-user experiments. It enables Python simulation environments to be accessed online, allowing humans to interact with them individually or alongside AI agents and other participants.
 
-<div align="center">
-  <img src="docs/assets/images/overcooked_example.apng" alt="Overcooked human-AI demo" width="600"/>
-</div>
-
 ## Installation
 
 ```bash
 pip install multi-user-gymnasium
 ```
 
-## Documentation
+<div align="center">
+  <img src="docs/assets/images/overcooked_example.apng" alt="Overcooked human-AI demo" width="600"/>
+</div>
 
-Full documentation is available at [multi-user-gymnasium.readthedocs.io](https://multi-user-gymnasium.readthedocs.io/).
+## What does MUG offer?
 
-- [Getting Started](https://multi-user-gymnasium.readthedocs.io/en/latest/content/quick_start.html)
-- [Core Concepts](https://multi-user-gymnasium.readthedocs.io/en/latest/content/core_concepts/index.html)
-- [Examples](https://multi-user-gymnasium.readthedocs.io/en/latest/content/examples/index.html)
+- **Same environment, training to deployment.** Run user experiments in the browser against the exact same simulation environments you use to train your AI agents without any rewrites or ports.
+- **In-browser execution.** Python environments and AI policies can run client-side for zero-latency experiences for participants. Heavier environments---or those that can't be compiled to run in the browser---can be run on the server.
+- **Multi-human Experiments.** Built-in networking, rollback netcode, and waiting rooms for multi-participant experiments.
+- **Experiment orchestration.** Scene flow, participant management, and data collection out of the box.
+- **Extensive customizability.** Advanced hooks and configuration for custom rendering, matchmaking, scene logic, and more.
+
+For full explanations of each feature, see the [documentation](https://multi-user-gymnasium.readthedocs.io/).
+
+
 
 ## Acknowledgements
 
