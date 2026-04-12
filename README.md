@@ -10,9 +10,7 @@
 Multi-User Gymnasium (MUG) converts [Gymnasium](https://gymnasium.farama.org/) and [PettingZoo](https://pettingzoo.farama.org/) environments into browser-based, multi-user experiments. It enables Python simulation environments to be accessed online, allowing humans to interact with them individually or alongside AI agents and other participants.
 
 <div align="center">
-  <video src="docs/assets/images/OvercookedDemo.webm" autoplay loop muted playsinline width="600">
-    Your browser does not support the video tag.
-  </video>
+  <img src="docs/assets/images/overcooked_example.apng" alt="Overcooked human-AI demo" width="600"/>
 </div>
 
 ## Installation
