@@ -1,20 +1,81 @@
 """Pluggable data sinks for MUG experiment data.
 
-A ``DataSink`` is the backend MUG writes participant data to. The default
-``FilesystemSink`` writes CSV + JSON to ``data/{experiment_id}/{scene_id}/``.
-Users can plug in their own sinks (Postgres,
-SQLite, S3, etc.) by subclassing ``DataSink``.
+A :class:`DataSink` is the backend MUG writes participant data to. During an
+experiment MUG produces six kinds of records — scene metadata, static-scene
+form answers, per-episode gym data, ``mugGlobals`` snapshots, per-participant
+multiplayer metrics, and per-game aggregated multiplayer metrics. The sink
+receives each one through a correspondingly-named ``write_*`` method and
+decides where it goes (a file, a database, a cloud bucket, several of those
+at once, ...).
 
-Three patterns are supported:
+The default is :class:`FilesystemSink`, which writes CSV + JSON under
+``data/{experiment_id}/{scene_id}/`` — identical to pre-sink MUG. If you only
+want the defaults, you don't have to know this module exists.
 
-- **A single sink.** Drop-in replacement for the filesystem default.
-- **Fan-out.** ``MultiSink([FilesystemSink(), PostgresSink(...)])`` writes to
-  both. Keeps the filesystem as a durability floor even when using a database.
-- **Async drain with spillover.** ``AsyncSinkWrapper`` puts records on an
-  in-memory queue drained by a background thread, so slow sinks never block
-  the eventlet hub. If the queue fills up or the underlying sink raises,
-  records are spilled to ``data/{experiment_id}/.pending/{sink}/`` and replayed
-  later. No record is ever dropped.
+Three composition patterns cover almost every real use case:
+
+1. **A single sink.** Drop-in replacement for the filesystem default::
+
+       config.experiment(
+           stager=...,
+           experiment_id="mystudy",
+           data_sink=SQLiteSink("data/mystudy.db"),
+       )
+
+2. **Fan-out via** :class:`MultiSink`. Write every record to several sinks at
+   once. Failures in one child never affect the others. The canonical use is
+   to keep :class:`FilesystemSink` as a local **durability floor** alongside a
+   remote database, so you always have CSVs on disk even if the DB is down::
+
+       config.experiment(
+           ...,
+           data_sink=MultiSink([
+               FilesystemSink(),
+               AsyncSinkWrapper(SQLiteSink("data/mystudy.db")),
+           ]),
+       )
+
+3. **Async drain with spillover via** :class:`AsyncSinkWrapper`. Wrap any
+   sink that does network, disk, or database I/O. The wrapper returns control
+   to the socket handler as soon as a record is on an in-memory queue, and a
+   background thread drains the queue into the wrapped sink. This is **the
+   only safe way to plug a blocking DB driver into MUG** — eventlet's
+   cooperative scheduler will freeze every connected participant if a socket
+   handler blocks on psycopg2 or a similar C-extension client.
+
+   ``AsyncSinkWrapper`` guarantees that **no record is ever silently dropped**.
+   If the in-memory queue is full or the wrapped sink raises, the record is
+   serialized to ``data/{experiment_id}/.pending/{SinkName}/<stamp>.json``
+   (a "dead-letter" spillover), and a low-priority replay pass running on the
+   same drain thread keeps trying to push spilled records through the sink.
+   Successful replays delete the spillover file; failures leave it for the
+   next attempt. Permanent misconfigurations (wrong DSN, missing schema)
+   show up as a growing ``.pending/`` directory, not lost data.
+
+Writing your own sink
+---------------------
+
+Subclass :class:`DataSink` and implement whichever ``write_*`` methods you
+care about — the base class provides no-op defaults, so a sink that only
+captures episode data doesn't have to stub the rest. Sinks should:
+
+- Be threadsafe. When wrapped in :class:`AsyncSinkWrapper`, every write runs
+  on a background thread and may be called concurrently with another write.
+- Raise to signal failure. The async wrapper catches the exception and spills
+  the record for replay. Do **not** swallow errors silently — that bypasses
+  the no-data-loss guarantee.
+- Avoid retries in the hot path. Let the wrapper handle transient failures
+  via spillover. If you need DB-specific retries (deadlock handling,
+  connection re-establishment), scope them tightly and still raise if they
+  can't recover.
+
+The sink conformance suite in :mod:`tests.unit.test_data_sink` exercises
+every contract of the interface. Any custom sink can be run against it by
+subclassing the test classes — failing tests point at contract violations.
+
+See :mod:`mug.server.data_sinks.sqlite_sink` for a small reference
+implementation that's designed to be copied as a starting point for
+others like ``PostgresSink``, ``MongoSink``, ``S3Sink``.
 """
 
 from __future__ import annotations
@@ -37,16 +98,65 @@ logger = logging.getLogger(__name__)
 
 
 class DataSink(ABC):
-    """Abstract data sink.
+    """Abstract backend for MUG participant data.
 
-    Implement any subset of the ``write_*`` methods you care about. The base
-    class provides no-op defaults so a sink targeting only gym episode data
-    doesn't have to stub every method.
+    A sink receives every piece of data an experiment produces through six
+    ``write_*`` methods. Each method represents a distinct kind of record
+    that MUG emits at a specific point in a participant's lifecycle; see the
+    ``Participants & Data Collection`` guide in the docs for where each one
+    is produced on the server side.
 
-    All write methods must tolerate being called from a background thread.
-    Concrete sinks are responsible for their own retry logic — raise to signal
-    failure, and the async wrapper (if wrapping this sink) will spill the
-    record to disk for later replay.
+    **Partial implementations are expected.** The base class provides a
+    no-op default for every write method, so a sink that only cares about
+    episode time-series data can implement :meth:`write_episode` and leave
+    the rest alone. Any record sent to an un-implemented method is silently
+    accepted and dropped by the default — which is almost always what you
+    want. Pair the partial sink with a :class:`FilesystemSink` inside a
+    :class:`MultiSink` if you want the rest of the data on disk too.
+
+    Contract for implementers
+    -------------------------
+
+    - **Threading.** Every write method may be called from any thread. When
+      wrapped in :class:`AsyncSinkWrapper`, writes run on a dedicated drain
+      thread and must be safe to call concurrently with another pending
+      write. Most concrete sinks satisfy this by holding a
+      ``threading.Lock`` around a single connection object.
+
+    - **Error handling.** Raise an exception to signal failure. When the
+      sink is wrapped in :class:`AsyncSinkWrapper`, raising triggers the
+      dead-letter spillover path and the record will be retried later. Do
+      not swallow errors silently — that bypasses MUG's no-data-loss
+      guarantee. Logging a warning and re-raising is fine.
+
+    - **Retries.** Leave transient retry logic to the async wrapper's
+      spillover mechanism. Only build retries into a concrete sink for
+      errors the wrapper can't handle (e.g. a deadlock a single retry will
+      always resolve). Even then, raise if you can't recover.
+
+    - **Idempotency.** Spillover replay is at-least-once: under failure, a
+      spilled record may end up being delivered to the sink more than once.
+      Use primary keys, upserts, or deduplication if your backend can't
+      tolerate duplicates.
+
+    Minimal example
+    ---------------
+
+    A custom sink that only captures episode data and prints a one-line
+    summary for each one::
+
+        class PrintEpisodeSink(DataSink):
+            def write_episode(
+                self, experiment_id, scene_id, subject_id, episode_num, data
+            ):
+                n_steps = len(data.get("t", []))
+                print(f"{subject_id} | {scene_id} | ep{episode_num}: {n_steps} steps")
+
+        config.experiment(
+            stager=...,
+            experiment_id="demo",
+            data_sink=MultiSink([FilesystemSink(), PrintEpisodeSink()]),
+        )
     """
 
     def write_metadata(
@@ -56,7 +166,15 @@ class DataSink(ABC):
         subject_id: str,
         metadata: dict,
     ) -> None:
-        """Persist scene metadata (headers, form answers, completion codes)."""
+        """Persist scene metadata when a participant enters a scene.
+
+        Called once per scene activation, for every scene that has
+        ``should_export_metadata=True``. The ``metadata`` dict is the
+        serialized scene state — headers, element IDs, ``experiment_config``,
+        scene timestamps, and for ``CompletionCodeScene`` the generated
+        ``completion_code``. Exact keys vary by scene subclass; ``scene_id``,
+        ``scene_type``, and ``timestamp`` are always present.
+        """
 
     def write_static_scene_data(
         self,
@@ -65,7 +183,12 @@ class DataSink(ABC):
         subject_id: str,
         data: dict,
     ) -> None:
-        """Persist a static scene's end-of-scene data (form answers, etc.)."""
+        """Persist form answers emitted at the end of a static scene.
+
+        Called once when a participant advances out of a scene that collected
+        input (``TextBox``, ``OptionBoxes``, ``ScalesAndTextBox``, ...). The
+        ``data`` dict is a flat map of element ID → user-entered value.
+        """
 
     def write_episode(
         self,
@@ -77,10 +200,19 @@ class DataSink(ABC):
     ) -> None:
         """Persist one episode of gym gameplay.
 
+        Called at every episode boundary during a ``GymScene``. Episodes are
+        streamed one-at-a-time rather than batched at scene end — a long
+        scene would produce a payload too large to reliably transfer back
+        from the client otherwise.
+
         ``data`` is the decoded msgpack payload: a dict of lists where each
-        list is a per-timestep stream (observations, actions, rewards, ``t``,
-        ``terminateds``, etc.). Nested dicts may be present — sinks are free
-        to flatten them however they like.
+        list is a per-timestep stream (``t``, ``action``, ``reward``,
+        ``terminateds``, ``truncateds``, per-agent observations, ...). Nested
+        dicts may be present for multi-agent environments — sinks are free
+        to flatten them however they like. :class:`FilesystemSink` uses
+        ``flatten_dict`` with dotted column names, e.g. ``obs.player_0.pos``.
+
+        ``episode_num`` is 0-indexed within the scene.
         """
 
     def write_globals(
@@ -90,7 +222,14 @@ class DataSink(ABC):
         subject_id: str,
         mug_globals: dict,
     ) -> None:
-        """Persist the latest ``mugGlobals`` snapshot for this participant."""
+        """Persist the latest ``mugGlobals`` snapshot for a participant.
+
+        ``mugGlobals`` is the client-side key/value state that survives scene
+        transitions. This method is called alongside every static-scene and
+        episode write, so the snapshot is always fresh. Default behavior in
+        :class:`FilesystemSink` is to overwrite — you probably want the same
+        upsert-style semantics in a relational backend.
+        """
 
     def write_multiplayer_metrics(
         self,
@@ -99,7 +238,12 @@ class DataSink(ABC):
         subject_id: str,
         metrics: dict,
     ) -> None:
-        """Persist per-participant P2P / sync validation metrics."""
+        """Persist per-participant P2P / sync validation metrics.
+
+        Called once per participant per multiplayer scene when a game ends.
+        ``metrics`` contains connection info (P2P type, health), frame
+        hashes, desync events, input delivery stats, and rollback metrics.
+        """
 
     def write_aggregated_multiplayer_metrics(
         self,
@@ -112,24 +256,44 @@ class DataSink(ABC):
 
         Unlike the other ``write_*`` methods this is keyed by ``game_id``
         instead of ``subject_id`` because the aggregated record is per-game,
-        produced once when both players' individual metrics have arrived.
+        produced once when both players' individual metrics have arrived
+        and MUG has cross-checked hashes for desync detection.
         """
 
     def flush(self, timeout: float | None = None) -> bool:
-        """Block until all pending records are persisted or spilled.
+        """Block until every pending record is persisted or safely spilled.
 
-        Called at experiment-end scenes and on graceful shutdown. The default
-        is a no-op for synchronous sinks. Async wrappers override this to
-        drain their queues.
+        Called automatically at two points in the server lifecycle:
 
-        Returns ``True`` if the flush completed cleanly, ``False`` if it timed
-        out. The caller is expected to log and continue either way — a stuck
-        sink must never block participant completion.
+        1. **Terminal scenes.** When a participant advances into an
+           ``EndScene`` / ``CompletionCodeScene``, MUG flushes the sink with
+           a 30s timeout so the participant's data is persisted before they
+           see the completion screen and close the tab.
+        2. **Graceful shutdown.** The ``atexit`` hook flushes with a 10s
+           timeout then calls :meth:`close`.
+
+        For synchronous sinks there's nothing to flush, so the default is a
+        no-op that returns ``True`` immediately. :class:`AsyncSinkWrapper`
+        overrides this to drain its in-memory queue; spilled records survive
+        a missed flush and are replayed later.
+
+        :param timeout: Maximum seconds to wait for the flush to complete.
+            ``None`` means wait indefinitely. The caller is expected to
+            continue regardless of the return value — a stuck sink must
+            never block participant completion.
+        :returns: ``True`` if the flush completed cleanly, ``False`` if the
+            timeout was hit while records were still pending.
         """
         return True
 
     def close(self) -> None:
-        """Release any open resources. Called once on server shutdown."""
+        """Release any open resources. Called once on server shutdown.
+
+        The default is a no-op. Concrete sinks holding connections, file
+        handles, or background threads should override this to clean up.
+        Must not raise — if you can't close cleanly, log a warning and
+        return.
+        """
 
 
 # ---------------------------------------------------------------------------
@@ -138,11 +302,31 @@ class DataSink(ABC):
 
 
 class FilesystemSink(DataSink):
-    """Writes CSV + JSON files under ``{base_dir}/{experiment_id}/{scene_id}/``.
+    """The default sink: CSV + JSON files on local disk.
 
-    This is a lift-and-shift of the direct ``df.to_csv(...)`` / ``json.dump``
-    calls that used to live in ``mug/server/app.py``. Output layout is
-    identical to pre-sink MUG.
+    Writes every record under ``{base_dir}/{experiment_id}/{scene_id}/`` with
+    a filename keyed by ``subject_id`` (or ``game_id`` for aggregated P2P
+    metrics). The output layout is stable and is the format every MUG
+    example, analysis snippet, and doc page assumes::
+
+        {base_dir}/{experiment_id}/{scene_id}/
+            {subject_id}_metadata.json         # write_metadata
+            {subject_id}.csv                   # write_static_scene_data
+            {subject_id}_ep{N}.csv             # write_episode, one per episode
+            {subject_id}_globals.json          # write_globals
+            {subject_id}_multiplayer_metrics.json   # write_multiplayer_metrics
+            {game_id}_aggregated_metrics.json  # write_aggregated_multiplayer_metrics
+
+    Writes are synchronous and fast — no network, just local disk — so
+    this sink is safe to run directly inside a socketio handler without an
+    :class:`AsyncSinkWrapper` in front of it. It's also the canonical
+    "durability floor" of a :class:`MultiSink` stack: keeping
+    ``FilesystemSink`` in the stack means you always have a local copy of
+    every record, even if a remote sink downstream is misbehaving.
+
+    :param base_dir: Root directory for all output. Defaults to ``"data"``,
+        resolved relative to the process's current working directory.
+        Override to write elsewhere on disk.
     """
 
     def __init__(self, base_dir: str = "data"):
@@ -219,7 +403,14 @@ class FilesystemSink(DataSink):
 def _episode_dict_to_dataframe(data: dict) -> pd.DataFrame | None:
     """Convert a decoded episode payload into a padded DataFrame.
 
-    Returns ``None`` if the payload is empty (no timesteps to save).
+    Flattens any nested dict (e.g. per-agent observations) with
+    ``flatten_dict.flatten(reducer="dot")`` so the resulting CSV has one
+    column per leaf key, e.g. ``obs.player_0.pos``. Columns with shorter
+    lists are padded with ``None`` so every column has the same length and
+    ``pd.DataFrame`` construction succeeds.
+
+    Returns ``None`` if the payload is empty (no ``t`` key or an empty one),
+    signalling to the caller that there's nothing to write.
     """
     if not data or not data.get("t"):
         return None
@@ -242,22 +433,41 @@ def _episode_dict_to_dataframe(data: dict) -> pd.DataFrame | None:
 
 
 class MultiSink(DataSink):
-    """Fan-out to multiple sinks.
+    """Fan out every record to multiple child sinks.
 
-    Failures in one sink never affect the others. Each child sink sees every
-    write. Typical usage keeps ``FilesystemSink`` as the durability floor and
-    pairs it with one or more remote sinks::
+    Each write is dispatched to each child in the order they were supplied.
+    **Failures in one child do not affect the others**: exceptions are
+    caught, logged with the child's class name, and the dispatch continues
+    to the next child. This makes it safe to pair a robust local sink with
+    a potentially-flaky remote one — the local sink still gets the record
+    even if the remote one raises.
 
-        config.data_sink(MultiSink([
-            FilesystemSink(),
-            AsyncSinkWrapper(PostgresSink("postgres://...")),
-        ]))
+    The canonical pattern is to keep :class:`FilesystemSink` as the first
+    child (the "durability floor") and wrap any network-bound sink in
+    :class:`AsyncSinkWrapper`::
+
+        config.experiment(
+            stager=...,
+            experiment_id="mystudy",
+            data_sink=MultiSink([
+                FilesystemSink(),
+                AsyncSinkWrapper(PostgresSink("postgres://...")),
+            ]),
+        )
+
+    :meth:`flush` returns ``True`` only if **every** child flushed cleanly
+    within the timeout; otherwise it returns ``False`` but still attempts to
+    flush each child.
+
+    :param sinks: Iterable of :class:`DataSink` instances. Dispatch order
+        matches the iteration order; a list or tuple is the obvious choice.
     """
 
     def __init__(self, sinks: Iterable[DataSink]):
         self.sinks = list(sinks)
 
     def _each(self, method_name: str, *args, **kwargs):
+        """Dispatch ``method_name`` to every child, catching per-child errors."""
         for sink in self.sinks:
             try:
                 getattr(sink, method_name)(*args, **kwargs)
@@ -315,11 +525,22 @@ class MultiSink(DataSink):
 
 @dataclasses.dataclass
 class _SinkRecord:
-    """A single pending write, uniform across write_* method types.
+    """A single pending write queued inside :class:`AsyncSinkWrapper`.
 
-    ``kwargs`` is the full argument dict passed to the underlying sink's
-    method, so the record is self-contained and doesn't need to know which
-    kwargs a given method takes (subject_id vs game_id, episode_num, etc.).
+    Records are uniform across every ``write_*`` method type: the method
+    name and the full kwargs dict are stored together so the drain worker
+    can dispatch without caring whether the specific call expected
+    ``subject_id`` or ``game_id`` or ``episode_num``. This also keeps the
+    on-disk spillover JSON format simple — a record is the method name,
+    its kwargs, and a retry counter.
+
+    :ivar method: Name of the ``DataSink`` method to invoke when this
+        record is drained (e.g. ``"write_metadata"``).
+    :ivar kwargs: Full kwarg dict to pass to that method. Must be
+        JSON-serializable so the record can survive a spillover write.
+    :ivar attempts: How many times this record has been dispatched to the
+        wrapped sink without success. Incremented each time the record is
+        spilled after a failure, for diagnostics.
     """
 
     method: str  # "write_metadata", "write_episode", ...
@@ -337,19 +558,96 @@ class _SinkRecord:
 class AsyncSinkWrapper(DataSink):
     """Run any sink on a background thread with a bounded queue.
 
-    Handler calls return immediately after enqueueing. A drain thread pops
-    records off the queue and dispatches them to the wrapped sink.
+    Wrap any :class:`DataSink` that performs network, disk, or database I/O
+    before handing it to MUG. Incoming ``write_*`` calls push a record onto
+    an in-memory :class:`queue.Queue` and return immediately. A dedicated
+    daemon thread drains the queue and dispatches each record to the
+    wrapped sink.
 
-    **No record is ever dropped.** If the queue is full or the wrapped sink
-    raises, the record is serialized to
-    ``{spillover_dir}/{experiment_id}/.pending/{sink_class}/<uuid>.json``.
-    A low-priority replay pass picks spilled records up the next time the
-    drain thread is idle and tries to push them through the sink. Successful
-    replays delete the spillover file; failures leave it for the next attempt.
+    Why the wrapper exists
+    ----------------------
 
-    This means the only thing that can grow unboundedly is disk usage, and
-    only when the underlying sink is permanently broken (wrong DSN, bad
-    credentials, missing schema). Those cases log a warning on every retry.
+    MUG runs under eventlet, a cooperative scheduler. Any socket handler
+    that blocks on network I/O — for example, a synchronous psycopg2 call
+    to Postgres — freezes the eventlet hub and stalls **every** connected
+    participant until the call returns. Even a single slow DB write can
+    cause cascading waitroom timeouts and scene-transition failures across
+    the whole experiment. :class:`AsyncSinkWrapper` is the escape hatch:
+    handlers only ever interact with a Python ``queue.put_nowait`` call,
+    which is fast and non-blocking, and all the potentially-blocking work
+    happens on a thread that eventlet isn't watching.
+
+    Rule of thumb: wrap any sink whose ``write_*`` methods might take more
+    than ~5 ms. Local file writes are fine unwrapped. Anything over a
+    network — Postgres, MySQL, HTTP APIs, cloud storage — should be
+    wrapped.
+
+    No record is ever silently dropped
+    ----------------------------------
+
+    Two things can go wrong under load: the queue can fill up faster than
+    the drain thread can empty it, or the wrapped sink can raise on an
+    individual write. Both cases are handled the same way — the record is
+    spilled to disk:
+
+    1. ``_enqueue`` catches ``queue.Full`` and calls :meth:`_spill`.
+    2. ``_dispatch`` catches any exception from the wrapped sink's
+       ``write_*`` method and calls :meth:`_spill`.
+
+    Spilled records land at
+    ``{spillover_base_dir}/{experiment_id}/.pending/{sink_name}/<ts>_<uuid>.json``
+    as one-file-per-record JSON. A low-priority replay pass runs between
+    queue drains (rate-limited to ``replay_interval_s``), walks the
+    ``.pending/`` directory, and tries each spillover file against the
+    wrapped sink. Successful replays delete the file; failures leave it
+    for the next attempt.
+
+    The net effect: the only thing that can grow unboundedly is disk
+    usage in ``.pending/``, and only when the wrapped sink is permanently
+    broken (wrong DSN, missing schema, bad credentials). Those cases log
+    a warning on every failure, so they surface instead of silently
+    losing data.
+
+    Replay is at-least-once
+    -----------------------
+
+    Under some failure modes (e.g. the sink succeeds but then the process
+    crashes before the spillover file is deleted), a record may be
+    replayed even after a successful previous delivery. Sinks that can't
+    tolerate duplicates should use primary keys or upserts.
+
+    Composition with ``MultiSink``
+    ------------------------------
+
+    You almost always want to combine ``AsyncSinkWrapper`` with
+    :class:`MultiSink` and :class:`FilesystemSink`::
+
+        data_sink=MultiSink([
+            FilesystemSink(),                              # local durability floor
+            AsyncSinkWrapper(SQLiteSink("data/mystudy.db")),
+        ])
+
+    ``FilesystemSink`` gives you unconditional local CSVs for free. The
+    async wrapper adds the DB sink asynchronously without any risk of it
+    blocking the eventlet hub.
+
+    :param sink: The concrete :class:`DataSink` to wrap. All writes will
+        be dispatched to this sink from the drain thread.
+    :param max_queue_size: Maximum number of pending records held in
+        memory before new records spill to disk. Higher values use more
+        RAM but absorb larger bursts without touching the filesystem.
+        ``10_000`` is a sensible default for research-scale experiments —
+        even at ~100 records/sec that's 100 seconds of headroom.
+    :param spillover_base_dir: Root directory under which dead-letter
+        spillover files are written. Defaults to ``"data"`` so spillover
+        lives alongside the :class:`FilesystemSink` output.
+    :param replay_interval_s: Minimum seconds between spillover replay
+        passes. Rate-limiting prevents a broken sink from pinning a CPU
+        spinning on failing retries. Defaults to 5 seconds.
+    :param sink_name: Human-readable name used in log lines and as the
+        spillover subdirectory. Defaults to the wrapped sink's class name,
+        which is usually fine unless you have two instances of the same
+        sink class in a single :class:`MultiSink`.
     """
 
     def __init__(
@@ -375,7 +673,14 @@ class AsyncSinkWrapper(DataSink):
     # -- lifecycle -------------------------------------------------------
 
     def start(self) -> None:
-        """Spawn the drain worker. Idempotent."""
+        """Spawn the background drain worker. Idempotent and lazy.
+
+        Called automatically on the first ``write_*`` invocation, so
+        wrapping a sink doesn't consume a thread until records actually
+        start flowing. Safe to call manually if you want the worker
+        running before the first write (for example, to get the startup
+        log line deterministically).
+        """
         if self._worker_started:
             return
         self._worker_started = True
@@ -388,6 +693,14 @@ class AsyncSinkWrapper(DataSink):
         logger.info(f"[AsyncSink] Started drain worker for {self._sink_name}")
 
     def close(self) -> None:
+        """Signal the drain worker to stop and close the wrapped sink.
+
+        Called once on server shutdown via ``atexit``. Sets the shutdown
+        event, joins the worker with a 5-second timeout (so a wedged
+        replay doesn't hold up server exit), and then calls ``close`` on
+        the wrapped sink. Any exception from the wrapped sink's close is
+        caught and logged so shutdown always proceeds.
+        """
         self._shutdown.set()
         if self._worker is not None:
             self._worker.join(timeout=5.0)
@@ -397,7 +710,21 @@ class AsyncSinkWrapper(DataSink):
             logger.warning(f"[AsyncSink] {self._sink_name}.close raised: {e}")
 
     def flush(self, timeout: float | None = None) -> bool:
-        """Block until the in-memory queue is empty (or timeout)."""
+        """Block until the in-memory queue is empty (or the timeout hits).
+
+        This only drains the in-memory queue — it does **not** wait for
+        the spillover replay pass to finish. Records still in
+        ``.pending/`` at flush time are considered "safely persisted" for
+        the purposes of this call (they'll survive a crash and replay on
+        next startup), so the flush can return quickly even in the
+        presence of a temporarily-broken sink.
+
+        :param timeout: Maximum seconds to wait. ``None`` waits forever.
+        :returns: ``True`` if the queue drained within the timeout,
+            ``False`` if records were still pending when the timeout hit.
+            A warning is logged in the latter case; the caller should
+            continue either way.
+        """
         deadline = time.monotonic() + timeout if timeout else None
         while not self._queue.empty():
             if deadline and time.monotonic() >= deadline:
@@ -502,6 +829,11 @@ class AsyncSinkWrapper(DataSink):
     # -- internals -------------------------------------------------------
 
     def _enqueue(self, record: _SinkRecord) -> None:
+        """Add a record to the in-memory queue, spilling on queue-full.
+
+        Lazily starts the drain worker on the first call so wrappers don't
+        consume threads until actual work arrives.
+        """
         if not self._worker_started:
             self.start()
         try:
@@ -514,6 +846,13 @@ class AsyncSinkWrapper(DataSink):
             self._spill(record)
 
     def _drain_loop(self) -> None:
+        """Main drain worker loop — runs on a dedicated daemon thread.
+
+        Pops records from the queue and dispatches them to the wrapped
+        sink. When the queue is empty, opportunistically tries a spillover
+        replay pass (rate-limited internally) and loops back. Exits cleanly
+        when the ``_shutdown`` event is set.
+        """
         while not self._shutdown.is_set():
             try:
                 record = self._queue.get(timeout=0.1)
@@ -525,6 +864,13 @@ class AsyncSinkWrapper(DataSink):
             self._queue.task_done()
 
     def _dispatch(self, record: _SinkRecord) -> None:
+        """Invoke the wrapped sink's write method for one record.
+
+        On exception, logs a warning, increments the record's ``attempts``
+        counter, and spills to disk for later replay. Never re-raises —
+        failures are always converted into spillover so the drain loop
+        keeps running.
+        """
         method = getattr(self.sink, record.method)
         try:
             method(**record.kwargs)
@@ -537,6 +883,12 @@ class AsyncSinkWrapper(DataSink):
             self._spill(record)
 
     def _spillover_dir(self, experiment_id: str) -> str:
+        """Path to the dead-letter directory for a given experiment.
+
+        Created on demand. Scoped by both ``experiment_id`` and
+        ``sink_name`` so multiple async sinks inside a single ``MultiSink``
+        don't collide.
+        """
         path = os.path.join(
             self.spillover_base_dir, experiment_id, ".pending", self._sink_name
         )
@@ -544,6 +896,18 @@ class AsyncSinkWrapper(DataSink):
         return path
 
     def _spill(self, record: _SinkRecord) -> None:
+        """Serialize a failed record to a spillover file for later replay.
+
+        Filename is ``<unix_timestamp>_<uuid4>.json`` so the sort order
+        (used by :meth:`_maybe_replay_spillover`) preserves the order in
+        which records were spilled — oldest spilled records replay first.
+
+        If even the spillover write fails (disk full, bad permissions),
+        the record is lost and the failure is logged at ``error`` level.
+        This is the only path in the wrapper that can lose data, and it
+        represents a filesystem-level failure that can't be recovered
+        from inside the sink layer.
+        """
         experiment_id = record.kwargs.get("experiment_id", "_unknown")
         try:
             spill_dir = self._spillover_dir(experiment_id)
@@ -559,11 +923,23 @@ class AsyncSinkWrapper(DataSink):
             )
 
     def _maybe_replay_spillover(self) -> None:
-        """Attempt to replay spilled records for known experiments.
+        """Attempt to replay spilled records for every known experiment.
 
-        Rate-limited to ``replay_interval_s`` so a broken sink doesn't pin a
-        CPU spinning on failing replays. Walks the spillover base dir and
-        tries each file; successes are deleted, failures stay put.
+        Rate-limited to ``replay_interval_s`` so a broken sink doesn't pin
+        a CPU spinning on failing replays. Walks
+        ``{spillover_base_dir}/*/.pending/{sink_name}/`` and tries each
+        spillover file against the wrapped sink:
+
+        - **Success** → delete the spillover file and log an info line.
+        - **Failure** → leave the file in place for the next attempt, log
+          at debug level (so permanent failures don't flood the log), and
+          stop this pass early. If one spillover fails the sink is almost
+          certainly still down and looping over more files just wastes
+          work.
+
+        Files are processed in lexicographic order, which (because the
+        filenames are prefixed with Unix timestamps) means the oldest
+        spilled records replay first.
         """
         now = time.monotonic()
         if now - self._last_replay_attempt < self.replay_interval_s:
