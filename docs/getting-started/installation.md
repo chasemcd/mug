@@ -1,38 +1,11 @@
 # Installation
 
-Multi-User Gymnasium (MUG) requires Python 3.8 or higher and can be installed via pip.
-
-## Prerequisites
-
-Before installing MUG, ensure you have:
-
-- Python 3.8 or higher
-- pip (Python package installer)
-- A modern web browser (Chrome, Firefox, Safari, or Edge)
-
-## Installation
-
 When building experiments, always install MUG with the server option:
 
 ```bash
 pip install multi-user-gymnasium[server]
 ```
 
-This installs all dependencies needed to create and host experiments:
-
-- **Core dependencies:**
-
-  - `gymnasium==1.0.0` - Standard environment interface
-  - `numpy` - Numerical computing
-
-- **Server dependencies:**
-
-  - `eventlet` - Asynchronous networking
-  - `flask` - Web framework
-  - `flask-socketio` - Real-time bidirectional communication
-  - `msgpack` - Efficient data serialization
-  - `pandas` - Data logging and export
-  - `flatten_dict` - Data structure utilities
 
 !!! note
 
