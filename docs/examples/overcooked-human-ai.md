@@ -33,8 +33,8 @@ Participants work alongside an AI chef to complete cooking tasks in various kitc
 1. Clone the MUG repository and install with server dependencies:
 
     ```bash
-    git clone https://github.com/chasemcd/interactive-gym.git
-    cd interactive-gym
+    git clone https://github.com/chasemcd/mug.git
+    cd mug
     pip install -e .[server]
     ```
 

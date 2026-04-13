@@ -428,8 +428,8 @@ If you have questions about implementing these methods for your environment:
 
 1. Check the examples above
 2. Look at reference implementations in MUG
-3. Open an issue: https://github.com/anthropics/interactive-gym/issues
-4. Join discussions: https://github.com/anthropics/interactive-gym/discussions
+3. Open an issue: https://github.com/anthropics/multi-user-gymnasium/issues
+4. Join discussions: https://github.com/anthropics/multi-user-gymnasium/discussions
 
 ---
 

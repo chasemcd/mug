@@ -13,7 +13,7 @@ In this experiment, participants control a car trying to reach a flag on top of 
 - Configuring keyboard controls
 - Creating a complete three-scene experiment
 
-![Mountain Car gameplay](https://raw.githubusercontent.com/chasemcd/interactive-gym/main/docs/_static/mountain_car_demo.gif)
+![Mountain Car gameplay](https://raw.githubusercontent.com/chasemcd/mug/main/docs/_static/mountain_car_demo.gif)
 
 ## Features Demonstrated
 
@@ -31,8 +31,8 @@ In this experiment, participants control a car trying to reach a flag on top of 
 1. Clone the MUG repository and install with server dependencies:
 
     ```bash
-    git clone https://github.com/chasemcd/interactive-gym.git
-    cd interactive-gym
+    git clone https://github.com/chasemcd/mug.git
+    cd mug
     pip install -e .[server]
     ```
 
@@ -194,7 +194,7 @@ end_scene = (
     .scene(scene_id="mountain_car_end_scene")
     .display(
         scene_header="Thanks for playing!",
-        scene_body="For more information, visit interactive-gym.readthedocs.io!",
+        scene_body="For more information, visit multi-user-gymnasium.readthedocs.io!",
     )
 )
 ```

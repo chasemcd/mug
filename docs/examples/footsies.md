@@ -32,8 +32,8 @@ Footsies is a minimalist fighting game focused on spacing and fundamentals. Part
 1. Clone the MUG repository and install with server dependencies:
 
     ```bash
-    git clone https://github.com/chasemcd/interactive-gym.git
-    cd interactive-gym
+    git clone https://github.com/chasemcd/mug.git
+    cd mug
     pip install -e .[server]
     ```
 

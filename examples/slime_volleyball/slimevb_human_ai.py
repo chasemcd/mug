@@ -83,7 +83,7 @@ end_scene = (
     .scene(scene_id="slimevb_end_scene")
     .display(
         scene_header="Thanks for playing!",
-        scene_body="For more information, visit interactive-gym.readthedocs.io!",
+        scene_body="For more information, visit multi-user-gymnasium.readthedocs.io!",
     )
 )
 

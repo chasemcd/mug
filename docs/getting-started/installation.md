@@ -17,8 +17,8 @@ pip install multi-user-gymnasium[server]
 To contribute to MUG or modify the source code, clone the repository and install in editable mode:
 
 ```bash
-git clone https://github.com/chasemcd/interactive-gym.git
-cd interactive-gym
+git clone https://github.com/chasemcd/mug.git
+cd mug
 pip install -e .
 ```
 

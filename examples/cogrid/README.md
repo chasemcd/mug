@@ -233,7 +233,7 @@ If you use these examples in research, please cite:
   title={Multi-User Gymnasium (MUG): Browser-Based Multi-Agent RL Experiments},
   author={McDonald, Chase},
   year={2024},
-  url={https://github.com/chasemcd/interactive-gym}
+  url={https://github.com/chasemcd/mug}
 }
 
 @article{mcdonald2025controllable,

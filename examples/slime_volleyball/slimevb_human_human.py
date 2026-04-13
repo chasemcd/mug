@@ -85,7 +85,7 @@ end_scene = (
     .scene(scene_id="slimevb_end_scene")
     .display(
         scene_header="Thanks for playing!",
-        scene_body="For more information, visit interactive-gym.readthedocs.io!",
+        scene_body="For more information, visit multi-user-gymnasium.readthedocs.io!",
     )
 )
 
@@ -109,7 +109,12 @@ if __name__ == "__main__":
         experiment_config.ExperimentConfig()
         .experiment(stager=stager, experiment_id="slime_vb_demo")
         .hosting(port=5702, host="0.0.0.0")
-        .static_files(directories=["examples/slime_volleyball/assets", "examples/shared/assets"])
+        .static_files(
+            directories=[
+                "examples/slime_volleyball/assets",
+                "examples/shared/assets",
+            ]
+        )
     )
 
     app.run(experiment_config)

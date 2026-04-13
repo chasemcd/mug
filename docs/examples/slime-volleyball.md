@@ -31,8 +31,8 @@ Participants control a "slime" creature trying to score points by getting the ba
 1. Clone the MUG repository and install with server dependencies:
 
     ```bash
-    git clone https://github.com/chasemcd/interactive-gym.git
-    cd interactive-gym
+    git clone https://github.com/chasemcd/mug.git
+    cd mug
     pip install -e .[server]
     ```
 
