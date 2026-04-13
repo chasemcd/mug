@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import copy
 import json
-import os
 import random
 from datetime import datetime
 
@@ -105,16 +104,6 @@ class Scene:
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             **metadata,
         }
-
-    def export_metadata(self, subject_id: str):
-        """Save the metadata for the current scene."""
-        if self.experiment_id:
-            base_dir = f"data/{self.experiment_id}/{self.scene_id}"
-        else:
-            base_dir = f"data/{self.scene_id}"
-        os.makedirs(base_dir, exist_ok=True)
-        with open(f"{base_dir}/{subject_id}_metadata.json", "w") as f:
-            json.dump(self.scene_metadata, f)
 
     def on_client_callback(
         self, data, socketio: flask_socketio.SocketIO, room: str | int
