@@ -1,6 +1,6 @@
 import * as ui_utils from './ui_utils.js';
 import {startUnityScene, terminateUnityScene, shutdownUnityGame, preloadUnityGame} from './unity_utils.js';
-import {graphics_start, graphics_end, addStateToBuffer, clearStateBuffer, getRemoteGameData, pressedKeys} from './phaser_gym_graphics.js';
+import {graphics_start, graphics_end, addStateToBuffer, clearStateBuffer, pressedKeys} from './phaser_gym_graphics.js';
 import {RemoteGame} from './pyodide_remote_game.js';
 import {MultiplayerPyodideGame} from './pyodide_multiplayer_game.js';
 import {ProbeConnection} from './probe_connection.js';
@@ -1649,7 +1649,7 @@ function terminateGymScene(data) {
         pyodideRemoteGame.cleanupForSceneExit();
     }
 
-    // Sync globals to server before emitting game data
+    // Sync globals to server before scene exit
     socket.emit("sync_globals", {mugGlobals: window.mugGlobals});
 
     // Emit multiplayer metrics separately if this is a multiplayer game
@@ -1658,9 +1658,8 @@ function terminateGymScene(data) {
         pyodideRemoteGame.emitMultiplayerMetrics(data.scene_id);
     }
 
-    let remoteGameData = getRemoteGameData();
-    const binaryData = msgpack.encode(remoteGameData);
-    socket.emit("emit_remote_game_data", {data: binaryData, scene_id: data.scene_id, session_id: window.sessionId, mugGlobals: window.mugGlobals});
+    // Gym episode data is streamed incrementally via emit_episode_data at each
+    // episode boundary — no end-of-scene upload needed.
 
     $("#sceneHeader").show();
     $("#sceneHeader").html("");

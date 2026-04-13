@@ -14,9 +14,7 @@ import uuid
 
 import flask
 import flask_socketio
-import flatten_dict
 import msgpack
-import pandas as pd
 from flask_login import LoginManager
 
 from mug.scenes import gym_scene, stager, unity_scene
@@ -425,7 +423,13 @@ def register_subject(data):
         participant_stager.start(socketio, room=sid)
 
     participant_stager.current_scene.experiment_id = CONFIG.experiment_id
-    participant_stager.current_scene.export_metadata(subject_id)
+    if participant_stager.current_scene.should_export_metadata:
+        CONFIG.data_sink.write_metadata(
+            CONFIG.experiment_id,
+            participant_stager.current_scene.scene_id,
+            subject_id,
+            participant_stager.current_scene.scene_metadata,
+        )
 
 
 @socketio.on("request_current_scene")
@@ -599,7 +603,25 @@ def advance_scene(data):
 
     current_scene.experiment_id = CONFIG.experiment_id
     if current_scene.should_export_metadata:
-        current_scene.export_metadata(subject_id)
+        CONFIG.data_sink.write_metadata(
+            CONFIG.experiment_id,
+            current_scene.scene_id,
+            subject_id,
+            current_scene.scene_metadata,
+        )
+
+    # If we just advanced into a terminal scene, drain the data sink so the
+    # participant's records are persisted before they see the completion code
+    # and close the tab. A stuck sink must never block participant completion,
+    # so we flush with a short timeout and continue regardless.
+    from mug.scenes import static_scene as _ss
+    if isinstance(current_scene, _ss.EndScene):
+        if not CONFIG.data_sink.flush(timeout=30.0):
+            logger.warning(
+                f"[AdvanceScene] data_sink flush timed out for {subject_id} "
+                f"at terminal scene {current_scene.scene_id}. Pending records "
+                f"remain in .pending/ for replay."
+            )
 
 
 @socketio.on("join_game")
@@ -1017,10 +1039,19 @@ def on_exit():
     for game_manager in GAME_MANAGERS.values():
         game_manager.tear_down()
 
+    # Drain + close the data sink so any in-flight records either land on
+    # the sink or spill to .pending/ for replay on next startup.
+    if CONFIG is not None and getattr(CONFIG, "data_sink", None) is not None:
+        try:
+            CONFIG.data_sink.flush(timeout=10.0)
+            CONFIG.data_sink.close()
+        except Exception as e:
+            logger.warning(f"[Shutdown] data_sink flush/close raised: {e}")
+
 
 @socketio.on("static_scene_data_emission")
 def data_emission(data):
-    """Save the static scene data to a csv file."""
+    """Save the static scene data through the configured data sink."""
     global PARTICIPANT_SESSIONS
 
     subject_id = get_subject_id_from_session_id(flask.request.sid)
@@ -1035,115 +1066,17 @@ def data_emission(data):
     if not CONFIG.save_experiment_data:
         return
 
-    # Save to a csv in data/{scene_id}/{subject_id}.csv
-    # Save the static scene data to a csv file.
     scene_id = data.get("scene_id")
     if not scene_id:
         logger.error("Scene ID is required to save data.")
         return
 
-    # Create a directory for the CSV files if it doesn't exist
-    os.makedirs(f"data/{CONFIG.experiment_id}/{scene_id}/", exist_ok=True)
-
-    # Generate a unique filename
-    filename = f"data/{CONFIG.experiment_id}/{scene_id}/{subject_id}.csv"
-    globals_filename = f"data/{CONFIG.experiment_id}/{scene_id}/{subject_id}_globals.json"
-
-    # Save as CSV
-    logger.info(f"Saving {filename}")
-
-    # convert to a list so we can save it as a csv
-    for k, v in data["data"].items():
-        data["data"][k] = [v]
-
-    df = pd.DataFrame(data["data"])
-
-    df["timestamp"] = pd.to_datetime("now")
-
-    if CONFIG.save_experiment_data:
-        df.to_csv(filename, index=False)
-
-        with open(globals_filename, "w") as f:
-            json.dump(data["mugGlobals"], f)
-
-
-@socketio.on("emit_remote_game_data")
-def receive_remote_game_data(data):
-    global PARTICIPANT_SESSIONS
-
-    subject_id = get_subject_id_from_session_id(flask.request.sid)
-
-    # Sync mugGlobals to session for persistence
-    client_globals = data.get("mugGlobals", {})
-    session = PARTICIPANT_SESSIONS.get(subject_id)
-    if session is not None and client_globals:
-        session.mug_globals.update(client_globals)
-        session.last_updated_at = time.time()
-
-    if not CONFIG.save_experiment_data:
-        return
-
-    # Decode the msgpack data
-    decoded_data = msgpack.unpackb(data["data"])
-
-    # Check if there's any data to save (may be empty if data was sent per-episode)
-    if not decoded_data or not decoded_data.get("t"):
-        logger.info(f"No final data to save for scene {data.get('scene_id')} (data was sent per-episode)")
-        return
-
-    # Flatten any nested dictionaries
-    flattened_data = flatten_dict.flatten(decoded_data, reducer="dot")
-
-    # Find the maximum length among all values
-    max_length = max(
-        len(value) if isinstance(value, list) else 1
-        for value in flattened_data.values()
+    CONFIG.data_sink.write_static_scene_data(
+        CONFIG.experiment_id, scene_id, subject_id, data["data"],
     )
-
-    # Pad shorter lists with None and convert non-list values to lists
-    padded_data = {}
-    for key, value in flattened_data.items():
-        if not isinstance(value, list):
-            padded_data[key] = [value] + [None] * (max_length - 1)
-        else:
-            padded_data[key] = value + [None] * (max_length - len(value))
-
-    # Convert to DataFrame
-    df = pd.DataFrame(padded_data)
-
-    # Create a directory for the CSV files if it doesn't exist
-    os.makedirs(f"data/{CONFIG.experiment_id}/{data['scene_id']}/", exist_ok=True)
-
-    # Generate a unique filename
-    filename = f"data/{CONFIG.experiment_id}/{data['scene_id']}/{subject_id}.csv"
-    globals_filename = f"data/{CONFIG.experiment_id}/{data['scene_id']}/{subject_id}_globals.json"
-
-    # Save as CSV
-    logger.info(f"Saving {filename}")
-
-    if CONFIG.save_experiment_data:
-        df.to_csv(filename, index=False)
-        with open(globals_filename, "w") as f:
-            json.dump(data["mugGlobals"], f)
-
-    # Also get the current scene for this participant and save the metadata
-    # TODO(chase): this has issues where the data may not be received before the
-    # scene is advanced, which results in this getting the metadata for the _next_
-    # scene.
-
-    # participant_stager = STAGERS.get(subject_id, None)
-    # if participant_stager is None:
-    #     logger.error(
-    #         f"Subject {subject_id} tried to save data but they don't have a Stager."
-    #     )
-    #     return
-
-    # current_scene = participant_stager.current_scene
-    # current_scene_metadata = current_scene.get_complete_scene_metadata()
-
-    # # save the metadata to a json file
-    # with open(f"data/{CONFIG.experiment_id}/{data['scene_id']}/{subject_id}_metadata.json", "w") as f:
-    #     json.dump(current_scene_metadata, f)
+    CONFIG.data_sink.write_globals(
+        CONFIG.experiment_id, scene_id, subject_id, data.get("mugGlobals", {}),
+    )
 
 
 @socketio.on("emit_episode_data")
@@ -1182,49 +1115,18 @@ def receive_episode_data(data):
     if not CONFIG.save_experiment_data:
         return {"status": "ok", "saved": False}
 
-    # Decode the msgpack data
     decoded_data = msgpack.unpackb(data["data"])
-
-    # Check if there's any data to save
     if not decoded_data or not decoded_data.get("t"):
         logger.info(f"No data to save for episode {episode_num}")
         return {"status": "ok", "saved": False}
 
-    # Flatten any nested dictionaries
-    flattened_data = flatten_dict.flatten(decoded_data, reducer="dot")
-
-    # Find the maximum length among all values
-    max_length = max(
-        len(value) if isinstance(value, list) else 1
-        for value in flattened_data.values()
+    scene_id = data["scene_id"]
+    CONFIG.data_sink.write_episode(
+        CONFIG.experiment_id, scene_id, subject_id, episode_num, decoded_data,
     )
-
-    # Pad shorter lists with None and convert non-list values to lists
-    padded_data = {}
-    for key, value in flattened_data.items():
-        if not isinstance(value, list):
-            padded_data[key] = [value] + [None] * (max_length - 1)
-        else:
-            padded_data[key] = value + [None] * (max_length - len(value))
-
-    # Convert to DataFrame
-    df = pd.DataFrame(padded_data)
-
-    # Create a directory for the CSV files if it doesn't exist
-    os.makedirs(f"data/{CONFIG.experiment_id}/{data['scene_id']}/", exist_ok=True)
-
-    # Generate filename with episode number
-    filename = f"data/{CONFIG.experiment_id}/{data['scene_id']}/{subject_id}_ep{episode_num}.csv"
-
-    # Save as CSV
-    logger.info(f"Saving episode {episode_num} data: {filename} ({len(df)} rows)")
-
-    df.to_csv(filename, index=False)
-
-    # Also save globals (overwrite each episode to keep latest)
-    globals_filename = f"data/{CONFIG.experiment_id}/{data['scene_id']}/{subject_id}_globals.json"
-    with open(globals_filename, "w") as f:
-        json.dump(data.get("mugGlobals", {}), f)
+    CONFIG.data_sink.write_globals(
+        CONFIG.experiment_id, scene_id, subject_id, data.get("mugGlobals", {}),
+    )
 
     return {"status": "ok", "saved": True}
 
@@ -1257,14 +1159,9 @@ def receive_multiplayer_metrics(data):
         logger.warning(f"Invalid multiplayer metrics data from {subject_id}")
         return
 
-    # Create directory if needed
-    os.makedirs(f"data/{CONFIG.experiment_id}/{scene_id}/", exist_ok=True)
-
-    # Save individual player's metrics
-    filename = f"data/{CONFIG.experiment_id}/{scene_id}/{subject_id}_multiplayer_metrics.json"
-    logger.info(f"Saving multiplayer metrics to {filename}")
-    with open(filename, "w") as f:
-        json.dump(metrics, f, indent=2)
+    CONFIG.data_sink.write_multiplayer_metrics(
+        CONFIG.experiment_id, scene_id, subject_id, metrics,
+    )
 
     # Aggregate metrics when both players submit
     game_id = metrics.get("gameId")
@@ -1452,11 +1349,9 @@ def _create_aggregated_metrics(scene_id: str, game_id: str, player_metrics: dict
         }
     }
 
-    # Save aggregated file
-    filename = f"data/{CONFIG.experiment_id}/{scene_id}/{game_id}_aggregated_metrics.json"
-    logger.info(f"Saving aggregated multiplayer metrics to {filename}")
-    with open(filename, "w") as f:
-        json.dump(aggregated, f, indent=2)
+    CONFIG.data_sink.write_aggregated_multiplayer_metrics(
+        CONFIG.experiment_id, scene_id, game_id, aggregated,
+    )
 
 
 def _compare_hashes(hashes_a: list, hashes_b: list, player_a_id: str, player_b_id: str) -> dict:

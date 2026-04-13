@@ -6,6 +6,7 @@ import os
 from typing import Callable
 
 from mug.scenes.stager import Stager
+from mug.server.data_sink import DataSink, FilesystemSink
 from mug.utils.sentinels import NotProvided
 from mug.utils.webrtc import configure_webrtc
 
@@ -28,6 +29,7 @@ class ExperimentConfig:
 
         # Experiment data
         self.save_experiment_data = True
+        self.data_sink: DataSink = FilesystemSink()
 
         # WebRTC / TURN server configuration
         self.turn_username: str | None = None
@@ -56,7 +58,21 @@ class ExperimentConfig:
         experiment_id: str = NotProvided,
         stager: Stager = NotProvided,
         save_experiment_data: bool = True,
+        data_sink: DataSink = NotProvided,
     ) -> ExperimentConfig:
+        """Configure the experiment.
+
+        :param experiment_id: Identifier used as the root folder name and
+            carried through to every data record (e.g. "overcooked_hai").
+        :param stager: The :class:`Stager` instance that sequences scenes.
+        :param save_experiment_data: Master switch for data collection.
+        :param data_sink: Backend MUG writes participant data to. Defaults to
+            :class:`FilesystemSink` (CSV + JSON under ``data/{experiment_id}/``).
+            Replace with any :class:`DataSink` subclass — or wrap one in
+            :class:`MultiSink` / :class:`AsyncSinkWrapper` — to route data to
+            a database, cloud storage, etc. See :doc:`the participants & data
+            collection guide <core-concepts/participants-and-data>`.
+        """
         if experiment_id is not NotProvided:
             self.experiment_id = experiment_id
 
@@ -65,6 +81,9 @@ class ExperimentConfig:
 
         if save_experiment_data is not NotProvided:
             self.save_experiment_data = save_experiment_data
+
+        if data_sink is not NotProvided:
+            self.data_sink = data_sink
 
         return self
 

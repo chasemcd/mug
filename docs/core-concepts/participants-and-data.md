@@ -169,11 +169,95 @@ start_scene = (
 
 Scenes that capture form input (`TextBox`, `OptionBoxes`, `ScalesAndTextBox`, `CompletionCodeScene`) typically set `should_export_metadata=True` — without it, the participant's answers are collected in the browser but never persisted.
 
-!!! note "Things that aren't configurable"
+## Custom data sinks
 
-    - The output root is hardcoded to `data/` relative to the process's working directory. If you need files in a different location, run the server from a different CWD or `ln -s` the directory.
+MUG's default `FilesystemSink` writes CSV + JSON files under `data/{experiment_id}/{scene_id}/`. If you'd rather push data to a database, cloud storage, or a custom backend, plug in your own `DataSink`.
+
+### The `DataSink` interface
+
+A sink implements six write methods, plus `flush()` and `close()` for lifecycle. The methods correspond to the five write paths MUG produces during an experiment, plus one aggregated path for P2P metrics:
+
+```python
+from mug.server.data_sink import DataSink
+
+class MyDataSink(DataSink):
+    def write_metadata(self, experiment_id, scene_id, subject_id, metadata): ...
+    def write_static_scene_data(self, experiment_id, scene_id, subject_id, data): ...
+    def write_episode(self, experiment_id, scene_id, subject_id, episode_num, data): ...
+    def write_globals(self, experiment_id, scene_id, subject_id, mug_globals): ...
+    def write_multiplayer_metrics(self, experiment_id, scene_id, subject_id, metrics): ...
+    def write_aggregated_multiplayer_metrics(self, experiment_id, scene_id, game_id, metrics): ...
+    def flush(self, timeout=None): return True
+    def close(self): pass
+```
+
+The base class provides no-op defaults for every method, so a sink targeting only gym episode data (for example) doesn't have to stub the rest. Payloads are plain dicts — the same ones MUG produces after decoding msgpack and flattening nested observations — so sinks never need to depend on pandas.
+
+Register your sink on `ExperimentConfig`:
+
+```python
+config = (
+    experiment_config.ExperimentConfig()
+    .experiment(
+        stager=stager.Stager(scenes=[...]),
+        experiment_id="mystudy",
+        data_sink=MyDataSink(),
+    )
+)
+```
+
+### Composition: `MultiSink` and `AsyncSinkWrapper`
+
+Two decorator sinks cover the most common patterns.
+
+**`MultiSink`** fans out every write to multiple sinks. Failures in one child don't affect the others. The recommended pattern is to always keep `FilesystemSink` as one leg, so you have a local CSV durability floor even when the primary backend is a remote database:
+
+```python
+from mug.server.data_sink import FilesystemSink, MultiSink, AsyncSinkWrapper
+from mug.server.data_sinks import SQLiteSink
+
+config.experiment(
+    stager=...,
+    experiment_id="mystudy",
+    data_sink=MultiSink([
+        FilesystemSink(),                              # local CSVs, always
+        AsyncSinkWrapper(SQLiteSink("mystudy.db")),    # queryable store
+    ]),
+)
+```
+
+**`AsyncSinkWrapper`** runs any sink on a background thread with a bounded in-memory queue. Handler calls return immediately after enqueueing, so slow I/O (database round-trips, cloud uploads) never blocks the socket worker. **This is required for any sink that does network or database I/O** — synchronous DB writes inside an eventlet handler will freeze every connected participant.
+
+### No data is ever lost
+
+`AsyncSinkWrapper` guarantees no-drop delivery via **dead-letter spillover**:
+
+1. If the queue is full when a new record arrives, the record is spilled to `data/{experiment_id}/.pending/{SinkClassName}/<timestamp>.json`.
+2. If the wrapped sink raises on a dispatch, the record is spilled to the same location.
+3. A low-priority replay pass runs between queue pops. It walks `.pending/` and retries each spilled record against the sink. On success, the spillover file is deleted. On failure, it's left for the next attempt.
+
+The net effect: a transient database outage or a burst of traffic never drops a record. Permanent misconfigurations (wrong DSN, missing schema) manifest as a growing `.pending/` directory with a warning logged on every retry, so the failure is visible without being silent data loss.
+
+Because `FilesystemSink` is typically in the `MultiSink` alongside any async backend, the CSV files on disk are always the primary source of truth — spillover is a backup channel specifically for catching remote backends up, not a replacement for the filesystem.
+
+### Flush on terminal scenes and shutdown
+
+When a participant reaches an `EndScene` or `CompletionCodeScene`, MUG automatically calls `config.data_sink.flush(timeout=30.0)` before the participant sees the completion screen. This drains the async queue so records are either persisted to the sink or safely spilled to `.pending/` before the participant closes the tab. A stuck sink logs a warning and lets the participant leave anyway — completion is never blocked.
+
+On server shutdown (`atexit`), MUG flushes with a shorter 10-second timeout and calls `close()` on the sink.
+
+### Writing your own: the SQLite example
+
+`mug/server/data_sinks/sqlite_sink.py` is the reference external sink implementation, kept small enough to copy as a starting point for `PostgresSink`, `MongoSink`, or whatever else you need. It uses stdlib `sqlite3`, creates its schema on first write, and stores dict payloads as JSON text columns. Swap the table definitions and `INSERT` statements for your database of choice — the `DataSink` interface is the only thing that has to match.
+
+### Testing your sink
+
+Any custom sink can be verified against MUG's conformance suite by subclassing the test classes in `tests/unit/test_data_sink.py`. The suite exercises every write method, flush/close lifecycle, `MultiSink` fan-out, and the async wrapper's spillover + replay paths.
+
+!!! note "Things that are *still* not configurable"
+
+    - The default `FilesystemSink` writes under `data/` relative to the process's working directory. Pass a custom `base_dir` when instantiating if you need a different path.
     - There is no per-scene "extra fields to capture" hook beyond what's serialized into `scene_metadata` automatically. To attach custom data to a scene, subclass the scene and extend its `scene_metadata` property, or write to `mugGlobals`.
-    - Data is filesystem-only. There is no built-in database, S3, or cloud integration.
 
 ## Completion codes for Prolific, MTurk, and similar panels
 
