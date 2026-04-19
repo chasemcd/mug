@@ -11,10 +11,11 @@ Multi-User Gymnasium (MUG) converts [Gymnasium](https://gymnasium.farama.org/) a
 
 ## What does MUG offer?
 
-1. MUG allows researchers to scalably run human experiments in the browser against the exact same simulation environments used for AI training.
-2. Python environments can be run directly in the browser, eliminating the need for a client-server communication that will introduce latency.
-3. Built-in networking, rollback netcode, and waiting rooms for multi-player experiments.
-4. Full experiment flow, allowing for the integration of tutorials, surveys, feedback scenes, randomization, and much more.
+- **Same environment, training to deployment.** Run user experiments in the browser against the exact same simulation environments you use to train your AI agents without any rewrites or ports.
+- **In-browser execution.** Python environments and AI policies can run client-side for zero-latency experiences for participants. Heavier environments---or those that can't be compiled to run in the browser---can be run on the server.
+- **Multi-human Experiments.** Built-in networking, rollback netcode, and waiting rooms for multi-participant experiments.
+- **Experiment orchestration.** Scene flow, [participant management, and data collection](https://multi-user-gymnasium.readthedocs.io/en/latest/core-concepts/participants-and-data/) out of the box.
+- **Extensive customizability.** Advanced hooks and configuration for custom rendering, matchmaking, scene logic, and more.
 
 Get started by reading the [documentation](https://multi-user-gymnasium.readthedocs.io/).
 
@@ -27,16 +28,6 @@ pip install multi-user-gymnasium[server]
 <div align="center">
   <img src="docs/assets/images/overcooked_example.apng" alt="Overcooked human-AI demo" width="600"/>
 </div>
-
-## What does MUG offer?
-
-- **Same environment, training to deployment.** Run user experiments in the browser against the exact same simulation environments you use to train your AI agents without any rewrites or ports.
-- **In-browser execution.** Python environments and AI policies can run client-side for zero-latency experiences for participants. Heavier environments---or those that can't be compiled to run in the browser---can be run on the server.
-- **Multi-human Experiments.** Built-in networking, rollback netcode, and waiting rooms for multi-participant experiments.
-- **Experiment orchestration.** Scene flow, [participant management, and data collection](https://multi-user-gymnasium.readthedocs.io/en/latest/core-concepts/participants-and-data/) out of the box.
-- **Extensive customizability.** Advanced hooks and configuration for custom rendering, matchmaking, scene logic, and more.
-
-For full explanations of each feature, see the [documentation](https://multi-user-gymnasium.readthedocs.io/).
 
 
 ## Citation
