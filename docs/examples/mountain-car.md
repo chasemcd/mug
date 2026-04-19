@@ -1,7 +1,7 @@
 # Mountain Car
 
 <div align="center">
-  <video src="../assets/images/mountain_car_example.webm" autoplay loop muted playsinline width="600">
+  <video src="../../assets/images/mountain_car_example.webm" autoplay loop muted playsinline width="600">
     Your browser does not support the video tag.
   </video>
 </div>

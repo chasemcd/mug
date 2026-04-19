@@ -1,12 +1,12 @@
 # Overcooked: Human-AI (Client-Side)
 
 <div align="center">
-  <video src="../assets/images/overcooked_human_ai_experiment.webm" autoplay loop muted playsinline width="600">
+  <video src="../../assets/images/overcooked_human_ai_experiment.webm" autoplay loop muted playsinline width="600">
     Your browser does not support the video tag.
   </video>
 </div>
 
-A human collaborates with an ONNX AI teammate to prepare and deliver dishes on the Cramped Room Overcooked kitchen, with the environment and policy both running client-side via Pyodide. The participant plays one round with a Self-Play (SP) partner and a second round with an Instance-Based Cognitive (IBC / Behavior Shaping) partner, then rates the two partners against each other. Inspired by [McDonald & Gonzalez (2025)](https://arxiv.org/abs/2503.05455).
+A human collaborates with an ONNX AI teammate to prepare and deliver dishes on the Cramped Room Overcooked kitchen, with the environment and policy both running client-side via Pyodide. The participant plays two rounds with an AI partner and then fills out a side-by-side preference survey over the two rounds. For illustration, both rounds load the same ONNX weights — swap in different `onnx_path` values to turn this into a real within-subjects comparison between two partners.
 
 **Source:** [`examples/cogrid/overcooked_human_ai.py`](https://github.com/chasemcd/mug/blob/main/examples/cogrid/overcooked_human_ai.py)
 
@@ -22,7 +22,7 @@ cogrid/
 ├── environments/
 │   └── cramped_room_environment_initialization.py   # Pyodide env (single-agent + ONNX partner)
 └── assets/overcooked/models/
-    └── cogrid-0.2.1-cramped-room.onnx               # Shared ONNX weights
+    └── cogrid-0.2.1-cramped-room.onnx               # ONNX weights used by both rounds
 ```
 
 ## Experiment Flow
@@ -32,18 +32,18 @@ stager = stager.Stager(
     scenes=[
         oc_scenes.start_scene,
         oc_scenes.tutorial_gym_scene,
-        oc_scenes.cramped_room_0,       # SP round + IBC round + preference survey
+        oc_scenes.cramped_room_0,       # round 1 + round 2 + preference survey
         oc_scenes.feedback_scene,
         oc_scenes.end_scene,
     ]
 )
 ```
 
-`cramped_room_0` is a `SceneWrapper` that plays `cramped_room_sp_0`, then `cramped_room_ibc_0`, then a side-by-side preference survey `cramped_room_options_scene_0`. Both rounds use the same Cramped Room kitchen so the only thing that changes between them is the AI partner.
+`cramped_room_0` is a `SceneWrapper` that sequences two partner rounds on the Cramped Room kitchen followed by a side-by-side preference survey comparing them.
 
 ## Policy Mapping
 
-Both rounds pair the human with an ONNX partner loaded in the browser via `onnxruntime-web`. In this example the two mappings happen to point at the same weights file — swap in different `onnx_path` values to compare any two partners.
+Each round pairs the human with an ONNX partner loaded in the browser via `onnxruntime-web`. Both mappings point at the same weights file here for illustration — so the partner "changes" between rounds only in that it's a fresh instance. Replace either `onnx_path` with a second model to turn this into an actual comparison.
 
 ```python
 OVERCOOKED_MODEL_CONFIG = ModelConfig(obs_input="input", logit_output="logits")
@@ -65,9 +65,9 @@ POLICY_MAPPING_CRAMPED_ROOM_1 = {
 }
 ```
 
-## Scene (round 1, `cramped_room_sp_0`)
+## Round scene
 
-The IBC scene (`cramped_room_ibc_0`) is a `copy.deepcopy(cramped_room_sp_0)` with the policy mapping swapped.
+The second round is built as `copy.deepcopy(...)` of the first with only the policy mapping swapped — everything else (rendering, gameplay, environment file) is identical.
 
 ```python
 cramped_room_sp_0 = (
@@ -127,7 +127,3 @@ cramped_room_options_scene_0 = (
     .display(scene_subheader="Partner Feedback")
 )
 ```
-
-## References
-
-McDonald, C., & Gonzalez, C. (2025). *Controllable Complementarity: Subjective Preferences in Human-AI Collaboration*. arXiv:2503.05455.

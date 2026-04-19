@@ -1,7 +1,7 @@
 # Overcooked: Human-Human
 
 <div align="center">
-  <video src="../assets/images/overcooked_human_human.webm" autoplay loop muted playsinline width="600">
+  <video src="../../assets/images/overcooked_human_human.webm" autoplay loop muted playsinline width="600">
     Your browser does not support the video tag.
   </video>
 </div>

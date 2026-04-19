@@ -4,7 +4,7 @@ Overcooked Human-AI Comparison (Client-Side with Pyodide)
 This example demonstrates Human-AI experiments where:
 - One human participant plays with AI partners in the browser
 - Environment runs client-side using Pyodide (zero server computation)
-- Two AI partners (SP and IBC) for within-subjects comparison
+- Two AI partners (both the same here for our example) for within-subjects comparison
 - Participant provides preference feedback between partners
 
 Usage:

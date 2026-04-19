@@ -1,7 +1,7 @@
 # Slime Volleyball: Human-AI
 
 <div align="center">
-  <video src="../assets/images/slime_vb_human_ai.webm" autoplay loop muted playsinline width="600">
+  <video src="../../assets/images/slime_vb_human_ai.webm" autoplay loop muted playsinline width="600">
     Your browser does not support the video tag.
   </video>
 </div>

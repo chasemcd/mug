@@ -1,7 +1,7 @@
 # Slime Volleyball: Human-Human
 
 <div align="center">
-  <video src="../assets/images/slime_vb_hh_experiment.webm" autoplay loop muted playsinline width="600">
+  <video src="../../assets/images/slime_vb_hh_experiment.webm" autoplay loop muted playsinline width="600">
     Your browser does not support the video tag.
   </video>
 </div>
