@@ -9,6 +9,8 @@
 
 Multi-User Gymnasium (MUG) converts [Gymnasium](https://gymnasium.farama.org/) and [PettingZoo](https://pettingzoo.farama.org/) environments into browser-based, multi-user experiments. It enables Python simulation environments to be accessed online, allowing humans to interact with them individually or alongside AI agents and other participants.
 
+Get started by reading the [documentation](https://multi-user-gymnasium.readthedocs.io/).
+
 ## Installation
 
 ```bash
