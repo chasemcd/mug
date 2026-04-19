@@ -463,9 +463,3 @@ stager = stager.Stager(scenes=[
     end_scene,
 ])
 ```
-
-## Next Steps
-
-- **Learn about the Stager**: [Stager](stager.md) to sequence scenes
-- **Explore rendering**: [Surface API](surface-api.md) for draw method reference
-- **See examples**: [Examples](../examples/index.md) for complete experiments

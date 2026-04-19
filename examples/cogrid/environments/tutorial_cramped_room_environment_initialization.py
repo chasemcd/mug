@@ -151,7 +151,9 @@ class OvercookedEnv(CoGridEnv):
                 continue
 
             if hasattr(obj, "can_place_on") and obj.can_place_on and obj.obj_placed_on is not None:
-                self._draw_dynamic_object(obj.obj_placed_on)
+                # obj_placed_on is re-instantiated each render sync and has no
+                # pos of its own — draw it at the containing object's position.
+                self._draw_dynamic_object(obj.obj_placed_on, pos=obj.pos)
 
             self._draw_dynamic_object(obj)
 
@@ -202,12 +204,18 @@ class OvercookedEnv(CoGridEnv):
 
         return result
 
-    def _draw_dynamic_object(self, obj):
-        """Draw a dynamic (non-persistent) object onto the surface."""
-        if obj.pos is None:
+    def _draw_dynamic_object(self, obj, pos=None):
+        """Draw a dynamic (non-persistent) object onto the surface.
+
+        ``pos`` overrides ``obj.pos`` — used when drawing objects that live
+        on something else (e.g. items sitting on a counter) and so don't
+        carry their own grid position.
+        """
+        effective_pos = pos if pos is not None else obj.pos
+        if effective_pos is None:
             return
         if isinstance(obj, overcooked_grid_objects.Pot):
-            x, y = get_x_y(obj.pos, HEIGHT, WIDTH)
+            x, y = get_x_y(effective_pos, HEIGHT, WIDTH)
             if not obj.objects_in_pot:
                 return
             status = "cooked" if obj.cooking_timer == 0 else "cooking"
@@ -239,7 +247,7 @@ class OvercookedEnv(CoGridEnv):
                     relative=True,
                 )
         elif isinstance(obj, overcooked_grid_objects.Onion):
-            x, y = get_x_y(obj.pos, HEIGHT, WIDTH)
+            x, y = get_x_y(effective_pos, HEIGHT, WIDTH)
             self.surface.image(
                 id=obj.uuid,
                 x=x,
@@ -252,7 +260,7 @@ class OvercookedEnv(CoGridEnv):
                 depth=1,
             )
         elif isinstance(obj, overcooked_grid_objects.Plate):
-            x, y = get_x_y(obj.pos, HEIGHT, WIDTH)
+            x, y = get_x_y(effective_pos, HEIGHT, WIDTH)
             self.surface.image(
                 id=obj.uuid,
                 x=x,
@@ -265,7 +273,7 @@ class OvercookedEnv(CoGridEnv):
                 depth=1,
             )
         elif isinstance(obj, overcooked_grid_objects.OnionSoup):
-            x, y = get_x_y(obj.pos, HEIGHT, WIDTH)
+            x, y = get_x_y(effective_pos, HEIGHT, WIDTH)
             self.surface.image(
                 id=obj.uuid,
                 x=x,

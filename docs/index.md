@@ -2,7 +2,7 @@
 
 ![PyPI - Version](https://img.shields.io/pypi/v/multi-user-gymnasium)
 ![PyPI - Downloads](https://img.shields.io/pypi/dm/multi-user-gymnasium)
-![GitHub Repo stars](https://img.shields.io/github/stars/chasemcd/interactive-gym)
+![GitHub Repo stars](https://img.shields.io/github/stars/chasemcd/mug)
 
 <div align="center">
   <img src="assets/images/mug_logo.png" alt="MUG logo" width="300"/>
@@ -21,14 +21,14 @@ pip install multi-user-gymnasium
 Take any [Gymnasium](https://gymnasium.farama.org/) or [PettingZoo](https://pettingzoo.farama.org/) `ParallelEnv` environment, a policy trained in it, and put them in a participant's browser for human-AI interaction experiments.
 
 <div align="center">
-  <video src="assets/images/OvercookedDemo.webm" autoplay loop muted playsinline width="600">
+  <video src="assets/images/overcooked_human_ai_experiment.webm" autoplay loop muted playsinline width="600">
     Your browser does not support the video tag.
   </video>
 </div>
 
 === "1. Select an Environment"
 
-    Any Gymnasium env or PettingZoo `ParallelEnv` works. We'll use [CoGrid](https://github.com/chasemcd/cogrid)'s Overcooked Cramped Room for demonstration (see other examples in the sidebar):
+    Any Gymnasium or PettingZoo (`ParallelEnv`) environment works. We'll use [CoGrid](https://github.com/chasemcd/cogrid)'s Overcooked Cramped Room for demonstration (see other examples in the sidebar):
 
     ```python
     import cogrid
@@ -137,11 +137,3 @@ Take any [Gymnasium](https://gymnasium.farama.org/) or [PettingZoo](https://pett
 - [Installation](getting-started/installation.md) — Complete installation guide including prerequisites and verification steps.
 - [Quick Start: Single Player](getting-started/quick-start.md) — Step-by-step walkthrough creating a Mountain Car experiment with custom rendering and Pyodide.
 - [Quick Start: Multiplayer](getting-started/quick-start-multiplayer.md) — Step-by-step walkthrough creating a two-player Slime Volleyball experiment with P2P synchronization and GGPO rollback netcode.
-
-## Next Steps
-
-After completing the installation and quick start guides:
-
-- **Learn the architecture**: [Core Concepts](core-concepts/scenes.md) explains how MUG works
-- **Explore examples**: [Examples](examples/index.md) shows complete experiments
-- **Read detailed guides**: Browse the Core Concepts section for in-depth documentation

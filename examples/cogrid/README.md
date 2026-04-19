@@ -229,22 +229,10 @@ localStorage.debug = '*';  // Enable all debug logs
 If you use these examples in research, please cite:
 
 ```bibtex
-@software{mug,
-  title={Multi-User Gymnasium (MUG): Browser-Based Multi-Agent RL Experiments},
-  author={McDonald, Chase},
-  year={2024},
-  url={https://github.com/chasemcd/interactive-gym}
-}
-
-@article{mcdonald2025controllable,
-  title={Controllable Complementarity: Subjective Preferences in Human-AI Collaboration},
+@article{mcdonald2026cogrid,
+  title={CoGrid \& the Multi-User Gymnasium: A Framework for Multi-Agent Experimentation},
   author={McDonald, Chase and Gonzalez, Cleotilde},
-  journal={arXiv preprint arXiv:2503.05455},
-  year={2025}
+  journal={arXiv preprint arXiv:2604.15044},
+  year={2026}
 }
 ```
-
-## Related Examples
-
-- `../pettingzoo/` - Other multi-agent environments
-- See main MUG documentation for more examples

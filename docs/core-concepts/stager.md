@@ -420,9 +420,3 @@ class DebugStager(Stager):
 - Each participant should have their own Stager instance (handled automatically)
 - Check that you're not sharing game state across participants
 - Verify thread-safety in custom callbacks
-
-## Next Steps
-
-- **Learn about scenes**: [Scenes](scenes.md) for detailed scene documentation
-- **Explore examples**: [Examples](../examples/index.md) for complete experiments
-- **Learn about rendering**: [Surface API](surface-api.md)

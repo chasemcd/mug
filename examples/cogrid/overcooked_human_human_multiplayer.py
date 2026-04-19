@@ -52,12 +52,14 @@ hh_start_scene = (
 )
 
 
-# Create stager with multiplayer scenes
+# Create stager with multiplayer scenes. Each participant pair is randomly
+# assigned one of the five Overcooked layouts (see HH_LAYOUTS in
+# overcooked_utils.py) via RandomizeOrder(keep_n=1).
 stager = stager.Stager(
     scenes=[
         hh_start_scene,
-        oc_scenes.tutorial_gym_scene,
-        oc_scenes.cramped_room_human_human.gameplay(num_episodes=20, max_steps=1350).multiplayer(pause_on_partner_background=False),
+        # oc_scenes.tutorial_gym_scene,
+        oc_scenes.randomized_human_human_layouts,
         oc_scenes.multiplayer_feedback_scene,
         oc_scenes.end_scene,
     ]
@@ -80,13 +82,19 @@ if __name__ == "__main__":
         experiment_config.ExperimentConfig()
         .experiment(stager=stager, experiment_id=args.experiment_id)
         .hosting(port=args.port, host="0.0.0.0")
-        .entry_screening(browser_requirements=["Chrome", "Safari"], browser_blocklist=["Firefox"], max_ping=200)
+        .entry_screening(
+            browser_requirements=["Chrome", "Safari", "Firefox"],
+            # browser_blocklist=["Firefox"],
+            max_ping=200,
+        )
         # For TURN server fallback, use:
         # $ export TURN_USERNAME=<open-relay-username>
         # $ export TURN_CREDENTIAL=<open-relay-password>
         # Or pass them in below.
         .webrtc(force_relay=False)
-        .static_files(directories=["examples/cogrid/assets", "examples/shared/assets"])
+        .static_files(
+            directories=["examples/cogrid/assets", "examples/shared/assets"]
+        )
     )
 
     app.run(experiment_config)

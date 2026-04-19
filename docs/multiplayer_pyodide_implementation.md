@@ -1038,7 +1038,7 @@ CLIENT 1                                              CLIENT 2
 ### File Organization
 
 ```
-interactive-gym/
+mug/
 ├── mug/
 │   ├── server/
 │   │   ├── app.py                           # SocketIO event handlers

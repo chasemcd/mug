@@ -32,7 +32,7 @@ game_scene = (
     .runtime(
         environment_initialization_code=(
             "import gymnasium as gym\n"
-            "env = gym.make('CartPole-v1', render_mode='interactive-gym')"
+            "env = gym.make('CartPole-v1', render_mode='mug')"
         ),
         packages_to_install=["gymnasium==1.0.0"],
     )
@@ -263,7 +263,7 @@ def my_helper():
 class MyEnv(gym.Env):
     # ...
 
-env = MyEnv(render_mode='interactive-gym')
+env = MyEnv(render_mode='mug')
     """,
 )
 ```
@@ -430,7 +430,7 @@ class MultiAgentEnv(gym.Env):
         # Step with all actions
         return super().step(actions)
 
-env = MultiAgentEnv(render_mode='interactive-gym')
+env = MultiAgentEnv(render_mode='mug')
     """,
 )
 ```
@@ -514,9 +514,3 @@ game_scene = (
     )
 )
 ```
-
-## Next Steps
-
-- **Server-side execution**: [Server Mode](server-mode.md)
-- **Learn about rendering**: [Surface API](surface-api.md)
-- **See complete example**: [Quick Start](../getting-started/quick-start.md)

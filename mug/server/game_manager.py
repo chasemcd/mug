@@ -338,16 +338,10 @@ class GameManager:
                 del self.reset_events[game.game_id][subject_id]
                 return False
 
-            if self.scene.game_page_html_fn is not None:
-                self.socketio.emit(
-                    "update_game_page_text",
-                    {
-                        "game_page_text": self.scene.game_page_html_fn(
-                            game, subject_id
-                        )
-                    },
-                    room=subject_id,
-                )
+            # Per-subject game page HTML is emitted from start_game() once the
+            # socket is in the game room — emitting here would either route to
+            # an unjoined room or be overwritten by the subsequent start_game
+            # broadcast of in_game_scene_body.
 
             return True
 
@@ -1298,6 +1292,29 @@ class GameManager:
             },
             room=game.game_id,
         )
+
+        # Per-subject game page HTML (runs after start_game so it overrides
+        # in_game_scene_body rather than being overwritten by it). Each
+        # participant gets their own HTML targeted at their socket.
+        if self.scene.game_page_html_fn is not None:
+            for subject_id in list(game.human_players.values()):
+                if not subject_id or subject_id == AvailableSlot:
+                    continue
+                socket_id = self._get_socket_id(subject_id)
+                if not socket_id:
+                    continue
+                try:
+                    page_html = self.scene.game_page_html_fn(game, subject_id)
+                except Exception:
+                    logger.exception(
+                        f"game_page_html_fn raised for subject {subject_id}"
+                    )
+                    continue
+                self.socketio.emit(
+                    "update_game_page_text",
+                    {"game_page_text": page_html},
+                    room=socket_id,
+                )
 
         if not self.scene.run_through_pyodide:
             # Non-pyodide games go straight to PLAYING (no validation phase)

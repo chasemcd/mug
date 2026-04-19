@@ -35,10 +35,13 @@ start_scene = (
         should_export_metadata=True,
     )
     .display(
-        scene_header="Welcome",
+        scene_header="Welcome!",
         scene_body=(
-            "Welcome to the Mountain Car experiment! This is a demonstration of "
-            "how to set up a basic experiment with an environment that renders via an RGB image.",
+            "<center>"
+            "This is a demonstration of "
+            "how to set up a basic experiment "
+            "in the classic Mountain Car environment.",
+            "</center>",
         ),
     )
 )
@@ -50,32 +53,22 @@ mountain_car_scene = (
     .policies(policy_mapping=POLICY_MAPPING)
     .rendering(
         fps=30,
-        game_width=600,
-        game_height=400,
+        game_width=300,
+        game_height=200,
     )
     .gameplay(
         default_action=NOOP_ACTION,
         action_mapping=action_mapping,
-        num_episodes=5,
+        num_episodes=1,
         max_steps=200,
         input_mode=configuration_constants.InputModes.PressedKeys,
     )
     .content(
         scene_header="Mountain Car",
-        scene_body="<center><p>"
-        "On this page, Python is initializing and loading packages in the background. With a decent internet connection, it should only be a few moments. If it takes longer than inspected, right click on the page and select 'Inspect -> Console' to see if an error was logged. <br> <br> When it has initialized, the button will become active and you can continue on in the experiment."
-        "</p></center>",
-        in_game_scene_body="""
-        <center>
-        <p>
-        Use the arrow keys to move the "car" (ball) up the hill!
-        </p>
-        </center>
-        <br><br>
-        """,
+        scene_body="<center><p>" "Get ready to play!" "</p></center>",
     )
     .runtime(
-        environment_initialization_code_filepath="examples/mountain_car/mountain_car_rgb_env.py",
+        environment_initialization_code_filepath="examples/mountain_car/mountain_car_env.py",
         packages_to_install=[
             "gymnasium",
         ],

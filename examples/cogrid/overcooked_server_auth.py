@@ -43,7 +43,7 @@ def _create_overcooked_env(**kwargs):
     import time, which allows the example to be imported for inspection without
     requiring cogrid to be installed.
     """
-    from examples.cogrid.environments.cramped_room_environment_initialization_hh import (
+    from examples.cogrid.environments.overcooked_hh_template import (
         OvercookedEnv, overcooked_config)
 
     return OvercookedEnv(config=overcooked_config, **kwargs)
@@ -100,16 +100,10 @@ server_auth_scene = (
         "Work together to prepare and deliver as many dishes as possible. "
         "</p></center>",
         game_page_html_fn=overcooked_utils.overcooked_game_page_header_fn,
-        in_game_scene_body="""
-        <center>
-        <p>
-        Use the arrow keys <img src="examples/shared/assets/keys/arrow_keys_2.png" alt="Keyboard arrow keys" height="24" width="20" style="vertical-align:middle;">
-        to control your chef and press <img src="examples/shared/assets/keys/icons8-w-key-50.png" alt="W key" height="24" width="24" style="vertical-align:middle;"> to pick up and
-        drop objects. Coordinate with your partner to deliver as many dishes as possible!
-        </p>
-        </center>
-        <br><br>
-        """,
+        in_game_scene_body=overcooked_utils.overcooked_two_column_layout(
+            "You and your partner control the two chefs."
+            "<br>Coordinate to deliver as many dishes as possible."
+        ),
     )
     .multiplayer(mode="server_authoritative")
 )

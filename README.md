@@ -12,7 +12,7 @@ Multi-User Gymnasium (MUG) converts [Gymnasium](https://gymnasium.farama.org/) a
 ## Installation
 
 ```bash
-pip install multi-user-gymnasium
+pip install multi-user-gymnasium[server]
 ```
 
 <div align="center">
@@ -30,6 +30,31 @@ pip install multi-user-gymnasium
 For full explanations of each feature, see the [documentation](https://multi-user-gymnasium.readthedocs.io/).
 
 
+## Citation
+
+If you use MUG in your research, please cite:
+
+```bibtex
+@article{mcdonald2026cogrid,
+  title={CoGrid \& the Multi-User Gymnasium: A Framework for Multi-Agent Experimentation},
+  author={McDonald, Chase and Gonzalez, Cleotilde},
+  journal={arXiv preprint arXiv:2604.15044},
+  year={2026}
+}
+```
+
+## MUG in the Wild
+
+Below are a list of projects that have used MUG. If you use it in your research, please let us know or open a PR for it to be added here.
+
+```bibtex
+@article{mcdonald2025controllable,
+  title={Controllable Complementarity: Subjective Preferences in Human-AI Collaboration},
+  author={McDonald, Chase and Gonzalez, Cleotilde},
+  journal={arXiv preprint arXiv:2503.05455},
+  year={2025}
+}
+```
 
 ## Acknowledgements
 

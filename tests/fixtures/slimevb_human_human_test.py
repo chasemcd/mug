@@ -93,13 +93,11 @@ end_scene = (
     .scene(scene_id="slimevb_end_scene")
     .display(
         scene_header="Thanks for playing!",
-        scene_body="For more information, visit interactive-gym.readthedocs.io!",
+        scene_body="For more information, visit multi-user-gymnasium.readthedocs.io!",
     )
 )
 
-stager = stager.Stager(
-    scenes=[start_scene, slime_scene, end_scene]
-)
+stager = stager.Stager(scenes=[start_scene, slime_scene, end_scene])
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
