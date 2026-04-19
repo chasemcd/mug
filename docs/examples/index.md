@@ -21,7 +21,7 @@ Examples must be run from a cloned repository, not a pip install, because they r
     ```bash
     git clone https://github.com/chasemcd/mug.git
     cd mug
-    pip install -e .[server]
+    pip install -e ".[server]"
     ```
 
 2. Install any example-specific dependencies listed in the individual example page.
