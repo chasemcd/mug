@@ -11,7 +11,7 @@ Multi-User Gymnasium (MUG) converts [Gymnasium](https://gymnasium.farama.org/) a
 
 ## What does MUG offer?
 
-1. MUG allows researchers to run scalable, human experiments in the browser against the exact same simulation environments used for AI training.
+1. MUG allows researchers to scalably run human experiments in the browser against the exact same simulation environments used for AI training.
 2. Python environments can be run directly in the browser, eliminating the need for a client-server communication that will introduce latency.
 3. Built-in networking, rollback netcode, and waiting rooms for multi-player experiments.
 4. Full experiment flow, allowing for the integration of tutorials, surveys, feedback scenes, randomization, and much more.
