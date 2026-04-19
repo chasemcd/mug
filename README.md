@@ -12,7 +12,7 @@ Multi-User Gymnasium (MUG) converts [Gymnasium](https://gymnasium.farama.org/) a
 ## Installation
 
 ```bash
-pip install multi-user-gymnasium
+pip install multi-user-gymnasium[server]
 ```
 
 <div align="center">
