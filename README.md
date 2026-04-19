@@ -67,5 +67,4 @@ Below are a list of projects that have used MUG. If you use it in your research,
 
 ## Acknowledgements
 
-The Phaser integration and server implementation are inspired by and derived from the
-Overcooked AI demo by Carroll et al. (https://github.com/HumanCompatibleAI/overcooked-demo/tree/master).
+- This project was originally inspired by the work by Carroll et al. in their [Overcooked-AI demo](https://github.com/HumanCompatibleAI/overcooked-demo/tree/master). Most notably in the use of their Overcooked environment and assets in our examples, as well as the use of Phaser (with their client-server implementation).
