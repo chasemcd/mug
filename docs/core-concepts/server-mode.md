@@ -641,8 +641,3 @@ Browser-side execution is preferred whenever the environment is compatible. Use 
 - Profile environment with multiple episodes
 - Clear large arrays in `reset()`
 - Monitor memory usage during long sessions
-
-## Next Steps
-
-- **Browser-side execution**: [Browser-Side Execution](pyodide-mode.md)
-- **Human-Human Overcooked example** (P2P, with server-authoritative variant): [Overcooked: Human-Human](../examples/overcooked-client-side.md)

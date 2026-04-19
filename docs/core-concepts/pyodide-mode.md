@@ -514,9 +514,3 @@ game_scene = (
     )
 )
 ```
-
-## Next Steps
-
-- **Server-side execution**: [Server Mode](server-mode.md)
-- **Learn about rendering**: [Surface API](surface-api.md)
-- **See complete example**: [Quick Start](../getting-started/quick-start.md)
