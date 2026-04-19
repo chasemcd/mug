@@ -21,7 +21,7 @@ pip install multi-user-gymnasium
 Take any [Gymnasium](https://gymnasium.farama.org/) or [PettingZoo](https://pettingzoo.farama.org/) `ParallelEnv` environment, a policy trained in it, and put them in a participant's browser for human-AI interaction experiments.
 
 <div align="center">
-  <video src="assets/images/OvercookedDemo.webm" autoplay loop muted playsinline width="600">
+  <video src="assets/images/overcooked_human_human.webm" autoplay loop muted playsinline width="600">
     Your browser does not support the video tag.
   </video>
 </div>
