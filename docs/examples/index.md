@@ -1,62 +1,47 @@
 # Examples
 
-Complete example experiments demonstrating various MUG features. Each example includes full source code, detailed documentation, and instructions for customization.
+Complete example experiments demonstrating various MUG features. Each example includes full source code and documentation.
 
 All examples are located in the [examples/](https://github.com/chasemcd/interactive-gym/tree/main/examples) directory.
 
-## Example Comparison
+| Example | Players | Mode |
+|---------|---------|------|
+| [Mountain Car](mountain-car.md) | Human | Client |
+| [Slime Volleyball: Human-AI](slime-volleyball-hai.md) | Human vs AI | Client |
+| [Slime Volleyball: Human-Human](slime-volleyball-hh.md) | Human-Human | Client (P2P/GGPO) |
+| [Overcooked: Human-AI](overcooked-human-ai.md) | Human + AI | Client |
+| [Overcooked: Human-Human (P2P)](overcooked-client-side.md) | Human-Human | Client (P2P/GGPO) |
+| [Overcooked: Human-Human (Server)](overcooked-multiplayer.md) | Human-Human | Server |
+| [Footsies](footsies.md) | Human vs AI | Client (WebGL) |
 
-| Example | Players | Mode | Complexity | Key Features |
-|---------|---------|------|------------|--------------|
-| [Mountain Car](mountain-car.md) | Human | Client | Beginner | Client-side execution, custom rendering, RGB array conversion |
-| [Slime Volleyball](slime-volleyball.md) | Human-Human, Human-AI | Server/Client | Intermediate | Human vs AI, ONNX policy inference, sprite rendering |
-| [Overcooked: Human-AI](overcooked-human-ai.md) | Human-AI | Client | Advanced | Human-AI coordination, SP and BS policies, randomized layouts |
-| [Overcooked: Client-Side](overcooked-client-side.md) | Human-Human | Client (P2P/GGPO) | Advanced | P2P multiplayer, GGPO rollback, latency-aware matchmaking |
-| [Overcooked: Server-Side](overcooked-multiplayer.md) | Human-Human | Server | Advanced | Server-authoritative multiplayer, synchronized gameplay |
-| [Footsies](footsies.md) | Human-AI | Client (WebGL) | Advanced | Fighting game mechanics, frame-perfect timing, competitive play |
+## Running Examples
 
-### Prerequisites
+Examples must be run from a cloned repository, not a pip install, because they rely on relative paths for assets (sprites, models, ONNX files).
 
-**Important**: Examples must be run from a cloned repository, not from a pip installation, because they rely on relative paths for assets (sprites, models, etc.).
-
-1. **Clone the repository**:
+1. Clone the repository and install with server dependencies:
 
     ```bash
     git clone https://github.com/chasemcd/interactive-gym.git
     cd interactive-gym
-    ```
-
-2. **Install MUG with server dependencies**:
-
-    ```bash
     pip install -e .[server]
     ```
 
-3. **Install example-specific dependencies** (if needed):
+2. Install any example-specific dependencies listed in the individual example page.
 
-    Some examples require additional packages. See individual example documentation for details.
-
-### Running Examples
-
-Examples must be run as modules from the repository root to ensure correct asset paths:
-
-1. **From the repository root**, run the example as a module:
-
-    ```bash
-    python -m examples.example_name.experiment_file
-    ```
-
-    For example:
+3. From the repository root, run the example as a module:
 
     ```bash
     # Mountain Car
     python -m examples.mountain_car.mountain_car_experiment
 
-    # Slime Volleyball (Human vs AI, browser-side)
-    python -m examples.slime_volleyball.human_ai_pyodide
+    # Slime Volleyball (Human vs AI)
+    python -m examples.slime_volleyball.slimevb_human_ai
 
-    # Overcooked (Human vs AI, client-side)
-    python -m examples.cogrid.overcooked_human_ai_client_side
+    # Slime Volleyball (Human vs Human, client-side P2P)
+    python -m examples.slime_volleyball.slimevb_human_human
+
+    # Overcooked (Human + AI)
+    python -m examples.cogrid.overcooked_human_ai
 
     # Overcooked (Human vs Human, client-side P2P)
     python -m examples.cogrid.overcooked_human_human_multiplayer --experiment-id test
@@ -68,17 +53,48 @@ Examples must be run as modules from the repository root to ensure correct asset
     python -m examples.footsies.footsies_experiment
     ```
 
-2. **Open browser** to the specified port (usually http://localhost:5702 or http://localhost:5000)
+4. Open a browser to the port printed on startup (typically http://localhost:5702).
 
-### Example Structure
+## Common Patterns
 
-Each example directory typically contains:
+These apply across every example and are not repeated on individual pages.
 
-```text
-example_name/
-├── experiment_file.py            # Main experiment file
-├── environment_file.py           # Environment implementation (if needed)
-├── README.md                     # Setup instructions
-├── policies/                     # AI policies (if applicable)
-└── assets/                       # Images, sprites, etc.
+### Eventlet monkey-patching
+
+Every experiment file starts with:
+
+```python
+from __future__ import annotations
+import eventlet
+eventlet.monkey_patch()
 ```
+
+This must happen before any other imports so Flask-SocketIO networking is non-blocking.
+
+### Serving assets outside the MUG package
+
+Anything loaded by path — sprites, ONNX models, HTML, GIFs — must be registered with `.static_files()` so the server can serve it:
+
+```python
+config = (
+    experiment_config.ExperimentConfig()
+    .experiment(stager=stager, experiment_id="...")
+    .hosting(port=5702, host="0.0.0.0")
+    .static_files(directories=[
+        "examples/<example>/assets",
+        "examples/shared/assets",
+    ])
+)
+```
+
+Each directory is served at a URL matching its filesystem path, so the same string used in Python (e.g. `examples/cogrid/assets/.../terrain.png`) is also the browser URL.
+
+### Pyodide environments
+
+For client-side examples, the browser runs a Python file you point `.runtime()` at. That file must leave a module-level variable named `env`:
+
+```python
+env = MyEnv(render_mode="mug")
+```
+
+MUG loads Pyodide in the browser, pip-installs any `packages_to_install`, executes the file, and calls `env.reset()` / `env.step()` / `env.render()` from JavaScript. For multiplayer P2P, the env must also implement `get_state()` / `set_state()` for GGPO rollback.

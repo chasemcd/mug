@@ -64,8 +64,8 @@ nav:
   - Examples:
     - Overview: examples/index.md
     - Mountain Car: examples/mountain-car.md
-    - Slime Volleyball: examples/slime-volleyball.md
-    - "Overcooked: Overview": examples/overcooked.md
+    - "Slime Volleyball: Human-AI": examples/slime-volleyball-hai.md
+    - "Slime Volleyball: Human-Human": examples/slime-volleyball-hh.md
     - "Overcooked: Human-AI": examples/overcooked-human-ai.md
     - "Overcooked: Client-Side P2P": examples/overcooked-client-side.md
     - "Overcooked: Server-Side": examples/overcooked-multiplayer.md

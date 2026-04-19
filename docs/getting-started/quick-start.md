@@ -14,7 +14,7 @@ pip install multi-user-gymnasium[server]
 
 The standard Mountain Car uses pygame for rendering, which is not available in the browser. We override the `render()` method to use MUG's Surface API instead.
 
-Create a file called `mountain_car_rgb_env.py`:
+Create a file called `mountain_car_env.py`:
 
 ```python
 import numpy as np
@@ -159,7 +159,7 @@ mountain_car_scene = (
     )
     .runtime(
         run_through_pyodide=True,
-        environment_initialization_code_filepath="mountain_car_rgb_env.py",
+        environment_initialization_code_filepath="mountain_car_env.py",
     )
 )
 
@@ -235,7 +235,7 @@ Install server dependencies:
 pip install multi-user-gymnasium[server]
 ```
 
-**"File not found: mountain_car_rgb_env.py"**
+**"File not found: mountain_car_env.py"**
 
 Make sure the file path in `.runtime()` is relative to where you run the script, or use an absolute path.
 

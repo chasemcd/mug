@@ -54,7 +54,7 @@ slime_scene = (
     .gameplay(
         default_action=NOOP,
         action_mapping=ACTION_MAPPING,
-        num_episodes=5,
+        num_episodes=2,
         max_steps=3000,
         input_mode=configuration_constants.InputModes.PressedKeys,
     )
@@ -62,13 +62,24 @@ slime_scene = (
         scene_header="Slime Volleyball",
         scene_body="<center><p>" "Press start to continue. " "</p></center>",
         in_game_scene_body="""
-        <center>
-        <p>
-        Use the arrow keys <img src="examples/shared/assets/keys/arrow_keys_2.png" alt="Keyboard arrow keys" height="24" width="20" style="vertical-align:middle;">
-        to control the slime on the right!
-        </p>
-        </center>
-        <br><br>
+        <div style="text-align: center; font-family: sans-serif; margin: 8px auto; max-width: 520px;">
+            <p style="font-size: 0.95em; margin: 0 0 10px 0;">
+                You control
+                <img src="examples/slime_volleyball/assets/slime_volleyball/red_slime.png"
+                     alt="Red slime" style="height: 1.2em; vertical-align: -0.25em;">
+                — land the ball on your opponent's side to score.
+            </p>
+            <div style="display: flex; align-items: center; justify-content: center; gap: 16px;">
+                <img src="examples/shared/assets/keys/arrow_keys_2.png"
+                     alt="Keyboard arrow keys"
+                     style="height: 90px; width: auto;">
+                <div style="text-align: left; font-size: 0.9em; line-height: 1.4;">
+                    <div><b>&larr; / &rarr;</b> &nbsp;move</div>
+                    <div><b>&uarr;</b> &nbsp;jump</div>
+                    <div><b>&uarr; + &larr; / &rarr;</b> &nbsp;jump diagonally</div>
+                </div>
+            </div>
+        </div>
         """,
     )
     .runtime(
@@ -83,7 +94,15 @@ end_scene = (
     .scene(scene_id="slimevb_end_scene")
     .display(
         scene_header="Thanks for playing!",
-        scene_body="For more information, visit interactive-gym.readthedocs.io!",
+        scene_body=(
+            '<div style="text-align: center; font-family: sans-serif; margin-top: 12px;">'
+            "For more information, visit "
+            '<a href="https://multi-user-gymnasium.readthedocs.io" target="_blank" rel="noopener noreferrer" '
+            'style="color: #3f51b5; text-decoration: none; font-weight: 600; border-bottom: 1px solid #3f51b5;">'
+            "multi-user-gymnasium.readthedocs.io"
+            "</a>."
+            "</div>"
+        ),
     )
 )
 

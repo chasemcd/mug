@@ -29,7 +29,7 @@ OVERCOOKED_MODEL_CONFIG = ModelConfig(
     logit_output="logits",
 )
 
-SP_POLICY_MAPPING_CRAMPED_ROOM = {
+POLICY_MAPPING_CRAMPED_ROOM_0 = {
     0: configuration_constants.PolicyTypes.Human,
     1: dataclasses.replace(
         OVERCOOKED_MODEL_CONFIG,
@@ -37,7 +37,7 @@ SP_POLICY_MAPPING_CRAMPED_ROOM = {
     ),
 }
 
-IBC_POLICY_MAPPING_CRAMPED_ROOM = {
+POLICY_MAPPING_CRAMPED_ROOM_1 = {
     0: configuration_constants.PolicyTypes.Human,
     1: dataclasses.replace(
         OVERCOOKED_MODEL_CONFIG,
@@ -104,24 +104,18 @@ tutorial_gym_scene = (
         default_action=Noop,
         action_mapping=action_mapping,
         num_episodes=1,
-        max_steps=1000,
+        max_steps=500,
         input_mode=configuration_constants.InputModes.SingleKeystroke,
     )
     .content(
         scene_header="Overcooked Tutorial",
         scene_body_filepath="examples/cogrid/html_pages/overcooked_controls.html",
-        in_game_scene_body="""
-        <center>
-        <p>
-        Use the arrow keys <img src="examples/shared/assets/keys/arrow_keys_2.png" alt="Keyboard arrow keys" height="24" width="20" style="vertical-align:middle;">
-        to control your chef <img src="examples/cogrid/assets/overcooked/blue_chef.png" alt="Blue Chef" height="24" width="24" style="vertical-align:middle;">
-        and press <img src="examples/shared/assets/keys/icons8-w-key-50.png" alt="W key" height="24" width="24" style="vertical-align:middle;"> to pick up and
-        drop objects. Try to deliver as many dishes as possible by combining onions in the pot, plating the cooked onions,
-        and delivering them to the grey delivery zone.
-        </p>
-        </center>
-        <br><br>
-        """,
+        in_game_scene_body=overcooked_utils.overcooked_two_column_layout(
+            'You control <img src="examples/cogrid/assets/overcooked/blue_chef.png" '
+            'alt="Blue Chef" style="height: 1.2em; vertical-align: -0.25em;">.'
+            "<br>Try to deliver as many dishes as possible: combine onions in the pot, "
+            "plate the cooked soup, and deliver it to the grey zone."
+        ),
         game_page_html_fn=overcooked_utils.overcooked_game_page_header_fn,
     )
     .runtime(
@@ -134,7 +128,7 @@ tutorial_gym_scene = (
 cramped_room_sp_0 = (
     gym_scene.GymScene()
     .scene(scene_id="cramped_room_sp_0", experiment_config={})
-    .policies(policy_mapping=SP_POLICY_MAPPING_CRAMPED_ROOM, frame_skip=5)
+    .policies(policy_mapping=POLICY_MAPPING_CRAMPED_ROOM_0, frame_skip=5)
     .rendering(
         fps=30,
         hud_text_fn=overcooked_utils.hud_text_fn,
@@ -149,7 +143,7 @@ cramped_room_sp_0 = (
         default_action=Noop,
         action_mapping=action_mapping,
         num_episodes=1,
-        max_steps=1350,
+        max_steps=600,
         input_mode=configuration_constants.InputModes.SingleKeystroke,
     )
     .content(
@@ -164,18 +158,12 @@ cramped_room_sp_0 = (
         "When the button activates, click it to begin. "
         "</p></center>",
         game_page_html_fn=overcooked_utils.overcooked_game_page_header_fn,
-        in_game_scene_body="""
-        <center>
-        <p>
-        Use the arrow keys <img src="examples/shared/assets/keys/arrow_keys_2.png" alt="Keyboard arrow keys" height="24" width="20" style="vertical-align:middle;">
-        to control your chef <img src="examples/cogrid/assets/overcooked/blue_chef.png" alt="Blue Chef" height="24" width="24" style="vertical-align:middle;">
-        and press <img src="examples/shared/assets/keys/icons8-w-key-50.png" alt="W key" height="24" width="24" style="vertical-align:middle;"> to pick up and
-        drop objects. Try to deliver as many dishes as possible by combining onions in the pot, plating the cooked onions,
-        and delivering them to the grey delivery zone.
-        </p>
-        </center>
-        <br><br>
-        """,
+        in_game_scene_body=overcooked_utils.overcooked_two_column_layout(
+            'You control <img src="examples/cogrid/assets/overcooked/blue_chef.png" '
+            'alt="Blue Chef" style="height: 1.2em; vertical-align: -0.25em;">.'
+            "<br>Combine onions in the pot, plate the cooked soup, and deliver it to "
+            "the grey zone."
+        ),
     )
     .runtime(
         environment_initialization_code_filepath="examples/cogrid/environments/cramped_room_environment_initialization.py",
@@ -185,7 +173,7 @@ cramped_room_sp_0 = (
 cramped_room_ibc_0 = (
     copy.deepcopy(cramped_room_sp_0)
     .scene(scene_id="cramped_room_ibc_0", experiment_config={})
-    .policies(policy_mapping=IBC_POLICY_MAPPING_CRAMPED_ROOM)
+    .policies(policy_mapping=POLICY_MAPPING_CRAMPED_ROOM_1)
     .content(
         scene_header="Overcooked",
         scene_body="<center><p>"
@@ -247,16 +235,10 @@ cramped_room_human_human = (
         "Work together to prepare and deliver as many dishes as possible. "
         "</p></center>",
         game_page_html_fn=overcooked_utils.overcooked_game_page_header_fn,
-        in_game_scene_body="""
-        <center>
-        <p>
-        Use the arrow keys <img src="examples/shared/assets/keys/arrow_keys_2.png" alt="Keyboard arrow keys" height="24" width="20" style="vertical-align:middle;">
-        to control your chef and press <img src="examples/shared/assets/keys/icons8-w-key-50.png" alt="W key" height="24" width="24" style="vertical-align:middle;"> to pick up and
-        drop objects. Coordinate with your partner to deliver as many dishes as possible!
-        </p>
-        </center>
-        <br><br>
-        """,
+        in_game_scene_body=overcooked_utils.overcooked_two_column_layout(
+            "You and your partner control the two chefs."
+            "<br>Coordinate to deliver as many dishes as possible."
+        ),
     )
     .waitroom(
         timeout=300000,  # 5 minutes

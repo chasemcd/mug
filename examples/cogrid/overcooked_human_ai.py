@@ -27,7 +27,7 @@ from mug.server import app
 stager = stager.Stager(
     scenes=[
         oc_scenes.start_scene,
-        # oc_scenes.tutorial_gym_scene,
+        oc_scenes.tutorial_gym_scene,
         oc_scenes.cramped_room_0,
         oc_scenes.feedback_scene,
         oc_scenes.end_scene,
