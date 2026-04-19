@@ -67,6 +67,5 @@ nav:
     - "Slime Volleyball: Human-AI": examples/slime-volleyball-hai.md
     - "Slime Volleyball: Human-Human": examples/slime-volleyball-hh.md
     - "Overcooked: Human-AI": examples/overcooked-human-ai.md
-    - "Overcooked: Client-Side P2P": examples/overcooked-client-side.md
-    - "Overcooked: Server-Side": examples/overcooked-multiplayer.md
+    - "Overcooked: Human-Human": examples/overcooked-client-side.md
     - Footsies: examples/footsies.md

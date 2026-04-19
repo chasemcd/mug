@@ -505,7 +505,7 @@ game_scene = (
 
     In server-authoritative mode, participants do not need to download Pyodide or your environment code. This means faster initial load times but higher per-frame latency.
 
-For a full server-authoritative example, see [Overcooked Multiplayer](../examples/overcooked-multiplayer.md).
+For a full server-authoritative example, see the *Running server-authoritative instead* section of [Overcooked: Human-Human](../examples/overcooked-client-side.md#running-server-authoritative-instead).
 
 ---
 
@@ -613,6 +613,5 @@ config = (
 ## Next Steps
 
 - See [Server Mode](../core-concepts/server-mode.md) for a detailed explanation of server-authoritative architecture and advanced configuration
-- See [Overcooked Client-Side](../examples/overcooked-client-side.md) for a full P2P multiplayer example with GGPO
-- See [Overcooked Multiplayer](../examples/overcooked-multiplayer.md) for a full server-authoritative example
+- See [Overcooked: Human-Human](../examples/overcooked-client-side.md) for a full P2P multiplayer example with GGPO (with a server-authoritative variant at the bottom of the page)
 - Review the [Quick Start](quick-start.md) if you need a refresher on single-player experiment basics

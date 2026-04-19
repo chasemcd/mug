@@ -645,5 +645,4 @@ Browser-side execution is preferred whenever the environment is compatible. Use 
 ## Next Steps
 
 - **Browser-side execution**: [Browser-Side Execution](pyodide-mode.md)
-- **Server-authoritative example**: [Overcooked Multiplayer](../examples/overcooked-multiplayer.md)
-- **Client-side P2P example**: [Overcooked Client-Side](../examples/overcooked-client-side.md)
+- **Human-Human Overcooked example** (P2P, with server-authoritative variant): [Overcooked: Human-Human](../examples/overcooked-client-side.md)

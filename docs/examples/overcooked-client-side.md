@@ -1,10 +1,16 @@
-# Overcooked: Human-Human (Client-Side)
+# Overcooked: Human-Human
+
+<div align="center">
+  <video src="../assets/images/overcooked_human_human.webm" autoplay loop muted playsinline width="600">
+    Your browser does not support the video tag.
+  </video>
+</div>
 
 Two human participants collaborate as chefs on the Cramped Room kitchen, with each browser running its own Pyodide copy of the environment and exchanging inputs peer-to-peer over WebRTC. GGPO rollback netcode keeps the two simulations synchronized, and FIFO matchmaking with a maximum P2P RTT filters out high-latency pairings.
 
 **Source:** [`examples/cogrid/overcooked_human_human_multiplayer.py`](https://github.com/chasemcd/interactive-gym/blob/main/examples/cogrid/overcooked_human_human_multiplayer.py)
 
-For a simpler P2P walkthrough with the full GGPO explanation, see [Quick Start: Multiplayer](../getting-started/quick-start-multiplayer.md). For the server-authoritative version, see [Overcooked: Server-Side](overcooked-multiplayer.md).
+For a simpler P2P walkthrough with the full GGPO explanation, see [Quick Start: Multiplayer](../getting-started/quick-start-multiplayer.md). For a version where the environment runs on the server instead, see the [Running server-authoritative instead](#running-server-authoritative-instead) section at the bottom.
 
 See [Examples](index.md) for install and run instructions. This example also requires:
 
@@ -132,13 +138,38 @@ export TURN_CREDENTIAL="your-openrelay-api-key"
 
 Set `force_relay=True` to route all WebRTC traffic through TURN (useful for testing). See [Server Mode](../core-concepts/server-mode.md) for TURN setup.
 
-## Client-Side vs Server-Authoritative
+## Running server-authoritative instead
 
-| | Client-Side (P2P) | Server-Authoritative |
-|---|---|---|
-| Environment runs | In each browser (Pyodide) | On the server |
-| Perceived latency | Low (local sim + GGPO) | Higher (input round-trips server) |
-| Server load | Minimal (matchmaking only) | Proportional to active games |
-| Dependencies | Pure Python only | Any Python code |
-| Requires `get_state`/`set_state` | Yes | No |
-| Initial load time | 30-90s (Pyodide startup) | Instant |
+Use server-authoritative mode when the environment has compiled dependencies, needs GPU inference, or otherwise cannot run in Pyodide. Three changes to the scene above are enough to flip the mode:
+
+1. **Drop `.runtime(...)`** — there is no Pyodide, so no env-init file to execute in the browser.
+2. **Add `.environment(env_creator=..., env_config=...)`** — the server constructs the env itself. A lazy `env_creator` avoids importing heavy dependencies at module load time.
+3. **Change `.multiplayer(mode="server_authoritative")`** — turns off GGPO / rollback / `get_state` / `set_state`; every input round-trips through the server and both browsers receive the same rendered state each frame.
+
+```python
+def _create_overcooked_env(**kwargs):
+    """Lazy env_creator so cogrid is only imported when the server creates the env."""
+    from examples.cogrid.environments.cramped_room_environment_initialization_hh import (
+        OvercookedEnv, overcooked_config,
+    )
+    return OvercookedEnv(config=overcooked_config, **kwargs)
+
+
+server_auth_scene = (
+    gym_scene.GymScene()
+    .scene(scene_id="cramped_room_server_auth")
+    .policies(policy_mapping=HUMAN_HUMAN_POLICY_MAPPING)
+    .environment(env_creator=_create_overcooked_env, env_config={"render_mode": "mug"})
+    .rendering(fps=30, ...)
+    .gameplay(default_action=Noop, action_mapping=action_mapping, ...)
+    .multiplayer(mode="server_authoritative")
+)
+```
+
+To equalize perceived latency across players on different networks, add a fixed `input_delay`:
+
+```python
+.multiplayer(mode="server_authoritative", input_delay=2)  # ~66ms @ 30 FPS
+```
+
+See [`examples/cogrid/overcooked_server_auth.py`](https://github.com/chasemcd/interactive-gym/blob/main/examples/cogrid/overcooked_server_auth.py) for the full working example.

@@ -58,7 +58,7 @@ stager = stager.Stager(
         hh_start_scene,
         oc_scenes.tutorial_gym_scene,
         oc_scenes.cramped_room_human_human.gameplay(
-            num_episodes=20, max_steps=1350
+            num_episodes=1, max_steps=600
         ).multiplayer(pause_on_partner_background=False),
         oc_scenes.multiplayer_feedback_scene,
         oc_scenes.end_scene,
@@ -83,8 +83,8 @@ if __name__ == "__main__":
         .experiment(stager=stager, experiment_id=args.experiment_id)
         .hosting(port=args.port, host="0.0.0.0")
         .entry_screening(
-            browser_requirements=["Chrome", "Safari"],
-            browser_blocklist=["Firefox"],
+            browser_requirements=["Chrome", "Safari", "Firefox"],
+            # browser_blocklist=["Firefox"],
             max_ping=200,
         )
         # For TURN server fallback, use:

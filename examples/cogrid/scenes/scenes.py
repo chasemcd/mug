@@ -227,11 +227,11 @@ cramped_room_human_human = (
     .content(
         scene_header="Overcooked - Multiplayer",
         scene_body="<center><p>"
-        "You'll now play with another human participant! "
-        "Please wait in the lobby for your partner to join. "
+        "You'll now play with another player! "
+        "Press start to join the lobby and find a partner. "
         "<br><br> "
         "You will be playing on the layout pictured below. "
-        '<center><img src="examples/cogrid/assets/overcooked/cramped_room.png" alt="Annotated Overcooked environment." height="270" width="315"></center>'
+        f'<center><img src="examples/cogrid/assets/overcooked/cramped_room.png" alt="Annotated Overcooked environment." height="{overcooked_utils.TILE_SIZE * 4}" width="{overcooked_utils.TILE_SIZE * 5}"></center>'
         "Work together to prepare and deliver as many dishes as possible. "
         "</p></center>",
         game_page_html_fn=overcooked_utils.overcooked_game_page_header_fn,
