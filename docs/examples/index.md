@@ -11,7 +11,6 @@ All examples are located in the [examples/](https://github.com/chasemcd/interact
 | [Slime Volleyball: Human-Human](slime-volleyball-hh.md) | Human-Human | Client (P2P/GGPO) |
 | [Overcooked: Human-AI](overcooked-human-ai.md) | Human + AI | Client |
 | [Overcooked: Human-Human](overcooked-client-side.md) | Human-Human | Client (P2P/GGPO, with server-auth variant) |
-| [Footsies](footsies.md) | Human vs AI | Client (WebGL) |
 
 ## Running Examples
 
@@ -46,9 +45,6 @@ Examples must be run from a cloned repository, not a pip install, because they r
     python -m examples.cogrid.overcooked_human_human_multiplayer --experiment-id test
     # Server-authoritative variant of the same example
     python -m examples.cogrid.overcooked_server_auth --experiment-id test
-
-    # Footsies
-    python -m examples.footsies.footsies_experiment
     ```
 
 4. Open a browser to the port printed on startup (typically http://localhost:5702).
