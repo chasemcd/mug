@@ -1,7 +1,7 @@
 site_name: MUG
-site_url: https://interactive-gym.readthedocs.io
-repo_url: https://github.com/chasemcd/interactive-gym
-repo_name: chasemcd/interactive-gym
+site_url: https://multi-user-gymnasium.readthedocs.io
+repo_url: https://github.com/chasemcd/mug
+repo_name: chasemcd/mug
 
 theme:
   name: material

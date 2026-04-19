@@ -157,4 +157,4 @@ Now that you have MUG installed, you can:
 1. Follow the [Quick Start](quick-start.md) to create your first experiment
 2. Check out the [Examples](../examples/index.md) to see what's possible
 
-For questions or issues, visit the [GitHub repository](https://github.com/chasemcd/interactive-gym) or open an issue.
+For questions or issues, visit the [GitHub repository](https://github.com/chasemcd/mug) or open an issue.

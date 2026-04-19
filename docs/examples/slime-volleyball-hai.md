@@ -8,7 +8,7 @@
 
 A human plays volleyball against an AI opponent in the browser. The environment and the policy both run in Pyodide, and the example demonstrates ONNX-in-browser inference and multi-key action combinations.
 
-**Source:** [`examples/slime_volleyball/slimevb_human_ai.py`](https://github.com/chasemcd/interactive-gym/blob/main/examples/slime_volleyball/slimevb_human_ai.py)
+**Source:** [`examples/slime_volleyball/slimevb_human_ai.py`](https://github.com/chasemcd/mug/blob/main/examples/slime_volleyball/slimevb_human_ai.py)
 
 See [Examples](index.md) for install and run instructions. This example also requires the [Slime Volleyball game](https://github.com/chasemcd/slimevolleygym) (ported from [David Ha's original implementation](https://github.com/hardmaru/slimevolleygym)), which we install in the user's browsers (install locally with `pip install slimevb==0.1.1`).
 

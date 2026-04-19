@@ -8,7 +8,7 @@
 
 Two human participants collaborate as chefs across the five classic Overcooked kitchens — Cramped Room, Asymmetric Advantages, Coordination Ring, Forced Coordination, and Counter Circuit. Each participant pair is randomly assigned one layout via `RandomizeOrder(keep_n=1)`. Each browser runs its own Pyodide copy of the environment and exchanges inputs peer-to-peer over WebRTC; GGPO rollback netcode keeps the two simulations synchronized, and FIFO matchmaking with a maximum P2P RTT filters out high-latency pairings.
 
-**Source:** [`examples/cogrid/overcooked_human_human_multiplayer.py`](https://github.com/chasemcd/interactive-gym/blob/main/examples/cogrid/overcooked_human_human_multiplayer.py)
+**Source:** [`examples/cogrid/overcooked_human_human_multiplayer.py`](https://github.com/chasemcd/mug/blob/main/examples/cogrid/overcooked_human_human_multiplayer.py)
 
 For a simpler P2P walkthrough with the full GGPO explanation, see [Quick Start: Multiplayer](../getting-started/quick-start-multiplayer.md). For a version where the environment runs on the server instead, see the [Running server-authoritative instead](#running-server-authoritative-instead) section at the bottom.
 
@@ -56,7 +56,7 @@ stager = stager.Stager(
 
 ## Layout list and per-layout scenes
 
-The five layouts — their CoGrid name, grid dimensions, and preview image — are listed in one place, `HH_LAYOUTS` in [`overcooked_utils.py`](https://github.com/chasemcd/interactive-gym/blob/main/examples/cogrid/overcooked_utils.py):
+The five layouts — their CoGrid name, grid dimensions, and preview image — are listed in one place, `HH_LAYOUTS` in [`overcooked_utils.py`](https://github.com/chasemcd/mug/blob/main/examples/cogrid/overcooked_utils.py):
 
 | Label | CoGrid layout | cols × rows |
 |---|---|---|
@@ -224,4 +224,4 @@ To equalize perceived latency across players on different networks, add a fixed 
 .multiplayer(mode="server_authoritative", input_delay=2)  # ~66ms @ 30 FPS
 ```
 
-See [`examples/cogrid/overcooked_server_auth.py`](https://github.com/chasemcd/interactive-gym/blob/main/examples/cogrid/overcooked_server_auth.py) for the full working example.
+See [`examples/cogrid/overcooked_server_auth.py`](https://github.com/chasemcd/mug/blob/main/examples/cogrid/overcooked_server_auth.py) for the full working example.

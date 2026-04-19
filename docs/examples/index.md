@@ -2,7 +2,7 @@
 
 Complete example experiments demonstrating various MUG features. Each example includes full source code and documentation.
 
-All examples are located in the [examples/](https://github.com/chasemcd/interactive-gym/tree/main/examples) directory.
+All examples are located in the [examples/](https://github.com/chasemcd/mug/tree/main/examples) directory.
 
 | Example | Players | Mode |
 |---------|---------|------|
@@ -19,8 +19,8 @@ Examples must be run from a cloned repository, not a pip install, because they r
 1. Clone the repository and install with server dependencies:
 
     ```bash
-    git clone https://github.com/chasemcd/interactive-gym.git
-    cd interactive-gym
+    git clone https://github.com/chasemcd/mug.git
+    cd mug
     pip install -e .[server]
     ```
 

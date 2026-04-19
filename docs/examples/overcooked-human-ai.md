@@ -8,7 +8,7 @@
 
 A human collaborates with an ONNX AI teammate to prepare and deliver dishes on the Cramped Room Overcooked kitchen, with the environment and policy both running client-side via Pyodide. The participant plays one round with a Self-Play (SP) partner and a second round with an Instance-Based Cognitive (IBC / Behavior Shaping) partner, then rates the two partners against each other. Inspired by [McDonald & Gonzalez (2025)](https://arxiv.org/abs/2503.05455).
 
-**Source:** [`examples/cogrid/overcooked_human_ai.py`](https://github.com/chasemcd/interactive-gym/blob/main/examples/cogrid/overcooked_human_ai.py)
+**Source:** [`examples/cogrid/overcooked_human_ai.py`](https://github.com/chasemcd/mug/blob/main/examples/cogrid/overcooked_human_ai.py)
 
 See [Examples](index.md) for install and run instructions. This example also requires the [CoGrid Overcooked environment](https://github.com/chasemcd/cogrid), which we install in the user's browser (install locally with `pip install cogrid==0.2.1` if you want to run the environment outside the experiment).
 

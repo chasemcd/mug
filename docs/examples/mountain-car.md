@@ -8,7 +8,7 @@
 
 A single-player Pyodide experiment where a participant controls a car trying to reach a flag on top of a hill. The environment is Gymnasium's `MountainCar-v0` with `render()` reimplemented against MUG's Surface API so it can run in the browser.
 
-**Source:** [`examples/mountain_car/mountain_car_experiment.py`](https://github.com/chasemcd/interactive-gym/blob/main/examples/mountain_car/mountain_car_experiment.py)
+**Source:** [`examples/mountain_car/mountain_car_experiment.py`](https://github.com/chasemcd/mug/blob/main/examples/mountain_car/mountain_car_experiment.py)
 
 See [Examples](index.md) for install and run instructions. This example uses [Gymnasium](https://gymnasium.farama.org/), which we install in the user's browser (Gymnasium also ships with MUG, so no separate local install is needed).
 

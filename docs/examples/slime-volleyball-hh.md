@@ -8,7 +8,7 @@
 
 Two human participants play Slime Volleyball against each other. Each browser runs its own copy of the environment via Pyodide; inputs are exchanged peer-to-peer and GGPO rollback keeps the two simulations in sync.
 
-**Source:** [`examples/slime_volleyball/slimevb_human_human.py`](https://github.com/chasemcd/interactive-gym/blob/main/examples/slime_volleyball/slimevb_human_human.py)
+**Source:** [`examples/slime_volleyball/slimevb_human_human.py`](https://github.com/chasemcd/mug/blob/main/examples/slime_volleyball/slimevb_human_human.py)
 
 This page only calls out the differences from the [Human-AI version](slime-volleyball-hai.md) — refer there for environment rendering, action mapping, and general structure.
 

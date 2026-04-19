@@ -2,7 +2,7 @@
 
 ![PyPI - Version](https://img.shields.io/pypi/v/multi-user-gymnasium)
 ![PyPI - Downloads](https://img.shields.io/pypi/dm/multi-user-gymnasium)
-![GitHub Repo stars](https://img.shields.io/github/stars/chasemcd/interactive-gym)
+![GitHub Repo stars](https://img.shields.io/github/stars/chasemcd/mug)
 
 <div align="center">
   <img src="assets/images/mug_logo.png" alt="MUG logo" width="300"/>
