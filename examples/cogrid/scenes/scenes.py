@@ -203,60 +203,90 @@ cramped_room_options_scene_0 = (
 )
 
 
-cramped_room_human_human = (
-    gym_scene.GymScene()
-    .scene(scene_id="cramped_room_hh", experiment_config={})
-    .policies(policy_mapping=HUMAN_HUMAN_POLICY_MAPPING)
-    .rendering(
-        fps=30,
-        hud_text_fn=overcooked_utils.hud_text_fn,
-        game_width=overcooked_utils.TILE_SIZE * 5,
-        game_height=overcooked_utils.TILE_SIZE * 4,
-        background="#e6b453",
+def _build_human_human_scene(
+    layout_name: str, cols: int, rows: int, label: str, preview_img: str
+):
+    """Build a human-human multiplayer scene for one Overcooked layout."""
+    scene_id = f"hh_{layout_name}"
+    width_px = overcooked_utils.TILE_SIZE * cols
+    height_px = overcooked_utils.TILE_SIZE * rows
+    # Preview image dimensions scaled to keep a consistent on-screen footprint.
+    preview_width = 315
+    preview_height = int(preview_width * rows / cols)
+    return (
+        gym_scene.GymScene()
+        .scene(scene_id=scene_id, experiment_config={})
+        .policies(policy_mapping=HUMAN_HUMAN_POLICY_MAPPING)
+        .rendering(
+            fps=30,
+            hud_text_fn=overcooked_utils.hud_text_fn,
+            game_width=width_px,
+            game_height=height_px,
+            background="#e6b453",
+        )
+        .assets(
+            assets_to_preload=overcooked_utils.overcooked_preload_assets_spec(),
+        )
+        .gameplay(
+            default_action=Noop,
+            action_mapping=action_mapping,
+            num_episodes=5,
+            max_steps=1350,
+            input_mode=configuration_constants.InputModes.SingleKeystroke,
+        )
+        .content(
+            scene_header=f"Overcooked - {label}",
+            scene_body=(
+                "<center><p>"
+                "You'll now play with another player! "
+                "Press start to join the lobby and find a partner. "
+                "<br><br> "
+                f"You will be playing on the <b>{label}</b> layout pictured below. "
+                "Work together to prepare and deliver as many dishes as possible."
+                f'<br><br><img src="{preview_img}" alt="{label} layout" '
+                f'height="{preview_height}" width="{preview_width}">'
+                "</p></center>"
+            ),
+            game_page_html_fn=overcooked_utils.overcooked_game_page_header_fn,
+            in_game_scene_body=overcooked_utils.overcooked_two_column_layout(
+                "You and your partner control the two chefs."
+                "<br>Coordinate to deliver as many dishes as possible."
+            ),
+        )
+        .waitroom(
+            timeout=300000,  # 5 minutes
+            timeout_message="Sorry, we could not find enough players for this study. Please return the HIT now. You will be paid through a Compensation HIT.",
+        )
+        .runtime(
+            environment_initialization_code=overcooked_utils.make_hh_env_init_code(
+                layout_name, cols, rows
+            ),
+            packages_to_install=["numpy", "cogrid==0.2.1", "opencv-python"],
+        )
+        .multiplayer(
+            input_delay=3,
+            matchmaker=FIFOMatchmaker(
+                max_p2p_rtt_ms=100,  # only pair participants with <=100ms RTT
+            ),
+            hide_lobby_count=True,
+            partner_disconnect_message="Your partner disconnected. The task will end here and you will be compensated for your performance so far. Please submit the completion code below.",
+            partner_disconnect_show_completion_code=True,
+        )
     )
-    .assets(
-        assets_to_preload=overcooked_utils.overcooked_preload_assets_spec(),
-    )
-    .gameplay(
-        default_action=Noop,
-        action_mapping=action_mapping,
-        num_episodes=5,
-        max_steps=1350,
-        input_mode=configuration_constants.InputModes.SingleKeystroke,
-    )
-    .content(
-        scene_header="Overcooked - Multiplayer",
-        scene_body="<center><p>"
-        "You'll now play with another player! "
-        "Press start to join the lobby and find a partner. "
-        "<br><br> "
-        "You will be playing on the layout pictured below. "
-        f'<center><img src="examples/cogrid/assets/overcooked/cramped_room.png" alt="Annotated Overcooked environment." height="{overcooked_utils.TILE_SIZE * 4}" width="{overcooked_utils.TILE_SIZE * 5}"></center>'
-        "Work together to prepare and deliver as many dishes as possible. "
-        "</p></center>",
-        game_page_html_fn=overcooked_utils.overcooked_game_page_header_fn,
-        in_game_scene_body=overcooked_utils.overcooked_two_column_layout(
-            "You and your partner control the two chefs."
-            "<br>Coordinate to deliver as many dishes as possible."
-        ),
-    )
-    .waitroom(
-        timeout=300000,  # 5 minutes
-        timeout_message="Sorry, we could not find enough players for this study. Please return the HIT now. You will be paid through a Compensation HIT.",
-    )
-    .runtime(
-        environment_initialization_code_filepath="examples/cogrid/environments/cramped_room_environment_initialization_hh.py",
-        packages_to_install=["numpy", "cogrid==0.2.1", "opencv-python"],
-    )
-    .multiplayer(
-        input_delay=3,
-        matchmaker=FIFOMatchmaker(
-            max_p2p_rtt_ms=100,  # only pair participants with <=100ms RTT
-        ),
-        hide_lobby_count=True,
-        partner_disconnect_message="Your partner disconnected. The task will end here and you will be compensated for your performance so far. Please submit the completion code below.",
-        partner_disconnect_show_completion_code=True,
-    )
+
+
+# One scene per layout. RandomizeOrder(keep_n=1) picks one for each
+# participant pair so the study covers all five layouts across participants.
+human_human_layout_scenes = [
+    _build_human_human_scene(layout_name, cols, rows, label, preview_img)
+    for layout_name, cols, rows, label, preview_img in overcooked_utils.HH_LAYOUTS
+]
+
+cramped_room_human_human = human_human_layout_scenes[0]  # retained for back-compat
+
+randomized_human_human_layouts = scene.RandomizeOrder(
+    human_human_layout_scenes,
+    keep_n=1,
 )
 
 # Feedback scene for multiplayer

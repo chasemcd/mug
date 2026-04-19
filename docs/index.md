@@ -28,7 +28,7 @@ Take any [Gymnasium](https://gymnasium.farama.org/) or [PettingZoo](https://pett
 
 === "1. Select an Environment"
 
-    Any Gymnasium env or PettingZoo `ParallelEnv` works. We'll use [CoGrid](https://github.com/chasemcd/cogrid)'s Overcooked Cramped Room for demonstration (see other examples in the sidebar):
+    Any Gymnasium or PettingZoo (`ParallelEnv`) environment works. We'll use [CoGrid](https://github.com/chasemcd/cogrid)'s Overcooked Cramped Room for demonstration (see other examples in the sidebar):
 
     ```python
     import cogrid

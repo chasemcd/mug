@@ -1,8 +1,62 @@
 from __future__ import annotations
 
+import os
+
 from mug.server import remote_game
 
 ASSET_PATH = "examples/cogrid/assets/overcooked/sprites"
+
+# Layouts available for the human-human multi-layout experiment. Each entry
+# is (layout_name_in_cogrid, cols, rows, display_label, preview_image_path).
+HH_LAYOUTS: list[tuple[str, int, int, str, str]] = [
+    (
+        "overcooked_cramped_room_v0", 5, 4, "Cramped Room",
+        "examples/cogrid/assets/overcooked/cramped_room.png",
+    ),
+    (
+        "overcooked_asymmetric_advantages_v0", 9, 5, "Asymmetric Advantages",
+        "examples/cogrid/assets/overcooked/asymmetric_advantages.png",
+    ),
+    (
+        "overcooked_coordination_ring_v0", 5, 5, "Coordination Ring",
+        "examples/cogrid/assets/overcooked/coordination_ring.png",
+    ),
+    (
+        "overcooked_forced_coordination_v0", 5, 4, "Forced Coordination",
+        "examples/cogrid/assets/overcooked/forced_coordination.png",
+    ),
+    (
+        "overcooked_counter_circuit_v0", 8, 5, "Counter Circuit",
+        "examples/cogrid/assets/overcooked/counter_circuit.png",
+    ),
+]
+
+HH_ENV_TEMPLATE_PATH = os.path.join(
+    os.path.dirname(__file__),
+    "environments",
+    "overcooked_hh_template.py",
+)
+
+
+def make_hh_env_init_code(layout_name: str, cols: int, rows: int) -> str:
+    """Return the Pyodide env-init code for a specific HH layout.
+
+    Reads the template in ``environments/overcooked_hh_template.py`` and
+    rewrites the three default ``LAYOUT_*`` assignment lines. The template
+    parses as-is (defaults to cramped room) so it also works for direct
+    imports from the server-authoritative example.
+    """
+    with open(HH_ENV_TEMPLATE_PATH, encoding="utf-8") as f:
+        template = f.read()
+    return (
+        template
+        .replace(
+            'LAYOUT_NAME = "overcooked_cramped_room_v0"',
+            f'LAYOUT_NAME = "{layout_name}"',
+        )
+        .replace("LAYOUT_COLS = 5", f"LAYOUT_COLS = {cols}")
+        .replace("LAYOUT_ROWS = 4", f"LAYOUT_ROWS = {rows}")
+    )
 
 ARROW_KEYS_IMG = "examples/shared/assets/keys/arrow_keys_2.png"
 W_KEY_IMG = "examples/shared/assets/keys/icons8-w-key-50.png"

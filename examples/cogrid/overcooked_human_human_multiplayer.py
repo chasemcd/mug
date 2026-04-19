@@ -52,14 +52,14 @@ hh_start_scene = (
 )
 
 
-# Create stager with multiplayer scenes
+# Create stager with multiplayer scenes. Each participant pair is randomly
+# assigned one of the five Overcooked layouts (see HH_LAYOUTS in
+# overcooked_utils.py) via RandomizeOrder(keep_n=1).
 stager = stager.Stager(
     scenes=[
         hh_start_scene,
-        oc_scenes.tutorial_gym_scene,
-        oc_scenes.cramped_room_human_human.gameplay(
-            num_episodes=1, max_steps=600
-        ).multiplayer(pause_on_partner_background=False),
+        # oc_scenes.tutorial_gym_scene,
+        oc_scenes.randomized_human_human_layouts,
         oc_scenes.multiplayer_feedback_scene,
         oc_scenes.end_scene,
     ]

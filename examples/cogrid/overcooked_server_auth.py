@@ -43,7 +43,7 @@ def _create_overcooked_env(**kwargs):
     import time, which allows the example to be imported for inspection without
     requiring cogrid to be installed.
     """
-    from examples.cogrid.environments.cramped_room_environment_initialization_hh import (
+    from examples.cogrid.environments.overcooked_hh_template import (
         OvercookedEnv, overcooked_config)
 
     return OvercookedEnv(config=overcooked_config, **kwargs)

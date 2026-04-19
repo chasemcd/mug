@@ -527,24 +527,35 @@ Open two browser tabs (or two separate browsers) to `http://localhost:8000`. Eac
 
 ## WebRTC / TURN Configuration
 
-P2P mode uses WebRTC data channels for direct browser-to-browser communication. In most local and LAN setups, WebRTC connects automatically via STUN servers. However, when participants are behind restrictive firewalls or symmetric NATs, you need a TURN relay server.
+P2P mode uses WebRTC data channels for direct browser-to-browser communication. On LANs and most home networks, WebRTC connects automatically via STUN. Participants behind restrictive firewalls or symmetric NATs need a TURN relay to connect, so any production deployment with a diverse participant pool should configure one.
 
-**Default configuration (STUN only):**
+### Quickest path: env-vars + `.webrtc()`
+
+MUG reads `TURN_USERNAME` and `TURN_CREDENTIAL` from the environment automatically when you call `.webrtc()`. This is the recommended setup for crowdsourced deployments:
+
+```bash
+export TURN_USERNAME="your-openrelay-username"
+export TURN_CREDENTIAL="your-openrelay-api-key"
+```
 
 ```python
 config = (
     experiment_config.ExperimentConfig()
     .experiment(stager=experiment_stager, experiment_id="coordination_grid")
     .hosting(port=8000, host="0.0.0.0")
-    .webrtc(
-        ice_servers=[
-            {"urls": "stun:stun.l.google.com:19302"},
-        ]
-    )
+    .webrtc()  # picks up TURN_USERNAME / TURN_CREDENTIAL from env
 )
 ```
 
-**With a TURN server:**
+Pass `force_relay=True` to route all WebRTC traffic through TURN (useful for reproducing a relayed-only connection during testing):
+
+```python
+.webrtc(force_relay=True)
+```
+
+### Explicit ICE server list
+
+To override STUN/TURN endpoints directly, pass an `ice_servers` list. MUG will use this list verbatim instead of its default STUN + env-var TURN config:
 
 ```python
 config = (
@@ -564,9 +575,11 @@ config = (
 )
 ```
 
+Free/self-hosted TURN options include [coturn](https://github.com/coturn/coturn) and [Twilio Network Traversal Service](https://www.twilio.com/docs/stun-turn). See [Server Mode](../core-concepts/server-mode.md) for more on TURN setup.
+
 !!! warning
 
-    Without a TURN server, some participants behind corporate firewalls or carrier-grade NAT will fail to connect in P2P mode. For production experiments with diverse participant networks, always configure a TURN server. Free/open TURN options include [coturn](https://github.com/coturn/coturn) (self-hosted) and [Twilio Network Traversal Service](https://www.twilio.com/docs/stun-turn).
+    Without a TURN server, some participants behind corporate firewalls or carrier-grade NAT will fail to connect in P2P mode. For production experiments with diverse participant networks, always configure a TURN server.
 
 ---
 

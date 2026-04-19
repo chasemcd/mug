@@ -1,8 +1,9 @@
-"""Cramped Room human-human environment initialization for CoGrid 0.2.1.
+"""Overcooked human-human environment template for CoGrid 0.2.1.
 
-Two-agent environment for human-human multiplayer experiments. This file
-is executed by Pyodide to create the environment. It must produce an
-``env`` variable at module scope.
+This is a template: ``make_hh_env_init_code()`` in ``overcooked_utils.py``
+substitutes the three ``__LAYOUT_*__`` constants below before handing the code
+to Pyodide. Each participant pair gets a fresh copy with a specific layout.
+The file must produce an ``env`` variable at module scope.
 """
 from __future__ import annotations
 
@@ -17,10 +18,18 @@ from cogrid.envs.overcooked.rewards import DeliveryReward
 
 from mug.rendering import Surface
 
+# Layout defaults (cramped room). make_hh_env_init_code() in overcooked_utils.py
+# rewrites these three lines verbatim to produce a per-layout copy before
+# handing the code to Pyodide. The defaults let the template parse as-is for
+# direct imports (e.g. from the server-authoritative example).
+LAYOUT_NAME = "overcooked_cramped_room_v0"
+LAYOUT_COLS = 5
+LAYOUT_ROWS = 4
+
 ASSET_PATH = "examples/cogrid/assets/overcooked/sprites"
 TILE_SIZE = 45
-WIDTH = 5 * TILE_SIZE
-HEIGHT = 4 * TILE_SIZE
+WIDTH = LAYOUT_COLS * TILE_SIZE
+HEIGHT = LAYOUT_ROWS * TILE_SIZE
 DIR_TO_CARDINAL_DIRECTION = {
     0: "EAST",
     1: "SOUTH",
@@ -317,15 +326,16 @@ overcooked_config = {
     "rewards": [
         DeliveryReward(coefficient=1.0, common_reward=True),
     ],
-    "grid": {"layout": "overcooked_cramped_room_v0"},
+    "grid": {"layout": LAYOUT_NAME},
     "scope": "overcooked",
     "max_steps": 1350,
     "pickupable_types": ["onion", "onion_soup", "plate", "tomato", "tomato_soup"],
 }
 
+ENV_ID = f"Overcooked-HH-{LAYOUT_NAME}-MUG"
 registry.register(
-    environment_id="Overcooked-CrampedRoom-HH-MUG",
+    environment_id=ENV_ID,
     env_class=functools.partial(OvercookedEnv, config=overcooked_config),
 )
 
-env = registry.make("Overcooked-CrampedRoom-HH-MUG", render_mode="mug")
+env = registry.make(ENV_ID, render_mode="mug")

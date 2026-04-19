@@ -10,7 +10,7 @@ A single-player Pyodide experiment where a participant controls a car trying to 
 
 **Source:** [`examples/mountain_car/mountain_car_experiment.py`](https://github.com/chasemcd/interactive-gym/blob/main/examples/mountain_car/mountain_car_experiment.py)
 
-See [Examples](index.md) for install and run instructions.
+See [Examples](index.md) for install and run instructions. This example uses [Gymnasium](https://gymnasium.farama.org/), which we install in the user's browser (Gymnasium also ships with MUG, so no separate local install is needed).
 
 ## File Structure
 
