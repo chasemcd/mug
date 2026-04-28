@@ -36,7 +36,7 @@ class MountainCarEnv(_BaseMountainCarEnv):
         action = actions["human"]
         return super().step(action)
 
-    def render(self):
+    def render(self, *, agent_id=None):
         # MUG requests rendering with render_mode="mug"; guard so misuse fails
         # loudly rather than returning an unexpected type.
         assert self.render_mode == "mug"

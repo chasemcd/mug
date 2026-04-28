@@ -122,7 +122,7 @@ class SlimeVBEnvIG(slimevolley_env.SlimeVolleyEnv):
             relative=True,
         )
 
-    def render(self):
+    def render(self, *, agent_id=None):
         if self._game is None:
             self._build_legacy_game()
         self._sync_game_from_state()

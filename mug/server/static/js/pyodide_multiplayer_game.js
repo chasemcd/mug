@@ -1758,10 +1758,13 @@ print(f"[Python] Seeded RNG with {${seed}}")
         }
 
         const startTime = performance.now();
+        const agentIdLiteral = this.myPlayerId != null
+            ? JSON.stringify(this.myPlayerId)
+            : 'None';
         const result = await this.pyodide.runPythonAsync(`
 import numpy as np
 obs, infos = env.reset(seed=${this.gameSeed || 'None'})
-render_state = env.render()
+render_state = _mug_render(env, ${agentIdLiteral})
 
 if not isinstance(obs, dict):
     obs = obs.reshape(-1).astype(np.float32)
@@ -2305,7 +2308,10 @@ hashlib.md5(json.dumps(_st, sort_keys=True).encode()).hexdigest()[:8]
         let finalRenderState = render_state;
         if (rollbackOccurred) {
             try {
-                const freshRender = await this.pyodide.runPythonAsync(`env.render()`);
+                const freshAgentIdLiteral = this.myPlayerId != null
+                    ? JSON.stringify(this.myPlayerId)
+                    : 'None';
+                const freshRender = await this.pyodide.runPythonAsync(`_mug_render(env, ${freshAgentIdLiteral})`);
                 let freshRenderState = await this.pyodide.toPy(freshRender).toJs();
 
                 // Handle RGB array rendering if needed
@@ -2488,6 +2494,9 @@ hashlib.md5(json.dumps(_st, sort_keys=True).encode()).hexdigest()[:8]
          */
         const pyActions = this.pyodide.toPy(actions);
 
+        const agentIdLiteral = this.myPlayerId != null
+            ? JSON.stringify(this.myPlayerId)
+            : 'None';
         const result = await this.pyodide.runPythonAsync(`
 ${this.config.on_game_step_code || ''}
 import numpy as np
@@ -2496,7 +2505,7 @@ import numpy as np
 agent_actions = {int(k) if k.isnumeric() or isinstance(k, (float, int)) else k: v for k, v in ${pyActions}.items()}
 
 obs, rewards, terminateds, truncateds, infos = env.step(agent_actions)
-render_state = env.render()
+render_state = _mug_render(env, ${agentIdLiteral})
 
 # Flatten observations for consistency
 if not isinstance(obs, dict):
@@ -3282,7 +3291,10 @@ print(f"[Python] State applied via set_state: convert={_convert_time:.1f}ms, des
         // Trigger a re-render to show the corrected state
         applyTiming.renderStart = performance.now();
         try {
-            await this.pyodide.runPythonAsync(`env.render()`);
+            const applyAgentIdLiteral = this.myPlayerId != null
+                ? JSON.stringify(this.myPlayerId)
+                : 'None';
+            await this.pyodide.runPythonAsync(`_mug_render(env, ${applyAgentIdLiteral})`);
             // The render state will be picked up on the next frame
             applyTiming.renderEnd = performance.now();
         } catch (e) {

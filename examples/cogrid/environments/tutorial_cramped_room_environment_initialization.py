@@ -66,7 +66,7 @@ class OvercookedEnv(CoGridEnv):
         super().on_reset()
         self._pending_surface_reset = True
 
-    def render(self):
+    def render(self, *, agent_id=None):
         # Static objects (persistent, only sent on first frame or change)
         for obj in self.grid.grid:
             if obj is None:

@@ -107,6 +107,10 @@ class GymScene(scene.Scene):
         self.game_height: int | None = 400
         self.fps: int = 10
         self.background: str = "#FFFFFF"  # white background default
+        # When True (server-authoritative mode only), render once per human
+        # player slot with that agent's ``agent_id`` and emit privately to
+        # their socket. Requires the env's ``render`` to accept ``agent_id``.
+        self.per_agent_render: bool = False
         self.state_init: list = []
         self.assets_dir: str = "./static/assets/"
         self.assets_to_preload: list[str] = []
@@ -289,6 +293,7 @@ class GymScene(scene.Scene):
         game_height: int = NotProvided,
         background: str = NotProvided,
         rollback_smoothing_duration: int | None = NotProvided,
+        per_agent_render: bool = NotProvided,
     ):
         """Configure display and rendering settings for the GymScene.
 
@@ -312,6 +317,12 @@ class GymScene(scene.Scene):
             rollback corrections. Set to None to disable smoothing, or a positive integer to enable.
             Defaults to NotProvided (uses class default of 100ms).
         :type rollback_smoothing_duration: int | None, optional
+        :param per_agent_render: If True (server-authoritative mode only), call
+            ``env.render(agent_id=...)`` once per human player slot and emit the
+            resulting frame privately to that player's socket. Requires the env's
+            ``render`` method to accept an ``agent_id`` keyword argument.
+            Defaults to NotProvided (False).
+        :type per_agent_render: bool, optional
         :raises ValueError: If rollback_smoothing_duration is less than 0
         :return: This scene object
         :rtype: GymScene
@@ -353,6 +364,10 @@ class GymScene(scene.Scene):
                     "rollback_smoothing_duration must be None or >= 0"
                 )
             self.rollback_smoothing_duration = rollback_smoothing_duration
+
+        if per_agent_render is not NotProvided:
+            assert isinstance(per_agent_render, bool)
+            self.per_agent_render = per_agent_render
 
         return self
 

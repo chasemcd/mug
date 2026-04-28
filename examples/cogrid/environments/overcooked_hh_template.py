@@ -86,7 +86,7 @@ class OvercookedEnv(CoGridEnv):
             infos[agent_id]["layout_id"] = self.current_layout_id
         return infos
 
-    def render(self):
+    def render(self, *, agent_id=None):
         assert self.render_mode == "mug"
         # Static objects (persistent, only sent on first frame or change)
         for obj in self.grid.grid:

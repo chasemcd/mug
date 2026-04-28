@@ -282,7 +282,9 @@ human_human_layout_scenes = [
     for layout_name, cols, rows, label, preview_img in overcooked_utils.HH_LAYOUTS
 ]
 
-cramped_room_human_human = human_human_layout_scenes[0]  # retained for back-compat
+cramped_room_human_human = human_human_layout_scenes[
+    0
+]  # retained for back-compat
 
 randomized_human_human_layouts = scene.RandomizeOrder(
     human_human_layout_scenes,
@@ -340,5 +342,97 @@ end_scene = (
     )
     .display(
         scene_header="Thank you for participating!",
+    )
+)
+
+
+# ============================================================================
+# OVERCOOKED V2 (Gessler et al., partial observability)
+# ============================================================================
+# The cogrid 0.3.0 OvercookedV2 environments use ``local_view_radius=2`` so
+# each agent observes only a 5x5 window centred on themselves. The render
+# function in the env file produces an agent-centred viewport (option B from
+# the design discussion): the canvas is exactly the 5x5 view, scrolling with
+# the agent. Off-grid cells render as void; the partner is hidden when their
+# cell falls outside the viewer's window.
+
+_V2_TILE_SIZE = 60
+_V2_VIEW_DIAM = 5  # 2 * local_view_radius + 1
+_V2_CANVAS_PX = _V2_TILE_SIZE * _V2_VIEW_DIAM  # 300
+
+overcooked_v2_test_time_simple_scene = (
+    gym_scene.GymScene()
+    .scene(scene_id="overcooked_v2_test_time_simple", experiment_config={})
+    .policies(policy_mapping=HUMAN_HUMAN_POLICY_MAPPING)
+    .rendering(
+        fps=30,
+        hud_text_fn=overcooked_utils.hud_text_fn,
+        game_width=_V2_CANVAS_PX,
+        game_height=_V2_CANVAS_PX,
+        background="#0E0E0E",
+    )
+    .assets(
+        assets_to_preload=overcooked_utils.overcooked_preload_assets_spec()
+        + [
+            # V2 mixed-soup frames live in soups.png — Phaser must preload
+            # this atlas alongside the V1 set or pot renders for mixed
+            # onion+tomato pots will silently fail.
+            {
+                "object_type": "atlas_spec",
+                "name": "soups",
+                "img_path": "examples/cogrid/assets/overcooked/sprites/soups.png",
+                "atlas_path": "examples/cogrid/assets/overcooked/sprites/soups.json",
+            },
+        ],
+    )
+    .gameplay(
+        default_action=Noop,
+        action_mapping=action_mapping,
+        num_episodes=3,
+        max_steps=400,
+        input_mode=configuration_constants.InputModes.SingleKeystroke,
+    )
+    .content(
+        scene_header="OvercookedV2 - Test Time (Partial Observability)",
+        scene_body=(
+            "<center><p>"
+            "You'll play OvercookedV2 with another participant. "
+            "Each chef has a <b>limited 5x5 view</b> centred on themselves -- "
+            "you can only see what's nearby. The recipe indicator (blue tile) "
+            "shows which soup the kitchen is currently asking for; deliver "
+            "the right soup to the green X to score, and avoid wrong "
+            "deliveries (they lose points)."
+            "<br><br>Press start to join the lobby and find a partner."
+            "</p></center>"
+        ),
+        game_page_html_fn=overcooked_utils.overcooked_game_page_header_fn,
+        in_game_scene_body=overcooked_utils.overcooked_two_column_layout(
+            "You and your partner each see only your own 5x5 surroundings."
+            "<br>Communicate by where you stand and what you carry."
+        ),
+    )
+    .waitroom(
+        timeout=300000,  # 5 minutes
+        timeout_message=(
+            "Sorry, we could not find enough players for this study. Please "
+            "return the HIT now. You will be paid through a Compensation HIT."
+        ),
+    )
+    .runtime(
+        environment_initialization_code_filepath=(
+            "examples/cogrid/environments/overcooked_v2_test_time_simple.py"
+        ),
+        packages_to_install=["numpy", "cogrid==0.3.1", "opencv-python"],
+    )
+    .multiplayer(
+        input_delay=3,
+        matchmaker=FIFOMatchmaker(max_p2p_rtt_ms=100),
+        hide_lobby_count=True,
+        partner_disconnect_message=(
+            "Your partner disconnected. The task will end here and you will "
+            "be compensated for your performance so far. Please submit the "
+            "completion code below."
+        ),
+        partner_disconnect_show_completion_code=True,
     )
 )

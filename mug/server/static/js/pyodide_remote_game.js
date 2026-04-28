@@ -98,6 +98,13 @@ import js
 mug_globals = dict(js.window.mugGlobals.object_entries())
 
 ${restCode}
+
+import inspect as _mug_inspect
+def _mug_render(env, agent_id=None):
+    if 'agent_id' in _mug_inspect.signature(env.render).parameters:
+        return env.render(agent_id=agent_id)
+    return env.render()
+
 env
         `);
 
@@ -141,6 +148,13 @@ import js
 mug_globals = dict(js.window.mugGlobals.object_entries())
 print("Globals on initialization: ", mug_globals)
 ${reinitRestCode}
+
+import inspect as _mug_inspect
+def _mug_render(env, agent_id=None):
+    if 'agent_id' in _mug_inspect.signature(env.render).parameters:
+        return env.render(agent_id=agent_id)
+    return env.render()
+
 env
         `);
 
@@ -190,10 +204,13 @@ env
         await this.showEpisodeTransition();
 
         const startTime = performance.now();
+        const agentIdLiteral = this.config.human_id != null
+            ? JSON.stringify(this.config.human_id)
+            : 'None';
         const result = await this.pyodide.runPythonAsync(`
 import numpy as np
 obs, infos = env.reset()
-render_state = env.render()
+render_state = _mug_render(env, ${agentIdLiteral})
 
 if not isinstance(obs, dict):
     obs = obs.reshape(-1).astype(np.float32)
@@ -316,11 +333,14 @@ obs, infos, render_state
         // DIAG-03: Capture timestamp when env.step() is called
         this.pipelineMetrics.stepCallTimestamp = performance.now();
 
+        const agentIdLiteral = this.config.human_id != null
+            ? JSON.stringify(this.config.human_id)
+            : 'None';
         const result = await this.pyodide.runPythonAsync(`
 ${this.config.on_game_step_code}
 agent_actions = {int(k) if k.isnumeric() or isinstance(k, (float, int)) else k: v for k, v in ${pyActions}.items()}
 obs, rewards, terminateds, truncateds, infos = env.step(agent_actions)
-render_state = env.render()
+render_state = _mug_render(env, ${agentIdLiteral})
 
 if not isinstance(obs, dict):
     obs = obs.reshape(-1).astype(np.float32)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import itertools
 import logging
 import random
@@ -1367,6 +1368,18 @@ class GameManager:
 
         game._load_policies()
 
+        # Fail loudly if per_agent_render is on but env can't honor it.
+        # Without this check the server would silently emit identical frames
+        # to every player.
+        if self.scene.per_agent_render:
+            render_params = inspect.signature(game.env.render).parameters
+            if "agent_id" not in render_params:
+                raise ValueError(
+                    f"per_agent_render is enabled on scene "
+                    f"'{self.scene.scene_id}' but env.render() does not accept "
+                    f"an 'agent_id' keyword argument."
+                )
+
         # First reset
         with game.lock:
             game.reset()
@@ -1567,35 +1580,48 @@ class GameManager:
         return pressed_keys
 
     def render_server_game(self, game: remote_game.ServerGame):
-        """Render and broadcast game state to all clients in the room.
+        """Render and broadcast game state to clients.
 
         Calls env.render() to get a Phaser-compatible state dict (the env was
-        created with render_mode="mug"), then broadcasts it with
-        metadata via the server_render_state socket event.
+        created with render_mode="mug"), then emits it via the
+        server_render_state socket event. When ``scene.per_agent_render`` is
+        True, render once per human slot with that agent's ``agent_id`` and
+        emit privately to each subject's socket; otherwise render once and
+        broadcast room-wide.
         """
-        # Get render state from the environment
-        render_state = game.env.render()
-
-        # Build HUD text if configured
         hud_text = (
             self.scene.hud_text_fn(game)
             if self.scene.hud_text_fn is not None
             else None
         )
 
-        # Broadcast to all clients in the room
-        self.socketio.emit(
-            "server_render_state",
-            {
-                "render_state": render_state,
-                "step": game.tick_num,
-                "episode": game.episode_num,
-                "rewards": dict(game.episode_rewards),
-                "cumulative_rewards": dict(game.total_rewards),
-                "hud_text": hud_text,
-            },
-            room=game.game_id,
-        )
+        base_payload = {
+            "step": game.tick_num,
+            "episode": game.episode_num,
+            "rewards": dict(game.episode_rewards),
+            "cumulative_rewards": dict(game.total_rewards),
+            "hud_text": hud_text,
+        }
+
+        if not self.scene.per_agent_render:
+            self.socketio.emit(
+                "server_render_state",
+                {**base_payload, "render_state": game.env.render()},
+                room=game.game_id,
+            )
+            return
+
+        for agent_id, subject_id in game.human_players.items():
+            if not subject_id or subject_id == AvailableSlot:
+                continue
+            self.socketio.emit(
+                "server_render_state",
+                {
+                    **base_payload,
+                    "render_state": game.env.render(agent_id=agent_id),
+                },
+                to=subject_id,
+            )
 
     def cleanup_game(self, game_id: GameID):
         """End a game and clean up ALL associated state.
