@@ -63,6 +63,18 @@ TILE_SIZE = 60
 WIDTH = VIEW_DIAM * TILE_SIZE
 HEIGHT = VIEW_DIAM * TILE_SIZE
 
+# Render one cell beyond the visible viewport on each side so that sprites
+# entering or leaving the visible area can tween from / to off-canvas
+# positions instead of popping in / out. The 7x7 ring is rendered every
+# frame; cells outside the canvas (fractional x or y outside [0, 1]) are
+# clipped by Phaser at draw time.
+BUFFER = 1
+RENDER_DIAM = VIEW_DIAM + 2 * BUFFER  # 7x7 effective render area
+
+# Sprite tween duration (ms). Matches V1's chef-sprite tween. At fps=30 the
+# tween covers ~2.3 frames, so each step glides smoothly into the next.
+TWEEN_MS = 75
+
 # cogrid direction enum -> sprite atlas direction string.
 DIR_TO_CARDINAL = {0: "EAST", 1: "SOUTH", 2: "WEST", 3: "NORTH"}
 
@@ -72,7 +84,6 @@ INGREDIENT_COLORS = {
     "broccoli": "#228B22",
     "mushroom": "#8B5A2B",
 }
-INGREDIENT_LETTER = {"broccoli": "B", "mushroom": "M"}
 
 # Recipe indicator dot colors mirror cogrid v2_objects._RECIPE_DOT_COLORS so
 # the indicator state (1 = onion_soup, 2 = tomato_soup, ...) reads correctly.
@@ -232,29 +243,46 @@ class OvercookedV2PartialObsEnv(CoGridEnv):
         r0 = ar - VIEW_RADIUS
         c0 = ac - VIEW_RADIUS
 
-        def in_view(world_pos) -> bool:
+        def in_buffer(world_pos) -> bool:
+            """World cell falls within the rendered (visible + buffer) area."""
             wr, wc = world_pos
-            return r0 <= wr < r0 + VIEW_DIAM and c0 <= wc < c0 + VIEW_DIAM
+            return (
+                r0 - BUFFER <= wr < r0 + VIEW_DIAM + BUFFER
+                and c0 - BUFFER <= wc < c0 + VIEW_DIAM + BUFFER
+            )
 
         def to_xy(world_pos) -> tuple[float, float]:
-            """World cell -> top-left (x, y) in 0..1 canvas fractions."""
+            """World cell -> top-left (x, y) in 0..1 canvas fractions.
+
+            Cells in the buffer ring map to negative or >1 fractions; that's
+            intentional -- Phaser positions the sprite off-canvas where it's
+            clipped, but a position-tween from off-canvas into the visible
+            area (or vice versa) animates smoothly when the agent moves.
+            """
             wr, wc = world_pos
             return (wc - c0) / VIEW_DIAM, (wr - r0) / VIEW_DIAM
 
         # 1. Tile background: floor for in-world cells, void for out-of-world.
         self._draw_background(r0, c0)
 
-        # 2. Static / placed objects within the viewport.
+        # 2. Static / placed objects in the buffered render area. Buffer
+        # rendering means a cell at the visible edge that's about to scroll
+        # off-screen still has a UUID at off-canvas position next frame, so
+        # Phaser tweens its slide-out instead of destroying it abruptly.
         for obj in self.grid.grid:
-            if obj is None or not in_view(obj.pos):
+            if obj is None or not in_buffer(obj.pos):
                 continue
             self._draw_object(obj, to_xy(obj.pos))
 
-        # 3. Other agents (only when their world position is in the viewport).
+        # 3. Partner agents -- buffered too, so a partner crossing the
+        # viewport boundary slides in / out smoothly with the rest of the
+        # world. The wire packet contains their state at off-canvas positions
+        # one cell beyond the agent's actual vision radius (visible only via
+        # devtools / network inspection); acceptable for our study contexts.
         for aid, agent_obj in self.grid.grid_agents.items():
             if aid == agent_id:
                 continue
-            if not in_view(agent_obj.pos):
+            if not in_buffer(agent_obj.pos):
                 continue
             self._draw_agent(aid, agent_obj, to_xy(agent_obj.pos), is_self=False)
 
@@ -272,15 +300,19 @@ class OvercookedV2PartialObsEnv(CoGridEnv):
     # Drawing helpers
     # ------------------------------------------------------------------
     def _draw_background(self, r0: int, c0: int) -> None:
+        # World-stable IDs (``bg-w{wr}-{wc}``) so Phaser tweens each tile's
+        # screen position when the viewport scrolls instead of destroying
+        # the old one and creating a new one. Iterating BUFFER + 5 + BUFFER
+        # gives off-canvas tiles ready to slide into view next step.
         cell = 1.0 / VIEW_DIAM
-        for vr in range(VIEW_DIAM):
-            for vc in range(VIEW_DIAM):
+        for vr in range(-BUFFER, VIEW_DIAM + BUFFER):
+            for vc in range(-BUFFER, VIEW_DIAM + BUFFER):
                 wr = r0 + vr
                 wc = c0 + vc
                 in_world = 0 <= wr < self.grid.height and 0 <= wc < self.grid.width
                 color = FLOOR_COLOR if in_world else VOID_COLOR
                 self.surface.rect(
-                    id=f"bg-{vr}-{vc}",
+                    id=f"bg-w{wr}-{wc}",
                     x=vc * cell,
                     y=vr * cell,
                     w=cell,
@@ -288,6 +320,7 @@ class OvercookedV2PartialObsEnv(CoGridEnv):
                     color=color,
                     relative=True,
                     depth=-10,
+                    tween_duration=TWEEN_MS,
                 )
 
     def _draw_object(self, obj, xy: tuple[float, float]) -> None:
@@ -297,7 +330,17 @@ class OvercookedV2PartialObsEnv(CoGridEnv):
         if isinstance(obj, (Counter, Wall)):
             self._draw_counter_tile(obj, x, y, cell)
             if isinstance(obj, Counter) and obj.obj_placed_on is not None:
-                self._draw_floor_item(obj.obj_placed_on, x, y, cell)
+                # ``obj_placed_on`` is re-instantiated each render sync so
+                # ``id(obj)``-based keys would churn every frame. Anchor the
+                # placed item to its host counter's world position for a
+                # stable, tween-able UUID.
+                self._draw_floor_item(
+                    obj.obj_placed_on,
+                    x,
+                    y,
+                    cell,
+                    key_override=f"on-counter-{_key(obj)}",
+                )
             return
 
         # Static fixtures sit on a counter visually; draw the counter sprite
@@ -323,9 +366,9 @@ class OvercookedV2PartialObsEnv(CoGridEnv):
         elif isinstance(obj, TomatoStack):
             self._draw_terrain_sprite("tomatoes.png", obj, x, y, cell)
         elif isinstance(obj, BroccoliStack):
-            self._draw_vector_stack(x, y, cell, "broccoli")
+            self._draw_vector_stack(obj, x, y, cell, "broccoli")
         elif isinstance(obj, MushroomStack):
-            self._draw_vector_stack(x, y, cell, "mushroom")
+            self._draw_vector_stack(obj, x, y, cell, "mushroom")
         elif isinstance(obj, PlateStack):
             self._draw_terrain_sprite("dishes.png", obj, x, y, cell)
         elif isinstance(obj, OpenPot):
@@ -355,6 +398,7 @@ class OvercookedV2PartialObsEnv(CoGridEnv):
             frame="counter.png",
             relative=True,
             depth=-5,
+            tween_duration=TWEEN_MS,
         )
 
     def _draw_terrain_sprite(
@@ -370,14 +414,25 @@ class OvercookedV2PartialObsEnv(CoGridEnv):
             frame=frame,
             relative=True,
             depth=-3,
+            tween_duration=TWEEN_MS,
         )
 
-    def _draw_vector_stack(self, x: float, y: float, cell: float, kind: str) -> None:
-        """Vector fallback for ingredient stacks without sprites (broccoli, mushroom)."""
+    def _draw_vector_stack(
+        self, obj, x: float, y: float, cell: float, kind: str
+    ) -> None:
+        """Vector fallback for ingredient stacks without sprites (broccoli, mushroom).
+
+        Distinguished by ingredient color alone -- a text label looked good
+        statically but tweened poorly when the viewport scrolled (Phaser
+        re-rasterizes text on each tween step, producing visible jitter).
+        """
         cx = x + cell / 2
         cy = y + cell / 2
+        # ID keyed by world position (via ``_key(obj)``) -- not viewport
+        # fraction -- so the same stack tweens across frames as the viewport
+        # scrolls.
         self.surface.circle(
-            id=f"stack-{kind}-{x:.4f}-{y:.4f}",
+            id=f"stack-{kind}-{_key(obj)}",
             x=cx,
             y=cy,
             radius=cell * 0.32,
@@ -386,16 +441,7 @@ class OvercookedV2PartialObsEnv(CoGridEnv):
             stroke_width=1,
             relative=True,
             depth=-3,
-        )
-        self.surface.text(
-            id=f"stack-{kind}-label-{x:.4f}-{y:.4f}",
-            text=INGREDIENT_LETTER[kind],
-            x=cx,
-            y=cy,
-            size=18,
-            color="#FFFFFF",
-            relative=True,
-            depth=-2,
+            tween_duration=TWEEN_MS,
         )
 
     def _draw_pot(self, obj: OpenPot, x: float, y: float, cell: float) -> None:
@@ -411,6 +457,7 @@ class OvercookedV2PartialObsEnv(CoGridEnv):
             frame="pot.png",
             relative=True,
             depth=-2,
+            tween_duration=TWEEN_MS,
         )
 
         ingredients = list(getattr(obj, "objects_in_pot", []))
@@ -434,6 +481,7 @@ class OvercookedV2PartialObsEnv(CoGridEnv):
                 frame=frame,
                 relative=True,
                 depth=1,
+                tween_duration=TWEEN_MS,
             )
         else:
             # Vector fallback: any pot containing broccoli, mushroom, or other
@@ -455,6 +503,7 @@ class OvercookedV2PartialObsEnv(CoGridEnv):
                     stroke_width=1,
                     relative=True,
                     depth=1,
+                    tween_duration=TWEEN_MS,
                 )
 
         if len(ingredients) >= capacity:
@@ -467,6 +516,7 @@ class OvercookedV2PartialObsEnv(CoGridEnv):
                 color="#FF5050" if timer > 0 else "#80FF80",
                 relative=True,
                 depth=2,
+                tween_duration=TWEEN_MS,
             )
 
     def _pot_contents_frame(
@@ -518,6 +568,7 @@ class OvercookedV2PartialObsEnv(CoGridEnv):
             border_radius=4,
             relative=True,
             depth=-2,
+            tween_duration=TWEEN_MS,
         )
         dot_color = RECIPE_DOT_COLORS.get(int(getattr(obj, "state", 0)))
         if dot_color is not None:
@@ -529,6 +580,7 @@ class OvercookedV2PartialObsEnv(CoGridEnv):
                 color=dot_color,
                 relative=True,
                 depth=-1,
+                tween_duration=TWEEN_MS,
             )
 
     def _draw_button_indicator(self, obj, x: float, y: float, cell: float) -> None:
@@ -543,6 +595,7 @@ class OvercookedV2PartialObsEnv(CoGridEnv):
             border_radius=4,
             relative=True,
             depth=-2,
+            tween_duration=TWEEN_MS,
         )
         self.surface.circle(
             id=f"button-{_key(obj)}-knob",
@@ -552,15 +605,30 @@ class OvercookedV2PartialObsEnv(CoGridEnv):
             color="#FFFFFF" if active else "#A088B0",
             relative=True,
             depth=-1,
+            tween_duration=TWEEN_MS,
         )
 
-    def _draw_floor_item(self, obj, x: float, y: float, cell: float) -> None:
+    def _draw_floor_item(
+        self,
+        obj,
+        x: float,
+        y: float,
+        cell: float,
+        *,
+        key_override: str | None = None,
+    ) -> None:
         """Render an item sitting on a counter or on the floor.
 
-        Used for both ``obj_placed_on`` overlays and stray loose objects.
+        ``key_override`` lets the caller anchor the IDs to a stable host
+        position (e.g. ``on-counter-{r}-{c}``) instead of the per-instance
+        fallback used for loose floor items. cogrid re-instantiates
+        ``obj_placed_on`` each render sync, so without an override the
+        ``id(obj)`` fallback would change every frame and prevent tweens.
+
         Sprites for onion/tomato/plate/onion-soup/tomato-soup; vector
         fallback for broccoli/mushroom and runtime-generated mixed soups.
         """
+        key = key_override or _key(obj)
         carry = _carry_kind(obj)
         # Sprite-backed items go through the objects atlas, sized smaller than
         # the cell so the underlying counter is still visible.
@@ -573,7 +641,7 @@ class OvercookedV2PartialObsEnv(CoGridEnv):
         }.get(carry)
         if sprite_frame is not None:
             self.surface.image(
-                id=f"item-{_key(obj)}",
+                id=f"item-{key}",
                 x=x + cell * 0.15,
                 y=y + cell * 0.15,
                 w=TILE_SIZE * 0.7,
@@ -582,6 +650,7 @@ class OvercookedV2PartialObsEnv(CoGridEnv):
                 frame=sprite_frame,
                 relative=True,
                 depth=0,
+                tween_duration=TWEEN_MS,
             )
             return
 
@@ -589,7 +658,7 @@ class OvercookedV2PartialObsEnv(CoGridEnv):
         cy = y + cell / 2
         if carry in ("broccoli", "mushroom"):
             self.surface.circle(
-                id=f"item-{carry}-{_key(obj)}",
+                id=f"item-{carry}-{key}",
                 x=cx,
                 y=cy,
                 radius=cell * 0.22,
@@ -598,11 +667,12 @@ class OvercookedV2PartialObsEnv(CoGridEnv):
                 stroke_width=1,
                 relative=True,
                 depth=0,
+                tween_duration=TWEEN_MS,
             )
             return
         # Mixed soup (any V2-generated soup type) -- plate base + colored center.
         self.surface.circle(
-            id=f"soup-base-{_key(obj)}",
+            id=f"soup-base-{key}",
             x=cx,
             y=cy,
             radius=cell * 0.30,
@@ -611,15 +681,17 @@ class OvercookedV2PartialObsEnv(CoGridEnv):
             stroke_width=1,
             relative=True,
             depth=0,
+            tween_duration=TWEEN_MS,
         )
         self.surface.circle(
-            id=f"soup-center-{_key(obj)}",
+            id=f"soup-center-{key}",
             x=cx,
             y=cy,
             radius=cell * 0.18,
             color=_soup_color(obj),
             relative=True,
             depth=1,
+            tween_duration=TWEEN_MS,
         )
 
     # ------------------------------------------------------------------
@@ -641,6 +713,13 @@ class OvercookedV2PartialObsEnv(CoGridEnv):
         carry = _carry_kind(held_obj) if held_obj is not None else None
         held_suffix = SPRITE_HELD_SUFFIX.get(carry, "") if carry else ""
 
+        # Self never moves on screen (always at viewport center) so a tween
+        # does nothing useful and would cause the held-item overlay to slide
+        # awkwardly when self changes direction in place. Partner does move
+        # on screen -- both when they walk and when self walks -- so they
+        # get the full tween.
+        tween_ms = 0 if is_self else TWEEN_MS
+
         # Body sprite -- the chefs atlas has a per-direction frame plus
         # held-item variants for the items we have sprites for. For
         # broccoli/mushroom/mixed-soup, we use the plain chef sprite and
@@ -655,6 +734,7 @@ class OvercookedV2PartialObsEnv(CoGridEnv):
             frame=f"{cardinal}{held_suffix}.png",
             relative=True,
             depth=3,
+            tween_duration=tween_ms,
         )
         # Hat overlay -- distinguishes agents (blue / green / fallback).
         hat_color = AGENT_HAT_COLORS.get(aid, AGENT_HAT_FALLBACK)
@@ -668,6 +748,7 @@ class OvercookedV2PartialObsEnv(CoGridEnv):
             frame=f"{cardinal}-{hat_color}hat.png",
             relative=True,
             depth=4,
+            tween_duration=tween_ms,
         )
         # Self-vs-other indicator: thin colored ring at the top so the
         # viewing player can spot themselves at a glance.
@@ -681,11 +762,14 @@ class OvercookedV2PartialObsEnv(CoGridEnv):
             color=ring_color,
             relative=True,
             depth=5,
+            tween_duration=tween_ms,
         )
 
         # Held-item overlay for items without a chef-sprite variant.
         if held_obj is not None and not held_suffix:
-            self._draw_held_overlay(held_obj, carry, x, y, cell, aid, cardinal)
+            self._draw_held_overlay(
+                held_obj, carry, x, y, cell, aid, cardinal, tween_ms
+            )
 
     def _draw_held_overlay(
         self,
@@ -696,11 +780,14 @@ class OvercookedV2PartialObsEnv(CoGridEnv):
         cell: float,
         aid,
         cardinal: str,
+        tween_ms: int,
     ) -> None:
         """Draw a held item on top of a plain chef sprite.
 
         Position offsets follow the cogrid sprite convention: held items sit
-        slightly in front of the chef in their facing direction.
+        slightly in front of the chef in their facing direction. The
+        ``tween_ms`` argument is forwarded from the calling agent so the
+        held item glides with the chef (partner) or snaps in place (self).
         """
         # In-front-of-chef offset by direction (small, so it stays inside the tile).
         offset = {
@@ -723,6 +810,7 @@ class OvercookedV2PartialObsEnv(CoGridEnv):
                 stroke_width=1,
                 relative=True,
                 depth=6,
+                tween_duration=tween_ms,
             )
             return
         # Mixed soup -- plate + colored center.
@@ -736,6 +824,7 @@ class OvercookedV2PartialObsEnv(CoGridEnv):
             stroke_width=1,
             relative=True,
             depth=6,
+            tween_duration=tween_ms,
         )
         self.surface.circle(
             id=f"agent-{aid}-held-center",
@@ -745,6 +834,7 @@ class OvercookedV2PartialObsEnv(CoGridEnv):
             color=_soup_color(obj),
             relative=True,
             depth=7,
+            tween_duration=tween_ms,
         )
 
 
