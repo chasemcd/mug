@@ -349,90 +349,116 @@ end_scene = (
 # ============================================================================
 # OVERCOOKED V2 (Gessler et al., partial observability)
 # ============================================================================
-# The cogrid 0.3.0 OvercookedV2 environments use ``local_view_radius=2`` so
+# The cogrid 0.3.x OvercookedV2 environments use ``local_view_radius=2`` so
 # each agent observes only a 5x5 window centred on themselves. The render
-# function in the env file produces an agent-centred viewport (option B from
-# the design discussion): the canvas is exactly the 5x5 view, scrolling with
-# the agent. Off-grid cells render as void; the partner is hidden when their
-# cell falls outside the viewer's window.
+# function in ``environments/overcooked_v2_test_time_simple.py`` is a single
+# generic template that handles every V2 layout -- agent-centred viewport
+# scrolling with the agent, off-grid cells rendered as void, partner hidden
+# when their cell falls outside the viewer's window. ``_build_v2_scene``
+# substitutes the env id into the template so the same renderer drives
+# every layout.
 
 _V2_TILE_SIZE = 60
 _V2_VIEW_DIAM = 5  # 2 * local_view_radius + 1
 _V2_CANVAS_PX = _V2_TILE_SIZE * _V2_VIEW_DIAM  # 300
 
-overcooked_v2_test_time_simple_scene = (
-    gym_scene.GymScene()
-    .scene(scene_id="overcooked_v2_test_time_simple", experiment_config={})
-    .policies(policy_mapping=HUMAN_HUMAN_POLICY_MAPPING)
-    .rendering(
-        fps=30,
-        hud_text_fn=overcooked_utils.hud_text_fn,
-        game_width=_V2_CANVAS_PX,
-        game_height=_V2_CANVAS_PX,
-        background="#0E0E0E",
+# soups.png covers mixed onion+tomato pot frames (idle/cooked/done × T_X_O_Y);
+# Phaser must preload this atlas alongside the V1 set or those pot renders
+# silently fail.
+_V2_ASSETS_TO_PRELOAD = overcooked_utils.overcooked_preload_assets_spec() + [
+    {
+        "object_type": "atlas_spec",
+        "name": "soups",
+        "img_path": "examples/cogrid/assets/overcooked/sprites/soups.png",
+        "atlas_path": "examples/cogrid/assets/overcooked/sprites/soups.json",
+    },
+]
+
+
+def _build_v2_scene(env_id: str, label: str) -> gym_scene.GymScene:
+    """Build a partial-observability V2 scene for one cogrid env.
+
+    The render path (canvas size, atlases, action mapping, multiplayer
+    config, lobby UX) is identical across V2 layouts -- only the env id
+    differs. Pass any registered ``OvercookedV2-*`` id; the generic
+    template renders all of them.
+    """
+    safe_id = env_id.replace("-", "_").replace(".", "_").lower()
+    return (
+        gym_scene.GymScene()
+        .scene(scene_id=f"v2_{safe_id}", experiment_config={})
+        .policies(policy_mapping=HUMAN_HUMAN_POLICY_MAPPING)
+        .rendering(
+            fps=30,
+            hud_text_fn=overcooked_utils.hud_text_fn,
+            game_width=_V2_CANVAS_PX,
+            game_height=_V2_CANVAS_PX,
+            background="#0E0E0E",
+        )
+        .assets(assets_to_preload=_V2_ASSETS_TO_PRELOAD)
+        .gameplay(
+            default_action=Noop,
+            action_mapping=action_mapping,
+            num_episodes=3,
+            max_steps=400,
+            input_mode=configuration_constants.InputModes.SingleKeystroke,
+        )
+        .content(
+            scene_header=f"OvercookedV2 - {label} (Partial Observability)",
+            scene_body=(
+                "<center><p>"
+                "You'll play OvercookedV2 with another participant. "
+                "Each chef has a <b>limited 5x5 view</b> centred on "
+                "themselves -- you can only see what's nearby. The recipe "
+                "indicator (blue tile) shows which soup the kitchen is "
+                "currently asking for; deliver the right soup to the green "
+                "X to score, and avoid wrong deliveries (they lose points)."
+                "<br><br>Press start to join the lobby and find a partner."
+                "</p></center>"
+            ),
+            game_page_html_fn=overcooked_utils.overcooked_game_page_header_fn,
+            in_game_scene_body=overcooked_utils.overcooked_two_column_layout(
+                "You and your partner each see only your own 5x5 surroundings."
+                "<br>Communicate by where you stand and what you carry."
+            ),
+        )
+        .waitroom(
+            timeout=300000,  # 5 minutes
+            timeout_message=(
+                "Sorry, we could not find enough players for this study. "
+                "Please return the HIT now. You will be paid through a "
+                "Compensation HIT."
+            ),
+        )
+        .runtime(
+            environment_initialization_code=overcooked_utils.make_v2_env_init_code(
+                env_id
+            ),
+            packages_to_install=["numpy", "cogrid==0.3.1", "opencv-python"],
+        )
+        .multiplayer(
+            input_delay=3,
+            matchmaker=FIFOMatchmaker(max_p2p_rtt_ms=100),
+            hide_lobby_count=True,
+            partner_disconnect_message=(
+                "Your partner disconnected. The task will end here and you "
+                "will be compensated for your performance so far. Please "
+                "submit the completion code below."
+            ),
+            partner_disconnect_show_completion_code=True,
+        )
     )
-    .assets(
-        assets_to_preload=overcooked_utils.overcooked_preload_assets_spec()
-        + [
-            # V2 mixed-soup frames live in soups.png — Phaser must preload
-            # this atlas alongside the V1 set or pot renders for mixed
-            # onion+tomato pots will silently fail.
-            {
-                "object_type": "atlas_spec",
-                "name": "soups",
-                "img_path": "examples/cogrid/assets/overcooked/sprites/soups.png",
-                "atlas_path": "examples/cogrid/assets/overcooked/sprites/soups.json",
-            },
-        ],
-    )
-    .gameplay(
-        default_action=Noop,
-        action_mapping=action_mapping,
-        num_episodes=3,
-        max_steps=400,
-        input_mode=configuration_constants.InputModes.SingleKeystroke,
-    )
-    .content(
-        scene_header="OvercookedV2 - Test Time (Partial Observability)",
-        scene_body=(
-            "<center><p>"
-            "You'll play OvercookedV2 with another participant. "
-            "Each chef has a <b>limited 5x5 view</b> centred on themselves -- "
-            "you can only see what's nearby. The recipe indicator (blue tile) "
-            "shows which soup the kitchen is currently asking for; deliver "
-            "the right soup to the green X to score, and avoid wrong "
-            "deliveries (they lose points)."
-            "<br><br>Press start to join the lobby and find a partner."
-            "</p></center>"
-        ),
-        game_page_html_fn=overcooked_utils.overcooked_game_page_header_fn,
-        in_game_scene_body=overcooked_utils.overcooked_two_column_layout(
-            "You and your partner each see only your own 5x5 surroundings."
-            "<br>Communicate by where you stand and what you carry."
-        ),
-    )
-    .waitroom(
-        timeout=300000,  # 5 minutes
-        timeout_message=(
-            "Sorry, we could not find enough players for this study. Please "
-            "return the HIT now. You will be paid through a Compensation HIT."
-        ),
-    )
-    .runtime(
-        environment_initialization_code_filepath=(
-            "examples/cogrid/environments/overcooked_v2_test_time_simple.py"
-        ),
-        packages_to_install=["numpy", "cogrid==0.3.1", "opencv-python"],
-    )
-    .multiplayer(
-        input_delay=3,
-        matchmaker=FIFOMatchmaker(max_p2p_rtt_ms=100),
-        hide_lobby_count=True,
-        partner_disconnect_message=(
-            "Your partner disconnected. The task will end here and you will "
-            "be compensated for your performance so far. Please submit the "
-            "completion code below."
-        ),
-        partner_disconnect_show_completion_code=True,
-    )
-)
+
+
+# One scene per registered V2 layout. Index by env id so launchers can pull
+# the one (or several) they want without rebuilding.
+v2_scenes_by_id: dict[str, gym_scene.GymScene] = {
+    env_id: _build_v2_scene(env_id, label)
+    for env_id, label in overcooked_utils.V2_LAYOUTS
+}
+
+# Default-exposed scene keeps the original module-level name so existing
+# launchers continue to import it unchanged.
+overcooked_v2_test_time_simple_scene = v2_scenes_by_id[
+    "OvercookedV2-TestTimeSimple-V0"
+]

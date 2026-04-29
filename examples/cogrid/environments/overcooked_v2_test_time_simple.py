@@ -1,16 +1,24 @@
-"""OvercookedV2 TestTimeSimple environment with partial observability.
+"""Generic OvercookedV2 environment template with partial-observability render.
 
-Wraps cogrid 0.3.0's ``OvercookedV2-TestTimeSimple-V0`` registration with a
-MUG-compatible ``render`` that produces an *agent-centred* 5x5 viewport. Each
-agent's view spans a Chebyshev radius of 2 around their own cell; cells
-outside the world grid render as void. The viewport scrolls with the agent,
-matching the ``local_view`` observation tensor that V2 RL agents see.
+This is a *template*: ``make_v2_env_init_code()`` in ``overcooked_utils.py``
+substitutes the ``SOURCE_ENV_ID`` line below before handing the code to
+Pyodide, so a single render path drives every cogrid 0.3.x ``OvercookedV2-*``
+environment (TestTimeSimple, TestTimeWide, GroundedCoordSimple/Ring,
+DemoCookSimple/Wide, CrampedRoomIndicator). The template parses as-is for
+direct imports; the default ``SOURCE_ENV_ID`` runs TestTimeSimple.
 
-Sprite policy: reuse the existing Overcooked V1 atlases (terrain, chefs,
-objects) for the items they cover (counter, pot, serve, dishes, onion,
-tomato, plate, onion-soup, tomato-soup, all chef poses). New V2 ingredients
-(broccoli, mushroom) and mixed soups have no sprites, so they fall back to
-vector primitives.
+The render produces an agent-centred 5x5 viewport: each agent's view spans
+a Chebyshev radius of 2 around their own cell, and cells outside the world
+grid render as void. The viewport scrolls with the agent, matching the
+``local_view`` observation tensor V2 RL agents see. Static fixtures (and the
+partner agent) are rendered with a 1-cell buffer ring beyond the visible
+area so they tween smoothly into / out of view as the agent walks.
+
+Sprite policy: reuse the V1 atlases (terrain, chefs, objects) for the items
+they cover -- counter, pot, serve, dishes, onion, tomato, plate, onion-soup,
+tomato-soup, all chef poses. The ``soups`` atlas covers mixed onion+tomato
+pot states. New V2 ingredients (broccoli, mushroom) and any combination
+involving them fall back to vector primitives until art is generated.
 
 This file is executed by Pyodide to create the ``env`` variable at module
 scope.
@@ -52,6 +60,9 @@ from mug.rendering import Surface
 
 logger = logging.getLogger(__name__)
 
+# Template substitution target. ``make_v2_env_init_code(env_id)`` in
+# overcooked_utils.py rewrites this exact line before handing the code to
+# Pyodide; keep it as a single literal so the textual replace is robust.
 SOURCE_ENV_ID = "OvercookedV2-TestTimeSimple-V0"
 ENV_ID = f"{SOURCE_ENV_ID}-MUG"
 

@@ -58,6 +58,44 @@ def make_hh_env_init_code(layout_name: str, cols: int, rows: int) -> str:
         .replace("LAYOUT_ROWS = 4", f"LAYOUT_ROWS = {rows}")
     )
 
+
+# OvercookedV2 environments registered by cogrid 0.3.x. Each entry is
+# (env_id, display_label). Used by the V2 scene builder to enumerate
+# selectable environments; the env file is a single generic template
+# (``overcooked_v2_test_time_simple.py``) substituted per-env_id.
+V2_LAYOUTS: list[tuple[str, str]] = [
+    ("OvercookedV2-TestTimeSimple-V0", "Test Time Simple"),
+    ("OvercookedV2-TestTimeWide-V0", "Test Time Wide"),
+    ("OvercookedV2-GroundedCoordSimple-V0", "Grounded Coordination Simple"),
+    ("OvercookedV2-GroundedCoordRing-V0", "Grounded Coordination Ring"),
+    ("OvercookedV2-DemoCookSimple-V0", "Demo Cook Simple"),
+    ("OvercookedV2-DemoCookWide-V0", "Demo Cook Wide"),
+]
+
+V2_ENV_TEMPLATE_PATH = os.path.join(
+    os.path.dirname(__file__),
+    "environments",
+    "overcooked_v2_test_time_simple.py",
+)
+
+
+def make_v2_env_init_code(env_id: str) -> str:
+    """Return the Pyodide env-init code for a specific OvercookedV2 environment.
+
+    Reads the V2 template and rewrites the ``SOURCE_ENV_ID`` line so the
+    same render path drives every V2 layout. The template parses as-is
+    (defaults to ``OvercookedV2-TestTimeSimple-V0``).
+
+    :param env_id: A cogrid registry id, e.g. ``OvercookedV2-TestTimeWide-V0``.
+        Must be one of the IDs registered by ``cogrid.envs.__init__``.
+    """
+    with open(V2_ENV_TEMPLATE_PATH, encoding="utf-8") as f:
+        template = f.read()
+    return template.replace(
+        'SOURCE_ENV_ID = "OvercookedV2-TestTimeSimple-V0"',
+        f'SOURCE_ENV_ID = "{env_id}"',
+    )
+
 ARROW_KEYS_IMG = "examples/shared/assets/keys/arrow_keys_2.png"
 W_KEY_IMG = "examples/shared/assets/keys/icons8-w-key-50.png"
 CHEF_IMGS = {
