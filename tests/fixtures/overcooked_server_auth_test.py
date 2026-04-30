@@ -36,7 +36,7 @@ def _create_overcooked_env(**kwargs):
     """Lazy env_creator that imports cogrid only when the server creates the env.
 
     Defers the heavy cogrid import to runtime so this module can be imported
-    without cogrid installed (same pattern as overcooked_server_auth.py).
+    without cogrid installed (same pattern as overcooked_server_auth_hh.py).
     """
     from examples.cogrid.environments.cramped_room_environment_initialization_hh import (
         OvercookedEnv, overcooked_config)

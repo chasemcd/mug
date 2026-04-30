@@ -351,7 +351,7 @@ end_scene = (
 # ============================================================================
 # The cogrid 0.3.x OvercookedV2 environments use ``local_view_radius=2`` so
 # each agent observes only a 5x5 window centred on themselves. The render
-# function in ``environments/overcooked_v2_test_time_simple.py`` is a single
+# function in ``environments/overcooked_v2_template.py`` is a single
 # generic template that handles every V2 layout -- agent-centred viewport
 # scrolling with the agent, off-grid cells rendered as void, partner hidden
 # when their cell falls outside the viewer's window. ``_build_v2_scene``

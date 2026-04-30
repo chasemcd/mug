@@ -12,7 +12,7 @@ pip install cogrid
 
 ## Examples
 
-### 1. Human-AI Comparison (`overcooked_human_ai.py`)
+### 1. Human-AI Comparison (`overcooked_hai.py`)
 
 **Description**: Within-subjects experiment comparing two AI partners (Self-Play vs Behavior Shaping).
 
@@ -25,7 +25,7 @@ pip install cogrid
 
 **Usage**:
 ```bash
-python -m examples.cogrid.overcooked_human_ai
+python -m examples.cogrid.overcooked_hai
 ```
 
 Navigate to `http://localhost:5702` in your browser.
@@ -38,7 +38,7 @@ Navigate to `http://localhost:5702` in your browser.
 5. Preference feedback
 6. Completion
 
-### 2. Human-Human Multiplayer (`overcooked_human_human_multiplayer.py`)
+### 2. Human-Human Multiplayer (`overcooked_hh.py`)
 
 **Description**: Real-time multiplayer experiment with two human participants.
 
@@ -54,7 +54,7 @@ Navigate to `http://localhost:5702` in your browser.
 
 **Usage**:
 ```bash
-python -m examples.cogrid.overcooked_human_human_multiplayer
+python -m examples.cogrid.overcooked_hh
 ```
 
 Open **TWO** browser windows to `http://localhost:5702`.

@@ -8,7 +8,7 @@ This example demonstrates Human-AI experiments where:
 - Participant provides preference feedback between partners
 
 Usage:
-    python -m examples.cogrid.overcooked_human_ai
+    python -m examples.cogrid.overcooked_hai
 """
 
 from __future__ import annotations

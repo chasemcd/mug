@@ -8,7 +8,7 @@
 
 A human collaborates with an ONNX AI teammate to prepare and deliver dishes on the Cramped Room Overcooked kitchen, with the environment and policy both running client-side via Pyodide. The participant plays two rounds with an AI partner and then fills out a side-by-side preference survey over the two rounds. For illustration, both rounds load the same ONNX weights — swap in different `onnx_path` values to turn this into a real within-subjects comparison between two partners.
 
-**Source:** [`examples/cogrid/overcooked_human_ai.py`](https://github.com/chasemcd/mug/blob/main/examples/cogrid/overcooked_human_ai.py)
+**Source:** [`examples/cogrid/overcooked_hai.py`](https://github.com/chasemcd/mug/blob/main/examples/cogrid/overcooked_hai.py)
 
 See [Examples](index.md) for install and run instructions. This example also requires the [CoGrid Overcooked environment](https://github.com/chasemcd/cogrid), which we install in the user's browser (install locally with `pip install cogrid==0.2.1` if you want to run the environment outside the experiment).
 
@@ -16,7 +16,7 @@ See [Examples](index.md) for install and run instructions. This example also req
 
 ```text
 cogrid/
-├── overcooked_human_ai.py    # Main experiment file
+├── overcooked_hai.py         # Main experiment file
 ├── scenes/scenes.py          # Scene definitions
 ├── overcooked_utils.py       # Rendering + shared helpers
 ├── environments/

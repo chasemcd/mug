@@ -1,13 +1,14 @@
 """Overcooked V2 (partial observability) — Human-Human Multiplayer (P2P Pyodide).
 
-Two participants play the cogrid 0.3.0 ``OvercookedV2-TestTimeSimple-V0``
-layout. Each browser runs its own Pyodide environment; the render function
-in ``examples/cogrid/environments/overcooked_v2_test_time_simple.py``
-produces an agent-centred 5x5 viewport, so each player naturally sees only
-what their own chef can observe.
+Two participants play one of the cogrid 0.3.x ``OvercookedV2-*`` layouts
+(default: ``OvercookedV2-TestTimeSimple-V0``; swap via ``oc_scenes.v2_scenes_by_id``).
+Each browser runs its own Pyodide environment; the render function in
+``examples/cogrid/environments/overcooked_v2_template.py`` produces an
+agent-centred 5x5 viewport, so each player naturally sees only what their
+own chef can observe.
 
 Usage:
-    python -m examples.cogrid.overcooked_v2_partial_obs --experiment-id <id>
+    python -m examples.cogrid.overcooked_v2_hh --experiment-id <id>
 
 Open two browser windows to http://localhost:5703 and play together.
 """

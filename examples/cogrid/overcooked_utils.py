@@ -10,23 +10,38 @@ ASSET_PATH = "examples/cogrid/assets/overcooked/sprites"
 # is (layout_name_in_cogrid, cols, rows, display_label, preview_image_path).
 HH_LAYOUTS: list[tuple[str, int, int, str, str]] = [
     (
-        "overcooked_cramped_room_v0", 5, 4, "Cramped Room",
+        "overcooked_cramped_room_v0",
+        5,
+        4,
+        "Cramped Room",
         "examples/cogrid/assets/overcooked/cramped_room.png",
     ),
     (
-        "overcooked_asymmetric_advantages_v0", 9, 5, "Asymmetric Advantages",
+        "overcooked_asymmetric_advantages_v0",
+        9,
+        5,
+        "Asymmetric Advantages",
         "examples/cogrid/assets/overcooked/asymmetric_advantages.png",
     ),
     (
-        "overcooked_coordination_ring_v0", 5, 5, "Coordination Ring",
+        "overcooked_coordination_ring_v0",
+        5,
+        5,
+        "Coordination Ring",
         "examples/cogrid/assets/overcooked/coordination_ring.png",
     ),
     (
-        "overcooked_forced_coordination_v0", 5, 4, "Forced Coordination",
+        "overcooked_forced_coordination_v0",
+        5,
+        4,
+        "Forced Coordination",
         "examples/cogrid/assets/overcooked/forced_coordination.png",
     ),
     (
-        "overcooked_counter_circuit_v0", 8, 5, "Counter Circuit",
+        "overcooked_counter_circuit_v0",
+        8,
+        5,
+        "Counter Circuit",
         "examples/cogrid/assets/overcooked/counter_circuit.png",
     ),
 ]
@@ -49,8 +64,7 @@ def make_hh_env_init_code(layout_name: str, cols: int, rows: int) -> str:
     with open(HH_ENV_TEMPLATE_PATH, encoding="utf-8") as f:
         template = f.read()
     return (
-        template
-        .replace(
+        template.replace(
             'LAYOUT_NAME = "overcooked_cramped_room_v0"',
             f'LAYOUT_NAME = "{layout_name}"',
         )
@@ -62,7 +76,7 @@ def make_hh_env_init_code(layout_name: str, cols: int, rows: int) -> str:
 # OvercookedV2 environments registered by cogrid 0.3.x. Each entry is
 # (env_id, display_label). Used by the V2 scene builder to enumerate
 # selectable environments; the env file is a single generic template
-# (``overcooked_v2_test_time_simple.py``) substituted per-env_id.
+# (``overcooked_v2_template.py``) substituted per-env_id.
 V2_LAYOUTS: list[tuple[str, str]] = [
     ("OvercookedV2-TestTimeSimple-V0", "Test Time Simple"),
     ("OvercookedV2-TestTimeWide-V0", "Test Time Wide"),
@@ -75,7 +89,7 @@ V2_LAYOUTS: list[tuple[str, str]] = [
 V2_ENV_TEMPLATE_PATH = os.path.join(
     os.path.dirname(__file__),
     "environments",
-    "overcooked_v2_test_time_simple.py",
+    "overcooked_v2_template.py",
 )
 
 
@@ -96,6 +110,7 @@ def make_v2_env_init_code(env_id: str) -> str:
         f'SOURCE_ENV_ID = "{env_id}"',
     )
 
+
 ARROW_KEYS_IMG = "examples/shared/assets/keys/arrow_keys_2.png"
 W_KEY_IMG = "examples/shared/assets/keys/icons8-w-key-50.png"
 CHEF_IMGS = {
@@ -103,7 +118,10 @@ CHEF_IMGS = {
     1: "examples/cogrid/assets/overcooked/green_chef.png",
 }
 
-def _legend_pair(img_src: str, img_alt: str, img_height_px: int, label: str) -> str:
+
+def _legend_pair(
+    img_src: str, img_alt: str, img_height_px: int, label: str
+) -> str:
     """One [image] [label] cell used inside the horizontal legend row."""
     return f"""
     <div style="display: flex; align-items: center; gap: 8px;">
@@ -114,13 +132,14 @@ def _legend_pair(img_src: str, img_alt: str, img_height_px: int, label: str) -> 
     """
 
 
-CONTROLS_PAIRS_HTML = (
-    _legend_pair(ARROW_KEYS_IMG, "Keyboard arrow keys", 70, "move")
-    + _legend_pair(W_KEY_IMG, "W key", 36, "pick up / drop")
-)
+CONTROLS_PAIRS_HTML = _legend_pair(
+    ARROW_KEYS_IMG, "Keyboard arrow keys", 70, "move"
+) + _legend_pair(W_KEY_IMG, "W key", 36, "pick up / drop")
 
 
-def overcooked_controls_row(chef_img: str, chef_label: str = "your chef") -> str:
+def overcooked_controls_row(
+    chef_img: str, chef_label: str = "your chef"
+) -> str:
     """Single horizontal row: chef pair + arrow-keys pair + W-key pair, evenly spaced."""
     chef_cell = _legend_pair(chef_img, chef_label, 36, chef_label)
     return f"""

@@ -2,10 +2,11 @@
 
 This is a *template*: ``make_v2_env_init_code()`` in ``overcooked_utils.py``
 substitutes the ``SOURCE_ENV_ID`` line below before handing the code to
-Pyodide, so a single render path drives every cogrid 0.3.x ``OvercookedV2-*``
-environment (TestTimeSimple, TestTimeWide, GroundedCoordSimple/Ring,
-DemoCookSimple/Wide, CrampedRoomIndicator). The template parses as-is for
-direct imports; the default ``SOURCE_ENV_ID`` runs TestTimeSimple.
+Pyodide, so a single render path drives every partial-observability
+``OvercookedV2-*`` environment registered by cogrid 0.3.x: TestTimeSimple,
+TestTimeWide, GroundedCoordSimple, GroundedCoordRing, DemoCookSimple,
+DemoCookWide. The template parses as-is for direct imports; the default
+``SOURCE_ENV_ID`` runs TestTimeSimple.
 
 The render produces an agent-centred 5x5 viewport: each agent's view spans
 a Chebyshev radius of 2 around their own cell, and cells outside the world

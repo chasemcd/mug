@@ -39,12 +39,12 @@ Examples must be run from a cloned repository, not a pip install, because they r
     python -m examples.slime_volleyball.slimevb_human_human
 
     # Overcooked (Human + AI)
-    python -m examples.cogrid.overcooked_human_ai
+    python -m examples.cogrid.overcooked_hai
 
     # Overcooked (Human vs Human) — client-side P2P by default
-    python -m examples.cogrid.overcooked_human_human_multiplayer --experiment-id test
+    python -m examples.cogrid.overcooked_hh --experiment-id test
     # Server-authoritative variant of the same example
-    python -m examples.cogrid.overcooked_server_auth --experiment-id test
+    python -m examples.cogrid.overcooked_server_auth_hh --experiment-id test
     ```
 
 4. Open a browser to the port printed on startup (typically http://localhost:5702).

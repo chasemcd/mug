@@ -8,7 +8,7 @@
 
 Two human participants collaborate as chefs across the five classic Overcooked kitchens — Cramped Room, Asymmetric Advantages, Coordination Ring, Forced Coordination, and Counter Circuit. Each participant pair is randomly assigned one layout via `RandomizeOrder(keep_n=1)`. Each browser runs its own Pyodide copy of the environment and exchanges inputs peer-to-peer over WebRTC; GGPO rollback netcode keeps the two simulations synchronized, and FIFO matchmaking with a maximum P2P RTT filters out high-latency pairings.
 
-**Source:** [`examples/cogrid/overcooked_human_human_multiplayer.py`](https://github.com/chasemcd/mug/blob/main/examples/cogrid/overcooked_human_human_multiplayer.py)
+**Source:** [`examples/cogrid/overcooked_hh.py`](https://github.com/chasemcd/mug/blob/main/examples/cogrid/overcooked_hh.py)
 
 For a simpler P2P walkthrough with the full GGPO explanation, see [Quick Start: Multiplayer](../getting-started/quick-start-multiplayer.md). For a version where the environment runs on the server instead, see the [Running server-authoritative instead](#running-server-authoritative-instead) section at the bottom.
 
@@ -18,7 +18,7 @@ See [Examples](index.md) for install and run instructions. This example also req
 
 ```text
 cogrid/
-├── overcooked_human_human_multiplayer.py
+├── overcooked_hh.py
 ├── scenes/scenes.py                    # Builds one scene per layout + RandomizeOrder wrapper
 ├── environments/
 │   └── overcooked_hh_template.py       # Pyodide env template (placeholders filled per layout)
@@ -224,4 +224,4 @@ To equalize perceived latency across players on different networks, add a fixed 
 .multiplayer(mode="server_authoritative", input_delay=2)  # ~66ms @ 30 FPS
 ```
 
-See [`examples/cogrid/overcooked_server_auth.py`](https://github.com/chasemcd/mug/blob/main/examples/cogrid/overcooked_server_auth.py) for the full working example.
+See [`examples/cogrid/overcooked_server_auth_hh.py`](https://github.com/chasemcd/mug/blob/main/examples/cogrid/overcooked_server_auth_hh.py) for the full working example.
