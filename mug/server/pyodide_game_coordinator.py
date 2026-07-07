@@ -345,6 +345,46 @@ class PyodideGameCoordinator:
                 f"to {len(game.players) - 1} other player(s)"
             )
 
+    def _snapshot_player(self, game_id: str, player_id: str | int) -> dict:
+        """Snapshot the fields callers need from a game. Must hold self.lock."""
+        game = self.games[game_id]
+        return {
+            "game_id": game_id,
+            "player_id": player_id,
+            "is_active": game.is_active,
+            "player_ids": list(game.players.keys()),
+            "subject_ids": list(game.player_subjects.values()),
+            "frame_number": game.frame_number,
+            "created_at": game.created_at,
+        }
+
+    def find_player_by_socket(self, socket_id: str) -> dict | None:
+        """Find the game a socket belongs to.
+
+        Returns a snapshot dict captured under the coordinator lock
+        (game_id, player_id, is_active, player_ids, subject_ids,
+        frame_number, created_at), or None if the socket is not in any game.
+        """
+        with self.lock:
+            for game_id, game in self.games.items():
+                for player_id, sid in game.players.items():
+                    if sid == socket_id:
+                        return self._snapshot_player(game_id, player_id)
+        return None
+
+    def find_player_by_subject(self, subject_id: str) -> dict | None:
+        """Find the game a subject belongs to.
+
+        Returns the same snapshot shape as find_player_by_socket, or None
+        if the subject is not in any game.
+        """
+        with self.lock:
+            for game_id, game in self.games.items():
+                for player_id, sid in game.player_subjects.items():
+                    if sid == subject_id:
+                        return self._snapshot_player(game_id, player_id)
+        return None
+
     def remove_player(self, game_id: str, player_id: str | int, notify_others: bool = True, reason: str = 'partner_disconnected'):
         """
         Handle player disconnection.

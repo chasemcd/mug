@@ -7,6 +7,69 @@ from flask_socketio import SocketIO
 from mug.scenes import scene
 from mug.utils.sentinels import NotProvided
 
+DEFAULT_SCALE_LABELS = (
+    "Strongly Disagree",
+    "Disagree",
+    "Neutral",
+    "Agree",
+    "Strongly Agree",
+)
+
+
+def _scale_question_html(
+    index: int, question: str, labels_row: str, scale_size: int
+) -> str:
+    """HTML for a single Likert slider question, including its thumb styling."""
+    return f"""
+    <div class="scale-question" style="margin-bottom: 15px; text-align: center;">
+        <div style="border: 1px solid #ccc; padding: 10px; display: inline-block; margin: 0 auto; width: 80%;">
+            <p style="margin: 0 0 10px 0;">{question} <span style="color: red;">*</span></p>
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+                {labels_row}
+            </div>
+            <div style="display: flex; align-items: center; justify-content: center;">
+                <input type="range" id="scale-{index}" class="scale-input" min="0" max="{scale_size - 1}" value="{(scale_size - 1) // 2}" style="margin: 10px 0; -webkit-appearance: none; appearance: none; width: 100%; height: 2px; background: #d3d3d3; outline: none; opacity: 0.7; transition: opacity .2s;">
+            </div>
+        </div>
+    </div>
+    <style>
+        #scale-{index}::-webkit-slider-thumb {{
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #d3d3d3;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }}
+        #scale-{index}::-moz-range-thumb {{
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #d3d3d3;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }}
+        #scale-{index}.interacted::-webkit-slider-thumb {{
+            background: #4CAF50;
+        }}
+        #scale-{index}.interacted::-moz-range-thumb {{
+            background: #4CAF50;
+        }}
+    </style>
+    """
+
+
+def _text_box_html(text_box_header: str) -> str:
+    """HTML for a required free-text response box."""
+    return f"""
+    <div style="margin-top: 20px; text-align: center;">
+        <p>{text_box_header} <span style="color: red;">*</span></p>
+        <textarea id="user-input" rows="4" cols="50" style="width: 100%; max-width: 500px;"></textarea>
+    </div>
+    """
+
 
 class StaticScene(scene.Scene):
     """
@@ -63,19 +126,9 @@ class StaticScene(scene.Scene):
 
         :raises AssertionError: If both scene_body and scene_body_filepath are provided
         """
-        if scene_body_filepath is not NotProvided:
-            assert (
-                scene_body is NotProvided
-            ), "Cannot set both filepath and html_body."
-
-            with open(scene_body_filepath, encoding="utf-8") as f:
-                self.scene_body = f.read()
-
-        if scene_body is not NotProvided:
-            assert (
-                scene_body_filepath is NotProvided
-            ), "Cannot set both filepath and html_body."
-            self.scene_body = scene_body
+        body = scene.resolve_scene_body(scene_body, scene_body_filepath)
+        if body is not NotProvided:
+            self.scene_body = body
 
         if scene_header is not NotProvided:
             self.scene_header = scene_header
@@ -268,15 +321,11 @@ class OptionBoxesWithScalesAndTextBox(StaticScene):
         scale_questions: list[str],
         option_box_header: str,
         scale_size: int = 21,
-        scale_labels: list[str] = [
-            "Strongly Disagree",
-            "Disagree",
-            "Neutral",
-            "Agree",
-            "Strongly Agree",
-        ],
+        scale_labels: list[str] | None = None,
     ):
         super().__init__()
+        if scale_labels is None:
+            scale_labels = list(DEFAULT_SCALE_LABELS)
         self.pre_scale_header = pre_scale_header
         self.scale_size = scale_size
         self.scale_questions = scale_questions
@@ -337,56 +386,18 @@ class OptionBoxesWithScalesAndTextBox(StaticScene):
             '<div id="scale-questions-container" style="margin-top: 20px;">\n'
         )
         for i, question in enumerate(self.scale_questions):
-            html += f"""
-            <div class="scale-question" style="margin-bottom: 15px; text-align: center;">
-                <div style="border: 1px solid #ccc; padding: 10px; display: inline-block; margin: 0 auto; width: 80%;">
-                    <p style="margin: 0 0 10px 0;">{question} <span style="color: red;">*</span></p>
-                    <div style="display: flex; align-items: center; justify-content: space-between;">
-                        <span style="flex: 1; text-align: left; font-size: 12px;">{self.scale_labels[0]}</span>
-                        <span style="flex: 1; text-align: center; font-size: 12px;">{self.scale_labels[len(self.scale_labels)//2]}</span>
-                        <span style="flex: 1; text-align: right; font-size: 12px;">{self.scale_labels[-1]}</span>
-                    </div>
-                    <div style="display: flex; align-items: center; justify-content: center;">
-                        <input type="range" id="scale-{i}" class="scale-input" min="0" max="{self.scale_size - 1}" value="{(self.scale_size - 1) // 2}" style="margin: 10px 0; -webkit-appearance: none; appearance: none; width: 100%; height: 2px; background: #d3d3d3; outline: none; opacity: 0.7; transition: opacity .2s;">
-                    </div>
-                </div>
-            </div>
-            <style>
-                #scale-{i}::-webkit-slider-thumb {{
-                    -webkit-appearance: none;
-                    appearance: none;
-                    width: 20px;
-                    height: 20px;
-                    border-radius: 50%;
-                    background: #d3d3d3;
-                    cursor: pointer;
-                    transition: background 0.3s ease;
-                }}
-                #scale-{i}::-moz-range-thumb {{
-                    width: 20px;
-                    height: 20px;
-                    border-radius: 50%;
-                    background: #d3d3d3;
-                    cursor: pointer;
-                    transition: background 0.3s ease;
-                }}
-                #scale-{i}.interacted::-webkit-slider-thumb {{
-                    background: #4CAF50;
-                }}
-                #scale-{i}.interacted::-moz-range-thumb {{
-                    background: #4CAF50;
-                }}
-            </style>
-            """
+            labels_row = (
+                f'<span style="flex: 1; text-align: left; font-size: 12px;">{self.scale_labels[0]}</span>'
+                f'<span style="flex: 1; text-align: center; font-size: 12px;">{self.scale_labels[len(self.scale_labels) // 2]}</span>'
+                f'<span style="flex: 1; text-align: right; font-size: 12px;">{self.scale_labels[-1]}</span>'
+            )
+            html += _scale_question_html(
+                i, question, labels_row, self.scale_size
+            )
         html += "</div>\n"
 
         # Add text box
-        html += f"""
-        <div style="margin-top: 20px; text-align: center;">
-            <p>{text_box_header} <span style="color: red;">*</span></p>
-            <textarea id="user-input" rows="4" cols="50" style="width: 100%; max-width: 500px;"></textarea>
-        </div>
-        """
+        html += _text_box_html(text_box_header)
 
         html += """
         <script>
@@ -458,10 +469,9 @@ class OptionBoxesWithScalesAndTextBox(StaticScene):
 
 
 class ScalesAndTextBox(StaticScene):
-    """A StaticScene subclass that displays option boxes with scales and a text box.
+    """A StaticScene subclass that displays Likert scales and a text box.
 
     This class creates a static scene with multiple interactive elements:
-    - Option boxes that can be selected
     - Likert scales for rating different aspects
     - A text box for additional input
 
@@ -473,15 +483,11 @@ class ScalesAndTextBox(StaticScene):
         pre_scale_header: str,
         scale_questions: list[str],
         scale_size: int = 21,
-        scale_labels: list[str] = [
-            "Strongly Disagree",
-            "Disagree",
-            "Neutral",
-            "Agree",
-            "Strongly Agree",
-        ],
+        scale_labels: list[str] | None = None,
     ):
         super().__init__()
+        if scale_labels is None:
+            scale_labels = list(DEFAULT_SCALE_LABELS)
         self.pre_scale_header = pre_scale_header
         self.scale_size = scale_size
         self.scale_questions = scale_questions
@@ -500,10 +506,8 @@ class ScalesAndTextBox(StaticScene):
 
     def _create_html(self, text_box_header: str) -> str:
         """
-        Given a list of N options, creates HTML code to display a horizontal line of N boxes,
-        each with a unique color. Each box is labeled by a string in the options list.
-        When a user clicks a box, it becomes highlighted.
-        The advance button is only enabled when a box is clicked, all scales are interacted with, and text is entered.
+        Creates HTML code to display the configured Likert scales and a text box.
+        The advance button is only enabled when all scales are interacted with and text is entered.
         """
         html = ""
 
@@ -530,54 +534,13 @@ class ScalesAndTextBox(StaticScene):
                     text_align = "center"
                 label_spans += f'<span style="text-align: {text_align}; font-size: 12px;">{label}</span>\n'
 
-            html += f"""
-            <div class="scale-question" style="margin-bottom: 15px; text-align: center;">
-                <div style="border: 1px solid #ccc; padding: 10px; display: inline-block; margin: 0 auto; width: 80%;">
-                    <p style="margin: 0 0 10px 0;">{question} <span style="color: red;">*</span></p>
-                    <div style="display: flex; align-items: center; justify-content: space-between;">
-                        {label_spans}
-                    </div>
-                    <div style="display: flex; align-items: center; justify-content: center;">
-                        <input type="range" id="scale-{i}" class="scale-input" min="0" max="{self.scale_size - 1}" value="{(self.scale_size - 1) // 2}" style="margin: 10px 0; -webkit-appearance: none; appearance: none; width: 100%; height: 2px; background: #d3d3d3; outline: none; opacity: 0.7; transition: opacity .2s;">
-                    </div>
-                </div>
-            </div>
-            <style>
-                #scale-{i}::-webkit-slider-thumb {{
-                    -webkit-appearance: none;
-                    appearance: none;
-                    width: 20px;
-                    height: 20px;
-                    border-radius: 50%;
-                    background: #d3d3d3;
-                    cursor: pointer;
-                    transition: background 0.3s ease;
-                }}
-                #scale-{i}::-moz-range-thumb {{
-                    width: 20px;
-                    height: 20px;
-                    border-radius: 50%;
-                    background: #d3d3d3;
-                    cursor: pointer;
-                    transition: background 0.3s ease;
-                }}
-                #scale-{i}.interacted::-webkit-slider-thumb {{
-                    background: #4CAF50;
-                }}
-                #scale-{i}.interacted::-moz-range-thumb {{
-                    background: #4CAF50;
-                }}
-            </style>
-            """
+            html += _scale_question_html(
+                i, question, label_spans, self.scale_size
+            )
         html += "</div>\n"
 
         # Add text box
-        html += f"""
-        <div style="margin-top: 20px; text-align: center;">
-            <p>{text_box_header} <span style="color: red;">*</span></p>
-            <textarea id="user-input" rows="4" cols="50" style="width: 100%; max-width: 500px;"></textarea>
-        </div>
-        """
+        html += _text_box_html(text_box_header)
 
         html += """
         <script>

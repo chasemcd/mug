@@ -15,7 +15,7 @@ This is the capstone validation for v1.19 P2P Lifecycle Cleanup:
 
 Scene flow:
 1. StartScene (instructions) - advanceButton
-2. GymScene (multiplayer Overcooked, 1 episode, 450 steps) - startButton -> P2P game
+2. GymScene (multiplayer Overcooked, 1 episode, 200 steps) - startButton -> P2P game
 3. ScalesAndTextBox (multiplayer feedback) - survey scene (isolation tested here)
 4. CompletionCodeScene (end)
 """
@@ -78,7 +78,7 @@ def test_partner_exit_on_survey_no_overlay(flask_server_scene_isolation, player_
     set_tab_visibility(page2, visible=True)
 
     # ---- Step 6: Wait for episode completion ----
-    # Players are idle, episode ends via time limit (~15s at 30fps with 450 steps)
+    # Players are idle, episode ends via time limit (~7s at 30fps with 200 steps)
     wait_for_episode_complete(page1, episode_num=1, timeout=180000)
     wait_for_episode_complete(page2, episode_num=1, timeout=180000)
 

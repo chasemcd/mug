@@ -30,6 +30,10 @@ class UnityScene(scene.Scene):
 
         # The path to the WebGL build
         self.build_path: str | None = None
+        # The name of the WebGL build and its canvas dimensions (set via .webgl())
+        self.build_name: str | None = None
+        self.height: int | None = None
+        self.width: int | None = None
         # The base URL for WebGL builds (relative to server root)
         self.webgl_base_url: str = "static/web_gl"
         # The condition(s) under which the user can continue on to the next scene
@@ -75,19 +79,9 @@ class UnityScene(scene.Scene):
 
         :raises AssertionError: If both scene_body and scene_body_filepath are provided
         """
-        if scene_body_filepath is not NotProvided:
-            assert (
-                scene_body is NotProvided
-            ), "Cannot set both filepath and html_body."
-
-            with open(scene_body_filepath, encoding="utf-8") as f:
-                self.scene_body = f.read()
-
-        if scene_body is not NotProvided:
-            assert (
-                scene_body_filepath is NotProvided
-            ), "Cannot set both filepath and html_body."
-            self.scene_body = scene_body
+        body = scene.resolve_scene_body(scene_body, scene_body_filepath)
+        if body is not NotProvided:
+            self.scene_body = body
 
         if scene_header is not NotProvided:
             self.scene_header = scene_header

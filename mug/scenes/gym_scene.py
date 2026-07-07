@@ -43,7 +43,6 @@ class GymScene(scene.Scene):
         min_ping_measurements (int): Minimum number of ping measurements required.
         callback (None): Callback function for the scene.
         env_to_state_fn (Callable | None): Function to convert environment state to renderable state.
-        preload_specs (list[dict[str, str | int | float]] | None): Specifications for preloading assets.
         hud_text_fn (Callable | None): Function to generate HUD text.
         location_representation (str): Representation of locations ('relative' or 'pixels').
         game_width (int | None): Width of the game window.
@@ -97,7 +96,6 @@ class GymScene(scene.Scene):
 
         # Rendering
         self.env_to_state_fn: Callable | None = None
-        self.preload_specs: list[dict[str, str | int | float]] | None = None
         self.hud_text_fn: Callable | None = None
         self.hud_score_carry_over: bool = (
             False  # If True, cumulative rewards carry over between episodes
@@ -274,7 +272,7 @@ class GymScene(scene.Scene):
             self.env_config = env_config
 
         if seed is not NotProvided:
-            self.seed = seed
+            self.env_seed = seed
 
         return self
 
@@ -358,7 +356,6 @@ class GymScene(scene.Scene):
 
     def assets(
         self,
-        preload_specs: list[dict[str, str | float | int]] = NotProvided,
         assets_dir: str = NotProvided,
         assets_to_preload: list[str] = NotProvided,
         animation_configs: list = NotProvided,
@@ -366,8 +363,6 @@ class GymScene(scene.Scene):
     ):
         """Configure asset loading and initialization.
 
-        :param preload_specs: Specifications for preloading assets, defaults to NotProvided
-        :type preload_specs: list[dict[str, str | float | int]], optional
         :param assets_dir: Directory containing game assets, defaults to NotProvided
         :type assets_dir: str, optional
         :param assets_to_preload: List of asset filenames to preload, defaults to NotProvided
@@ -379,9 +374,6 @@ class GymScene(scene.Scene):
         :return: This scene object
         :rtype: GymScene
         """
-        if preload_specs is not NotProvided:
-            self.preload_specs = preload_specs
-
         if assets_dir is not NotProvided:
             self.assets_dir = assets_dir
 
@@ -598,33 +590,15 @@ class GymScene(scene.Scene):
         if game_page_html_fn is not NotProvided:
             self.game_page_html_fn = game_page_html_fn
 
-        if scene_body_filepath is not NotProvided:
-            assert (
-                scene_body is NotProvided
-            ), "Cannot set both filepath and html_body."
+        body = scene.resolve_scene_body(scene_body, scene_body_filepath)
+        if body is not NotProvided:
+            self.scene_body = body
 
-            with open(scene_body_filepath, encoding="utf-8") as f:
-                self.scene_body = f.read()
-
-        if scene_body is not NotProvided:
-            assert (
-                scene_body_filepath is NotProvided
-            ), "Cannot set both filepath and html_body."
-            self.scene_body = scene_body
-
-        if in_game_scene_body_filepath is not NotProvided:
-            assert (
-                in_game_scene_body is NotProvided
-            ), "Cannot set both filepath and html_body."
-
-            with open(in_game_scene_body_filepath, encoding="utf-8") as f:
-                self.in_game_scene_body = f.read()
-
-        if in_game_scene_body is not NotProvided:
-            assert (
-                in_game_scene_body_filepath is NotProvided
-            ), "Cannot set both filepath and html_body."
-            self.in_game_scene_body = in_game_scene_body
+        in_game_body = scene.resolve_scene_body(
+            in_game_scene_body, in_game_scene_body_filepath
+        )
+        if in_game_body is not NotProvided:
+            self.in_game_scene_body = in_game_body
 
         return self
 
@@ -690,6 +664,16 @@ class GymScene(scene.Scene):
             DeprecationWarning,
             stacklevel=2,
         )
+        self._set_matchmaking_params(hide_lobby_count, max_rtt, matchmaker)
+        return self
+
+    def _set_matchmaking_params(
+        self,
+        hide_lobby_count: bool = NotProvided,
+        max_rtt: int = NotProvided,
+        matchmaker: Matchmaker = NotProvided,
+    ) -> None:
+        """Validate and set matchmaking params (shared by matchmaking()/multiplayer())."""
         if hide_lobby_count is not NotProvided:
             self.hide_lobby_count = hide_lobby_count
 
@@ -707,8 +691,6 @@ class GymScene(scene.Scene):
                     "matchmaker must be a Matchmaker subclass instance"
                 )
             self._matchmaker = matchmaker
-
-        return self
 
     @property
     def matchmaker(self) -> Matchmaker | None:
@@ -968,23 +950,7 @@ class GymScene(scene.Scene):
             self.input_confirmation_timeout_ms = input_confirmation_timeout_ms
 
         # --- Matchmaking params ---
-        if hide_lobby_count is not NotProvided:
-            self.hide_lobby_count = hide_lobby_count
-
-        if max_rtt is not NotProvided:
-            if max_rtt is not None and max_rtt <= 0:
-                raise ValueError("max_rtt must be a positive integer or None")
-            self.matchmaking_max_rtt = max_rtt
-
-        if matchmaker is not NotProvided:
-            # Runtime import to avoid circular dependency
-            from mug.server.matchmaker import Matchmaker as MatchmakerABC
-
-            if not isinstance(matchmaker, MatchmakerABC):
-                raise TypeError(
-                    "matchmaker must be a Matchmaker subclass instance"
-                )
-            self._matchmaker = matchmaker
+        self._set_matchmaking_params(hide_lobby_count, max_rtt, matchmaker)
 
         # --- Player grouping params ---
         if wait_for_known_group is not NotProvided:

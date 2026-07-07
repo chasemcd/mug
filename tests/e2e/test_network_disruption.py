@@ -46,7 +46,7 @@ from tests.fixtures.network_helpers import (apply_latency, apply_packet_loss,
 # =============================================================================
 
 @pytest.mark.timeout(300)  # 5 minutes max
-def test_packet_loss_triggers_rollback(flask_server, player_contexts):
+def test_packet_loss_triggers_rollback(flask_server_long_episode, player_contexts):
     """
     NET-02: Test that episode completes under packet loss conditions.
 
@@ -63,7 +63,7 @@ def test_packet_loss_triggers_rollback(flask_server, player_contexts):
     counting is observational only.
     """
     page1, page2 = player_contexts
-    base_url = flask_server["url"]
+    base_url = flask_server_long_episode["url"]
 
     # Apply packet loss to player 2 BEFORE navigation
     cdp2 = apply_packet_loss(page2, packet_loss_percent=15, latency_ms=50)
@@ -148,7 +148,7 @@ def test_packet_loss_triggers_rollback(flask_server, player_contexts):
 # =============================================================================
 
 @pytest.mark.timeout(300)  # 5 minutes max
-def test_tab_visibility_triggers_fast_forward(flask_server, player_contexts):
+def test_tab_visibility_triggers_fast_forward(flask_server_long_episode, player_contexts):
     """
     NET-03: Test that tab unfocus/refocus exercises fast-forward path.
 
@@ -165,7 +165,7 @@ def test_tab_visibility_triggers_fast_forward(flask_server, player_contexts):
     through frames rapidly without rendering to catch up.
     """
     page1, page2 = player_contexts
-    base_url = flask_server["url"]
+    base_url = flask_server_long_episode["url"]
 
     # Navigate to game
     page1.goto(base_url)
@@ -280,7 +280,7 @@ def test_tab_visibility_triggers_fast_forward(flask_server, player_contexts):
 # =============================================================================
 
 @pytest.mark.timeout(300)  # 5 minutes max
-def test_active_input_with_packet_loss(flask_server, player_contexts):
+def test_active_input_with_packet_loss(flask_server_long_episode, player_contexts):
     """
     Test data parity when both players actively input actions under packet loss.
 
@@ -308,7 +308,7 @@ def test_active_input_with_packet_loss(flask_server, player_contexts):
     - Player 2: random actions every 200ms, 15% packet loss + 50ms latency
     """
     page1, page2 = player_contexts
-    base_url = flask_server["url"]
+    base_url = flask_server_long_episode["url"]
 
     # Apply packet loss to player 2 BEFORE navigation
     cdp2 = apply_packet_loss(page2, packet_loss_percent=15, latency_ms=50)
@@ -412,7 +412,7 @@ def test_active_input_with_packet_loss(flask_server, player_contexts):
 # =============================================================================
 
 @pytest.mark.timeout(300)  # 5 minutes max
-def test_deep_rollback_via_tab_hide(flask_server, player_contexts):
+def test_deep_rollback_via_tab_hide(flask_server_long_episode, player_contexts):
     """
     Stress test GGPO rollback with >150 frames depth (>5 seconds at 30 FPS).
 
@@ -437,7 +437,7 @@ def test_deep_rollback_via_tab_hide(flask_server, player_contexts):
     - Player 2: random actions every 200ms, 300ms latency, 6s tab hide
     """
     page1, page2 = player_contexts
-    base_url = flask_server["url"]
+    base_url = flask_server_long_episode["url"]
 
     # Apply 300ms latency to player 2 BEFORE navigation
     cdp2 = apply_latency(page2, latency_ms=300)

@@ -125,6 +125,23 @@ class Scene:
         pass
 
 
+def resolve_scene_body(scene_body, scene_body_filepath):
+    """Resolve body content provided either as a literal string or a filepath.
+
+    Exactly one of the two may be provided. Returns the resolved content, or
+    NotProvided if neither argument was given.
+    """
+    if scene_body_filepath is not NotProvided:
+        assert (
+            scene_body is NotProvided
+        ), "Cannot set both filepath and html_body."
+
+        with open(scene_body_filepath, encoding="utf-8") as f:
+            return f.read()
+
+    return scene_body
+
+
 def serialize_dict(data):
     """
     Serialize a dictionary to JSON, removing unserializable keys recursively.
@@ -176,7 +193,7 @@ class SceneWrapper:
 
         self.scenes: Scene | SceneWrapper = scenes
 
-    def build(self) -> SceneWrapper:
+    def build(self) -> list[Scene]:
         """
         Build the SceneWrapper for a participant.
         """
@@ -210,7 +227,7 @@ class RandomizeOrder(SceneWrapper):
         super().__init__(scenes, **kwargs)
         self.keep_n = keep_n
 
-    def build(self) -> RandomizeOrder:
+    def build(self) -> list[Scene]:
         """
         Randomize the order before building the SceneWrapper.
         """
@@ -240,9 +257,9 @@ class RepeatScene(SceneWrapper):
         super().__init__(scenes, **kwargs)
         self.n = n
 
-    def build(self) -> SceneWrapper:
+    def build(self) -> list[Scene]:
         """
-        Randomize the order before building the SceneWrapper.
+        Repeat the scenes n times before building the SceneWrapper.
         """
         self.scenes = self.scenes * self.n
         return super().build()

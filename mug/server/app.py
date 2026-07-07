@@ -487,6 +487,33 @@ def _get_subject_rtt(subject_id: str) -> int | None:
     return None
 
 
+def _save_session_state(subject_id, participant_stager, *, disconnected=False):
+    """Persist the participant's stager position to their session for restoration.
+
+    When disconnected=True, also clears the socket binding so reconnection
+    logic treats the participant as offline.
+
+    Returns the session, or None if the participant has no session.
+    """
+    session = PARTICIPANT_SESSIONS.get(subject_id)
+    if session is None:
+        return None
+
+    if participant_stager is not None:
+        current_scene = participant_stager.current_scene
+        session.stager_state = participant_stager.get_state()
+        session.current_scene_id = (
+            current_scene.scene_id if current_scene else None
+        )
+
+    if disconnected:
+        session.socket_id = None
+        session.is_connected = False
+
+    session.last_updated_at = time.time()
+    return session
+
+
 @socketio.on("advance_scene")
 def advance_scene(data):
     global GAME_MANAGERS, PARTICIPANT_SESSIONS
@@ -510,20 +537,18 @@ def advance_scene(data):
     # Clean up Pyodide game state BEFORE scene transition
     # This prevents false 'partner_disconnected' when WebRTC closes during transition
     if PYODIDE_COORDINATOR is not None:
-        for game_id, game_state in list(PYODIDE_COORDINATOR.games.items()):
-            for player_id, socket_id in list(game_state.players.items()):
-                if socket_id == flask.request.sid:
-                    logger.info(
-                        f"[AdvanceScene] Removing {subject_id} (player {player_id}) "
-                        f"from Pyodide game {game_id} before scene transition"
-                    )
-                    PYODIDE_COORDINATOR.remove_player(
-                        game_id=game_id,
-                        player_id=player_id,
-                        notify_others=True,
-                        reason='scene_completed',
-                    )
-                    break
+        found = PYODIDE_COORDINATOR.find_player_by_socket(flask.request.sid)
+        if found is not None:
+            logger.info(
+                f"[AdvanceScene] Removing {subject_id} (player {found['player_id']}) "
+                f"from Pyodide game {found['game_id']} before scene transition"
+            )
+            PYODIDE_COORDINATOR.remove_player(
+                game_id=found["game_id"],
+                player_id=found["player_id"],
+                notify_others=True,
+                reason='scene_completed',
+            )
 
     participant_stager.advance(socketio, room=flask.request.sid)
 
@@ -552,11 +577,8 @@ def advance_scene(data):
                 )
 
     # Update session state with new scene position for session restoration
-    session = PARTICIPANT_SESSIONS.get(subject_id)
+    session = _save_session_state(subject_id, participant_stager)
     if session is not None:
-        session.stager_state = participant_stager.get_state()
-        session.current_scene_id = current_scene.scene_id if current_scene else None
-        session.last_updated_at = time.time()
         logger.debug(
             f"Updated session state for {subject_id} after advance: "
             f"scene_index={session.stager_state.get('current_scene_index')}, "
@@ -772,40 +794,33 @@ def leave_game(data):
 
         # Also clean up from pyodide coordinator if applicable
         if PYODIDE_COORDINATOR:
-            # Find and remove this player from any pyodide games
-            for game_id, game in list(PYODIDE_COORDINATOR.games.items()):
-                if subject_id in game.player_subjects.values():
-                    # Find the player_id for this subject
-                    player_id = None
-                    for pid, sid in game.player_subjects.items():
-                        if sid == subject_id:
-                            player_id = pid
-                            break
-                    if player_id is not None:
-                        logger.info(f"[LeaveGame] Removing subject {subject_id} (player {player_id}) from pyodide game {game_id}")
-                        # Archive the session before removing if it was a waiting game
-                        if ADMIN_AGGREGATOR and not game.is_active:
-                            session = PARTICIPANT_SESSIONS.get(subject_id)
-                            scene_id = session.current_scene_id if session else None
-                            session_snapshot = {
-                                'game_id': game_id,
-                                'players': list(game.players.keys()),
-                                'subject_ids': list(game.player_subjects.values()),
-                                'current_frame': game.frame_number,
-                                'created_at': game.created_at,
-                                'game_type': 'multiplayer',
-                                'current_episode': None,
-                                'scene_id': scene_id,
-                            }
-                            ADMIN_AGGREGATOR.record_session_termination(
-                                game_id=game_id,
-                                reason='waitroom_timeout',
-                                players=list(game.player_subjects.values()),
-                                details={'leaving_player': subject_id},
-                                session_snapshot=session_snapshot
-                            )
-                        PYODIDE_COORDINATOR.remove_player(game_id, player_id, notify_others=True)
-                    break
+            found = PYODIDE_COORDINATOR.find_player_by_subject(subject_id)
+            if found is not None:
+                game_id = found["game_id"]
+                player_id = found["player_id"]
+                logger.info(f"[LeaveGame] Removing subject {subject_id} (player {player_id}) from pyodide game {game_id}")
+                # Archive the session before removing if it was a waiting game
+                if ADMIN_AGGREGATOR and not found["is_active"]:
+                    session = PARTICIPANT_SESSIONS.get(subject_id)
+                    scene_id = session.current_scene_id if session else None
+                    session_snapshot = {
+                        'game_id': game_id,
+                        'players': found["player_ids"],
+                        'subject_ids': found["subject_ids"],
+                        'current_frame': found["frame_number"],
+                        'created_at': found["created_at"],
+                        'game_type': 'multiplayer',
+                        'current_episode': None,
+                        'scene_id': scene_id,
+                    }
+                    ADMIN_AGGREGATOR.record_session_termination(
+                        game_id=game_id,
+                        reason='waitroom_timeout',
+                        players=found["subject_ids"],
+                        details={'leaving_player': subject_id},
+                        session_snapshot=session_snapshot
+                    )
+                PYODIDE_COORDINATOR.remove_player(game_id, player_id, notify_others=True)
 
         # Reset participant state (Phase 54)
         PARTICIPANT_TRACKER.reset(subject_id)
@@ -1067,6 +1082,30 @@ def data_emission(data):
             json.dump(data["mugGlobals"], f)
 
 
+def _game_data_to_dataframe(decoded_data: dict) -> pd.DataFrame:
+    """Flatten nested game data and pad all columns to equal length.
+
+    Game data arrives as a nested dict of scalars and per-timestep lists;
+    columns must be padded with None to the longest list before building
+    a DataFrame.
+    """
+    flattened_data = flatten_dict.flatten(decoded_data, reducer="dot")
+
+    max_length = max(
+        len(value) if isinstance(value, list) else 1
+        for value in flattened_data.values()
+    )
+
+    padded_data = {}
+    for key, value in flattened_data.items():
+        if not isinstance(value, list):
+            padded_data[key] = [value] + [None] * (max_length - 1)
+        else:
+            padded_data[key] = value + [None] * (max_length - len(value))
+
+    return pd.DataFrame(padded_data)
+
+
 @socketio.on("emit_remote_game_data")
 def receive_remote_game_data(data):
     global PARTICIPANT_SESSIONS
@@ -1091,25 +1130,7 @@ def receive_remote_game_data(data):
         logger.info(f"No final data to save for scene {data.get('scene_id')} (data was sent per-episode)")
         return
 
-    # Flatten any nested dictionaries
-    flattened_data = flatten_dict.flatten(decoded_data, reducer="dot")
-
-    # Find the maximum length among all values
-    max_length = max(
-        len(value) if isinstance(value, list) else 1
-        for value in flattened_data.values()
-    )
-
-    # Pad shorter lists with None and convert non-list values to lists
-    padded_data = {}
-    for key, value in flattened_data.items():
-        if not isinstance(value, list):
-            padded_data[key] = [value] + [None] * (max_length - 1)
-        else:
-            padded_data[key] = value + [None] * (max_length - len(value))
-
-    # Convert to DataFrame
-    df = pd.DataFrame(padded_data)
+    df = _game_data_to_dataframe(decoded_data)
 
     # Create a directory for the CSV files if it doesn't exist
     os.makedirs(f"data/{CONFIG.experiment_id}/{data['scene_id']}/", exist_ok=True)
@@ -1118,32 +1139,10 @@ def receive_remote_game_data(data):
     filename = f"data/{CONFIG.experiment_id}/{data['scene_id']}/{subject_id}.csv"
     globals_filename = f"data/{CONFIG.experiment_id}/{data['scene_id']}/{subject_id}_globals.json"
 
-    # Save as CSV
     logger.info(f"Saving {filename}")
-
-    if CONFIG.save_experiment_data:
-        df.to_csv(filename, index=False)
-        with open(globals_filename, "w") as f:
-            json.dump(data["mugGlobals"], f)
-
-    # Also get the current scene for this participant and save the metadata
-    # TODO(chase): this has issues where the data may not be received before the
-    # scene is advanced, which results in this getting the metadata for the _next_
-    # scene.
-
-    # participant_stager = STAGERS.get(subject_id, None)
-    # if participant_stager is None:
-    #     logger.error(
-    #         f"Subject {subject_id} tried to save data but they don't have a Stager."
-    #     )
-    #     return
-
-    # current_scene = participant_stager.current_scene
-    # current_scene_metadata = current_scene.get_complete_scene_metadata()
-
-    # # save the metadata to a json file
-    # with open(f"data/{CONFIG.experiment_id}/{data['scene_id']}/{subject_id}_metadata.json", "w") as f:
-    #     json.dump(current_scene_metadata, f)
+    df.to_csv(filename, index=False)
+    with open(globals_filename, "w") as f:
+        json.dump(data["mugGlobals"], f)
 
 
 @socketio.on("emit_episode_data")
@@ -1190,25 +1189,7 @@ def receive_episode_data(data):
         logger.info(f"No data to save for episode {episode_num}")
         return {"status": "ok", "saved": False}
 
-    # Flatten any nested dictionaries
-    flattened_data = flatten_dict.flatten(decoded_data, reducer="dot")
-
-    # Find the maximum length among all values
-    max_length = max(
-        len(value) if isinstance(value, list) else 1
-        for value in flattened_data.values()
-    )
-
-    # Pad shorter lists with None and convert non-list values to lists
-    padded_data = {}
-    for key, value in flattened_data.items():
-        if not isinstance(value, list):
-            padded_data[key] = [value] + [None] * (max_length - 1)
-        else:
-            padded_data[key] = value + [None] * (max_length - len(value))
-
-    # Convert to DataFrame
-    df = pd.DataFrame(padded_data)
+    df = _game_data_to_dataframe(decoded_data)
 
     # Create a directory for the CSV files if it doesn't exist
     os.makedirs(f"data/{CONFIG.experiment_id}/{data['scene_id']}/", exist_ok=True)
@@ -2314,6 +2295,33 @@ def handle_p2p_reconnection_timeout(data):
             break
 
 
+def _execute_exclusion_callback(
+    callback, context, result_event, default_result, subject_id, kind
+):
+    """Run a researcher-defined exclusion callback, failing open on error.
+
+    Emits `result_event` with the callback's decision (only the fields named
+    in `default_result` are forwarded). On exception, emits the defaults plus
+    the error so the participant is never excluded by a broken callback.
+
+    Returns the emitted payload, or None if the callback raised.
+    """
+    try:
+        result = callback(context)
+        payload = {
+            key: result.get(key, default)
+            for key, default in default_result.items()
+        }
+        flask_socketio.emit(result_event, payload)
+        return payload
+    except Exception as e:
+        logger.error(
+            f"[Callback Error] {kind} callback failed for {subject_id}: {e}"
+        )
+        flask_socketio.emit(result_event, {**default_result, "error": str(e)})
+        return None
+
+
 @socketio.on('execute_entry_callback')
 def handle_execute_entry_callback(data):
     """Execute researcher-defined entry screening callback.
@@ -2336,7 +2344,6 @@ def handle_execute_entry_callback(data):
             }
         }
     """
-    session_id = data.get('session_id')
     scene_id = data.get('scene_id')
     context = data.get('context', {})
 
@@ -2356,20 +2363,16 @@ def handle_execute_entry_callback(data):
         flask_socketio.emit('entry_callback_result', {'exclude': False, 'message': None})
         return
 
-    try:
-        # Execute the callback
-        result = CONFIG.entry_exclusion_callback(context)
-
-        # Validate result format
-        exclude = result.get('exclude', False)
-        message = result.get('message', None)
-
-        logger.info(f"Entry callback for {subject_id}: exclude={exclude}")
-        flask_socketio.emit('entry_callback_result', {'exclude': exclude, 'message': message})
-    except Exception as e:
-        logger.error(f"[Callback Error] Entry callback failed for {subject_id}: {e}")
-        # On error, allow entry (fail open) but log
-        flask_socketio.emit('entry_callback_result', {'exclude': False, 'message': None, 'error': str(e)})
+    payload = _execute_exclusion_callback(
+        CONFIG.entry_exclusion_callback,
+        context,
+        'entry_callback_result',
+        {'exclude': False, 'message': None},
+        subject_id,
+        'Entry',
+    )
+    if payload is not None:
+        logger.info(f"Entry callback for {subject_id}: exclude={payload['exclude']}")
 
 
 @socketio.on('execute_continuous_callback')
@@ -2392,7 +2395,6 @@ def handle_execute_continuous_callback(data):
             }
         }
     """
-    session_id = data.get('session_id')
     scene_id = data.get('scene_id')
     context = data.get('context', {})
 
@@ -2415,26 +2417,23 @@ def handle_execute_continuous_callback(data):
         flask_socketio.emit('continuous_callback_result', {'exclude': False, 'warn': False, 'message': None})
         return
 
-    try:
-        # Add subject_id and scene_id to context
-        context['subject_id'] = subject_id
-        context['scene_id'] = scene.scene_id if hasattr(scene, 'scene_id') else scene_id
+    # Add subject_id and scene_id to context
+    context['subject_id'] = subject_id
+    context['scene_id'] = scene.scene_id if hasattr(scene, 'scene_id') else scene_id
 
-        # Execute the callback
-        result = scene.continuous_exclusion_callback(context)
-
-        # Validate result format
-        exclude = result.get('exclude', False)
-        warn = result.get('warn', False)
-        message = result.get('message', None)
-
-        if exclude or warn:
-            logger.info(f"Continuous callback for {subject_id}: exclude={exclude}, warn={warn}")
-        flask_socketio.emit('continuous_callback_result', {'exclude': exclude, 'warn': warn, 'message': message})
-    except Exception as e:
-        logger.error(f"[Callback Error] Continuous callback failed for {subject_id}: {e}")
-        # On error, don't exclude (fail open) but log
-        flask_socketio.emit('continuous_callback_result', {'exclude': False, 'warn': False, 'message': None, 'error': str(e)})
+    payload = _execute_exclusion_callback(
+        scene.continuous_exclusion_callback,
+        context,
+        'continuous_callback_result',
+        {'exclude': False, 'warn': False, 'message': None},
+        subject_id,
+        'Continuous',
+    )
+    if payload is not None and (payload['exclude'] or payload['warn']):
+        logger.info(
+            f"Continuous callback for {subject_id}: "
+            f"exclude={payload['exclude']}, warn={payload['warn']}"
+        )
 
 
 @socketio.on("pyodide_hud_update")
@@ -2682,18 +2681,9 @@ def on_disconnect():
             f"[Grace] {subject_id} disconnected during Pyodide loading. "
             f"Preserving session for reconnection."
         )
-        session = PARTICIPANT_SESSIONS.get(subject_id)
-        if session is not None:
-            participant_stager = STAGERS.get(subject_id, None)
-            if participant_stager:
-                session.stager_state = participant_stager.get_state()
-                session.current_scene_id = (
-                    participant_stager.current_scene.scene_id
-                    if participant_stager.current_scene else None
-                )
-            session.socket_id = None
-            session.is_connected = False
-            session.last_updated_at = time.time()
+        _save_session_state(
+            subject_id, STAGERS.get(subject_id, None), disconnected=True
+        )
         return  # Skip game cleanup, partner notifications, etc.
 
     # Log activity for admin dashboard (before cleanup)
@@ -2717,13 +2707,10 @@ def on_disconnect():
     logger.info(f"Subject {subject_id} disconnected, current scene: {current_scene.scene_id if current_scene else 'None'}")
 
     # Save session state for potential reconnection
-    session = PARTICIPANT_SESSIONS.get(subject_id)
+    session = _save_session_state(
+        subject_id, participant_stager, disconnected=True
+    )
     if session is not None:
-        session.stager_state = participant_stager.get_state()
-        session.current_scene_id = current_scene.scene_id if current_scene else None
-        session.socket_id = None
-        session.is_connected = False
-        session.last_updated_at = time.time()
         logger.info(
             f"Saved session state for {subject_id}: "
             f"scene_index={session.stager_state.get('current_scene_index')}, "
@@ -2740,85 +2727,85 @@ def on_disconnect():
 
     # Handle Pyodide multiplayer games
     if PYODIDE_COORDINATOR is not None:
-        # Iterate through all games to find this player
-        for game_id, game_state in list(PYODIDE_COORDINATOR.games.items()):
-            for player_id, socket_id in game_state.players.items():
-                if socket_id == flask.request.sid:
-                    # For Pyodide games, check if the game is active
-                    is_in_active_pyodide_game = game_state.is_active
+        found = PYODIDE_COORDINATOR.find_player_by_socket(flask.request.sid)
+        if found is not None:
+            game_id = found["game_id"]
+            player_id = found["player_id"]
+            # For Pyodide games, check if the game is active
+            is_in_active_pyodide_game = found["is_active"]
 
+            logger.info(
+                f"Player {player_id} (subject {subject_id}) disconnected "
+                f"from Pyodide game {game_id} (active={is_in_active_pyodide_game})"
+            )
+
+            # Record session termination for admin dashboard
+            if ADMIN_AGGREGATOR and is_in_active_pyodide_game:
+                # Build session snapshot with P2P health data
+                all_subject_ids = found["subject_ids"]
+                p2p_health = ADMIN_AGGREGATOR._get_p2p_health_for_game(game_id)
+
+                session_snapshot = {
+                    'game_id': game_id,
+                    'subject_ids': all_subject_ids,
+                    'p2p_health': p2p_health,
+                    'frame_number': found["frame_number"],
+                    'created_at': found["created_at"],
+                }
+
+                ADMIN_AGGREGATOR.record_session_termination(
+                    game_id=game_id,
+                    reason='partner_disconnected',
+                    players=all_subject_ids,
+                    details={
+                        'disconnected_player': subject_id,
+                        'disconnected_player_id': player_id,
+                        'frame_at_disconnect': found["frame_number"],
+                    },
+                    session_snapshot=session_snapshot
+                )
+
+            # Only notify others if player was in an active game
+            PYODIDE_COORDINATOR.remove_player(
+                game_id=game_id,
+                player_id=player_id,
+                notify_others=is_in_active_pyodide_game
+            )
+
+            # CRITICAL: Also clean up GameManager state
+            # The player may be in GameManager's waitroom (subject_games, waiting_games)
+            # even though they're also registered in PYODIDE_COORDINATOR
+            logger.info(
+                f"[Disconnect:Pyodide] Checking GameManager cleanup for {subject_id}. "
+                f"current_scene={current_scene.scene_id if current_scene else None}"
+            )
+            game_manager = GAME_MANAGERS.get(current_scene.scene_id, None) if current_scene else None
+            if game_manager:
+                in_game = game_manager.subject_in_game(subject_id)
+                logger.info(
+                    f"[Disconnect:Pyodide] game_manager found, subject_in_game={in_game}, "
+                    f"subject_games={list(game_manager.subject_games.keys())}, "
+                    f"waiting_games={game_manager.waiting_games}"
+                )
+                if in_game:
                     logger.info(
-                        f"Player {player_id} (subject {subject_id}) disconnected "
-                        f"from Pyodide game {game_id} (active={is_in_active_pyodide_game})"
+                        f"[Disconnect:Pyodide] Calling remove_subject_quietly for {subject_id}"
                     )
-
-                    # Record session termination for admin dashboard
-                    if ADMIN_AGGREGATOR and is_in_active_pyodide_game:
-                        # Build session snapshot with P2P health data
-                        all_subject_ids = list(game_state.player_subjects.values())
-                        p2p_health = ADMIN_AGGREGATOR._get_p2p_health_for_game(game_id)
-
-                        session_snapshot = {
-                            'game_id': game_id,
-                            'subject_ids': all_subject_ids,
-                            'p2p_health': p2p_health,
-                            'frame_number': game_state.frame_number,
-                            'created_at': game_state.created_at,
-                        }
-
-                        ADMIN_AGGREGATOR.record_session_termination(
-                            game_id=game_id,
-                            reason='partner_disconnected',
-                            players=all_subject_ids,
-                            details={
-                                'disconnected_player': subject_id,
-                                'disconnected_player_id': player_id,
-                                'frame_at_disconnect': game_state.frame_number,
-                            },
-                            session_snapshot=session_snapshot
-                        )
-
-                    # Only notify others if player was in an active game
-                    PYODIDE_COORDINATOR.remove_player(
-                        game_id=game_id,
-                        player_id=player_id,
-                        notify_others=is_in_active_pyodide_game
-                    )
-
-                    # CRITICAL: Also clean up GameManager state
-                    # The player may be in GameManager's waitroom (subject_games, waiting_games)
-                    # even though they're also registered in PYODIDE_COORDINATOR
+                    game_manager.remove_subject_quietly(subject_id)
                     logger.info(
-                        f"[Disconnect:Pyodide] Checking GameManager cleanup for {subject_id}. "
-                        f"current_scene={current_scene.scene_id if current_scene else None}"
+                        f"[Disconnect:Pyodide] After cleanup: "
+                        f"subject_games={list(game_manager.subject_games.keys())}, "
+                        f"waiting_games={game_manager.waiting_games}"
                     )
-                    game_manager = GAME_MANAGERS.get(current_scene.scene_id, None) if current_scene else None
-                    if game_manager:
-                        in_game = game_manager.subject_in_game(subject_id)
-                        logger.info(
-                            f"[Disconnect:Pyodide] game_manager found, subject_in_game={in_game}, "
-                            f"subject_games={list(game_manager.subject_games.keys())}, "
-                            f"waiting_games={game_manager.waiting_games}"
-                        )
-                        if in_game:
-                            logger.info(
-                                f"[Disconnect:Pyodide] Calling remove_subject_quietly for {subject_id}"
-                            )
-                            game_manager.remove_subject_quietly(subject_id)
-                            logger.info(
-                                f"[Disconnect:Pyodide] After cleanup: "
-                                f"subject_games={list(game_manager.subject_games.keys())}, "
-                                f"waiting_games={game_manager.waiting_games}"
-                            )
-                    else:
-                        logger.warning(
-                            f"[Disconnect:Pyodide] No game_manager found for scene {current_scene.scene_id if current_scene else 'None'}"
-                        )
+            else:
+                logger.warning(
+                    f"[Disconnect:Pyodide] No game_manager found for scene {current_scene.scene_id if current_scene else 'None'}"
+                )
 
-                    # Clean up group manager
-                    if GROUP_MANAGER:
-                        GROUP_MANAGER.cleanup_subject(subject_id)
-                    return
+            # Clean up group manager
+            if GROUP_MANAGER:
+                GROUP_MANAGER.cleanup_subject(subject_id)
+            return
 
     # Handle regular (non-Pyodide) games via GameManager
     # First try the current scene's game manager
