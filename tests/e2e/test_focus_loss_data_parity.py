@@ -56,7 +56,7 @@ def clean_data_dir():
 
 
 @pytest.mark.timeout(300)
-def test_focus_loss_episode_boundary_parity(flask_server, player_contexts, clean_data_dir):
+def test_focus_loss_episode_boundary_parity(flask_server_long_episode, player_contexts, clean_data_dir):
     """
     FOCUS-02: Test data parity maintained when one client loses focus at episode boundary.
 
@@ -74,7 +74,7 @@ def test_focus_loss_episode_boundary_parity(flask_server, player_contexts, clean
     - Data consistency at episode boundaries with pending fast-forward
     """
     page1, page2 = player_contexts
-    base_url = flask_server["url"]
+    base_url = flask_server_long_episode["url"]
 
     # Run through to gameplay (shared helper handles matchmaking + UI flow)
     run_full_episode_flow_until_gameplay(page1, page2, base_url)

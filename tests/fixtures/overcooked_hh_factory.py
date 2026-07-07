@@ -31,7 +31,7 @@ def make_hh_config(
     experiment_id: str,
     default_port: int,
     num_episodes: int = 1,
-    max_steps: int = 450,
+    max_steps: int = 200,  # ~7s at 30fps; matches the other "fast" test fixtures
     focus_loss_timeout_ms: int = 0,
     matchmaker=None,
 ) -> tuple:

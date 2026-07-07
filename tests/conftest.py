@@ -264,6 +264,66 @@ def flask_server():
 
 
 @pytest.fixture(scope="function")
+def flask_server_long_episode():
+    """Start a Flask server with a LONG episode (max_steps=450, ~15s at 30fps).
+
+    Scope: function (fresh server per test for isolation)
+    Yields: dict with 'url' and 'process' keys
+
+    For the few tests that intrinsically need a long episode (focus-loss
+    boundary, deep-rollback via multi-second tab hide). Most tests use the
+    faster 200-step `flask_server` fixture instead.
+    """
+    port = 5713
+    base_url = f"http://localhost:{port}"
+
+    _ensure_port_available(port)
+
+    process = subprocess.Popen(
+        [
+            "python",
+            "-m",
+            "tests.fixtures.overcooked_hh_long_episode_test",
+            "--port",
+            str(port),
+        ],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        start_new_session=True,
+    )
+
+    max_retries = 30
+    for attempt in range(max_retries):
+        try:
+            conn = HTTPConnection("localhost", port, timeout=1)
+            conn.request("GET", "/")
+            response = conn.getresponse()
+            conn.close()
+            if response.status < 500:
+                break
+        except (ConnectionRefusedError, OSError, TimeoutError):
+            pass
+
+        if process.poll() is not None:
+            stderr = process.stderr.read() if process.stderr else b""
+            raise RuntimeError(
+                f"Flask server exited unexpectedly (code {process.returncode}).\n"
+                f"stderr: {stderr.decode()}"
+            )
+
+        time.sleep(1)
+    else:
+        _teardown_server(process, port)
+        raise RuntimeError(
+            f"Flask server failed to start after {max_retries} retries"
+        )
+
+    yield {"url": base_url, "process": process}
+
+    _teardown_server(process, port)
+
+
+@pytest.fixture(scope="function")
 def flask_server_fresh():
     """
     Start Flask server as subprocess for each test function.

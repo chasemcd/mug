@@ -1,7 +1,7 @@
 """Overcooked Human-Human Multiplayer - Standard Test Configuration.
 
 Base test config with relaxed constraints for E2E testing:
-- No focus loss timeout, no RTT limit, shorter episodes (450 steps).
+- No focus loss timeout, no RTT limit, shorter episodes (200 steps).
 
 Usage: python -m tests.fixtures.overcooked_human_human_multiplayer_test
 Default port: 5702

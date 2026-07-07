@@ -545,23 +545,6 @@ obs, rewards, terminateds, truncateds, infos, render_state
 
 
 
-// Helper function to convert Proxy(Map) to a plain object
-function convertProxyToObject(obj) {
-    if (obj instanceof Map) {
-        return Array.from(obj).reduce((acc, [key, value]) => {
-            acc[key] = value instanceof Object ? this.convertProxyToObject(value) : value;
-            return acc;
-        }, {});
-    } else if (obj instanceof Object) {
-        return Object.keys(obj).reduce((acc, key) => {
-            acc[key] = obj[key] instanceof Object ? this.convertProxyToObject(obj[key]) : obj[key];
-            return acc;
-        }, {});
-    }
-    return obj; // Return value directly if it's neither Map nor Object
-}
-
-
 // Helper function to convert all `undefined` values in an object to `null`
 export function convertUndefinedToNull(obj) {
     if (typeof obj !== 'object' || obj === null) {

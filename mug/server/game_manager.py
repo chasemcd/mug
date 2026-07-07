@@ -207,9 +207,7 @@ class GameManager:
 
             # If this is a multiplayer Pyodide game, create coordinator state
             # Only for P2P multiplayer games, not server-authoritative
-            if (self.scene.pyodide_multiplayer
-                    and self.pyodide_coordinator
-                    and not getattr(self.scene, 'server_authoritative', False)):
+            if self._is_p2p_pyodide():
                 num_players = len(self.scene.policy_mapping)  # Number of agents in the game
 
                 # WebRTC TURN configuration from experiment config
@@ -351,6 +349,40 @@ class GameManager:
             p for p in self.scene.policy_mapping.values()
             if p == configuration_constants.PolicyTypes.Human
         ])
+
+    def _is_p2p_pyodide(self) -> bool:
+        """True if this scene runs P2P Pyodide multiplayer (not server-authoritative)."""
+        return bool(
+            self.scene.pyodide_multiplayer
+            and self.pyodide_coordinator
+            and not getattr(self.scene, "server_authoritative", False)
+        )
+
+    def _add_player_to_pyodide_coordinator(
+        self,
+        game_id,
+        player_id,
+        subject_id: SubjectID,
+        socket_id,
+        log_prefix: str,
+    ) -> None:
+        """Register a player with the Pyodide coordinator for P2P multiplayer games.
+
+        No-op for server-authoritative or non-Pyodide-multiplayer scenes.
+        """
+        if not self._is_p2p_pyodide():
+            return
+
+        self.pyodide_coordinator.add_player(
+            game_id=game_id,
+            player_id=player_id,
+            socket_id=socket_id,
+            subject_id=subject_id,
+        )
+        logger.info(
+            f"{log_prefix} Added player {player_id} (subject: {subject_id}) "
+            f"to Pyodide coordinator for game {game_id}"
+        )
 
     def _build_match_candidate(self, subject_id: SubjectID) -> MatchCandidate:
         """Build a MatchCandidate with group history if available.
@@ -904,23 +936,15 @@ class GameManager:
         # Add players to Pyodide coordinator AFTER room joins and state transition.
         # The coordinator emits pyodide_game_ready when all players are added,
         # so clients must already be in the room to receive it.
-        # Only for P2P multiplayer games, not server-authoritative.
-        if (self.scene.pyodide_multiplayer
-                and self.pyodide_coordinator
-                and not getattr(self.scene, 'server_authoritative', False)):
-            for player_id, subject_id in game.human_players.items():
-                if subject_id and subject_id != AvailableSlot:
-                    socket_id = self._get_socket_id(subject_id)
-                    self.pyodide_coordinator.add_player(
-                        game_id=game.game_id,
-                        player_id=player_id,
-                        socket_id=socket_id,
-                        subject_id=subject_id,
-                    )
-                    logger.info(
-                        f"[Probe:Pyodide] Added player {player_id} (subject: {subject_id}) "
-                        f"to Pyodide coordinator for game {game.game_id}"
-                    )
+        for player_id, subject_id in game.human_players.items():
+            if subject_id and subject_id != AvailableSlot:
+                self._add_player_to_pyodide_coordinator(
+                    game_id=game.game_id,
+                    player_id=player_id,
+                    subject_id=subject_id,
+                    socket_id=self._get_socket_id(subject_id),
+                    log_prefix="[Probe:Pyodide]",
+                )
 
         # Log match assignment (Phase 56)
         if self.match_logger:
@@ -1003,20 +1027,14 @@ class GameManager:
                 )
 
             # If multiplayer Pyodide, add player to coordinator
-            # Only for P2P multiplayer games, not server-authoritative.
-            if (self.scene.pyodide_multiplayer
-                    and self.pyodide_coordinator
-                    and not getattr(self.scene, 'server_authoritative', False)):
-                socket_id = flask.request.sid if subject_id == arriving_subject_id else self._get_socket_id(subject_id)
-                self.pyodide_coordinator.add_player(
-                    game_id=game.game_id,
-                    player_id=player_id,
-                    socket_id=socket_id,
-                    subject_id=subject_id
-                )
-                logger.info(
-                    f"[CreateMatch] Added player {player_id} (subject: {subject_id}) to Pyodide coordinator"
-                )
+            socket_id = flask.request.sid if subject_id == arriving_subject_id else self._get_socket_id(subject_id)
+            self._add_player_to_pyodide_coordinator(
+                game_id=game.game_id,
+                player_id=player_id,
+                subject_id=subject_id,
+                socket_id=socket_id,
+                log_prefix="[CreateMatch]",
+            )
 
         # Verify game is ready
         if not game.is_ready_to_start():
@@ -1194,13 +1212,28 @@ class GameManager:
 
     def remove_subject(self, subject_id: SubjectID):
         """Remove a subject from their game."""
-        game_id = self.subject_games[subject_id]
-        game = self.games[game_id]
+        game_id = self.subject_games.get(subject_id)
+        if game_id is None:
+            logger.warning(
+                f"remove_subject called for {subject_id} but they are not in any game."
+            )
+            return
+
+        game = self.games.get(game_id)
+        if game is None:
+            logger.warning(
+                f"remove_subject called for {subject_id} but game {game_id} doesn't exist. "
+                f"Cleaning up stale tracking."
+            )
+            self.subject_games.pop(subject_id, None)
+            self.subject_rooms.pop(subject_id, None)
+            return
+
         game.remove_human_player(subject_id)
 
         # Remove the subject from the game
-        del self.subject_games[subject_id]
-        del self.subject_rooms[subject_id]
+        self.subject_games.pop(subject_id, None)
+        self.subject_rooms.pop(subject_id, None)
 
         # Use flask_socketio.leave_room instead of self.socketio.leave_room
         flask_socketio.leave_room(game_id)
