@@ -1,4 +1,5 @@
 import {actionFromONNX, initModelConfigs} from './onnx_inference.js';
+import {actionFromHeuristic, initHeuristicPolicies, isHeuristicPolicy} from './heuristic_policies.js';
 import {drainInputDelayQueue} from './ui_utils.js';
 
 
@@ -331,6 +332,7 @@ class GymScene extends Phaser.Scene {
         this.last_rendered_step = -1;
         this.scene_metadata = config.scene_metadata;
         initModelConfigs(this.scene_metadata);
+        initHeuristicPolicies(this.scene_metadata);
         this.pyodide_remote_game = config.pyodide_remote_game;
         this.isProcessingPyodide = false;
         this.stateImageSprite = null;
@@ -605,6 +607,15 @@ class GymScene extends Phaser.Scene {
                 // Cast the agent ID to an integer
                 let observation = currentObservations.get(isNaN(agentID) ? agentID : parseInt(agentID));
                 this.queryBotPolicy(agentID, policyID, observation);
+            } else if (isHeuristicPolicy(policyID)) {
+                // Heuristic policies run synchronously in Pyodide against the
+                // live env instance, so return the action directly.
+                try {
+                    return actionFromHeuristic(this.pyodide_remote_game.pyodide, policyID, agentID);
+                } catch (error) {
+                    console.error(`Heuristic policy error for agent ${agentID}:`, error);
+                    // Fall through to the previous/default action logic below
+                }
             } else if (policyID === "random") {
                 // If the policy is random, return a random action
                 return Math.floor(Math.random() * Object.keys(this.scene_metadata.action_mapping).length + 1) - 1;
