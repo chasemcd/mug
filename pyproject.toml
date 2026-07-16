@@ -4,7 +4,7 @@ build-backend = "uv_build"
 
 [project]
 name = "multi_user_gymnasium"
-version = "0.1.2"
+version = "0.1.3"
 description = "A platform for running interactive experiments in the browser with standard simulation environments."
 readme = "README.md"
 license = "MIT"
