@@ -30,6 +30,33 @@ pip install multi-user-gymnasium[server]
 </div>
 
 
+## Development
+
+MUG uses [uv](https://docs.astral.sh/uv/) for package management. From a cloned repository:
+
+```bash
+# Create the environment and install all dependencies (server, test, docs)
+uv sync --all-extras
+
+# Run the unit tests
+uv run pytest tests/unit
+
+# Run an example
+uv run python -m examples.slime_volleyball.slimevb_human_ai
+```
+
+Dependencies are locked in `uv.lock`; after changing dependencies in
+`pyproject.toml`, run `uv lock` and commit the updated lockfile.
+
+### Releasing
+
+Bump `version` in `pyproject.toml`, then build and publish with uv:
+
+```bash
+uv build
+uv publish  # reads UV_PUBLISH_TOKEN or prompts for PyPI credentials
+```
+
 ## Citation
 
 If you use MUG in your research, please cite:

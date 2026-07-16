@@ -16,35 +16,35 @@ All examples are located in the [examples/](https://github.com/chasemcd/mug/tree
 
 Examples must be run from a cloned repository, not a pip install, because they rely on relative paths for assets (sprites, models, ONNX files).
 
-1. Clone the repository and install with server dependencies:
+1. Clone the repository and set up the environment with [uv](https://docs.astral.sh/uv/):
 
     ```bash
     git clone https://github.com/chasemcd/mug.git
     cd mug
-    pip install -e ".[server]"
+    uv sync --extra server
     ```
 
-2. Install any example-specific dependencies listed in the individual example page.
+2. Install any example-specific dependencies listed in the individual example page (`uv pip install <package>`).
 
 3. From the repository root, run the example as a module:
 
     ```bash
     # Mountain Car
-    python -m examples.mountain_car.mountain_car_experiment
+    uv run python -m examples.mountain_car.mountain_car_experiment
 
     # Slime Volleyball (Human vs AI)
-    python -m examples.slime_volleyball.slimevb_human_ai
+    uv run python -m examples.slime_volleyball.slimevb_human_ai
 
     # Slime Volleyball (Human vs Human, client-side P2P)
-    python -m examples.slime_volleyball.slimevb_human_human
+    uv run python -m examples.slime_volleyball.slimevb_human_human
 
     # Overcooked (Human + AI)
-    python -m examples.cogrid.overcooked_human_ai
+    uv run python -m examples.cogrid.overcooked_human_ai
 
     # Overcooked (Human vs Human) — client-side P2P by default
-    python -m examples.cogrid.overcooked_human_human_multiplayer --experiment-id test
+    uv run python -m examples.cogrid.overcooked_human_human_multiplayer --experiment-id test
     # Server-authoritative variant of the same example
-    python -m examples.cogrid.overcooked_server_auth --experiment-id test
+    uv run python -m examples.cogrid.overcooked_server_auth --experiment-id test
     ```
 
 4. Open a browser to the port printed on startup (typically http://localhost:5702).

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+import inspect
 
 
 @dataclasses.dataclass(frozen=True)
@@ -13,6 +14,11 @@ class InputModes:
 class PolicyTypes:
     Human = "human"
     Random = "random"
+
+
+# Prefix used in policy_mapping values to mark heuristic (Python code) policies.
+# A HeuristicPolicy named "chaser" decomposes to the mapping value "heuristic:chaser".
+HEURISTIC_POLICY_PREFIX = "heuristic:"
 
 
 @dataclasses.dataclass(frozen=True)
@@ -160,3 +166,111 @@ class ModelConfig:
     def to_dict(self) -> dict:
         """Return a plain dict of all fields for JSON serialization."""
         return dataclasses.asdict(self)
+
+
+class HeuristicPolicy:
+    """Base class for heuristic (Python code) policies.
+
+    Subclass and implement :meth:`compute_action`, which receives the live
+    environment instance and an agent ID and returns an action for that
+    agent::
+
+        class BallChaser(HeuristicPolicy):
+            def compute_action(self, env, agent_id):
+                ...
+                return action
+
+    Like ``ModelConfig``, heuristic policies are used directly as values in
+    ``policy_mapping`` -- pass the subclass itself (not an instance)::
+
+        policy_mapping = {
+            "agent_left": PolicyTypes.Human,
+            "agent_right": BallChaser,
+        }
+
+    The ``policies()`` method automatically decomposes the class: the mapping
+    value becomes ``"heuristic:<ClassName>"`` and the source code of the
+    module that defines the subclass is stored in ``policy_configs``.
+
+    The policy executes wherever the environment lives: inside the Pyodide
+    interpreter for browser (P2P) games, or on the server for
+    server-authoritative games. Because the defining module's source is
+    shipped as text and re-executed there:
+
+    - Define the subclass in its own self-contained module (not in the
+      experiment script / ``__main__``) -- include any imports the module
+      needs and do not reference variables from other modules.
+    - The subclass must be instantiable with no constructor arguments.
+
+    One instance is created per agent, so instance attributes may hold
+    per-agent state across steps. In multiplayer P2P games each client runs
+    the heuristic locally, so it should be deterministic given the
+    environment state (avoid ``random``/unseeded RNG), and stateless policies
+    are safest since rollback corrections re-execute steps.
+    """
+
+    def compute_action(self, env, agent_id):
+        """Return an action for ``agent_id`` given the live env instance."""
+        raise NotImplementedError(
+            f"{type(self).__name__} must implement compute_action(env, agent_id)."
+        )
+
+    # -- Decomposition/serialization machinery (used by GymScene.policies()) --
+
+    @classmethod
+    def policy_id(cls) -> str:
+        """The policy_mapping value this policy class decomposes to."""
+        return f"{HEURISTIC_POLICY_PREFIX}{cls.__name__}"
+
+    @classmethod
+    def to_config(cls) -> dict:
+        """Return a plain dict (including module source) for serialization.
+
+        Raises:
+            ValueError: If the subclass is defined in ``__main__`` or its
+                source file cannot be located.
+        """
+        if cls.__module__ == "__main__":
+            raise ValueError(
+                f"HeuristicPolicy subclass '{cls.__name__}' is defined in the "
+                f"main script. Define it in its own importable module so its "
+                f"source can be shipped to where the environment runs."
+            )
+        try:
+            source_file = inspect.getsourcefile(cls)
+        except TypeError:
+            source_file = None
+        if source_file is None:
+            raise ValueError(
+                f"Cannot locate the source file for HeuristicPolicy subclass "
+                f"'{cls.__name__}'. Define it in a .py module on disk."
+            )
+        with open(source_file, encoding="utf-8") as f:
+            code = f.read()
+        return {
+            "type": "heuristic",
+            "name": cls.__name__,
+            "code": code,
+        }
+
+    @staticmethod
+    def load_from_config(config: dict) -> HeuristicPolicy:
+        """Execute a to_config() payload and return a policy instance.
+
+        Raises:
+            ValueError: If the code does not define a class named
+                ``config["name"]`` with a compute_action method.
+        """
+        namespace = {}
+        exec(config["code"], namespace)
+        policy_cls = namespace.get(config["name"])
+        if not (
+            isinstance(policy_cls, type)
+            and callable(getattr(policy_cls, "compute_action", None))
+        ):
+            raise ValueError(
+                f"Heuristic policy code must define a class named "
+                f"'{config['name']}' with a compute_action(env, agent_id) "
+                f"method."
+            )
+        return policy_cls()

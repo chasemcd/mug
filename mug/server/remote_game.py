@@ -352,8 +352,10 @@ class ServerGame:
     def _load_policies(self) -> None:
         """Load bot policies server-side.
 
-        Iterates policy_mapping; for each non-Human agent, loads the policy
-        using scene.load_policy_fn (if provided). Random agents store None.
+        Iterates policy_mapping; for each non-Human agent, loads the policy.
+        Heuristic policies are exec'd from their source in policy_configs.
+        Other policies use scene.load_policy_fn (if provided). Random agents
+        store None.
         """
         self.policies = {}
         for agent_id, policy_type in self.scene.policy_mapping.items():
@@ -361,6 +363,14 @@ class ServerGame:
                 continue
             if policy_type == configuration_constants.PolicyTypes.Random:
                 self.policies[agent_id] = None
+            elif self._is_heuristic_policy(policy_type):
+                # One instance per agent so policies can hold per-agent state
+                config = self.scene.policy_configs[agent_id]
+                self.policies[agent_id] = (
+                    configuration_constants.HeuristicPolicy.load_from_config(
+                        config
+                    )
+                )
             elif self.scene.load_policy_fn is not None:
                 self.policies[agent_id] = self.scene.load_policy_fn(
                     agent_id, policy_type
@@ -375,13 +385,26 @@ class ServerGame:
             f"Game {self.game_id}: loaded policies for {list(self.policies.keys())}"
         )
 
+    @staticmethod
+    def _is_heuristic_policy(policy_type: Any) -> bool:
+        """Check whether a policy_mapping value denotes a heuristic policy."""
+        return isinstance(policy_type, str) and policy_type.startswith(
+            configuration_constants.HEURISTIC_POLICY_PREFIX
+        )
+
     def _get_bot_action(self, agent_id: str | int) -> Any:
         """Get an action for a bot agent.
 
+        If the agent's policy is a heuristic, calls it with the live env.
         If the agent has a policy and policy_inference_fn, uses those.
         If the agent's policy type is Random, samples from the env action space.
         """
         policy_type = self.scene.policy_mapping.get(agent_id)
+        if self._is_heuristic_policy(policy_type):
+            heuristic_policy = self.policies.get(agent_id)
+            if heuristic_policy is not None:
+                return heuristic_policy.compute_action(self.env, agent_id)
+            return self.scene.default_action
         if policy_type == configuration_constants.PolicyTypes.Random:
             # Sample random action from the env's action space for this agent
             if hasattr(self.env, "action_space"):

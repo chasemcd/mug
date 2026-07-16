@@ -11,7 +11,8 @@ if TYPE_CHECKING:
 
 import mug
 from mug.configurations import configuration_constants
-from mug.configurations.configuration_constants import ModelConfig
+from mug.configurations.configuration_constants import (
+    HEURISTIC_POLICY_PREFIX, HeuristicPolicy, ModelConfig)
 from mug.scenes import scene
 from mug.utils.sentinels import NotProvided
 
@@ -399,10 +400,14 @@ class GymScene(scene.Scene):
         """Configure policy settings for the GymScene.
 
         :param policy_mapping: A dictionary mapping agent IDs to policy names, types,
-            or ``ModelConfig`` instances. ``ModelConfig`` values (with ``onnx_path``
-            set) are automatically decomposed: the ONNX path replaces the value in
-            ``self.policy_mapping`` and the config dict is stored in
-            ``self.policy_configs``. Defaults to NotProvided.
+            ``ModelConfig`` instances, or ``HeuristicPolicy`` subclasses.
+            ``ModelConfig`` values (with ``onnx_path`` set) are automatically
+            decomposed: the ONNX path replaces the value in ``self.policy_mapping``
+            and the config dict is stored in ``self.policy_configs``.
+            ``HeuristicPolicy`` subclasses (pass the class itself) decompose the
+            same way: the mapping value becomes ``"heuristic:<ClassName>"`` and
+            the config (including the defining module's source code) is stored
+            in ``self.policy_configs``. Defaults to NotProvided.
         :type policy_mapping: dict, optional
         :param load_policy_fn: A function to load policies, defaults to NotProvided
         :type load_policy_fn: Callable, optional
@@ -435,10 +440,12 @@ class GymScene(scene.Scene):
         return self
 
     def _decompose_model_configs(self):
-        """Extract ModelConfig values from policy_mapping.
+        """Extract ModelConfig and HeuristicPolicy values from policy_mapping.
 
         For each ModelConfig value: store its onnx_path as the policy_mapping
-        value and its to_dict() output in policy_configs.
+        value and its to_dict() output in policy_configs. For each
+        HeuristicPolicy subclass: store "heuristic:<ClassName>" as the
+        policy_mapping value and its to_config() output in policy_configs.
         """
         for key, value in list(self.policy_mapping.items()):
             if isinstance(value, ModelConfig):
@@ -449,13 +456,24 @@ class GymScene(scene.Scene):
                     )
                 self.policy_mapping[key] = value.onnx_path
                 self.policy_configs[key] = value.to_dict()
+            elif isinstance(value, type) and issubclass(value, HeuristicPolicy):
+                self.policy_mapping[key] = value.policy_id()
+                self.policy_configs[key] = value.to_config()
+            elif isinstance(value, HeuristicPolicy):
+                raise ValueError(
+                    f"policy_mapping value for '{key}' is a HeuristicPolicy "
+                    f"instance; pass the class itself (constructor arguments "
+                    f"cannot be shipped to where the environment runs)."
+                )
 
     def _validate_policy_configs(self):
         """Validate that policy_configs is consistent with policy_mapping.
 
         Raises:
-            ValueError: If an ONNX policy has no config entry.
+            ValueError: If an ONNX or heuristic policy has no config entry, or
+                if two heuristic policies share a name but have different code.
         """
+        heuristic_code_by_name: dict[str, str] = {}
         for policy_id, policy_value in self.policy_mapping.items():
             if (
                 isinstance(policy_value, str)
@@ -466,6 +484,26 @@ class GymScene(scene.Scene):
                     f"ONNX policy '{policy_id}' has no entry in policy_configs. "
                     f"Use a ModelConfig with onnx_path set as the policy_mapping value."
                 )
+
+            if isinstance(policy_value, str) and policy_value.startswith(
+                HEURISTIC_POLICY_PREFIX
+            ):
+                config = self.policy_configs.get(policy_id)
+                if not config or not config.get("code"):
+                    raise ValueError(
+                        f"Heuristic policy '{policy_id}' has no code in policy_configs. "
+                        f"Use a HeuristicPolicy instance as the policy_mapping value."
+                    )
+                name = config["name"]
+                if (
+                    name in heuristic_code_by_name
+                    and heuristic_code_by_name[name] != config["code"]
+                ):
+                    raise ValueError(
+                        f"Two HeuristicPolicy instances named '{name}' have "
+                        f"different code. Heuristic policy names must be unique."
+                    )
+                heuristic_code_by_name[name] = config["code"]
 
     def _auto_infer_multiplayer(self):
         """Auto-set pyodide_multiplayer if inferable from policy_mapping and runtime config.
