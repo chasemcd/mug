@@ -5,7 +5,8 @@ build:
   tools:
     python: "3.12"
   commands:
-    - pip install ".[docs]"
-    - zensical build
+    - pip install uv
+    - uv sync --extra docs
+    - uv run zensical build
     - mkdir -p $READTHEDOCS_OUTPUT/html
     - cp -r site/* $READTHEDOCS_OUTPUT/html/
