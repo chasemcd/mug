@@ -230,6 +230,54 @@ Define who/what controls each agent:
 )
 ```
 
+`policy_mapping` values can be:
+
+- `PolicyTypes.Human` — controlled by a participant's keyboard input.
+- `PolicyTypes.Random` — samples uniformly from the action space.
+- A `ModelConfig` (with `onnx_path` set) — an ONNX model inferenced in the
+  participant's browser via `onnxruntime-web`.
+- A `HeuristicPolicy` subclass — a hand-written Python policy executed
+  against the live environment instance.
+
+**Heuristic policies** subclass `HeuristicPolicy` and implement
+`compute_action(self, env, agent_id) -> action`. Define the subclass in its
+own self-contained `.py` module (include any imports it needs), then drop
+the class itself into the policy mapping:
+
+```python
+# policies/ball_chaser.py
+from mug.configurations.configuration_constants import HeuristicPolicy
+
+class BallChaser(HeuristicPolicy):
+    def compute_action(self, env, agent_id):
+        state = env.get_state()
+        ...
+        return action
+```
+
+```python
+# experiment script
+from policies.ball_chaser import BallChaser
+from mug.configurations.configuration_constants import PolicyTypes
+
+policy_mapping = {
+    "player_0": PolicyTypes.Human,
+    "player_1": BallChaser,  # pass the class, not an instance
+}
+```
+
+The defining module's source is shipped to wherever the environment lives
+and the class is re-instantiated there: inside the browser's Pyodide
+interpreter for Pyodide/P2P scenes, or on the server for
+server-authoritative scenes. The policy therefore has direct access to the
+environment instance (not just observations). One instance is created per
+agent, so instance attributes can hold per-agent state across steps; the
+subclass must be instantiable with no constructor arguments. In multiplayer
+P2P games each client runs the heuristic locally, so keep it deterministic
+given the environment state (no unseeded randomness). See
+`examples/slime_volleyball/slimevb_human_heuristic.py` for a complete
+example.
+
 ### .content()
 
 Customize participant-facing text:

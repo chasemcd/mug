@@ -1,6 +1,6 @@
 [build-system]
-requires = ["setuptools", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["uv_build>=0.11,<0.13"]
+build-backend = "uv_build"
 
 [project]
 name = "multi_user_gymnasium"
@@ -8,6 +8,7 @@ version = "0.1.2"
 description = "A platform for running interactive experiments in the browser with standard simulation environments."
 readme = "README.md"
 license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">= 3.10"
 authors = [
     { name = "Chase McDonald", email = "chasecmcdonald@gmail.com" },
@@ -37,8 +38,12 @@ docs = [
     "zensical",
 ]
 
-[tool.setuptools.packages.find]
-include = ["mug*"]
+[tool.uv.build-backend]
+# Flat layout: the `mug` package lives at the repo root (not under src/).
+module-name = "mug"
+module-root = ""
+source-exclude = ["**/.DS_Store"]
+wheel-exclude = ["**/.DS_Store"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
