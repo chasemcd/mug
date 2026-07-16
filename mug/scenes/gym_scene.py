@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any, Callable
 if TYPE_CHECKING:
     from mug.server.matchmaker import Matchmaker
 
+import mug
 from mug.configurations import configuration_constants
 from mug.configurations.configuration_constants import ModelConfig
 from mug.scenes import scene
@@ -57,7 +58,7 @@ class GymScene(scene.Scene):
         queue_resync_threshold (int): Trigger state resync if action queue exceeds this size (default 50).
     """
 
-    DEFAULT_MUG_PACKAGE = "multi-user-gymnasium==0.1.2"
+    DEFAULT_MUG_PACKAGE = f"multi-user-gymnasium=={mug.__version__}"
 
     def __init__(
         self,
