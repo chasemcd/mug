@@ -1,0 +1,25 @@
+{
+  "schema": {
+    "name": "mug.api-09.realtime-command",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "a687a1359b23e69f995ab8ccae6a335f99f87848c8dcd524cd4c3d92cfa0506a"
+    }
+  },
+  "command_id": "command_019b6000-0000-7000-8000-000000000700",
+  "channel_key": "game",
+  "intent_schema": {
+    "name": "mug.intent.game-action",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1"
+    }
+  },
+  "payload_digest": {
+    "algorithm": "sha-256",
+    "hex": "e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1"
+  },
+  "submitted_at": "2026-08-02T12:05:00.000000Z"
+}

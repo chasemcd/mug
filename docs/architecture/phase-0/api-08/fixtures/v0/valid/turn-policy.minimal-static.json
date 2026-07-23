@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "mug.api-08.turn-policy",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "0e305fb358b6d53126d9081ae36f078f18a683684f2bfe799a97197c3d549d4a"
+    }
+  },
+  "channel_key": "chat",
+  "activation": "mention",
+  "max_model_activations_per_turn": 1
+}

@@ -1,0 +1,18 @@
+{
+  "schema": {
+    "name": "mug.api-04.treatment-exposure",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "5985bd0df049a1a3fa2fc730e66fe0fe89c7a49038e40d1ce07a46f6a0fea161"
+    }
+  },
+  "visit_id": "visit_019b6000-0000-7000-8000-000000000090",
+  "treatment_key": "difficulty",
+  "level_key": "easy",
+  "exposed_at": "2026-08-02T12:05:00.000000Z",
+  "exposure_digest": {
+    "algorithm": "sha-256",
+    "hex": "f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2"
+  }
+}

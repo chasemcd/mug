@@ -1,0 +1,22 @@
+{
+  "schema": {
+    "name": "mug.api-08.chat-message",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "0e305fb358b6d53126d9081ae36f078f18a683684f2bfe799a97197c3d549d4a"
+    }
+  },
+  "message_id": "message_019b6000-0000-7000-8000-000000000a01",
+  "interaction_id": "interaction_019b6000-0000-7000-8000-000000000420",
+  "channel_key": "chat",
+  "author_actor_id": "actor_019b6000-0000-7000-8000-000000000410",
+  "sequence": 1,
+  "content_digest": {
+    "algorithm": "sha-256",
+    "hex": "c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1"
+  },
+  "visibility": "broadcast",
+  "idempotency_key": "idem_AAAAAAAAAAAAAAAAAAAAAA",
+  "submitted_at": "2026-08-02T12:05:00.000000Z"
+}

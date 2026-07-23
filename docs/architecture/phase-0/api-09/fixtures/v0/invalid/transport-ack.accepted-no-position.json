@@ -1,0 +1,12 @@
+{
+  "schema": {
+    "name": "mug.api-09.transport-ack",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "a687a1359b23e69f995ab8ccae6a335f99f87848c8dcd524cd4c3d92cfa0506a"
+    }
+  },
+  "command_id": "command_019b6000-0000-7000-8000-000000000700",
+  "ack_kind": "accepted"
+}

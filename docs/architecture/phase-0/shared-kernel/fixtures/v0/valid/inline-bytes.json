@@ -1,0 +1,9 @@
+{
+  "encoding": "base64url",
+  "data": "TVVH",
+  "size_bytes": 3,
+  "digest": {
+    "algorithm": "sha-256",
+    "hex": "bb5cef287093d9ce01cfbf2275f2449b472930fafb2e51b0b73841720613099c"
+  }
+}

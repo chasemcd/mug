@@ -1,0 +1,22 @@
+{
+  "schema": {
+    "name": "mug.api-18.preference-assignment",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "23659cee1b0870cb156470ea50e88501e7158412e6c6d762c3735e54a8114705"
+    }
+  },
+  "assignment_id": "prefassign_019b6000-0000-7000-8000-000000000f01",
+  "query_id": "prefquery_019b6000-0000-7000-8000-000000000f30",
+  "enrollment_id": "enrollment_019b6000-0000-7000-8000-000000000050",
+  "candidate_display_order": [
+    "option-a",
+    "option-a"
+  ],
+  "blinded": true,
+  "seed_commitment": {
+    "algorithm": "sha-256",
+    "hex": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1"
+  }
+}

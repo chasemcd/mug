@@ -1,0 +1,27 @@
+{
+  "schema": {
+    "name": "mug.api-05.group",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "df3da1e10ffec853c052c7188e617cd2f2f529876c19b86d852164ba97552c1f"
+    }
+  },
+  "group_key": "team",
+  "size": 4,
+  "match": {
+    "strategy": "latency",
+    "max_p2p_rtt": {
+      "microseconds": 150000
+    }
+  },
+  "wait": {
+    "microseconds": 90000000
+  },
+  "on_timeout": "release",
+  "activities": [
+    {
+      "activity_key": "round-1"
+    }
+  ]
+}

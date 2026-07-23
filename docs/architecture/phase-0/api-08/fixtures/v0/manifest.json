@@ -1,0 +1,146 @@
+{
+  "schema": {
+    "name": "mug.api-08.conversation.fixture-manifest",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "0e305fb358b6d53126d9081ae36f078f18a683684f2bfe799a97197c3d549d4a"
+    }
+  },
+  "manifest_version": "0.2.0",
+  "suite": "api-08-conversation",
+  "contract_version": 0,
+  "cases": [
+    {
+      "id": "chat-message.valid.minimal-static",
+      "instance": "valid/chat-message.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-08.conversation:0#/$defs/ChatMessage",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "conversation-segment.valid.minimal-static",
+      "instance": "valid/conversation-segment.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-08.conversation:0#/$defs/ConversationSegment",
+      "expect": "valid",
+      "validation_layer": "semantic"
+    },
+    {
+      "id": "context-snapshot.valid.minimal-static",
+      "instance": "valid/context-snapshot.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-08.conversation:0#/$defs/ContextSnapshot",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "turn-policy.valid.minimal-static",
+      "instance": "valid/turn-policy.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-08.conversation:0#/$defs/TurnPolicy",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "delivery-receipt.valid.minimal-static",
+      "instance": "valid/delivery-receipt.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-08.conversation:0#/$defs/DeliveryReceipt",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "delivery-receipt.valid.experienced-stream",
+      "instance": "valid/delivery-receipt.experienced-stream.json",
+      "schema_ref": "urn:mug:schema:mug.api-08.conversation:0#/$defs/DeliveryReceipt",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "candidate-reply-set.valid.minimal-static",
+      "instance": "valid/candidate-reply-set.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-08.conversation:0#/$defs/CandidateReplySet",
+      "expect": "valid",
+      "validation_layer": "semantic"
+    },
+    {
+      "id": "conversation-segment.invalid.non-contiguous",
+      "instance": "invalid/conversation-segment.non-contiguous.json",
+      "schema_ref": "urn:mug:schema:mug.api-08.conversation:0#/$defs/ConversationSegment",
+      "expect": "invalid",
+      "validation_layer": "semantic",
+      "expected_error": {
+        "keyword": "segmentContiguity",
+        "instance_pointer": "/message_ids"
+      }
+    },
+    {
+      "id": "chat-message.invalid.bad-visibility",
+      "instance": "invalid/chat-message.bad-visibility.json",
+      "schema_ref": "urn:mug:schema:mug.api-08.conversation:0#/$defs/ChatMessage",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "enum",
+        "instance_pointer": "/visibility"
+      }
+    },
+    {
+      "id": "turn-policy.invalid.bad-activation",
+      "instance": "invalid/turn-policy.bad-activation.json",
+      "schema_ref": "urn:mug:schema:mug.api-08.conversation:0#/$defs/TurnPolicy",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "enum",
+        "instance_pointer": "/activation"
+      }
+    },
+    {
+      "id": "delivery-receipt.invalid.bad-id",
+      "instance": "invalid/delivery-receipt.bad-id.json",
+      "schema_ref": "urn:mug:schema:mug.api-08.conversation:0#/$defs/DeliveryReceipt",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "pattern",
+        "instance_pointer": "/message_id"
+      }
+    },
+    {
+      "id": "context-snapshot.invalid.empty-context",
+      "instance": "invalid/context-snapshot.empty-context.json",
+      "schema_ref": "urn:mug:schema:mug.api-08.conversation:0#/$defs/ContextSnapshot",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "minItems",
+        "instance_pointer": "/included_message_ids"
+      }
+    },
+    {
+      "id": "delivery-receipt.invalid.bad-evidence-stream",
+      "instance": "invalid/delivery-receipt.bad-evidence-stream.json",
+      "schema_ref": "urn:mug:schema:mug.api-08.conversation:0#/$defs/DeliveryReceipt",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "enum",
+        "instance_pointer": "/evidence_stream"
+      }
+    },
+    {
+      "id": "candidate-reply-set.invalid.unpresented-selection",
+      "instance": "invalid/candidate-reply-set.unpresented-selection.json",
+      "schema_ref": "urn:mug:schema:mug.api-08.conversation:0#/$defs/CandidateReplySet",
+      "expect": "invalid",
+      "validation_layer": "semantic",
+      "expected_error": {
+        "keyword": "candidateSelection",
+        "instance_pointer": "/selected_message_id"
+      }
+    },
+    {
+      "id": "candidate-reply-set.invalid.single-candidate",
+      "instance": "invalid/candidate-reply-set.single-candidate.json",
+      "schema_ref": "urn:mug:schema:mug.api-08.conversation:0#/$defs/CandidateReplySet",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "minItems",
+        "instance_pointer": "/candidate_message_ids"
+      }
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "schema": {
+    "name": "mug.domain-error",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "f675d9ec1f6258719da93a507421689b26babf69d36503c7df90b5039e238d6d"
+    }
+  },
+  "error_id": "error_019b5ed9-14ec-7f51-89c9-d42db811f044",
+  "request_id": "request_019b5ed0-14ec-7f51-89c9-d42db811f03b",
+  "recorded_at": "2026-07-17T10:22:31.440000-04:00",
+  "code": "dependency.unavailable",
+  "category": "dependency",
+  "safe_message": "The dependency is temporarily unavailable.",
+  "retry": {
+    "mode": "same_command"
+  },
+  "details": {
+    "schema": {
+      "name": "mug.error.dependency-unavailable-details",
+      "version": 0,
+      "digest": {
+        "algorithm": "sha-256",
+        "hex": "38eda73750648c5b0fa57556fb953e33cafdb6e1e7ed481d3033cd729ba8cda8"
+      }
+    },
+    "data": {}
+  },
+  "support_reference": "error_019b5ed9-14ec-7f51-89c9-d42db811f044"
+}

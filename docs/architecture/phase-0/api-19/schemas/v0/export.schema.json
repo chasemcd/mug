@@ -1,0 +1,475 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:mug:schema:mug.api-19.export:0",
+  "title": "MUG API-19 Dataset Query, Export, and Lineage contracts, version 0",
+  "$defs": {
+    "AuthoringKey": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(?:[-_.][a-z0-9]+)*$",
+      "maxLength": 128
+    },
+    "DatasetKind": {
+      "enum": [
+        "events",
+        "trajectories",
+        "preferences",
+        "conversations"
+      ]
+    },
+    "GitCommitSha": {
+      "type": "string",
+      "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"
+    },
+    "GitBranchName": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*$",
+      "maxLength": 255
+    },
+    "GitRemoteUrl": {
+      "type": "string",
+      "pattern": "^(?:[a-z][a-z0-9+.-]*://[^\\s]+|[A-Za-z0-9._-]+@[A-Za-z0-9._-]+:[^\\s]+)$",
+      "maxLength": 512
+    },
+    "GitSourcePath": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*$",
+      "maxLength": 255
+    },
+    "GitProvenanceRef": {
+      "type": "object",
+      "required": [
+        "commit",
+        "dirty"
+      ],
+      "properties": {
+        "commit": {
+          "$ref": "#/$defs/GitCommitSha"
+        },
+        "branch": {
+          "$ref": "#/$defs/GitBranchName"
+        },
+        "remote": {
+          "$ref": "#/$defs/GitRemoteUrl"
+        },
+        "dirty": {
+          "type": "boolean"
+        },
+        "patch_digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        },
+        "source_path": {
+          "$ref": "#/$defs/GitSourcePath"
+        }
+      },
+      "additionalProperties": false,
+      "if": {
+        "required": [
+          "dirty"
+        ],
+        "properties": {
+          "dirty": {
+            "const": true
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "patch_digest"
+        ]
+      },
+      "else": {
+        "not": {
+          "required": [
+            "patch_digest"
+          ]
+        }
+      }
+    },
+    "ExportRequestSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-19.export-request"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ExportRequest": {
+      "type": "object",
+      "required": [
+        "schema",
+        "export_key",
+        "study_version",
+        "dataset_kind",
+        "filters_digest",
+        "requested_at"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/ExportRequestSchemaRef"
+        },
+        "export_key": {
+          "$ref": "#/$defs/AuthoringKey"
+        },
+        "study_version": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/StudyVersionRef"
+        },
+        "dataset_kind": {
+          "$ref": "#/$defs/DatasetKind"
+        },
+        "filters_digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        },
+        "requested_at": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/UtcInstant"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ExportBundleSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-19.export-bundle"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ExportBundle": {
+      "type": "object",
+      "required": [
+        "schema",
+        "export_key",
+        "study_version",
+        "dataset_kind",
+        "artifact",
+        "row_count",
+        "row_schema",
+        "lineage_digest",
+        "completeness",
+        "snapshot_at",
+        "bundle_digest",
+        "data_handling"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/ExportBundleSchemaRef"
+        },
+        "export_key": {
+          "$ref": "#/$defs/AuthoringKey"
+        },
+        "study_version": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/StudyVersionRef"
+        },
+        "dataset_kind": {
+          "$ref": "#/$defs/DatasetKind"
+        },
+        "artifact": {
+          "allOf": [
+            {
+              "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/ArtifactRef"
+            },
+            {
+              "properties": {
+                "media_type": {
+                  "const": "application/x-ndjson"
+                }
+              }
+            }
+          ]
+        },
+        "row_count": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/NonNegativeSafeInteger"
+        },
+        "row_schema": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/SchemaRef"
+        },
+        "lineage_digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        },
+        "completeness": {
+          "enum": [
+            "complete",
+            "partial"
+          ]
+        },
+        "snapshot_at": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/UtcInstant"
+        },
+        "bundle_digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        },
+        "data_handling": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/DataHandlingRef"
+        }
+      },
+      "additionalProperties": false
+    },
+    "LineageRecordSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-19.lineage-record"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "LineageRecord": {
+      "type": "object",
+      "required": [
+        "schema",
+        "export_key",
+        "study_version",
+        "git_provenance",
+        "source_stream_ids",
+        "source_artifact_ids",
+        "transformation"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/LineageRecordSchemaRef"
+        },
+        "export_key": {
+          "$ref": "#/$defs/AuthoringKey"
+        },
+        "study_version": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/StudyVersionRef"
+        },
+        "git_provenance": {
+          "$ref": "#/$defs/GitProvenanceRef"
+        },
+        "source_stream_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^stream_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "maxItems": 1024
+        },
+        "source_artifact_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^artifact_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "maxItems": 4096
+        },
+        "transformation": {
+          "enum": [
+            "none",
+            "redacted",
+            "aggregated"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "DatasetSchemaBindingSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-19.dataset-schema-binding"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "DatasetSchemaBinding": {
+      "type": "object",
+      "required": [
+        "schema",
+        "dataset_kind",
+        "row_schema"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/DatasetSchemaBindingSchemaRef"
+        },
+        "dataset_kind": {
+          "$ref": "#/$defs/DatasetKind"
+        },
+        "row_schema": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/SchemaRef"
+        }
+      },
+      "additionalProperties": false
+    },
+    "FixtureManifestSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-19.export.fixture-manifest"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "FixtureCase": {
+      "type": "object",
+      "required": [
+        "id",
+        "instance",
+        "schema_ref",
+        "expect"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)+$",
+          "maxLength": 160
+        },
+        "instance": {
+          "type": "string",
+          "pattern": "^(?:valid|invalid)/[a-z0-9][a-z0-9._-]*\\.json$",
+          "maxLength": 256
+        },
+        "schema_ref": {
+          "type": "string",
+          "pattern": "^urn:mug:schema:mug\\.api-19\\.export:0#/\\$defs/[A-Za-z][A-Za-z0-9]*$",
+          "maxLength": 256
+        },
+        "validation_layer": {
+          "enum": [
+            "schema",
+            "semantic"
+          ]
+        },
+        "expect": {
+          "enum": [
+            "valid",
+            "invalid"
+          ]
+        },
+        "expected_error": {
+          "type": "object",
+          "required": [
+            "keyword",
+            "instance_pointer"
+          ],
+          "properties": {
+            "keyword": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "maxLength": 96
+            },
+            "instance_pointer": {
+              "type": "string",
+              "pattern": "^(?:/[^/]+)*$",
+              "maxLength": 256
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false,
+      "if": {
+        "required": [
+          "expect"
+        ],
+        "properties": {
+          "expect": {
+            "const": "invalid"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "expected_error"
+        ]
+      },
+      "else": {
+        "not": {
+          "required": [
+            "expected_error"
+          ]
+        }
+      }
+    },
+    "FixtureManifest": {
+      "type": "object",
+      "required": [
+        "schema",
+        "manifest_version",
+        "suite",
+        "contract_version",
+        "cases"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/FixtureManifestSchemaRef"
+        },
+        "manifest_version": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/SemVer"
+        },
+        "suite": {
+          "const": "api-19-export"
+        },
+        "contract_version": {
+          "const": 0
+        },
+        "cases": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/FixtureCase"
+          },
+          "minItems": 1,
+          "maxItems": 512
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

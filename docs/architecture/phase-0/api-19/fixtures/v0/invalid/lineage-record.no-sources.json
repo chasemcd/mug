@@ -1,0 +1,30 @@
+{
+  "schema": {
+    "name": "mug.api-19.lineage-record",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "97155dd5f5f7945722339f859b002c11e7fdade91f224cb23a9bee28b7b21343"
+    }
+  },
+  "export_key": "events-baseline",
+  "study_version": {
+    "study_id": "study_019b6000-0000-7000-8000-000000000001",
+    "study_version_id": "studyver_019b6000-0000-7000-8000-000000000010",
+    "version_number": 2,
+    "manifest_digest": {
+      "algorithm": "sha-256",
+      "hex": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1"
+    }
+  },
+  "git_provenance": {
+    "commit": "0123456789abcdef0123456789abcdef01234567",
+    "branch": "main",
+    "remote": "https://example.org/lab/cooperative-foraging.git",
+    "dirty": false,
+    "source_path": "studies/cooperative-foraging"
+  },
+  "source_stream_ids": [],
+  "source_artifact_ids": [],
+  "transformation": "none"
+}

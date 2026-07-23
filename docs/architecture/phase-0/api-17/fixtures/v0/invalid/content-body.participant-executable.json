@@ -1,0 +1,7 @@
+{
+  "origin": "participant",
+  "source": "inline",
+  "format": "html",
+  "executable": true,
+  "text": "<script>exfiltrate()</script>"
+}

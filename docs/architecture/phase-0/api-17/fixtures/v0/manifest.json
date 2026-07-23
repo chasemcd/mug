@@ -1,0 +1,218 @@
+{
+  "schema": {
+    "name": "mug.api-17.content.fixture-manifest",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "63d889325b5004a974527cd9401c5819a22dbcf385c573d7cfad70595313c86f"
+    }
+  },
+  "manifest_version": "0.2.0",
+  "suite": "api-17-content",
+  "contract_version": 0,
+  "cases": [
+    {
+      "id": "form-spec.valid.minimal-static",
+      "instance": "valid/form-spec.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-17.content:0#/$defs/FormSpec",
+      "expect": "valid",
+      "validation_layer": "semantic"
+    },
+    {
+      "id": "form-response.valid.minimal-static",
+      "instance": "valid/form-response.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-17.content:0#/$defs/FormResponse",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "presentation-component.valid.minimal-static",
+      "instance": "valid/presentation-component.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-17.content:0#/$defs/PresentationComponent",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "accessibility-profile.valid.minimal-static",
+      "instance": "valid/accessibility-profile.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-17.content:0#/$defs/AccessibilityProfile",
+      "expect": "valid",
+      "validation_layer": "semantic"
+    },
+    {
+      "id": "content-spec.valid.inline-markdown",
+      "instance": "valid/content-spec.inline-markdown.json",
+      "schema_ref": "urn:mug:schema:mug.api-17.content:0#/$defs/ContentSpec",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "content-spec.valid.file-html",
+      "instance": "valid/content-spec.file-html.json",
+      "schema_ref": "urn:mug:schema:mug.api-17.content:0#/$defs/ContentSpec",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "content-spec.valid.response-required",
+      "instance": "valid/content-spec.response-required.json",
+      "schema_ref": "urn:mug:schema:mug.api-17.content:0#/$defs/ContentSpec",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "content-body.valid.participant-inert",
+      "instance": "valid/content-body.participant-inert.json",
+      "schema_ref": "urn:mug:schema:mug.api-17.content:0#/$defs/ContentBody",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "gate-control.valid.advance-block",
+      "instance": "valid/gate-control.advance-block.json",
+      "schema_ref": "urn:mug:schema:mug.api-17.content:0#/$defs/GateControl",
+      "expect": "valid",
+      "validation_layer": "semantic"
+    },
+    {
+      "id": "gate-control.valid.join-unblock",
+      "instance": "valid/gate-control.join-unblock.json",
+      "schema_ref": "urn:mug:schema:mug.api-17.content:0#/$defs/GateControl",
+      "expect": "valid",
+      "validation_layer": "semantic"
+    },
+    {
+      "id": "form-spec.invalid.duplicate-field",
+      "instance": "invalid/form-spec.duplicate-field.json",
+      "schema_ref": "urn:mug:schema:mug.api-17.content:0#/$defs/FormSpec",
+      "expect": "invalid",
+      "validation_layer": "semantic",
+      "expected_error": {
+        "keyword": "duplicateField",
+        "instance_pointer": "/fields/1/field_key"
+      }
+    },
+    {
+      "id": "form-spec.invalid.bad-field-kind",
+      "instance": "invalid/form-spec.bad-field-kind.json",
+      "schema_ref": "urn:mug:schema:mug.api-17.content:0#/$defs/FormSpec",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "enum",
+        "instance_pointer": "/fields/0/kind"
+      }
+    },
+    {
+      "id": "form-spec.invalid.choice-without-options",
+      "instance": "invalid/form-spec.choice-without-options.json",
+      "schema_ref": "urn:mug:schema:mug.api-17.content:0#/$defs/FormSpec",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "required",
+        "instance_pointer": "/fields/0"
+      }
+    },
+    {
+      "id": "form-response.invalid.bad-id",
+      "instance": "invalid/form-response.bad-id.json",
+      "schema_ref": "urn:mug:schema:mug.api-17.content:0#/$defs/FormResponse",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "pattern",
+        "instance_pointer": "/visit_id"
+      }
+    },
+    {
+      "id": "accessibility-profile.invalid.aa-without-a11y",
+      "instance": "invalid/accessibility-profile.aa-without-a11y.json",
+      "schema_ref": "urn:mug:schema:mug.api-17.content:0#/$defs/AccessibilityProfile",
+      "expect": "invalid",
+      "validation_layer": "semantic",
+      "expected_error": {
+        "keyword": "accessibilityFloor",
+        "instance_pointer": "/wcag_level"
+      }
+    },
+    {
+      "id": "accessibility-profile.invalid.bad-wcag",
+      "instance": "invalid/accessibility-profile.bad-wcag.json",
+      "schema_ref": "urn:mug:schema:mug.api-17.content:0#/$defs/AccessibilityProfile",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "enum",
+        "instance_pointer": "/wcag_level"
+      }
+    },
+    {
+      "id": "content-spec.invalid.bad-format",
+      "instance": "invalid/content-spec.bad-format.json",
+      "schema_ref": "urn:mug:schema:mug.api-17.content:0#/$defs/ContentSpec",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "enum",
+        "instance_pointer": "/body/format"
+      }
+    },
+    {
+      "id": "content-spec.invalid.file-missing-digest",
+      "instance": "invalid/content-spec.file-missing-digest.json",
+      "schema_ref": "urn:mug:schema:mug.api-17.content:0#/$defs/ContentSpec",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "required",
+        "instance_pointer": "/body"
+      }
+    },
+    {
+      "id": "content-body.invalid.participant-executable",
+      "instance": "invalid/content-body.participant-executable.json",
+      "schema_ref": "urn:mug:schema:mug.api-17.content:0#/$defs/ContentBody",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "const",
+        "instance_pointer": "/origin"
+      }
+    },
+    {
+      "id": "content-spec.invalid.participant-body",
+      "instance": "invalid/content-spec.participant-body.json",
+      "schema_ref": "urn:mug:schema:mug.api-17.content:0#/$defs/ContentSpec",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "const",
+        "instance_pointer": "/body/origin"
+      }
+    },
+    {
+      "id": "gate-control.invalid.bad-target",
+      "instance": "invalid/gate-control.bad-target.json",
+      "schema_ref": "urn:mug:schema:mug.api-17.content:0#/$defs/GateControl",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "enum",
+        "instance_pointer": "/gate_target"
+      }
+    },
+    {
+      "id": "gate-control.invalid.missing-gate-op",
+      "instance": "invalid/gate-control.missing-gate-op.json",
+      "schema_ref": "urn:mug:schema:mug.api-17.content:0#/$defs/GateControl",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "required",
+        "instance_pointer": ""
+      }
+    },
+    {
+      "id": "gate-control.invalid.anchor-mismatch",
+      "instance": "invalid/gate-control.anchor-mismatch.json",
+      "schema_ref": "urn:mug:schema:mug.api-17.content:0#/$defs/GateControl",
+      "expect": "invalid",
+      "validation_layer": "semantic",
+      "expected_error": {
+        "keyword": "gateAnchorMismatch",
+        "instance_pointer": "/anchor/anchor_kind"
+      }
+    }
+  ]
+}

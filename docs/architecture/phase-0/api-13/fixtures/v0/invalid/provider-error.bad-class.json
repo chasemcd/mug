@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "mug.api-13.provider-error",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "4d5daed964741e873a261d06732f45e8d4342562325528d4824d7d1ab9915cdc"
+    }
+  },
+  "modelcall_id": "modelcall_019b6000-0000-7000-8000-000000000c01",
+  "error_class": "server-melted",
+  "retryable": true
+}

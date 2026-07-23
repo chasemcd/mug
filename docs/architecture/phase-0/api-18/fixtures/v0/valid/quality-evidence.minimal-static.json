@@ -1,0 +1,14 @@
+{
+  "schema": {
+    "name": "mug.api-18.quality-evidence",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "23659cee1b0870cb156470ea50e88501e7158412e6c6d762c3735e54a8114705"
+    }
+  },
+  "response_id": "prefresponse_019b6000-0000-7000-8000-000000000f40",
+  "attention_check_passed": true,
+  "response_time_ms": 8400,
+  "flagged": false
+}

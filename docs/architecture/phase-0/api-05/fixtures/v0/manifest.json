@@ -1,0 +1,229 @@
+{
+  "schema": {
+    "name": "mug.api-05.actor.fixture-manifest",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "df3da1e10ffec853c052c7188e617cd2f2f529876c19b86d852164ba97552c1f"
+    }
+  },
+  "manifest_version": "0.3.0",
+  "suite": "api-05-actor",
+  "contract_version": 0,
+  "cases": [
+    {
+      "id": "seat-definition.valid.minimal-static",
+      "instance": "valid/seat-definition.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-05.actor:0#/$defs/SeatDefinition",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "actor-instance.valid.human",
+      "instance": "valid/actor-instance.human.json",
+      "schema_ref": "urn:mug:schema:mug.api-05.actor:0#/$defs/ActorInstance",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "actor-instance.valid.software",
+      "instance": "valid/actor-instance.software.json",
+      "schema_ref": "urn:mug:schema:mug.api-05.actor:0#/$defs/ActorInstance",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "controller-binding.valid.human-game",
+      "instance": "valid/controller-binding.human-game.json",
+      "schema_ref": "urn:mug:schema:mug.api-05.actor:0#/$defs/ControllerBinding",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "controller-binding.valid.llm-chat",
+      "instance": "valid/controller-binding.llm-chat.json",
+      "schema_ref": "urn:mug:schema:mug.api-05.actor:0#/$defs/ControllerBinding",
+      "expect": "valid",
+      "validation_layer": "semantic"
+    },
+    {
+      "id": "cast-declaration.valid.total-mixed",
+      "instance": "valid/cast-declaration.total-mixed.json",
+      "schema_ref": "urn:mug:schema:mug.api-05.actor:0#/$defs/CastDeclaration",
+      "expect": "valid",
+      "validation_layer": "semantic"
+    },
+    {
+      "id": "cast-declaration.valid.all-agent",
+      "instance": "valid/cast-declaration.all-agent.json",
+      "schema_ref": "urn:mug:schema:mug.api-05.actor:0#/$defs/CastDeclaration",
+      "expect": "valid",
+      "validation_layer": "semantic"
+    },
+    {
+      "id": "seat-agent-binding.valid.explicit",
+      "instance": "valid/seat-agent-binding.explicit.json",
+      "schema_ref": "urn:mug:schema:mug.api-05.actor:0#/$defs/SeatAgentBinding",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "group.valid.latency-n4",
+      "instance": "valid/group.latency-n4.json",
+      "schema_ref": "urn:mug:schema:mug.api-05.actor:0#/$defs/Group",
+      "expect": "valid",
+      "validation_layer": "semantic"
+    },
+    {
+      "id": "group.valid.persisted-two-activities",
+      "instance": "valid/group.persisted-two-activities.json",
+      "schema_ref": "urn:mug:schema:mug.api-05.actor:0#/$defs/Group",
+      "expect": "valid",
+      "validation_layer": "semantic"
+    },
+    {
+      "id": "group.valid.custom-matchmaker",
+      "instance": "valid/group.custom-matchmaker.json",
+      "schema_ref": "urn:mug:schema:mug.api-05.actor:0#/$defs/Group",
+      "expect": "valid",
+      "validation_layer": "semantic"
+    },
+    {
+      "id": "actor-instance.invalid.software-missing-subject",
+      "instance": "invalid/actor-instance.software-missing-subject.json",
+      "schema_ref": "urn:mug:schema:mug.api-05.actor:0#/$defs/ActorInstance",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "required",
+        "instance_pointer": ""
+      }
+    },
+    {
+      "id": "controller-binding.invalid.human-with-ref",
+      "instance": "invalid/controller-binding.human-with-ref.json",
+      "schema_ref": "urn:mug:schema:mug.api-05.actor:0#/$defs/ControllerBinding",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "not",
+        "instance_pointer": ""
+      }
+    },
+    {
+      "id": "controller-binding.invalid.software-missing-ref",
+      "instance": "invalid/controller-binding.software-missing-ref.json",
+      "schema_ref": "urn:mug:schema:mug.api-05.actor:0#/$defs/ControllerBinding",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "required",
+        "instance_pointer": ""
+      }
+    },
+    {
+      "id": "controller-binding.invalid.capability-mismatch",
+      "instance": "invalid/controller-binding.capability-mismatch.json",
+      "schema_ref": "urn:mug:schema:mug.api-05.actor:0#/$defs/ControllerBinding",
+      "expect": "invalid",
+      "validation_layer": "semantic",
+      "expected_error": {
+        "keyword": "controllerCapability",
+        "instance_pointer": "/controller_kind"
+      }
+    },
+    {
+      "id": "seat-definition.invalid.bad-key",
+      "instance": "invalid/seat-definition.bad-key.json",
+      "schema_ref": "urn:mug:schema:mug.api-05.actor:0#/$defs/SeatDefinition",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "pattern",
+        "instance_pointer": "/seat_key"
+      }
+    },
+    {
+      "id": "cast-declaration.invalid.partial-cast",
+      "instance": "invalid/cast-declaration.partial-cast.json",
+      "schema_ref": "urn:mug:schema:mug.api-05.actor:0#/$defs/CastDeclaration",
+      "expect": "invalid",
+      "validation_layer": "semantic",
+      "expected_error": {
+        "keyword": "castTotality",
+        "instance_pointer": "/cast"
+      }
+    },
+    {
+      "id": "cast-declaration.invalid.unknown-actor-kind",
+      "instance": "invalid/cast-declaration.unknown-actor-kind.json",
+      "schema_ref": "urn:mug:schema:mug.api-05.actor:0#/$defs/CastDeclaration",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "oneOf",
+        "instance_pointer": "/cast/forager-2"
+      }
+    },
+    {
+      "id": "group.invalid.size-zero",
+      "instance": "invalid/group.size-zero.json",
+      "schema_ref": "urn:mug:schema:mug.api-05.actor:0#/$defs/Group",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "minimum",
+        "instance_pointer": "/size"
+      }
+    },
+    {
+      "id": "group.invalid.unknown-match-strategy",
+      "instance": "invalid/group.unknown-match-strategy.json",
+      "schema_ref": "urn:mug:schema:mug.api-05.actor:0#/$defs/Group",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "oneOf",
+        "instance_pointer": "/match"
+      }
+    },
+    {
+      "id": "group.invalid.reuse-missing-onmissing",
+      "instance": "invalid/group.reuse-missing-onmissing.json",
+      "schema_ref": "urn:mug:schema:mug.api-05.actor:0#/$defs/Group",
+      "expect": "invalid",
+      "validation_layer": "semantic",
+      "expected_error": {
+        "keyword": "onMissingRequired",
+        "instance_pointer": "/activities/1"
+      }
+    },
+    {
+      "id": "onnx-policy.valid.sample-temperature",
+      "instance": "valid/onnx-policy.sample-temperature.json",
+      "schema_ref": "urn:mug:schema:mug.api-05.actor:0#/$defs/OnnxPolicy",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "group.valid.latency-p2p-bound",
+      "instance": "valid/group.latency-p2p-bound.json",
+      "schema_ref": "urn:mug:schema:mug.api-05.actor:0#/$defs/Group",
+      "expect": "valid",
+      "validation_layer": "semantic"
+    },
+    {
+      "id": "controller-binding.invalid.custom-inference-fn",
+      "instance": "invalid/controller-binding.custom-inference-fn.json",
+      "schema_ref": "urn:mug:schema:mug.api-05.actor:0#/$defs/ControllerBinding",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "additionalProperties",
+        "instance_pointer": ""
+      }
+    },
+    {
+      "id": "onnx-policy.invalid.bad-selection-mode",
+      "instance": "invalid/onnx-policy.bad-selection-mode.json",
+      "schema_ref": "urn:mug:schema:mug.api-05.actor:0#/$defs/OnnxPolicy",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "enum",
+        "instance_pointer": "/selection_mode"
+      }
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:mug:schema:mug.command-results:0",
+  "title": "MUG command-result contracts, version 0",
+  "description": "Frozen schemas for command results that do not mirror a persisted record. A command receipt carries one of these as its typed result.",
+  "$defs": {
+    "EnrollmentResult": {
+      "type": "object",
+      "required": ["outcome", "enrollment_id", "study_id", "status", "revision"],
+      "properties": {
+        "outcome": { "const": "enrolled" },
+        "enrollment_id": { "type": "string" },
+        "study_id": { "type": "string" },
+        "status": { "type": "string" },
+        "revision": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "LaunchResult": {
+      "type": "object",
+      "required": ["outcome", "ticket_handle", "study_id", "expires_at"],
+      "properties": {
+        "outcome": { "const": "issued" },
+        "ticket_handle": { "type": "string" },
+        "study_id": { "type": "string" },
+        "expires_at": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "VisitTransitionResult": {
+      "type": "object",
+      "required": ["outcome", "visit_id", "status", "revision"],
+      "properties": {
+        "outcome": { "type": "string" },
+        "visit_id": { "type": "string" },
+        "status": { "type": "string" },
+        "revision": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    }
+  }
+}

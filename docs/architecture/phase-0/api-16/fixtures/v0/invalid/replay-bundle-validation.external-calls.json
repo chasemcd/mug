@@ -1,0 +1,15 @@
+{
+  "schema": {
+    "name": "mug.api-16.replay-bundle-validation",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "73201d6c79a1df974207da0d252faa122f5231b10ce2211a03f0acf6e32e7c79"
+    }
+  },
+  "interaction_id": "interaction_019b6000-0000-7000-8000-000000000420",
+  "valid": false,
+  "external_calls_made": true,
+  "modified_artifact_ids": [],
+  "verification": "deterministic"
+}

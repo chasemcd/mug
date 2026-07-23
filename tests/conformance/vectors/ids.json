@@ -1,0 +1,110 @@
+{
+  "kind": "ids",
+  "vectors": [
+    {
+      "id": "study_0190b2a0-1c3d-7f00-8abc-000000000001",
+      "kind": "study",
+      "name": "valid-study",
+      "registered": true,
+      "uuid": "0190b2a0-1c3d-7f00-8abc-000000000001"
+    },
+    {
+      "id": "participant_0190b2a0-1c3d-7f00-8abc-000000000001",
+      "kind": "participant",
+      "name": "valid-participant",
+      "registered": true,
+      "uuid": "0190b2a0-1c3d-7f00-8abc-000000000001"
+    },
+    {
+      "id": "event_0190b2a0-1c3d-7f00-8abc-000000000001",
+      "kind": "event",
+      "name": "valid-event",
+      "registered": true,
+      "uuid": "0190b2a0-1c3d-7f00-8abc-000000000001"
+    },
+    {
+      "id": "stream_0190b2a0-1c3d-7f00-8abc-000000000001",
+      "kind": "stream",
+      "name": "valid-stream",
+      "registered": true,
+      "uuid": "0190b2a0-1c3d-7f00-8abc-000000000001"
+    },
+    {
+      "id": "command_0190b2a0-1c3d-7f00-8abc-000000000001",
+      "kind": "command",
+      "name": "valid-command",
+      "registered": true,
+      "uuid": "0190b2a0-1c3d-7f00-8abc-000000000001"
+    },
+    {
+      "id": "artifact_0190b2a0-1c3d-7f00-8abc-000000000001",
+      "kind": "artifact",
+      "name": "valid-artifact",
+      "registered": true,
+      "uuid": "0190b2a0-1c3d-7f00-8abc-000000000001"
+    },
+    {
+      "id": "prefassign_0190b2a0-1c3d-7f00-8abc-000000000001",
+      "kind": "prefassign",
+      "name": "valid-prefassign",
+      "registered": true,
+      "uuid": "0190b2a0-1c3d-7f00-8abc-000000000001"
+    },
+    {
+      "id": "account_0190b2a0-1c3d-7f00-8abc-000000000001",
+      "kind": null,
+      "name": "invalid-reserved-prefix",
+      "registered": false,
+      "uuid": null
+    },
+    {
+      "id": "widget_0190b2a0-1c3d-7f00-8abc-000000000001",
+      "kind": null,
+      "name": "invalid-unknown-prefix",
+      "registered": false,
+      "uuid": null
+    },
+    {
+      "id": "study_0190b2a0-1c3d-6f00-8abc-000000000001",
+      "kind": null,
+      "name": "invalid-uuid-wrong-version",
+      "registered": false,
+      "uuid": null
+    },
+    {
+      "id": "study_0190b2a0-1c3d-7f00-7abc-000000000001",
+      "kind": null,
+      "name": "invalid-uuid-wrong-variant",
+      "registered": false,
+      "uuid": null
+    },
+    {
+      "id": "study_0190B2A0-1C3D-7F00-8ABC-000000000001",
+      "kind": null,
+      "name": "invalid-uuid-uppercase",
+      "registered": false,
+      "uuid": null
+    },
+    {
+      "id": "study0190b2a0-1c3d-7f00-8abc-000000000001",
+      "kind": null,
+      "name": "invalid-missing-underscore",
+      "registered": false,
+      "uuid": null
+    },
+    {
+      "id": "",
+      "kind": null,
+      "name": "invalid-empty",
+      "registered": false,
+      "uuid": null
+    },
+    {
+      "id": "study_",
+      "kind": null,
+      "name": "invalid-prefix-only",
+      "registered": false,
+      "uuid": null
+    }
+  ]
+}

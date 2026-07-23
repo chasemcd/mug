@@ -1,0 +1,53 @@
+{
+  "schema": {
+    "name": "mug.api-07.render-packet",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "2c41f0fe7bacf95174dc6c1cc1e57a4ce478d1deca1aeadd9d857f91d7d2caaa"
+    }
+  },
+  "episode_id": "episode_019b6000-0000-7000-8000-000000000800",
+  "seat_key": "p1",
+  "frame_number": 42,
+  "render_digest": {
+    "algorithm": "sha-256",
+    "hex": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1"
+  },
+  "keyframe": true,
+  "commands": [
+    {
+      "op": "rect",
+      "id": "bg",
+      "x": 0,
+      "y": 0,
+      "w": 640,
+      "h": 480,
+      "color": "#111111",
+      "persistent": true,
+      "depth": 0,
+      "glow": true
+    },
+    {
+      "op": "circle",
+      "x": 120.5,
+      "y": 96.25,
+      "radius": 6,
+      "color": "crimson",
+      "depth": 1
+    },
+    {
+      "op": "image",
+      "id": "p1",
+      "image_name": "forager",
+      "x": 200,
+      "y": 240,
+      "angle": 90,
+      "depth": 2,
+      "tween_duration": 80,
+      "extras": {
+        "blend_mode": "additive"
+      }
+    }
+  ]
+}

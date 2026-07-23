@@ -1,0 +1,18 @@
+{
+  "schema": {
+    "name": "mug.api-17.gate-control",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "63d889325b5004a974527cd9401c5819a22dbcf385c573d7cfad70595313c86f"
+    }
+  },
+  "component_key": "start-button",
+  "gate_target": "advance",
+  "gate_action": "block",
+  "anchor": {
+    "anchor_kind": "flow_node",
+    "anchor_key": "consent"
+  },
+  "accessibility_profile": "wcag-aa"
+}

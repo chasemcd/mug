@@ -1,0 +1,854 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:mug:schema:mug.api-05.actor:0",
+  "title": "MUG API-05 Seats, Actors, Casting, Grouping, and Controller Bindings contracts, version 0",
+  "$defs": {
+    "AuthoringKey": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(?:[-_.][a-z0-9]+)*$",
+      "maxLength": 128
+    },
+    "VersionedRef": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(?:[-_.][a-z0-9]+)*@[A-Za-z0-9][A-Za-z0-9._-]{0,63}$",
+      "maxLength": 192
+    },
+    "EnvAgentId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+      "maxLength": 128
+    },
+    "SeatDefinitionSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-05.seat-definition"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "SeatDefinition": {
+      "type": "object",
+      "required": [
+        "schema",
+        "seat_definition_id",
+        "seat_key",
+        "occupancy",
+        "modality_capabilities"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/SeatDefinitionSchemaRef"
+        },
+        "seat_definition_id": {
+          "type": "string",
+          "pattern": "^seatdef_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "seat_key": {
+          "$ref": "#/$defs/AuthoringKey"
+        },
+        "occupancy": {
+          "enum": [
+            "human",
+            "software",
+            "either"
+          ]
+        },
+        "modality_capabilities": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/CapabilitySet"
+        }
+      },
+      "additionalProperties": false
+    },
+    "HumanSubject": {
+      "type": "object",
+      "required": [
+        "enrollment_id"
+      ],
+      "properties": {
+        "enrollment_id": {
+          "type": "string",
+          "pattern": "^enrollment_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "SoftwareSubject": {
+      "type": "object",
+      "required": [
+        "agent_version_id"
+      ],
+      "properties": {
+        "agent_version_id": {
+          "type": "string",
+          "pattern": "^agentver_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ActorInstanceSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-05.actor-instance"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ActorInstance": {
+      "type": "object",
+      "required": [
+        "schema",
+        "actor_id",
+        "interaction_id",
+        "seat_definition_id",
+        "seat_key",
+        "kind"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/ActorInstanceSchemaRef"
+        },
+        "actor_id": {
+          "type": "string",
+          "pattern": "^actor_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "interaction_id": {
+          "type": "string",
+          "pattern": "^interaction_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "seat_definition_id": {
+          "type": "string",
+          "pattern": "^seatdef_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "seat_key": {
+          "$ref": "#/$defs/AuthoringKey"
+        },
+        "kind": {
+          "enum": [
+            "human",
+            "software"
+          ]
+        },
+        "human_subject": {
+          "$ref": "#/$defs/HumanSubject"
+        },
+        "software_subject": {
+          "$ref": "#/$defs/SoftwareSubject"
+        }
+      },
+      "additionalProperties": false,
+      "if": {
+        "required": [
+          "kind"
+        ],
+        "properties": {
+          "kind": {
+            "const": "human"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "human_subject"
+        ],
+        "not": {
+          "required": [
+            "software_subject"
+          ]
+        }
+      },
+      "else": {
+        "required": [
+          "software_subject"
+        ],
+        "not": {
+          "required": [
+            "human_subject"
+          ]
+        }
+      }
+    },
+    "ControllerBindingSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-05.controller-binding"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ControllerBinding": {
+      "type": "object",
+      "required": [
+        "schema",
+        "binding_id",
+        "actor_id",
+        "channel_key",
+        "capability",
+        "controller_kind"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/ControllerBindingSchemaRef"
+        },
+        "binding_id": {
+          "type": "string",
+          "pattern": "^controller_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "actor_id": {
+          "type": "string",
+          "pattern": "^actor_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "channel_key": {
+          "$ref": "#/$defs/AuthoringKey"
+        },
+        "capability": {
+          "enum": [
+            "game-action",
+            "chat-message",
+            "annotation",
+            "action-plan"
+          ]
+        },
+        "controller_kind": {
+          "enum": [
+            "human-input",
+            "scripted-policy",
+            "rl-model",
+            "llm"
+          ]
+        },
+        "controller_ref": {
+          "type": "string",
+          "pattern": "^agentver_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        }
+      },
+      "additionalProperties": false,
+      "if": {
+        "required": [
+          "controller_kind"
+        ],
+        "properties": {
+          "controller_kind": {
+            "const": "human-input"
+          }
+        }
+      },
+      "then": {
+        "not": {
+          "required": [
+            "controller_ref"
+          ]
+        }
+      },
+      "else": {
+        "required": [
+          "controller_ref"
+        ]
+      }
+    },
+    "OnnxPreprocessing": {
+      "type": "object",
+      "description": "Typed, declared observation-preprocessing rule drawn from a closed vocabulary (RP-5). Preprocessing is structured data, never inline code; there is no inline-JavaScript escape hatch.",
+      "required": [
+        "transform"
+      ],
+      "properties": {
+        "transform": {
+          "enum": [
+            "identity",
+            "normalize",
+            "standardize",
+            "clip",
+            "flatten",
+            "one-hot"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "OnnxPolicySchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-05.onnx-policy"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "OnnxPolicy": {
+      "type": "object",
+      "description": "Typed ONNX inference-policy spec that a software controller references by immutable versioned qualified name (RP-5, A05-O02). Custom pre/post-processing is expressed as declared, digested structure — a typed `preprocessing` rule and a closed-vocabulary `selection_mode` — replacing the dropped inline `custom_inference_fn` escape hatch. An inline-code field such as `custom_inference_fn` is structurally rejected by `additionalProperties: false`; a scripted `Policy` in study code is the only other permitted custom path and is itself versioned and digested.",
+      "required": [
+        "schema",
+        "policy_ref",
+        "preprocessing",
+        "selection_mode"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/OnnxPolicySchemaRef"
+        },
+        "policy_ref": {
+          "$ref": "#/$defs/VersionedRef"
+        },
+        "preprocessing": {
+          "$ref": "#/$defs/OnnxPreprocessing"
+        },
+        "selection_mode": {
+          "enum": [
+            "argmax",
+            "sample"
+          ]
+        },
+        "temperature": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 100
+        }
+      },
+      "additionalProperties": false,
+      "if": {
+        "required": [
+          "selection_mode"
+        ],
+        "properties": {
+          "selection_mode": {
+            "const": "sample"
+          }
+        }
+      },
+      "else": {
+        "not": {
+          "required": [
+            "temperature"
+          ]
+        }
+      }
+    },
+    "HumanActorSpec": {
+      "type": "object",
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "const": "human"
+        }
+      },
+      "additionalProperties": false
+    },
+    "AgentActorSpec": {
+      "type": "object",
+      "required": [
+        "kind",
+        "agent_ref"
+      ],
+      "properties": {
+        "kind": {
+          "const": "agent"
+        },
+        "agent_ref": {
+          "$ref": "#/$defs/VersionedRef"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ActorSpec": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/HumanActorSpec"
+        },
+        {
+          "$ref": "#/$defs/AgentActorSpec"
+        }
+      ]
+    },
+    "CastTreatment": {
+      "type": "object",
+      "required": [
+        "kind",
+        "treatment_key",
+        "levels"
+      ],
+      "properties": {
+        "kind": {
+          "const": "treatment"
+        },
+        "treatment_key": {
+          "$ref": "#/$defs/AuthoringKey"
+        },
+        "levels": {
+          "type": "object",
+          "minProperties": 2,
+          "maxProperties": 64,
+          "propertyNames": {
+            "$ref": "#/$defs/AuthoringKey"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/ActorSpec"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "CastSlot": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/HumanActorSpec"
+        },
+        {
+          "$ref": "#/$defs/AgentActorSpec"
+        },
+        {
+          "$ref": "#/$defs/CastTreatment"
+        }
+      ]
+    },
+    "CastDeclarationSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-05.cast-declaration"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "CastDeclaration": {
+      "type": "object",
+      "required": [
+        "schema",
+        "activity_key",
+        "seats",
+        "cast"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/CastDeclarationSchemaRef"
+        },
+        "activity_key": {
+          "$ref": "#/$defs/AuthoringKey"
+        },
+        "seats": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AuthoringKey"
+          },
+          "minItems": 1,
+          "maxItems": 64,
+          "uniqueItems": true
+        },
+        "cast": {
+          "type": "object",
+          "minProperties": 1,
+          "maxProperties": 64,
+          "propertyNames": {
+            "$ref": "#/$defs/AuthoringKey"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/CastSlot"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "SeatAgentBindingSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-05.seat-agent-binding"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "SeatAgentBinding": {
+      "type": "object",
+      "required": [
+        "schema",
+        "seat_agent_binding_id",
+        "interaction_id",
+        "actor_id",
+        "seat_key",
+        "env_agent_id"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/SeatAgentBindingSchemaRef"
+        },
+        "seat_agent_binding_id": {
+          "type": "string",
+          "pattern": "^seatbind_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "interaction_id": {
+          "type": "string",
+          "pattern": "^interaction_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "actor_id": {
+          "type": "string",
+          "pattern": "^actor_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "seat_key": {
+          "$ref": "#/$defs/AuthoringKey"
+        },
+        "env_agent_id": {
+          "$ref": "#/$defs/EnvAgentId"
+        }
+      },
+      "additionalProperties": false
+    },
+    "MatchFifo": {
+      "type": "object",
+      "required": [
+        "strategy"
+      ],
+      "properties": {
+        "strategy": {
+          "const": "fifo"
+        }
+      },
+      "additionalProperties": false
+    },
+    "MatchLatency": {
+      "type": "object",
+      "description": "Two-stage round-trip-time match strategy. `max_estimated_rtt` bounds the first-stage estimate to the coordinator; `max_p2p_rtt` bounds the second-stage full-mesh probe among candidate members (RP-7).",
+      "required": [
+        "strategy"
+      ],
+      "properties": {
+        "strategy": {
+          "const": "latency"
+        },
+        "max_estimated_rtt": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Duration"
+        },
+        "max_p2p_rtt": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Duration",
+          "description": "Upper bound on every pairwise peer-to-peer RTT. The group forms only when ALL pairwise RTTs among candidate members satisfy this bound (RP-7); a single failing pair blocks formation. This is the author-facing declaration; the runtime probe-evidence record that proves every pair passed is owned by API-06."
+        }
+      },
+      "additionalProperties": false,
+      "anyOf": [
+        {
+          "required": [
+            "max_estimated_rtt"
+          ]
+        },
+        {
+          "required": [
+            "max_p2p_rtt"
+          ]
+        }
+      ]
+    },
+    "MatchCustom": {
+      "type": "object",
+      "required": [
+        "strategy",
+        "matchmaker_ref"
+      ],
+      "properties": {
+        "strategy": {
+          "const": "custom"
+        },
+        "matchmaker_ref": {
+          "$ref": "#/$defs/VersionedRef"
+        }
+      },
+      "additionalProperties": false
+    },
+    "MatchStrategy": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/MatchFifo"
+        },
+        {
+          "$ref": "#/$defs/MatchLatency"
+        },
+        {
+          "$ref": "#/$defs/MatchCustom"
+        }
+      ]
+    },
+    "GroupActivity": {
+      "type": "object",
+      "required": [
+        "activity_key"
+      ],
+      "properties": {
+        "activity_key": {
+          "$ref": "#/$defs/AuthoringKey"
+        },
+        "on_missing_member": {
+          "enum": [
+            "wait",
+            "regroup"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "GroupSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-05.group"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "Group": {
+      "type": "object",
+      "required": [
+        "schema",
+        "group_key",
+        "size",
+        "activities"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/GroupSchemaRef"
+        },
+        "group_key": {
+          "$ref": "#/$defs/AuthoringKey"
+        },
+        "size": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64
+        },
+        "match": {
+          "$ref": "#/$defs/MatchStrategy"
+        },
+        "wait": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Duration"
+        },
+        "on_timeout": {
+          "enum": [
+            "release"
+          ]
+        },
+        "activities": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/GroupActivity"
+          },
+          "minItems": 1,
+          "maxItems": 128
+        }
+      },
+      "additionalProperties": false
+    },
+    "FixtureManifestSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-05.actor.fixture-manifest"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "FixtureCase": {
+      "type": "object",
+      "required": [
+        "id",
+        "instance",
+        "schema_ref",
+        "expect"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)+$",
+          "maxLength": 160
+        },
+        "instance": {
+          "type": "string",
+          "pattern": "^(?:valid|invalid)/[a-z0-9][a-z0-9._-]*\\.json$",
+          "maxLength": 256
+        },
+        "schema_ref": {
+          "type": "string",
+          "pattern": "^urn:mug:schema:mug\\.api-05\\.actor:0#/\\$defs/[A-Za-z][A-Za-z0-9]*$",
+          "maxLength": 256
+        },
+        "validation_layer": {
+          "enum": [
+            "schema",
+            "semantic"
+          ]
+        },
+        "expect": {
+          "enum": [
+            "valid",
+            "invalid"
+          ]
+        },
+        "expected_error": {
+          "type": "object",
+          "required": [
+            "keyword",
+            "instance_pointer"
+          ],
+          "properties": {
+            "keyword": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "maxLength": 96
+            },
+            "instance_pointer": {
+              "type": "string",
+              "pattern": "^(?:/[^/]+)*$",
+              "maxLength": 256
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false,
+      "if": {
+        "required": [
+          "expect"
+        ],
+        "properties": {
+          "expect": {
+            "const": "invalid"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "expected_error"
+        ]
+      },
+      "else": {
+        "not": {
+          "required": [
+            "expected_error"
+          ]
+        }
+      }
+    },
+    "FixtureManifest": {
+      "type": "object",
+      "required": [
+        "schema",
+        "manifest_version",
+        "suite",
+        "contract_version",
+        "cases"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/FixtureManifestSchemaRef"
+        },
+        "manifest_version": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/SemVer"
+        },
+        "suite": {
+          "const": "api-05-actor"
+        },
+        "contract_version": {
+          "const": 0
+        },
+        "cases": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/FixtureCase"
+          },
+          "minItems": 1,
+          "maxItems": 512
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

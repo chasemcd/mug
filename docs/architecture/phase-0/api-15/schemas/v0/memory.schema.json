@@ -1,0 +1,365 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:mug:schema:mug.api-15.memory:0",
+  "title": "MUG API-15 Experimental Agent Memory contracts, version 0",
+  "$defs": {
+    "MemoryScopeName": {
+      "enum": [
+        "working",
+        "episodic",
+        "longitudinal"
+      ]
+    },
+    "MemoryModeName": {
+      "enum": [
+        "shared",
+        "isolated",
+        "ablated"
+      ]
+    },
+    "MemoryScopeSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-15.memory-scope"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "MemoryScope": {
+      "type": "object",
+      "required": [
+        "schema",
+        "scope_kind",
+        "treatment_mode",
+        "owner_enrollment_id"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/MemoryScopeSchemaRef"
+        },
+        "scope_kind": {
+          "$ref": "#/$defs/MemoryScopeName"
+        },
+        "treatment_mode": {
+          "$ref": "#/$defs/MemoryModeName"
+        },
+        "owner_enrollment_id": {
+          "type": "string",
+          "pattern": "^enrollment_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "MemoryReadSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-15.memory-read"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "MemoryRead": {
+      "type": "object",
+      "required": [
+        "schema",
+        "memory_id",
+        "scope_kind",
+        "content_digest",
+        "base_version",
+        "read_at"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/MemoryReadSchemaRef"
+        },
+        "memory_id": {
+          "type": "string",
+          "pattern": "^memory_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "scope_kind": {
+          "$ref": "#/$defs/MemoryScopeName"
+        },
+        "content_digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        },
+        "base_version": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/VersionStamp"
+        },
+        "read_at": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/UtcInstant"
+        }
+      },
+      "additionalProperties": false
+    },
+    "MemoryProposalSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-15.memory-proposal"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "MemoryProposal": {
+      "type": "object",
+      "required": [
+        "schema",
+        "memory_id",
+        "scope_kind",
+        "proposed_digest",
+        "base_version",
+        "provenance_decision_id"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/MemoryProposalSchemaRef"
+        },
+        "memory_id": {
+          "type": "string",
+          "pattern": "^memory_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "scope_kind": {
+          "$ref": "#/$defs/MemoryScopeName"
+        },
+        "proposed_digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        },
+        "base_version": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/VersionStamp"
+        },
+        "provenance_decision_id": {
+          "type": "string",
+          "pattern": "^decision_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "MemoryCommitSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-15.memory-commit"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "MemoryCommit": {
+      "type": "object",
+      "required": [
+        "schema",
+        "memory_id",
+        "scope_kind",
+        "committed_digest",
+        "prior_version",
+        "new_version",
+        "provenance_decision_id"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/MemoryCommitSchemaRef"
+        },
+        "memory_id": {
+          "type": "string",
+          "pattern": "^memory_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "scope_kind": {
+          "$ref": "#/$defs/MemoryScopeName"
+        },
+        "committed_digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        },
+        "prior_version": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/VersionStamp"
+        },
+        "new_version": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/VersionStamp"
+        },
+        "provenance_decision_id": {
+          "type": "string",
+          "pattern": "^decision_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "FixtureManifestSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-15.memory.fixture-manifest"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "FixtureCase": {
+      "type": "object",
+      "required": [
+        "id",
+        "instance",
+        "schema_ref",
+        "expect"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)+$",
+          "maxLength": 160
+        },
+        "instance": {
+          "type": "string",
+          "pattern": "^(?:valid|invalid)/[a-z0-9][a-z0-9._-]*\\.json$",
+          "maxLength": 256
+        },
+        "schema_ref": {
+          "type": "string",
+          "pattern": "^urn:mug:schema:mug\\.api-15\\.memory:0#/\\$defs/[A-Za-z][A-Za-z0-9]*$",
+          "maxLength": 256
+        },
+        "validation_layer": {
+          "enum": [
+            "schema",
+            "semantic"
+          ]
+        },
+        "expect": {
+          "enum": [
+            "valid",
+            "invalid"
+          ]
+        },
+        "expected_error": {
+          "type": "object",
+          "required": [
+            "keyword",
+            "instance_pointer"
+          ],
+          "properties": {
+            "keyword": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "maxLength": 96
+            },
+            "instance_pointer": {
+              "type": "string",
+              "pattern": "^(?:/[^/]+)*$",
+              "maxLength": 256
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false,
+      "if": {
+        "required": [
+          "expect"
+        ],
+        "properties": {
+          "expect": {
+            "const": "invalid"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "expected_error"
+        ]
+      },
+      "else": {
+        "not": {
+          "required": [
+            "expected_error"
+          ]
+        }
+      }
+    },
+    "FixtureManifest": {
+      "type": "object",
+      "required": [
+        "schema",
+        "manifest_version",
+        "suite",
+        "contract_version",
+        "cases"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/FixtureManifestSchemaRef"
+        },
+        "manifest_version": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/SemVer"
+        },
+        "suite": {
+          "const": "api-15-memory"
+        },
+        "contract_version": {
+          "const": 0
+        },
+        "cases": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/FixtureCase"
+          },
+          "minItems": 1,
+          "maxItems": 512
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

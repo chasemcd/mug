@@ -1,0 +1,8 @@
+{
+  "name": "plugin.example-controller.policy",
+  "version": 1,
+  "digest": {
+    "algorithm": "sha-256",
+    "hex": "0000000000000000000000000000000000000000000000000000000000000000"
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "binding_key": "controller-binding",
+  "scope_key": "activity-scope",
+  "kind": "plugin"
+}

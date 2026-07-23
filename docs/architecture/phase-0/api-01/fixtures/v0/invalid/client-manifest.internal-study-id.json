@@ -1,0 +1,46 @@
+{
+  "schema": {
+    "name": "mug.study.client-manifest",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "96958cdf2ab34fd541208d2adcd17f0d2c7d43ee2c1f5e433d2c87e323e2d58f"
+    }
+  },
+  "protocol_requirements": [],
+  "required_capabilities": [],
+  "client_build_slot": "participant-shell",
+  "components": [
+    {
+      "slot": "welcome-panel",
+      "activation_slot": "welcome-activity",
+      "component_schema": {
+        "name": "mug.fixture.client-component-config",
+        "version": 0,
+        "digest": {
+          "algorithm": "sha-256",
+          "hex": "b1d2fba452987b804f64003ee6888a5c7653b85e4e541191677a7a16575c031b"
+        }
+      },
+      "config": {
+        "schema": {
+          "name": "mug.fixture.client-component-config",
+          "version": 0,
+          "digest": {
+            "algorithm": "sha-256",
+            "hex": "b1d2fba452987b804f64003ee6888a5c7653b85e4e541191677a7a16575c031b"
+          }
+        },
+        "data": {
+          "content_slot": "welcome-copy",
+          "submit_label": "study_019b6000-0000-7000-8000-000000000001"
+        }
+      }
+    }
+  ],
+  "resource_slots": [],
+  "accessibility_profile": "wcag-aa",
+  "locales": [
+    "en-US"
+  ]
+}

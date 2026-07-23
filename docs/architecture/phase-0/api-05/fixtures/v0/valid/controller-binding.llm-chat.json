@@ -1,0 +1,16 @@
+{
+  "schema": {
+    "name": "mug.api-05.controller-binding",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "df3da1e10ffec853c052c7188e617cd2f2f529876c19b86d852164ba97552c1f"
+    }
+  },
+  "binding_id": "controller_019b6000-0000-7000-8000-000000000441",
+  "actor_id": "actor_019b6000-0000-7000-8000-000000000411",
+  "channel_key": "chat",
+  "capability": "chat-message",
+  "controller_kind": "llm",
+  "controller_ref": "agentver_019b6000-0000-7000-8000-000000000430"
+}

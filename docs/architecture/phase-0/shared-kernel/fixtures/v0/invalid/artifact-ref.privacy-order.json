@@ -1,0 +1,16 @@
+{
+  "artifact_id": "artifact_01981c61-bdc2-7bad-9ef1-c53633e9c613",
+  "digest": {
+    "algorithm": "sha-256",
+    "hex": "9acbbcf3f70f3581b4cfe0954dc23bb3dbc063cd459aca06f99d488b80848429"
+  },
+  "size_bytes": 120391,
+  "media_type": "application/vnd.apache.arrow.file",
+  "content_encoding": "zstd",
+  "data_handling": {
+    "privacy_labels": [
+      "sensitive",
+      "research"
+    ]
+  }
+}

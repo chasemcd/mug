@@ -1,0 +1,195 @@
+{
+  "schema": {
+    "name": "mug.api-02.fixture-manifest",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "4fe71236a986f298966abe5ed4a6e9d1b53121a6b22de829eeb9a52826e09825"
+    }
+  },
+  "manifest_version": "0.2.0",
+  "suite": "api-02-platform-deployment",
+  "contract_version": 0,
+  "cases": [
+    {
+      "id": "deployment-requirement.valid.minimal-static",
+      "instance": "valid/deployment-requirement.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-02.platform-deployment:0#/$defs/DeploymentRequirement",
+      "validation_layer": "schema",
+      "expect": "valid"
+    },
+    {
+      "id": "deployment-revision.valid.minimal-static",
+      "instance": "valid/deployment-revision.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-02.platform-deployment:0#/$defs/DeploymentRevision",
+      "validation_layer": "semantic",
+      "expect": "valid"
+    },
+    {
+      "id": "deployment-revision.valid.localhost-dev",
+      "instance": "valid/deployment-revision.localhost-dev.json",
+      "schema_ref": "urn:mug:schema:mug.api-02.platform-deployment:0#/$defs/DeploymentRevision",
+      "validation_layer": "semantic",
+      "expect": "valid"
+    },
+    {
+      "id": "client-deployment.valid.minimal-static",
+      "instance": "valid/client-deployment.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-02.platform-deployment:0#/$defs/ClientDeploymentProjection",
+      "validation_layer": "semantic",
+      "expect": "valid"
+    },
+    {
+      "id": "satisfaction-report.valid.minimal-static",
+      "instance": "valid/satisfaction-report.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-02.platform-deployment:0#/$defs/SatisfactionReport",
+      "validation_layer": "semantic",
+      "expect": "valid"
+    },
+    {
+      "id": "satisfaction-report.valid.unsatisfied-static",
+      "instance": "valid/satisfaction-report.unsatisfied-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-02.platform-deployment:0#/$defs/SatisfactionReport",
+      "validation_layer": "semantic",
+      "expect": "valid"
+    },
+    {
+      "id": "deployment.valid.live-static",
+      "instance": "valid/deployment.live-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-02.platform-deployment:0#/$defs/Deployment",
+      "validation_layer": "semantic",
+      "expect": "valid"
+    },
+    {
+      "id": "deployment.valid.stopped-static",
+      "instance": "valid/deployment.stopped-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-02.platform-deployment:0#/$defs/Deployment",
+      "validation_layer": "semantic",
+      "expect": "valid"
+    },
+    {
+      "id": "deployment-requirement.invalid.inline-secret",
+      "instance": "invalid/deployment-requirement.inline-secret.json",
+      "schema_ref": "urn:mug:schema:mug.api-02.platform-deployment:0#/$defs/DeploymentRequirement",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "additionalProperties",
+        "instance_pointer": "/data/secret_requirements/0"
+      }
+    },
+    {
+      "id": "deployment-requirement.invalid.grant-coupling",
+      "instance": "invalid/deployment-requirement.grant-coupling.json",
+      "schema_ref": "urn:mug:schema:mug.api-02.platform-deployment:0#/$defs/DeploymentRequirement",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "additionalProperties",
+        "instance_pointer": "/data"
+      }
+    },
+    {
+      "id": "deployment-revision.invalid.capability-grants",
+      "instance": "invalid/deployment-revision.capability-grants.json",
+      "schema_ref": "urn:mug:schema:mug.api-02.platform-deployment:0#/$defs/DeploymentRevision",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "additionalProperties",
+        "instance_pointer": ""
+      }
+    },
+    {
+      "id": "deployment-revision.invalid.dangling-provider-secret",
+      "instance": "invalid/deployment-revision.dangling-provider-secret.json",
+      "schema_ref": "urn:mug:schema:mug.api-02.platform-deployment:0#/$defs/DeploymentRevision",
+      "validation_layer": "semantic",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "providerSecretBinding",
+        "instance_pointer": "/provider_bindings/0/secret_requirement_key"
+      }
+    },
+    {
+      "id": "deployment-revision.invalid.duplicate-secret-key",
+      "instance": "invalid/deployment-revision.duplicate-secret-key.json",
+      "schema_ref": "urn:mug:schema:mug.api-02.platform-deployment:0#/$defs/DeploymentRevision",
+      "validation_layer": "semantic",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "duplicateSecretKey",
+        "instance_pointer": "/secret_bindings/1/requirement_key"
+      }
+    },
+    {
+      "id": "deployment-revision.invalid.unpinned-binding-revision",
+      "instance": "invalid/deployment-revision.unpinned-binding-revision.json",
+      "schema_ref": "urn:mug:schema:mug.api-02.platform-deployment:0#/$defs/DeploymentRevision",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "not",
+        "instance_pointer": "/secret_bindings/0/secret_ref"
+      }
+    },
+    {
+      "id": "client-deployment.invalid.operator-endpoint",
+      "instance": "invalid/client-deployment.operator-endpoint.json",
+      "schema_ref": "urn:mug:schema:mug.api-02.platform-deployment:0#/$defs/ClientDeploymentProjection",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "enum",
+        "instance_pointer": "/endpoints/0/role"
+      }
+    },
+    {
+      "id": "client-deployment.invalid.secret-field",
+      "instance": "invalid/client-deployment.secret-field.json",
+      "schema_ref": "urn:mug:schema:mug.api-02.platform-deployment:0#/$defs/ClientDeploymentProjection",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "additionalProperties",
+        "instance_pointer": ""
+      }
+    },
+    {
+      "id": "satisfaction-report.invalid.inconsistent",
+      "instance": "invalid/satisfaction-report.inconsistent.json",
+      "schema_ref": "urn:mug:schema:mug.api-02.platform-deployment:0#/$defs/SatisfactionReport",
+      "validation_layer": "semantic",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "satisfiedConsistency",
+        "instance_pointer": "/satisfied"
+      }
+    },
+    {
+      "id": "satisfaction-report.invalid.capability-gaps",
+      "instance": "invalid/satisfaction-report.capability-gaps.json",
+      "schema_ref": "urn:mug:schema:mug.api-02.platform-deployment:0#/$defs/SatisfactionReport",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "additionalProperties",
+        "instance_pointer": ""
+      }
+    },
+    {
+      "id": "deployment.invalid.retired-disposition",
+      "instance": "invalid/deployment.retired-disposition.json",
+      "schema_ref": "urn:mug:schema:mug.api-02.platform-deployment:0#/$defs/Deployment",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "enum",
+        "instance_pointer": "/disposition"
+      }
+    },
+    {
+      "id": "deployment.invalid.mismatched-revision",
+      "instance": "invalid/deployment.mismatched-revision.json",
+      "schema_ref": "urn:mug:schema:mug.api-02.platform-deployment:0#/$defs/Deployment",
+      "validation_layer": "semantic",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "revisionDeploymentMismatch",
+        "instance_pointer": "/current_revision/deployment_id"
+      }
+    }
+  ]
+}

@@ -1,0 +1,331 @@
+{
+  "schema": {
+    "name": "mug.fixture-manifest",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "f675d9ec1f6258719da93a507421689b26babf69d36503c7df90b5039e238d6d"
+    }
+  },
+  "manifest_version": "0.1.0",
+  "suite": "shared-kernel",
+  "contract_version": 0,
+  "cases": [
+    {
+      "id": "wire-command.valid.full",
+      "instance": "valid/wire-command.full.json",
+      "schema_ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/WireCommandEnvelope",
+      "expect": "valid"
+    },
+    {
+      "id": "command-receipt.valid.accepted",
+      "instance": "valid/command-receipt.accepted.json",
+      "schema_ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/CommandReceipt",
+      "expect": "valid"
+    },
+    {
+      "id": "command-receipt.valid.indeterminate",
+      "instance": "valid/command-receipt.indeterminate.json",
+      "schema_ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/CommandReceipt",
+      "expect": "valid"
+    },
+    {
+      "id": "domain-error.valid.revision-conflict",
+      "instance": "valid/domain-error.revision-conflict.json",
+      "schema_ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/DomainError",
+      "expect": "valid"
+    },
+    {
+      "id": "artifact-ref.valid",
+      "instance": "valid/artifact-ref.json",
+      "schema_ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/ArtifactRef",
+      "expect": "valid"
+    },
+    {
+      "id": "secret-ref.valid.pinned",
+      "instance": "valid/secret-ref.pinned.json",
+      "schema_ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/SecretRef",
+      "expect": "valid"
+    },
+    {
+      "id": "canonicalization-vectors.valid",
+      "instance": "valid/canonicalization-vectors.json",
+      "schema_ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/CanonicalizationVectorSet",
+      "expect": "valid"
+    },
+    {
+      "id": "inline-bytes.valid",
+      "instance": "valid/inline-bytes.json",
+      "schema_ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/InlineBytes",
+      "expect": "valid"
+    },
+    {
+      "id": "capability-set.valid",
+      "instance": "valid/capability-set.json",
+      "schema_ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/CapabilitySet",
+      "expect": "valid"
+    },
+    {
+      "id": "public-handle.valid",
+      "instance": "valid/public-handle.json",
+      "schema_ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/PublicHandle",
+      "expect": "valid"
+    },
+    {
+      "id": "wire-command.invalid.principal-claim",
+      "instance": "invalid/wire-command.principal-claim.json",
+      "schema_ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/WireCommandEnvelope",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "additionalProperties",
+        "instance_pointer": ""
+      }
+    },
+    {
+      "id": "wire-command.invalid.conflicting-preconditions",
+      "instance": "invalid/wire-command.conflicting-preconditions.json",
+      "schema_ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/WireCommandEnvelope",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "oneOf",
+        "instance_pointer": "/preconditions"
+      }
+    },
+    {
+      "id": "wire-command.invalid.domain-payload",
+      "instance": "invalid/wire-command.domain-payload.json",
+      "schema_ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/WireCommandEnvelope",
+      "validation_layer": "typed_object",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "pattern",
+        "instance_pointer": "/payload/data/candidate_id"
+      }
+    },
+    {
+      "id": "wire-command.invalid.domain-schema-digest",
+      "instance": "invalid/wire-command.domain-schema-digest.json",
+      "schema_ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/WireCommandEnvelope",
+      "validation_layer": "typed_object",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "digest",
+        "instance_pointer": "/payload/schema/digest/hex"
+      }
+    },
+    {
+      "id": "wire-command.invalid.command-schema-binding",
+      "instance": "invalid/wire-command.command-schema-binding.json",
+      "schema_ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/WireCommandEnvelope",
+      "validation_layer": "typed_object",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "commandSchemaBinding",
+        "instance_pointer": "/payload/schema"
+      }
+    },
+    {
+      "id": "command-receipt.invalid.result-and-error",
+      "instance": "invalid/command-receipt.result-and-error.json",
+      "schema_ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/CommandReceipt",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "not",
+        "instance_pointer": ""
+      }
+    },
+    {
+      "id": "command-receipt.invalid.accepted-empty-streams",
+      "instance": "invalid/command-receipt.accepted-empty-streams.json",
+      "schema_ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/CommandReceipt",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "minProperties",
+        "instance_pointer": "/stream_positions"
+      }
+    },
+    {
+      "id": "command-receipt.invalid.indeterminate-same-command",
+      "instance": "invalid/command-receipt.indeterminate-same-command.json",
+      "schema_ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/CommandReceipt",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "const",
+        "instance_pointer": "/error/retry/mode"
+      }
+    },
+    {
+      "id": "secret-ref.invalid.inline-value",
+      "instance": "invalid/secret-ref.inline-value.json",
+      "schema_ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/SecretRef",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "additionalProperties",
+        "instance_pointer": ""
+      }
+    },
+    {
+      "id": "artifact-ref.invalid.storage-uri",
+      "instance": "invalid/artifact-ref.storage-uri.json",
+      "schema_ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/ArtifactRef",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "additionalProperties",
+        "instance_pointer": ""
+      }
+    },
+    {
+      "id": "resource-ref.invalid.uuid4",
+      "instance": "invalid/resource-ref.uuid4.json",
+      "schema_ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/ResourceRef",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "pattern",
+        "instance_pointer": "/id"
+      }
+    },
+    {
+      "id": "resource-ref.invalid.kind-claim",
+      "instance": "invalid/resource-ref.kind-claim.json",
+      "schema_ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/ResourceRef",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "additionalProperties",
+        "instance_pointer": ""
+      }
+    },
+    {
+      "id": "resource-ref.invalid.unregistered-prefix",
+      "instance": "invalid/resource-ref.unregistered-prefix.json",
+      "schema_ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/ResourceRef",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "pattern",
+        "instance_pointer": "/id"
+      }
+    },
+    {
+      "id": "domain-error.invalid.timestamp-offset",
+      "instance": "invalid/domain-error.timestamp-offset.json",
+      "schema_ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/DomainError",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "pattern",
+        "instance_pointer": "/recorded_at"
+      }
+    },
+    {
+      "id": "artifact-ref.invalid.uppercase-digest",
+      "instance": "invalid/artifact-ref.uppercase-digest.json",
+      "schema_ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/ArtifactRef",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "pattern",
+        "instance_pointer": "/digest/hex"
+      }
+    },
+    {
+      "id": "artifact-ref.invalid.retention-policy",
+      "instance": "invalid/artifact-ref.retention-policy.json",
+      "schema_ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/ArtifactRef",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "additionalProperties",
+        "instance_pointer": "/data_handling"
+      }
+    },
+    {
+      "id": "artifact-ref.invalid.privacy-order",
+      "instance": "invalid/artifact-ref.privacy-order.json",
+      "schema_ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/ArtifactRef",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "oneOf",
+        "instance_pointer": "/data_handling/privacy_labels"
+      }
+    },
+    {
+      "id": "semver.invalid.leading-zero-prerelease",
+      "instance": "invalid/semver.leading-zero-prerelease.json",
+      "schema_ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/SemVer",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "pattern",
+        "instance_pointer": ""
+      }
+    },
+    {
+      "id": "trace-context.invalid.zero-trace-id",
+      "instance": "invalid/trace-context.zero-trace-id.json",
+      "schema_ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/TraceContext",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "not",
+        "instance_pointer": "/traceparent"
+      }
+    },
+    {
+      "id": "inline-bytes.invalid.noncanonical-length",
+      "instance": "invalid/inline-bytes.noncanonical-length.json",
+      "schema_ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/InlineBytes",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "pattern",
+        "instance_pointer": "/data"
+      }
+    },
+    {
+      "id": "inline-bytes.invalid.size-mismatch",
+      "instance": "invalid/inline-bytes.size-mismatch.json",
+      "schema_ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/InlineBytes",
+      "validation_layer": "semantic",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "decodedSize",
+        "instance_pointer": "/size_bytes"
+      }
+    },
+    {
+      "id": "inline-bytes.invalid.digest-mismatch",
+      "instance": "invalid/inline-bytes.digest-mismatch.json",
+      "schema_ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/InlineBytes",
+      "validation_layer": "semantic",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "digest",
+        "instance_pointer": "/digest/hex"
+      }
+    },
+    {
+      "id": "capability-set.invalid.unsorted",
+      "instance": "invalid/capability-set.unsorted.json",
+      "schema_ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/CapabilitySet",
+      "validation_layer": "semantic",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "canonicalOrder",
+        "instance_pointer": ""
+      }
+    },
+    {
+      "id": "schema-ref.invalid.plugin-namespace",
+      "instance": "invalid/schema-ref.plugin-namespace.json",
+      "schema_ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/SchemaRef",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "pattern",
+        "instance_pointer": "/name"
+      }
+    },
+    {
+      "id": "capability-set.invalid.plugin-namespace",
+      "instance": "invalid/capability-set.plugin-namespace.json",
+      "schema_ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/CapabilitySet",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "pattern",
+        "instance_pointer": "/0"
+      }
+    }
+  ]
+}

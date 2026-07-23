@@ -1,0 +1,23 @@
+{
+  "schema": {
+    "name": "mug.api-14.tool-result",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "0dc762fe68b24cf27065b570c468a76323514d650016cd5b4d87150732766941"
+    }
+  },
+  "tool_call_id": "toolcall_019b6000-0000-7000-8000-000000000e01",
+  "outcome": "executed",
+  "effect": "mutating",
+  "approval_required": true,
+  "approval_digest": {
+    "algorithm": "sha-256",
+    "hex": "c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1"
+  },
+  "result_digest": {
+    "algorithm": "sha-256",
+    "hex": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1"
+  },
+  "executed_at": "2026-08-02T12:20:05.000000Z"
+}

@@ -1,0 +1,17 @@
+{
+  "schema": {
+    "name": "mug.api-06.connection-lease",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "538a17e390be96543227d1cdef37274dbf0e59d1c10c457f3c3f428be182dc02"
+    }
+  },
+  "lease": {
+    "lease_id": "lease_019b6000-0000-7000-8000-000000000450",
+    "namespace_epoch_id": "leaseepoch_019b6000-0000-7000-8000-000000000451"
+  },
+  "interaction_id": "interaction_019b6000-0000-7000-8000-000000000420",
+  "actor_id": "actor_019b6000-0000-7000-8000-000000000410",
+  "expires_at": "2026-08-02T12:30:00.000000Z"
+}

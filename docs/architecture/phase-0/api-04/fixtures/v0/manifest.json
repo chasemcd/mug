@@ -1,0 +1,224 @@
+{
+  "schema": {
+    "name": "mug.api-04.fixture-manifest",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "5985bd0df049a1a3fa2fc730e66fe0fe89c7a49038e40d1ce07a46f6a0fea161"
+    }
+  },
+  "manifest_version": "0.3.0",
+  "suite": "api-04-visit-plan",
+  "contract_version": 0,
+  "cases": [
+    {
+      "id": "visit.valid.minimal-static",
+      "instance": "valid/visit.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-04.visit-plan:0#/$defs/Visit",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "visit-plan.valid.minimal-static",
+      "instance": "valid/visit-plan.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-04.visit-plan:0#/$defs/VisitPlan",
+      "expect": "valid",
+      "validation_layer": "semantic"
+    },
+    {
+      "id": "treatment-plan.valid.inline-cast",
+      "instance": "valid/treatment-plan.inline-cast.json",
+      "schema_ref": "urn:mug:schema:mug.api-04.visit-plan:0#/$defs/TreatmentPlan",
+      "expect": "valid",
+      "validation_layer": "semantic"
+    },
+    {
+      "id": "treatment-plan.valid.shared-crossed",
+      "instance": "valid/treatment-plan.shared-crossed.json",
+      "schema_ref": "urn:mug:schema:mug.api-04.visit-plan:0#/$defs/TreatmentPlan",
+      "expect": "valid",
+      "validation_layer": "semantic"
+    },
+    {
+      "id": "treatment-assignment.valid.participant",
+      "instance": "valid/treatment-assignment.participant.json",
+      "schema_ref": "urn:mug:schema:mug.api-04.visit-plan:0#/$defs/TreatmentAssignment",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "treatment-assignment.valid.group-scope",
+      "instance": "valid/treatment-assignment.group-scope.json",
+      "schema_ref": "urn:mug:schema:mug.api-04.visit-plan:0#/$defs/TreatmentAssignment",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "treatment-exposure.valid.minimal-static",
+      "instance": "valid/treatment-exposure.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-04.visit-plan:0#/$defs/TreatmentExposure",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "allocation-state.valid.minimal",
+      "instance": "valid/allocation-state.minimal.json",
+      "schema_ref": "urn:mug:schema:mug.api-04.visit-plan:0#/$defs/AllocationState",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "state-document.valid.minimal-static",
+      "instance": "valid/state-document.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-04.visit-plan:0#/$defs/StateDocument",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "visit-plan.invalid.dup-ordinal",
+      "instance": "invalid/visit-plan.dup-ordinal.json",
+      "schema_ref": "urn:mug:schema:mug.api-04.visit-plan:0#/$defs/VisitPlan",
+      "expect": "invalid",
+      "validation_layer": "semantic",
+      "expected_error": {
+        "keyword": "duplicateOrdinal",
+        "instance_pointer": "/activities/1/ordinal"
+      }
+    },
+    {
+      "id": "visit.invalid.missing-deployment",
+      "instance": "invalid/visit.missing-deployment.json",
+      "schema_ref": "urn:mug:schema:mug.api-04.visit-plan:0#/$defs/Visit",
+      "expect": "invalid",
+      "validation_layer": "schema",
+      "expected_error": {
+        "keyword": "required",
+        "instance_pointer": ""
+      }
+    },
+    {
+      "id": "treatment-exposure.invalid.missing-occurrence",
+      "instance": "invalid/treatment-exposure.missing-occurrence.json",
+      "schema_ref": "urn:mug:schema:mug.api-04.visit-plan:0#/$defs/TreatmentExposure",
+      "expect": "invalid",
+      "validation_layer": "schema",
+      "expected_error": {
+        "keyword": "required",
+        "instance_pointer": ""
+      }
+    },
+    {
+      "id": "treatment-assignment.invalid.with-occurrence",
+      "instance": "invalid/treatment-assignment.with-occurrence.json",
+      "schema_ref": "urn:mug:schema:mug.api-04.visit-plan:0#/$defs/TreatmentAssignment",
+      "expect": "invalid",
+      "validation_layer": "schema",
+      "expected_error": {
+        "keyword": "additionalProperties",
+        "instance_pointer": ""
+      }
+    },
+    {
+      "id": "treatment-assignment.invalid.group-missing-group",
+      "instance": "invalid/treatment-assignment.group-missing-group.json",
+      "schema_ref": "urn:mug:schema:mug.api-04.visit-plan:0#/$defs/TreatmentAssignment",
+      "expect": "invalid",
+      "validation_layer": "schema",
+      "expected_error": {
+        "keyword": "required",
+        "instance_pointer": ""
+      }
+    },
+    {
+      "id": "state-document.invalid.bad-namespace",
+      "instance": "invalid/state-document.bad-namespace.json",
+      "schema_ref": "urn:mug:schema:mug.api-04.visit-plan:0#/$defs/StateDocument",
+      "expect": "invalid",
+      "validation_layer": "schema",
+      "expected_error": {
+        "keyword": "pattern",
+        "instance_pointer": "/namespace"
+      }
+    },
+    {
+      "id": "treatment-plan.invalid.balanced-missing-unit",
+      "instance": "invalid/treatment-plan.balanced-missing-unit.json",
+      "schema_ref": "urn:mug:schema:mug.api-04.visit-plan:0#/$defs/TreatmentPlan",
+      "expect": "invalid",
+      "validation_layer": "schema",
+      "expected_error": {
+        "keyword": "required",
+        "instance_pointer": "/placements/0/treatment/assign"
+      }
+    },
+    {
+      "id": "treatment-plan.invalid.empty-levels",
+      "instance": "invalid/treatment-plan.empty-levels.json",
+      "schema_ref": "urn:mug:schema:mug.api-04.visit-plan:0#/$defs/TreatmentPlan",
+      "expect": "invalid",
+      "validation_layer": "schema",
+      "expected_error": {
+        "keyword": "minItems",
+        "instance_pointer": "/placements/0/treatment/levels"
+      }
+    },
+    {
+      "id": "treatment-plan.invalid.dangling-ref",
+      "instance": "invalid/treatment-plan.dangling-ref.json",
+      "schema_ref": "urn:mug:schema:mug.api-04.visit-plan:0#/$defs/TreatmentPlan",
+      "expect": "invalid",
+      "validation_layer": "semantic",
+      "expected_error": {
+        "keyword": "danglingTreatmentRef",
+        "instance_pointer": "/placements/0/treatment/ref"
+      }
+    },
+    {
+      "id": "treatment-plan.invalid.unplaced-design-factor",
+      "instance": "invalid/treatment-plan.unplaced-design-factor.json",
+      "schema_ref": "urn:mug:schema:mug.api-04.visit-plan:0#/$defs/TreatmentPlan",
+      "expect": "invalid",
+      "validation_layer": "semantic",
+      "expected_error": {
+        "keyword": "unplacedDesignFactor",
+        "instance_pointer": "/design/cross/1"
+      }
+    },
+    {
+      "id": "eligibility-callback.valid.default-fail-closed",
+      "instance": "valid/eligibility-callback.default-fail-closed.json",
+      "schema_ref": "urn:mug:schema:mug.api-04.visit-plan:0#/$defs/EligibilityCallback",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "eligibility-callback.valid.explicit-fail-open",
+      "instance": "valid/eligibility-callback.explicit-fail-open.json",
+      "schema_ref": "urn:mug:schema:mug.api-04.visit-plan:0#/$defs/EligibilityCallback",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "eligibility-callback.invalid.bad-on-error",
+      "instance": "invalid/eligibility-callback.bad-on-error.json",
+      "schema_ref": "urn:mug:schema:mug.api-04.visit-plan:0#/$defs/EligibilityCallback",
+      "expect": "invalid",
+      "validation_layer": "schema",
+      "expected_error": {
+        "keyword": "enum",
+        "instance_pointer": "/on_error"
+      }
+    },
+    {
+      "id": "eligibility-callback.invalid.malformed-callback",
+      "instance": "invalid/eligibility-callback.malformed-callback.json",
+      "schema_ref": "urn:mug:schema:mug.api-04.visit-plan:0#/$defs/EligibilityCallback",
+      "expect": "invalid",
+      "validation_layer": "schema",
+      "expected_error": {
+        "keyword": "pattern",
+        "instance_pointer": "/callback"
+      }
+    }
+  ]
+}

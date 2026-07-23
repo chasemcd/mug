@@ -1,0 +1,24 @@
+{
+  "schema": {
+    "name": "mug.api-13.provider-response",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "4d5daed964741e873a261d06732f45e8d4342562325528d4824d7d1ab9915cdc"
+    }
+  },
+  "modelcall_id": "modelcall_019b6000-0000-7000-8000-000000000c01",
+  "generation_id": "generation_019b6000-0000-7000-8000-000000000c10",
+  "outcome": "maybe",
+  "resolved_model": "vendor-chat-mini-2026-05",
+  "usage": {
+    "input_tokens": 320,
+    "output_tokens": 96,
+    "cost_micros": 1400
+  },
+  "output_digest": {
+    "algorithm": "sha-256",
+    "hex": "c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1"
+  },
+  "completed_at": "2026-08-02T12:05:00.900000Z"
+}

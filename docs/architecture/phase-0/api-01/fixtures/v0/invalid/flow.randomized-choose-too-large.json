@@ -1,0 +1,45 @@
+{
+  "entry_node_id": "flownode_019b6000-0000-7000-8000-000000000102",
+  "nodes": [
+    {
+      "node_id": "flownode_019b6000-0000-7000-8000-000000000102",
+      "key": "root",
+      "kind": "randomized_select",
+      "choices": [
+        "flownode_019b6000-0000-7000-8000-000000000104"
+      ],
+      "choose": 2,
+      "rule": {
+        "schema": {
+          "name": "mug.fixture.terminal-action",
+          "version": 0,
+          "digest": {
+            "algorithm": "sha-256",
+            "hex": "0f2e2d078bfee32773d4ceeb67e0dc127df1d5babfee46d9d877f7a2889282be"
+          }
+        },
+        "data": {
+          "outcome": "complete"
+        }
+      }
+    },
+    {
+      "node_id": "flownode_019b6000-0000-7000-8000-000000000104",
+      "key": "finish",
+      "kind": "terminal",
+      "terminal": {
+        "schema": {
+          "name": "mug.fixture.terminal-action",
+          "version": 0,
+          "digest": {
+            "algorithm": "sha-256",
+            "hex": "0f2e2d078bfee32773d4ceeb67e0dc127df1d5babfee46d9d877f7a2889282be"
+          }
+        },
+        "data": {
+          "outcome": "complete"
+        }
+      }
+    }
+  ]
+}

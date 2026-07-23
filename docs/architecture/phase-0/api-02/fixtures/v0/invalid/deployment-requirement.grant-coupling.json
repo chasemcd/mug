@@ -1,0 +1,49 @@
+{
+  "schema": {
+    "name": "mug.api-02.deployment-requirement",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "4fe71236a986f298966abe5ed4a6e9d1b53121a6b22de829eeb9a52826e09825"
+    }
+  },
+  "data": {
+    "secret_requirements": [
+      {
+        "requirement_key": "chat-provider-key",
+        "purpose": "provider-credential",
+        "optional": false
+      },
+      {
+        "requirement_key": "webhook-token",
+        "purpose": "integration-token",
+        "optional": true
+      }
+    ],
+    "execution_slots": [
+      {
+        "slot": "game-server",
+        "runtime": "server"
+      },
+      {
+        "slot": "participant-shell",
+        "runtime": "browser"
+      }
+    ],
+    "provider_adapters": [
+      {
+        "adapter_key": "chat-llm",
+        "provider_class": "openai-compatible"
+      }
+    ],
+    "region_policy": {
+      "allowed_regions": [
+        "us-east-1"
+      ],
+      "residency": "pinned"
+    },
+    "required_capabilities": [
+      "mug.client.protocol.v1"
+    ]
+  }
+}

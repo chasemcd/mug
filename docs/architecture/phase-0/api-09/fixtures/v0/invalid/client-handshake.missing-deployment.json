@@ -1,0 +1,16 @@
+{
+  "schema": {
+    "name": "mug.api-09.client-handshake",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "a687a1359b23e69f995ab8ccae6a335f99f87848c8dcd524cd4c3d92cfa0506a"
+    }
+  },
+  "launch_handle": "handle_AAAAAAAAAAAAAAAAAAAAAA",
+  "protocol_capabilities": [
+    "mug.client.protocol.v1",
+    "mug.client.bridge.v1"
+  ],
+  "client_build_slot": "participant-shell"
+}

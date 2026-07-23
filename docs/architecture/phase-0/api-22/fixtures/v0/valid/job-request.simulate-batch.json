@@ -1,0 +1,17 @@
+{
+  "schema": {
+    "name": "mug.api-22.job-request",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "df34b114612fea375a7a9e76da5b94bddf2bd5809da6a6277fe51b203e567c33"
+    }
+  },
+  "job_id": "job_019b6000-0000-7000-8000-000000000912",
+  "job_kind": "simulate-batch",
+  "work_key": {
+    "algorithm": "sha-256",
+    "hex": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  },
+  "submitted_at": "2026-08-02T13:00:00.000000Z"
+}

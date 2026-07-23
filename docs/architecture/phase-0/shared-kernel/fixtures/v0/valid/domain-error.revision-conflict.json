@@ -1,0 +1,38 @@
+{
+  "schema": {
+    "name": "mug.domain-error",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "f675d9ec1f6258719da93a507421689b26babf69d36503c7df90b5039e238d6d"
+    }
+  },
+  "error_id": "error_019b5ed9-14ec-7f51-89c9-d42db811f044",
+  "request_id": "request_019b5ed0-14ec-7f51-89c9-d42db811f03b",
+  "recorded_at": "2026-07-17T14:22:31.440000Z",
+  "command": {
+    "name": "preference.response.submit",
+    "version": 0
+  },
+  "code": "command.revision_conflict",
+  "category": "conflict",
+  "safe_message": "The assignment changed. Refresh it before submitting again.",
+  "retry": {
+    "mode": "refresh_then_new_command"
+  },
+  "details": {
+    "schema": {
+      "name": "mug.error.command-revision-conflict-details",
+      "version": 0,
+      "digest": {
+        "algorithm": "sha-256",
+        "hex": "f55aa68443d9fc110655dfe412abdf6c1131f81917c7f9236c3f1ff2da55309e"
+      }
+    },
+    "data": {
+      "expected_revision": 3,
+      "current_revision": 4
+    }
+  },
+  "support_reference": "error_019b5ed9-14ec-7f51-89c9-d42db811f044"
+}

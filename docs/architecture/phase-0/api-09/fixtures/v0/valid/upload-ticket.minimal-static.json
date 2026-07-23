@@ -1,0 +1,15 @@
+{
+  "schema": {
+    "name": "mug.api-09.upload-ticket",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "a687a1359b23e69f995ab8ccae6a335f99f87848c8dcd524cd4c3d92cfa0506a"
+    }
+  },
+  "upload_id": "upload_019b6000-0000-7000-8000-000000000720",
+  "grant_handle": "handle_AAAAAAAAAAAAAAAAAAAAAA",
+  "media_type": "image/png",
+  "max_size_bytes": 1048576,
+  "expires_at": "2026-08-02T12:30:00.000000Z"
+}

@@ -1,0 +1,1009 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:mug:schema:mug.api-04.visit-plan:0",
+  "title": "MUG API-04 Visit Plans, Treatment, Exposure, and State contracts, version 0",
+  "$defs": {
+    "AuthoringKey": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(?:[-_.][a-z0-9]+)*$",
+      "maxLength": 128
+    },
+    "QualifiedName": {
+      "type": "string",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*)*:[A-Za-z_][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*)*$",
+      "maxLength": 512
+    },
+    "FieldRef": {
+      "type": "object",
+      "required": [
+        "activity_key",
+        "field_key"
+      ],
+      "properties": {
+        "activity_key": {
+          "$ref": "#/$defs/AuthoringKey"
+        },
+        "field_key": {
+          "$ref": "#/$defs/AuthoringKey"
+        }
+      },
+      "additionalProperties": false
+    },
+    "AssignPolicy": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "policy"
+          ],
+          "properties": {
+            "policy": {
+              "const": "random"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "policy",
+            "unit"
+          ],
+          "properties": {
+            "policy": {
+              "const": "balanced"
+            },
+            "unit": {
+              "enum": [
+                "groups",
+                "participants"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "policy"
+          ],
+          "properties": {
+            "policy": {
+              "const": "blocked"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "policy",
+            "by"
+          ],
+          "properties": {
+            "policy": {
+              "const": "stratified"
+            },
+            "by": {
+              "$ref": "#/$defs/FieldRef"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "Treatment": {
+      "type": "object",
+      "required": [
+        "key",
+        "levels",
+        "assign",
+        "scope"
+      ],
+      "properties": {
+        "key": {
+          "$ref": "#/$defs/AuthoringKey"
+        },
+        "levels": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AuthoringKey"
+          },
+          "minItems": 1,
+          "maxItems": 64,
+          "uniqueItems": true
+        },
+        "assign": {
+          "$ref": "#/$defs/AssignPolicy"
+        },
+        "scope": {
+          "enum": [
+            "participant",
+            "group"
+          ]
+        },
+        "within": {
+          "type": "boolean"
+        },
+        "order": {
+          "enum": [
+            "randomized",
+            "counterbalanced"
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "if": {
+        "required": [
+          "within"
+        ],
+        "properties": {
+          "within": {
+            "const": true
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "order"
+        ]
+      },
+      "else": {
+        "not": {
+          "required": [
+            "order"
+          ]
+        }
+      }
+    },
+    "TreatmentRef": {
+      "type": "object",
+      "required": [
+        "ref"
+      ],
+      "properties": {
+        "ref": {
+          "$ref": "#/$defs/AuthoringKey"
+        }
+      },
+      "additionalProperties": false
+    },
+    "PlacementSite": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "kind",
+            "activity_key",
+            "seat_key"
+          ],
+          "properties": {
+            "kind": {
+              "const": "cast-slot"
+            },
+            "activity_key": {
+              "$ref": "#/$defs/AuthoringKey"
+            },
+            "seat_key": {
+              "$ref": "#/$defs/AuthoringKey"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "kind",
+            "activity_key",
+            "parameter_key"
+          ],
+          "properties": {
+            "kind": {
+              "const": "parameter"
+            },
+            "activity_key": {
+              "$ref": "#/$defs/AuthoringKey"
+            },
+            "parameter_key": {
+              "$ref": "#/$defs/AuthoringKey"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "TreatmentPlacement": {
+      "type": "object",
+      "required": [
+        "site",
+        "treatment"
+      ],
+      "properties": {
+        "site": {
+          "$ref": "#/$defs/PlacementSite"
+        },
+        "treatment": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/Treatment"
+            },
+            {
+              "$ref": "#/$defs/TreatmentRef"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "Design": {
+      "type": "object",
+      "required": [
+        "cross",
+        "assign"
+      ],
+      "properties": {
+        "cross": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AuthoringKey"
+          },
+          "minItems": 2,
+          "maxItems": 16,
+          "uniqueItems": true
+        },
+        "assign": {
+          "$ref": "#/$defs/AssignPolicy"
+        }
+      },
+      "additionalProperties": false
+    },
+    "TreatmentPlanSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-04.treatment-plan"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "TreatmentPlan": {
+      "type": "object",
+      "required": [
+        "schema",
+        "study_version",
+        "shared_treatments",
+        "placements"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/TreatmentPlanSchemaRef"
+        },
+        "study_version": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/StudyVersionRef"
+        },
+        "shared_treatments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Treatment"
+          },
+          "maxItems": 64
+        },
+        "placements": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TreatmentPlacement"
+          },
+          "minItems": 1,
+          "maxItems": 256
+        },
+        "design": {
+          "$ref": "#/$defs/Design"
+        }
+      },
+      "additionalProperties": false
+    },
+    "VisitSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-04.visit"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "Visit": {
+      "type": "object",
+      "required": [
+        "schema",
+        "visit_id",
+        "enrollment_id",
+        "study_id",
+        "study_version",
+        "deployment",
+        "status",
+        "version"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/VisitSchemaRef"
+        },
+        "visit_id": {
+          "type": "string",
+          "pattern": "^visit_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "enrollment_id": {
+          "type": "string",
+          "pattern": "^enrollment_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "study_id": {
+          "type": "string",
+          "pattern": "^study_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "study_version": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/StudyVersionRef"
+        },
+        "deployment": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/DeploymentRevisionRef"
+        },
+        "status": {
+          "enum": [
+            "created",
+            "in-progress",
+            "completed",
+            "abandoned"
+          ]
+        },
+        "version": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/VersionStamp"
+        }
+      },
+      "additionalProperties": false
+    },
+    "RandomizationOutcome": {
+      "type": "object",
+      "required": [
+        "flow_node_id",
+        "rule_key",
+        "chosen",
+        "seed_commitment"
+      ],
+      "properties": {
+        "flow_node_id": {
+          "type": "string",
+          "pattern": "^flownode_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "rule_key": {
+          "$ref": "#/$defs/AuthoringKey"
+        },
+        "chosen": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AuthoringKey"
+          },
+          "minItems": 1,
+          "maxItems": 64
+        },
+        "seed_commitment": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "PlannedActivity": {
+      "type": "object",
+      "required": [
+        "occurrence_id",
+        "activity_definition_id",
+        "flow_node_id",
+        "ordinal",
+        "status",
+        "parameter_digest"
+      ],
+      "properties": {
+        "occurrence_id": {
+          "type": "string",
+          "pattern": "^activity_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "activity_definition_id": {
+          "type": "string",
+          "pattern": "^activitydef_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "flow_node_id": {
+          "type": "string",
+          "pattern": "^flownode_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "ordinal": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/NonNegativeSafeInteger"
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "active",
+            "completed",
+            "skipped"
+          ]
+        },
+        "parameter_digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "EligibilityCallbackSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-04.eligibility-callback"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "EligibilityCallback": {
+      "description": "A flow-level screening/eligibility callback (ADR-0014 flow-based eligibility) owned by API-04. It is evaluated server-side at a flow node, addressed by the qualified name of a study-repo callable, to admit or exclude a participant before or at a flow step. On callback error or timeout the default is `fail_closed` (exclude/block); an author may explicitly opt into `fail_open`. This flow-level screening is distinct from API-06 `MonitoringPolicy` continuous in-play exclusion, which removes an already-admitted participant during an interaction; that continuous concern is owned by API-06 and is not encoded here.",
+      "type": "object",
+      "required": [
+        "schema",
+        "flow_node_id",
+        "rule_key",
+        "callback"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/EligibilityCallbackSchemaRef"
+        },
+        "flow_node_id": {
+          "type": "string",
+          "pattern": "^flownode_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "rule_key": {
+          "$ref": "#/$defs/AuthoringKey"
+        },
+        "callback": {
+          "$ref": "#/$defs/QualifiedName"
+        },
+        "on_error": {
+          "enum": [
+            "fail_closed",
+            "fail_open"
+          ],
+          "default": "fail_closed"
+        }
+      },
+      "additionalProperties": false
+    },
+    "VisitPlanSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-04.visit-plan"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "VisitPlan": {
+      "type": "object",
+      "required": [
+        "schema",
+        "visit_id",
+        "study_version",
+        "plan_digest",
+        "activities",
+        "randomization_outcomes",
+        "materialized_at"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/VisitPlanSchemaRef"
+        },
+        "visit_id": {
+          "type": "string",
+          "pattern": "^visit_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "study_version": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/StudyVersionRef"
+        },
+        "plan_digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        },
+        "activities": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/PlannedActivity"
+          },
+          "minItems": 1,
+          "maxItems": 1024
+        },
+        "randomization_outcomes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/RandomizationOutcome"
+          },
+          "maxItems": 256
+        },
+        "eligibility": {
+          "description": "Flow-level screening/eligibility callbacks evaluated server-side at flow nodes (fail-closed by default). Distinct from API-06 continuous in-play monitoring exclusion.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/EligibilityCallback"
+          },
+          "maxItems": 256
+        },
+        "materialized_at": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/UtcInstant"
+        }
+      },
+      "additionalProperties": false
+    },
+    "TreatmentAssignmentSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-04.treatment-assignment"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "TreatmentAssignment": {
+      "type": "object",
+      "required": [
+        "schema",
+        "treatment_key",
+        "level_key",
+        "scope",
+        "assigned_at",
+        "assignment_digest"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/TreatmentAssignmentSchemaRef"
+        },
+        "treatment_key": {
+          "$ref": "#/$defs/AuthoringKey"
+        },
+        "level_key": {
+          "$ref": "#/$defs/AuthoringKey"
+        },
+        "scope": {
+          "enum": [
+            "participant",
+            "group"
+          ]
+        },
+        "visit_id": {
+          "type": "string",
+          "pattern": "^visit_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "group_id": {
+          "type": "string",
+          "pattern": "^group_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "assigned_at": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/UtcInstant"
+        },
+        "assignment_digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false,
+      "if": {
+        "required": [
+          "scope"
+        ],
+        "properties": {
+          "scope": {
+            "const": "group"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "group_id"
+        ],
+        "not": {
+          "required": [
+            "visit_id"
+          ]
+        }
+      },
+      "else": {
+        "required": [
+          "visit_id"
+        ],
+        "not": {
+          "required": [
+            "group_id"
+          ]
+        }
+      }
+    },
+    "TreatmentExposureSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-04.treatment-exposure"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "TreatmentExposure": {
+      "type": "object",
+      "required": [
+        "schema",
+        "visit_id",
+        "treatment_key",
+        "level_key",
+        "occurrence_id",
+        "exposed_at",
+        "exposure_digest"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/TreatmentExposureSchemaRef"
+        },
+        "visit_id": {
+          "type": "string",
+          "pattern": "^visit_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "treatment_key": {
+          "$ref": "#/$defs/AuthoringKey"
+        },
+        "level_key": {
+          "$ref": "#/$defs/AuthoringKey"
+        },
+        "occurrence_id": {
+          "type": "string",
+          "pattern": "^activity_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "exposed_at": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/UtcInstant"
+        },
+        "exposure_digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "CellLevel": {
+      "type": "object",
+      "required": [
+        "treatment_key",
+        "level_key"
+      ],
+      "properties": {
+        "treatment_key": {
+          "$ref": "#/$defs/AuthoringKey"
+        },
+        "level_key": {
+          "$ref": "#/$defs/AuthoringKey"
+        }
+      },
+      "additionalProperties": false
+    },
+    "AllocationCellCount": {
+      "type": "object",
+      "required": [
+        "cell",
+        "groups",
+        "participants"
+      ],
+      "properties": {
+        "cell": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CellLevel"
+          },
+          "minItems": 1,
+          "maxItems": 16
+        },
+        "groups": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/NonNegativeSafeInteger"
+        },
+        "participants": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/NonNegativeSafeInteger"
+        }
+      },
+      "additionalProperties": false
+    },
+    "AllocationStateSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-04.allocation-state"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "AllocationState": {
+      "type": "object",
+      "required": [
+        "schema",
+        "study_version",
+        "cells",
+        "version"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/AllocationStateSchemaRef"
+        },
+        "study_version": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/StudyVersionRef"
+        },
+        "cells": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AllocationCellCount"
+          },
+          "maxItems": 4096
+        },
+        "version": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/VersionStamp"
+        }
+      },
+      "additionalProperties": false
+    },
+    "StateDocumentSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-04.state-document"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "StateDocument": {
+      "type": "object",
+      "required": [
+        "schema",
+        "visit_id",
+        "namespace",
+        "content_schema",
+        "content_digest",
+        "version"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/StateDocumentSchemaRef"
+        },
+        "visit_id": {
+          "type": "string",
+          "pattern": "^visit_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "namespace": {
+          "$ref": "#/$defs/AuthoringKey"
+        },
+        "content_schema": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/SchemaRef"
+        },
+        "content_digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        },
+        "version": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/VersionStamp"
+        }
+      },
+      "additionalProperties": false
+    },
+    "FixtureManifestSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-04.fixture-manifest"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "FixtureCase": {
+      "type": "object",
+      "required": [
+        "id",
+        "instance",
+        "schema_ref",
+        "expect"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)+$",
+          "maxLength": 160
+        },
+        "instance": {
+          "type": "string",
+          "pattern": "^(?:valid|invalid)/[a-z0-9][a-z0-9._-]*\\.json$",
+          "maxLength": 256
+        },
+        "schema_ref": {
+          "type": "string",
+          "pattern": "^urn:mug:schema:mug\\.api-04\\.visit-plan:0#/\\$defs/[A-Za-z][A-Za-z0-9]*$",
+          "maxLength": 256
+        },
+        "validation_layer": {
+          "enum": [
+            "schema",
+            "semantic"
+          ]
+        },
+        "expect": {
+          "enum": [
+            "valid",
+            "invalid"
+          ]
+        },
+        "expected_error": {
+          "type": "object",
+          "required": [
+            "keyword",
+            "instance_pointer"
+          ],
+          "properties": {
+            "keyword": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "maxLength": 96
+            },
+            "instance_pointer": {
+              "type": "string",
+              "pattern": "^(?:/[^/]+)*$",
+              "maxLength": 256
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false,
+      "if": {
+        "required": [
+          "expect"
+        ],
+        "properties": {
+          "expect": {
+            "const": "invalid"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "expected_error"
+        ]
+      },
+      "else": {
+        "not": {
+          "required": [
+            "expected_error"
+          ]
+        }
+      }
+    },
+    "FixtureManifest": {
+      "type": "object",
+      "required": [
+        "schema",
+        "manifest_version",
+        "suite",
+        "contract_version",
+        "cases"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/FixtureManifestSchemaRef"
+        },
+        "manifest_version": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/SemVer"
+        },
+        "suite": {
+          "const": "api-04-visit-plan"
+        },
+        "contract_version": {
+          "const": 0
+        },
+        "cases": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/FixtureCase"
+          },
+          "minItems": 1,
+          "maxItems": 512
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

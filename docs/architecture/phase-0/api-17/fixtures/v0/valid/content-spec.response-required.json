@@ -1,0 +1,24 @@
+{
+  "schema": {
+    "name": "mug.api-17.content-spec",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "63d889325b5004a974527cd9401c5819a22dbcf385c573d7cfad70595313c86f"
+    }
+  },
+  "content_key": "consent",
+  "body": {
+    "origin": "author",
+    "source": "file",
+    "format": "markdown",
+    "executable": false,
+    "path": "content/consent.md",
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4"
+    }
+  },
+  "response_required": true,
+  "version": 1
+}

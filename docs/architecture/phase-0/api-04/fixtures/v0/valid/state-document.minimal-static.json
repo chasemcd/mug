@@ -1,0 +1,28 @@
+{
+  "schema": {
+    "name": "mug.api-04.state-document",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "5985bd0df049a1a3fa2fc730e66fe0fe89c7a49038e40d1ce07a46f6a0fea161"
+    }
+  },
+  "visit_id": "visit_019b6000-0000-7000-8000-000000000090",
+  "namespace": "game-progress",
+  "content_schema": {
+    "name": "mug.state.game-progress",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3"
+    }
+  },
+  "content_digest": {
+    "algorithm": "sha-256",
+    "hex": "d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4"
+  },
+  "version": {
+    "revision": 7,
+    "etag": "sha256:e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3"
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "schema": {
+    "name": "mug.api-05.cast-declaration",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "df3da1e10ffec853c052c7188e617cd2f2f529876c19b86d852164ba97552c1f"
+    }
+  },
+  "activity_key": "foraging",
+  "seats": [
+    "forager-1",
+    "forager-2"
+  ],
+  "cast": {
+    "forager-1": {
+      "kind": "human"
+    },
+    "forager-2": {
+      "kind": "treatment",
+      "treatment_key": "partner",
+      "levels": {
+        "human": {
+          "kind": "human"
+        },
+        "ai": {
+          "kind": "agent",
+          "agent_ref": "llm-partner@2"
+        }
+      }
+    }
+  }
+}

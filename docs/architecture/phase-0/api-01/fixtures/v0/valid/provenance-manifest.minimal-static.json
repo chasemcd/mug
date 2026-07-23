@@ -1,0 +1,111 @@
+{
+  "schema": {
+    "name": "mug.study.provenance-manifest",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "96958cdf2ab34fd541208d2adcd17f0d2c7d43ee2c1f5e433d2c87e323e2d58f"
+    }
+  },
+  "compiler": {
+    "name": "mug-study-compiler",
+    "version": "0.1.0",
+    "artifact_digest": {
+      "algorithm": "sha-256",
+      "hex": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    "contract": {
+      "name": "mug.study.compiler-contract",
+      "version": 0,
+      "digest": {
+        "algorithm": "sha-256",
+        "hex": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      }
+    },
+    "normalization_profile": "mug-normalization-v0"
+  },
+  "source_git": {
+    "commit": "0123456789abcdef0123456789abcdef01234567",
+    "branch": "main",
+    "remote": "https://example.invalid/studies/minimal-static.git",
+    "dirty": false
+  },
+  "source_artifacts": [],
+  "dependency_artifacts": [],
+  "schema_bundle": {
+    "artifact_id": "artifact_019b6000-0000-7000-8000-000000000301",
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "size_bytes": 4096,
+    "media_type": "application/schema+json",
+    "content_encoding": "identity",
+    "data_handling": {
+      "privacy_labels": [
+        "research",
+        "sensitive"
+      ]
+    }
+  },
+  "transformations": [],
+  "projection_outputs": [
+    {
+      "role": "client",
+      "projection_key": "participant-default",
+      "projection": {
+        "manifest_schema": {
+          "name": "mug.study.client-manifest",
+          "version": 0,
+          "digest": {
+            "algorithm": "sha-256",
+            "hex": "96958cdf2ab34fd541208d2adcd17f0d2c7d43ee2c1f5e433d2c87e323e2d58f"
+          }
+        },
+        "content_digest": {
+          "algorithm": "sha-256",
+          "hex": "34227c83b5d96822a98030047fcf8cf7771fa3ebdab829d4d2612f58aaf39e54"
+        },
+        "size_bytes": 1023
+      },
+      "data_handling": {
+        "privacy_labels": [
+          "research"
+        ]
+      },
+      "retention_disposition": "retained"
+    },
+    {
+      "role": "server",
+      "projection": {
+        "manifest_schema": {
+          "name": "mug.study.server-manifest",
+          "version": 0,
+          "digest": {
+            "algorithm": "sha-256",
+            "hex": "96958cdf2ab34fd541208d2adcd17f0d2c7d43ee2c1f5e433d2c87e323e2d58f"
+          }
+        },
+        "content_digest": {
+          "algorithm": "sha-256",
+          "hex": "be5a9de8712b48b6d82e9ffb2ed66fe0fead6a1775faab4fa73f98c12921bc4f"
+        },
+        "size_bytes": 1217
+      },
+      "data_handling": {
+        "privacy_labels": [
+          "research",
+          "sensitive"
+        ]
+      },
+      "retention_disposition": "retained"
+    }
+  ],
+  "limitations": [],
+  "data_handling": {
+    "privacy_labels": [
+      "research",
+      "sensitive"
+    ]
+  }
+}

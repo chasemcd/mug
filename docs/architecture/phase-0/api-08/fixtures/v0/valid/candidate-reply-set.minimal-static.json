@@ -1,0 +1,19 @@
+{
+  "schema": {
+    "name": "mug.api-08.candidate-reply-set",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "0e305fb358b6d53126d9081ae36f078f18a683684f2bfe799a97197c3d549d4a"
+    }
+  },
+  "channel_key": "chat",
+  "prompt_message_id": "message_019b6000-0000-7000-8000-000000000a01",
+  "candidate_message_ids": [
+    "message_019b6000-0000-7000-8000-000000000b01",
+    "message_019b6000-0000-7000-8000-000000000b02"
+  ],
+  "selected_message_id": "message_019b6000-0000-7000-8000-000000000b01",
+  "preference_response_id": "prefresponse_019b6000-0000-7000-8000-000000000e01",
+  "recorded_at": "2026-08-02T12:05:02.000000Z"
+}

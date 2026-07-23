@@ -1,0 +1,21 @@
+{
+  "schema": {
+    "name": "mug.api-15.memory-proposal",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "a04cf73e88cd0e0b15725930fb0206cde24296e6b93159ed969a54cb8d49ac4e"
+    }
+  },
+  "memory_id": "mem_019b6000-0000-7000-8000-000000001001",
+  "scope_kind": "longitudinal",
+  "proposed_digest": {
+    "algorithm": "sha-256",
+    "hex": "a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2"
+  },
+  "base_version": {
+    "revision": 4,
+    "etag": "sha256:e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4"
+  },
+  "provenance_decision_id": "decision_019b6000-0000-7000-8000-000000000b01"
+}

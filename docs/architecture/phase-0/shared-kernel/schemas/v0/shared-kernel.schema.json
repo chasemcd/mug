@@ -1,0 +1,859 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:mug:schema:mug.shared-kernel:0",
+  "title": "MUG shared-kernel draft contracts",
+  "description": "Mutable Phase 0 proposal. Version 0 is forbidden in published, deployed, or archival records.",
+  "$defs": {
+    "SafeInteger": {
+      "type": "integer",
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991
+    },
+    "NonNegativeSafeInteger": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "PositiveSafeInteger": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "RegisteredMugId": {
+      "type": "string",
+      "pattern": "^(?:study|studyver|flownode|deploy|deployrev|participant|service|system|researcher|enrollment|visit|visitplan|activitydef|activity|seatdef|actor|controller|interaction|group|channeldef|channel|lease|leaseepoch|prodepoch|clockepoch|correlation|episode|message|stream|event|artifact|upload|agentdef|agentver|agentrun|promptdef|promptver|decision|modelcall|generation|tooldef|toolver|toolcall|memory|prefdef|prefver|prefquery|prefassign|prefresponse|secret|job|command|request|receipt|error)_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "maxLength": 61
+    },
+    "PublicHandle": {
+      "type": "string",
+      "pattern": "^handle_[A-Za-z0-9_-]{21}[AQgw]$",
+      "maxLength": 29
+    },
+    "CommandId": {
+      "type": "string",
+      "pattern": "^command_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "RequestId": {
+      "type": "string",
+      "pattern": "^request_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "ReceiptId": {
+      "type": "string",
+      "pattern": "^receipt_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "ErrorId": {
+      "type": "string",
+      "pattern": "^error_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "IdempotencyKey": {
+      "type": "string",
+      "pattern": "^idem_[A-Za-z0-9_-]{21}[AQgw]$",
+      "maxLength": 27
+    },
+    "SemVer": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(?:\\.(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$",
+      "maxLength": 128
+    },
+    "UtcInstant": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])T(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]\\.[0-9]{6}Z$"
+    },
+    "Duration": {
+      "type": "object",
+      "required": ["microseconds"],
+      "properties": {
+        "microseconds": { "$ref": "#/$defs/NonNegativeSafeInteger" }
+      },
+      "additionalProperties": false
+    },
+    "Digest": {
+      "type": "object",
+      "required": ["algorithm", "hex"],
+      "properties": {
+        "algorithm": { "const": "sha-256" },
+        "hex": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "SchemaName": {
+      "type": "string",
+      "pattern": "^mug(?:\\.[a-z][a-z0-9-]*)+$",
+      "maxLength": 160
+    },
+    "SchemaRef": {
+      "type": "object",
+      "required": ["name", "version", "digest"],
+      "properties": {
+        "name": { "$ref": "#/$defs/SchemaName" },
+        "version": { "$ref": "#/$defs/NonNegativeSafeInteger" },
+        "digest": { "$ref": "#/$defs/Digest" }
+      },
+      "additionalProperties": false
+    },
+    "TypedObject": {
+      "type": "object",
+      "required": ["schema", "data"],
+      "properties": {
+        "schema": { "$ref": "#/$defs/SchemaRef" },
+        "data": {
+          "type": "object",
+          "maxProperties": 256
+        }
+      },
+      "additionalProperties": false
+    },
+    "FixturePreferenceResponseSubmitPayload": {
+      "type": "object",
+      "required": ["candidate_id"],
+      "properties": {
+        "candidate_id": {
+          "type": "string",
+          "pattern": "^candidate-[1-9][0-9]*$",
+          "maxLength": 64
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "FixturePreferenceResponseSubmitResult": {
+      "type": "object",
+      "required": ["response_id"],
+      "properties": {
+        "response_id": {
+          "type": "string",
+          "pattern": "^prefresponse_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "FixtureRevisionConflictDetails": {
+      "type": "object",
+      "required": ["expected_revision", "current_revision"],
+      "properties": {
+        "expected_revision": { "$ref": "#/$defs/PositiveSafeInteger" },
+        "current_revision": { "$ref": "#/$defs/PositiveSafeInteger" }
+      },
+      "additionalProperties": false
+    },
+    "FixtureUnknownOutcomeDetails": {
+      "type": "object",
+      "required": ["reconciliation_reference"],
+      "properties": {
+        "reconciliation_reference": {
+          "type": "string",
+          "pattern": "^reconcile-synthetic-[1-9][0-9]*$",
+          "maxLength": 96
+        }
+      },
+      "additionalProperties": false
+    },
+    "FixtureEmptyObject": {
+      "type": "object",
+      "maxProperties": 0,
+      "additionalProperties": false
+    },
+    "CommandEnvelopeSchemaRef": {
+      "allOf": [
+        { "$ref": "#/$defs/SchemaRef" },
+        {
+          "type": "object",
+          "properties": {
+            "name": { "const": "mug.command-envelope" },
+            "version": { "const": 0 }
+          }
+        }
+      ]
+    },
+    "CommandReceiptSchemaRef": {
+      "allOf": [
+        { "$ref": "#/$defs/SchemaRef" },
+        {
+          "type": "object",
+          "properties": {
+            "name": { "const": "mug.command-receipt" },
+            "version": { "const": 0 }
+          }
+        }
+      ]
+    },
+    "DomainErrorSchemaRef": {
+      "allOf": [
+        { "$ref": "#/$defs/SchemaRef" },
+        {
+          "type": "object",
+          "properties": {
+            "name": { "const": "mug.domain-error" },
+            "version": { "const": 0 }
+          }
+        }
+      ]
+    },
+    "FixtureManifestSchemaRef": {
+      "allOf": [
+        { "$ref": "#/$defs/SchemaRef" },
+        {
+          "type": "object",
+          "properties": {
+            "name": { "const": "mug.fixture-manifest" },
+            "version": { "const": 0 }
+          }
+        }
+      ]
+    },
+    "CanonicalizationVectorsSchemaRef": {
+      "allOf": [
+        { "$ref": "#/$defs/SchemaRef" },
+        {
+          "type": "object",
+          "properties": {
+            "name": { "const": "mug.canonicalization-vectors" },
+            "version": { "const": 0 }
+          }
+        }
+      ]
+    },
+    "VersionStamp": {
+      "type": "object",
+      "required": ["revision", "etag"],
+      "properties": {
+        "revision": { "$ref": "#/$defs/PositiveSafeInteger" },
+        "etag": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "StudyVersionRef": {
+      "type": "object",
+      "required": ["study_id", "study_version_id", "version_number", "manifest_digest"],
+      "properties": {
+        "study_id": {
+          "type": "string",
+          "pattern": "^study_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "study_version_id": {
+          "type": "string",
+          "pattern": "^studyver_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "version_number": { "$ref": "#/$defs/PositiveSafeInteger" },
+        "manifest_digest": { "$ref": "#/$defs/Digest" }
+      },
+      "additionalProperties": false
+    },
+    "DeploymentRevisionRef": {
+      "type": "object",
+      "required": ["deployment_id", "deployment_revision_id", "revision_number", "study_version", "manifest_digest"],
+      "properties": {
+        "deployment_id": {
+          "type": "string",
+          "pattern": "^deploy_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "deployment_revision_id": {
+          "type": "string",
+          "pattern": "^deployrev_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "revision_number": { "$ref": "#/$defs/PositiveSafeInteger" },
+        "study_version": { "$ref": "#/$defs/StudyVersionRef" },
+        "manifest_digest": { "$ref": "#/$defs/Digest" }
+      },
+      "additionalProperties": false
+    },
+    "ResourceRef": {
+      "type": "object",
+      "required": ["id"],
+      "properties": {
+        "id": { "$ref": "#/$defs/RegisteredMugId" }
+      },
+      "additionalProperties": false
+    },
+    "PrincipalRef": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["kind", "id"],
+          "properties": {
+            "kind": { "const": "participant" },
+            "id": { "type": "string", "pattern": "^participant_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["kind", "id"],
+          "properties": {
+            "kind": { "const": "researcher" },
+            "id": { "type": "string", "pattern": "^researcher_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["kind", "id"],
+          "properties": {
+            "kind": { "const": "service" },
+            "id": { "type": "string", "pattern": "^service_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["kind", "id"],
+          "properties": {
+            "kind": { "const": "system" },
+            "id": { "type": "string", "pattern": "^system_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$" }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "PrivacyClassification": {
+      "oneOf": [
+        { "const": ["public"] },
+        { "const": ["research"] },
+        { "const": ["research", "sensitive"] },
+        { "const": ["research", "pii"] },
+        { "const": ["research", "sensitive", "pii"] }
+      ]
+    },
+    "DataHandlingRef": {
+      "type": "object",
+      "required": ["privacy_labels"],
+      "properties": {
+        "privacy_labels": { "$ref": "#/$defs/PrivacyClassification" }
+      },
+      "additionalProperties": false
+    },
+    "ArtifactRef": {
+      "type": "object",
+      "required": ["artifact_id", "digest", "size_bytes", "media_type", "content_encoding", "data_handling"],
+      "properties": {
+        "artifact_id": {
+          "type": "string",
+          "pattern": "^artifact_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "digest": { "$ref": "#/$defs/Digest" },
+        "size_bytes": { "$ref": "#/$defs/NonNegativeSafeInteger" },
+        "media_type": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9!#$&^_.+-]*/[a-z0-9][a-z0-9!#$&^_.+-]*$",
+          "maxLength": 127
+        },
+        "content_encoding": {
+          "enum": ["identity", "gzip", "zstd", "br"]
+        },
+        "content_schema": { "$ref": "#/$defs/SchemaRef" },
+        "data_handling": { "$ref": "#/$defs/DataHandlingRef" }
+      },
+      "additionalProperties": false
+    },
+    "SecretRef": {
+      "type": "object",
+      "required": ["binding_id", "resolution"],
+      "properties": {
+        "binding_id": {
+          "type": "string",
+          "pattern": "^secret_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "resolution": {
+          "enum": ["deployment-current", "pinned"]
+        },
+        "binding_revision": { "$ref": "#/$defs/PositiveSafeInteger" }
+      },
+      "additionalProperties": false,
+      "if": {
+        "required": ["resolution"],
+        "properties": { "resolution": { "const": "pinned" } }
+      },
+      "then": { "required": ["binding_revision"] },
+      "else": { "not": { "required": ["binding_revision"] } }
+    },
+    "StreamPosition": {
+      "type": "object",
+      "required": ["stream_id", "sequence"],
+      "properties": {
+        "stream_id": {
+          "type": "string",
+          "pattern": "^stream_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "sequence": { "$ref": "#/$defs/PositiveSafeInteger" }
+      },
+      "additionalProperties": false
+    },
+    "StreamPositions": {
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^stream_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+      },
+      "additionalProperties": { "$ref": "#/$defs/PositiveSafeInteger" },
+      "maxProperties": 64
+    },
+    "EventCursor": {
+      "type": "object",
+      "required": ["stream_id", "after_sequence"],
+      "properties": {
+        "stream_id": {
+          "type": "string",
+          "pattern": "^stream_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "after_sequence": { "$ref": "#/$defs/NonNegativeSafeInteger" }
+      },
+      "additionalProperties": false
+    },
+    "LeaseRef": {
+      "type": "object",
+      "required": ["lease_id", "namespace_epoch_id", "generation"],
+      "properties": {
+        "lease_id": {
+          "type": "string",
+          "pattern": "^lease_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "namespace_epoch_id": {
+          "type": "string",
+          "pattern": "^leaseepoch_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "generation": { "$ref": "#/$defs/PositiveSafeInteger" }
+      },
+      "additionalProperties": false
+    },
+    "CapabilitySet": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^mug(?:\\.[a-z][a-z0-9-]*)+\\.v[1-9][0-9]*$",
+        "maxLength": 160
+      },
+      "maxItems": 256,
+      "uniqueItems": true
+    },
+    "TraceContext": {
+      "type": "object",
+      "required": ["traceparent"],
+      "properties": {
+        "traceparent": {
+          "type": "string",
+          "pattern": "^00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$",
+          "not": {
+            "anyOf": [
+              { "pattern": "^00-0{32}-" },
+              { "pattern": "^00-[0-9a-f]{32}-0{16}-" }
+            ]
+          },
+          "maxLength": 55
+        },
+        "tracestate": {
+          "type": "string",
+          "maxLength": 512
+        }
+      },
+      "additionalProperties": false
+    },
+    "CommandTypeRef": {
+      "type": "object",
+      "required": ["name", "version"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)+$",
+          "maxLength": 128
+        },
+        "version": { "$ref": "#/$defs/NonNegativeSafeInteger" }
+      },
+      "additionalProperties": false
+    },
+    "CommandPreconditions": {
+      "type": "object",
+      "properties": {
+        "expected_revision": { "$ref": "#/$defs/PositiveSafeInteger" },
+        "expected_state": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$",
+          "maxLength": 64
+        },
+        "expected_absent": { "const": true }
+      },
+      "additionalProperties": false,
+      "oneOf": [
+        {
+          "required": ["expected_absent"],
+          "not": {
+            "anyOf": [
+              { "required": ["expected_revision"] },
+              { "required": ["expected_state"] }
+            ]
+          }
+        },
+        {
+          "required": ["expected_revision"],
+          "not": { "required": ["expected_absent"] }
+        }
+      ]
+    },
+    "ProducerPosition": {
+      "type": "object",
+      "required": ["epoch_id", "sequence", "content_digest"],
+      "properties": {
+        "epoch_id": {
+          "type": "string",
+          "pattern": "^prodepoch_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "sequence": { "$ref": "#/$defs/PositiveSafeInteger" },
+        "content_digest": { "$ref": "#/$defs/Digest" }
+      },
+      "additionalProperties": false
+    },
+    "WireCommandEnvelope": {
+      "type": "object",
+      "required": ["schema", "protocol_version", "command", "request_id", "idempotency_key", "target", "payload"],
+      "properties": {
+        "schema": { "$ref": "#/$defs/CommandEnvelopeSchemaRef" },
+        "protocol_version": { "$ref": "#/$defs/SemVer" },
+        "command": { "$ref": "#/$defs/CommandTypeRef" },
+        "request_id": { "$ref": "#/$defs/RequestId" },
+        "idempotency_key": { "$ref": "#/$defs/IdempotencyKey" },
+        "target": { "$ref": "#/$defs/ResourceRef" },
+        "preconditions": { "$ref": "#/$defs/CommandPreconditions" },
+        "producer": { "$ref": "#/$defs/ProducerPosition" },
+        "lease_token": {
+          "type": "string",
+          "minLength": 32,
+          "maxLength": 2048
+        },
+        "timeout_ms": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 86400000
+        },
+        "client_observed_at": { "$ref": "#/$defs/UtcInstant" },
+        "payload": { "$ref": "#/$defs/TypedObject" }
+      },
+      "additionalProperties": false
+    },
+    "ReceiptDurability": {
+      "type": "object",
+      "required": ["receipt", "effect", "profile"],
+      "properties": {
+        "receipt": {
+          "enum": ["runtime", "journaled", "transactional"]
+        },
+        "effect": {
+          "enum": ["none", "runtime", "journaled", "transactional", "artifact_committed", "unknown"]
+        },
+        "profile": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:[-_.][a-z0-9]+)*$",
+          "maxLength": 96
+        }
+      },
+      "additionalProperties": false
+    },
+    "RetryDirective": {
+      "type": "object",
+      "required": ["mode"],
+      "properties": {
+        "mode": {
+          "enum": ["never", "same_command", "poll_existing", "refresh_then_new_command", "after_reauthentication", "operator_reconciliation"]
+        },
+        "retry_after_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 86400000
+        }
+      },
+      "additionalProperties": false
+    },
+    "DomainError": {
+      "type": "object",
+      "required": ["schema", "error_id", "recorded_at", "code", "category", "safe_message", "retry", "support_reference"],
+      "properties": {
+        "schema": { "$ref": "#/$defs/DomainErrorSchemaRef" },
+        "error_id": { "$ref": "#/$defs/ErrorId" },
+        "request_id": { "$ref": "#/$defs/RequestId" },
+        "recorded_at": { "$ref": "#/$defs/UtcInstant" },
+        "command": { "$ref": "#/$defs/CommandTypeRef" },
+        "code": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*(?:\\.[a-z][a-z0-9_]*)+$",
+          "maxLength": 128
+        },
+        "category": {
+          "enum": ["protocol", "validation", "authentication", "authorization", "not_found", "conflict", "stale", "deadline", "unsupported", "rate_limit", "backpressure", "dependency", "integrity", "privacy", "internal"]
+        },
+        "safe_message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "retry": { "$ref": "#/$defs/RetryDirective" },
+        "details": { "$ref": "#/$defs/TypedObject" },
+        "support_reference": { "$ref": "#/$defs/ErrorId" }
+      },
+      "additionalProperties": false
+    },
+    "CommandReceipt": {
+      "type": "object",
+      "required": ["schema", "receipt_id", "command_id", "command", "idempotency_key", "outcome", "receipt_class", "durability", "recorded_at", "stream_positions"],
+      "properties": {
+        "schema": { "$ref": "#/$defs/CommandReceiptSchemaRef" },
+        "receipt_id": { "$ref": "#/$defs/ReceiptId" },
+        "command_id": { "$ref": "#/$defs/CommandId" },
+        "command": { "$ref": "#/$defs/CommandTypeRef" },
+        "idempotency_key": { "$ref": "#/$defs/IdempotencyKey" },
+        "outcome": {
+          "enum": ["accepted", "rejected", "indeterminate"]
+        },
+        "receipt_class": {
+          "enum": ["ingress", "commit", "artifact_commit"]
+        },
+        "durability": { "$ref": "#/$defs/ReceiptDurability" },
+        "recorded_at": { "$ref": "#/$defs/UtcInstant" },
+        "resource": { "$ref": "#/$defs/ResourceRef" },
+        "version_stamp": { "$ref": "#/$defs/VersionStamp" },
+        "stream_positions": { "$ref": "#/$defs/StreamPositions" },
+        "result": { "$ref": "#/$defs/TypedObject" },
+        "error": { "$ref": "#/$defs/DomainError" }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "required": ["outcome"],
+            "properties": { "outcome": { "const": "accepted" } }
+          },
+          "then": {
+            "required": ["result"],
+            "not": { "required": ["error"] }
+          },
+          "else": {
+            "required": ["error"],
+            "not": { "required": ["result"] }
+          }
+        },
+        {
+          "if": {
+            "required": ["outcome", "receipt_class"],
+            "properties": {
+              "outcome": { "const": "accepted" },
+              "receipt_class": { "const": "ingress" }
+            }
+          },
+          "then": {
+            "properties": {
+              "durability": {
+                "properties": {
+                  "receipt": { "enum": ["runtime", "journaled"] },
+                  "effect": { "enum": ["runtime", "journaled"] }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": ["outcome", "receipt_class"],
+            "properties": {
+              "outcome": { "const": "accepted" },
+              "receipt_class": { "const": "commit" }
+            }
+          },
+          "then": {
+            "properties": {
+              "durability": {
+                "properties": {
+                  "receipt": { "const": "transactional" },
+                  "effect": { "const": "transactional" }
+                }
+              },
+              "stream_positions": { "minProperties": 1 }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": ["outcome", "receipt_class"],
+            "properties": {
+              "outcome": { "const": "accepted" },
+              "receipt_class": { "const": "artifact_commit" }
+            }
+          },
+          "then": {
+            "properties": {
+              "durability": {
+                "properties": {
+                  "receipt": { "const": "transactional" },
+                  "effect": { "const": "artifact_committed" }
+                }
+              },
+              "stream_positions": { "minProperties": 1 }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": ["outcome"],
+            "properties": { "outcome": { "const": "rejected" } }
+          },
+          "then": {
+            "properties": {
+              "durability": {
+                "properties": { "effect": { "const": "none" } }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": ["outcome"],
+            "properties": { "outcome": { "const": "indeterminate" } }
+          },
+          "then": {
+            "properties": {
+              "receipt_class": { "const": "commit" },
+              "durability": {
+                "properties": {
+                  "receipt": { "const": "transactional" },
+                  "effect": { "const": "unknown" }
+                }
+              },
+              "error": {
+                "properties": {
+                  "retry": {
+                    "properties": {
+                      "mode": { "const": "operator_reconciliation" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "InlineBytes": {
+      "type": "object",
+      "required": ["encoding", "data", "size_bytes", "digest"],
+      "properties": {
+        "encoding": { "const": "base64url" },
+        "data": {
+          "type": "string",
+          "pattern": "^(?:[A-Za-z0-9_-]{4})*(?:[A-Za-z0-9_-][AQgw]|[A-Za-z0-9_-]{2}[AEIMQUYcgkosw048])?$",
+          "maxLength": 5462
+        },
+        "size_bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4096
+        },
+        "digest": { "$ref": "#/$defs/Digest" }
+      },
+      "additionalProperties": false
+    },
+    "CanonicalizationVectorSet": {
+      "type": "object",
+      "required": ["schema", "vectors"],
+      "properties": {
+        "schema": { "$ref": "#/$defs/CanonicalizationVectorsSchemaRef" },
+        "vectors": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 128,
+          "items": {
+            "type": "object",
+            "required": ["id", "value", "canonical_utf8", "digest"],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9]*(?:[-_.][a-z0-9]+)*$",
+                "maxLength": 96
+              },
+              "value": true,
+              "canonical_utf8": {
+                "type": "string",
+                "maxLength": 65536
+              },
+              "digest": { "$ref": "#/$defs/Digest" }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "FixtureExpectedError": {
+      "type": "object",
+      "required": ["keyword", "instance_pointer"],
+      "properties": {
+        "keyword": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9]*$",
+          "maxLength": 64
+        },
+        "instance_pointer": {
+          "type": "string",
+          "pattern": "^(?:/(?:[^~/]|~0|~1)*)*$",
+          "maxLength": 512
+        }
+      },
+      "additionalProperties": false
+    },
+    "FixtureCase": {
+      "type": "object",
+      "required": ["id", "instance", "schema_ref", "expect"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:[-_.][a-z0-9]+)*$",
+          "maxLength": 128
+        },
+        "instance": {
+          "type": "string",
+          "pattern": "^(?:valid|invalid)/[a-z][a-z0-9]*(?:[-_.][a-z0-9]+)*\\.json$",
+          "maxLength": 256
+        },
+        "schema_ref": {
+          "type": "string",
+          "pattern": "^urn:mug:schema:mug\\.shared-kernel:0#/(?:\\$defs)/[A-Za-z][A-Za-z0-9]*$",
+          "maxLength": 256
+        },
+        "validation_layer": {
+          "enum": ["schema", "typed_object", "semantic"]
+        },
+        "expect": { "enum": ["valid", "invalid"] },
+        "expected_error": { "$ref": "#/$defs/FixtureExpectedError" }
+      },
+      "additionalProperties": false,
+      "if": {
+        "required": ["expect"],
+        "properties": { "expect": { "const": "invalid" } }
+      },
+      "then": { "required": ["expected_error"] },
+      "else": { "not": { "required": ["expected_error"] } }
+    },
+    "FixtureManifest": {
+      "type": "object",
+      "required": ["schema", "manifest_version", "suite", "contract_version", "cases"],
+      "properties": {
+        "schema": { "$ref": "#/$defs/FixtureManifestSchemaRef" },
+        "manifest_version": { "$ref": "#/$defs/SemVer" },
+        "suite": { "const": "shared-kernel" },
+        "contract_version": { "const": 0 },
+        "cases": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 512,
+          "items": { "$ref": "#/$defs/FixtureCase" }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

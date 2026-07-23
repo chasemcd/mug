@@ -1,0 +1,47 @@
+{
+  "schema": {
+    "name": "mug.api-07.episode-boundary",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "2c41f0fe7bacf95174dc6c1cc1e57a4ce478d1deca1aeadd9d857f91d7d2caaa"
+    }
+  },
+  "episode_id": "episode_019b6000-0000-7000-8000-000000000800",
+  "interaction_id": "interaction_019b6000-0000-7000-8000-000000000420",
+  "kind": "terminal",
+  "end_frame_exclusive": 128,
+  "authority": "peer",
+  "state_hash": {
+    "algorithm": "sha-256",
+    "hex": "c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1"
+  },
+  "p2p_barrier": {
+    "mesh_membership_digest": {
+      "algorithm": "sha-256",
+      "hex": "5f9103cfaa1ea55b01c4f9e8b6765447f60c6ff6ba5c8ad53ab251bfb7feb2b0"
+    },
+    "membership_generation": 3,
+    "frozen_peer_actor_ids": [
+      "actor_019b6000-0000-7000-8000-000000000410",
+      "actor_019b6000-0000-7000-8000-000000000411",
+      "actor_019b6000-0000-7000-8000-000000000412",
+      "actor_019b6000-0000-7000-8000-000000000413"
+    ],
+    "rule": "minimum-end-frame-exclusive",
+    "peer_end_frames": [
+      {
+        "peer_actor_id": "actor_019b6000-0000-7000-8000-000000000410",
+        "end_frame_exclusive": 130
+      },
+      {
+        "peer_actor_id": "actor_019b6000-0000-7000-8000-000000000411",
+        "end_frame_exclusive": 129
+      },
+      {
+        "peer_actor_id": "actor_019b6000-0000-7000-8000-000000000412",
+        "end_frame_exclusive": 128
+      }
+    ]
+  }
+}

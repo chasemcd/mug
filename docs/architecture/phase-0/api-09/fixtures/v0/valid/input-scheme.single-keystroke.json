@@ -1,0 +1,27 @@
+{
+  "schema": {
+    "name": "mug.api-09.input-scheme",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "a687a1359b23e69f995ab8ccae6a335f99f87848c8dcd524cd4c3d92cfa0506a"
+    }
+  },
+  "seat_key": "navigator",
+  "mode": "single_keystroke",
+  "bindings": {
+    "w": [
+      1,
+      0
+    ],
+    "s": [
+      0,
+      1
+    ],
+    "d": [
+      0.5,
+      -0.25
+    ]
+  },
+  "on_no_input": "repeat_last"
+}

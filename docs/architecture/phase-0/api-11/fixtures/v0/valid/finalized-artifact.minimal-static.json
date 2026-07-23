@@ -1,0 +1,32 @@
+{
+  "schema": {
+    "name": "mug.api-11.finalized-artifact",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "007023d2d389fee6f93450c95aac747b412f4ecdfe033820df73c484b75b247e"
+    }
+  },
+  "artifact": {
+    "artifact_id": "artifact_019b6000-0000-7000-8000-000000000710",
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1"
+    },
+    "size_bytes": 8192,
+    "media_type": "application/octet-stream",
+    "content_encoding": "identity",
+    "data_handling": {
+      "privacy_labels": [
+        "research",
+        "sensitive"
+      ]
+    }
+  },
+  "staged_upload_id": "upload_019b6000-0000-7000-8000-000000000720",
+  "intended_digest": {
+    "algorithm": "sha-256",
+    "hex": "f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1"
+  },
+  "finalized_at": "2026-08-02T12:06:00.000000Z"
+}

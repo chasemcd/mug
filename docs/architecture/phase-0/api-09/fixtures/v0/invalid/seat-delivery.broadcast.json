@@ -1,0 +1,29 @@
+{
+  "schema": {
+    "name": "mug.api-09.seat-delivery",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "a687a1359b23e69f995ab8ccae6a335f99f87848c8dcd524cd4c3d92cfa0506a"
+    }
+  },
+  "seat_key": "forager-1",
+  "delivery_kind": "render_packet",
+  "payload_schema": {
+    "name": "mug.api-07.render-packet",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7"
+    }
+  },
+  "payload_digest": {
+    "algorithm": "sha-256",
+    "hex": "f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1"
+  },
+  "stream_position": {
+    "stream_id": "stream_019b6000-0000-7000-8000-000000000500",
+    "sequence": 8
+  },
+  "broadcast": true
+}

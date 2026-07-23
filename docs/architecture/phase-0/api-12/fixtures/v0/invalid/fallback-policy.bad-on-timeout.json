@@ -1,0 +1,12 @@
+{
+  "schema": {
+    "name": "mug.api-12.fallback-policy",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "b7ac5272d5f4ddbbbb1779afb7f6045a51382067e3318b0c5b800a7658d13a76"
+    }
+  },
+  "on_timeout": "noop",
+  "on_stale": "repeat-last"
+}

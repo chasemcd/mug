@@ -1,0 +1,23 @@
+{
+  "enforcement": "server-authoritative",
+  "max_rtt": {
+    "microseconds": 250000
+  },
+  "max_hidden": {
+    "microseconds": 5000000
+  },
+  "ladder": [
+    {
+      "at_violations": 1,
+      "action": "warn"
+    },
+    {
+      "at_violations": 5,
+      "action": "exclude"
+    }
+  ],
+  "callback": {
+    "handler": "exclude",
+    "on_error": "fail_closed"
+  }
+}

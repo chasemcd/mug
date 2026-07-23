@@ -1,0 +1,17 @@
+{
+  "schema": {
+    "name": "mug.api-08.context-snapshot",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "0e305fb358b6d53126d9081ae36f078f18a683684f2bfe799a97197c3d549d4a"
+    }
+  },
+  "message_id": "message_019b6000-0000-7000-8000-000000000a02",
+  "model_request_digest": {
+    "algorithm": "sha-256",
+    "hex": "d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1"
+  },
+  "included_message_ids": [],
+  "captured_at": "2026-08-02T12:05:01.000000Z"
+}

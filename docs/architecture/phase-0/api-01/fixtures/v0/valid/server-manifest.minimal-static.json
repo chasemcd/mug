@@ -1,0 +1,77 @@
+{
+  "schema": {
+    "name": "mug.study.server-manifest",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "96958cdf2ab34fd541208d2adcd17f0d2c7d43ee2c1f5e433d2c87e323e2d58f"
+    }
+  },
+  "execution_requirements": [
+    "mug.activity.content.v1"
+  ],
+  "scopes": [
+    {
+      "scope_key": "welcome-runtime",
+      "selector": {
+        "schema": {
+          "name": "mug.fixture.runtime-scope-selector",
+          "version": 0,
+          "digest": {
+            "algorithm": "sha-256",
+            "hex": "5142db8e0f1b86dbf208dfbd4a4818d47251747d14d32ef9b3b53c1c64466fa3"
+          }
+        },
+        "data": {
+          "activity_key": "welcome"
+        }
+      }
+    }
+  ],
+  "bindings": [
+    {
+      "binding_key": "welcome-config",
+      "scope_key": "welcome-runtime",
+      "kind": "domain_config",
+      "value": {
+        "schema": {
+          "name": "mug.fixture.server-activity-config",
+          "version": 0,
+          "digest": {
+            "algorithm": "sha-256",
+            "hex": "5142db8e0f1b86dbf208dfbd4a4818d47251747d14d32ef9b3b53c1c64466fa3"
+          }
+        },
+        "data": {
+          "activity_key": "welcome"
+        }
+      }
+    },
+    {
+      "binding_key": "activity-progress-flow",
+      "scope_key": "welcome-runtime",
+      "kind": "data_flow",
+      "value": {
+        "schema": {
+          "name": "mug.fixture.data-flow",
+          "version": 0,
+          "digest": {
+            "algorithm": "sha-256",
+            "hex": "762d2f87c31ae4a2436afb737eab1cc627493d6dd852c73562b152c26e951c99"
+          }
+        },
+        "data": {
+          "source": "participant-browser",
+          "destination": "study-service",
+          "purpose": "activity-progress"
+        }
+      }
+    }
+  ],
+  "data_handling": {
+    "privacy_labels": [
+      "research",
+      "sensitive"
+    ]
+  }
+}

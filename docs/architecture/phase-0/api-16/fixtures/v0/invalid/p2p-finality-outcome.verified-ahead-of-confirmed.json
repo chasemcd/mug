@@ -1,0 +1,9 @@
+{
+  "status": "verified",
+  "confirmed_through_frame": 126,
+  "verified_through_frame": 127,
+  "agreed_state_hash_chain_digest": {
+    "algorithm": "sha-256",
+    "hex": "f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7"
+  }
+}

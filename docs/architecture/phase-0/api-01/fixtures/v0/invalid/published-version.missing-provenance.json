@@ -1,0 +1,217 @@
+{
+  "schema": {
+    "name": "mug.study.published-version",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "96958cdf2ab34fd541208d2adcd17f0d2c7d43ee2c1f5e433d2c87e323e2d58f"
+    }
+  },
+  "study_version": {
+    "study_id": "study_019b6000-0000-7000-8000-000000000001",
+    "study_version_id": "studyver_019b6000-0000-7000-8000-000000000502",
+    "version_number": 1,
+    "manifest_digest": {
+      "algorithm": "sha-256",
+      "hex": "797e066b784164cb2b19c244ddbe8db67fcaf9ad76ad615c84ac57db75037531"
+    }
+  },
+  "version_string": "1.0",
+  "candidate": {
+    "artifact_id": "artifact_019b6000-0000-7000-8000-000000000308",
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "6666666666666666666666666666666666666666666666666666666666666666"
+    },
+    "size_bytes": 8192,
+    "media_type": "application/json",
+    "content_encoding": "identity",
+    "data_handling": {
+      "privacy_labels": [
+        "research",
+        "sensitive"
+      ]
+    }
+  },
+  "scientific": {
+    "manifest_schema": {
+      "name": "mug.study.scientific-manifest",
+      "version": 0,
+      "digest": {
+        "algorithm": "sha-256",
+        "hex": "96958cdf2ab34fd541208d2adcd17f0d2c7d43ee2c1f5e433d2c87e323e2d58f"
+      }
+    },
+    "content_digest": {
+      "algorithm": "sha-256",
+      "hex": "797e066b784164cb2b19c244ddbe8db67fcaf9ad76ad615c84ac57db75037531"
+    },
+    "artifact": {
+      "artifact_id": "artifact_019b6000-0000-7000-8000-000000000303",
+      "digest": {
+        "algorithm": "sha-256",
+        "hex": "797e066b784164cb2b19c244ddbe8db67fcaf9ad76ad615c84ac57db75037531"
+      },
+      "size_bytes": 3728,
+      "media_type": "application/json",
+      "content_encoding": "identity",
+      "content_schema": {
+        "name": "mug.study.scientific-manifest",
+        "version": 0,
+        "digest": {
+          "algorithm": "sha-256",
+          "hex": "96958cdf2ab34fd541208d2adcd17f0d2c7d43ee2c1f5e433d2c87e323e2d58f"
+        }
+      },
+      "data_handling": {
+        "privacy_labels": [
+          "research",
+          "sensitive"
+        ]
+      }
+    }
+  },
+  "clients": [
+    {
+      "projection_key": "participant-default",
+      "selector": {
+        "schema": {
+          "name": "mug.fixture.projection-selector",
+          "version": 0,
+          "digest": {
+            "algorithm": "sha-256",
+            "hex": "f7d8378587f8f4150203a635ae2e078b383a990d148fefedb9383c4ad50c185f"
+          }
+        },
+        "data": {
+          "audience_class": "participant-default"
+        }
+      },
+      "manifest": {
+        "manifest_schema": {
+          "name": "mug.study.client-manifest",
+          "version": 0,
+          "digest": {
+            "algorithm": "sha-256",
+            "hex": "96958cdf2ab34fd541208d2adcd17f0d2c7d43ee2c1f5e433d2c87e323e2d58f"
+          }
+        },
+        "content_digest": {
+          "algorithm": "sha-256",
+          "hex": "34227c83b5d96822a98030047fcf8cf7771fa3ebdab829d4d2612f58aaf39e54"
+        },
+        "artifact": {
+          "artifact_id": "artifact_019b6000-0000-7000-8000-000000000304",
+          "digest": {
+            "algorithm": "sha-256",
+            "hex": "34227c83b5d96822a98030047fcf8cf7771fa3ebdab829d4d2612f58aaf39e54"
+          },
+          "size_bytes": 1023,
+          "media_type": "application/json",
+          "content_encoding": "identity",
+          "content_schema": {
+            "name": "mug.study.client-manifest",
+            "version": 0,
+            "digest": {
+              "algorithm": "sha-256",
+              "hex": "96958cdf2ab34fd541208d2adcd17f0d2c7d43ee2c1f5e433d2c87e323e2d58f"
+            }
+          },
+          "data_handling": {
+            "privacy_labels": [
+              "research"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "server": {
+    "manifest_schema": {
+      "name": "mug.study.server-manifest",
+      "version": 0,
+      "digest": {
+        "algorithm": "sha-256",
+        "hex": "96958cdf2ab34fd541208d2adcd17f0d2c7d43ee2c1f5e433d2c87e323e2d58f"
+      }
+    },
+    "content_digest": {
+      "algorithm": "sha-256",
+      "hex": "be5a9de8712b48b6d82e9ffb2ed66fe0fead6a1775faab4fa73f98c12921bc4f"
+    },
+    "artifact": {
+      "artifact_id": "artifact_019b6000-0000-7000-8000-000000000305",
+      "digest": {
+        "algorithm": "sha-256",
+        "hex": "be5a9de8712b48b6d82e9ffb2ed66fe0fead6a1775faab4fa73f98c12921bc4f"
+      },
+      "size_bytes": 1217,
+      "media_type": "application/json",
+      "content_encoding": "identity",
+      "content_schema": {
+        "name": "mug.study.server-manifest",
+        "version": 0,
+        "digest": {
+          "algorithm": "sha-256",
+          "hex": "96958cdf2ab34fd541208d2adcd17f0d2c7d43ee2c1f5e433d2c87e323e2d58f"
+        }
+      },
+      "data_handling": {
+        "privacy_labels": [
+          "research",
+          "sensitive"
+        ]
+      }
+    }
+  },
+  "provenance": {
+    "manifest_schema": {
+      "name": "mug.study.provenance-manifest",
+      "version": 0,
+      "digest": {
+        "algorithm": "sha-256",
+        "hex": "96958cdf2ab34fd541208d2adcd17f0d2c7d43ee2c1f5e433d2c87e323e2d58f"
+      }
+    },
+    "content_digest": {
+      "algorithm": "sha-256",
+      "hex": "8bfac8e9fda6a7be468c89035ea10ab47276107417677e1132fd39a561c20d41"
+    },
+    "artifact": {
+      "artifact_id": "artifact_019b6000-0000-7000-8000-000000000306",
+      "digest": {
+        "algorithm": "sha-256",
+        "hex": "8bfac8e9fda6a7be468c89035ea10ab47276107417677e1132fd39a561c20d41"
+      },
+      "size_bytes": 2112,
+      "media_type": "application/json",
+      "content_encoding": "identity",
+      "content_schema": {
+        "name": "mug.study.provenance-manifest",
+        "version": 0,
+        "digest": {
+          "algorithm": "sha-256",
+          "hex": "96958cdf2ab34fd541208d2adcd17f0d2c7d43ee2c1f5e433d2c87e323e2d58f"
+        }
+      },
+      "data_handling": {
+        "privacy_labels": [
+          "research",
+          "sensitive"
+        ]
+      }
+    }
+  },
+  "warning_acknowledgments": [],
+  "publication_command": {
+    "id": "command_019b6000-0000-7000-8000-000000000602"
+  },
+  "publication_receipt": {
+    "id": "receipt_019b6000-0000-7000-8000-000000000603"
+  },
+  "published_at": "2026-07-18T12:00:00.000000Z",
+  "published_by": {
+    "kind": "researcher",
+    "id": "researcher_019b6000-0000-7000-8000-000000000601"
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "schema": {
+    "name": "mug.api-09.client-handshake",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "a687a1359b23e69f995ab8ccae6a335f99f87848c8dcd524cd4c3d92cfa0506a"
+    }
+  },
+  "launch_handle": "handle_AAAAAAAAAAAAAAAAAAAAAA",
+  "accepted_deployment": {
+    "deployment_id": "deploy_019b6000-0000-7000-8000-000000000020",
+    "deployment_revision_id": "deployrev_019b6000-0000-7000-8000-000000000021",
+    "revision_number": 1,
+    "study_version": {
+      "study_id": "study_019b6000-0000-7000-8000-000000000001",
+      "study_version_id": "studyver_019b6000-0000-7000-8000-000000000010",
+      "version_number": 2,
+      "manifest_digest": {
+        "algorithm": "sha-256",
+        "hex": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1"
+      }
+    },
+    "manifest_digest": {
+      "algorithm": "sha-256",
+      "hex": "a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2"
+    }
+  },
+  "protocol_capabilities": [
+    "mug.client.protocol.v1",
+    "mug.client.bridge.v1"
+  ],
+  "client_build_slot": "participant-shell"
+}

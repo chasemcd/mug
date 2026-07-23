@@ -1,0 +1,14 @@
+{
+  "schema": {
+    "name": "mug.api-04.eligibility-callback",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "5985bd0df049a1a3fa2fc730e66fe0fe89c7a49038e40d1ce07a46f6a0fea161"
+    }
+  },
+  "flow_node_id": "flownode_019b6000-0000-7000-8000-000000000402",
+  "rule_key": "consent-screen",
+  "callback": "studies.foraging.screening:ConsentGate",
+  "on_error": "fail_open"
+}

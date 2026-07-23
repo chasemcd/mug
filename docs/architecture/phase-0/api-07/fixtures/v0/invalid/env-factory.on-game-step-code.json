@@ -1,0 +1,15 @@
+{
+  "schema": {
+    "name": "mug.api-07.env-factory",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "2c41f0fe7bacf95174dc6c1cc1e57a4ce478d1deca1aeadd9d857f91d7d2caaa"
+    }
+  },
+  "channel_key": "board",
+  "factory": "studies.foraging.envs.foraging:make_env",
+  "mode": "server",
+  "requires": [],
+  "on_game_step_code": "reward_bonus += 1"
+}

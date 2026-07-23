@@ -1,0 +1,14 @@
+{
+  "schema": {
+    "name": "mug.api-14.environment-command-mailbox",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "0dc762fe68b24cf27065b570c468a76323514d650016cd5b4d87150732766941"
+    }
+  },
+  "interaction_id": "interaction_019b6000-0000-7000-8000-000000000420",
+  "command_key": "grant-bonus",
+  "delivered": false,
+  "enqueued_at": "2026-08-02T12:20:01.000000Z"
+}

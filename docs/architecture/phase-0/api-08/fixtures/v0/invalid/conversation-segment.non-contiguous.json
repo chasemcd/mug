@@ -1,0 +1,17 @@
+{
+  "schema": {
+    "name": "mug.api-08.conversation-segment",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "0e305fb358b6d53126d9081ae36f078f18a683684f2bfe799a97197c3d549d4a"
+    }
+  },
+  "channel_key": "chat",
+  "message_ids": [
+    "message_019b6000-0000-7000-8000-000000000a01",
+    "message_019b6000-0000-7000-8000-000000000a02"
+  ],
+  "start_sequence": 1,
+  "end_sequence": 5
+}

@@ -1,0 +1,234 @@
+{
+  "schema": {
+    "name": "mug.api-09.client.fixture-manifest",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "a687a1359b23e69f995ab8ccae6a335f99f87848c8dcd524cd4c3d92cfa0506a"
+    }
+  },
+  "manifest_version": "0.3.0",
+  "suite": "api-09-client",
+  "contract_version": 0,
+  "cases": [
+    {
+      "id": "client-handshake.valid.minimal-static",
+      "instance": "valid/client-handshake.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-09.client:0#/$defs/ClientHandshake",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "realtime-command.valid.minimal-static",
+      "instance": "valid/realtime-command.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-09.client:0#/$defs/RealtimeCommand",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "upload-ticket.valid.minimal-static",
+      "instance": "valid/upload-ticket.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-09.client:0#/$defs/UploadTicket",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "transport-ack.valid.minimal-static",
+      "instance": "valid/transport-ack.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-09.client:0#/$defs/TransportAck",
+      "expect": "valid",
+      "validation_layer": "semantic"
+    },
+    {
+      "id": "input-scheme.valid.pressed-keys",
+      "instance": "valid/input-scheme.pressed-keys.json",
+      "schema_ref": "urn:mug:schema:mug.api-09.client:0#/$defs/InputScheme",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "input-scheme.valid.single-keystroke",
+      "instance": "valid/input-scheme.single-keystroke.json",
+      "schema_ref": "urn:mug:schema:mug.api-09.client:0#/$defs/InputScheme",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "seat-delivery.valid.render-packet",
+      "instance": "valid/seat-delivery.render-packet.json",
+      "schema_ref": "urn:mug:schema:mug.api-09.client:0#/$defs/SeatDelivery",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "bridge-message.valid.response-set",
+      "instance": "valid/bridge-message.response-set.json",
+      "schema_ref": "urn:mug:schema:mug.api-09.client:0#/$defs/BridgeMessage",
+      "expect": "valid",
+      "validation_layer": "semantic"
+    },
+    {
+      "id": "upload-ticket.invalid.storage-uri",
+      "instance": "invalid/upload-ticket.storage-uri.json",
+      "schema_ref": "urn:mug:schema:mug.api-09.client:0#/$defs/UploadTicket",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "additionalProperties",
+        "instance_pointer": ""
+      }
+    },
+    {
+      "id": "client-handshake.invalid.missing-deployment",
+      "instance": "invalid/client-handshake.missing-deployment.json",
+      "schema_ref": "urn:mug:schema:mug.api-09.client:0#/$defs/ClientHandshake",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "required",
+        "instance_pointer": ""
+      }
+    },
+    {
+      "id": "realtime-command.invalid.bad-id",
+      "instance": "invalid/realtime-command.bad-id.json",
+      "schema_ref": "urn:mug:schema:mug.api-09.client:0#/$defs/RealtimeCommand",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "pattern",
+        "instance_pointer": "/command_id"
+      }
+    },
+    {
+      "id": "transport-ack.invalid.accepted-no-position",
+      "instance": "invalid/transport-ack.accepted-no-position.json",
+      "schema_ref": "urn:mug:schema:mug.api-09.client:0#/$defs/TransportAck",
+      "expect": "invalid",
+      "validation_layer": "semantic",
+      "expected_error": {
+        "keyword": "ackEvidence",
+        "instance_pointer": "/ack_kind"
+      }
+    },
+    {
+      "id": "realtime-command.invalid.missing-idempotency",
+      "instance": "invalid/realtime-command.missing-idempotency.json",
+      "schema_ref": "urn:mug:schema:mug.api-09.client:0#/$defs/RealtimeCommand",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "required",
+        "instance_pointer": ""
+      }
+    },
+    {
+      "id": "input-scheme.invalid.invented-action-name",
+      "instance": "invalid/input-scheme.invented-action-name.json",
+      "schema_ref": "urn:mug:schema:mug.api-09.client:0#/$defs/InputScheme",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "anyOf",
+        "instance_pointer": "/bindings/up"
+      }
+    },
+    {
+      "id": "input-scheme.invalid.decides-every",
+      "instance": "invalid/input-scheme.decides-every.json",
+      "schema_ref": "urn:mug:schema:mug.api-09.client:0#/$defs/InputScheme",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "additionalProperties",
+        "instance_pointer": ""
+      }
+    },
+    {
+      "id": "seat-delivery.invalid.broadcast",
+      "instance": "invalid/seat-delivery.broadcast.json",
+      "schema_ref": "urn:mug:schema:mug.api-09.client:0#/$defs/SeatDelivery",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "additionalProperties",
+        "instance_pointer": ""
+      }
+    },
+    {
+      "id": "bridge-message.invalid.identity-field",
+      "instance": "invalid/bridge-message.identity-field.json",
+      "schema_ref": "urn:mug:schema:mug.api-09.client:0#/$defs/BridgeMessage",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "additionalProperties",
+        "instance_pointer": ""
+      }
+    },
+    {
+      "id": "bridge-message.invalid.advance-with-key",
+      "instance": "invalid/bridge-message.advance-with-key.json",
+      "schema_ref": "urn:mug:schema:mug.api-09.client:0#/$defs/BridgeMessage",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "not",
+        "instance_pointer": ""
+      }
+    },
+    {
+      "id": "bridge-message.invalid.reserved-key",
+      "instance": "invalid/bridge-message.reserved-key.json",
+      "schema_ref": "urn:mug:schema:mug.api-09.client:0#/$defs/BridgeMessage",
+      "expect": "invalid",
+      "validation_layer": "semantic",
+      "expected_error": {
+        "keyword": "bridgeUntrusted",
+        "instance_pointer": "/key"
+      }
+    },
+    {
+      "id": "monitoring-measurement.valid.ping-visibility",
+      "instance": "valid/monitoring-measurement.ping-visibility.json",
+      "schema_ref": "urn:mug:schema:mug.api-09.client:0#/$defs/MonitoringMeasurement",
+      "expect": "valid",
+      "validation_layer": "semantic"
+    },
+    {
+      "id": "monitoring-measurement.invalid.bad-metric",
+      "instance": "invalid/monitoring-measurement.bad-metric.json",
+      "schema_ref": "urn:mug:schema:mug.api-09.client:0#/$defs/MonitoringMeasurement",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "enum",
+        "instance_pointer": "/measurements/0/metric"
+      }
+    },
+    {
+      "id": "gate-op.valid.block-advance",
+      "instance": "valid/gate-op.block-advance.json",
+      "schema_ref": "urn:mug:schema:mug.api-09.client:0#/$defs/GateOp",
+      "expect": "valid",
+      "validation_layer": "semantic"
+    },
+    {
+      "id": "gate-op.valid.unblock-join",
+      "instance": "valid/gate-op.unblock-join.json",
+      "schema_ref": "urn:mug:schema:mug.api-09.client:0#/$defs/GateOp",
+      "expect": "valid",
+      "validation_layer": "semantic"
+    },
+    {
+      "id": "gate-op.invalid.bad-target",
+      "instance": "invalid/gate-op.bad-target.json",
+      "schema_ref": "urn:mug:schema:mug.api-09.client:0#/$defs/GateOp",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "enum",
+        "instance_pointer": "/target"
+      }
+    },
+    {
+      "id": "gate-op.invalid.missing-anchor",
+      "instance": "invalid/gate-op.missing-anchor.json",
+      "schema_ref": "urn:mug:schema:mug.api-09.client:0#/$defs/GateOp",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "required",
+        "instance_pointer": ""
+      }
+    }
+  ]
+}

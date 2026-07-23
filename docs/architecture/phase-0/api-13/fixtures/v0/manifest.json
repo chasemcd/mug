@@ -1,0 +1,131 @@
+{
+  "schema": {
+    "name": "mug.api-13.provider.fixture-manifest",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "4d5daed964741e873a261d06732f45e8d4342562325528d4824d7d1ab9915cdc"
+    }
+  },
+  "manifest_version": "0.2.0",
+  "suite": "api-13-provider",
+  "contract_version": 0,
+  "cases": [
+    {
+      "id": "agent-version.valid.minimal-static",
+      "instance": "valid/agent-version.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-13.provider:0#/$defs/AgentVersion",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "agent-version.valid.oss-no-secret",
+      "instance": "valid/agent-version.oss-no-secret.json",
+      "schema_ref": "urn:mug:schema:mug.api-13.provider:0#/$defs/AgentVersion",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "provider-request.valid.minimal-static",
+      "instance": "valid/provider-request.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-13.provider:0#/$defs/ProviderRequest",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "provider-response.valid.minimal-static",
+      "instance": "valid/provider-response.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-13.provider:0#/$defs/ProviderResponse",
+      "expect": "valid",
+      "validation_layer": "semantic"
+    },
+    {
+      "id": "provider-error.valid.minimal-static",
+      "instance": "valid/provider-error.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-13.provider:0#/$defs/ProviderError",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "provider-response.invalid.completed-no-output",
+      "instance": "invalid/provider-response.completed-no-output.json",
+      "schema_ref": "urn:mug:schema:mug.api-13.provider:0#/$defs/ProviderResponse",
+      "expect": "invalid",
+      "validation_layer": "semantic",
+      "expected_error": {
+        "keyword": "providerEvidence",
+        "instance_pointer": "/outcome"
+      }
+    },
+    {
+      "id": "provider-request.invalid.secret-material",
+      "instance": "invalid/provider-request.secret-material.json",
+      "schema_ref": "urn:mug:schema:mug.api-13.provider:0#/$defs/ProviderRequest",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "additionalProperties",
+        "instance_pointer": ""
+      }
+    },
+    {
+      "id": "agent-version.invalid.bad-id",
+      "instance": "invalid/agent-version.bad-id.json",
+      "schema_ref": "urn:mug:schema:mug.api-13.provider:0#/$defs/AgentVersion",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "pattern",
+        "instance_pointer": "/agent_version_id"
+      }
+    },
+    {
+      "id": "agent-version.invalid.free-form-provider",
+      "instance": "invalid/agent-version.free-form-provider.json",
+      "schema_ref": "urn:mug:schema:mug.api-13.provider:0#/$defs/AgentVersion",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "enum",
+        "instance_pointer": "/provider"
+      }
+    },
+    {
+      "id": "agent-version.invalid.secret-material",
+      "instance": "invalid/agent-version.secret-material.json",
+      "schema_ref": "urn:mug:schema:mug.api-13.provider:0#/$defs/AgentVersion",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "additionalProperties",
+        "instance_pointer": ""
+      }
+    },
+    {
+      "id": "agent-version.invalid.zero-version",
+      "instance": "invalid/agent-version.zero-version.json",
+      "schema_ref": "urn:mug:schema:mug.api-13.provider:0#/$defs/AgentVersion",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "minimum",
+        "instance_pointer": "/version_number"
+      }
+    },
+    {
+      "id": "provider-error.invalid.bad-class",
+      "instance": "invalid/provider-error.bad-class.json",
+      "schema_ref": "urn:mug:schema:mug.api-13.provider:0#/$defs/ProviderError",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "enum",
+        "instance_pointer": "/error_class"
+      }
+    },
+    {
+      "id": "provider-response.invalid.bad-outcome",
+      "instance": "invalid/provider-response.bad-outcome.json",
+      "schema_ref": "urn:mug:schema:mug.api-13.provider:0#/$defs/ProviderResponse",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "enum",
+        "instance_pointer": "/outcome"
+      }
+    }
+  ]
+}

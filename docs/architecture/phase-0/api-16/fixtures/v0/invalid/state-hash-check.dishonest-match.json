@@ -1,0 +1,22 @@
+{
+  "schema": {
+    "name": "mug.api-16.state-hash-check",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "73201d6c79a1df974207da0d252faa122f5231b10ce2211a03f0acf6e32e7c79"
+    }
+  },
+  "episode_id": "episode_019b6000-0000-7000-8000-000000000800",
+  "frame_number": 129,
+  "expected_state_hash": {
+    "algorithm": "sha-256",
+    "hex": "c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1"
+  },
+  "observed_state_hash": {
+    "algorithm": "sha-256",
+    "hex": "c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2"
+  },
+  "result": "match",
+  "verification": "deterministic"
+}

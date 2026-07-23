@@ -1,0 +1,53 @@
+{
+  "schema": {
+    "name": "mug.api-04.allocation-state",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "5985bd0df049a1a3fa2fc730e66fe0fe89c7a49038e40d1ce07a46f6a0fea161"
+    }
+  },
+  "study_version": {
+    "study_id": "study_019b6000-0000-7000-8000-000000000001",
+    "study_version_id": "studyver_019b6000-0000-7000-8000-000000000010",
+    "version_number": 2,
+    "manifest_digest": {
+      "algorithm": "sha-256",
+      "hex": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1"
+    }
+  },
+  "cells": [
+    {
+      "cell": [
+        {
+          "treatment_key": "difficulty",
+          "level_key": "easy"
+        },
+        {
+          "treatment_key": "partner",
+          "level_key": "human"
+        }
+      ],
+      "groups": 3,
+      "participants": 6
+    },
+    {
+      "cell": [
+        {
+          "treatment_key": "difficulty",
+          "level_key": "easy"
+        },
+        {
+          "treatment_key": "partner",
+          "level_key": "ai"
+        }
+      ],
+      "groups": 2,
+      "participants": 4
+    }
+  ],
+  "version": {
+    "revision": 11,
+    "etag": "sha256:e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4"
+  }
+}

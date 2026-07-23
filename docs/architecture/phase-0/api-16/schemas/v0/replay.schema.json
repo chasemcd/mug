@@ -1,0 +1,1191 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:mug:schema:mug.api-16.replay:0",
+  "title": "MUG API-16 Replay Capture, Bundles, and Validation contracts, version 0",
+  "$defs": {
+    "ReplayManifestSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-16.replay-manifest"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "CapabilityLevels": {
+      "type": "object",
+      "required": [
+        "visual",
+        "deterministic"
+      ],
+      "properties": {
+        "visual": {
+          "type": "boolean"
+        },
+        "deterministic": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ExecutionMode": {
+      "enum": [
+        "server",
+        "browser",
+        "p2p"
+      ]
+    },
+    "EnvHooks": {
+      "type": "object",
+      "required": [
+        "snapshot_restore",
+        "state_hash"
+      ],
+      "properties": {
+        "snapshot_restore": {
+          "const": true
+        },
+        "state_hash": {
+          "const": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "SnapshotCoverage": {
+      "type": "object",
+      "required": [
+        "environment_state",
+        "platform_state",
+        "python_random_state",
+        "numpy_random_state",
+        "mug_javascript_rng_state"
+      ],
+      "properties": {
+        "environment_state": {
+          "const": true
+        },
+        "platform_state": {
+          "const": true
+        },
+        "python_random_state": {
+          "const": true
+        },
+        "numpy_random_state": {
+          "const": true
+        },
+        "mug_javascript_rng_state": {
+          "const": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "DeterminismDeclaration": {
+      "type": "object",
+      "required": [
+        "env_hooks",
+        "snapshot_coverage",
+        "state_hash_chain_digest"
+      ],
+      "properties": {
+        "env_hooks": {
+          "$ref": "#/$defs/EnvHooks"
+        },
+        "snapshot_coverage": {
+          "$ref": "#/$defs/SnapshotCoverage"
+        },
+        "state_hash_chain_digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "P2PReplayEvidenceSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-16.p2p-replay-evidence"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "P2PMeshMembershipSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-06.p2p-mesh-membership"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "P2PFrameFinalitySchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-07.p2p-frame-finality"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "EpisodeBoundarySchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-07.episode-boundary"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "P2PBotAuthoritySchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-12.p2p-bot-authority"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "DecisionResultSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-12.decision-result"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "P2PMeshMembershipBinding": {
+      "type": "object",
+      "required": [
+        "schema",
+        "artifact"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/P2PMeshMembershipSchemaRef"
+        },
+        "artifact": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/ArtifactRef"
+        }
+      },
+      "additionalProperties": false
+    },
+    "P2PFrameFinalityBinding": {
+      "type": "object",
+      "required": [
+        "schema",
+        "artifact"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/P2PFrameFinalitySchemaRef"
+        },
+        "artifact": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/ArtifactRef"
+        }
+      },
+      "additionalProperties": false
+    },
+    "EpisodeBoundaryBinding": {
+      "type": "object",
+      "required": [
+        "schema",
+        "artifact"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/EpisodeBoundarySchemaRef"
+        },
+        "artifact": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/ArtifactRef"
+        }
+      },
+      "additionalProperties": false
+    },
+    "P2PBotAuthorityBinding": {
+      "type": "object",
+      "required": [
+        "schema",
+        "artifact"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/P2PBotAuthoritySchemaRef"
+        },
+        "artifact": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/ArtifactRef"
+        }
+      },
+      "additionalProperties": false
+    },
+    "DecisionTapeBinding": {
+      "type": "object",
+      "required": [
+        "schema",
+        "artifact"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/DecisionTapeSchemaRef"
+        },
+        "artifact": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/ArtifactRef"
+        }
+      },
+      "additionalProperties": false
+    },
+    "DecisionResultBinding": {
+      "type": "object",
+      "required": [
+        "schema",
+        "artifact"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/DecisionResultSchemaRef"
+        },
+        "artifact": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/ArtifactRef"
+        }
+      },
+      "additionalProperties": false
+    },
+    "NullableFrameNumber": {
+      "oneOf": [
+        {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/NonNegativeSafeInteger"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "VerifiedFinalityOutcome": {
+      "type": "object",
+      "required": [
+        "status",
+        "confirmed_through_frame",
+        "verified_through_frame",
+        "agreed_state_hash_chain_digest"
+      ],
+      "properties": {
+        "status": {
+          "const": "verified"
+        },
+        "confirmed_through_frame": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/NonNegativeSafeInteger"
+        },
+        "verified_through_frame": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/NonNegativeSafeInteger"
+        },
+        "agreed_state_hash_chain_digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ConfirmedOnlyFinalityOutcome": {
+      "type": "object",
+      "required": [
+        "status",
+        "confirmed_through_frame"
+      ],
+      "properties": {
+        "status": {
+          "const": "confirmed-only"
+        },
+        "confirmed_through_frame": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/NonNegativeSafeInteger"
+        }
+      },
+      "additionalProperties": false
+    },
+    "DisputedFinalityOutcome": {
+      "type": "object",
+      "required": [
+        "status",
+        "confirmed_through_frame",
+        "first_disputed_frame"
+      ],
+      "properties": {
+        "status": {
+          "const": "disputed"
+        },
+        "confirmed_through_frame": {
+          "$ref": "#/$defs/NullableFrameNumber"
+        },
+        "first_disputed_frame": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/NonNegativeSafeInteger"
+        }
+      },
+      "additionalProperties": false
+    },
+    "PartialFinalityOutcome": {
+      "type": "object",
+      "required": [
+        "status",
+        "confirmed_through_frame"
+      ],
+      "properties": {
+        "status": {
+          "const": "partial"
+        },
+        "confirmed_through_frame": {
+          "$ref": "#/$defs/NullableFrameNumber"
+        }
+      },
+      "additionalProperties": false
+    },
+    "P2PFinalityOutcome": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/VerifiedFinalityOutcome"
+        },
+        {
+          "$ref": "#/$defs/ConfirmedOnlyFinalityOutcome"
+        },
+        {
+          "$ref": "#/$defs/DisputedFinalityOutcome"
+        },
+        {
+          "$ref": "#/$defs/PartialFinalityOutcome"
+        }
+      ]
+    },
+    "P2PReplayEvidence": {
+      "type": "object",
+      "required": [
+        "schema",
+        "mesh_membership_digest",
+        "membership_generation",
+        "frozen_peer_actor_ids",
+        "mesh_membership",
+        "frame_finality",
+        "episode_boundaries",
+        "bot_authorities",
+        "decision_results",
+        "decision_tape",
+        "finality_outcome"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/P2PReplayEvidenceSchemaRef"
+        },
+        "mesh_membership_digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        },
+        "membership_generation": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/PositiveSafeInteger"
+        },
+        "frozen_peer_actor_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^actor_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "minItems": 2,
+          "maxItems": 64,
+          "uniqueItems": true
+        },
+        "mesh_membership": {
+          "$ref": "#/$defs/P2PMeshMembershipBinding"
+        },
+        "frame_finality": {
+          "$ref": "#/$defs/P2PFrameFinalityBinding"
+        },
+        "episode_boundaries": {
+          "$ref": "#/$defs/EpisodeBoundaryBinding"
+        },
+        "bot_authorities": {
+          "$ref": "#/$defs/P2PBotAuthorityBinding"
+        },
+        "decision_results": {
+          "$ref": "#/$defs/DecisionResultBinding"
+        },
+        "decision_tape": {
+          "$ref": "#/$defs/DecisionTapeBinding"
+        },
+        "finality_outcome": {
+          "$ref": "#/$defs/P2PFinalityOutcome"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ExperiencedEvidenceSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-10.evidence"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ReproductionScope": {
+      "enum": [
+        "canonical-only",
+        "canonical-and-experienced"
+      ]
+    },
+    "ExperiencedFrameLineageEntry": {
+      "type": "object",
+      "required": [
+        "stream_position",
+        "delivery_kind"
+      ],
+      "properties": {
+        "stream_position": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/StreamPosition"
+        },
+        "delivery_kind": {
+          "enum": [
+            "delivered",
+            "speculative",
+            "corrected",
+            "skipped"
+          ]
+        },
+        "canonical_event_id": {
+          "type": "string",
+          "pattern": "^event_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "supersedes_experienced_position": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/StreamPosition"
+        }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "delivery_kind"
+            ],
+            "properties": {
+              "delivery_kind": {
+                "const": "corrected"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "canonical_event_id",
+              "supersedes_experienced_position"
+            ]
+          }
+        }
+      ]
+    },
+    "ExperiencedStreamReplay": {
+      "type": "object",
+      "required": [
+        "experienced_frames_schema",
+        "experienced_stream",
+        "canonical_event_ids",
+        "experienced_lineage"
+      ],
+      "properties": {
+        "experienced_frames_schema": {
+          "$ref": "#/$defs/ExperiencedEvidenceSchemaRef"
+        },
+        "experienced_stream": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/ArtifactRef"
+        },
+        "canonical_event_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^event_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "minItems": 1,
+          "maxItems": 4096,
+          "uniqueItems": true
+        },
+        "experienced_lineage": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ExperiencedFrameLineageEntry"
+          },
+          "minItems": 1,
+          "maxItems": 4096
+        }
+      },
+      "additionalProperties": false
+    },
+    "ReplayManifest": {
+      "type": "object",
+      "required": [
+        "schema",
+        "interaction_id",
+        "execution_mode",
+        "capability_levels",
+        "reproduction_scope",
+        "artifact_refs",
+        "schema_bundle",
+        "integrity_digest"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/ReplayManifestSchemaRef"
+        },
+        "interaction_id": {
+          "type": "string",
+          "pattern": "^interaction_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "execution_mode": {
+          "$ref": "#/$defs/ExecutionMode"
+        },
+        "capability_levels": {
+          "$ref": "#/$defs/CapabilityLevels"
+        },
+        "reproduction_scope": {
+          "$ref": "#/$defs/ReproductionScope"
+        },
+        "experienced_stream_replay": {
+          "$ref": "#/$defs/ExperiencedStreamReplay"
+        },
+        "determinism": {
+          "$ref": "#/$defs/DeterminismDeclaration"
+        },
+        "p2p_replay_evidence": {
+          "$ref": "#/$defs/P2PReplayEvidence"
+        },
+        "artifact_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/ArtifactRef"
+          },
+          "minItems": 1,
+          "maxItems": 4096
+        },
+        "schema_bundle": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/ArtifactRef"
+        },
+        "integrity_digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "capability_levels"
+            ],
+            "properties": {
+              "capability_levels": {
+                "required": [
+                  "deterministic"
+                ],
+                "properties": {
+                  "deterministic": {
+                    "const": true
+                  }
+                }
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "determinism"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "determinism"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "execution_mode"
+            ],
+            "properties": {
+              "execution_mode": {
+                "const": "p2p"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "p2p_replay_evidence"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "p2p_replay_evidence"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "reproduction_scope"
+            ],
+            "properties": {
+              "reproduction_scope": {
+                "const": "canonical-and-experienced"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "experienced_stream_replay"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "experienced_stream_replay"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "ModelOutputTapeEntry": {
+      "type": "object",
+      "required": [
+        "kind",
+        "modelcall_id",
+        "output_digest",
+        "tool_call_ids"
+      ],
+      "properties": {
+        "kind": {
+          "const": "model-output"
+        },
+        "modelcall_id": {
+          "type": "string",
+          "pattern": "^modelcall_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "output_digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        },
+        "tool_call_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^toolcall_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "maxItems": 64
+        }
+      },
+      "additionalProperties": false
+    },
+    "P2PBotActionTapeEntry": {
+      "type": "object",
+      "required": [
+        "kind",
+        "decision_id",
+        "decision_result_digest",
+        "bot_actor_id",
+        "authority_actor_id",
+        "decision_origin",
+        "episode_id",
+        "frame_number",
+        "mesh_membership_digest",
+        "membership_generation",
+        "authority_generation",
+        "action_digest",
+        "output_digest",
+        "replay_behavior"
+      ],
+      "properties": {
+        "kind": {
+          "const": "p2p-bot-action"
+        },
+        "decision_id": {
+          "type": "string",
+          "pattern": "^decision_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "decision_result_digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        },
+        "bot_actor_id": {
+          "type": "string",
+          "pattern": "^actor_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "authority_actor_id": {
+          "type": "string",
+          "pattern": "^actor_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "decision_origin": {
+          "enum": [
+            "authority-local",
+            "server-scheduler"
+          ]
+        },
+        "episode_id": {
+          "type": "string",
+          "pattern": "^episode_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "frame_number": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/NonNegativeSafeInteger"
+        },
+        "mesh_membership_digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        },
+        "membership_generation": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/PositiveSafeInteger"
+        },
+        "authority_generation": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/PositiveSafeInteger"
+        },
+        "action_digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        },
+        "output_digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        },
+        "replay_behavior": {
+          "const": "apply-recorded-action"
+        }
+      },
+      "additionalProperties": false
+    },
+    "TapeEntry": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ModelOutputTapeEntry"
+        },
+        {
+          "$ref": "#/$defs/P2PBotActionTapeEntry"
+        }
+      ]
+    },
+    "DecisionTapeSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-16.decision-tape"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "DecisionTape": {
+      "type": "object",
+      "required": [
+        "schema",
+        "interaction_id",
+        "entries"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/DecisionTapeSchemaRef"
+        },
+        "interaction_id": {
+          "type": "string",
+          "pattern": "^interaction_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "entries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TapeEntry"
+          },
+          "maxItems": 4096
+        }
+      },
+      "additionalProperties": false
+    },
+    "StateHashCheckSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-16.state-hash-check"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "DeterministicStateHashCheck": {
+      "type": "object",
+      "required": [
+        "schema",
+        "episode_id",
+        "frame_number",
+        "expected_state_hash",
+        "observed_state_hash",
+        "result",
+        "verification"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/StateHashCheckSchemaRef"
+        },
+        "episode_id": {
+          "type": "string",
+          "pattern": "^episode_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "frame_number": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/NonNegativeSafeInteger"
+        },
+        "expected_state_hash": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        },
+        "observed_state_hash": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        },
+        "result": {
+          "enum": [
+            "match",
+            "mismatch"
+          ]
+        },
+        "verification": {
+          "const": "deterministic"
+        }
+      },
+      "additionalProperties": false
+    },
+    "VisualFallbackStateHashCheck": {
+      "type": "object",
+      "required": [
+        "schema",
+        "episode_id",
+        "frame_number",
+        "verification",
+        "reason"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/StateHashCheckSchemaRef"
+        },
+        "episode_id": {
+          "type": "string",
+          "pattern": "^episode_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "frame_number": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/NonNegativeSafeInteger"
+        },
+        "verification": {
+          "const": "visual-fallback"
+        },
+        "reason": {
+          "enum": [
+            "determinism-not-declared",
+            "snapshot-unavailable",
+            "state-hash-unavailable"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "StateHashCheck": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/DeterministicStateHashCheck"
+        },
+        {
+          "$ref": "#/$defs/VisualFallbackStateHashCheck"
+        }
+      ]
+    },
+    "ReplayBundleValidationSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-16.replay-bundle-validation"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ReplayBundleValidation": {
+      "type": "object",
+      "required": [
+        "schema",
+        "interaction_id",
+        "valid",
+        "external_calls_made",
+        "modified_artifact_ids",
+        "verification"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/ReplayBundleValidationSchemaRef"
+        },
+        "interaction_id": {
+          "type": "string",
+          "pattern": "^interaction_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "valid": {
+          "type": "boolean"
+        },
+        "external_calls_made": {
+          "type": "boolean"
+        },
+        "modified_artifact_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^artifact_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+          },
+          "maxItems": 256
+        },
+        "verification": {
+          "enum": [
+            "deterministic",
+            "visual-fallback"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "FixtureManifestSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-16.replay.fixture-manifest"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "FixtureCase": {
+      "type": "object",
+      "required": [
+        "id",
+        "instance",
+        "schema_ref",
+        "expect"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)+$",
+          "maxLength": 160
+        },
+        "instance": {
+          "type": "string",
+          "pattern": "^(?:valid|invalid)/[a-z0-9][a-z0-9._-]*\\.json$",
+          "maxLength": 256
+        },
+        "schema_ref": {
+          "type": "string",
+          "pattern": "^urn:mug:schema:mug\\.api-16\\.replay:0#/\\$defs/[A-Za-z][A-Za-z0-9]*$",
+          "maxLength": 256
+        },
+        "validation_layer": {
+          "enum": [
+            "schema",
+            "semantic"
+          ]
+        },
+        "expect": {
+          "enum": [
+            "valid",
+            "invalid"
+          ]
+        },
+        "expected_error": {
+          "type": "object",
+          "required": [
+            "keyword",
+            "instance_pointer"
+          ],
+          "properties": {
+            "keyword": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "maxLength": 96
+            },
+            "instance_pointer": {
+              "type": "string",
+              "pattern": "^(?:/[^/]+)*$",
+              "maxLength": 256
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false,
+      "if": {
+        "required": [
+          "expect"
+        ],
+        "properties": {
+          "expect": {
+            "const": "invalid"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "expected_error"
+        ]
+      },
+      "else": {
+        "not": {
+          "required": [
+            "expected_error"
+          ]
+        }
+      }
+    },
+    "FixtureManifest": {
+      "type": "object",
+      "required": [
+        "schema",
+        "manifest_version",
+        "suite",
+        "contract_version",
+        "cases"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/FixtureManifestSchemaRef"
+        },
+        "manifest_version": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/SemVer"
+        },
+        "suite": {
+          "const": "api-16-replay"
+        },
+        "contract_version": {
+          "const": 0
+        },
+        "cases": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/FixtureCase"
+          },
+          "minItems": 1,
+          "maxItems": 512
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

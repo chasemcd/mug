@@ -1,0 +1,39 @@
+{
+  "schema": {
+    "name": "mug.api-06.interaction",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "538a17e390be96543227d1cdef37274dbf0e59d1c10c457f3c3f428be182dc02"
+    }
+  },
+  "interaction_id": "interaction_019b6000-0000-7000-8000-000000000420",
+  "study_version": {
+    "study_id": "study_019b6000-0000-7000-8000-000000000001",
+    "study_version_id": "studyver_019b6000-0000-7000-8000-000000000010",
+    "version_number": 2,
+    "manifest_digest": {
+      "algorithm": "sha-256",
+      "hex": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1"
+    }
+  },
+  "visit_ids": [
+    "visit_019b6000-0000-7000-8000-000000000090",
+    "visit_019b6000-0000-7000-8000-000000000091"
+  ],
+  "cast": {
+    "forager-1": "actor_019b6000-0000-7000-8000-000000000410",
+    "forager-2": null
+  },
+  "channels": [
+    "board",
+    "talk"
+  ],
+  "group_id": "group_019b6000-0000-7000-8000-000000000480",
+  "on_missing": "wait",
+  "status": "active",
+  "version": {
+    "revision": 2,
+    "etag": "sha256:e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1"
+  }
+}

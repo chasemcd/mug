@@ -1,0 +1,38 @@
+{
+  "kind": "server_python_wheel",
+  "artifact": {
+    "artifact_id": "artifact_019b6000-0000-7000-8000-000000000401",
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "3333333333333333333333333333333333333333333333333333333333333333"
+    },
+    "size_bytes": 2048,
+    "media_type": "application/vnd.python.wheel",
+    "content_encoding": "identity",
+    "data_handling": {
+      "privacy_labels": [
+        "research",
+        "sensitive"
+      ]
+    }
+  },
+  "entrypoint": "https://example.invalid/latest.py",
+  "runtime_abi": "cpython-3.13",
+  "dependency_lock": {
+    "artifact_id": "artifact_019b6000-0000-7000-8000-000000000402",
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "4444444444444444444444444444444444444444444444444444444444444444"
+    },
+    "size_bytes": 1024,
+    "media_type": "application/json",
+    "content_encoding": "identity",
+    "data_handling": {
+      "privacy_labels": [
+        "research",
+        "sensitive"
+      ]
+    }
+  },
+  "required_capabilities": []
+}

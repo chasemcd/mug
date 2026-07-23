@@ -1,0 +1,41 @@
+{
+  "schema": {
+    "name": "mug.api-16.decision-tape",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "73201d6c79a1df974207da0d252faa122f5231b10ce2211a03f0acf6e32e7c79"
+    }
+  },
+  "interaction_id": "interaction_019b6000-0000-7000-8000-000000000420",
+  "entries": [
+    {
+      "kind": "p2p-bot-action",
+      "decision_id": "decision_019b6000-0000-7000-8000-00000000d001",
+      "decision_result_digest": {
+        "algorithm": "sha-256",
+        "hex": "d6ab38d662cd0b1c3df18080ccac763df615d728bc7680ff753e365aa2f8e690"
+      },
+      "bot_actor_id": "actor_019b6000-0000-7000-8000-000000000201",
+      "authority_actor_id": "actor_019b6000-0000-7000-8000-000000000413",
+      "decision_origin": "server-scheduler",
+      "episode_id": "episode_019b6000-0000-7000-8000-000000000800",
+      "frame_number": 42,
+      "mesh_membership_digest": {
+        "algorithm": "sha-256",
+        "hex": "5f9103cfaa1ea55b01c4f9e8b6765447f60c6ff6ba5c8ad53ab251bfb7feb2b0"
+      },
+      "membership_generation": 3,
+      "authority_generation": 1,
+      "action_digest": {
+        "algorithm": "sha-256",
+        "hex": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1"
+      },
+      "output_digest": {
+        "algorithm": "sha-256",
+        "hex": "c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3"
+      },
+      "replay_behavior": "apply-recorded-action"
+    }
+  ]
+}

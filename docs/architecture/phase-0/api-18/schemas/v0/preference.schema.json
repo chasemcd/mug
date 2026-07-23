@@ -1,0 +1,460 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:mug:schema:mug.api-18.preference:0",
+  "title": "MUG API-18 Preferences, Annotation, and Quality contracts, version 0",
+  "$defs": {
+    "AuthoringKey": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(?:[-_.][a-z0-9]+)*$",
+      "maxLength": 128
+    },
+    "ComparisonTask": {
+      "type": "object",
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "pairwise",
+            "rating"
+          ]
+        },
+        "prompt": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        }
+      },
+      "additionalProperties": false
+    },
+    "PreferenceProtocolSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-18.preference-protocol"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "PreferenceProtocol": {
+      "type": "object",
+      "required": [
+        "schema",
+        "protocol_version_id",
+        "protocol_definition_id",
+        "candidate_kind",
+        "task",
+        "blinded",
+        "randomize_order"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/PreferenceProtocolSchemaRef"
+        },
+        "protocol_version_id": {
+          "type": "string",
+          "pattern": "^prefver_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "protocol_definition_id": {
+          "type": "string",
+          "pattern": "^prefdef_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "candidate_kind": {
+          "enum": [
+            "trajectory",
+            "model-output",
+            "chat-message",
+            "conversation-segment",
+            "media"
+          ]
+        },
+        "task": {
+          "$ref": "#/$defs/ComparisonTask"
+        },
+        "blinded": {
+          "type": "boolean"
+        },
+        "randomize_order": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "CandidateRefSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-18.candidate-ref"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "CandidateRef": {
+      "type": "object",
+      "required": [
+        "schema",
+        "candidate_key",
+        "kind",
+        "content_ref",
+        "display_handle"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/CandidateRefSchemaRef"
+        },
+        "candidate_key": {
+          "$ref": "#/$defs/AuthoringKey"
+        },
+        "kind": {
+          "enum": [
+            "trajectory",
+            "model-output",
+            "chat-message",
+            "conversation-segment",
+            "media"
+          ]
+        },
+        "content_ref": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/ArtifactRef"
+        },
+        "display_handle": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/PublicHandle"
+        }
+      },
+      "additionalProperties": false
+    },
+    "PreferenceAssignmentSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-18.preference-assignment"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "PreferenceAssignment": {
+      "type": "object",
+      "required": [
+        "schema",
+        "assignment_id",
+        "query_id",
+        "enrollment_id",
+        "candidate_display_order",
+        "blinded",
+        "seed_commitment"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/PreferenceAssignmentSchemaRef"
+        },
+        "assignment_id": {
+          "type": "string",
+          "pattern": "^prefassign_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "query_id": {
+          "type": "string",
+          "pattern": "^prefquery_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "enrollment_id": {
+          "type": "string",
+          "pattern": "^enrollment_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "candidate_display_order": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AuthoringKey"
+          },
+          "minItems": 2,
+          "maxItems": 64
+        },
+        "blinded": {
+          "type": "boolean"
+        },
+        "seed_commitment": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "PreferenceResponseSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-18.preference-response"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "PreferenceResponse": {
+      "type": "object",
+      "required": [
+        "schema",
+        "response_id",
+        "assignment_id",
+        "choice",
+        "presented_order",
+        "receipt_required",
+        "submitted_at"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/PreferenceResponseSchemaRef"
+        },
+        "response_id": {
+          "type": "string",
+          "pattern": "^prefresponse_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "assignment_id": {
+          "type": "string",
+          "pattern": "^prefassign_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "choice": {
+          "$ref": "#/$defs/AuthoringKey"
+        },
+        "presented_order": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AuthoringKey"
+          },
+          "minItems": 2,
+          "maxItems": 64
+        },
+        "receipt_required": {
+          "type": "boolean"
+        },
+        "submitted_at": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/UtcInstant"
+        }
+      },
+      "additionalProperties": false
+    },
+    "QualityEvidenceSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-18.quality-evidence"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "QualityEvidence": {
+      "type": "object",
+      "required": [
+        "schema",
+        "response_id",
+        "attention_check_passed",
+        "response_time_ms",
+        "flagged"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/QualityEvidenceSchemaRef"
+        },
+        "response_id": {
+          "type": "string",
+          "pattern": "^prefresponse_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "attention_check_passed": {
+          "type": "boolean"
+        },
+        "response_time_ms": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/NonNegativeSafeInteger"
+        },
+        "flagged": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "FixtureManifestSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-18.preference.fixture-manifest"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "FixtureCase": {
+      "type": "object",
+      "required": [
+        "id",
+        "instance",
+        "schema_ref",
+        "expect"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)+$",
+          "maxLength": 160
+        },
+        "instance": {
+          "type": "string",
+          "pattern": "^(?:valid|invalid)/[a-z0-9][a-z0-9._-]*\\.json$",
+          "maxLength": 256
+        },
+        "schema_ref": {
+          "type": "string",
+          "pattern": "^urn:mug:schema:mug\\.api-18\\.preference:0#/\\$defs/[A-Za-z][A-Za-z0-9]*$",
+          "maxLength": 256
+        },
+        "validation_layer": {
+          "enum": [
+            "schema",
+            "semantic"
+          ]
+        },
+        "expect": {
+          "enum": [
+            "valid",
+            "invalid"
+          ]
+        },
+        "expected_error": {
+          "type": "object",
+          "required": [
+            "keyword",
+            "instance_pointer"
+          ],
+          "properties": {
+            "keyword": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "maxLength": 96
+            },
+            "instance_pointer": {
+              "type": "string",
+              "pattern": "^(?:/[^/]+)*$",
+              "maxLength": 256
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false,
+      "if": {
+        "required": [
+          "expect"
+        ],
+        "properties": {
+          "expect": {
+            "const": "invalid"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "expected_error"
+        ]
+      },
+      "else": {
+        "not": {
+          "required": [
+            "expected_error"
+          ]
+        }
+      }
+    },
+    "FixtureManifest": {
+      "type": "object",
+      "required": [
+        "schema",
+        "manifest_version",
+        "suite",
+        "contract_version",
+        "cases"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/FixtureManifestSchemaRef"
+        },
+        "manifest_version": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/SemVer"
+        },
+        "suite": {
+          "const": "api-18-preference"
+        },
+        "contract_version": {
+          "const": 0
+        },
+        "cases": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/FixtureCase"
+          },
+          "minItems": 1,
+          "maxItems": 512
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

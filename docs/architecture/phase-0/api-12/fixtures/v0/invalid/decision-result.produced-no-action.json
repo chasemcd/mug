@@ -1,0 +1,15 @@
+{
+  "schema": {
+    "name": "mug.api-12.decision-result",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "b7ac5272d5f4ddbbbb1779afb7f6045a51382067e3318b0c5b800a7658d13a76"
+    }
+  },
+  "decision_id": "decision_019b6000-0000-7000-8000-000000000b01",
+  "execution_mode": "server",
+  "outcome": "produced",
+  "staleness": "fresh",
+  "produced_at": "2026-08-02T12:05:00.150000Z"
+}

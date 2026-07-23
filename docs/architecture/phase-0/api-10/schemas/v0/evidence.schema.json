@@ -1,0 +1,343 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:mug:schema:mug.api-10.evidence:0",
+  "title": "MUG API-10 Events, Capture, and Provenance contracts, version 0",
+  "$defs": {
+    "AuthoringKey": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(?:[-_.][a-z0-9]+)*$",
+      "maxLength": 128
+    },
+    "EventEnvelopeSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-10.event-envelope"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "EventEnvelope": {
+      "type": "object",
+      "required": [
+        "schema",
+        "event_id",
+        "stream_position",
+        "producer_position",
+        "event_schema",
+        "payload_digest",
+        "recorded_at",
+        "data_handling"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/EventEnvelopeSchemaRef"
+        },
+        "event_id": {
+          "type": "string",
+          "pattern": "^event_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "stream_position": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/StreamPosition"
+        },
+        "producer_position": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/ProducerPosition"
+        },
+        "event_schema": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/SchemaRef"
+        },
+        "payload_digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        },
+        "recorded_at": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/UtcInstant"
+        },
+        "causation_event_id": {
+          "type": "string",
+          "pattern": "^event_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "data_handling": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/DataHandlingRef"
+        }
+      },
+      "additionalProperties": false
+    },
+    "CaptureStreamRule": {
+      "type": "object",
+      "required": [
+        "stream_kind",
+        "profile"
+      ],
+      "properties": {
+        "stream_kind": {
+          "enum": [
+            "trajectory",
+            "event",
+            "render",
+            "experienced"
+          ]
+        },
+        "profile": {
+          "enum": [
+            "canonical",
+            "experienced"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "CapturePolicySchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-10.capture-policy"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "CapturePolicy": {
+      "type": "object",
+      "required": [
+        "schema",
+        "policy_key",
+        "completeness",
+        "streams"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/CapturePolicySchemaRef"
+        },
+        "policy_key": {
+          "$ref": "#/$defs/AuthoringKey"
+        },
+        "completeness": {
+          "enum": [
+            "complete",
+            "best-effort"
+          ]
+        },
+        "streams": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CaptureStreamRule"
+          },
+          "minItems": 1,
+          "maxItems": 64
+        }
+      },
+      "additionalProperties": false
+    },
+    "ExperiencedFrameSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-10.experienced-frame"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ExperiencedFrame": {
+      "type": "object",
+      "required": [
+        "schema",
+        "stream_position",
+        "delivery_kind",
+        "delivered_at"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/ExperiencedFrameSchemaRef"
+        },
+        "stream_position": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/StreamPosition"
+        },
+        "canonical_event_id": {
+          "type": "string",
+          "pattern": "^event_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "supersedes_experienced_position": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/StreamPosition"
+        },
+        "delivery_kind": {
+          "enum": [
+            "delivered",
+            "speculative",
+            "corrected",
+            "skipped"
+          ]
+        },
+        "delivered_at": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/UtcInstant"
+        }
+      },
+      "additionalProperties": false
+    },
+    "FixtureManifestSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-10.evidence.fixture-manifest"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "FixtureCase": {
+      "type": "object",
+      "required": [
+        "id",
+        "instance",
+        "schema_ref",
+        "expect"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)+$",
+          "maxLength": 160
+        },
+        "instance": {
+          "type": "string",
+          "pattern": "^(?:valid|invalid)/[a-z0-9][a-z0-9._-]*\\.json$",
+          "maxLength": 256
+        },
+        "schema_ref": {
+          "type": "string",
+          "pattern": "^urn:mug:schema:mug\\.api-10\\.evidence:0#/\\$defs/[A-Za-z][A-Za-z0-9]*$",
+          "maxLength": 256
+        },
+        "validation_layer": {
+          "enum": [
+            "schema",
+            "semantic"
+          ]
+        },
+        "expect": {
+          "enum": [
+            "valid",
+            "invalid"
+          ]
+        },
+        "expected_error": {
+          "type": "object",
+          "required": [
+            "keyword",
+            "instance_pointer"
+          ],
+          "properties": {
+            "keyword": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "maxLength": 96
+            },
+            "instance_pointer": {
+              "type": "string",
+              "pattern": "^(?:/[^/]+)*$",
+              "maxLength": 256
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false,
+      "if": {
+        "required": [
+          "expect"
+        ],
+        "properties": {
+          "expect": {
+            "const": "invalid"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "expected_error"
+        ]
+      },
+      "else": {
+        "not": {
+          "required": [
+            "expected_error"
+          ]
+        }
+      }
+    },
+    "FixtureManifest": {
+      "type": "object",
+      "required": [
+        "schema",
+        "manifest_version",
+        "suite",
+        "contract_version",
+        "cases"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/FixtureManifestSchemaRef"
+        },
+        "manifest_version": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/SemVer"
+        },
+        "suite": {
+          "const": "api-10-evidence"
+        },
+        "contract_version": {
+          "const": 0
+        },
+        "cases": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/FixtureCase"
+          },
+          "minItems": 1,
+          "maxItems": 512
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "name": "@mug/kernel",
+  "version": "0.1.0",
+  "description": "The MUG kernel twin: the browser-side half of the wire kernel (canonicalization, digest, identifier encoding, typed-object envelope). It reproduces the Python kernel byte for byte.",
+  "license": "MIT",
+  "type": "commonjs",
+  "main": "dist/src/kernel/index.js",
+  "types": "dist/src/kernel/index.d.ts",
+  "files": [
+    "dist",
+    "src"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "build:web": "tsc -p tsconfig.web.json",
+    "conformance": "node dist/conformance/run.js",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "check:web": "tsc -p tsconfig.web.json --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "typescript": "^5.6.0"
+  }
+}

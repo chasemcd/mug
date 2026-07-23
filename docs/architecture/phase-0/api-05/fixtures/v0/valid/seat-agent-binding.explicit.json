@@ -1,0 +1,15 @@
+{
+  "schema": {
+    "name": "mug.api-05.seat-agent-binding",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "df3da1e10ffec853c052c7188e617cd2f2f529876c19b86d852164ba97552c1f"
+    }
+  },
+  "seat_agent_binding_id": "seatbind_019b6000-0000-7000-8000-000000000450",
+  "interaction_id": "interaction_019b6000-0000-7000-8000-000000000420",
+  "actor_id": "actor_019b6000-0000-7000-8000-000000000410",
+  "seat_key": "player-left",
+  "env_agent_id": "agent_0"
+}

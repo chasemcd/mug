@@ -1,0 +1,20 @@
+{
+  "schema": {
+    "name": "mug.api-17.content-spec",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "63d889325b5004a974527cd9401c5819a22dbcf385c573d7cfad70595313c86f"
+    }
+  },
+  "content_key": "welcome",
+  "body": {
+    "origin": "participant",
+    "source": "inline",
+    "format": "markdown",
+    "executable": false,
+    "text": "I shared all my berries."
+  },
+  "response_required": false,
+  "version": 1
+}

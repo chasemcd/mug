@@ -1,0 +1,27 @@
+{
+  "schema": {
+    "name": "mug.api-11.unit-of-work-receipt",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "007023d2d389fee6f93450c95aac747b412f4ecdfe033820df73c484b75b247e"
+    }
+  },
+  "command_id": "command_019b6000-0000-7000-8000-000000000700",
+  "aggregate_ref": {
+    "id": "visit_019b6000-0000-7000-8000-000000000090"
+  },
+  "aggregate_version": {
+    "revision": 5,
+    "etag": "sha256:e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5"
+  },
+  "committed_event_ids": [
+    "event_019b6000-0000-7000-8000-000000000601"
+  ],
+  "outbox_included": true,
+  "durability": {
+    "receipt": "transactional",
+    "effect": "transactional",
+    "profile": "pg-synchronous-commit"
+  }
+}

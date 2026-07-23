@@ -1,0 +1,30 @@
+{
+  "manifest_schema": {
+    "name": "mug.study.scientific-manifest",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "96958cdf2ab34fd541208d2adcd17f0d2c7d43ee2c1f5e433d2c87e323e2d58f"
+    }
+  },
+  "content_digest": {
+    "algorithm": "sha-256",
+    "hex": "320b814674559cd7d492a157baecd02528c55f91d6036e383f8859cdcf123269"
+  },
+  "artifact": {
+    "artifact_id": "artifact_019b6000-0000-7000-8000-000000000303",
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "320b814674559cd7d492a157baecd02528c55f91d6036e383f8859cdcf123269"
+    },
+    "size_bytes": 3695,
+    "media_type": "application/json",
+    "content_encoding": "identity",
+    "data_handling": {
+      "privacy_labels": [
+        "research",
+        "sensitive"
+      ]
+    }
+  }
+}

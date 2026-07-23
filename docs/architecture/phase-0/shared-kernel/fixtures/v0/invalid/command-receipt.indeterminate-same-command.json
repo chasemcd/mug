@@ -1,0 +1,64 @@
+{
+  "schema": {
+    "name": "mug.command-receipt",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "f675d9ec1f6258719da93a507421689b26babf69d36503c7df90b5039e238d6d"
+    }
+  },
+  "receipt_id": "receipt_019b5ee4-14ec-7f51-89c9-d42db811f050",
+  "command_id": "command_019b5ee1-14ec-7f51-89c9-d42db811f051",
+  "command": {
+    "name": "tool.invoke",
+    "version": 0
+  },
+  "idempotency_key": "idem_7Gg3L2M1qPv9sXr4Nk8BzQ",
+  "outcome": "indeterminate",
+  "receipt_class": "commit",
+  "durability": {
+    "receipt": "transactional",
+    "effect": "unknown",
+    "profile": "postgres-synchronous-v1"
+  },
+  "recorded_at": "2026-07-17T14:22:32.439000Z",
+  "stream_positions": {
+    "stream_019b5eed-14ec-7f51-89c9-d42db811f053": 10
+  },
+  "error": {
+    "schema": {
+      "name": "mug.domain-error",
+      "version": 0,
+      "digest": {
+        "algorithm": "sha-256",
+        "hex": "f675d9ec1f6258719da93a507421689b26babf69d36503c7df90b5039e238d6d"
+      }
+    },
+    "error_id": "error_019b5ee9-14ec-7f51-89c9-d42db811f054",
+    "recorded_at": "2026-07-17T14:22:32.440000Z",
+    "command": {
+      "name": "tool.invoke",
+      "version": 0
+    },
+    "code": "external.unknown_outcome",
+    "category": "dependency",
+    "safe_message": "The external effect may have occurred and requires reconciliation.",
+    "retry": {
+      "mode": "same_command"
+    },
+    "details": {
+      "schema": {
+        "name": "mug.error.external-unknown-outcome-details",
+        "version": 0,
+        "digest": {
+          "algorithm": "sha-256",
+          "hex": "a8fe011ab57352f533124415d5d7dabc0f752a5523b331c1cc8b71ebd69c6cb5"
+        }
+      },
+      "data": {
+        "reconciliation_reference": "reconcile-synthetic-1"
+      }
+    },
+    "support_reference": "error_019b5ee9-14ec-7f51-89c9-d42db811f054"
+  }
+}

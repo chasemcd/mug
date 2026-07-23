@@ -1,0 +1,25 @@
+{
+  "schema": {
+    "name": "mug.api-05.group",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "df3da1e10ffec853c052c7188e617cd2f2f529876c19b86d852164ba97552c1f"
+    }
+  },
+  "group_key": "skill-team",
+  "size": 3,
+  "match": {
+    "strategy": "custom",
+    "matchmaker_ref": "skill-matcher@3"
+  },
+  "wait": {
+    "microseconds": 120000000
+  },
+  "on_timeout": "release",
+  "activities": [
+    {
+      "activity_key": "ranked-game"
+    }
+  ]
+}

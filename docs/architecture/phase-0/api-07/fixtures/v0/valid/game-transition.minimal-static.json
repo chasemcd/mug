@@ -1,0 +1,25 @@
+{
+  "schema": {
+    "name": "mug.api-07.game-transition",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "2c41f0fe7bacf95174dc6c1cc1e57a4ce478d1deca1aeadd9d857f91d7d2caaa"
+    }
+  },
+  "interaction_id": "interaction_019b6000-0000-7000-8000-000000000420",
+  "channel_key": "board",
+  "episode_id": "episode_019b6000-0000-7000-8000-000000000800",
+  "frame_number": 42,
+  "action_digest": {
+    "algorithm": "sha-256",
+    "hex": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1"
+  },
+  "state_digest": {
+    "algorithm": "sha-256",
+    "hex": "a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2"
+  },
+  "applied_decisions": [],
+  "authority": "server",
+  "recorded_at": "2026-08-02T12:05:00.000000Z"
+}

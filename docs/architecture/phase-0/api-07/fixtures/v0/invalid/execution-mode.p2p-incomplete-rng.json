@@ -1,0 +1,37 @@
+{
+  "schema": {
+    "name": "mug.api-07.execution-mode",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "2c41f0fe7bacf95174dc6c1cc1e57a4ce478d1deca1aeadd9d857f91d7d2caaa"
+    }
+  },
+  "mode": "p2p",
+  "snapshot_contract": "deterministic",
+  "writer": "per-replica",
+  "p2p_contract": {
+    "topology": "full-mesh",
+    "input_exchange": "every-frozen-peer",
+    "confirmation": "complete-peer-action-set",
+    "verification": "unanimous-peer-state-hashes",
+    "episode_barrier": "minimum-end-frame-exclusive",
+    "human_input_delay": "symmetric",
+    "reconciliation": "lower-peer-actor-id-defers",
+    "snapshot_coverage": {
+      "environment_state": true,
+      "platform_state": true,
+      "python_rng_state": true,
+      "numpy_rng_state": true
+    },
+    "bot_decisions": {
+      "authority": "designated-peer",
+      "selection": "highest-eligible-peer-actor-id",
+      "tenure": "episode-fixed",
+      "unilateral_switch": "forbidden",
+      "authority_change": "new-fenced-authority-generation",
+      "transport": "peer-input-stream",
+      "rollback": "replay-recorded-decision-result"
+    }
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "schema": {
+    "name": "mug.api-19.dataset-schema-binding",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "97155dd5f5f7945722339f859b002c11e7fdade91f224cb23a9bee28b7b21343"
+    }
+  },
+  "dataset_kind": "events",
+  "row_schema": {
+    "name": "mug.export.event-row",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1"
+    }
+  }
+}

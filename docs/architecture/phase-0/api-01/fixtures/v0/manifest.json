@@ -1,0 +1,272 @@
+{
+  "schema": {
+    "name": "mug.study.fixture-manifest",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "96958cdf2ab34fd541208d2adcd17f0d2c7d43ee2c1f5e433d2c87e323e2d58f"
+    }
+  },
+  "manifest_version": "0.2.0",
+  "suite": "api-01-study-authoring",
+  "contract_version": 0,
+  "cases": [
+    {
+      "id": "authoring-document.valid.minimal-static",
+      "instance": "valid/authoring-document.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-01.study-authoring:0#/$defs/AuthoringDocument",
+      "validation_layer": "semantic",
+      "expect": "valid"
+    },
+    {
+      "id": "client-manifest.valid.minimal-static",
+      "instance": "valid/client-manifest.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-01.study-authoring:0#/$defs/ClientManifest",
+      "validation_layer": "semantic",
+      "expect": "valid"
+    },
+    {
+      "id": "server-manifest.valid.minimal-static",
+      "instance": "valid/server-manifest.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-01.study-authoring:0#/$defs/StudyServerManifest",
+      "validation_layer": "typed_object",
+      "expect": "valid"
+    },
+    {
+      "id": "provenance-manifest.valid.minimal-static",
+      "instance": "valid/provenance-manifest.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-01.study-authoring:0#/$defs/ProvenanceManifest",
+      "validation_layer": "semantic",
+      "expect": "valid"
+    },
+    {
+      "id": "scientific-manifest.valid.minimal-static",
+      "instance": "valid/scientific-manifest.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-01.study-authoring:0#/$defs/ScientificManifest",
+      "validation_layer": "semantic",
+      "expect": "valid"
+    },
+    {
+      "id": "manifest-set.valid.minimal-static",
+      "instance": "valid/manifest-set.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-01.study-authoring:0#/$defs/ManifestSet",
+      "validation_layer": "semantic",
+      "expect": "valid"
+    },
+    {
+      "id": "validation-report.valid.empty",
+      "instance": "valid/validation-report.valid.json",
+      "schema_ref": "urn:mug:schema:mug.api-01.study-authoring:0#/$defs/ValidationReport",
+      "validation_layer": "semantic",
+      "expect": "valid"
+    },
+    {
+      "id": "git-provenance.valid.clean-commit",
+      "instance": "valid/git-provenance.clean-commit.json",
+      "schema_ref": "urn:mug:schema:mug.api-01.study-authoring:0#/$defs/GitProvenance",
+      "validation_layer": "semantic",
+      "expect": "valid"
+    },
+    {
+      "id": "git-provenance.valid.dirty-with-patch",
+      "instance": "valid/git-provenance.dirty-with-patch.json",
+      "schema_ref": "urn:mug:schema:mug.api-01.study-authoring:0#/$defs/GitProvenance",
+      "validation_layer": "semantic",
+      "expect": "valid"
+    },
+    {
+      "id": "published-version.valid.minimal-static",
+      "instance": "valid/published-version.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-01.study-authoring:0#/$defs/PublishedStudyVersion",
+      "validation_layer": "semantic",
+      "expect": "valid"
+    },
+    {
+      "id": "secret-requirement.invalid.inline-value",
+      "instance": "invalid/secret-requirement.inline-value.json",
+      "schema_ref": "urn:mug:schema:mug.api-01.study-authoring:0#/$defs/SecretRequirement",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "additionalProperties",
+        "instance_pointer": ""
+      }
+    },
+    {
+      "id": "capability-requirement.invalid.missing-disposition",
+      "instance": "invalid/capability-requirement.optional-without-disposition.json",
+      "schema_ref": "urn:mug:schema:mug.api-01.study-authoring:0#/$defs/CapabilityRequirement",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "required",
+        "instance_pointer": ""
+      }
+    },
+    {
+      "id": "capability-requirement.invalid.plugin-namespace",
+      "instance": "invalid/capability-requirement.plugin-namespace.json",
+      "schema_ref": "urn:mug:schema:mug.api-01.study-authoring:0#/$defs/CapabilityRequirement",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "pattern",
+        "instance_pointer": "/capability"
+      }
+    },
+    {
+      "id": "server-runtime-binding.invalid.plugin-kind",
+      "instance": "invalid/server-runtime-binding.plugin-kind.json",
+      "schema_ref": "urn:mug:schema:mug.api-01.study-authoring:0#/$defs/ServerRuntimeBindingBase",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "enum",
+        "instance_pointer": "/kind"
+      }
+    },
+    {
+      "id": "diagnostic.invalid.error-suppressible",
+      "instance": "invalid/diagnostic.error-suppressible.json",
+      "schema_ref": "urn:mug:schema:mug.api-01.study-authoring:0#/$defs/Diagnostic",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "const",
+        "instance_pointer": "/suppressible"
+      }
+    },
+    {
+      "id": "authoring-document.invalid.duplicate-definition-key",
+      "instance": "invalid/authoring-document.duplicate-definition-key.json",
+      "schema_ref": "urn:mug:schema:mug.api-01.study-authoring:0#/$defs/AuthoringDocument",
+      "validation_layer": "semantic",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "duplicateDefinitionKey",
+        "instance_pointer": "/definitions/1/key"
+      }
+    },
+    {
+      "id": "flow.invalid.undefined-child",
+      "instance": "invalid/flow.undefined-child.json",
+      "schema_ref": "urn:mug:schema:mug.api-01.study-authoring:0#/$defs/FlowSpec",
+      "validation_layer": "semantic",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "missingNode",
+        "instance_pointer": "/nodes/0/children/0"
+      }
+    },
+    {
+      "id": "flow.invalid.choose-too-large",
+      "instance": "invalid/flow.randomized-choose-too-large.json",
+      "schema_ref": "urn:mug:schema:mug.api-01.study-authoring:0#/$defs/FlowSpec",
+      "validation_layer": "semantic",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "chooseExceedsChoices",
+        "instance_pointer": "/nodes/0/choose"
+      }
+    },
+    {
+      "id": "client-manifest.invalid.internal-study-id",
+      "instance": "invalid/client-manifest.internal-study-id.json",
+      "schema_ref": "urn:mug:schema:mug.api-01.study-authoring:0#/$defs/ClientManifest",
+      "validation_layer": "semantic",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "clientDisclosure",
+        "instance_pointer": "/components/0/config/data/submit_label"
+      }
+    },
+    {
+      "id": "manifest-artifact.invalid.digest-mismatch",
+      "instance": "invalid/manifest-artifact.digest-mismatch.json",
+      "schema_ref": "urn:mug:schema:mug.api-01.study-authoring:0#/$defs/ManifestArtifact",
+      "validation_layer": "semantic",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "artifactDigest",
+        "instance_pointer": "/artifact/digest/hex"
+      }
+    },
+    {
+      "id": "publication.invalid.version-zero",
+      "instance": "invalid/publication.version-zero-manifest.json",
+      "schema_ref": "urn:mug:schema:mug.api-01.study-authoring:0#/$defs/ManifestArtifact",
+      "validation_layer": "publication",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "schemaVersionZero",
+        "instance_pointer": "/manifest_schema/version"
+      }
+    },
+    {
+      "id": "code-package.invalid.mutable-entrypoint-url",
+      "instance": "invalid/code-package.mutable-entrypoint-url.json",
+      "schema_ref": "urn:mug:schema:mug.api-01.study-authoring:0#/$defs/CodePackageRef",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "pattern",
+        "instance_pointer": "/entrypoint"
+      }
+    },
+    {
+      "id": "git-provenance.invalid.dirty-without-patch",
+      "instance": "invalid/git-provenance.dirty-without-patch.json",
+      "schema_ref": "urn:mug:schema:mug.api-01.study-authoring:0#/$defs/GitProvenance",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "required",
+        "instance_pointer": ""
+      }
+    },
+    {
+      "id": "git-provenance.invalid.clean-with-patch",
+      "instance": "invalid/git-provenance.clean-with-patch.json",
+      "schema_ref": "urn:mug:schema:mug.api-01.study-authoring:0#/$defs/GitProvenance",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "not",
+        "instance_pointer": ""
+      }
+    },
+    {
+      "id": "git-provenance.invalid.malformed-commit",
+      "instance": "invalid/git-provenance.malformed-commit.json",
+      "schema_ref": "urn:mug:schema:mug.api-01.study-authoring:0#/$defs/GitProvenance",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "pattern",
+        "instance_pointer": "/commit"
+      }
+    },
+    {
+      "id": "git-provenance.invalid.patch-digest-mismatch",
+      "instance": "invalid/git-provenance.patch-digest-mismatch.json",
+      "schema_ref": "urn:mug:schema:mug.api-01.study-authoring:0#/$defs/GitProvenance",
+      "validation_layer": "semantic",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "patchDigest",
+        "instance_pointer": "/patch/artifact/digest/hex"
+      }
+    },
+    {
+      "id": "published-version.invalid.missing-provenance",
+      "instance": "invalid/published-version.missing-provenance.json",
+      "schema_ref": "urn:mug:schema:mug.api-01.study-authoring:0#/$defs/PublishedStudyVersion",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "required",
+        "instance_pointer": ""
+      }
+    },
+    {
+      "id": "published-version.invalid.blank-version-string",
+      "instance": "invalid/published-version.blank-version-string.json",
+      "schema_ref": "urn:mug:schema:mug.api-01.study-authoring:0#/$defs/PublishedStudyVersion",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "minLength",
+        "instance_pointer": "/version_string"
+      }
+    }
+  ]
+}

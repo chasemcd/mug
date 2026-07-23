@@ -1,0 +1,112 @@
+{
+  "schema": {
+    "name": "mug.api-22.jobs.fixture-manifest",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "df34b114612fea375a7a9e76da5b94bddf2bd5809da6a6277fe51b203e567c33"
+    }
+  },
+  "manifest_version": "0.2.0",
+  "suite": "api-22-jobs",
+  "contract_version": 0,
+  "cases": [
+    {
+      "id": "job-request.valid.minimal-static",
+      "instance": "valid/job-request.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-22.jobs:0#/$defs/JobRequest",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "job-request.valid.simulate-batch",
+      "instance": "valid/job-request.simulate-batch.json",
+      "schema_ref": "urn:mug:schema:mug.api-22.jobs:0#/$defs/JobRequest",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "first-class-kind.valid.export-bundle-build",
+      "instance": "valid/first-class-kind.export-bundle-build.json",
+      "schema_ref": "urn:mug:schema:mug.api-22.jobs:0#/$defs/FirstClassJobKind",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "job-run.valid.minimal-static",
+      "instance": "valid/job-run.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-22.jobs:0#/$defs/JobRun",
+      "expect": "valid",
+      "validation_layer": "semantic"
+    },
+    {
+      "id": "job-result.valid.minimal-static",
+      "instance": "valid/job-result.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-22.jobs:0#/$defs/JobResult",
+      "expect": "valid",
+      "validation_layer": "semantic"
+    },
+    {
+      "id": "job-run.invalid.succeeded-no-result",
+      "instance": "invalid/job-run.succeeded-no-result.json",
+      "schema_ref": "urn:mug:schema:mug.api-22.jobs:0#/$defs/JobRun",
+      "expect": "invalid",
+      "validation_layer": "semantic",
+      "expected_error": {
+        "keyword": "jobResult",
+        "instance_pointer": "/status"
+      }
+    },
+    {
+      "id": "job-result.invalid.success-no-ref",
+      "instance": "invalid/job-result.success-no-ref.json",
+      "schema_ref": "urn:mug:schema:mug.api-22.jobs:0#/$defs/JobResult",
+      "expect": "invalid",
+      "validation_layer": "semantic",
+      "expected_error": {
+        "keyword": "jobResult",
+        "instance_pointer": "/outcome"
+      }
+    },
+    {
+      "id": "job-run.invalid.bad-status",
+      "instance": "invalid/job-run.bad-status.json",
+      "schema_ref": "urn:mug:schema:mug.api-22.jobs:0#/$defs/JobRun",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "enum",
+        "instance_pointer": "/status"
+      }
+    },
+    {
+      "id": "job-request.invalid.bad-id",
+      "instance": "invalid/job-request.bad-id.json",
+      "schema_ref": "urn:mug:schema:mug.api-22.jobs:0#/$defs/JobRequest",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "pattern",
+        "instance_pointer": "/job_id"
+      }
+    },
+    {
+      "id": "job-run.invalid.missing-lease",
+      "instance": "invalid/job-run.missing-lease.json",
+      "schema_ref": "urn:mug:schema:mug.api-22.jobs:0#/$defs/JobRun",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "required",
+        "instance_pointer": ""
+      }
+    },
+    {
+      "id": "first-class-kind.invalid.retired-spelling",
+      "instance": "invalid/first-class-kind.retired-spelling.json",
+      "schema_ref": "urn:mug:schema:mug.api-22.jobs:0#/$defs/FirstClassJobKind",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "enum",
+        "instance_pointer": ""
+      }
+    }
+  ]
+}

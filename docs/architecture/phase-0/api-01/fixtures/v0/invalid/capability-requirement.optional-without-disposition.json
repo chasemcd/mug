@@ -1,0 +1,4 @@
+{
+  "capability": "mug.capture.client-timing.v1",
+  "criticality": "optional_observational"
+}

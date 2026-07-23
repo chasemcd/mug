@@ -1,0 +1,4 @@
+{
+  "capability": "plugin.example-controller.policy.v1",
+  "criticality": "required"
+}

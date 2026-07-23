@@ -1,0 +1,232 @@
+{
+  "schema": {
+    "name": "mug.api-12.scheduler.fixture-manifest",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "b7ac5272d5f4ddbbbb1779afb7f6045a51382067e3318b0c5b800a7658d13a76"
+    }
+  },
+  "manifest_version": "0.3.0",
+  "suite": "api-12-scheduler",
+  "contract_version": 0,
+  "cases": [
+    {
+      "id": "decision-request.valid.minimal-static",
+      "instance": "valid/decision-request.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-12.scheduler:0#/$defs/DecisionRequest",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "decision-result.valid.minimal-static",
+      "instance": "valid/decision-result.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-12.scheduler:0#/$defs/DecisionResult",
+      "expect": "valid",
+      "validation_layer": "semantic"
+    },
+    {
+      "id": "p2p-bot-authority.valid.four-peer",
+      "instance": "valid/p2p-bot-authority.four-peer.json",
+      "schema_ref": "urn:mug:schema:mug.api-12.scheduler:0#/$defs/P2PBotAuthority",
+      "expect": "valid",
+      "validation_layer": "semantic"
+    },
+    {
+      "id": "decision-request.valid.p2p-bot",
+      "instance": "valid/decision-request.p2p-bot.json",
+      "schema_ref": "urn:mug:schema:mug.api-12.scheduler:0#/$defs/DecisionRequest",
+      "expect": "valid",
+      "validation_layer": "semantic"
+    },
+    {
+      "id": "decision-result.valid.p2p-bot",
+      "instance": "valid/decision-result.p2p-bot.json",
+      "schema_ref": "urn:mug:schema:mug.api-12.scheduler:0#/$defs/DecisionResult",
+      "expect": "valid",
+      "validation_layer": "semantic"
+    },
+    {
+      "id": "scheduler-state.valid.minimal-static",
+      "instance": "valid/scheduler-state.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-12.scheduler:0#/$defs/SchedulerState",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "fallback-policy.valid.minimal-static",
+      "instance": "valid/fallback-policy.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-12.scheduler:0#/$defs/FallbackPolicy",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "controller-policy.valid.realtime-static",
+      "instance": "valid/controller-policy.realtime-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-12.scheduler:0#/$defs/ControllerPolicy",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "controller-policy.valid.non-realtime-static",
+      "instance": "valid/controller-policy.non-realtime-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-12.scheduler:0#/$defs/ControllerPolicy",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "decision-request.invalid.bad-id",
+      "instance": "invalid/decision-request.bad-id.json",
+      "schema_ref": "urn:mug:schema:mug.api-12.scheduler:0#/$defs/DecisionRequest",
+      "expect": "invalid",
+      "validation_layer": "schema",
+      "expected_error": {
+        "keyword": "pattern",
+        "instance_pointer": "/decision_id"
+      }
+    },
+    {
+      "id": "p2p-bot-authority.invalid.wrong-selected-peer",
+      "instance": "invalid/p2p-bot-authority.wrong-selected-peer.json",
+      "schema_ref": "urn:mug:schema:mug.api-12.scheduler:0#/$defs/P2PBotAuthority",
+      "expect": "invalid",
+      "validation_layer": "semantic",
+      "expected_error": {
+        "keyword": "authoritySelection",
+        "instance_pointer": "/authority_actor_id"
+      }
+    },
+    {
+      "id": "p2p-bot-authority.invalid.missing-fence",
+      "instance": "invalid/p2p-bot-authority.missing-fence.json",
+      "schema_ref": "urn:mug:schema:mug.api-12.scheduler:0#/$defs/P2PBotAuthority",
+      "expect": "invalid",
+      "validation_layer": "schema",
+      "expected_error": {
+        "keyword": "required",
+        "instance_pointer": ""
+      }
+    },
+    {
+      "id": "decision-request.invalid.p2p-missing-authority",
+      "instance": "invalid/decision-request.p2p-missing-authority.json",
+      "schema_ref": "urn:mug:schema:mug.api-12.scheduler:0#/$defs/DecisionRequest",
+      "expect": "invalid",
+      "validation_layer": "schema",
+      "expected_error": {
+        "keyword": "required",
+        "instance_pointer": ""
+      }
+    },
+    {
+      "id": "decision-request.invalid.p2p-stale-authority",
+      "instance": "invalid/decision-request.p2p-stale-authority.json",
+      "schema_ref": "urn:mug:schema:mug.api-12.scheduler:0#/$defs/DecisionRequest",
+      "expect": "invalid",
+      "validation_layer": "semantic",
+      "expected_error": {
+        "keyword": "authorityBinding",
+        "instance_pointer": "/p2p_authority/episode_generation"
+      }
+    },
+    {
+      "id": "decision-result.invalid.p2p-wrong-authority",
+      "instance": "invalid/decision-result.p2p-wrong-authority.json",
+      "schema_ref": "urn:mug:schema:mug.api-12.scheduler:0#/$defs/DecisionResult",
+      "expect": "invalid",
+      "validation_layer": "semantic",
+      "expected_error": {
+        "keyword": "authorityBinding",
+        "instance_pointer": "/p2p_authority/authority_actor_id"
+      }
+    },
+    {
+      "id": "decision-result.invalid.p2p-redecide",
+      "instance": "invalid/decision-result.p2p-redecide.json",
+      "schema_ref": "urn:mug:schema:mug.api-12.scheduler:0#/$defs/DecisionResult",
+      "expect": "invalid",
+      "validation_layer": "schema",
+      "expected_error": {
+        "keyword": "const",
+        "instance_pointer": "/replay_behavior"
+      }
+    },
+    {
+      "id": "decision-result.invalid.produced-no-action",
+      "instance": "invalid/decision-result.produced-no-action.json",
+      "schema_ref": "urn:mug:schema:mug.api-12.scheduler:0#/$defs/DecisionResult",
+      "expect": "invalid",
+      "validation_layer": "semantic",
+      "expected_error": {
+        "keyword": "decisionEvidence",
+        "instance_pointer": "/outcome"
+      }
+    },
+    {
+      "id": "decision-result.invalid.produced-stale",
+      "instance": "invalid/decision-result.produced-stale.json",
+      "schema_ref": "urn:mug:schema:mug.api-12.scheduler:0#/$defs/DecisionResult",
+      "expect": "invalid",
+      "validation_layer": "semantic",
+      "expected_error": {
+        "keyword": "staleDecision",
+        "instance_pointer": "/staleness"
+      }
+    },
+    {
+      "id": "scheduler-state.invalid.bad-status",
+      "instance": "invalid/scheduler-state.bad-status.json",
+      "schema_ref": "urn:mug:schema:mug.api-12.scheduler:0#/$defs/SchedulerState",
+      "expect": "invalid",
+      "validation_layer": "schema",
+      "expected_error": {
+        "keyword": "enum",
+        "instance_pointer": "/status"
+      }
+    },
+    {
+      "id": "fallback-policy.invalid.bad-on-timeout",
+      "instance": "invalid/fallback-policy.bad-on-timeout.json",
+      "schema_ref": "urn:mug:schema:mug.api-12.scheduler:0#/$defs/FallbackPolicy",
+      "expect": "invalid",
+      "validation_layer": "schema",
+      "expected_error": {
+        "keyword": "enum",
+        "instance_pointer": "/on_timeout"
+      }
+    },
+    {
+      "id": "fallback-policy.invalid.stale-apply",
+      "instance": "invalid/fallback-policy.stale-apply.json",
+      "schema_ref": "urn:mug:schema:mug.api-12.scheduler:0#/$defs/FallbackPolicy",
+      "expect": "invalid",
+      "validation_layer": "schema",
+      "expected_error": {
+        "keyword": "enum",
+        "instance_pointer": "/on_stale"
+      }
+    },
+    {
+      "id": "controller-policy.invalid.realtime-no-fallback",
+      "instance": "invalid/controller-policy.realtime-no-fallback.json",
+      "schema_ref": "urn:mug:schema:mug.api-12.scheduler:0#/$defs/ControllerPolicy",
+      "expect": "invalid",
+      "validation_layer": "schema",
+      "expected_error": {
+        "keyword": "required",
+        "instance_pointer": ""
+      }
+    },
+    {
+      "id": "controller-policy.invalid.zero-cadence",
+      "instance": "invalid/controller-policy.zero-cadence.json",
+      "schema_ref": "urn:mug:schema:mug.api-12.scheduler:0#/$defs/ControllerPolicy",
+      "expect": "invalid",
+      "validation_layer": "schema",
+      "expected_error": {
+        "keyword": "minimum",
+        "instance_pointer": "/decides_every"
+      }
+    }
+  ]
+}

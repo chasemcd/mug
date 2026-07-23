@@ -1,0 +1,126 @@
+{
+  "schema": {
+    "name": "mug.api-14.tools.fixture-manifest",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "0dc762fe68b24cf27065b570c468a76323514d650016cd5b4d87150732766941"
+    }
+  },
+  "manifest_version": "0.2.0",
+  "suite": "api-14-tools",
+  "contract_version": 0,
+  "cases": [
+    {
+      "id": "tool-version.valid.minimal-static",
+      "instance": "valid/tool-version.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-14.tools:0#/$defs/ToolVersion",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "tool-version.valid.mcp-gated",
+      "instance": "valid/tool-version.mcp-gated.json",
+      "schema_ref": "urn:mug:schema:mug.api-14.tools:0#/$defs/ToolVersion",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "tool-call.valid.minimal-static",
+      "instance": "valid/tool-call.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-14.tools:0#/$defs/ToolCall",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "tool-call.valid.mutating-ungated",
+      "instance": "valid/tool-call.mutating-ungated.json",
+      "schema_ref": "urn:mug:schema:mug.api-14.tools:0#/$defs/ToolCall",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "tool-approval.valid.minimal-static",
+      "instance": "valid/tool-approval.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-14.tools:0#/$defs/ToolApproval",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "tool-result.valid.minimal-static",
+      "instance": "valid/tool-result.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-14.tools:0#/$defs/ToolResult",
+      "expect": "valid",
+      "validation_layer": "semantic"
+    },
+    {
+      "id": "environment-command-mailbox.valid.minimal-static",
+      "instance": "valid/environment-command-mailbox.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-14.tools:0#/$defs/EnvironmentCommandMailbox",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "tool-version.invalid.bad-kind",
+      "instance": "invalid/tool-version.bad-kind.json",
+      "schema_ref": "urn:mug:schema:mug.api-14.tools:0#/$defs/ToolVersion",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "enum",
+        "instance_pointer": "/tool_kind"
+      }
+    },
+    {
+      "id": "tool-version.invalid.capability-grant",
+      "instance": "invalid/tool-version.capability-grant.json",
+      "schema_ref": "urn:mug:schema:mug.api-14.tools:0#/$defs/ToolVersion",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "additionalProperties",
+        "instance_pointer": ""
+      }
+    },
+    {
+      "id": "tool-call.invalid.bad-id",
+      "instance": "invalid/tool-call.bad-id.json",
+      "schema_ref": "urn:mug:schema:mug.api-14.tools:0#/$defs/ToolCall",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "pattern",
+        "instance_pointer": "/tool_call_id"
+      }
+    },
+    {
+      "id": "tool-approval.invalid.bad-decision",
+      "instance": "invalid/tool-approval.bad-decision.json",
+      "schema_ref": "urn:mug:schema:mug.api-14.tools:0#/$defs/ToolApproval",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "enum",
+        "instance_pointer": "/decision"
+      }
+    },
+    {
+      "id": "tool-result.invalid.executed-no-result",
+      "instance": "invalid/tool-result.executed-no-result.json",
+      "schema_ref": "urn:mug:schema:mug.api-14.tools:0#/$defs/ToolResult",
+      "expect": "invalid",
+      "validation_layer": "semantic",
+      "expected_error": {
+        "keyword": "toolEvidence",
+        "instance_pointer": "/outcome"
+      }
+    },
+    {
+      "id": "tool-result.invalid.gated-no-approval",
+      "instance": "invalid/tool-result.gated-no-approval.json",
+      "schema_ref": "urn:mug:schema:mug.api-14.tools:0#/$defs/ToolResult",
+      "expect": "invalid",
+      "validation_layer": "semantic",
+      "expected_error": {
+        "keyword": "approvalGate",
+        "instance_pointer": "/approval_required"
+      }
+    }
+  ]
+}

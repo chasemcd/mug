@@ -1,0 +1,735 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:mug:schema:mug.api-12.scheduler:0",
+  "title": "MUG API-12 Automated Controllers and Scheduling contracts, version 0",
+  "$defs": {
+    "AuthoringKey": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(?:[-_.][a-z0-9]+)*$",
+      "maxLength": 128
+    },
+    "ActorId": {
+      "type": "string",
+      "pattern": "^actor_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "EpisodeId": {
+      "type": "string",
+      "pattern": "^episode_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "ExecutionModeName": {
+      "enum": [
+        "server",
+        "browser",
+        "p2p"
+      ]
+    },
+    "Fallback": {
+      "enum": [
+        "repeat-last",
+        "default-action"
+      ]
+    },
+    "P2PMeshMembershipSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-06.p2p-mesh-membership"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "P2PBotAuthoritySchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-12.p2p-bot-authority"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "P2PBotAuthority": {
+      "type": "object",
+      "required": [
+        "schema",
+        "interaction_id",
+        "channel_key",
+        "episode_id",
+        "episode_generation",
+        "bot_actor_id",
+        "mesh_membership_schema",
+        "mesh_membership_digest",
+        "membership_generation",
+        "eligible_peer_actor_ids",
+        "authority_actor_id",
+        "authority_fence",
+        "authority_scope",
+        "selection_policy",
+        "mid_episode_failover",
+        "version"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/P2PBotAuthoritySchemaRef"
+        },
+        "interaction_id": {
+          "type": "string",
+          "pattern": "^interaction_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "channel_key": {
+          "$ref": "#/$defs/AuthoringKey"
+        },
+        "episode_id": {
+          "$ref": "#/$defs/EpisodeId"
+        },
+        "episode_generation": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/PositiveSafeInteger"
+        },
+        "bot_actor_id": {
+          "$ref": "#/$defs/ActorId"
+        },
+        "mesh_membership_schema": {
+          "$ref": "#/$defs/P2PMeshMembershipSchemaRef"
+        },
+        "mesh_membership_digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        },
+        "membership_generation": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/PositiveSafeInteger"
+        },
+        "eligible_peer_actor_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ActorId"
+          },
+          "minItems": 2,
+          "maxItems": 64,
+          "uniqueItems": true
+        },
+        "authority_actor_id": {
+          "$ref": "#/$defs/ActorId"
+        },
+        "authority_fence": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/LeaseRef"
+        },
+        "authority_scope": {
+          "const": "episode"
+        },
+        "selection_policy": {
+          "const": "highest-eligible-peer-actor-id"
+        },
+        "mid_episode_failover": {
+          "const": false
+        },
+        "version": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/VersionStamp"
+        }
+      },
+      "additionalProperties": false
+    },
+    "P2PAuthorityClaim": {
+      "type": "object",
+      "required": [
+        "authority_assignment_digest",
+        "interaction_id",
+        "channel_key",
+        "episode_id",
+        "episode_generation",
+        "target_frame",
+        "bot_actor_id",
+        "authority_actor_id",
+        "mesh_membership_digest",
+        "membership_generation",
+        "authority_fence"
+      ],
+      "properties": {
+        "authority_assignment_digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        },
+        "interaction_id": {
+          "type": "string",
+          "pattern": "^interaction_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "channel_key": {
+          "$ref": "#/$defs/AuthoringKey"
+        },
+        "episode_id": {
+          "$ref": "#/$defs/EpisodeId"
+        },
+        "episode_generation": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/PositiveSafeInteger"
+        },
+        "target_frame": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/NonNegativeSafeInteger"
+        },
+        "bot_actor_id": {
+          "$ref": "#/$defs/ActorId"
+        },
+        "authority_actor_id": {
+          "$ref": "#/$defs/ActorId"
+        },
+        "mesh_membership_digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        },
+        "membership_generation": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/PositiveSafeInteger"
+        },
+        "authority_fence": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/LeaseRef"
+        }
+      },
+      "additionalProperties": false
+    },
+    "DecisionRequestSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-12.decision-request"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "DecisionRequest": {
+      "type": "object",
+      "required": [
+        "schema",
+        "decision_id",
+        "actor_id",
+        "channel_key",
+        "execution_mode",
+        "episode_generation",
+        "source_observation_digest",
+        "deadline",
+        "validity_window",
+        "submitted_at"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/DecisionRequestSchemaRef"
+        },
+        "decision_id": {
+          "type": "string",
+          "pattern": "^decision_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "actor_id": {
+          "type": "string",
+          "pattern": "^actor_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "channel_key": {
+          "$ref": "#/$defs/AuthoringKey"
+        },
+        "execution_mode": {
+          "$ref": "#/$defs/ExecutionModeName"
+        },
+        "episode_generation": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/PositiveSafeInteger"
+        },
+        "source_observation_digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        },
+        "deadline": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/UtcInstant"
+        },
+        "validity_window": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Duration"
+        },
+        "submitted_at": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/UtcInstant"
+        },
+        "p2p_authority": {
+          "$ref": "#/$defs/P2PAuthorityClaim"
+        }
+      },
+      "additionalProperties": false,
+      "if": {
+        "properties": {
+          "execution_mode": {
+            "const": "p2p"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "p2p_authority"
+        ]
+      },
+      "else": {
+        "not": {
+          "required": [
+            "p2p_authority"
+          ]
+        }
+      }
+    },
+    "DecisionResultSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-12.decision-result"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "DecisionResult": {
+      "type": "object",
+      "required": [
+        "schema",
+        "decision_id",
+        "execution_mode",
+        "outcome",
+        "staleness"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/DecisionResultSchemaRef"
+        },
+        "decision_id": {
+          "type": "string",
+          "pattern": "^decision_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "execution_mode": {
+          "$ref": "#/$defs/ExecutionModeName"
+        },
+        "outcome": {
+          "enum": [
+            "produced",
+            "timed-out",
+            "cancelled",
+            "failed"
+          ]
+        },
+        "staleness": {
+          "enum": [
+            "fresh",
+            "stale"
+          ]
+        },
+        "action_digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        },
+        "produced_at": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/UtcInstant"
+        },
+        "p2p_authority": {
+          "$ref": "#/$defs/P2PAuthorityClaim"
+        },
+        "decision_origin": {
+          "enum": [
+            "server-scheduler",
+            "authority-local"
+          ]
+        },
+        "producer": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/ProducerPosition"
+        },
+        "replay_behavior": {
+          "const": "apply-recorded-action"
+        }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "execution_mode": {
+                "const": "p2p"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "p2p_authority",
+              "decision_origin",
+              "producer"
+            ]
+          },
+          "else": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "p2p_authority"
+                  ]
+                },
+                {
+                  "required": [
+                    "decision_origin"
+                  ]
+                },
+                {
+                  "required": [
+                    "producer"
+                  ]
+                },
+                {
+                  "required": [
+                    "replay_behavior"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "execution_mode": {
+                "const": "p2p"
+              },
+              "outcome": {
+                "const": "produced"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "replay_behavior"
+            ]
+          }
+        }
+      ]
+    },
+    "SchedulerStateSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-12.scheduler-state"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "SchedulerState": {
+      "type": "object",
+      "required": [
+        "schema",
+        "actor_id",
+        "status"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/SchedulerStateSchemaRef"
+        },
+        "actor_id": {
+          "type": "string",
+          "pattern": "^actor_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "status": {
+          "enum": [
+            "idle",
+            "requested",
+            "running",
+            "cancelling"
+          ]
+        },
+        "in_flight_decision_id": {
+          "type": "string",
+          "pattern": "^decision_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "FallbackPolicySchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-12.fallback-policy"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "FallbackPolicy": {
+      "type": "object",
+      "required": [
+        "schema",
+        "on_timeout",
+        "on_stale"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/FallbackPolicySchemaRef"
+        },
+        "on_timeout": {
+          "$ref": "#/$defs/Fallback"
+        },
+        "on_stale": {
+          "$ref": "#/$defs/Fallback"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ControllerPolicySchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-12.controller-policy"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ControllerPolicy": {
+      "type": "object",
+      "required": [
+        "schema",
+        "policy_key",
+        "decides_every",
+        "realtime_seat"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/ControllerPolicySchemaRef"
+        },
+        "policy_key": {
+          "$ref": "#/$defs/AuthoringKey"
+        },
+        "decides_every": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/PositiveSafeInteger"
+        },
+        "realtime_seat": {
+          "type": "boolean"
+        },
+        "fallback": {
+          "type": "object",
+          "required": [
+            "on_timeout",
+            "on_stale"
+          ],
+          "properties": {
+            "on_timeout": {
+              "$ref": "#/$defs/Fallback"
+            },
+            "on_stale": {
+              "$ref": "#/$defs/Fallback"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false,
+      "if": {
+        "required": [
+          "realtime_seat"
+        ],
+        "properties": {
+          "realtime_seat": {
+            "const": true
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "fallback"
+        ]
+      }
+    },
+    "FixtureManifestSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-12.scheduler.fixture-manifest"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "FixtureCase": {
+      "type": "object",
+      "required": [
+        "id",
+        "instance",
+        "schema_ref",
+        "expect"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)+$",
+          "maxLength": 160
+        },
+        "instance": {
+          "type": "string",
+          "pattern": "^(?:valid|invalid)/[a-z0-9][a-z0-9._-]*\\.json$",
+          "maxLength": 256
+        },
+        "schema_ref": {
+          "type": "string",
+          "pattern": "^urn:mug:schema:mug\\.api-12\\.scheduler:0#/\\$defs/[A-Za-z][A-Za-z0-9]*$",
+          "maxLength": 256
+        },
+        "validation_layer": {
+          "enum": [
+            "schema",
+            "semantic"
+          ]
+        },
+        "expect": {
+          "enum": [
+            "valid",
+            "invalid"
+          ]
+        },
+        "expected_error": {
+          "type": "object",
+          "required": [
+            "keyword",
+            "instance_pointer"
+          ],
+          "properties": {
+            "keyword": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "maxLength": 96
+            },
+            "instance_pointer": {
+              "type": "string",
+              "pattern": "^(?:/[^/]+)*$",
+              "maxLength": 256
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false,
+      "if": {
+        "required": [
+          "expect"
+        ],
+        "properties": {
+          "expect": {
+            "const": "invalid"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "expected_error"
+        ]
+      },
+      "else": {
+        "not": {
+          "required": [
+            "expected_error"
+          ]
+        }
+      }
+    },
+    "FixtureManifest": {
+      "type": "object",
+      "required": [
+        "schema",
+        "manifest_version",
+        "suite",
+        "contract_version",
+        "cases"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/FixtureManifestSchemaRef"
+        },
+        "manifest_version": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/SemVer"
+        },
+        "suite": {
+          "const": "api-12-scheduler"
+        },
+        "contract_version": {
+          "const": 0
+        },
+        "cases": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/FixtureCase"
+          },
+          "minItems": 1,
+          "maxItems": 512
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

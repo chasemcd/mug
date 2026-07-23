@@ -1,0 +1,18 @@
+{
+  "schema": {
+    "name": "mug.api-18.preference-protocol",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "23659cee1b0870cb156470ea50e88501e7158412e6c6d762c3735e54a8114705"
+    }
+  },
+  "protocol_version_id": "prefver_019b6000-0000-7000-8000-000000000f12",
+  "protocol_definition_id": "prefdef_019b6000-0000-7000-8000-000000000f13",
+  "candidate_kind": "model-output",
+  "task": {
+    "kind": "rating"
+  },
+  "blinded": false,
+  "randomize_order": false
+}

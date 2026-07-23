@@ -1,0 +1,105 @@
+{
+  "schema": {
+    "name": "mug.api-11.storage.fixture-manifest",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "007023d2d389fee6f93450c95aac747b412f4ecdfe033820df73c484b75b247e"
+    }
+  },
+  "manifest_version": "0.2.0",
+  "suite": "api-11-storage",
+  "contract_version": 0,
+  "cases": [
+    {
+      "id": "artifact-staging.valid.minimal-static",
+      "instance": "valid/artifact-staging.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-11.storage:0#/$defs/ArtifactStaging",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "finalized-artifact.valid.minimal-static",
+      "instance": "valid/finalized-artifact.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-11.storage:0#/$defs/FinalizedArtifact",
+      "expect": "valid",
+      "validation_layer": "semantic"
+    },
+    {
+      "id": "outbox-record.valid.minimal-static",
+      "instance": "valid/outbox-record.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-11.storage:0#/$defs/OutboxRecord",
+      "expect": "valid",
+      "validation_layer": "semantic"
+    },
+    {
+      "id": "unit-of-work-receipt.valid.minimal-static",
+      "instance": "valid/unit-of-work-receipt.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-11.storage:0#/$defs/UnitOfWorkReceipt",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "finalized-artifact.invalid.digest-mismatch",
+      "instance": "invalid/finalized-artifact.digest-mismatch.json",
+      "schema_ref": "urn:mug:schema:mug.api-11.storage:0#/$defs/FinalizedArtifact",
+      "expect": "invalid",
+      "validation_layer": "semantic",
+      "expected_error": {
+        "keyword": "artifactDigest",
+        "instance_pointer": "/artifact/digest/hex"
+      }
+    },
+    {
+      "id": "outbox-record.invalid.confirmed-no-events",
+      "instance": "invalid/outbox-record.confirmed-no-events.json",
+      "schema_ref": "urn:mug:schema:mug.api-11.storage:0#/$defs/OutboxRecord",
+      "expect": "invalid",
+      "validation_layer": "semantic",
+      "expected_error": {
+        "keyword": "outboxEvidence",
+        "instance_pointer": "/event_ids"
+      }
+    },
+    {
+      "id": "artifact-staging.invalid.retention-policy",
+      "instance": "invalid/artifact-staging.retention-policy.json",
+      "schema_ref": "urn:mug:schema:mug.api-11.storage:0#/$defs/ArtifactStaging",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "additionalProperties",
+        "instance_pointer": "/data_handling"
+      }
+    },
+    {
+      "id": "artifact-staging.invalid.bad-status",
+      "instance": "invalid/artifact-staging.bad-status.json",
+      "schema_ref": "urn:mug:schema:mug.api-11.storage:0#/$defs/ArtifactStaging",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "enum",
+        "instance_pointer": "/status"
+      }
+    },
+    {
+      "id": "outbox-record.invalid.bad-destination",
+      "instance": "invalid/outbox-record.bad-destination.json",
+      "schema_ref": "urn:mug:schema:mug.api-11.storage:0#/$defs/OutboxRecord",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "enum",
+        "instance_pointer": "/destination"
+      }
+    },
+    {
+      "id": "unit-of-work-receipt.invalid.missing-durability",
+      "instance": "invalid/unit-of-work-receipt.missing-durability.json",
+      "schema_ref": "urn:mug:schema:mug.api-11.storage:0#/$defs/UnitOfWorkReceipt",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "required",
+        "instance_pointer": ""
+      }
+    }
+  ]
+}

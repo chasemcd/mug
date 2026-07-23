@@ -1,0 +1,26 @@
+{
+  "schema": {
+    "name": "mug.api-06.matchmaking-ticket",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "538a17e390be96543227d1cdef37274dbf0e59d1c10c457f3c3f428be182dc02"
+    }
+  },
+  "study_version": {
+    "study_id": "study_019b6000-0000-7000-8000-000000000001",
+    "study_version_id": "studyver_019b6000-0000-7000-8000-000000000010",
+    "version_number": 2,
+    "manifest_digest": {
+      "algorithm": "sha-256",
+      "hex": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1"
+    }
+  },
+  "group_key": "team",
+  "enrollment_id": "enrollment_019b6000-0000-7000-8000-000000000081",
+  "match": {
+    "kind": "fifo"
+  },
+  "enqueued_at": "2026-08-02T11:58:00.000000Z",
+  "status": "matched"
+}

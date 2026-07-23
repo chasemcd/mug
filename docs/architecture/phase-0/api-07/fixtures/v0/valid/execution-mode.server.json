@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "mug.api-07.execution-mode",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "2c41f0fe7bacf95174dc6c1cc1e57a4ce478d1deca1aeadd9d857f91d7d2caaa"
+    }
+  },
+  "mode": "server",
+  "snapshot_contract": "keyframe",
+  "writer": "single"
+}

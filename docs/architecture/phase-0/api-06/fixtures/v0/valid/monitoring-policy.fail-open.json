@@ -1,0 +1,23 @@
+{
+  "enforcement": "server-authoritative",
+  "max_rtt": {
+    "microseconds": 200000
+  },
+  "max_hidden": {
+    "microseconds": 3000000
+  },
+  "ladder": [
+    {
+      "at_violations": 2,
+      "action": "warn"
+    },
+    {
+      "at_violations": 4,
+      "action": "exclude"
+    }
+  ],
+  "callback": {
+    "handler": "studies.foraging.monitoring.notify",
+    "on_error": "fail_open"
+  }
+}

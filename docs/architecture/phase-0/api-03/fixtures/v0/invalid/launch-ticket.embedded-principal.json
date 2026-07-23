@@ -1,0 +1,36 @@
+{
+  "schema": {
+    "name": "mug.api-03.launch-ticket",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "9e1a5bbf831cf1e93b854ffce55b56cdd67ce6499f1e7f5b266665d4a2894caf"
+    }
+  },
+  "ticket_handle": "handle_AAAAAAAAAAAAAAAAAAAAAA",
+  "study_id": "study_019b6000-0000-7000-8000-000000000001",
+  "deployment": {
+    "deployment_id": "deploy_019b6000-0000-7000-8000-000000000020",
+    "deployment_revision_id": "deployrev_019b6000-0000-7000-8000-000000000021",
+    "revision_number": 1,
+    "study_version": {
+      "study_id": "study_019b6000-0000-7000-8000-000000000001",
+      "study_version_id": "studyver_019b6000-0000-7000-8000-000000000010",
+      "version_number": 2,
+      "manifest_digest": {
+        "algorithm": "sha-256",
+        "hex": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1"
+      }
+    },
+    "manifest_digest": {
+      "algorithm": "sha-256",
+      "hex": "a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2"
+    }
+  },
+  "issued_at": "2026-08-02T12:00:00.000000Z",
+  "expires_at": "2026-08-02T13:00:00.000000Z",
+  "principal": {
+    "kind": "participant",
+    "id": "participant_019b6000-0000-7000-8000-000000000080"
+  }
+}

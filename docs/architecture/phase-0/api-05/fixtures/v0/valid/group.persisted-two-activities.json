@@ -1,0 +1,32 @@
+{
+  "schema": {
+    "name": "mug.api-05.group",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "df3da1e10ffec853c052c7188e617cd2f2f529876c19b86d852164ba97552c1f"
+    }
+  },
+  "group_key": "pair",
+  "size": 2,
+  "match": {
+    "strategy": "fifo"
+  },
+  "wait": {
+    "microseconds": 90000000
+  },
+  "on_timeout": "release",
+  "activities": [
+    {
+      "activity_key": "round-1"
+    },
+    {
+      "activity_key": "round-2",
+      "on_missing_member": "wait"
+    },
+    {
+      "activity_key": "round-3",
+      "on_missing_member": "regroup"
+    }
+  ]
+}

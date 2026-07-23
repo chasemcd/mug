@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "mug.api-12.scheduler-state",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "b7ac5272d5f4ddbbbb1779afb7f6045a51382067e3318b0c5b800a7658d13a76"
+    }
+  },
+  "actor_id": "actor_019b6000-0000-7000-8000-000000000411",
+  "status": "paused",
+  "in_flight_decision_id": "decision_019b6000-0000-7000-8000-000000000b01"
+}

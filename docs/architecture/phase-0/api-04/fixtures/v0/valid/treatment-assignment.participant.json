@@ -1,0 +1,19 @@
+{
+  "schema": {
+    "name": "mug.api-04.treatment-assignment",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "5985bd0df049a1a3fa2fc730e66fe0fe89c7a49038e40d1ce07a46f6a0fea161"
+    }
+  },
+  "treatment_key": "difficulty",
+  "level_key": "easy",
+  "scope": "participant",
+  "visit_id": "visit_019b6000-0000-7000-8000-000000000090",
+  "assigned_at": "2026-08-02T12:00:05.000000Z",
+  "assignment_digest": {
+    "algorithm": "sha-256",
+    "hex": "f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1"
+  }
+}

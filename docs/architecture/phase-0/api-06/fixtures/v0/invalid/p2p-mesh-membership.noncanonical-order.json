@@ -1,0 +1,25 @@
+{
+  "schema": {
+    "name": "mug.api-06.p2p-mesh-membership",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "538a17e390be96543227d1cdef37274dbf0e59d1c10c457f3c3f428be182dc02"
+    }
+  },
+  "interaction_id": "interaction_019b6000-0000-7000-8000-000000000420",
+  "group_id": "group_019b6000-0000-7000-8000-000000000480",
+  "channel_key": "board",
+  "peer_actor_ids": [
+    "actor_019b6000-0000-7000-8000-000000000410",
+    "actor_019b6000-0000-7000-8000-000000000412",
+    "actor_019b6000-0000-7000-8000-000000000411",
+    "actor_019b6000-0000-7000-8000-000000000413"
+  ],
+  "topology": "full-mesh",
+  "membership_generation": 3,
+  "version": {
+    "revision": 1,
+    "etag": "sha256:c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1"
+  }
+}

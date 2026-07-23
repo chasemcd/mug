@@ -1,0 +1,37 @@
+{
+  "schema": {
+    "name": "mug.command-envelope",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "f675d9ec1f6258719da93a507421689b26babf69d36503c7df90b5039e238d6d"
+    }
+  },
+  "protocol_version": "0.1.0",
+  "command": {
+    "name": "preference.response.submit",
+    "version": 0
+  },
+  "request_id": "request_019b5ed0-14ec-7f51-89c9-d42db811f03b",
+  "idempotency_key": "idem_7Gg3L2M1qPv9sXr4Nk8BzQ",
+  "target": {
+    "id": "prefassign_019b5ecc-14ec-7f51-89c9-d42db811f03d"
+  },
+  "principal": {
+    "kind": "participant",
+    "id": "participant_01981c70-5a35-76eb-94c8-5072f2c0c868"
+  },
+  "payload": {
+    "schema": {
+      "name": "mug.preference.response-submit-payload",
+      "version": 0,
+      "digest": {
+        "algorithm": "sha-256",
+        "hex": "bc41880bf580cc353fb9b3701e23f9781abebd3e476a3fa7e47ba70b450f1abc"
+      }
+    },
+    "data": {
+      "candidate_id": "candidate-1"
+    }
+  }
+}

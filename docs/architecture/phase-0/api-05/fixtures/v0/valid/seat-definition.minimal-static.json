@@ -1,0 +1,17 @@
+{
+  "schema": {
+    "name": "mug.api-05.seat-definition",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "df3da1e10ffec853c052c7188e617cd2f2f529876c19b86d852164ba97552c1f"
+    }
+  },
+  "seat_definition_id": "seatdef_019b6000-0000-7000-8000-000000000401",
+  "seat_key": "player-left",
+  "occupancy": "either",
+  "modality_capabilities": [
+    "mug.game.action.v1",
+    "mug.chat.message.v1"
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "schema": {
+    "name": "mug.api-13.agent-version",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "4d5daed964741e873a261d06732f45e8d4342562325528d4824d7d1ab9915cdc"
+    }
+  },
+  "agent_version_id": "agentver_019b6000-0000-7000-8000-000000000430",
+  "agent_definition_id": "agentdef_019b6000-0000-7000-8000-000000000431",
+  "agent_key": "llm-partner",
+  "version_number": 2,
+  "provider": "anthropic",
+  "model_selector": "claude-sonnet-4-5",
+  "prompt_version_id": "promptver_019b6000-0000-7000-8000-000000000440",
+  "parameters_digest": {
+    "algorithm": "sha-256",
+    "hex": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1"
+  },
+  "tool_version_ids": [
+    "toolver_019b6000-0000-7000-8000-000000000450"
+  ],
+  "fallback_policy_key": "chat-fallback",
+  "secret_name": "chat-provider-key"
+}

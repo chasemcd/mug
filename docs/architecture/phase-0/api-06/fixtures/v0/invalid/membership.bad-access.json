@@ -1,0 +1,14 @@
+{
+  "schema": {
+    "name": "mug.api-06.membership",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "538a17e390be96543227d1cdef37274dbf0e59d1c10c457f3c3f428be182dc02"
+    }
+  },
+  "interaction_id": "interaction_019b6000-0000-7000-8000-000000000420",
+  "actor_id": "actor_019b6000-0000-7000-8000-000000000413",
+  "channel_key": "talk",
+  "access": "owner"
+}

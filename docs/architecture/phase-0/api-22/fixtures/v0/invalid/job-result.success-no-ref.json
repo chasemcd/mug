@@ -1,0 +1,17 @@
+{
+  "schema": {
+    "name": "mug.api-22.job-result",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "df34b114612fea375a7a9e76da5b94bddf2bd5809da6a6277fe51b203e567c33"
+    }
+  },
+  "job_id": "job_019b6000-0000-7000-8000-000000000910",
+  "work_key": {
+    "algorithm": "sha-256",
+    "hex": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "outcome": "success",
+  "completed_at": "2026-08-02T12:00:05.000000Z"
+}

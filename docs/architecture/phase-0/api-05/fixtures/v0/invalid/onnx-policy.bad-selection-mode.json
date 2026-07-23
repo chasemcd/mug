@@ -1,0 +1,15 @@
+{
+  "schema": {
+    "name": "mug.api-05.onnx-policy",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "df3da1e10ffec853c052c7188e617cd2f2f529876c19b86d852164ba97552c1f"
+    }
+  },
+  "policy_ref": "berry-forager-onnx@4",
+  "preprocessing": {
+    "transform": "normalize"
+  },
+  "selection_mode": "greedy"
+}

@@ -1,0 +1,78 @@
+{
+  "schema": {
+    "name": "mug.api-03.fixture-manifest",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "9e1a5bbf831cf1e93b854ffce55b56cdd67ce6499f1e7f5b266665d4a2894caf"
+    }
+  },
+  "manifest_version": "0.1.0",
+  "suite": "api-03-identity-enrollment",
+  "contract_version": 0,
+  "cases": [
+    {
+      "id": "enrollment.valid.minimal-static",
+      "instance": "valid/enrollment.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-03.identity-enrollment:0#/$defs/Enrollment",
+      "expect": "valid",
+      "validation_layer": "semantic"
+    },
+    {
+      "id": "launch-ticket.valid.minimal-static",
+      "instance": "valid/launch-ticket.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-03.identity-enrollment:0#/$defs/LaunchTicket",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "external-identity-link.valid.minimal-static",
+      "instance": "valid/external-identity-link.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-03.identity-enrollment:0#/$defs/ExternalIdentityLink",
+      "expect": "valid",
+      "validation_layer": "semantic"
+    },
+    {
+      "id": "enrollment.invalid.researcher-principal",
+      "instance": "invalid/enrollment.researcher-principal.json",
+      "schema_ref": "urn:mug:schema:mug.api-03.identity-enrollment:0#/$defs/Enrollment",
+      "expect": "invalid",
+      "validation_layer": "semantic",
+      "expected_error": {
+        "keyword": "principalKind",
+        "instance_pointer": "/principal/kind"
+      }
+    },
+    {
+      "id": "enrollment.invalid.pii-field",
+      "instance": "invalid/enrollment.pii-field.json",
+      "schema_ref": "urn:mug:schema:mug.api-03.identity-enrollment:0#/$defs/Enrollment",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "additionalProperties",
+        "instance_pointer": ""
+      }
+    },
+    {
+      "id": "launch-ticket.invalid.embedded-principal",
+      "instance": "invalid/launch-ticket.embedded-principal.json",
+      "schema_ref": "urn:mug:schema:mug.api-03.identity-enrollment:0#/$defs/LaunchTicket",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "additionalProperties",
+        "instance_pointer": ""
+      }
+    },
+    {
+      "id": "external-identity-link.invalid.no-pii",
+      "instance": "invalid/external-identity-link.no-pii.json",
+      "schema_ref": "urn:mug:schema:mug.api-03.identity-enrollment:0#/$defs/ExternalIdentityLink",
+      "expect": "invalid",
+      "validation_layer": "semantic",
+      "expected_error": {
+        "keyword": "piiClassification",
+        "instance_pointer": "/data_handling/privacy_labels"
+      }
+    }
+  ]
+}

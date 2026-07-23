@@ -1,0 +1,7 @@
+{
+  "commit": "0123456789abcdef0123456789abcdef01234567",
+  "branch": "main",
+  "remote": "https://example.invalid/studies/minimal-static.git",
+  "dirty": false,
+  "source_path": "studies/minimal-static"
+}

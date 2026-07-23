@@ -1,0 +1,72 @@
+{
+  "schema": {
+    "name": "mug.command-receipt",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "f675d9ec1f6258719da93a507421689b26babf69d36503c7df90b5039e238d6d"
+    }
+  },
+  "receipt_id": "receipt_019b5ed4-14ec-7f51-89c9-d42db811f040",
+  "command_id": "command_019b5ed1-14ec-7f51-89c9-d42db811f041",
+  "command": {
+    "name": "preference.response.submit",
+    "version": 0
+  },
+  "idempotency_key": "idem_7Gg3L2M1qPv9sXr4Nk8BzQ",
+  "outcome": "accepted",
+  "receipt_class": "commit",
+  "durability": {
+    "receipt": "transactional",
+    "effect": "transactional",
+    "profile": "postgres-synchronous-v1"
+  },
+  "recorded_at": "2026-07-17T14:22:31.439000Z",
+  "stream_positions": {
+    "stream_019b5ecd-14ec-7f51-89c9-d42db811f043": 9
+  },
+  "result": {
+    "schema": {
+      "name": "mug.preference.response-submit-result",
+      "version": 0,
+      "digest": {
+        "algorithm": "sha-256",
+        "hex": "e80fad50984383eb0e6417d1b726f38225b23417a3b6da3f4e79ee8ac9b22e89"
+      }
+    },
+    "data": {
+      "response_id": "prefresponse_019b5ed4-14ec-7f51-89c9-d42db811f042"
+    }
+  },
+  "error": {
+    "schema": {
+      "name": "mug.domain-error",
+      "version": 0,
+      "digest": {
+        "algorithm": "sha-256",
+        "hex": "f675d9ec1f6258719da93a507421689b26babf69d36503c7df90b5039e238d6d"
+      }
+    },
+    "error_id": "error_019b5ed9-14ec-7f51-89c9-d42db811f044",
+    "request_id": "request_019b5ed0-14ec-7f51-89c9-d42db811f03b",
+    "recorded_at": "2026-07-17T14:22:31.440000Z",
+    "code": "command.state_conflict",
+    "category": "conflict",
+    "safe_message": "The command was rejected.",
+    "retry": {
+      "mode": "never"
+    },
+    "details": {
+      "schema": {
+        "name": "mug.error.command-state-conflict-details",
+        "version": 0,
+        "digest": {
+          "algorithm": "sha-256",
+          "hex": "38eda73750648c5b0fa57556fb953e33cafdb6e1e7ed481d3033cd729ba8cda8"
+        }
+      },
+      "data": {}
+    },
+    "support_reference": "error_019b5ed9-14ec-7f51-89c9-d42db811f044"
+  }
+}

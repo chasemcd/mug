@@ -1,0 +1,29 @@
+{
+  "commit": "89abcdef0123456789abcdef0123456789abcdef",
+  "branch": "feature/longer-time-limit",
+  "remote": "git@example.invalid:studies/minimal-static.git",
+  "dirty": true,
+  "patch": {
+    "patch_digest": {
+      "algorithm": "sha-256",
+      "hex": "5555555555555555555555555555555555555555555555555555555555555555"
+    },
+    "size_bytes": 512,
+    "artifact": {
+      "artifact_id": "artifact_019b6000-0000-7000-8000-000000000501",
+      "digest": {
+        "algorithm": "sha-256",
+        "hex": "5555555555555555555555555555555555555555555555555555555555555555"
+      },
+      "size_bytes": 512,
+      "media_type": "text/x-diff",
+      "content_encoding": "identity",
+      "data_handling": {
+        "privacy_labels": [
+          "research",
+          "sensitive"
+        ]
+      }
+    }
+  }
+}

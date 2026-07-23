@@ -1,0 +1,33 @@
+{
+  "schema": {
+    "name": "mug.api-06.group",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "538a17e390be96543227d1cdef37274dbf0e59d1c10c457f3c3f428be182dc02"
+    }
+  },
+  "group_id": "group_019b6000-0000-7000-8000-000000000480",
+  "study_version": {
+    "study_id": "study_019b6000-0000-7000-8000-000000000001",
+    "study_version_id": "studyver_019b6000-0000-7000-8000-000000000010",
+    "version_number": 2,
+    "manifest_digest": {
+      "algorithm": "sha-256",
+      "hex": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1"
+    }
+  },
+  "group_key": "team",
+  "size": 4,
+  "members": [
+    "enrollment_019b6000-0000-7000-8000-000000000081",
+    "enrollment_019b6000-0000-7000-8000-000000000082",
+    "enrollment_019b6000-0000-7000-8000-000000000083"
+  ],
+  "status": "formed",
+  "formed_at": "2026-08-02T12:00:00.000000Z",
+  "version": {
+    "revision": 3,
+    "etag": "sha256:f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1"
+  }
+}

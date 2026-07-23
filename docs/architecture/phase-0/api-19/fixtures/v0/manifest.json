@@ -1,0 +1,152 @@
+{
+  "schema": {
+    "name": "mug.api-19.export.fixture-manifest",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "97155dd5f5f7945722339f859b002c11e7fdade91f224cb23a9bee28b7b21343"
+    }
+  },
+  "manifest_version": "0.2.0",
+  "suite": "api-19-export",
+  "contract_version": 0,
+  "cases": [
+    {
+      "id": "export-request.valid.minimal-static",
+      "instance": "valid/export-request.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-19.export:0#/$defs/ExportRequest",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "export-bundle.valid.minimal-static",
+      "instance": "valid/export-bundle.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-19.export:0#/$defs/ExportBundle",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "lineage-record.valid.minimal-static",
+      "instance": "valid/lineage-record.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-19.export:0#/$defs/LineageRecord",
+      "expect": "valid",
+      "validation_layer": "semantic"
+    },
+    {
+      "id": "lineage-record.valid.redacted-derived",
+      "instance": "valid/lineage-record.redacted-derived.json",
+      "schema_ref": "urn:mug:schema:mug.api-19.export:0#/$defs/LineageRecord",
+      "expect": "valid",
+      "validation_layer": "semantic"
+    },
+    {
+      "id": "dataset-schema-binding.valid.minimal-static",
+      "instance": "valid/dataset-schema-binding.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-19.export:0#/$defs/DatasetSchemaBinding",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "lineage-record.invalid.no-sources",
+      "instance": "invalid/lineage-record.no-sources.json",
+      "schema_ref": "urn:mug:schema:mug.api-19.export:0#/$defs/LineageRecord",
+      "expect": "invalid",
+      "validation_layer": "semantic",
+      "expected_error": {
+        "keyword": "exportLineage",
+        "instance_pointer": "/source_stream_ids"
+      }
+    },
+    {
+      "id": "lineage-record.invalid.redacted-no-source-artifact",
+      "instance": "invalid/lineage-record.redacted-no-source-artifact.json",
+      "schema_ref": "urn:mug:schema:mug.api-19.export:0#/$defs/LineageRecord",
+      "expect": "invalid",
+      "validation_layer": "semantic",
+      "expected_error": {
+        "keyword": "derivedExportSource",
+        "instance_pointer": "/source_artifact_ids"
+      }
+    },
+    {
+      "id": "lineage-record.invalid.dirty-without-patch",
+      "instance": "invalid/lineage-record.dirty-without-patch.json",
+      "schema_ref": "urn:mug:schema:mug.api-19.export:0#/$defs/LineageRecord",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "required",
+        "instance_pointer": "/git_provenance"
+      }
+    },
+    {
+      "id": "export-request.invalid.format-menu-removed",
+      "instance": "invalid/export-request.format-menu-removed.json",
+      "schema_ref": "urn:mug:schema:mug.api-19.export:0#/$defs/ExportRequest",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "additionalProperties",
+        "instance_pointer": ""
+      }
+    },
+    {
+      "id": "export-request.invalid.retired-kind",
+      "instance": "invalid/export-request.retired-kind.json",
+      "schema_ref": "urn:mug:schema:mug.api-19.export:0#/$defs/ExportRequest",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "enum",
+        "instance_pointer": "/dataset_kind"
+      }
+    },
+    {
+      "id": "export-request.invalid.bad-key",
+      "instance": "invalid/export-request.bad-key.json",
+      "schema_ref": "urn:mug:schema:mug.api-19.export:0#/$defs/ExportRequest",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "pattern",
+        "instance_pointer": "/export_key"
+      }
+    },
+    {
+      "id": "export-bundle.invalid.bad-completeness",
+      "instance": "invalid/export-bundle.bad-completeness.json",
+      "schema_ref": "urn:mug:schema:mug.api-19.export:0#/$defs/ExportBundle",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "enum",
+        "instance_pointer": "/completeness"
+      }
+    },
+    {
+      "id": "export-bundle.invalid.bad-media-type",
+      "instance": "invalid/export-bundle.bad-media-type.json",
+      "schema_ref": "urn:mug:schema:mug.api-19.export:0#/$defs/ExportBundle",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "const",
+        "instance_pointer": "/artifact/media_type"
+      }
+    },
+    {
+      "id": "export-bundle.invalid.retention-policy",
+      "instance": "invalid/export-bundle.retention-policy.json",
+      "schema_ref": "urn:mug:schema:mug.api-19.export:0#/$defs/ExportBundle",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "additionalProperties",
+        "instance_pointer": "/data_handling"
+      }
+    },
+    {
+      "id": "dataset-schema-binding.invalid.bad-kind",
+      "instance": "invalid/dataset-schema-binding.bad-kind.json",
+      "schema_ref": "urn:mug:schema:mug.api-19.export:0#/$defs/DatasetSchemaBinding",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "enum",
+        "instance_pointer": "/dataset_kind"
+      }
+    }
+  ]
+}

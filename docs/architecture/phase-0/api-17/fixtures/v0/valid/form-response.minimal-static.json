@@ -1,0 +1,19 @@
+{
+  "schema": {
+    "name": "mug.api-17.form-response",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "63d889325b5004a974527cd9401c5819a22dbcf385c573d7cfad70595313c86f"
+    }
+  },
+  "form_key": "debrief",
+  "visit_id": "visit_019b6000-0000-7000-8000-000000000090",
+  "occurrence_id": "activity_019b6000-0000-7000-8000-000000000102",
+  "answers_digest": {
+    "algorithm": "sha-256",
+    "hex": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1"
+  },
+  "receipt_required": true,
+  "submitted_at": "2026-08-02T12:10:00.000000Z"
+}

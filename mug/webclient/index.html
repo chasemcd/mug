@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MUG</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: system-ui, sans-serif;
+        background: #0f1115;
+        color: #e6e6e6;
+        display: grid;
+        place-items: center;
+        height: 100vh;
+      }
+      main {
+        text-align: center;
+      }
+      #status {
+        font-size: 0.9rem;
+        color: #9aa0a6;
+      }
+      #status.ok {
+        color: #7ee787;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>MUG</h1>
+      <p id="status">connecting...</p>
+      <div id="app"></div>
+    </main>
+    <script type="module" src="/static/main.js"></script>
+  </body>
+</html>

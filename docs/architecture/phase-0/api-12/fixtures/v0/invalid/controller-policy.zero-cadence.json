@@ -1,0 +1,17 @@
+{
+  "schema": {
+    "name": "mug.api-12.controller-policy",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "b7ac5272d5f4ddbbbb1779afb7f6045a51382067e3318b0c5b800a7658d13a76"
+    }
+  },
+  "policy_key": "foraging-partner",
+  "decides_every": 0,
+  "realtime_seat": true,
+  "fallback": {
+    "on_timeout": "repeat-last",
+    "on_stale": "default-action"
+  }
+}

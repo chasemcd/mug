@@ -1,0 +1,19 @@
+{
+  "schema": {
+    "name": "mug.api-07.episode-boundary",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "2c41f0fe7bacf95174dc6c1cc1e57a4ce478d1deca1aeadd9d857f91d7d2caaa"
+    }
+  },
+  "episode_id": "episode_019b6000-0000-7000-8000-000000000800",
+  "interaction_id": "interaction_019b6000-0000-7000-8000-000000000420",
+  "kind": "terminal",
+  "end_frame_exclusive": 128,
+  "authority": "server",
+  "state_hash": {
+    "algorithm": "sha-256",
+    "hex": "c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1"
+  }
+}

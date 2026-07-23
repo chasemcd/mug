@@ -1,0 +1,16 @@
+{
+  "schema": {
+    "name": "mug.api-06.channel-instance",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "538a17e390be96543227d1cdef37274dbf0e59d1c10c457f3c3f428be182dc02"
+    }
+  },
+  "channel_instance_id": "channel_019b6000-0000-7000-8000-000000000461",
+  "interaction_id": "interaction_019b6000-0000-7000-8000-000000000420",
+  "channel_definition_id": "channeldef_019b6000-0000-7000-8000-000000000471",
+  "channel_key": "talk",
+  "channel_type": "chat",
+  "ordering": "per-producer"
+}

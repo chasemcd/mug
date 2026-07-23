@@ -1,0 +1,17 @@
+{
+  "schema": {
+    "name": "mug.api-10.experienced-frame",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "f8d8da4c9fc94a6ce9234132cf0f22f166d3a3f8668a1e8113d2cebf9c7c4d6b"
+    }
+  },
+  "stream_position": {
+    "stream_id": "stream_019b6000-0000-7000-8000-000000000500",
+    "sequence": 2
+  },
+  "canonical_event_id": "event_019b6000-0000-7000-8000-000000000602",
+  "delivery_kind": "guessed",
+  "delivered_at": "2026-08-02T12:05:01.500000Z"
+}

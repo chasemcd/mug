@@ -1,0 +1,18 @@
+{
+  "schema": {
+    "name": "mug.api-09.gate-op",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "a687a1359b23e69f995ab8ccae6a335f99f87848c8dcd524cd4c3d92cfa0506a"
+    }
+  },
+  "gate_id": "gate_019b6000-0000-7000-8000-000000000801",
+  "target": "advance",
+  "action": "block",
+  "anchor": {
+    "anchor_kind": "flow_node",
+    "anchor_key": "consent"
+  },
+  "requested_at": "2026-08-02T12:05:00.000000Z"
+}

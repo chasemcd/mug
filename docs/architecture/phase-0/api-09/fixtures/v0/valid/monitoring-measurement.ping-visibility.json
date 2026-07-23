@@ -1,0 +1,34 @@
+{
+  "schema": {
+    "name": "mug.api-09.monitoring-measurement",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "a687a1359b23e69f995ab8ccae6a335f99f87848c8dcd524cd4c3d92cfa0506a"
+    }
+  },
+  "policy": {
+    "name": "mug.api-06.interaction",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "538a17e390be96543227d1cdef37274dbf0e59d1c10c457f3c3f428be182dc02"
+    }
+  },
+  "seat_key": "forager-1",
+  "measurements": [
+    {
+      "metric": "rtt",
+      "observed": {
+        "microseconds": 42000
+      }
+    },
+    {
+      "metric": "hidden",
+      "observed": {
+        "microseconds": 0
+      }
+    }
+  ],
+  "measured_at": "2026-08-02T12:05:00.000000Z"
+}

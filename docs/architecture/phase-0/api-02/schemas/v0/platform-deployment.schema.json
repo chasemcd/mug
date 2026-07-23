@@ -1,0 +1,408 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:mug:schema:mug.api-02.platform-deployment:0",
+  "title": "MUG API-02 Platform Deployment contracts, version 0",
+  "$defs": {
+    "DeploymentKey": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(?:[-_.][a-z0-9]+)*$",
+      "maxLength": 128
+    },
+    "Region": {
+      "type": "string",
+      "pattern": "^[a-z]{2}(?:-[a-z0-9]+)+$",
+      "maxLength": 64
+    },
+    "EndpointUrl": {
+      "type": "string",
+      "pattern": "^(?:(?:https|wss)://[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+|(?:http|ws)://localhost)(?::[1-9][0-9]{0,4})?(?:/[A-Za-z0-9._~:/?#@!$&'()*+,;=%-]*)?$",
+      "maxLength": 512
+    },
+    "SecretPurpose": {
+      "enum": [
+        "provider-credential",
+        "signing-key",
+        "storage-credential",
+        "integration-token"
+      ]
+    },
+    "DeploymentDisposition": {
+      "enum": ["live", "stopped"]
+    },
+    "DeploymentRequirementSchemaRef": {
+      "type": "object",
+      "required": ["name", "version", "digest"],
+      "properties": {
+        "name": { "const": "mug.api-02.deployment-requirement" },
+        "version": { "const": 0 },
+        "digest": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest" }
+      },
+      "additionalProperties": false
+    },
+    "DeploymentSecretRequirement": {
+      "type": "object",
+      "required": ["requirement_key", "purpose", "optional"],
+      "properties": {
+        "requirement_key": { "$ref": "#/$defs/DeploymentKey" },
+        "purpose": { "$ref": "#/$defs/SecretPurpose" },
+        "optional": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "ExecutionSlotRequirement": {
+      "type": "object",
+      "required": ["slot", "runtime"],
+      "properties": {
+        "slot": { "$ref": "#/$defs/DeploymentKey" },
+        "runtime": { "enum": ["server", "browser", "worker"] }
+      },
+      "additionalProperties": false
+    },
+    "ProviderAdapterRequirement": {
+      "type": "object",
+      "required": ["adapter_key", "provider_class"],
+      "properties": {
+        "adapter_key": { "$ref": "#/$defs/DeploymentKey" },
+        "provider_class": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:[-.][a-z0-9]+)*$", "maxLength": 128 }
+      },
+      "additionalProperties": false
+    },
+    "RegionPolicy": {
+      "type": "object",
+      "required": ["allowed_regions", "residency"],
+      "properties": {
+        "allowed_regions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Region" },
+          "minItems": 1,
+          "maxItems": 32,
+          "uniqueItems": true
+        },
+        "residency": { "enum": ["flexible", "pinned"] }
+      },
+      "additionalProperties": false
+    },
+    "DeploymentRequirementData": {
+      "type": "object",
+      "required": ["secret_requirements", "execution_slots"],
+      "properties": {
+        "secret_requirements": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/DeploymentSecretRequirement" },
+          "maxItems": 64
+        },
+        "execution_slots": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ExecutionSlotRequirement" },
+          "minItems": 1,
+          "maxItems": 256
+        },
+        "provider_adapters": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ProviderAdapterRequirement" },
+          "maxItems": 64
+        },
+        "region_policy": { "$ref": "#/$defs/RegionPolicy" }
+      },
+      "additionalProperties": false
+    },
+    "DeploymentRequirement": {
+      "type": "object",
+      "required": ["schema", "data"],
+      "properties": {
+        "schema": { "$ref": "#/$defs/DeploymentRequirementSchemaRef" },
+        "data": { "$ref": "#/$defs/DeploymentRequirementData" }
+      },
+      "additionalProperties": false
+    },
+    "DeploymentSchemaRef": {
+      "type": "object",
+      "required": ["name", "version", "digest"],
+      "properties": {
+        "name": { "const": "mug.api-02.deployment" },
+        "version": { "const": 0 },
+        "digest": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest" }
+      },
+      "additionalProperties": false
+    },
+    "Deployment": {
+      "type": "object",
+      "required": ["schema", "deployment_id", "study_id", "disposition", "current_revision"],
+      "properties": {
+        "schema": { "$ref": "#/$defs/DeploymentSchemaRef" },
+        "deployment_id": {
+          "type": "string",
+          "pattern": "^deploy_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "study_id": {
+          "type": "string",
+          "pattern": "^study_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "disposition": { "$ref": "#/$defs/DeploymentDisposition" },
+        "current_revision": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/DeploymentRevisionRef" }
+      },
+      "additionalProperties": false
+    },
+    "DeploymentRevisionSchemaRef": {
+      "type": "object",
+      "required": ["name", "version", "digest"],
+      "properties": {
+        "name": { "const": "mug.api-02.deployment-revision" },
+        "version": { "const": 0 },
+        "digest": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest" }
+      },
+      "additionalProperties": false
+    },
+    "ClientBuildBinding": {
+      "type": "object",
+      "required": ["audience_class", "build"],
+      "properties": {
+        "audience_class": { "$ref": "#/$defs/DeploymentKey" },
+        "build": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/ArtifactRef" }
+      },
+      "additionalProperties": false
+    },
+    "ExecutionBinding": {
+      "type": "object",
+      "required": ["slot", "runtime", "artifact"],
+      "properties": {
+        "slot": { "$ref": "#/$defs/DeploymentKey" },
+        "runtime": { "enum": ["server", "browser", "worker"] },
+        "artifact": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/ArtifactRef" }
+      },
+      "additionalProperties": false
+    },
+    "SecretBinding": {
+      "type": "object",
+      "required": ["requirement_key", "purpose", "secret_ref"],
+      "properties": {
+        "requirement_key": { "$ref": "#/$defs/DeploymentKey" },
+        "purpose": { "$ref": "#/$defs/SecretPurpose" },
+        "secret_ref": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/SecretRef" }
+      },
+      "additionalProperties": false
+    },
+    "ProviderBinding": {
+      "type": "object",
+      "required": ["adapter_key", "provider_class", "model_selector", "secret_requirement_key"],
+      "properties": {
+        "adapter_key": { "$ref": "#/$defs/DeploymentKey" },
+        "provider_class": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:[-.][a-z0-9]+)*$", "maxLength": 128 },
+        "model_selector": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$", "maxLength": 200 },
+        "secret_requirement_key": { "$ref": "#/$defs/DeploymentKey" }
+      },
+      "additionalProperties": false
+    },
+    "EndpointBinding": {
+      "type": "object",
+      "required": ["role", "audience", "url", "protocol_capabilities"],
+      "properties": {
+        "role": { "enum": ["participant-realtime", "participant-http", "worker"] },
+        "audience": { "enum": ["participant", "internal"] },
+        "url": { "$ref": "#/$defs/EndpointUrl" },
+        "protocol_capabilities": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/CapabilitySet" }
+      },
+      "additionalProperties": false
+    },
+    "DeploymentRevision": {
+      "type": "object",
+      "required": [
+        "schema",
+        "deployment_id",
+        "deployment_revision_id",
+        "revision_number",
+        "study_version",
+        "requirement_digest",
+        "server_build",
+        "client_builds",
+        "execution_bindings",
+        "secret_bindings",
+        "region",
+        "endpoints",
+        "data_handling"
+      ],
+      "properties": {
+        "schema": { "$ref": "#/$defs/DeploymentRevisionSchemaRef" },
+        "deployment_id": {
+          "type": "string",
+          "pattern": "^deploy_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "deployment_revision_id": {
+          "type": "string",
+          "pattern": "^deployrev_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "revision_number": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/PositiveSafeInteger" },
+        "study_version": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/StudyVersionRef" },
+        "requirement_digest": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest" },
+        "server_build": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/ArtifactRef" },
+        "client_builds": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ClientBuildBinding" },
+          "minItems": 1,
+          "maxItems": 64
+        },
+        "execution_bindings": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ExecutionBinding" },
+          "minItems": 1,
+          "maxItems": 256
+        },
+        "provider_bindings": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ProviderBinding" },
+          "maxItems": 64
+        },
+        "secret_bindings": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/SecretBinding" },
+          "maxItems": 64
+        },
+        "region": { "$ref": "#/$defs/Region" },
+        "endpoints": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/EndpointBinding" },
+          "minItems": 1,
+          "maxItems": 64
+        },
+        "data_handling": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/DataHandlingRef" }
+      },
+      "additionalProperties": false
+    },
+    "ClientDeploymentProjectionSchemaRef": {
+      "type": "object",
+      "required": ["name", "version", "digest"],
+      "properties": {
+        "name": { "const": "mug.api-02.client-deployment" },
+        "version": { "const": 0 },
+        "digest": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest" }
+      },
+      "additionalProperties": false
+    },
+    "ParticipantEndpoint": {
+      "type": "object",
+      "required": ["role", "url", "protocol_capabilities"],
+      "properties": {
+        "role": { "enum": ["participant-realtime", "participant-http"] },
+        "url": { "$ref": "#/$defs/EndpointUrl" },
+        "protocol_capabilities": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/CapabilitySet" }
+      },
+      "additionalProperties": false
+    },
+    "ClientDeploymentProjection": {
+      "type": "object",
+      "required": ["schema", "deployment", "region", "endpoints", "protocol_capabilities"],
+      "properties": {
+        "schema": { "$ref": "#/$defs/ClientDeploymentProjectionSchemaRef" },
+        "deployment": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/DeploymentRevisionRef" },
+        "region": { "$ref": "#/$defs/Region" },
+        "endpoints": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ParticipantEndpoint" },
+          "minItems": 1,
+          "maxItems": 16
+        },
+        "protocol_capabilities": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/CapabilitySet" }
+      },
+      "additionalProperties": false
+    },
+    "SatisfactionReportSchemaRef": {
+      "type": "object",
+      "required": ["name", "version", "digest"],
+      "properties": {
+        "name": { "const": "mug.api-02.satisfaction-report" },
+        "version": { "const": 0 },
+        "digest": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest" }
+      },
+      "additionalProperties": false
+    },
+    "SatisfactionReport": {
+      "type": "object",
+      "required": [
+        "schema",
+        "study_version",
+        "requirement_digest",
+        "satisfied",
+        "unbound_secret_requirements",
+        "missing_execution_slots",
+        "region_gaps"
+      ],
+      "properties": {
+        "schema": { "$ref": "#/$defs/SatisfactionReportSchemaRef" },
+        "deployment_revision": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/DeploymentRevisionRef" },
+        "study_version": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/StudyVersionRef" },
+        "requirement_digest": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest" },
+        "satisfied": { "type": "boolean" },
+        "unbound_secret_requirements": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/DeploymentKey" },
+          "maxItems": 64
+        },
+        "missing_execution_slots": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/DeploymentKey" },
+          "maxItems": 256
+        },
+        "region_gaps": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Region" },
+          "maxItems": 32
+        }
+      },
+      "additionalProperties": false,
+      "if": { "required": ["satisfied"], "properties": { "satisfied": { "const": true } } },
+      "then": { "required": ["deployment_revision"] },
+      "else": { "not": { "required": ["deployment_revision"] } }
+    },
+    "FixtureManifestSchemaRef": {
+      "type": "object",
+      "required": ["name", "version", "digest"],
+      "properties": {
+        "name": { "const": "mug.api-02.fixture-manifest" },
+        "version": { "const": 0 },
+        "digest": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest" }
+      },
+      "additionalProperties": false
+    },
+    "FixtureCase": {
+      "type": "object",
+      "required": ["id", "instance", "schema_ref", "expect"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)+$", "maxLength": 160 },
+        "instance": { "type": "string", "pattern": "^(?:valid|invalid)/[a-z0-9][a-z0-9._-]*\\.json$", "maxLength": 256 },
+        "schema_ref": { "type": "string", "pattern": "^urn:mug:schema:mug\\.api-02\\.platform-deployment:0#/\\$defs/[A-Za-z][A-Za-z0-9]*$", "maxLength": 256 },
+        "validation_layer": { "enum": ["schema", "semantic"] },
+        "expect": { "enum": ["valid", "invalid"] },
+        "expected_error": {
+          "type": "object",
+          "required": ["keyword", "instance_pointer"],
+          "properties": {
+            "keyword": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_]*$", "maxLength": 96 },
+            "instance_pointer": { "type": "string", "pattern": "^(?:/[^/]+)*$", "maxLength": 256 }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false,
+      "if": { "required": ["expect"], "properties": { "expect": { "const": "invalid" } } },
+      "then": { "required": ["expected_error"] },
+      "else": { "not": { "required": ["expected_error"] } }
+    },
+    "FixtureManifest": {
+      "type": "object",
+      "required": ["schema", "manifest_version", "suite", "contract_version", "cases"],
+      "properties": {
+        "schema": { "$ref": "#/$defs/FixtureManifestSchemaRef" },
+        "manifest_version": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/SemVer" },
+        "suite": { "const": "api-02-platform-deployment" },
+        "contract_version": { "const": 0 },
+        "cases": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/FixtureCase" },
+          "minItems": 1,
+          "maxItems": 512
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

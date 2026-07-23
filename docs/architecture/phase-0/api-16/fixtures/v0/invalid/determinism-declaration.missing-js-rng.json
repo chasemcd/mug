@@ -1,0 +1,16 @@
+{
+  "env_hooks": {
+    "snapshot_restore": true,
+    "state_hash": true
+  },
+  "snapshot_coverage": {
+    "environment_state": true,
+    "platform_state": true,
+    "python_random_state": true,
+    "numpy_random_state": true
+  },
+  "state_hash_chain_digest": {
+    "algorithm": "sha-256",
+    "hex": "d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4"
+  }
+}

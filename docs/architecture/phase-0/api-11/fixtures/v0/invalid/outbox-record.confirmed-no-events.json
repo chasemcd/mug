@@ -1,0 +1,15 @@
+{
+  "schema": {
+    "name": "mug.api-11.outbox-record",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "007023d2d389fee6f93450c95aac747b412f4ecdfe033820df73c484b75b247e"
+    }
+  },
+  "command_id": "command_019b6000-0000-7000-8000-000000000700",
+  "destination": "event-bus",
+  "status": "confirmed",
+  "attempt": 1,
+  "event_ids": []
+}

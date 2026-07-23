@@ -61,6 +61,143 @@ nav:
     - Rendering System: core-concepts/rendering-system.md
     - Browser-Side Execution: core-concepts/pyodide-mode.md
     - Server Mode: core-concepts/server-mode.md
+  - Architecture:
+    - Overview: architecture/index.md
+    - North-Star Architecture: architecture/north-star.md
+    - Functional-Parity Contract: architecture/functional-parity.md
+    - Quality Attributes: architecture/quality-attributes.md
+    - Roadmap: architecture/roadmap.md
+    - Glossary: architecture/glossary.md
+    - Implementation:
+      - Overview: architecture/implementation/index.md
+      - Coding Standard: architecture/implementation/coding-standard.md
+      - Repository Structure: architecture/implementation/repo-structure.md
+    - Runtime Parity Audit:
+      - Overview: architecture/runtime-parity/index.md
+      - P2P Transport & Authority: architecture/runtime-parity/01-p2p-transport-authority.md
+      - Server-Authoritative Loop: architecture/runtime-parity/02-server-authoritative-loop.md
+      - Pyodide Env Lifecycle: architecture/runtime-parity/03-pyodide-env-lifecycle.md
+      - Data Capture & Persistence: architecture/runtime-parity/04-data-capture-persistence.md
+      - Matchmaking & Monitoring: architecture/runtime-parity/05-matchmaking-probes-monitoring.md
+      - Scene Flow & Globals: architecture/runtime-parity/06-scene-flow-globals.md
+      - Client Policies & Determinism: architecture/runtime-parity/07-client-policies-determinism.md
+    - Phase 0:
+      - Overview: architecture/phase-0/index.md
+      - API Catalog: architecture/phase-0/api-catalog.md
+      - Python Authoring API: architecture/phase-0/python-authoring-api.md
+      - API Review Tracker: architecture/phase-0/api-review-tracker.md
+      - API Design Standard: architecture/phase-0/api-design-standard.md
+      - Acceptance Scenarios: architecture/phase-0/acceptance-scenarios.md
+      - Failure & Recovery Matrix: architecture/phase-0/failure-matrix.md
+      - Threat Model: architecture/phase-0/threat-model.md
+      - Integrated Walkthrough: architecture/phase-0/integrated-walkthrough.md
+      - Implementation Backlog: architecture/phase-0/implementation-backlog.md
+      - Shared Kernel:
+        - Overview: architecture/phase-0/shared-kernel/index.md
+        - Identifiers & Resource Hierarchy: architecture/phase-0/shared-kernel/identifiers-and-resource-hierarchy.md
+        - Shared References: architecture/phase-0/shared-kernel/references.md
+        - Serialization & Schema Evolution: architecture/phase-0/shared-kernel/serialization-and-schema-evolution.md
+        - Commands, Receipts & Errors: architecture/phase-0/shared-kernel/commands-receipts-and-errors.md
+        - Time, Ordering & Fencing: architecture/phase-0/shared-kernel/time-ordering-and-fencing.md
+        - Privacy, Retention & Secrets: architecture/phase-0/shared-kernel/privacy-retention-and-secrets.md
+        - Schemas: architecture/phase-0/shared-kernel/schemas/index.md
+        - Golden Fixtures: architecture/phase-0/shared-kernel/fixtures/index.md
+        - Conformance Plan: architecture/phase-0/shared-kernel/conformance.md
+        - Review Record: architecture/phase-0/shared-kernel/review-record.md
+      - API-01 Study Authoring:
+        - Overview: architecture/phase-0/api-01/index.md
+        - Current-MUG Parity Map: architecture/phase-0/api-01/current-mug-parity-map.md
+        - Authoring & Publication: architecture/phase-0/api-01/authoring-and-publication.md
+        - Manifests & Packaging: architecture/phase-0/api-01/manifests-and-packaging.md
+        - Command & Failure Sequences: architecture/phase-0/api-01/publication-sequences.md
+        - Schemas: architecture/phase-0/api-01/schemas/index.md
+        - Golden Fixtures: architecture/phase-0/api-01/fixtures/index.md
+        - Conformance Plan: architecture/phase-0/api-01/conformance.md
+        - Review Record: architecture/phase-0/api-01/review-record.md
+      - API-02 Platform Deployment:
+        - Overview: architecture/phase-0/api-02/index.md
+        - Deployment & Secrets: architecture/phase-0/api-02/deployment-and-secrets.md
+        - Schemas: architecture/phase-0/api-02/schemas/index.md
+        - Golden Fixtures: architecture/phase-0/api-02/fixtures/index.md
+        - Conformance Plan: architecture/phase-0/api-02/conformance.md
+        - Review Record: architecture/phase-0/api-02/review-record.md
+      - API-03 Identity & Enrollment:
+        - Overview: architecture/phase-0/api-03/index.md
+        - Review Record: architecture/phase-0/api-03/review-record.md
+      - API-04 Visit Plans:
+        - Overview: architecture/phase-0/api-04/index.md
+        - Review Record: architecture/phase-0/api-04/review-record.md
+      - API-05 Actors & Controllers:
+        - Overview: architecture/phase-0/api-05/index.md
+        - Review Record: architecture/phase-0/api-05/review-record.md
+      - API-06 Interactions & Channels:
+        - Overview: architecture/phase-0/api-06/index.md
+        - Review Record: architecture/phase-0/api-06/review-record.md
+      - API-07 Game Runtime:
+        - Overview: architecture/phase-0/api-07/index.md
+        - Review Record: architecture/phase-0/api-07/review-record.md
+      - API-08 Conversation:
+        - Overview: architecture/phase-0/api-08/index.md
+        - Review Record: architecture/phase-0/api-08/review-record.md
+      - API-09 Participant Client:
+        - Overview: architecture/phase-0/api-09/index.md
+        - Review Record: architecture/phase-0/api-09/review-record.md
+      - API-10 Evidence & Capture:
+        - Overview: architecture/phase-0/api-10/index.md
+        - Review Record: architecture/phase-0/api-10/review-record.md
+      - API-11 Storage & Outbox:
+        - Overview: architecture/phase-0/api-11/index.md
+        - Review Record: architecture/phase-0/api-11/review-record.md
+      - API-12 Controller Scheduler:
+        - Overview: architecture/phase-0/api-12/index.md
+        - Review Record: architecture/phase-0/api-12/review-record.md
+      - API-13 Model Providers:
+        - Overview: architecture/phase-0/api-13/index.md
+        - Review Record: architecture/phase-0/api-13/review-record.md
+      - API-14 Tools:
+        - Overview: architecture/phase-0/api-14/index.md
+        - Review Record: architecture/phase-0/api-14/review-record.md
+      - API-15 Agent Memory:
+        - Overview: architecture/phase-0/api-15/index.md
+        - Review Record: architecture/phase-0/api-15/review-record.md
+      - API-16 Replay:
+        - Overview: architecture/phase-0/api-16/index.md
+        - Review Record: architecture/phase-0/api-16/review-record.md
+      - API-17 Content & Forms:
+        - Overview: architecture/phase-0/api-17/index.md
+        - Review Record: architecture/phase-0/api-17/review-record.md
+      - API-18 Preferences:
+        - Overview: architecture/phase-0/api-18/index.md
+        - Review Record: architecture/phase-0/api-18/review-record.md
+      - API-19 Export & Lineage:
+        - Overview: architecture/phase-0/api-19/index.md
+        - Review Record: architecture/phase-0/api-19/review-record.md
+      - API-20 Governance (removed):
+        - Overview: architecture/phase-0/api-20/index.md
+        - Review Record: architecture/phase-0/api-20/review-record.md
+      - API-21 Plugins (retracted):
+        - Overview: architecture/phase-0/api-21/index.md
+        - Review Record: architecture/phase-0/api-21/review-record.md
+      - API-22 Durable Jobs:
+        - Overview: architecture/phase-0/api-22/index.md
+        - Review Record: architecture/phase-0/api-22/review-record.md
+    - Decisions:
+      - Decision Register: architecture/decisions/index.md
+      - "ADR 0001: Functional Parity": architecture/decisions/0001-functional-parity-not-backward-compatibility.md
+      - "ADR 0002: Actor/Channel Model": architecture/decisions/0002-actor-channel-interaction-model.md
+      - "ADR 0003: Study Versions & Visit Plans": architecture/decisions/0003-immutable-study-versions-and-materialized-plans.md
+      - "ADR 0004: Storage Topology": architecture/decisions/0004-relational-event-and-artifact-storage.md
+      - "ADR 0005: External Agent Authority": architecture/decisions/0005-server-authoritative-external-agents.md
+      - "ADR 0006: Evidence Streams": architecture/decisions/0006-canonical-and-experienced-streams.md
+      - "ADR 0007: Explicit Manifests": architecture/decisions/0007-explicit-client-server-provenance-manifests.md
+      - "ADR 0008: Shared IDs & Schemas": architecture/decisions/0008-shared-identifiers-serialization-and-schema-evolution.md
+      - "ADR 0009: Commands & Receipts": architecture/decisions/0009-command-receipt-idempotency-and-concurrency.md
+      - "ADR 0010: Ordering & Fencing": architecture/decisions/0010-clocks-stream-ordering-and-lease-fencing.md
+      - "ADR 0011: Data & Secrets": architecture/decisions/0011-data-classification-retention-and-secret-references.md
+      - "ADR 0012: Study Compilation": architecture/decisions/0012-deterministic-study-compilation-and-atomic-publication.md
+      - "ADR 0013: Git-Native Versioning": architecture/decisions/0013-git-native-study-versioning.md
+      - "ADR 0014: Identity, Not Recruitment": architecture/decisions/0014-mug-scope-identity-not-recruitment.md
+      - "ADR 0015: Governance Out of Scope": architecture/decisions/0015-governance-out-of-scope.md
   - Examples:
     - Overview: examples/index.md
     - Mountain Car: examples/mountain-car.md

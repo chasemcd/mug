@@ -1,0 +1,111 @@
+{
+  "schema": {
+    "name": "mug.api-15.memory.fixture-manifest",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "a04cf73e88cd0e0b15725930fb0206cde24296e6b93159ed969a54cb8d49ac4e"
+    }
+  },
+  "manifest_version": "0.2.0",
+  "suite": "api-15-memory",
+  "contract_version": 0,
+  "cases": [
+    {
+      "id": "memory-scope.valid.minimal-static",
+      "instance": "valid/memory-scope.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-15.memory:0#/$defs/MemoryScope",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "memory-scope.valid.episodic-isolated",
+      "instance": "valid/memory-scope.episodic-isolated.json",
+      "schema_ref": "urn:mug:schema:mug.api-15.memory:0#/$defs/MemoryScope",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "memory-read.valid.minimal-static",
+      "instance": "valid/memory-read.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-15.memory:0#/$defs/MemoryRead",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "memory-proposal.valid.minimal-static",
+      "instance": "valid/memory-proposal.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-15.memory:0#/$defs/MemoryProposal",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "memory-commit.valid.minimal-static",
+      "instance": "valid/memory-commit.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-15.memory:0#/$defs/MemoryCommit",
+      "expect": "valid",
+      "validation_layer": "semantic"
+    },
+    {
+      "id": "memory-commit.invalid.non-monotonic-version",
+      "instance": "invalid/memory-commit.non-monotonic-version.json",
+      "schema_ref": "urn:mug:schema:mug.api-15.memory:0#/$defs/MemoryCommit",
+      "expect": "invalid",
+      "validation_layer": "semantic",
+      "expected_error": {
+        "keyword": "memoryVersion",
+        "instance_pointer": "/new_version/revision"
+      }
+    },
+    {
+      "id": "memory-commit.invalid.missing-provenance",
+      "instance": "invalid/memory-commit.missing-provenance.json",
+      "schema_ref": "urn:mug:schema:mug.api-15.memory:0#/$defs/MemoryCommit",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "required",
+        "instance_pointer": ""
+      }
+    },
+    {
+      "id": "memory-scope.invalid.bad-kind",
+      "instance": "invalid/memory-scope.bad-kind.json",
+      "schema_ref": "urn:mug:schema:mug.api-15.memory:0#/$defs/MemoryScope",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "enum",
+        "instance_pointer": "/scope_kind"
+      }
+    },
+    {
+      "id": "memory-scope.invalid.bad-treatment",
+      "instance": "invalid/memory-scope.bad-treatment.json",
+      "schema_ref": "urn:mug:schema:mug.api-15.memory:0#/$defs/MemoryScope",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "enum",
+        "instance_pointer": "/treatment_mode"
+      }
+    },
+    {
+      "id": "memory-read.invalid.uppercase-scope-kind",
+      "instance": "invalid/memory-read.uppercase-scope-kind.json",
+      "schema_ref": "urn:mug:schema:mug.api-15.memory:0#/$defs/MemoryRead",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "enum",
+        "instance_pointer": "/scope_kind"
+      }
+    },
+    {
+      "id": "memory-proposal.invalid.bad-id",
+      "instance": "invalid/memory-proposal.bad-id.json",
+      "schema_ref": "urn:mug:schema:mug.api-15.memory:0#/$defs/MemoryProposal",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "pattern",
+        "instance_pointer": "/memory_id"
+      }
+    }
+  ]
+}

@@ -1,0 +1,52 @@
+{
+  "schema": {
+    "name": "mug.api-12.decision-result",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "b7ac5272d5f4ddbbbb1779afb7f6045a51382067e3318b0c5b800a7658d13a76"
+    }
+  },
+  "decision_id": "decision_019b6000-0000-7000-8000-00000000d001",
+  "execution_mode": "p2p",
+  "outcome": "produced",
+  "staleness": "fresh",
+  "action_digest": {
+    "algorithm": "sha-256",
+    "hex": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1"
+  },
+  "produced_at": "2026-08-02T12:05:00.150000Z",
+  "p2p_authority": {
+    "authority_assignment_digest": {
+      "algorithm": "sha-256",
+      "hex": "17dbeeb86dd35c25760586013a661da05013c6b84c8d20804726587a5ccf8a67"
+    },
+    "interaction_id": "interaction_019b6000-0000-7000-8000-000000000420",
+    "channel_key": "board",
+    "episode_id": "episode_019b6000-0000-7000-8000-000000000800",
+    "episode_generation": 3,
+    "target_frame": 42,
+    "bot_actor_id": "actor_019b6000-0000-7000-8000-000000000201",
+    "authority_actor_id": "actor_019b6000-0000-7000-8000-000000000413",
+    "mesh_membership_digest": {
+      "algorithm": "sha-256",
+      "hex": "5f9103cfaa1ea55b01c4f9e8b6765447f60c6ff6ba5c8ad53ab251bfb7feb2b0"
+    },
+    "membership_generation": 3,
+    "authority_fence": {
+      "lease_id": "lease_019b6000-0000-7000-8000-000000000d01",
+      "namespace_epoch_id": "leaseepoch_019b6000-0000-7000-8000-000000000d02",
+      "generation": 1
+    }
+  },
+  "decision_origin": "server-scheduler",
+  "producer": {
+    "epoch_id": "prodepoch_019b6000-0000-7000-8000-000000000d03",
+    "sequence": 121,
+    "content_digest": {
+      "algorithm": "sha-256",
+      "hex": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1"
+    }
+  },
+  "replay_behavior": "re-decide"
+}

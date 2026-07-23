@@ -1,0 +1,19 @@
+{
+  "schema": {
+    "name": "mug.api-03.external-identity-link",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "9e1a5bbf831cf1e93b854ffce55b56cdd67ce6499f1e7f5b266665d4a2894caf"
+    }
+  },
+  "enrollment_id": "enrollment_019b6000-0000-7000-8000-000000000050",
+  "provider": "prolific",
+  "external_subject_handle": "handle_BBBBBBBBBBBBBBBBBBBBBA",
+  "data_handling": {
+    "privacy_labels": [
+      "research",
+      "pii"
+    ]
+  }
+}

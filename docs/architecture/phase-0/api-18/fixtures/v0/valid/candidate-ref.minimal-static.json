@@ -1,0 +1,29 @@
+{
+  "schema": {
+    "name": "mug.api-18.candidate-ref",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "23659cee1b0870cb156470ea50e88501e7158412e6c6d762c3735e54a8114705"
+    }
+  },
+  "candidate_key": "option-a",
+  "kind": "trajectory",
+  "content_ref": {
+    "artifact_id": "artifact_019b6000-0000-7000-8000-000000000f20",
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1"
+    },
+    "size_bytes": 2048,
+    "media_type": "application/json",
+    "content_encoding": "identity",
+    "data_handling": {
+      "privacy_labels": [
+        "research",
+        "sensitive"
+      ]
+    }
+  },
+  "display_handle": "handle_AAAAAAAAAAAAAAAAAAAAAA"
+}

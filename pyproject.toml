@@ -15,9 +15,45 @@ authors = [
 ]
 dependencies = [
     "numpy",
+    # Kernel (L0) runtime contract dependencies. The kernel needs these, and
+    # every family depends on the kernel, so they are core, not optional.
+    "pydantic>=2.9,<3",
+    "rfc8785>=0.1",
+    "jsonschema[format-nongpl]>=4.26,<5",
+    "referencing>=0.37,<1",
+    # The edge (L9) speaks HTTP with FastAPI. The second storage backend uses
+    # the standard-library sqlite3, so it stays core; the production asyncpg
+    # backend is an optional extra (see ``postgres`` below).
+    "fastapi>=0.115",
 ]
 
+# The ``mug`` command line (mug.cli): publish, deploy, export, replay, simulate.
+# It is a thin front end over the runtime and adds no dependency of its own.
+[project.scripts]
+mug = "mug.cli:main"
+
 [project.optional-dependencies]
+# The production Postgres backend (mug.storage.pg_store). The base install runs
+# on the in-memory and sqlite backends; install this extra to use PgStore.
+postgres = [
+    "asyncpg>=0.31.0",
+]
+# The ASGI server that runs the new application (mug.app). Distinct from the
+# legacy ``server`` extra, which runs the old Flask/SocketIO stack.
+serve = [
+    "uvicorn[standard]>=0.30",
+]
+# The Gymnasium environment adapter (mug.game.env). The server-authoritative
+# stepping loop needs it to run a real environment; it stays optional.
+game = [
+    "gymnasium>=0.29",
+]
+# The real LLM provider adapters (mug.agents.adapters). They reach Ollama,
+# Anthropic, and OpenAI over plain HTTP with httpx and no vendor SDK; the core
+# provider runtime imports no HTTP library, so this stays optional.
+llm = [
+    "httpx>=0.27",
+]
 server = [
     "eventlet",
     "flask",
@@ -30,9 +66,19 @@ server = [
 ]
 test = [
     "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "httpx>=0.27",
     "playwright>=1.49",
     "pytest-playwright>=0.6",
     "pytest-timeout>=2.3",
+]
+dev = [
+    "ruff>=0.6",
+    "pyright>=1.1.380",
+    # The pyright wrapper needs a modern Node; the host Node may be too old.
+    # Run pyright with PYRIGHT_PYTHON_GLOBAL_NODE=off to use this bundled Node.
+    "nodejs-wheel-binaries>=20",
+    "import-linter>=2.1",
 ]
 docs = [
     "zensical",
@@ -51,8 +97,137 @@ python_files = "test_*.py"
 python_classes = "Test*"
 python_functions = "test_*"
 addopts = "-v --tb=short"
+asyncio_mode = "auto"
 markers = [
     "timeout: marks test with custom timeout",
     "slow: marks tests as slow (may skip in CI)",
     "e2e: marks end-to-end tests requiring a running server and browser",
+]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 88
+# The legacy runtime is not held to the new standard; the rewrite lives in
+# `mug/kernel` and later families.
+extend-exclude = [
+    "mug/server",
+    "mug/scenes",
+    "mug/configurations",
+    "mug/rendering",
+    "mug/utils",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "TID", "RUF"]
+
+[tool.pyright]
+# Strict typing for the rewrite only (coding-standard P9). The legacy runtime is
+# excluded until it is removed.
+include = [
+    "mug/kernel",
+    "mug/runtime.py",
+    "mug/storage",
+    "mug/events",
+    "mug/jobs",
+    "mug/authoring",
+    "mug/platform",
+    "mug/workers.py",
+    "mug/identity",
+    "mug/visits",
+    "mug/casting",
+    "mug/interactions",
+    "mug/client",
+    "mug/game",
+    "mug/conversation",
+    "mug/agents",
+    "mug/scheduling",
+    "mug/providers",
+    "mug/tools",
+    "mug/memory",
+    "mug/replay",
+    "mug/content",
+    "mug/preferences",
+    "mug/export",
+    "mug/edge.py",
+    "mug/gateway.py",
+    "mug/realtime.py",
+    "mug/participant.py",
+    "mug/returns.py",
+    "mug/app.py",
+    "tests/unit",
+]
+pythonVersion = "3.10"
+typeCheckingMode = "strict"
+reportMissingTypeStubs = false
+
+# Import boundaries (coding-standard P6). The layered contract grows as each
+# family lands. Dependencies point inward along the layer graph.
+[tool.importlinter]
+root_package = "mug"
+
+[[tool.importlinter.contracts]]
+name = "New runtime does not import the legacy runtime"
+type = "forbidden"
+source_modules = [
+    "mug.cli",
+    "mug.app",
+    "mug.participant",
+    "mug.launch",
+    "mug.returns",
+    "mug.agents",
+    "mug.kernel",
+    "mug.runtime",
+    "mug.storage",
+    "mug.events",
+    "mug.jobs",
+    "mug.authoring",
+    "mug.platform",
+    "mug.workers",
+    "mug.identity",
+    "mug.visits",
+    "mug.casting",
+    "mug.interactions",
+    "mug.client",
+    "mug.game",
+    "mug.conversation",
+    "mug.scheduling",
+    "mug.providers",
+    "mug.tools",
+    "mug.memory",
+    "mug.replay",
+    "mug.content",
+    "mug.preferences",
+    "mug.export",
+    "mug.edge",
+    "mug.realtime",
+    "mug.gateway",
+]
+forbidden_modules = [
+    "mug.server",
+    "mug.scenes",
+    "mug.configurations",
+    "mug.rendering",
+    "mug.utils",
+]
+
+[[tool.importlinter.contracts]]
+name = "Layered architecture (dependencies point inward)"
+type = "layers"
+layers = [
+    "mug.cli",
+    "mug.app",
+    "mug.participant | mug.launch",
+    "mug.edge | mug.realtime",
+    "mug.gateway",
+    "mug.export",
+    "mug.replay | mug.content | mug.preferences",
+    "mug.agents",
+    "mug.scheduling | mug.providers | mug.tools | mug.memory",
+    "mug.game | mug.conversation",
+    "mug.casting | mug.interactions | mug.client",
+    "mug.identity | mug.visits",
+    "mug.authoring | mug.platform | mug.workers",
+    "mug.runtime",
+    "mug.storage | mug.events | mug.jobs | mug.returns",
+    "mug.kernel",
 ]

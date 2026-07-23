@@ -1,0 +1,46 @@
+{
+  "schema": {
+    "name": "mug.api-10.event-envelope",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "f8d8da4c9fc94a6ce9234132cf0f22f166d3a3f8668a1e8113d2cebf9c7c4d6b"
+    }
+  },
+  "event_id": "event_019b6000-0000-7000-8000-000000000601",
+  "stream_position": {
+    "stream_id": "stream_019b6000-0000-7000-8000-000000000500",
+    "sequence": 1
+  },
+  "producer_position": {
+    "epoch_id": "prodepoch_019b6000-0000-7000-8000-000000000510",
+    "sequence": 1,
+    "content_digest": {
+      "algorithm": "sha-256",
+      "hex": "c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1"
+    }
+  },
+  "event_schema": {
+    "name": "mug.event.game-transition",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1"
+    }
+  },
+  "payload_digest": {
+    "algorithm": "sha-256",
+    "hex": "e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1"
+  },
+  "recorded_at": "2026-08-02T12:05:00.000000Z",
+  "data_handling": {
+    "privacy_labels": [
+      "research",
+      "sensitive"
+    ],
+    "retention_policy": {
+      "retention_policy_id": "retpolicy_019b6000-0000-7000-8000-000000000201",
+      "retention_policy_version_id": "retpolicyver_019b6000-0000-7000-8000-000000000202"
+    }
+  }
+}

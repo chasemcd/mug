@@ -1,0 +1,11 @@
+{
+  "fingerprint": {
+    "algorithm": "sha-256",
+    "hex": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+  },
+  "code": "study.flow.reference_missing",
+  "severity": "error",
+  "stage": "flow",
+  "safe_message": "A referenced flow node does not exist.",
+  "suppressible": true
+}

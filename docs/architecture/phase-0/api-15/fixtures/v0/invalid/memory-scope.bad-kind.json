@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "mug.api-15.memory-scope",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "a04cf73e88cd0e0b15725930fb0206cde24296e6b93159ed969a54cb8d49ac4e"
+    }
+  },
+  "scope_kind": "permanent",
+  "treatment_mode": "isolated",
+  "owner_enrollment_id": "enrollment_019b6000-0000-7000-8000-000000000050"
+}

@@ -1,0 +1,1303 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:mug:schema:mug.api-01.study-authoring:0",
+  "title": "MUG API-01 study authoring, compilation, and publication draft contracts",
+  "description": "Mutable Phase 0 proposal. Version 0 is forbidden in published, deployed, or archival records.",
+  "$defs": {
+    "AuthoringKey": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(?:[-_][a-z0-9]+)*$",
+      "maxLength": 64
+    },
+    "StudyId": {
+      "type": "string",
+      "pattern": "^study_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "FlowNodeDefinitionId": {
+      "type": "string",
+      "pattern": "^flownode_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "ActivityDefinitionId": {
+      "type": "string",
+      "pattern": "^activitydef_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "JsonPointer": {
+      "type": "string",
+      "pattern": "^(?:/(?:[^~/]|~0|~1)*)*$",
+      "maxLength": 1024
+    },
+    "VersionString": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[^\\s](?:.*[^\\s])?$"
+    },
+    "GitCommitSha": {
+      "type": "string",
+      "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"
+    },
+    "GitBranchName": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*$",
+      "maxLength": 255
+    },
+    "GitRemoteUrl": {
+      "type": "string",
+      "pattern": "^(?:[a-z][a-z0-9+.-]*://[^\\s]+|[A-Za-z0-9._-]+@[A-Za-z0-9._-]+:[^\\s]+)$",
+      "maxLength": 512
+    },
+    "GitPatch": {
+      "type": "object",
+      "required": ["patch_digest", "size_bytes"],
+      "properties": {
+        "patch_digest": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest" },
+        "size_bytes": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/NonNegativeSafeInteger" },
+        "artifact": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/ArtifactRef" }
+      },
+      "additionalProperties": false
+    },
+    "GitSourcePath": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*$",
+      "maxLength": 255
+    },
+    "GitProvenance": {
+      "type": "object",
+      "required": ["commit", "dirty"],
+      "properties": {
+        "commit": { "$ref": "#/$defs/GitCommitSha" },
+        "branch": { "$ref": "#/$defs/GitBranchName" },
+        "remote": { "$ref": "#/$defs/GitRemoteUrl" },
+        "dirty": { "type": "boolean" },
+        "patch": { "$ref": "#/$defs/GitPatch" },
+        "source_path": { "$ref": "#/$defs/GitSourcePath" }
+      },
+      "additionalProperties": false,
+      "if": {
+        "required": ["dirty"],
+        "properties": { "dirty": { "const": true } }
+      },
+      "then": { "required": ["patch"] },
+      "else": { "not": { "required": ["patch"] } }
+    },
+    "AuthoringDocumentSchemaRef": {
+      "allOf": [
+        { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/SchemaRef" },
+        {
+          "type": "object",
+          "properties": {
+            "name": { "const": "mug.study.authoring-document" },
+            "version": { "const": 0 }
+          }
+        }
+      ]
+    },
+    "ScientificManifestSchemaRef": {
+      "allOf": [
+        { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/SchemaRef" },
+        {
+          "type": "object",
+          "properties": {
+            "name": { "const": "mug.study.scientific-manifest" },
+            "version": { "const": 0 }
+          }
+        }
+      ]
+    },
+    "ClientManifestSchemaRef": {
+      "allOf": [
+        { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/SchemaRef" },
+        {
+          "type": "object",
+          "properties": {
+            "name": { "const": "mug.study.client-manifest" },
+            "version": { "const": 0 }
+          }
+        }
+      ]
+    },
+    "ServerManifestSchemaRef": {
+      "allOf": [
+        { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/SchemaRef" },
+        {
+          "type": "object",
+          "properties": {
+            "name": { "const": "mug.study.server-manifest" },
+            "version": { "const": 0 }
+          }
+        }
+      ]
+    },
+    "ProvenanceManifestSchemaRef": {
+      "allOf": [
+        { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/SchemaRef" },
+        {
+          "type": "object",
+          "properties": {
+            "name": { "const": "mug.study.provenance-manifest" },
+            "version": { "const": 0 }
+          }
+        }
+      ]
+    },
+    "ManifestSetSchemaRef": {
+      "allOf": [
+        { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/SchemaRef" },
+        {
+          "type": "object",
+          "properties": {
+            "name": { "const": "mug.study.manifest-set" },
+            "version": { "const": 0 }
+          }
+        }
+      ]
+    },
+    "ValidationReportSchemaRef": {
+      "allOf": [
+        { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/SchemaRef" },
+        {
+          "type": "object",
+          "properties": {
+            "name": { "const": "mug.study.validation-report" },
+            "version": { "const": 0 }
+          }
+        }
+      ]
+    },
+    "CompiledStudyCandidateSchemaRef": {
+      "allOf": [
+        { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/SchemaRef" },
+        {
+          "type": "object",
+          "properties": {
+            "name": { "const": "mug.study.compiled-candidate" },
+            "version": { "const": 0 }
+          }
+        }
+      ]
+    },
+    "PublishedStudyVersionSchemaRef": {
+      "allOf": [
+        { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/SchemaRef" },
+        {
+          "type": "object",
+          "properties": {
+            "name": { "const": "mug.study.published-version" },
+            "version": { "const": 0 }
+          }
+        }
+      ]
+    },
+    "FixtureManifestSchemaRef": {
+      "allOf": [
+        { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/SchemaRef" },
+        {
+          "type": "object",
+          "properties": {
+            "name": { "const": "mug.study.fixture-manifest" },
+            "version": { "const": 0 }
+          }
+        }
+      ]
+    },
+    "DefinitionKind": {
+      "enum": [
+        "activity",
+        "agent",
+        "channel",
+        "flow_node",
+        "preference_protocol",
+        "prompt",
+        "seat",
+        "tool"
+      ]
+    },
+    "AuthoredDefinition": {
+      "type": "object",
+      "required": ["kind", "key", "definition", "spec"],
+      "properties": {
+        "kind": { "$ref": "#/$defs/DefinitionKind" },
+        "key": { "$ref": "#/$defs/AuthoringKey" },
+        "definition": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/ResourceRef" },
+        "spec": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/TypedObject" }
+      },
+      "additionalProperties": false
+    },
+    "FlowNodeBase": {
+      "type": "object",
+      "required": ["node_id", "key", "kind"],
+      "properties": {
+        "node_id": { "$ref": "#/$defs/FlowNodeDefinitionId" },
+        "key": { "$ref": "#/$defs/AuthoringKey" },
+        "kind": {
+          "enum": ["sequence", "activity", "randomized_select", "repeat", "branch", "terminal"]
+        }
+      }
+    },
+    "SequenceNode": {
+      "allOf": [
+        { "$ref": "#/$defs/FlowNodeBase" },
+        {
+          "type": "object",
+          "required": ["children"],
+          "properties": {
+            "kind": { "const": "sequence" },
+            "children": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/FlowNodeDefinitionId" },
+              "minItems": 1,
+              "maxItems": 256
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "ActivityNode": {
+      "allOf": [
+        { "$ref": "#/$defs/FlowNodeBase" },
+        {
+          "type": "object",
+          "required": ["activity_definition_id"],
+          "properties": {
+            "kind": { "const": "activity" },
+            "activity_definition_id": { "$ref": "#/$defs/ActivityDefinitionId" }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "RandomizedSelectNode": {
+      "allOf": [
+        { "$ref": "#/$defs/FlowNodeBase" },
+        {
+          "type": "object",
+          "required": ["choices", "choose", "rule"],
+          "properties": {
+            "kind": { "const": "randomized_select" },
+            "choices": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/FlowNodeDefinitionId" },
+              "minItems": 1,
+              "maxItems": 256,
+              "uniqueItems": true
+            },
+            "choose": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 256
+            },
+            "rule": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/TypedObject" }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "RepeatNode": {
+      "allOf": [
+        { "$ref": "#/$defs/FlowNodeBase" },
+        {
+          "type": "object",
+          "required": ["child", "repetitions"],
+          "properties": {
+            "kind": { "const": "repeat" },
+            "child": { "$ref": "#/$defs/FlowNodeDefinitionId" },
+            "repetitions": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10000
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "BranchCase": {
+      "type": "object",
+      "required": ["condition", "child"],
+      "properties": {
+        "condition": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/TypedObject" },
+        "child": { "$ref": "#/$defs/FlowNodeDefinitionId" }
+      },
+      "additionalProperties": false
+    },
+    "BranchNode": {
+      "allOf": [
+        { "$ref": "#/$defs/FlowNodeBase" },
+        {
+          "type": "object",
+          "required": ["cases"],
+          "properties": {
+            "kind": { "const": "branch" },
+            "cases": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/BranchCase" },
+              "minItems": 1,
+              "maxItems": 64
+            },
+            "default_child": { "$ref": "#/$defs/FlowNodeDefinitionId" }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "TerminalNode": {
+      "allOf": [
+        { "$ref": "#/$defs/FlowNodeBase" },
+        {
+          "type": "object",
+          "required": ["terminal"],
+          "properties": {
+            "kind": { "const": "terminal" },
+            "terminal": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/TypedObject" }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "FlowNode": {
+      "oneOf": [
+        { "$ref": "#/$defs/SequenceNode" },
+        { "$ref": "#/$defs/ActivityNode" },
+        { "$ref": "#/$defs/RandomizedSelectNode" },
+        { "$ref": "#/$defs/RepeatNode" },
+        { "$ref": "#/$defs/BranchNode" },
+        { "$ref": "#/$defs/TerminalNode" }
+      ]
+    },
+    "FlowSpec": {
+      "type": "object",
+      "required": ["entry_node_id", "nodes"],
+      "properties": {
+        "entry_node_id": { "$ref": "#/$defs/FlowNodeDefinitionId" },
+        "nodes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/FlowNode" },
+          "minItems": 1,
+          "maxItems": 4096
+        }
+      },
+      "additionalProperties": false
+    },
+    "SecretRequirement": {
+      "type": "object",
+      "required": ["slot", "purpose", "consumers"],
+      "properties": {
+        "slot": { "$ref": "#/$defs/AuthoringKey" },
+        "purpose": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$",
+          "maxLength": 128
+        },
+        "consumers": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$",
+            "maxLength": 128
+          },
+          "minItems": 1,
+          "maxItems": 32,
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "CapabilityRequirement": {
+      "type": "object",
+      "required": ["capability", "criticality"],
+      "properties": {
+        "capability": {
+          "type": "string",
+          "pattern": "^mug(?:\\.[a-z][a-z0-9-]*)+\\.v[1-9][0-9]*$",
+          "maxLength": 160
+        },
+        "criticality": { "enum": ["required", "optional_observational"] },
+        "omission_behavior": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$",
+          "maxLength": 128
+        },
+        "completeness_fact": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$",
+          "maxLength": 128
+        }
+      },
+      "additionalProperties": false,
+      "if": {
+        "required": ["criticality"],
+        "properties": { "criticality": { "const": "optional_observational" } }
+      },
+      "then": { "required": ["omission_behavior", "completeness_fact"] },
+      "else": {
+        "not": {
+          "anyOf": [
+            { "required": ["omission_behavior"] },
+            { "required": ["completeness_fact"] }
+          ]
+        }
+      }
+    },
+    "CapabilityClosure": {
+      "type": "object",
+      "required": ["requirements"],
+      "properties": {
+        "requirements": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/CapabilityRequirement" },
+          "maxItems": 512
+        }
+      },
+      "additionalProperties": false
+    },
+    "CodePackageRef": {
+      "type": "object",
+      "required": [
+        "kind",
+        "artifact",
+        "entrypoint",
+        "runtime_abi",
+        "dependency_lock",
+        "required_capabilities"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "browser_esm",
+            "browser_wasm",
+            "pyodide_wheel_bundle",
+            "server_python_wheel",
+            "onnx_model"
+          ]
+        },
+        "artifact": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/ArtifactRef" },
+        "entrypoint": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_][A-Za-z0-9_.:/#$-]*$",
+          "maxLength": 256
+        },
+        "runtime_abi": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:[-_.][a-z0-9]+)*$",
+          "maxLength": 128
+        },
+        "dependency_lock": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/ArtifactRef" },
+        "required_capabilities": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/CapabilitySet" }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "oneOf": [
+            {
+              "properties": {
+                "kind": { "const": "browser_esm" },
+                "artifact": { "properties": { "media_type": { "const": "application/javascript" } } },
+                "entrypoint": { "pattern": "^[A-Za-z0-9_][A-Za-z0-9_./-]*#[A-Za-z_$][A-Za-z0-9_$]*$" },
+                "runtime_abi": { "pattern": "^browser-esm-v[1-9][0-9]*$" }
+              }
+            },
+            {
+              "properties": {
+                "kind": { "const": "browser_wasm" },
+                "artifact": { "properties": { "media_type": { "const": "application/wasm" } } },
+                "entrypoint": { "pattern": "^[A-Za-z0-9_][A-Za-z0-9_./-]*#[A-Za-z_$][A-Za-z0-9_$]*$" },
+                "runtime_abi": { "pattern": "^wasi-preview[12]$" }
+              }
+            },
+            {
+              "properties": {
+                "kind": { "const": "pyodide_wheel_bundle" },
+                "artifact": { "properties": { "media_type": { "const": "application/vnd.python.wheel" } } },
+                "entrypoint": { "pattern": "^[A-Za-z_][A-Za-z0-9_.]*:[A-Za-z_][A-Za-z0-9_.]*$" },
+                "runtime_abi": { "pattern": "^pyodide-[1-9][0-9]*\\.[0-9]+$" }
+              }
+            },
+            {
+              "properties": {
+                "kind": { "const": "server_python_wheel" },
+                "artifact": { "properties": { "media_type": { "const": "application/vnd.python.wheel" } } },
+                "entrypoint": { "pattern": "^[A-Za-z_][A-Za-z0-9_.]*:[A-Za-z_][A-Za-z0-9_.]*$" },
+                "runtime_abi": { "pattern": "^cpython-[1-9][0-9]*\\.[0-9]+$" }
+              }
+            },
+            {
+              "properties": {
+                "kind": { "const": "onnx_model" },
+                "artifact": { "properties": { "media_type": { "const": "application/vnd.onnx" } } },
+                "entrypoint": { "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$" },
+                "runtime_abi": { "pattern": "^onnx-opset-[1-9][0-9]*$" }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "CompilationPolicy": {
+      "type": "object",
+      "required": [
+        "unknown_fields",
+        "warnings",
+        "executable_content",
+        "hermetic_build",
+        "reproducibility_check",
+        "client_disclosure_check"
+      ],
+      "properties": {
+        "unknown_fields": { "const": "reject" },
+        "warnings": { "enum": ["reject", "explicit_acknowledgment"] },
+        "executable_content": { "const": "packaged_only" },
+        "hermetic_build": { "const": "required" },
+        "reproducibility_check": { "const": "required" },
+        "client_disclosure_check": { "const": "required" }
+      },
+      "additionalProperties": false
+    },
+    "AuthoringDocument": {
+      "type": "object",
+      "required": [
+        "schema",
+        "study_id",
+        "title",
+        "flow",
+        "definitions",
+        "secret_requirements",
+        "code_packages",
+        "data_flows",
+        "deployment_requirements",
+        "compilation_policy",
+        "data_handling"
+      ],
+      "properties": {
+        "schema": { "$ref": "#/$defs/AuthoringDocumentSchemaRef" },
+        "study_id": { "$ref": "#/$defs/StudyId" },
+        "title": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "flow": { "$ref": "#/$defs/FlowSpec" },
+        "definitions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/AuthoredDefinition" },
+          "maxItems": 4096
+        },
+        "secret_requirements": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/SecretRequirement" },
+          "maxItems": 64
+        },
+        "code_packages": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/CodePackageRef" },
+          "maxItems": 256
+        },
+        "data_flows": {
+          "type": "array",
+          "items": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/TypedObject" },
+          "maxItems": 256
+        },
+        "deployment_requirements": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/TypedObject" },
+        "compilation_policy": { "$ref": "#/$defs/CompilationPolicy" },
+        "data_handling": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/DataHandlingRef" }
+      },
+      "additionalProperties": false
+    },
+    "CompilerIdentity": {
+      "type": "object",
+      "required": ["name", "version", "artifact_digest", "contract", "normalization_profile"],
+      "properties": {
+        "name": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:[-_.][a-z0-9]+)*$", "maxLength": 128 },
+        "version": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/SemVer" },
+        "artifact_digest": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest" },
+        "contract": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/SchemaRef" },
+        "normalization_profile": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:[-_.][a-z0-9]+)*$", "maxLength": 128 }
+      },
+      "additionalProperties": false
+    },
+    "ProjectionDigestRef": {
+      "type": "object",
+      "required": ["manifest_schema", "content_digest", "size_bytes"],
+      "properties": {
+        "manifest_schema": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/SchemaRef" },
+        "content_digest": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest" },
+        "size_bytes": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/NonNegativeSafeInteger" }
+      },
+      "additionalProperties": false
+    },
+    "ClientProjectionDigestRef": {
+      "type": "object",
+      "required": ["projection_key", "selector", "manifest"],
+      "properties": {
+        "projection_key": { "$ref": "#/$defs/AuthoringKey" },
+        "selector": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/TypedObject" },
+        "manifest": { "$ref": "#/$defs/ProjectionDigestRef" }
+      },
+      "additionalProperties": false
+    },
+    "ScientificManifest": {
+      "type": "object",
+      "required": [
+        "schema",
+        "study_id",
+        "source_digest",
+        "normalized_study",
+        "deployment_requirements",
+        "capability_closure",
+        "compiler",
+        "schema_bundle",
+        "projections",
+        "data_handling"
+      ],
+      "properties": {
+        "schema": { "$ref": "#/$defs/ScientificManifestSchemaRef" },
+        "study_id": { "$ref": "#/$defs/StudyId" },
+        "source_digest": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest" },
+        "normalized_study": { "$ref": "#/$defs/ManifestArtifact" },
+        "deployment_requirements": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/TypedObject" },
+        "capability_closure": { "$ref": "#/$defs/CapabilityClosure" },
+        "compiler": { "$ref": "#/$defs/CompilerIdentity" },
+        "schema_bundle": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/ArtifactRef" },
+        "projections": {
+          "type": "object",
+          "required": ["clients", "server", "provenance"],
+          "properties": {
+            "clients": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/ClientProjectionDigestRef" },
+              "minItems": 1,
+              "maxItems": 64
+            },
+            "server": { "$ref": "#/$defs/ProjectionDigestRef" },
+            "provenance": { "$ref": "#/$defs/ProjectionDigestRef" }
+          },
+          "additionalProperties": false
+        },
+        "data_handling": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/DataHandlingRef" }
+      },
+      "additionalProperties": false
+    },
+    "ClientComponentBinding": {
+      "type": "object",
+      "required": ["slot", "activation_slot", "component_schema", "config"],
+      "properties": {
+        "slot": { "$ref": "#/$defs/AuthoringKey" },
+        "activation_slot": { "$ref": "#/$defs/AuthoringKey" },
+        "component_schema": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/SchemaRef" },
+        "config": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/TypedObject" }
+      },
+      "additionalProperties": false
+    },
+    "ClientResourceSlot": {
+      "type": "object",
+      "required": ["slot", "activation_slot", "media_type", "presentation_policy"],
+      "properties": {
+        "slot": { "$ref": "#/$defs/AuthoringKey" },
+        "activation_slot": { "$ref": "#/$defs/AuthoringKey" },
+        "media_type": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9!#$&^_.+-]*/[a-z0-9][a-z0-9!#$&^_.+-]*$",
+          "maxLength": 127
+        },
+        "presentation_policy": { "enum": ["required_before_activity", "stream_on_demand", "optional_observational"] }
+      },
+      "additionalProperties": false
+    },
+    "ClientManifest": {
+      "type": "object",
+      "required": [
+        "schema",
+        "protocol_requirements",
+        "required_capabilities",
+        "client_build_slot",
+        "components",
+        "resource_slots",
+        "accessibility_profile",
+        "locales"
+      ],
+      "properties": {
+        "schema": { "$ref": "#/$defs/ClientManifestSchemaRef" },
+        "protocol_requirements": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/CapabilitySet" },
+        "required_capabilities": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/CapabilitySet" },
+        "client_build_slot": { "$ref": "#/$defs/AuthoringKey" },
+        "components": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ClientComponentBinding" },
+          "maxItems": 512
+        },
+        "resource_slots": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ClientResourceSlot" },
+          "maxItems": 512
+        },
+        "accessibility_profile": { "$ref": "#/$defs/AuthoringKey" },
+        "locales": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$", "maxLength": 35 },
+          "minItems": 1,
+          "maxItems": 64,
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "ServerRuntimeScope": {
+      "type": "object",
+      "required": ["scope_key", "selector"],
+      "properties": {
+        "scope_key": { "$ref": "#/$defs/AuthoringKey" },
+        "selector": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/TypedObject" }
+      },
+      "additionalProperties": false
+    },
+    "ServerRuntimeBindingBase": {
+      "type": "object",
+      "required": ["binding_key", "scope_key", "kind"],
+      "properties": {
+        "binding_key": { "$ref": "#/$defs/AuthoringKey" },
+        "scope_key": { "$ref": "#/$defs/AuthoringKey" },
+        "kind": {
+          "enum": [
+            "domain_config",
+            "code_package",
+            "artifact",
+            "secret_requirement",
+            "capture_policy",
+            "data_flow"
+          ]
+        }
+      }
+    },
+    "ServerRuntimeBinding": {
+      "oneOf": [
+        {
+          "allOf": [
+            { "$ref": "#/$defs/ServerRuntimeBindingBase" },
+            {
+              "type": "object",
+              "required": ["value"],
+              "properties": {
+                "kind": { "const": "domain_config" },
+                "value": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/TypedObject" }
+              }
+            }
+          ],
+          "unevaluatedProperties": false
+        },
+        {
+          "allOf": [
+            { "$ref": "#/$defs/ServerRuntimeBindingBase" },
+            {
+              "type": "object",
+              "required": ["package"],
+              "properties": {
+                "kind": { "const": "code_package" },
+                "package": { "$ref": "#/$defs/CodePackageRef" }
+              }
+            }
+          ],
+          "unevaluatedProperties": false
+        },
+        {
+          "allOf": [
+            { "$ref": "#/$defs/ServerRuntimeBindingBase" },
+            {
+              "type": "object",
+              "required": ["artifact"],
+              "properties": {
+                "kind": { "const": "artifact" },
+                "artifact": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/ArtifactRef" }
+              }
+            }
+          ],
+          "unevaluatedProperties": false
+        },
+        {
+          "allOf": [
+            { "$ref": "#/$defs/ServerRuntimeBindingBase" },
+            {
+              "type": "object",
+              "required": ["secret_requirement"],
+              "properties": {
+                "kind": { "const": "secret_requirement" },
+                "secret_requirement": { "$ref": "#/$defs/SecretRequirement" }
+              }
+            }
+          ],
+          "unevaluatedProperties": false
+        },
+        {
+          "allOf": [
+            { "$ref": "#/$defs/ServerRuntimeBindingBase" },
+            {
+              "type": "object",
+              "required": ["value"],
+              "properties": {
+                "kind": { "const": "capture_policy" },
+                "value": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/TypedObject" }
+              }
+            }
+          ],
+          "unevaluatedProperties": false
+        },
+        {
+          "allOf": [
+            { "$ref": "#/$defs/ServerRuntimeBindingBase" },
+            {
+              "type": "object",
+              "required": ["value"],
+              "properties": {
+                "kind": { "const": "data_flow" },
+                "value": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/TypedObject" }
+              }
+            }
+          ],
+          "unevaluatedProperties": false
+        }
+      ]
+    },
+    "StudyServerManifest": {
+      "type": "object",
+      "required": ["schema", "execution_requirements", "scopes", "bindings", "data_handling"],
+      "properties": {
+        "schema": { "$ref": "#/$defs/ServerManifestSchemaRef" },
+        "execution_requirements": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/CapabilitySet" },
+        "scopes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ServerRuntimeScope" },
+          "minItems": 1,
+          "maxItems": 1024
+        },
+        "bindings": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ServerRuntimeBinding" },
+          "maxItems": 4096
+        },
+        "data_handling": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/DataHandlingRef" }
+      },
+      "additionalProperties": false
+    },
+    "TransformationRecord": {
+      "type": "object",
+      "required": ["name", "version", "input_digest", "output_digest"],
+      "properties": {
+        "name": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:[-_.][a-z0-9]+)*$", "maxLength": 128 },
+        "version": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/SemVer" },
+        "input_digest": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest" },
+        "output_digest": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest" }
+      },
+      "additionalProperties": false
+    },
+    "ProvenanceProjectionRecord": {
+      "type": "object",
+      "required": ["role", "projection", "data_handling", "retention_disposition"],
+      "properties": {
+        "role": { "enum": ["client", "server"] },
+        "projection_key": { "$ref": "#/$defs/AuthoringKey" },
+        "projection": { "$ref": "#/$defs/ProjectionDigestRef" },
+        "data_handling": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/DataHandlingRef" },
+        "retention_disposition": { "enum": ["retained", "withheld", "transformed", "not_retained"] },
+        "reason_code": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:[-_.][a-z0-9]+)*$",
+          "maxLength": 128
+        }
+      },
+      "additionalProperties": false,
+      "if": {
+        "required": ["role"],
+        "properties": { "role": { "const": "client" } }
+      },
+      "then": { "required": ["projection_key"] },
+      "else": { "not": { "required": ["projection_key"] } }
+    },
+    "ProvenanceManifest": {
+      "type": "object",
+      "required": [
+        "schema",
+        "compiler",
+        "source_git",
+        "source_artifacts",
+        "dependency_artifacts",
+        "schema_bundle",
+        "transformations",
+        "projection_outputs",
+        "limitations",
+        "data_handling"
+      ],
+      "properties": {
+        "schema": { "$ref": "#/$defs/ProvenanceManifestSchemaRef" },
+        "compiler": { "$ref": "#/$defs/CompilerIdentity" },
+        "source_git": { "$ref": "#/$defs/GitProvenance" },
+        "source_artifacts": {
+          "type": "array",
+          "items": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/ArtifactRef" },
+          "maxItems": 1024
+        },
+        "dependency_artifacts": {
+          "type": "array",
+          "items": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/ArtifactRef" },
+          "maxItems": 2048
+        },
+        "schema_bundle": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/ArtifactRef" },
+        "transformations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/TransformationRecord" },
+          "maxItems": 1024
+        },
+        "projection_outputs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ProvenanceProjectionRecord" },
+          "minItems": 2,
+          "maxItems": 66
+        },
+        "limitations": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:[-_.][a-z0-9]+)*$", "maxLength": 160 },
+          "maxItems": 256,
+          "uniqueItems": true
+        },
+        "data_handling": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/DataHandlingRef" }
+      },
+      "additionalProperties": false
+    },
+    "ManifestArtifact": {
+      "type": "object",
+      "required": ["manifest_schema", "content_digest", "artifact"],
+      "properties": {
+        "manifest_schema": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/SchemaRef" },
+        "content_digest": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest" },
+        "artifact": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/ArtifactRef" }
+      },
+      "additionalProperties": false
+    },
+    "ClientProjectionArtifact": {
+      "type": "object",
+      "required": ["projection_key", "selector", "manifest"],
+      "properties": {
+        "projection_key": { "$ref": "#/$defs/AuthoringKey" },
+        "selector": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/TypedObject" },
+        "manifest": { "$ref": "#/$defs/ManifestArtifact" }
+      },
+      "additionalProperties": false
+    },
+    "ManifestSet": {
+      "type": "object",
+      "required": ["schema", "scientific", "clients", "server", "provenance", "schema_bundle", "validation_report"],
+      "properties": {
+        "schema": { "$ref": "#/$defs/ManifestSetSchemaRef" },
+        "scientific": { "$ref": "#/$defs/ManifestArtifact" },
+        "clients": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ClientProjectionArtifact" },
+          "minItems": 1,
+          "maxItems": 64
+        },
+        "server": { "$ref": "#/$defs/ManifestArtifact" },
+        "provenance": { "$ref": "#/$defs/ManifestArtifact" },
+        "schema_bundle": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/ArtifactRef" },
+        "validation_report": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/ArtifactRef" }
+      },
+      "additionalProperties": false
+    },
+    "SourceLocation": {
+      "type": "object",
+      "required": ["document", "pointer"],
+      "properties": {
+        "document": { "enum": ["authoring", "registry", "client", "server", "provenance", "scientific"] },
+        "pointer": { "$ref": "#/$defs/JsonPointer" }
+      },
+      "additionalProperties": false
+    },
+    "Diagnostic": {
+      "type": "object",
+      "required": ["fingerprint", "code", "severity", "stage", "safe_message", "suppressible"],
+      "properties": {
+        "fingerprint": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest" },
+        "code": { "type": "string", "pattern": "^[a-z][a-z0-9_]*(?:\\.[a-z][a-z0-9_]*)+$", "maxLength": 160 },
+        "severity": { "enum": ["error", "warning", "info"] },
+        "stage": { "enum": ["source", "identity", "flow", "capability", "privacy", "manifest", "publication"] },
+        "safe_message": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "primary_location": { "$ref": "#/$defs/SourceLocation" },
+        "related_locations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/SourceLocation" },
+          "maxItems": 32
+        },
+        "definition": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/ResourceRef" },
+        "suppressible": { "type": "boolean" }
+      },
+      "additionalProperties": false,
+      "if": {
+        "required": ["severity"],
+        "properties": { "severity": { "const": "error" } }
+      },
+      "then": { "properties": { "suppressible": { "const": false } } }
+    },
+    "DiagnosticCounts": {
+      "type": "object",
+      "required": ["error", "warning", "info"],
+      "properties": {
+        "error": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/NonNegativeSafeInteger" },
+        "warning": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/NonNegativeSafeInteger" },
+        "info": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/NonNegativeSafeInteger" }
+      },
+      "additionalProperties": false
+    },
+    "ValidationReport": {
+      "type": "object",
+      "required": ["schema", "input_fingerprint", "valid", "diagnostics", "counts", "compiler"],
+      "properties": {
+        "schema": { "$ref": "#/$defs/ValidationReportSchemaRef" },
+        "input_fingerprint": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest" },
+        "valid": { "type": "boolean" },
+        "diagnostics": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Diagnostic" },
+          "maxItems": 10000
+        },
+        "counts": { "$ref": "#/$defs/DiagnosticCounts" },
+        "compiler": { "$ref": "#/$defs/CompilerIdentity" }
+      },
+      "additionalProperties": false
+    },
+    "CompilationInputs": {
+      "type": "object",
+      "required": [
+        "git_provenance",
+        "source",
+        "compiler",
+        "schema_registry_digest",
+        "build_context_digest",
+        "target_platform_contract",
+        "compilation_policy"
+      ],
+      "properties": {
+        "git_provenance": { "$ref": "#/$defs/GitProvenance" },
+        "source": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/ArtifactRef" },
+        "compiler": { "$ref": "#/$defs/CompilerIdentity" },
+        "schema_registry_digest": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest" },
+        "build_context_digest": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest" },
+        "target_platform_contract": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/SchemaRef" },
+        "compilation_policy": { "$ref": "#/$defs/CompilationPolicy" }
+      },
+      "additionalProperties": false
+    },
+    "CompiledStudyCandidate": {
+      "type": "object",
+      "required": [
+        "schema",
+        "input_fingerprint",
+        "inputs",
+        "manifest_set",
+        "validation_report",
+        "scientific_manifest_digest",
+        "release_eligibility"
+      ],
+      "properties": {
+        "schema": { "$ref": "#/$defs/CompiledStudyCandidateSchemaRef" },
+        "input_fingerprint": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest" },
+        "inputs": { "$ref": "#/$defs/CompilationInputs" },
+        "manifest_set": { "$ref": "#/$defs/ManifestArtifact" },
+        "validation_report": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/ArtifactRef" },
+        "scientific_manifest_digest": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest" },
+        "release_eligibility": { "enum": ["design_unpublishable", "release_candidate"] }
+      },
+      "additionalProperties": false
+    },
+    "DiagnosticAcknowledgment": {
+      "type": "object",
+      "required": [
+        "diagnostic_fingerprint",
+        "candidate_digest",
+        "policy_schema",
+        "acknowledged_by",
+        "acknowledged_at"
+      ],
+      "properties": {
+        "diagnostic_fingerprint": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest" },
+        "candidate_digest": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest" },
+        "policy_schema": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/SchemaRef" },
+        "acknowledged_by": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/PrincipalRef" },
+        "acknowledged_at": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/UtcInstant" }
+      },
+      "additionalProperties": false
+    },
+    "StudyPublicationResult": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["outcome", "study_version", "version_string", "candidate_digest"],
+          "properties": {
+            "outcome": { "const": "created" },
+            "study_version": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/StudyVersionRef" },
+            "version_string": { "$ref": "#/$defs/VersionString" },
+            "candidate_digest": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["outcome", "study_version", "version_string", "candidate_digest"],
+          "properties": {
+            "outcome": { "const": "resolved_existing" },
+            "study_version": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/StudyVersionRef" },
+            "version_string": { "$ref": "#/$defs/VersionString" },
+            "candidate_digest": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest" }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "PublishedStudyVersion": {
+      "type": "object",
+      "required": [
+        "schema",
+        "study_version",
+        "version_string",
+        "git_provenance",
+        "candidate",
+        "scientific",
+        "clients",
+        "server",
+        "provenance",
+        "warning_acknowledgments",
+        "publication_command",
+        "publication_receipt",
+        "published_at",
+        "published_by"
+      ],
+      "properties": {
+        "schema": { "$ref": "#/$defs/PublishedStudyVersionSchemaRef" },
+        "study_version": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/StudyVersionRef" },
+        "version_string": { "$ref": "#/$defs/VersionString" },
+        "git_provenance": { "$ref": "#/$defs/GitProvenance" },
+        "candidate": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/ArtifactRef" },
+        "scientific": { "$ref": "#/$defs/ManifestArtifact" },
+        "clients": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ClientProjectionArtifact" },
+          "minItems": 1,
+          "maxItems": 64
+        },
+        "server": { "$ref": "#/$defs/ManifestArtifact" },
+        "provenance": { "$ref": "#/$defs/ManifestArtifact" },
+        "warning_acknowledgments": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/DiagnosticAcknowledgment" },
+          "maxItems": 10000
+        },
+        "publication_command": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/ResourceRef" },
+        "publication_receipt": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/ResourceRef" },
+        "published_at": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/UtcInstant" },
+        "published_by": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/PrincipalRef" }
+      },
+      "additionalProperties": false
+    },
+    "FixtureProjectionSelector": {
+      "type": "object",
+      "required": ["audience_class"],
+      "properties": {
+        "audience_class": { "$ref": "#/$defs/AuthoringKey" }
+      },
+      "additionalProperties": false
+    },
+    "FixtureRuntimeScopeSelector": {
+      "type": "object",
+      "required": ["activity_key"],
+      "properties": {
+        "activity_key": { "$ref": "#/$defs/AuthoringKey" }
+      },
+      "additionalProperties": false
+    },
+    "FixtureDeploymentRequirements": {
+      "type": "object",
+      "required": ["required_capabilities"],
+      "properties": {
+        "required_capabilities": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/CapabilitySet" }
+      },
+      "additionalProperties": false
+    },
+    "FixtureContentActivity": {
+      "type": "object",
+      "required": ["content_slot", "response_required"],
+      "properties": {
+        "content_slot": { "$ref": "#/$defs/AuthoringKey" },
+        "response_required": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "FixtureTerminalAction": {
+      "type": "object",
+      "required": ["outcome"],
+      "properties": {
+        "outcome": { "enum": ["complete", "ineligible", "withdrawn"] }
+      },
+      "additionalProperties": false
+    },
+    "FixtureClientComponentConfig": {
+      "type": "object",
+      "required": ["content_slot", "submit_label"],
+      "properties": {
+        "content_slot": { "$ref": "#/$defs/AuthoringKey" },
+        "submit_label": { "type": "string", "minLength": 1, "maxLength": 80 }
+      },
+      "additionalProperties": false
+    },
+    "FixtureServerActivityConfig": {
+      "type": "object",
+      "required": ["activity_key"],
+      "properties": {
+        "activity_key": { "$ref": "#/$defs/AuthoringKey" }
+      },
+      "additionalProperties": false
+    },
+    "FixtureDataFlow": {
+      "type": "object",
+      "required": ["source", "destination", "purpose"],
+      "properties": {
+        "source": { "$ref": "#/$defs/AuthoringKey" },
+        "destination": { "$ref": "#/$defs/AuthoringKey" },
+        "purpose": { "$ref": "#/$defs/AuthoringKey" }
+      },
+      "additionalProperties": false
+    },
+    "FixtureCase": {
+      "type": "object",
+      "required": ["id", "instance", "schema_ref", "expect"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)+$", "maxLength": 160 },
+        "instance": { "type": "string", "pattern": "^(?:valid|invalid)/[a-z0-9][a-z0-9._-]*\\.json$", "maxLength": 256 },
+        "schema_ref": { "type": "string", "pattern": "^urn:mug:schema:mug\\.api-01\\.study-authoring:0#/\\$defs/[A-Za-z][A-Za-z0-9]*$", "maxLength": 256 },
+        "validation_layer": { "enum": ["schema", "typed_object", "semantic", "publication"] },
+        "expect": { "enum": ["valid", "invalid"] },
+        "expected_error": {
+          "type": "object",
+          "required": ["keyword", "instance_pointer"],
+          "properties": {
+            "keyword": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_]*$", "maxLength": 96 },
+            "instance_pointer": { "$ref": "#/$defs/JsonPointer" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false,
+      "if": { "required": ["expect"], "properties": { "expect": { "const": "invalid" } } },
+      "then": { "required": ["expected_error"] },
+      "else": { "not": { "required": ["expected_error"] } }
+    },
+    "FixtureManifest": {
+      "type": "object",
+      "required": ["schema", "manifest_version", "suite", "contract_version", "cases"],
+      "properties": {
+        "schema": { "$ref": "#/$defs/FixtureManifestSchemaRef" },
+        "manifest_version": { "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/SemVer" },
+        "suite": { "const": "api-01-study-authoring" },
+        "contract_version": { "const": 0 },
+        "cases": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/FixtureCase" },
+          "minItems": 1,
+          "maxItems": 512
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "schema": {
+    "name": "mug.api-02.deployment",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "4fe71236a986f298966abe5ed4a6e9d1b53121a6b22de829eeb9a52826e09825"
+    }
+  },
+  "deployment_id": "deploy_019b6000-0000-7000-8000-000000000020",
+  "study_id": "study_019b6000-0000-7000-8000-000000000001",
+  "disposition": "stopped",
+  "current_revision": {
+    "deployment_id": "deploy_019b6000-0000-7000-8000-000000000020",
+    "deployment_revision_id": "deployrev_019b6000-0000-7000-8000-000000000021",
+    "revision_number": 1,
+    "study_version": {
+      "study_id": "study_019b6000-0000-7000-8000-000000000001",
+      "study_version_id": "studyver_019b6000-0000-7000-8000-000000000010",
+      "version_number": 2,
+      "manifest_digest": {
+        "algorithm": "sha-256",
+        "hex": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1"
+      }
+    },
+    "manifest_digest": {
+      "algorithm": "sha-256",
+      "hex": "556e08f0c0fbaf6c9792b8382aecf69e52c292fa6b3c0df50bd184d0c43c9fe9"
+    }
+  }
+}

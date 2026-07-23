@@ -1,0 +1,18 @@
+{
+  "schema": {
+    "name": "mug.api-22.job-run",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "df34b114612fea375a7a9e76da5b94bddf2bd5809da6a6277fe51b203e567c33"
+    }
+  },
+  "job_id": "job_019b6000-0000-7000-8000-000000000910",
+  "attempt": 1,
+  "status": "succeeded",
+  "result_digest": {
+    "algorithm": "sha-256",
+    "hex": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "started_at": "2026-08-02T12:00:01.000000Z"
+}

@@ -1,0 +1,28 @@
+{
+  "schema": {
+    "name": "mug.api-17.form-spec",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "63d889325b5004a974527cd9401c5819a22dbcf385c573d7cfad70595313c86f"
+    }
+  },
+  "form_key": "debrief",
+  "fields": [
+    {
+      "field_key": "enjoyment",
+      "kind": "likert",
+      "label": "How much did you enjoy this?",
+      "required": true,
+      "scale": 7
+    },
+    {
+      "field_key": "enjoyment",
+      "kind": "likert",
+      "label": "How fun was this?",
+      "required": true,
+      "scale": 5
+    }
+  ],
+  "version": 1
+}

@@ -1,0 +1,35 @@
+{
+  "schema": {
+    "name": "mug.api-07.env-factory",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "2c41f0fe7bacf95174dc6c1cc1e57a4ce478d1deca1aeadd9d857f91d7d2caaa"
+    }
+  },
+  "channel_key": "board",
+  "factory": "studies.foraging.envs.foraging:make_env",
+  "mode": "browser",
+  "requires": [
+    "cogrid",
+    "cogrid>=0.2"
+  ],
+  "source_bundle": {
+    "artifact_id": "artifact_019b6000-0000-7000-8000-00000000c0de",
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4"
+    },
+    "size_bytes": 24576,
+    "media_type": "application/zip",
+    "content_encoding": "identity",
+    "data_handling": {
+      "privacy_labels": [
+        "public"
+      ]
+    }
+  },
+  "hooks": [
+    "per-seat-observation"
+  ]
+}

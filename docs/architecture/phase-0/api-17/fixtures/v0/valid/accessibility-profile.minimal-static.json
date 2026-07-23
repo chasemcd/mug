@@ -1,0 +1,14 @@
+{
+  "schema": {
+    "name": "mug.api-17.accessibility-profile",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "63d889325b5004a974527cd9401c5819a22dbcf385c573d7cfad70595313c86f"
+    }
+  },
+  "profile_key": "wcag-aa",
+  "wcag_level": "aa",
+  "keyboard_navigable": true,
+  "screen_reader": true
+}

@@ -1,0 +1,123 @@
+{
+  "schema": {
+    "name": "mug.study.authoring-document",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "96958cdf2ab34fd541208d2adcd17f0d2c7d43ee2c1f5e433d2c87e323e2d58f"
+    }
+  },
+  "study_id": "study_019b6000-0000-7000-8000-000000000001",
+  "title": "Synthetic minimal static study",
+  "flow": {
+    "entry_node_id": "flownode_019b6000-0000-7000-8000-000000000102",
+    "nodes": [
+      {
+        "node_id": "flownode_019b6000-0000-7000-8000-000000000104",
+        "key": "finish",
+        "kind": "terminal",
+        "terminal": {
+          "schema": {
+            "name": "mug.fixture.terminal-action",
+            "version": 0,
+            "digest": {
+              "algorithm": "sha-256",
+              "hex": "0f2e2d078bfee32773d4ceeb67e0dc127df1d5babfee46d9d877f7a2889282be"
+            }
+          },
+          "data": {
+            "outcome": "complete"
+          }
+        }
+      },
+      {
+        "node_id": "flownode_019b6000-0000-7000-8000-000000000102",
+        "key": "root",
+        "kind": "sequence",
+        "children": [
+          "flownode_019b6000-0000-7000-8000-000000000103",
+          "flownode_019b6000-0000-7000-8000-000000000104"
+        ]
+      },
+      {
+        "node_id": "flownode_019b6000-0000-7000-8000-000000000103",
+        "key": "welcome-step",
+        "kind": "activity",
+        "activity_definition_id": "activitydef_019b6000-0000-7000-8000-000000000101"
+      }
+    ]
+  },
+  "definitions": [
+    {
+      "kind": "activity",
+      "key": "welcome",
+      "definition": {
+        "id": "activitydef_019b6000-0000-7000-8000-000000000101"
+      },
+      "spec": {
+        "schema": {
+          "name": "mug.fixture.content-activity",
+          "version": 0,
+          "digest": {
+            "algorithm": "sha-256",
+            "hex": "51f4ad4ffe673885c3f598f253d531aa91d3aa9d08310a2091ae1ee970332aeb"
+          }
+        },
+        "data": {
+          "content_slot": "welcome-copy",
+          "response_required": false
+        }
+      }
+    }
+  ],
+  "secret_requirements": [],
+  "code_packages": [],
+  "data_flows": [
+    {
+      "schema": {
+        "name": "mug.fixture.data-flow",
+        "version": 0,
+        "digest": {
+          "algorithm": "sha-256",
+          "hex": "762d2f87c31ae4a2436afb737eab1cc627493d6dd852c73562b152c26e951c99"
+        }
+      },
+      "data": {
+        "source": "participant-browser",
+        "destination": "study-service",
+        "purpose": "activity-progress"
+      }
+    }
+  ],
+  "deployment_requirements": {
+    "schema": {
+      "name": "mug.fixture.deployment-requirements",
+      "version": 0,
+      "digest": {
+        "algorithm": "sha-256",
+        "hex": "d4bbca1d734b4a91cc6fa394ef40e191495c0734955df65f2a51c898326134f6"
+      }
+    },
+    "data": {
+      "required_capabilities": [
+        "mug.activity.content.v1",
+        "mug.client.protocol.v1",
+        "mug.content.form.v1"
+      ]
+    }
+  },
+  "compilation_policy": {
+    "unknown_fields": "reject",
+    "warnings": "reject",
+    "executable_content": "packaged_only",
+    "hermetic_build": "required",
+    "reproducibility_check": "required",
+    "client_disclosure_check": "required"
+  },
+  "data_handling": {
+    "privacy_labels": [
+      "research",
+      "sensitive"
+    ]
+  }
+}

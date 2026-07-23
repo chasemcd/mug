@@ -1,0 +1,119 @@
+{
+  "schema": {
+    "name": "mug.api-18.preference.fixture-manifest",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "23659cee1b0870cb156470ea50e88501e7158412e6c6d762c3735e54a8114705"
+    }
+  },
+  "manifest_version": "0.2.0",
+  "suite": "api-18-preference",
+  "contract_version": 0,
+  "cases": [
+    {
+      "id": "preference-protocol.valid.minimal-static",
+      "instance": "valid/preference-protocol.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-18.preference:0#/$defs/PreferenceProtocol",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "preference-protocol.valid.rating-task",
+      "instance": "valid/preference-protocol.rating-task.json",
+      "schema_ref": "urn:mug:schema:mug.api-18.preference:0#/$defs/PreferenceProtocol",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "candidate-ref.valid.minimal-static",
+      "instance": "valid/candidate-ref.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-18.preference:0#/$defs/CandidateRef",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "preference-assignment.valid.minimal-static",
+      "instance": "valid/preference-assignment.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-18.preference:0#/$defs/PreferenceAssignment",
+      "expect": "valid",
+      "validation_layer": "semantic"
+    },
+    {
+      "id": "preference-response.valid.minimal-static",
+      "instance": "valid/preference-response.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-18.preference:0#/$defs/PreferenceResponse",
+      "expect": "valid",
+      "validation_layer": "semantic"
+    },
+    {
+      "id": "quality-evidence.valid.minimal-static",
+      "instance": "valid/quality-evidence.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-18.preference:0#/$defs/QualityEvidence",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "preference-protocol.invalid.bad-task-kind",
+      "instance": "invalid/preference-protocol.bad-task-kind.json",
+      "schema_ref": "urn:mug:schema:mug.api-18.preference:0#/$defs/PreferenceProtocol",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "enum",
+        "instance_pointer": "/task/kind"
+      }
+    },
+    {
+      "id": "preference-protocol.invalid.bad-candidate-kind",
+      "instance": "invalid/preference-protocol.bad-candidate-kind.json",
+      "schema_ref": "urn:mug:schema:mug.api-18.preference:0#/$defs/PreferenceProtocol",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "enum",
+        "instance_pointer": "/candidate_kind"
+      }
+    },
+    {
+      "id": "candidate-ref.invalid.raw-identity",
+      "instance": "invalid/candidate-ref.raw-identity.json",
+      "schema_ref": "urn:mug:schema:mug.api-18.preference:0#/$defs/CandidateRef",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "additionalProperties",
+        "instance_pointer": ""
+      }
+    },
+    {
+      "id": "preference-assignment.invalid.duplicate-order",
+      "instance": "invalid/preference-assignment.duplicate-order.json",
+      "schema_ref": "urn:mug:schema:mug.api-18.preference:0#/$defs/PreferenceAssignment",
+      "expect": "invalid",
+      "validation_layer": "semantic",
+      "expected_error": {
+        "keyword": "duplicateDisplayOrder",
+        "instance_pointer": "/candidate_display_order/1"
+      }
+    },
+    {
+      "id": "preference-response.invalid.bad-id",
+      "instance": "invalid/preference-response.bad-id.json",
+      "schema_ref": "urn:mug:schema:mug.api-18.preference:0#/$defs/PreferenceResponse",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "pattern",
+        "instance_pointer": "/response_id"
+      }
+    },
+    {
+      "id": "preference-response.invalid.phantom-choice",
+      "instance": "invalid/preference-response.phantom-choice.json",
+      "schema_ref": "urn:mug:schema:mug.api-18.preference:0#/$defs/PreferenceResponse",
+      "expect": "invalid",
+      "validation_layer": "semantic",
+      "expected_error": {
+        "keyword": "choiceNotPresented",
+        "instance_pointer": "/choice"
+      }
+    }
+  ]
+}

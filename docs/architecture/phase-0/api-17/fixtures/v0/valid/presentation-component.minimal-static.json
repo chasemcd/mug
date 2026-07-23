@@ -1,0 +1,20 @@
+{
+  "schema": {
+    "name": "mug.api-17.presentation-component",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "63d889325b5004a974527cd9401c5819a22dbcf385c573d7cfad70595313c86f"
+    }
+  },
+  "component_key": "welcome-panel",
+  "component_schema": {
+    "name": "mug.client.content-panel",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1"
+    }
+  },
+  "accessibility_profile": "wcag-aa"
+}

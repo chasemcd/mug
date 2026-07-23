@@ -1,0 +1,19 @@
+{
+  "schema": {
+    "name": "mug.api-18.preference-response",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "23659cee1b0870cb156470ea50e88501e7158412e6c6d762c3735e54a8114705"
+    }
+  },
+  "response_id": "prefresponse_019b6000-0000-7000-8000-000000000f40",
+  "assignment_id": "prefassign_019b6000-0000-7000-8000-000000000f01",
+  "choice": "option-c",
+  "presented_order": [
+    "option-a",
+    "option-b"
+  ],
+  "receipt_required": true,
+  "submitted_at": "2026-08-02T12:15:00.000000Z"
+}

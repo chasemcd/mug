@@ -1,0 +1,810 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:mug:schema:mug.api-09.client:0",
+  "title": "MUG API-09 Participant Client, Realtime, and Uploads contracts, version 0",
+  "$defs": {
+    "AuthoringKey": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(?:[-_.][a-z0-9]+)*$",
+      "maxLength": 128
+    },
+    "KeyName": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(?:[-_][a-z0-9]+)*$",
+      "maxLength": 32
+    },
+    "EnvActionValue": {
+      "anyOf": [
+        {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/SafeInteger"
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 1,
+          "maxItems": 64
+        }
+      ]
+    },
+    "NoInputFill": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/EnvActionValue"
+        },
+        {
+          "const": "repeat_last"
+        }
+      ]
+    },
+    "InputMode": {
+      "enum": [
+        "pressed_keys",
+        "single_keystroke"
+      ]
+    },
+    "ClientHandshakeSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-09.client-handshake"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ClientHandshake": {
+      "type": "object",
+      "required": [
+        "schema",
+        "launch_handle",
+        "accepted_deployment",
+        "protocol_capabilities",
+        "client_build_slot"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/ClientHandshakeSchemaRef"
+        },
+        "launch_handle": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/PublicHandle"
+        },
+        "accepted_deployment": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/DeploymentRevisionRef"
+        },
+        "protocol_capabilities": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/CapabilitySet"
+        },
+        "client_build_slot": {
+          "$ref": "#/$defs/AuthoringKey"
+        }
+      },
+      "additionalProperties": false
+    },
+    "RealtimeCommandSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-09.realtime-command"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "RealtimeCommand": {
+      "type": "object",
+      "required": [
+        "schema",
+        "command_id",
+        "channel_key",
+        "intent_schema",
+        "payload_digest",
+        "idempotency_key",
+        "submitted_at"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/RealtimeCommandSchemaRef"
+        },
+        "command_id": {
+          "type": "string",
+          "pattern": "^command_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "channel_key": {
+          "$ref": "#/$defs/AuthoringKey"
+        },
+        "intent_schema": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/SchemaRef"
+        },
+        "payload_digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        },
+        "idempotency_key": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/IdempotencyKey"
+        },
+        "submitted_at": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/UtcInstant"
+        }
+      },
+      "additionalProperties": false
+    },
+    "UploadTicketSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-09.upload-ticket"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "UploadTicket": {
+      "type": "object",
+      "required": [
+        "schema",
+        "upload_id",
+        "grant_handle",
+        "media_type",
+        "max_size_bytes",
+        "expires_at"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/UploadTicketSchemaRef"
+        },
+        "upload_id": {
+          "type": "string",
+          "pattern": "^upload_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "grant_handle": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/PublicHandle"
+        },
+        "media_type": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9!#$&^_.+-]*/[a-z0-9][a-z0-9!#$&^_.+-]*$",
+          "maxLength": 127
+        },
+        "max_size_bytes": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/PositiveSafeInteger"
+        },
+        "expires_at": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/UtcInstant"
+        }
+      },
+      "additionalProperties": false
+    },
+    "TransportAckSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-09.transport-ack"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "TransportAck": {
+      "type": "object",
+      "required": [
+        "schema",
+        "command_id",
+        "ack_kind"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/TransportAckSchemaRef"
+        },
+        "command_id": {
+          "type": "string",
+          "pattern": "^command_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "ack_kind": {
+          "enum": [
+            "parsed",
+            "queued",
+            "accepted"
+          ]
+        },
+        "stream_position": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/StreamPosition"
+        }
+      },
+      "additionalProperties": false
+    },
+    "InputSchemeSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-09.input-scheme"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "InputScheme": {
+      "type": "object",
+      "required": [
+        "schema",
+        "seat_key",
+        "mode",
+        "bindings",
+        "on_no_input"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/InputSchemeSchemaRef"
+        },
+        "seat_key": {
+          "$ref": "#/$defs/AuthoringKey"
+        },
+        "mode": {
+          "$ref": "#/$defs/InputMode"
+        },
+        "bindings": {
+          "type": "object",
+          "minProperties": 1,
+          "maxProperties": 128,
+          "propertyNames": {
+            "$ref": "#/$defs/KeyName"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/EnvActionValue"
+          }
+        },
+        "on_no_input": {
+          "$ref": "#/$defs/NoInputFill"
+        },
+        "input_delay": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/NonNegativeSafeInteger"
+        }
+      },
+      "additionalProperties": false
+    },
+    "SeatDeliverySchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-09.seat-delivery"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "SeatDelivery": {
+      "type": "object",
+      "required": [
+        "schema",
+        "seat_key",
+        "delivery_kind",
+        "payload_schema",
+        "payload_digest",
+        "stream_position"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/SeatDeliverySchemaRef"
+        },
+        "seat_key": {
+          "$ref": "#/$defs/AuthoringKey"
+        },
+        "delivery_kind": {
+          "enum": [
+            "render_packet",
+            "message"
+          ]
+        },
+        "payload_schema": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/SchemaRef"
+        },
+        "payload_digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        },
+        "stream_position": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/StreamPosition"
+        }
+      },
+      "additionalProperties": false
+    },
+    "BridgeOp": {
+      "enum": [
+        "response.set",
+        "response.get",
+        "state.set",
+        "state.get",
+        "advance"
+      ]
+    },
+    "BridgeMessageSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-09.bridge-message"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "BridgeMessage": {
+      "type": "object",
+      "required": [
+        "schema",
+        "op"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/BridgeMessageSchemaRef"
+        },
+        "op": {
+          "$ref": "#/$defs/BridgeOp"
+        },
+        "key": {
+          "$ref": "#/$defs/AuthoringKey"
+        },
+        "value": true
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "enum": [
+                  "response.set",
+                  "state.set"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "key",
+              "value"
+            ]
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "enum": [
+                  "response.get",
+                  "state.get"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "key"
+            ],
+            "not": {
+              "required": [
+                "value"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "advance"
+              }
+            }
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "key"
+                  ]
+                },
+                {
+                  "required": [
+                    "value"
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "MonitoringMeasurementSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-09.monitoring-measurement"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "MonitoringPolicyRef": {
+      "type": "object",
+      "description": "Inert pinned reference to API-06's server-authoritative MonitoringPolicy (urn:mug:schema:mug.api-06.interaction:0#/$defs/MonitoringPolicy). This is a foreign-bundle pin: API-09 never recomputes it against its own bundle. API-06 owns enforcement; API-09 only reports measurements the server evaluates against this policy.",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-06.interaction"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "QualityMeasurement": {
+      "type": "object",
+      "description": "One typed client quality sample. metric selects the ping/latency round-trip time (rtt) or the cumulative tab focus/blur hidden time (hidden); observed carries the measured Duration the server compares against MonitoringPolicy.max_rtt / max_hidden.",
+      "required": [
+        "metric",
+        "observed"
+      ],
+      "properties": {
+        "metric": {
+          "enum": [
+            "rtt",
+            "hidden"
+          ]
+        },
+        "observed": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Duration"
+        }
+      },
+      "additionalProperties": false
+    },
+    "MonitoringMeasurement": {
+      "type": "object",
+      "description": "RP-6: a typed client measurement event carrying the participant's ping/latency and tab focus/blur visibility samples. Enforcement is NOT client-side: API-09 only reports measurements. The server evaluates them against API-06's server-authoritative MonitoringPolicy (pinned via policy) and alone decides warn/exclude.",
+      "required": [
+        "schema",
+        "policy",
+        "seat_key",
+        "measurements",
+        "measured_at"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/MonitoringMeasurementSchemaRef"
+        },
+        "policy": {
+          "$ref": "#/$defs/MonitoringPolicyRef"
+        },
+        "seat_key": {
+          "$ref": "#/$defs/AuthoringKey"
+        },
+        "measurements": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/QualityMeasurement"
+          },
+          "minItems": 1,
+          "maxItems": 16
+        },
+        "measured_at": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/UtcInstant"
+        }
+      },
+      "additionalProperties": false
+    },
+    "GateTarget": {
+      "enum": [
+        "advance",
+        "join"
+      ]
+    },
+    "GateAction": {
+      "enum": [
+        "block",
+        "unblock"
+      ]
+    },
+    "GateAnchor": {
+      "type": "object",
+      "description": "The interaction/flow anchor a gate op blocks or unblocks. anchor_kind selects joining an interaction (interaction) or advancing a flow node (flow_node); anchor_key names it.",
+      "required": [
+        "anchor_kind",
+        "anchor_key"
+      ],
+      "properties": {
+        "anchor_kind": {
+          "enum": [
+            "interaction",
+            "flow_node"
+          ]
+        },
+        "anchor_key": {
+          "$ref": "#/$defs/AuthoringKey"
+        }
+      },
+      "additionalProperties": false
+    },
+    "GateOpSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-09.gate-op"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "GateOp": {
+      "type": "object",
+      "description": "RP-8: a typed readiness-gating op that lets trusted page JavaScript BLOCK or UNBLOCK advancing (target advance) or joining (target join) the anchored interaction/flow, formalizing the legacy startButton/advanceButton interval hacks. RP-8 adopts ONLY this readiness op; the state->env-args resolution path and the read-only participant handle are NOT adopted and remain open sub-items.",
+      "required": [
+        "schema",
+        "gate_id",
+        "target",
+        "action",
+        "anchor",
+        "requested_at"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/GateOpSchemaRef"
+        },
+        "gate_id": {
+          "type": "string",
+          "pattern": "^gate_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "target": {
+          "$ref": "#/$defs/GateTarget"
+        },
+        "action": {
+          "$ref": "#/$defs/GateAction"
+        },
+        "anchor": {
+          "$ref": "#/$defs/GateAnchor"
+        },
+        "requested_at": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/UtcInstant"
+        }
+      },
+      "additionalProperties": false
+    },
+    "FixtureManifestSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-09.client.fixture-manifest"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "FixtureCase": {
+      "type": "object",
+      "required": [
+        "id",
+        "instance",
+        "schema_ref",
+        "expect"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)+$",
+          "maxLength": 160
+        },
+        "instance": {
+          "type": "string",
+          "pattern": "^(?:valid|invalid)/[a-z0-9][a-z0-9._-]*\\.json$",
+          "maxLength": 256
+        },
+        "schema_ref": {
+          "type": "string",
+          "pattern": "^urn:mug:schema:mug\\.api-09\\.client:0#/\\$defs/[A-Za-z][A-Za-z0-9]*$",
+          "maxLength": 256
+        },
+        "validation_layer": {
+          "enum": [
+            "schema",
+            "semantic"
+          ]
+        },
+        "expect": {
+          "enum": [
+            "valid",
+            "invalid"
+          ]
+        },
+        "expected_error": {
+          "type": "object",
+          "required": [
+            "keyword",
+            "instance_pointer"
+          ],
+          "properties": {
+            "keyword": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "maxLength": 96
+            },
+            "instance_pointer": {
+              "type": "string",
+              "pattern": "^(?:/[^/]+)*$",
+              "maxLength": 256
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false,
+      "if": {
+        "required": [
+          "expect"
+        ],
+        "properties": {
+          "expect": {
+            "const": "invalid"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "expected_error"
+        ]
+      },
+      "else": {
+        "not": {
+          "required": [
+            "expected_error"
+          ]
+        }
+      }
+    },
+    "FixtureManifest": {
+      "type": "object",
+      "required": [
+        "schema",
+        "manifest_version",
+        "suite",
+        "contract_version",
+        "cases"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/FixtureManifestSchemaRef"
+        },
+        "manifest_version": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/SemVer"
+        },
+        "suite": {
+          "const": "api-09-client"
+        },
+        "contract_version": {
+          "const": 0
+        },
+        "cases": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/FixtureCase"
+          },
+          "minItems": 1,
+          "maxItems": 512
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

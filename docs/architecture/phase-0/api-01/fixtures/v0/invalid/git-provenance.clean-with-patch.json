@@ -1,0 +1,12 @@
+{
+  "commit": "0123456789abcdef0123456789abcdef01234567",
+  "branch": "main",
+  "dirty": false,
+  "patch": {
+    "patch_digest": {
+      "algorithm": "sha-256",
+      "hex": "5555555555555555555555555555555555555555555555555555555555555555"
+    },
+    "size_bytes": 512
+  }
+}

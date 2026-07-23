@@ -1,0 +1,134 @@
+{
+  "kind": "typed-object",
+  "vectors": [
+    {
+      "canonical": "{\"data\":{\"study_id\":\"study_0190b2a0-1c3d-7f00-8abc-000000000001\"},\"schema\":{\"digest\":{\"algorithm\":\"sha-256\",\"hex\":\"44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a\"},\"name\":\"mug.study.publish\",\"version\":0}}",
+      "name": "valid-typed-object",
+      "sha256": "8f695cadcf17e30acf53ab55e8b5f861103f6e1a28600a9768506f6b834b03cd",
+      "valid": true,
+      "value": {
+        "data": {
+          "study_id": "study_0190b2a0-1c3d-7f00-8abc-000000000001"
+        },
+        "schema": {
+          "digest": {
+            "algorithm": "sha-256",
+            "hex": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+          },
+          "name": "mug.study.publish",
+          "version": 0
+        }
+      }
+    },
+    {
+      "canonical": "{\"data\":{},\"schema\":{\"digest\":{\"algorithm\":\"sha-256\",\"hex\":\"44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a\"},\"name\":\"mug.study.publish\",\"version\":0}}",
+      "name": "valid-empty-data",
+      "sha256": "a6256930ea4f69e5f85bb914f7c3ba9f8eafcc8fb31de36b6771864196c340c5",
+      "valid": true,
+      "value": {
+        "data": {},
+        "schema": {
+          "digest": {
+            "algorithm": "sha-256",
+            "hex": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+          },
+          "name": "mug.study.publish",
+          "version": 0
+        }
+      }
+    },
+    {
+      "canonical": null,
+      "name": "missing-schema",
+      "sha256": null,
+      "valid": false,
+      "value": {
+        "data": {}
+      }
+    },
+    {
+      "canonical": null,
+      "name": "missing-data",
+      "sha256": null,
+      "valid": false,
+      "value": {
+        "schema": {
+          "digest": {
+            "algorithm": "sha-256",
+            "hex": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+          },
+          "name": "mug.study.publish",
+          "version": 0
+        }
+      }
+    },
+    {
+      "canonical": null,
+      "name": "data-is-array",
+      "sha256": null,
+      "valid": false,
+      "value": {
+        "data": [],
+        "schema": {
+          "digest": {
+            "algorithm": "sha-256",
+            "hex": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+          },
+          "name": "mug.study.publish",
+          "version": 0
+        }
+      }
+    },
+    {
+      "canonical": null,
+      "name": "bad-schema-name",
+      "sha256": null,
+      "valid": false,
+      "value": {
+        "data": {},
+        "schema": {
+          "digest": {
+            "algorithm": "sha-256",
+            "hex": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+          },
+          "name": "study.publish",
+          "version": 0
+        }
+      }
+    },
+    {
+      "canonical": null,
+      "name": "bad-digest-hex",
+      "sha256": null,
+      "valid": false,
+      "value": {
+        "data": {},
+        "schema": {
+          "digest": {
+            "algorithm": "sha-256",
+            "hex": "abc"
+          },
+          "name": "mug.study.publish",
+          "version": 0
+        }
+      }
+    },
+    {
+      "canonical": null,
+      "name": "negative-version",
+      "sha256": null,
+      "valid": false,
+      "value": {
+        "data": {},
+        "schema": {
+          "digest": {
+            "algorithm": "sha-256",
+            "hex": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+          },
+          "name": "mug.study.publish",
+          "version": -1
+        }
+      }
+    }
+  ]
+}

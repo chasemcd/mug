@@ -1,0 +1,25 @@
+{
+  "schema": {
+    "name": "mug.api-15.memory-commit",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "a04cf73e88cd0e0b15725930fb0206cde24296e6b93159ed969a54cb8d49ac4e"
+    }
+  },
+  "memory_id": "memory_019b6000-0000-7000-8000-000000001001",
+  "scope_kind": "longitudinal",
+  "committed_digest": {
+    "algorithm": "sha-256",
+    "hex": "a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2"
+  },
+  "prior_version": {
+    "revision": 4,
+    "etag": "sha256:e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4"
+  },
+  "new_version": {
+    "revision": 7,
+    "etag": "sha256:e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7e7"
+  },
+  "provenance_decision_id": "decision_019b6000-0000-7000-8000-000000000b01"
+}

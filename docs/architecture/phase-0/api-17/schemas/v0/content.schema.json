@@ -1,0 +1,749 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:mug:schema:mug.api-17.content:0",
+  "title": "MUG API-17 Content, Forms, and Presentation contracts, version 0",
+  "$defs": {
+    "AuthoringKey": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(?:[-_.][a-z0-9]+)*$",
+      "maxLength": 128
+    },
+    "RepoRelativePath": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]*(?:/[a-z0-9][a-z0-9._-]*)*$",
+      "maxLength": 512
+    },
+    "ContentBody": {
+      "type": "object",
+      "required": [
+        "origin",
+        "source",
+        "format",
+        "executable"
+      ],
+      "properties": {
+        "origin": {
+          "enum": [
+            "author",
+            "model",
+            "participant"
+          ]
+        },
+        "source": {
+          "enum": [
+            "file",
+            "inline"
+          ]
+        },
+        "format": {
+          "enum": [
+            "markdown",
+            "html"
+          ]
+        },
+        "executable": {
+          "type": "boolean"
+        },
+        "path": {
+          "$ref": "#/$defs/RepoRelativePath"
+        },
+        "text": {
+          "type": "string",
+          "maxLength": 262144
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "source": {
+                "const": "file"
+              }
+            },
+            "required": [
+              "source"
+            ]
+          },
+          "then": {
+            "required": [
+              "path",
+              "digest"
+            ]
+          },
+          "else": {
+            "required": [
+              "text"
+            ],
+            "not": {
+              "required": [
+                "path"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "executable": {
+                "const": true
+              }
+            },
+            "required": [
+              "executable"
+            ]
+          },
+          "then": {
+            "properties": {
+              "origin": {
+                "const": "author"
+              },
+              "format": {
+                "const": "html"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "format": {
+                "const": "markdown"
+              }
+            },
+            "required": [
+              "format"
+            ]
+          },
+          "then": {
+            "properties": {
+              "executable": {
+                "const": false
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "origin": {
+                "const": "author"
+              }
+            },
+            "required": [
+              "origin"
+            ]
+          },
+          "else": {
+            "properties": {
+              "executable": {
+                "const": false
+              },
+              "source": {
+                "const": "inline"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "ContentSpecSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-17.content-spec"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ContentSpec": {
+      "type": "object",
+      "required": [
+        "schema",
+        "content_key",
+        "body",
+        "response_required",
+        "version"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/ContentSpecSchemaRef"
+        },
+        "content_key": {
+          "$ref": "#/$defs/AuthoringKey"
+        },
+        "body": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/ContentBody"
+            },
+            {
+              "properties": {
+                "origin": {
+                  "const": "author"
+                }
+              }
+            }
+          ]
+        },
+        "response_required": {
+          "type": "boolean"
+        },
+        "version": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/PositiveSafeInteger"
+        }
+      },
+      "additionalProperties": false
+    },
+    "FormField": {
+      "type": "object",
+      "required": [
+        "field_key",
+        "kind",
+        "label",
+        "required"
+      ],
+      "properties": {
+        "field_key": {
+          "$ref": "#/$defs/AuthoringKey"
+        },
+        "kind": {
+          "enum": [
+            "likert",
+            "choice",
+            "text",
+            "number",
+            "slider",
+            "rating"
+          ]
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "minItems": 2,
+          "maxItems": 64
+        },
+        "scale": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 100
+        }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "choice"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "required": [
+              "options"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "options"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "likert"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "required": [
+              "scale"
+            ]
+          }
+        }
+      ]
+    },
+    "FormSpecSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-17.form-spec"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "FormSpec": {
+      "type": "object",
+      "required": [
+        "schema",
+        "form_key",
+        "fields",
+        "version"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/FormSpecSchemaRef"
+        },
+        "form_key": {
+          "$ref": "#/$defs/AuthoringKey"
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/FormField"
+          },
+          "minItems": 1,
+          "maxItems": 256
+        },
+        "version": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/PositiveSafeInteger"
+        }
+      },
+      "additionalProperties": false
+    },
+    "FormResponseSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-17.form-response"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "FormResponse": {
+      "type": "object",
+      "required": [
+        "schema",
+        "form_key",
+        "visit_id",
+        "occurrence_id",
+        "answers_digest",
+        "receipt_required",
+        "submitted_at"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/FormResponseSchemaRef"
+        },
+        "form_key": {
+          "$ref": "#/$defs/AuthoringKey"
+        },
+        "visit_id": {
+          "type": "string",
+          "pattern": "^visit_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "occurrence_id": {
+          "type": "string",
+          "pattern": "^activity_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "answers_digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        },
+        "receipt_required": {
+          "type": "boolean"
+        },
+        "submitted_at": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/UtcInstant"
+        }
+      },
+      "additionalProperties": false
+    },
+    "PresentationComponentSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-17.presentation-component"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "PresentationComponent": {
+      "type": "object",
+      "required": [
+        "schema",
+        "component_key",
+        "component_schema",
+        "accessibility_profile"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/PresentationComponentSchemaRef"
+        },
+        "component_key": {
+          "$ref": "#/$defs/AuthoringKey"
+        },
+        "component_schema": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/SchemaRef"
+        },
+        "accessibility_profile": {
+          "$ref": "#/$defs/AuthoringKey"
+        }
+      },
+      "additionalProperties": false
+    },
+    "GateTarget": {
+      "enum": [
+        "advance",
+        "join"
+      ]
+    },
+    "GateAction": {
+      "enum": [
+        "block",
+        "unblock"
+      ]
+    },
+    "GateAnchor": {
+      "type": "object",
+      "required": [
+        "anchor_kind",
+        "anchor_key"
+      ],
+      "properties": {
+        "anchor_kind": {
+          "enum": [
+            "interaction",
+            "flow_node"
+          ]
+        },
+        "anchor_key": {
+          "$ref": "#/$defs/AuthoringKey"
+        }
+      },
+      "additionalProperties": false
+    },
+    "GateOpRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-09.gate-op"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "GateControlSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-17.gate-control"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "GateControl": {
+      "type": "object",
+      "description": "RP-8: a first-class readiness-gating content control (the start/advance button/control) that surfaces a gate to the participant and drives the API-09 GateOp it emits. It declares which gate target it drives (advance vs join) and the anchored interaction/flow it gates, carries an accessibility profile like any shipped component, and pins the inert API-09 gate-op bundle it emits. Formalizes the legacy startButton/advanceButton interval hacks. RP-8 adopts ONLY this readiness control; the state->env-args resolution path and the read-only participant handle are NOT adopted and remain open sub-items.",
+      "required": [
+        "schema",
+        "component_key",
+        "gate_target",
+        "gate_action",
+        "anchor",
+        "gate_op",
+        "accessibility_profile"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/GateControlSchemaRef"
+        },
+        "component_key": {
+          "$ref": "#/$defs/AuthoringKey"
+        },
+        "gate_target": {
+          "$ref": "#/$defs/GateTarget"
+        },
+        "gate_action": {
+          "$ref": "#/$defs/GateAction"
+        },
+        "anchor": {
+          "$ref": "#/$defs/GateAnchor"
+        },
+        "gate_op": {
+          "$ref": "#/$defs/GateOpRef"
+        },
+        "accessibility_profile": {
+          "$ref": "#/$defs/AuthoringKey"
+        }
+      },
+      "additionalProperties": false
+    },
+    "AccessibilityProfileSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-17.accessibility-profile"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "AccessibilityProfile": {
+      "type": "object",
+      "required": [
+        "schema",
+        "profile_key",
+        "wcag_level",
+        "keyboard_navigable",
+        "screen_reader"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/AccessibilityProfileSchemaRef"
+        },
+        "profile_key": {
+          "$ref": "#/$defs/AuthoringKey"
+        },
+        "wcag_level": {
+          "enum": [
+            "a",
+            "aa",
+            "aaa"
+          ]
+        },
+        "keyboard_navigable": {
+          "type": "boolean"
+        },
+        "screen_reader": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "FixtureManifestSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-17.content.fixture-manifest"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "FixtureCase": {
+      "type": "object",
+      "required": [
+        "id",
+        "instance",
+        "schema_ref",
+        "expect"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)+$",
+          "maxLength": 160
+        },
+        "instance": {
+          "type": "string",
+          "pattern": "^(?:valid|invalid)/[a-z0-9][a-z0-9._-]*\\.json$",
+          "maxLength": 256
+        },
+        "schema_ref": {
+          "type": "string",
+          "pattern": "^urn:mug:schema:mug\\.api-17\\.content:0#/\\$defs/[A-Za-z][A-Za-z0-9]*$",
+          "maxLength": 256
+        },
+        "validation_layer": {
+          "enum": [
+            "schema",
+            "semantic"
+          ]
+        },
+        "expect": {
+          "enum": [
+            "valid",
+            "invalid"
+          ]
+        },
+        "expected_error": {
+          "type": "object",
+          "required": [
+            "keyword",
+            "instance_pointer"
+          ],
+          "properties": {
+            "keyword": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "maxLength": 96
+            },
+            "instance_pointer": {
+              "type": "string",
+              "pattern": "^(?:/[^/]+)*$",
+              "maxLength": 256
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false,
+      "if": {
+        "required": [
+          "expect"
+        ],
+        "properties": {
+          "expect": {
+            "const": "invalid"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "expected_error"
+        ]
+      },
+      "else": {
+        "not": {
+          "required": [
+            "expected_error"
+          ]
+        }
+      }
+    },
+    "FixtureManifest": {
+      "type": "object",
+      "required": [
+        "schema",
+        "manifest_version",
+        "suite",
+        "contract_version",
+        "cases"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/FixtureManifestSchemaRef"
+        },
+        "manifest_version": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/SemVer"
+        },
+        "suite": {
+          "const": "api-17-content"
+        },
+        "contract_version": {
+          "const": 0
+        },
+        "cases": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/FixtureCase"
+          },
+          "minItems": 1,
+          "maxItems": 512
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

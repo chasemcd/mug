@@ -1,0 +1,103 @@
+{
+  "schema": {
+    "name": "mug.canonicalization-vectors",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "f675d9ec1f6258719da93a507421689b26babf69d36503c7df90b5039e238d6d"
+    }
+  },
+  "vectors": [
+    {
+      "id": "object-order-and-literals",
+      "value": {
+        "z": 3,
+        "a": "MUG",
+        "nested": [
+          true,
+          null,
+          0
+        ]
+      },
+      "canonical_utf8": "{\"a\":\"MUG\",\"nested\":[true,null,0],\"z\":3}",
+      "digest": {
+        "algorithm": "sha-256",
+        "hex": "36b3e0c35c76f754c050c6a865e44c389c620d7b3029a2790248bbec0fd47ba1"
+      }
+    },
+    {
+      "id": "unicode-preservation",
+      "value": {
+        "text": "café",
+        "array": [
+          3,
+          2,
+          1
+        ]
+      },
+      "canonical_utf8": "{\"array\":[3,2,1],\"text\":\"café\"}",
+      "digest": {
+        "algorithm": "sha-256",
+        "hex": "a5147137b44e3672147ec5390b0e380879049be4a1c93a78857ec41f485245f2"
+      }
+    },
+    {
+      "id": "float-fraction",
+      "value": 0.8,
+      "canonical_utf8": "0.8",
+      "digest": {
+        "algorithm": "sha-256",
+        "hex": "1e9d7c27c8bbc8ddf0055c93e064a62fa995d177fee28cc8fa949bc8a4db06f4"
+      }
+    },
+    {
+      "id": "integral-float-collapses",
+      "value": 1.0,
+      "canonical_utf8": "1",
+      "digest": {
+        "algorithm": "sha-256",
+        "hex": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+      }
+    },
+    {
+      "id": "negative-zero-collapses",
+      "value": -0.0,
+      "canonical_utf8": "0",
+      "digest": {
+        "algorithm": "sha-256",
+        "hex": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9"
+      }
+    },
+    {
+      "id": "large-exponent",
+      "value": 1e21,
+      "canonical_utf8": "1e+21",
+      "digest": {
+        "algorithm": "sha-256",
+        "hex": "241c4643fa70b1dcde1205b71be4e3bebb17e9f880c8e1a33d0ead6c27271d3c"
+      }
+    },
+    {
+      "id": "small-exponent",
+      "value": 1e-7,
+      "canonical_utf8": "1e-7",
+      "digest": {
+        "algorithm": "sha-256",
+        "hex": "5b33e02f2c5103a05d32f6ba9cb058294452bfbf393967f68bb30c1bdcbbab22"
+      }
+    },
+    {
+      "id": "nested-object-with-float",
+      "value": {
+        "ratio": 0.8,
+        "label": "MUG",
+        "flag": true
+      },
+      "canonical_utf8": "{\"flag\":true,\"label\":\"MUG\",\"ratio\":0.8}",
+      "digest": {
+        "algorithm": "sha-256",
+        "hex": "253a8c95bfe8cc1a0cef8c8561cc9719d6177181439dea149900dd213e667fee"
+      }
+    }
+  ]
+}

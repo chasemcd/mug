@@ -1,0 +1,439 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:mug:schema:mug.api-14.tools:0",
+  "title": "MUG API-14 Tools, Approval, and Environment Commands contracts, version 0",
+  "$defs": {
+    "AuthoringKey": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(?:[-_.][a-z0-9]+)*$",
+      "maxLength": 128
+    },
+    "ToolVersionSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-14.tool-version"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ToolVersion": {
+      "type": "object",
+      "required": [
+        "schema",
+        "tool_version_id",
+        "tool_definition_id",
+        "tool_kind",
+        "mutating",
+        "approval_gate",
+        "egress_allowlist"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/ToolVersionSchemaRef"
+        },
+        "tool_version_id": {
+          "type": "string",
+          "pattern": "^toolver_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "tool_definition_id": {
+          "type": "string",
+          "pattern": "^tooldef_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "tool_kind": {
+          "enum": [
+            "native",
+            "mcp"
+          ]
+        },
+        "mutating": {
+          "type": "boolean"
+        },
+        "approval_gate": {
+          "type": "boolean"
+        },
+        "egress_allowlist": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?(?:\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$",
+            "maxLength": 255
+          },
+          "maxItems": 64,
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "ToolCallSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-14.tool-call"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ToolCall": {
+      "type": "object",
+      "required": [
+        "schema",
+        "tool_call_id",
+        "tool_version_id",
+        "arguments_digest",
+        "idempotency_key",
+        "mutating",
+        "approval_required"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/ToolCallSchemaRef"
+        },
+        "tool_call_id": {
+          "type": "string",
+          "pattern": "^toolcall_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "tool_version_id": {
+          "type": "string",
+          "pattern": "^toolver_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "arguments_digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        },
+        "idempotency_key": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/IdempotencyKey"
+        },
+        "mutating": {
+          "type": "boolean"
+        },
+        "approval_required": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ToolApprovalSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-14.tool-approval"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ToolApproval": {
+      "type": "object",
+      "required": [
+        "schema",
+        "tool_call_id",
+        "approver",
+        "decision",
+        "decided_at"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/ToolApprovalSchemaRef"
+        },
+        "tool_call_id": {
+          "type": "string",
+          "pattern": "^toolcall_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "approver": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/PrincipalRef"
+        },
+        "decision": {
+          "enum": [
+            "approved",
+            "denied"
+          ]
+        },
+        "decided_at": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/UtcInstant"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ToolResultSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-14.tool-result"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ToolResult": {
+      "type": "object",
+      "required": [
+        "schema",
+        "tool_call_id",
+        "outcome",
+        "effect",
+        "approval_required",
+        "executed_at"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/ToolResultSchemaRef"
+        },
+        "tool_call_id": {
+          "type": "string",
+          "pattern": "^toolcall_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "outcome": {
+          "enum": [
+            "executed",
+            "denied",
+            "failed"
+          ]
+        },
+        "effect": {
+          "enum": [
+            "none",
+            "mutating"
+          ]
+        },
+        "approval_required": {
+          "type": "boolean"
+        },
+        "approval_digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        },
+        "result_digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        },
+        "executed_at": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/UtcInstant"
+        }
+      },
+      "additionalProperties": false
+    },
+    "EnvironmentCommandMailboxSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-14.environment-command-mailbox"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "EnvironmentCommandMailbox": {
+      "type": "object",
+      "required": [
+        "schema",
+        "interaction_id",
+        "command_key",
+        "delivered",
+        "enqueued_at"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/EnvironmentCommandMailboxSchemaRef"
+        },
+        "interaction_id": {
+          "type": "string",
+          "pattern": "^interaction_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "command_key": {
+          "$ref": "#/$defs/AuthoringKey"
+        },
+        "delivered": {
+          "type": "boolean"
+        },
+        "enqueued_at": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/UtcInstant"
+        }
+      },
+      "additionalProperties": false
+    },
+    "FixtureManifestSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-14.tools.fixture-manifest"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "FixtureCase": {
+      "type": "object",
+      "required": [
+        "id",
+        "instance",
+        "schema_ref",
+        "expect"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)+$",
+          "maxLength": 160
+        },
+        "instance": {
+          "type": "string",
+          "pattern": "^(?:valid|invalid)/[a-z0-9][a-z0-9._-]*\\.json$",
+          "maxLength": 256
+        },
+        "schema_ref": {
+          "type": "string",
+          "pattern": "^urn:mug:schema:mug\\.api-14\\.tools:0#/\\$defs/[A-Za-z][A-Za-z0-9]*$",
+          "maxLength": 256
+        },
+        "validation_layer": {
+          "enum": [
+            "schema",
+            "semantic"
+          ]
+        },
+        "expect": {
+          "enum": [
+            "valid",
+            "invalid"
+          ]
+        },
+        "expected_error": {
+          "type": "object",
+          "required": [
+            "keyword",
+            "instance_pointer"
+          ],
+          "properties": {
+            "keyword": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+              "maxLength": 96
+            },
+            "instance_pointer": {
+              "type": "string",
+              "pattern": "^(?:/[^/]+)*$",
+              "maxLength": 256
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false,
+      "if": {
+        "required": [
+          "expect"
+        ],
+        "properties": {
+          "expect": {
+            "const": "invalid"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "expected_error"
+        ]
+      },
+      "else": {
+        "not": {
+          "required": [
+            "expected_error"
+          ]
+        }
+      }
+    },
+    "FixtureManifest": {
+      "type": "object",
+      "required": [
+        "schema",
+        "manifest_version",
+        "suite",
+        "contract_version",
+        "cases"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/FixtureManifestSchemaRef"
+        },
+        "manifest_version": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/SemVer"
+        },
+        "suite": {
+          "const": "api-14-tools"
+        },
+        "contract_version": {
+          "const": 0
+        },
+        "cases": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/FixtureCase"
+          },
+          "minItems": 1,
+          "maxItems": 512
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

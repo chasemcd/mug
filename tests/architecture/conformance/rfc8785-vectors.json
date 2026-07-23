@@ -1,0 +1,252 @@
+[
+  {
+    "name": "object-key-ordering",
+    "value": {"b":1,"a":2,"c":3},
+    "canonical": "{\"a\":2,\"b\":1,\"c\":3}",
+    "sha256": "e145110e712e3ed0a6b233551b27a90aa39b4c93ed67e111ba2002d16e5ed1fa"
+  },
+  {
+    "name": "object-nested",
+    "value": {"z":{"b":2,"a":1},"a":[3,2,1]},
+    "canonical": "{\"a\":[3,2,1],\"z\":{\"a\":1,\"b\":2}}",
+    "sha256": "f613a572f53e0e577f557af7e41633d7c30546ae97e1e20b8ad0dbea7118d7a6"
+  },
+  {
+    "name": "object-empty",
+    "value": {},
+    "canonical": "{}",
+    "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+  },
+  {
+    "name": "array-empty",
+    "value": [],
+    "canonical": "[]",
+    "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  },
+  {
+    "name": "array-nested",
+    "value": [[1,2],[3,[4,5]]],
+    "canonical": "[[1,2],[3,[4,5]]]",
+    "sha256": "7f9ac81ac763c420338e149551a71ea3bab81390b09e7f56823940acad97e306"
+  },
+  {
+    "name": "object-unicode-key-ordering",
+    "value": {"é":1,"z":2,"a":3},
+    "canonical": "{\"a\":3,\"z\":2,\"é\":1}",
+    "sha256": "fa7ddcf43923b2711f2f592f210e5ab9e4a54a3b2df09830d93f402391a33e4e"
+  },
+  {
+    "name": "int-zero",
+    "value": 0,
+    "canonical": "0",
+    "sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9"
+  },
+  {
+    "name": "int-one",
+    "value": 1,
+    "canonical": "1",
+    "sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+  },
+  {
+    "name": "int-negative-one",
+    "value": -1,
+    "canonical": "-1",
+    "sha256": "1bad6b8cf97131fceab8543e81f7757195fbb1d36b376ee994ad1cf17699c464"
+  },
+  {
+    "name": "int-max-safe",
+    "value": 9007199254740991,
+    "canonical": "9007199254740991",
+    "sha256": "f40b423c2dd95ff2b2f027e22208f438cf7242862e5e746860e697308c9add26"
+  },
+  {
+    "name": "int-min-safe",
+    "value": -9007199254740991,
+    "canonical": "-9007199254740991",
+    "sha256": "4c933a456bb8f2e9894b2d0b26480439cd72d52fb8a27cbf8fd7f323f22c7815"
+  },
+  {
+    "name": "float-0.8",
+    "value": 0.8,
+    "canonical": "0.8",
+    "sha256": "1e9d7c27c8bbc8ddf0055c93e064a62fa995d177fee28cc8fa949bc8a4db06f4"
+  },
+  {
+    "name": "float-1.2",
+    "value": 1.2,
+    "canonical": "1.2",
+    "sha256": "77ac319bfe1979e2d799d9e6987e65feb54f61511c03552ebae990826c208590"
+  },
+  {
+    "name": "float-0.25",
+    "value": 0.25,
+    "canonical": "0.25",
+    "sha256": "a30a043314fa89294fa2c1c989a01fbb5329e5c085a5c5a8d27317656de24ae0"
+  },
+  {
+    "name": "float-0.75",
+    "value": 0.75,
+    "canonical": "0.75",
+    "sha256": "ce5d3aa79ae56155078af52e8fac68eb2d0a78489f82bc26c1e1bbc667ba9fde"
+  },
+  {
+    "name": "float-0.5",
+    "value": 0.5,
+    "canonical": "0.5",
+    "sha256": "d2cbad71ff333de67d07ec676e352ab7f38248eb69c942950157220607c55e84"
+  },
+  {
+    "name": "float-negative-0.25",
+    "value": -0.25,
+    "canonical": "-0.25",
+    "sha256": "c39e10a12e907115c23f0597a37ba310350471a14f107c08bc831478d0114554"
+  },
+  {
+    "name": "float-120.5",
+    "value": 120.5,
+    "canonical": "120.5",
+    "sha256": "d55fdf83f0ba7afe44cf766b44c76301c711b17520d4cb92eb189fc670753bca"
+  },
+  {
+    "name": "float-96.25",
+    "value": 96.25,
+    "canonical": "96.25",
+    "sha256": "eb3a536075c1cf41494e43a52bcf4bd85fbd396fc6a12e7c712037291a960982"
+  },
+  {
+    "name": "integral-float-1.0",
+    "value": 1.0,
+    "canonical": "1",
+    "sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+  },
+  {
+    "name": "integral-float-1e0",
+    "value": 1e0,
+    "canonical": "1",
+    "sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+  },
+  {
+    "name": "integral-float-100.0",
+    "value": 100.0,
+    "canonical": "100",
+    "sha256": "ad57366865126e55649ecb23ae1d48887544976efea46a48eb5d85a6eeb4d306"
+  },
+  {
+    "name": "exponent-1e21",
+    "value": 1e21,
+    "canonical": "1e+21",
+    "sha256": "241c4643fa70b1dcde1205b71be4e3bebb17e9f880c8e1a33d0ead6c27271d3c"
+  },
+  {
+    "name": "exponent-1e-7",
+    "value": 1e-7,
+    "canonical": "1e-7",
+    "sha256": "5b33e02f2c5103a05d32f6ba9cb058294452bfbf393967f68bb30c1bdcbbab22"
+  },
+  {
+    "name": "exponent-5e-324-min-subnormal",
+    "value": 5e-324,
+    "canonical": "5e-324",
+    "sha256": "c46e7ca1be4c8734f373a56530787288fa2058d73d07855e9247e949f811a42a"
+  },
+  {
+    "name": "negative-zero",
+    "value": -0.0,
+    "canonical": "0",
+    "sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9"
+  },
+  {
+    "name": "boolean-true",
+    "value": true,
+    "canonical": "true",
+    "sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+  },
+  {
+    "name": "boolean-false",
+    "value": false,
+    "canonical": "false",
+    "sha256": "fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa"
+  },
+  {
+    "name": "null",
+    "value": null,
+    "canonical": "null",
+    "sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+  },
+  {
+    "name": "string-newline",
+    "value": "a\nb",
+    "canonical": "\"a\\nb\"",
+    "sha256": "8cb67f89f9ff0e25bb064da96907151d8e0eb7a5c0d4cde1b72ad1c9a30c065e"
+  },
+  {
+    "name": "string-tab",
+    "value": "tab\there",
+    "canonical": "\"tab\\there\"",
+    "sha256": "1188737362906cacc96bc6916f6be25d751e992befa61593aa2c1bf8c81974e3"
+  },
+  {
+    "name": "string-quote-and-backslash",
+    "value": "quote\"and\\slash",
+    "canonical": "\"quote\\\"and\\\\slash\"",
+    "sha256": "711e2e8a34d007e7612de268240b6ff21e009142b9f4d81ed5045a5f68875bbb"
+  },
+  {
+    "name": "string-control-u0001",
+    "value": "\u0001",
+    "canonical": "\"\\u0001\"",
+    "sha256": "b81cfb0a6715e53b373345b49e8ad94eb55fd777519dc539373d0634973c186e"
+  },
+  {
+    "name": "string-non-ascii-astral",
+    "value": "café 😀",
+    "canonical": "\"café 😀\"",
+    "sha256": "89fa4ccbaa53bc2ebec0726f73beccbe1618075d3ef9e740cf34ec284b07a66e"
+  },
+  {
+    "name": "typed-object-shape",
+    "value": {"version":0,"name":"shared-kernel","digest":{"hex":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","algorithm":"sha-256"}},
+    "canonical": "{\"digest\":{\"algorithm\":\"sha-256\",\"hex\":\"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\"},\"name\":\"shared-kernel\",\"version\":0}",
+    "sha256": "def8f096ea60c2bb12c9dd8a08a75e27598c96778dfb3b2bd534067178b7260c"
+  },
+  {
+    "name": "bare-identifier-string",
+    "value": "shared-kernel",
+    "canonical": "\"shared-kernel\"",
+    "sha256": "8b809a09cc63bc206e46e203fc8e635725600a01615ff5bb6faea8783345587a"
+  },
+  {
+    "name": "rfc8785-appendix-example",
+    "value": {
+  "numbers": [333333333.33333329, 1E30, 4.50, 2e-3, 0.000000000000000000000000001],
+  "string": "\u20ac$\u000F\u000aA'\u0042\u0022\u005c\\\"/",
+  "literals": [null, true, false]
+},
+    "canonical": "{\"literals\":[null,true,false],\"numbers\":[333333333.3333333,1e+30,4.5,0.002,1e-27],\"string\":\"€$\\u000f\\nA'B\\\"\\\\\\\\\\\"/\"}",
+    "sha256": "2d5e01a318d0f0879ab568c4be289c8b1f64ef8921a53c6277d5e069978baacb"
+  },
+  {
+    "name": "object-astral-key-ordering",
+    "value": {"z":1,"😀":2,"a":3},
+    "canonical": "{\"a\":3,\"z\":1,\"😀\":2}",
+    "sha256": "3bf6b9e389577ceae1003af351df22027d3cb8f0571fc0dc24b530f4244df1fa"
+  },
+  {
+    "name": "exponent-1e20",
+    "value": 1e20,
+    "canonical": "100000000000000000000",
+    "sha256": "c344e9487bfbd5c4e03c9fb90d62a5dde5e00b54d55c46e9f4a803aea162b80c"
+  },
+  {
+    "name": "float-17-significant-digits",
+    "value": 0.30000000000000004,
+    "canonical": "0.30000000000000004",
+    "sha256": "06bad31060c1212ae832de4c031f7b31e3b48aed57858294478cb19450cf34ca"
+  },
+  {
+    "name": "key-order-utf16-vs-codepoint-divergence",
+    "value": { "m": 3, "": 1, "😀": 2 },
+    "canonical": "{\"m\":3,\"😀\":2,\"\":1}",
+    "sha256": "9d1a5c3e5c9a090e7e7334c3eb6725b16118117e31d236846a5dc13979cbca3b"
+  }
+]
