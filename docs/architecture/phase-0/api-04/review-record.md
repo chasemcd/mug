@@ -44,7 +44,15 @@
 - [ ] Activity-advancement, completion, and abandonment state machines defined
 - [ ] Recovery fault injection at each activity boundary restores exact plan/treatment
 - [ ] API-06 interaction-start and API-09 delivery compatibility reviewed
-- [ ] NS-01, NS-08, and NS-10 walkthroughs pass
+- [ ] NS-01, NS-08, and NS-10 walkthroughs pass. **One NS-08 clause is now
+      closed by W10**: "only state namespaces declared for the second part are
+      carried forward". A `StateDocument` per visit and namespace is written
+      through `mug/visits/state.py` under a declared read/write policy, and a
+      return link that finds the part finished and a different study version
+      served opens a new visit under the same enrollment carrying only the
+      namespaces that version declares. The other clauses (restart never rebuilds
+      the plan, stable receipts, assignment and exposure distinct, blinded
+      external identity) are **not** claimed here.
 - [ ] Dependent ADRs accepted; four sign-offs recorded; version-1 bytes frozen
 
 ## Open decision log

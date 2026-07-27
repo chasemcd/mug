@@ -1,21 +1,13 @@
 """The peer-to-peer wire tier: drive one peer engine over a real duplex link.
 
-The rollback engine (``mug.game.mesh``) owns the GGPO contract; the synchronous
-coordinator (``mug.game.mesh_session``) hosts every engine in one process and
-relays the packets the same tick, so no engine ever predicts. This module is the
-distributed tier: it moves one engine to its own peer process and drives it over a
-duplex link to each other peer, the shape a WebRTC ``DataChannel`` provides. Now
-the round trip is real -- a peer's input arrives a few frames late -- so the engine
-predicts the missing input and rolls back when the real input contradicts the
-prediction, exactly the path it already owns.
+The rollback engine owns GGPO state. This distributed tier drives one engine over
+a duplex link to every peer. A real round trip makes the engine predict late
+inputs and roll back when the real values differ.
 
-The tier is transport-neutral. A ``PeerLink`` is any duplex channel that sends and
-receives one json-able message: a WebRTC data channel in production, an in-process
-latency-and-loss channel in a test. The codec turns each engine packet into a
-json-able message and back, so the link never sees an engine type. So a test drives
-a full mesh of nodes over in-process links that inject latency and drop packets,
-with no socket and no real network, and proves the peers still reach a byte-
-identical canonical trajectory.
+A ``PeerLink`` carries JSON-safe messages. WebRTC supplies it in production and
+an in-process latency link supplies it in tests. The codec keeps engine types out
+of the transport. A lossy full-mesh test proves that every peer still reaches the
+same canonical trajectory.
 
 The node re-announces its end frame every tick once its local episode has ended, so
 the minimum-end-frame barrier still closes even when a control message is dropped:
@@ -29,11 +21,18 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-from collections.abc import Callable, Mapping
-from typing import Any, Protocol
+import json
+from collections.abc import Callable, Mapping, Sequence
+from itertools import pairwise
+from typing import Any, Protocol, cast
 
 from mug.game.mesh import EndPacket, HashPacket, InputPacket, PeerEngine
 from mug.kernel import Digest
+
+_MAX_SAFE_INTEGER = 9_007_199_254_740_991
+_MAX_INPUT_HISTORY = 32
+_MAX_ACTOR_ID_LENGTH = 128
+_MAX_DATA_CHANNEL_MESSAGE_BYTES = 65_536
 
 
 class PeerLink(Protocol):
@@ -46,6 +45,10 @@ class PeerLink(Protocol):
 
     async def send(self, message: Mapping[str, Any]) -> None: ...
     async def recv(self) -> dict[str, Any] | None: ...
+
+
+class PeerLinkClosed(RuntimeError):
+    """A peer link closed or failed before the mesh node stopped."""
 
 
 # -- the packet codec ----------------------------------------------------------
@@ -83,33 +86,83 @@ def encode_end(packet: EndPacket) -> dict[str, Any]:
     }
 
 
-def decode(message: Mapping[str, Any]) -> InputPacket | HashPacket | EndPacket:
-    """Decode a wire message back into its engine packet.
+def _closed_fields(message: Mapping[str, Any], expected: set[str]) -> None:
+    """Reject a packet whose fields do not match its closed wire shape."""
+    if set(message) != expected:
+        raise ValueError("a peer packet has missing or unknown fields")
 
-    The ``kind`` discriminator names the packet. An unknown kind raises, so a
-    malformed message never silently becomes an empty packet.
-    """
+
+def _sender(message: Mapping[str, Any]) -> str:
+    """Read one bounded non-empty actor identifier."""
+    value = message.get("sender")
+    if not isinstance(value, str) or not value or len(value) > _MAX_ACTOR_ID_LENGTH:
+        raise ValueError("a peer packet sender must be a bounded string")
+    return value
+
+
+def _integer(value: Any, *, nonnegative: bool) -> int:
+    """Read one JSON safe integer with the required sign."""
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError("a peer packet integer field must be an integer")
+    minimum = 0 if nonnegative else -_MAX_SAFE_INTEGER
+    if value < minimum or value > _MAX_SAFE_INTEGER:
+        raise ValueError("a peer packet integer field is outside the safe range")
+    return value
+
+
+def _decode_input(message: Mapping[str, Any]) -> InputPacket:
+    """Decode one bounded redundant-input packet."""
+    _closed_fields(message, {"kind", "sender", "current_frame", "inputs"})
+    raw = message.get("inputs")
+    history: Sequence[object] = (
+        cast("Sequence[object]", raw) if isinstance(raw, (list, tuple)) else ()
+    )
+    if not 1 <= len(history) <= _MAX_INPUT_HISTORY:
+        raise ValueError("an input packet needs 1 to 32 history entries")
+    inputs: list[tuple[int, int]] = []
+    for item in history:
+        pair: Sequence[object] = (
+            cast("Sequence[object]", item) if isinstance(item, (list, tuple)) else ()
+        )
+        if len(pair) != 2:
+            raise ValueError("an input history entry must be a frame-action pair")
+        inputs.append(
+            (
+                _integer(pair[0], nonnegative=True),
+                _integer(pair[1], nonnegative=False),
+            )
+        )
+    if any(left[0] >= right[0] for left, right in pairwise(inputs)):
+        raise ValueError("input history frames must increase")
+    return InputPacket(
+        sender=_sender(message),
+        current_frame=_integer(message.get("current_frame"), nonnegative=True),
+        inputs=tuple(inputs),
+    )
+
+
+def decode(message: Mapping[str, Any]) -> InputPacket | HashPacket | EndPacket:
+    """Decode and validate one closed peer-engine packet."""
     kind = message.get("kind")
     if kind == "input":
-        inputs = tuple(
-            (int(frame), int(action)) for frame, action in message["inputs"]
-        )
-        return InputPacket(
-            sender=str(message["sender"]),
-            current_frame=int(message["current_frame"]),
-            inputs=inputs,
-        )
+        return _decode_input(message)
     if kind == "hash":
-        raw = message["state_hash"]
+        _closed_fields(message, {"kind", "sender", "frame_number", "state_hash"})
+        raw = message.get("state_hash")
+        if not isinstance(raw, Mapping):
+            raise ValueError("a hash packet needs a state_hash object")
         return HashPacket(
-            sender=str(message["sender"]),
-            frame_number=int(message["frame_number"]),
-            state_hash=Digest(algorithm=raw["algorithm"], hex=raw["hex"]),
+            sender=_sender(message),
+            frame_number=_integer(message.get("frame_number"), nonnegative=True),
+            state_hash=Digest.model_validate(raw),
         )
     if kind == "end":
+        _closed_fields(message, {"kind", "sender", "end_frame_exclusive"})
         return EndPacket(
-            sender=str(message["sender"]),
-            end_frame_exclusive=int(message["end_frame_exclusive"]),
+            sender=_sender(message),
+            end_frame_exclusive=_integer(
+                message.get("end_frame_exclusive"), nonnegative=True
+            ),
         )
     raise ValueError(f"unknown wire message kind: {kind!r}")
 
@@ -142,8 +195,9 @@ class PeerNode:
         self._actor_id = actor_id
         self._links = dict(links)
         self._action = action
-        self._inbound: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
+        self._inbound: asyncio.Queue[tuple[str, dict[str, Any]]] = asyncio.Queue()
         self._receivers: list[asyncio.Task[None]] = []
+        self._receive_failure: Exception | None = None
 
     @property
     def engine(self) -> PeerEngine:
@@ -154,16 +208,27 @@ class PeerNode:
         """Start one background receive loop per link, filling the inbound queue."""
         if self._receivers:
             return
-        for link in self._links.values():
-            self._receivers.append(asyncio.create_task(self._receive(link)))
+        for remote, link in self._links.items():
+            self._receivers.append(asyncio.create_task(self._receive(remote, link)))
 
-    async def _receive(self, link: PeerLink) -> None:
-        """Move every message from one link into the shared inbound queue."""
-        while True:
-            message = await link.recv()
-            if message is None:
-                return
-            await self._inbound.put(message)
+    async def _receive(self, remote: str, link: PeerLink) -> None:
+        """Bind every received message to the authenticated remote link."""
+        try:
+            while True:
+                message = await link.recv()
+                if message is None:
+                    raise PeerLinkClosed("a peer data channel closed")
+                await self._inbound.put((remote, message))
+        except asyncio.CancelledError:
+            raise
+        except Exception as error:
+            if self._receive_failure is None:
+                self._receive_failure = error
+
+    def _raise_receive_failure(self) -> None:
+        """Raise the first receive failure at the deterministic tick boundary."""
+        if self._receive_failure is not None:
+            raise self._receive_failure
 
     async def _broadcast(self, message: Mapping[str, Any]) -> None:
         """Send one message to every peer link."""
@@ -178,10 +243,12 @@ class PeerNode:
         """
         while True:
             try:
-                message = self._inbound.get_nowait()
+                remote, message = self._inbound.get_nowait()
             except asyncio.QueueEmpty:
                 return
             packet = decode(message)
+            if packet.sender != remote:
+                raise ValueError("a peer packet sender does not match its data channel")
             if isinstance(packet, InputPacket):
                 self._engine.receive_input(packet)
             elif isinstance(packet, HashPacket):
@@ -198,6 +265,7 @@ class PeerNode:
         A yield to the event loop lets the receive loops enqueue newly arrived
         messages before the next tick drains them.
         """
+        self._raise_receive_failure()
         self._drain_inbound()
         if not self._engine.ended():
             packet = self._engine.submit_local(int(self._action()))
@@ -205,6 +273,7 @@ class PeerNode:
         self._engine.advance()
         await self._gossip()
         await asyncio.sleep(0)
+        self._raise_receive_failure()
 
     async def _gossip(self) -> None:
         """Send the newly confirmed hashes and, once ended, re-announce the end."""
@@ -232,8 +301,103 @@ class PeerNode:
         self._receivers.clear()
 
 
+# -- the WebRTC data-channel adapter -------------------------------------------
+
+
+class DataChannel(Protocol):
+    """The subset of a WebRTC data channel the adapter drives.
+
+    An aiortc channel satisfies this seam directly. A browser adapter normalizes its
+    event objects and ``addEventListener`` API to this additive ``on`` API. The
+    adapter names no vendor type, so a fake channel proves it with no real network.
+    """
+
+    @property
+    def readyState(self) -> str: ...
+
+    def send(self, data: str) -> None: ...
+    def on(self, event: str, handler: Callable[..., Any]) -> Any: ...
+
+
+class DataChannelLink:
+    """Adapt one WebRTC data channel to the ``PeerLink`` seam.
+
+    The link json-frames each message the codec produced and sends it as text, the
+    shape a data channel carries. It registers a message handler that enqueues each
+    arrived message, so ``recv`` awaits the inbound queue rather than the channel;
+    the channel pushes, so no receive loop reads it. A close enqueues a ``None``
+    sentinel, so ``recv`` returns ``None`` once the channel has closed and the
+    driving node's receive loop ends cleanly.
+
+    The adapter holds no socket and imports no vendor SDK: the study passes the
+    concrete ``aiortc`` (or browser-bridged) channel, and a test passes a fake one
+    that duck-types the same two methods. So the wire tier reaches a real peer
+    process in production and stays deterministic under test.
+    """
+
+    def __init__(self, channel: DataChannel) -> None:
+        self._channel = channel
+        self._failed = False
+        self._inbound: asyncio.Queue[dict[str, Any] | None] = asyncio.Queue()
+        channel.on("message", self._on_message)
+        channel.on("close", self._on_close)
+        channel.on("error", self._on_error)
+
+    def _on_message(self, data: str | bytes) -> None:
+        """Decode one arrived text (or binary) message onto the inbound queue.
+
+        A non-object message (an array, a bare number, malformed text) is dropped,
+        so a stray frame never becomes a half-formed packet the codec must reject.
+        """
+        try:
+            encoded = data if isinstance(data, bytes) else data.encode("utf-8")
+            if len(encoded) > _MAX_DATA_CHANNEL_MESSAGE_BYTES:
+                self._fail()
+                return
+            text = encoded.decode("utf-8")
+            loaded = json.loads(text)
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            return
+        if isinstance(loaded, dict):
+            self._inbound.put_nowait(cast("dict[str, Any]", loaded))
+
+    def _on_close(self) -> None:
+        """Enqueue the close sentinel, so ``recv`` reports the channel has closed."""
+        self._inbound.put_nowait(None)
+
+    def _on_error(self, *_: object) -> None:
+        """Fail the link when its channel reports a transport error."""
+        self._fail()
+
+    def _fail(self) -> None:
+        """Fail this link and wake its receiver once."""
+        if self._failed:
+            return
+        self._failed = True
+        self._inbound.put_nowait(None)
+
+    @property
+    def is_open(self) -> bool:
+        """Return whether the data channel is open now."""
+        return not self._failed and self._channel.readyState == "open"
+
+    async def send(self, message: Mapping[str, Any]) -> None:
+        """Send one json-able message to the peer as compact text."""
+        text = json.dumps(message, separators=(",", ":"))
+        if len(text.encode("utf-8")) > _MAX_DATA_CHANNEL_MESSAGE_BYTES:
+            raise ValueError("a peer data-channel message exceeds 65536 bytes")
+        self._channel.send(text)
+
+    async def recv(self) -> dict[str, Any] | None:
+        """Return the next arrived message, or ``None`` once the channel has closed."""
+        return await self._inbound.get()
+
+
 __all__ = [
+    "DataChannel",
+    "DataChannelLink",
     "PeerLink",
+    "PeerLinkClosed",
     "PeerNode",
     "SeatAction",
     "decode",

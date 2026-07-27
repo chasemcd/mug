@@ -36,13 +36,72 @@ export type {
   StreamPosition,
   SessionHandlers,
   SessionConfig,
+  ChatMessage,
 } from './session.js';
 
 export { ParticipantClient } from './client.js';
 export type { ClientConfig, KeyTarget } from './client.js';
 
+export { PeerMesh } from './p2p.js';
+export type { PeerMeshConfig, MeshTimer } from './p2p.js';
+export { P2PEdge } from './p2pEdge.js';
+export { createMeshExecutor, meshRunConfig, preloadMeshRuntime } from './p2pGame.js';
+export type {
+  MeshDriver,
+  MeshExecutorConfig,
+  MeshManifest,
+  MeshRunResult,
+  MeshRuntime,
+  MeshSession,
+} from './p2pGame.js';
+export type {
+  P2PControlPort,
+  P2PEdgeConfig,
+  P2PExecutor,
+  P2PMeshHandoff,
+} from './p2pEdge.js';
+export {
+  browserPeerConnectionFactory,
+  fetchBrowserPeerConnectionFactory,
+} from './p2pRtc.js';
+export type {
+  IceGrantFetch,
+  IceGrantFetchInit,
+  IceGrantResponse,
+  MeshDataChannel,
+  MeshPeerConnection,
+  PeerConnectionFactory,
+} from './p2pRtc.js';
+export {
+  captureSubmissionFrame,
+  peerCompleteFrame,
+  peerReadyFrame,
+} from './p2pOutbound.js';
+export { isP2PInboundType, parseP2PInboundFrame } from './p2pWire.js';
+export type {
+  P2PBootstrap,
+  P2PInboundFrame,
+  P2PMeshAbort,
+  P2PMeshFinish,
+  P2PMeshStart,
+  P2POutboundFrame,
+  P2PSignal,
+  P2PSignalAck,
+  P2PSignalDelivery,
+} from './p2pWire.js';
+
 export { createRenderer } from './renderer.js';
-export type { Renderer, RenderPacket, SurfaceCommand, RelativePoint } from './renderer.js';
+export { LoadedAssets, browserDecoder } from './assets.js';
+export type { AssetManifest, DeclaredAsset, DecodeAsset } from './assets.js';
+export type {
+  Renderer,
+  RenderPacket,
+  SurfaceCommand,
+  Point,
+  AssetTable,
+  AtlasFrame,
+  RendererOptions,
+} from './renderer.js';
 
 export { preloadBrowserGame, playBrowserEpisode } from './browserGame.js';
 export type {
@@ -54,7 +113,7 @@ export type {
   EpisodeOptions,
 } from './browserGame.js';
 
-export { renderForm, renderContent, renderComplete } from './ui.js';
+export { renderChat, renderForm, renderContent, renderComplete } from './ui.js';
 export type {
   Delivery,
   FormDelivery,
@@ -64,4 +123,6 @@ export type {
   CompleteDelivery,
   FormField,
   Answers,
+  ChatScreen,
+  ChatHandlers,
 } from './ui.js';

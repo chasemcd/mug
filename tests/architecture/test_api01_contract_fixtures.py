@@ -596,6 +596,15 @@ def semantic_violations(
                 )
         violations.extend(_secret_reference_violations(value))
         return violations
+    if definition_name == "CompiledStudyCandidate":
+        # The fingerprint is what makes a compile reproducible: it must be the
+        # digest of the inputs it names, or nothing can check that the same inputs
+        # were compiled twice into the same study.
+        if canonical_digest(value["inputs"]) != value["input_fingerprint"]["hex"]:
+            violations = [("inputFingerprint", "/input_fingerprint/hex")]
+        else:
+            violations = []
+        return violations
     if definition_name == "StudyServerManifest":
         return _secret_reference_violations(value)
     if definition_name == "ProvenanceManifest":

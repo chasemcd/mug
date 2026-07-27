@@ -70,11 +70,75 @@ _CandidateKind = Literal[
 ]
 
 
+class Dimension(KernelModel):
+    """One axis a comparison is answered on, beside the overall preference.
+
+    ``scope`` says what one answer covers: ``pair`` is one answer over the whole
+    presented set (which candidate is more helpful), and ``each`` is one answer per
+    candidate (how verbose each of them is).
+
+    ``points`` is how far the scale goes, and it reads by the scope. A ``pair``
+    dimension counts the steps to each side, so ``1`` is a plain pick between the
+    candidates and ``2`` is a five-position scale (two steps each way, and the
+    midpoint that favours neither). An ``each`` dimension counts the positions of
+    its own scale, so ``5`` is a one-to-five rating of each candidate. A ``pair``
+    dimension has a midpoint whenever it has more than one step; a one-step ``pair``
+    dimension is a forced pick and has none. ``low_label`` and ``high_label`` name
+    the ends of the scale.
+    """
+
+    key: _AuthoringKey
+    label: Annotated[str, Field(min_length=1, max_length=256)]
+    scope: Literal["pair", "each"]
+    points: Annotated[int, Field(ge=1, le=10)]
+    low_label: Annotated[str, Field(min_length=1, max_length=64)] | None = None
+    high_label: Annotated[str, Field(min_length=1, max_length=64)] | None = None
+
+
+class DimensionRating(KernelModel):
+    """One dimension's answer: which candidate, and how much.
+
+    ``candidate_key`` is the candidate the value is about -- the one a ``pair``
+    dimension favours, or the one an ``each`` dimension scores. It is a candidate
+    key and never a screen position, so a randomized display order can not invert
+    a dimension. No candidate is the midpoint of the scale, which is the value
+    zero: the participant favoured neither.
+    """
+
+    dimension_key: _AuthoringKey
+    candidate_key: _AuthoringKey | None = None
+    value: Annotated[int, Field(ge=0, le=10)]
+
+    @model_validator(mode="after")
+    def _midpoint_names_no_candidate(self) -> DimensionRating:
+        if (self.candidate_key is None) != (self.value == 0):
+            raise ValueError(
+                "a rating that names no candidate is the zero-valued midpoint"
+            )
+        return self
+
+
 class ComparisonTask(KernelModel):
-    """The comparison task a protocol asks for: a typed kind and an optional prompt."""
+    """The comparison task a protocol asks for: a typed kind and an optional prompt.
+
+    ``dimensions`` are the axes the comparison is answered on beside the overall
+    preference. ``allow_tie`` says whether a tie was offered, so an analysis can
+    tell "no ties were recorded" from "no tie could be recorded".
+    """
 
     kind: Literal["pairwise", "rating"]
     prompt: Annotated[str, Field(min_length=1, max_length=1024)] | None = None
+    allow_tie: bool | None = None
+    dimensions: (
+        Annotated[list[Dimension], Field(min_length=1, max_length=16)] | None
+    ) = None
+
+    @model_validator(mode="after")
+    def _each_dimension_is_named_once(self) -> ComparisonTask:
+        keys = [dimension.key for dimension in self.dimensions or []]
+        if len(set(keys)) != len(keys):
+            raise ValueError("a task must name each dimension once")
+        return self
 
 
 class PreferenceProtocol(KernelModel):
@@ -132,7 +196,16 @@ class PreferenceAssignment(KernelModel):
 
 
 class PreferenceResponse(KernelModel):
-    """A recorded choice over the order a participant was shown."""
+    """A recorded choice over the order a participant was shown.
+
+    ``verdict`` is what the participant said about the set: ``choice`` (the
+    default) means ``choice`` names the preferred candidate, and ``tie`` or
+    ``both-bad`` mean neither was preferred. ``choice`` is still recorded under a
+    tie, because it names the candidate the response resolves to -- in a live
+    conversation, the reply the thread went on with.
+
+    ``ratings`` are the per-dimension answers, when the protocol asked for any.
+    """
 
     schema: SchemaRef = Field(  # pyright: ignore[reportIncompatibleMethodOverride]
         default_factory=lambda: _schema_ref("mug.api-18.preference-response")
@@ -143,6 +216,10 @@ class PreferenceResponse(KernelModel):
     presented_order: Annotated[
         list[_AuthoringKey], Field(min_length=2, max_length=64)
     ]
+    verdict: Literal["choice", "tie", "both-bad"] | None = None
+    ratings: (
+        Annotated[list[DimensionRating], Field(min_length=1, max_length=64)] | None
+    ) = None
     receipt_required: bool
     submitted_at: UtcInstant
 
@@ -152,6 +229,23 @@ class PreferenceResponse(KernelModel):
             raise ValueError(
                 "the recorded choice must be one of the presented candidates"
             )
+        return self
+
+    @model_validator(mode="after")
+    def _ratings_name_presented_candidates(self) -> PreferenceResponse:
+        seen: set[tuple[str, str | None]] = set()
+        for rating in self.ratings or []:
+            if (
+                rating.candidate_key is not None
+                and rating.candidate_key not in self.presented_order
+            ):
+                raise ValueError(
+                    "a rating must name one of the presented candidates"
+                )
+            key = (rating.dimension_key, rating.candidate_key)
+            if key in seen:
+                raise ValueError("a dimension is answered once for each candidate")
+            seen.add(key)
         return self
 
 

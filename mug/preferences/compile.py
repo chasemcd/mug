@@ -19,15 +19,16 @@ the participant sees only the handles.
 from __future__ import annotations
 
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
-from mug.authoring import Comparison
+from mug.authoring import Axis, Comparison
 from mug.kernel import ArtifactRef, PublicHandle
 from mug.preferences.runtime import candidate_from_artifact
 from mug.preferences.types import (
     CandidateRef,
     ComparisonTask,
+    Dimension,
     PreferenceProtocol,
 )
 
@@ -64,6 +65,7 @@ def compile_comparison(
     ids: ComparisonIds,
     resolve: Callable[[object], ArtifactRef],
     new_handle: Callable[[], PublicHandle],
+    key_for: Callable[[str, object], str] | None = None,
 ) -> CompiledComparison:
     """Compile one author ``Comparison`` into a protocol and its candidate refs.
 
@@ -71,10 +73,18 @@ def compile_comparison(
     option becomes a candidate over the artifact ``resolve`` maps it to, shown behind
     a fresh blinded handle. The candidate keys are id-safe slugs of the author's
     labels, so two options must not slug to the same key.
+
+    ``key_for`` replaces that keying when the caller has a better name for the
+    candidate than the author's label. A comparison of runs a participant made names
+    each candidate by the run itself, because the recorded choice then says which
+    run was preferred and a reader needs nothing beside it to know.
     """
-    task = ComparisonTask(
-        kind=_STYLE_TASK[comparison.style],  # pyright: ignore[reportArgumentType]
+    key_of: Callable[[str, object], str] = key_for or _key_from_label
+    task = comparison_task(
+        kind=_STYLE_TASK[comparison.style],
         prompt=comparison.ask,
+        ties=comparison.ties,
+        axes=comparison.axes,
     )
     protocol = PreferenceProtocol(
         protocol_version_id=ids.protocol_version_id,
@@ -88,7 +98,7 @@ def compile_comparison(
     keys: list[str] = []
     labels: dict[str, str] = {}
     for label, run in comparison.options.items():
-        key = _slug(label)
+        key = key_of(label, run)
         if key in labels:
             raise ValueError(f"two options slug to the same key: {key!r}")
         candidates.append(
@@ -109,7 +119,45 @@ def compile_comparison(
     )
 
 
-def _slug(label: str) -> str:
+def comparison_task(
+    *,
+    kind: str,
+    prompt: str,
+    ties: bool,
+    axes: Sequence[Axis],
+) -> ComparisonTask:
+    """Build the task a protocol asks: the question, the tie policy, and the axes.
+
+    ``ties`` is recorded even when nobody ties, because an absent tie has two
+    readings -- none was chosen, or none was on offer -- and only the record can
+    tell them apart. The author's axes become the dimensions each answer carries.
+    """
+    return ComparisonTask(
+        kind=kind,  # pyright: ignore[reportArgumentType]
+        prompt=prompt,
+        allow_tie=ties or None,
+        dimensions=[_dimension(axis) for axis in axes] or None,
+    )
+
+
+def _dimension(axis: Axis) -> Dimension:
+    """Turn one author axis into the dimension its answers are recorded under."""
+    return Dimension(
+        key=axis.key,
+        label=axis.ask,
+        scope=axis.scope,  # pyright: ignore[reportArgumentType]
+        points=axis.points,
+        low_label=axis.low,
+        high_label=axis.high,
+    )
+
+
+def _key_from_label(label: str, _run: object) -> str:
+    """Name one candidate by the author's own label, which is the default."""
+    return candidate_key_for(label)
+
+
+def candidate_key_for(label: str) -> str:
     """Turn an author's label into an id-safe candidate key.
 
     Lower-cases, replaces each run of non-alphanumerics with a single hyphen, and
@@ -121,4 +169,10 @@ def _slug(label: str) -> str:
     return lowered
 
 
-__all__ = ["ComparisonIds", "CompiledComparison", "compile_comparison"]
+__all__ = [
+    "ComparisonIds",
+    "CompiledComparison",
+    "candidate_key_for",
+    "comparison_task",
+    "compile_comparison",
+]

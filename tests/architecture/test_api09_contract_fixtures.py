@@ -1,5 +1,7 @@
 """Validate MUG API-09 Participant Client, Realtime, and Uploads contracts, version 0."""
 from __future__ import annotations
+
+import hashlib
 from typing import Any
 import pytest
 from _contract_harness import (canonical_digest, check_bundle_binding, check_manifest_complete,
@@ -23,6 +25,18 @@ def semantic_violations(name: str, value: Any) -> list:
             hits.append(("uniqueMeasurementMetric", "/measurements"))
     if name == "GateOp" and value["target"] == "join" and value["anchor"]["anchor_kind"] != "interaction":
         hits.append(("gateAnchorTarget", "/anchor/anchor_kind"))
+    if name == "P2PMeshBootstrap":
+        # One peer is one seat. A handle repeated in the peer set would have the
+        # room negotiate with itself, and a bootstrap is what freezes the mesh.
+        handles = [peer["peer_handle"] for peer in value["peers"]]
+        if len(handles) != len(set(handles)):
+            hits.append(("bootstrapHandles", "/peers"))
+    if name == "P2PCaptureSubmission":
+        # The digest binds the payload the peer really submitted. A submission
+        # whose digest does not match its own bytes is unusable as evidence.
+        digested = hashlib.sha256(value["payload_json"].encode("utf-8")).hexdigest()
+        if value["payload_digest"]["hex"] != digested:
+            hits.append(("capturePayloadDigest", "/payload_digest"))
     return hits
 
 @pytest.mark.parametrize("case", FAMILY.cases, ids=lambda case: case["id"])

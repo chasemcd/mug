@@ -256,6 +256,26 @@ class LLMAgent:
         """
         return reply
 
+    def say(self, reply: str, env: Any, agent_id: str) -> str | None:
+        """Return what to say on the chat channel, or None to say nothing.
+
+        One reply is read three ways: ``parse_reply`` takes the action, ``reflect``
+        takes the thought the model carries forward, and this takes the words the
+        other players read. So an agent that plays and talks costs one model call,
+        not two, and it talks on the same cadence it decides on -- which is what
+        keeps it from being asked to speak once per frame.
+
+        **What it says and what it does are judged apart.** A reply this reads a
+        message out of still publishes that message when ``parse_reply`` can not
+        find an action, and the seat falls back on the action alone. A partner that
+        says "going left" and then names an action nobody can read has still said
+        it, and the participant is owed the message.
+
+        The default says nothing, so an agent is silent until its study writes what
+        it should say.
+        """
+        return None
+
 
 __all__ = [
     "Chat",

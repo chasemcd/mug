@@ -26,6 +26,8 @@ from mug.storage import InMemoryStore
 _UUID = "019b6000-0000-7000-8000-{:012x}"
 _DIGEST = Digest(algorithm="sha-256", hex="a" * 64)
 _ASSIGNMENT = "prefassign_" + _UUID.format(0x001)
+_RESPONSE = "prefresponse_" + _UUID.format(0x001)  # shares the assignment body
+_QUALITY = "prefresponse_" + _UUID.format(0x005)
 
 
 def _artifact(tag: int) -> ArtifactRef:
@@ -124,22 +126,31 @@ async def test_a_participant_runs_the_compiled_comparison_end_to_end() -> None:
     )
     order = assignment.candidate_display_order
     respond_receipt, _ = await service.respond(
-        context=contexts.next(),
-        response_id="prefresponse_" + _UUID.format(0x004),
+        context=contexts.next(_RESPONSE),
+        assignment_id=_ASSIGNMENT,
         choice=order[0],
         presented_order=order,
         submitted_at="2026-07-22T00:00:05.000000Z",
     )
     quality_receipt, _ = await service.attest_quality(
-        context=contexts.next(),
+        context=contexts.next(_QUALITY),
+        assignment_id=_ASSIGNMENT,
         attention_check_passed=True,
         response_time_ms=4200,
     )
 
     assert respond_receipt.outcome == "accepted"
     assert quality_receipt.outcome == "accepted"
+    # The annotation is the assignment and the response; the quality evidence is
+    # its own record, so recording it never overwrites the recorded choice.
+    # The annotation is still one stream -- the response shares the assignment's
+    # identifier body -- and each record still heads its own aggregate, so the
+    # enrollment, the choice, and the evidence are all readable at the end.
     stream_id = "stream_" + _ASSIGNMENT.split("_", 1)[1]
-    assert len(read_ledger(store, stream_id)) == 3
+    assert len(read_ledger(store, stream_id)) == 2
+    assert len(read_ledger(store, "stream_" + _QUALITY.split("_", 1)[1])) == 1
+    for aggregate in (_ASSIGNMENT, _RESPONSE, _QUALITY):
+        assert store.load_aggregate(aggregate) is not None
 
 
 class _Contexts:
@@ -149,8 +160,9 @@ class _Contexts:
         self._aggregate_id = aggregate_id
         self._counter = itertools.count(1)
 
-    def next(self) -> CommandContext:
+    def next(self, aggregate_id: str | None = None) -> CommandContext:
         n = next(self._counter)
+        aggregate = aggregate_id or self._aggregate_id
         body = _UUID.format(n)
         return CommandContext.model_validate(
             {
@@ -159,13 +171,13 @@ class _Contexts:
                 "error_id": "error_" + body,
                 "idempotency_key": "idem_" + f"{n:021d}" + "A",
                 "event_id": "event_" + body,
-                "stream_id": "stream_" + self._aggregate_id.split("_", 1)[1],
+                "stream_id": "stream_" + aggregate.split("_", 1)[1],
                 "producer": {
                     "epoch_id": "prodepoch_" + _UUID.format(9),
                     "sequence": n,
                     "content_digest": _DIGEST.model_dump(mode="json"),
                 },
-                "aggregate_id": self._aggregate_id,
+                "aggregate_id": aggregate,
                 "principal": {
                     "kind": "service",
                     "id": "service_" + _UUID.format(0xA),

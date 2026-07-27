@@ -21,7 +21,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol, cast
 
-from mug.app import store_from_env
+from mug.app import gateway_secret_from_env, store_from_env
 from mug.export.types import GitProvenanceRef
 from mug.gateway import Gateway
 from mug.kernel import DataHandlingRef, Digest, PrincipalRef, WireCommandEnvelope
@@ -113,11 +113,19 @@ class CliSession:
         store is synchronous here, before any event loop starts, so a command's
         ``asyncio.run`` never nests the Postgres open loop. Every backend is both an
         event and an artifact store, so the resolved store is the combined view.
+
+        The gateway takes the deployment's own identifier secret when one is set
+        (``MUG_GATEWAY_SECRET``), so re-running a command that already committed
+        replays its receipt rather than colliding with it. Without one each
+        invocation draws its own secret, and a re-run is a conflict, not a replay.
         """
         resolved = (
             store if store is not None else cast("DurableStore", store_from_env())
         )
-        return cls(store=resolved, gateway=gateway or Gateway())
+        return cls(
+            store=resolved,
+            gateway=gateway or Gateway(secret=gateway_secret_from_env()),
+        )
 
     def next_idempotency_key(self) -> str:
         """Mint the next per-operation idempotency key for this session."""
@@ -143,7 +151,12 @@ class CliSession:
         )
 
     def envelope(
-        self, *, command: str, target_id: str, data: dict[str, object]
+        self,
+        *,
+        command: str,
+        target_id: str,
+        data: dict[str, object],
+        idempotency_key: str | None = None,
     ) -> WireCommandEnvelope:
         """Build the wire envelope for a command the command line originates.
 
@@ -158,7 +171,7 @@ class CliSession:
                 "protocol_version": "0.1.0",
                 "command": {"name": command, "version": 0},
                 "request_id": self.gateway.new_id("request"),
-                "idempotency_key": self.next_idempotency_key(),
+                "idempotency_key": idempotency_key or self.next_idempotency_key(),
                 "target": {"id": target_id},
                 "payload": {"schema": _schema("mug.cli.payload"), "data": data},
             }

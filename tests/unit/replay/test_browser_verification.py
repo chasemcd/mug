@@ -100,6 +100,12 @@ def test_a_genuine_run_verifies_deterministically() -> None:
     assert report.state_hash_chain_digest is not None
     assert len(report.checks) == len(actions)
     assert all(getattr(check, "result", None) == "match" for check in report.checks)
+    # A browser reports digests and its own actions, never the values, so the
+    # server's own re-execution is the only place a browser run's data exists.
+    assert [frame.frame_number for frame in report.trajectory] == [1, 2, 3, 4]
+    assert [frame.actions for frame in report.trajectory] == [
+        {"player": action} for action in actions
+    ]
 
 
 def test_a_tampered_state_hash_fails_verification() -> None:
@@ -118,6 +124,9 @@ def test_a_tampered_state_hash_fails_verification() -> None:
     assert not report.verified
     results = [getattr(check, "result", None) for check in report.checks]
     assert results == ["match", "mismatch", "match"]
+    # The re-execution is not this run, so its values are withheld: recording them
+    # would attach a trajectory to a run that diverged from it.
+    assert report.trajectory == ()
 
 
 def test_a_forged_solve_boundary_fails_verification() -> None:

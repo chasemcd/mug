@@ -64,6 +64,7 @@ def _action_hash(action):
 
 /** The public game manifest, projected server-side for the browser. */
 export interface BrowserManifest {
+  mode: 'browser';
   episode_id: string;
   interaction_id: string;
   seat_key: string;
@@ -71,9 +72,10 @@ export interface BrowserManifest {
   seed: number;
   max_steps: number;
   fps: number;
-  countdown: number;
+  countdown_seconds: number;
   action_bindings: { [key: string]: number };
   default_action: number;
+  hooks: string[];
   requires: string[];
   source_bundle: string;
   state_hash_source: string;

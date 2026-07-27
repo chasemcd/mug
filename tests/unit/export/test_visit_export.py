@@ -9,6 +9,7 @@ in order. The HTTP export endpoint serves the same document for a known flow.
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from typing import Any, cast
 
 import httpx
@@ -19,6 +20,7 @@ from mug.content import (
     AdvanceFlowCommand,
     MaterializeFlowCommand,
     advance_flow,
+    demo_study,
     materialize_flow,
 )
 from mug.export import export_visit
@@ -33,6 +35,7 @@ from mug.kernel import (
     PrincipalRef,
     WireCommandEnvelope,
 )
+from mug.kernel.refs import StudyVersionRef
 from mug.runtime import CommandContext
 from mug.storage import InMemoryStore
 
@@ -142,6 +145,7 @@ async def _advance(
         AdvanceFlowCommand(
             answers=answers, expected_revision=revision, captured_streams=streams
         ),
+        study=demo_study(),
         context=context,
         store=store,
     )
@@ -152,10 +156,12 @@ async def _run_full_visit(store: InMemoryStore) -> None:
     gateway = Gateway()
     await materialize_flow(
         MaterializeFlowCommand(visit_id=_VISIT_ID),
+        study=demo_study(),
         context=_mint(
             gateway, "flow.materialize", _FLOW_ID, {"visit_id": _VISIT_ID}, _idem("m")
         ),
         store=store,
+        **_plan_args(gateway),  # pyright: ignore[reportArgumentType]
     )
     await _advance(gateway, store, 1, {"agree": "yes"}, _idem("c"))
     await _advance(gateway, store, 2, {"mood": 4}, _idem("s"))
@@ -212,3 +218,22 @@ async def test_the_export_endpoint_serves_the_visit_jsonl() -> None:
 
     missing = client.get("/export/visitplan_019b6000-0000-7000-8000-000000000999")
     assert missing.status_code == 404
+
+
+def _seeding(gateway: Gateway) -> Callable[[str], bytes]:
+    """The seed source a plan draws its orders from."""
+    return lambda role: gateway.derived_seed("treatment", role)
+
+
+def _plan_args(gateway: Gateway) -> dict[str, object]:
+    """The identity and seed a plan is drafted with, for a study with no design."""
+    return {
+        "study_version": StudyVersionRef(
+            study_id=gateway.derived_id("study", "test"),
+            study_version_id=gateway.derived_id("studyver", "test"),
+            version_number=1,
+            manifest_digest=Digest(algorithm="sha-256", hex="0" * 64),
+        ),
+        "derive": gateway.derived_id,
+        "seed": _seeding(gateway),
+    }

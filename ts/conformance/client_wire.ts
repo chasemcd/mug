@@ -90,6 +90,10 @@ async function main(): Promise<void> {
   };
 
   let url = '';
+  // What the session hands the driver for a conversation. The mount pushes one
+  // chat frame per message the participant did not write, so a client that
+  // dropped or rejected them would show a one-sided transcript.
+  const heard: unknown[] = [];
   const session = new ParticipantSession({
     endpoint,
     connect: (built) => {
@@ -103,6 +107,13 @@ async function main(): Promise<void> {
       onHandshake: () => {},
       onDelivery: () => {},
       onRender: () => {},
+      onP2P: () => {},
+      onChat: (message) => {
+        heard.push(message);
+      },
+      onComparisonOptions: () => {},
+      onComparisonError: () => {},
+      onComparisonAck: () => {},
       onError: () => {},
       onClose: () => {},
     },
@@ -149,10 +160,53 @@ async function main(): Promise<void> {
   });
   session.sendInput(['ArrowLeft']);
 
+  // The conversation activity: the seat opens, the participant answers, and the
+  // participant then leaves, which is what advances the flow past the chat.
+  socket.deliver({
+    type: 'chat',
+    message_id: 'message_019b6000-0000-7000-8000-0000000000d1',
+    author_actor_id: 'actor_019b6000-0000-7000-8000-0000000000d2',
+    sequence: 1,
+    text: 'Hello. What brings you here today?',
+  });
+  session.sendChat('I am here for the study.');
+  session.sendChatEnd();
+
+  // What the participant carries between activities: the server delivers the
+  // namespaces they may read, a page writes one against the revision it read, and
+  // a refused write puts back what it replaced.
+  socket.deliver({
+    type: 'delivery',
+    delivery: { kind: 'content', state: { progress: { seen: ['notes'] } } },
+  });
+  const readBack = session.readState('progress');
+  await session.writeState('progress', { seen: ['notes', 'debrief'] });
+  const afterWrite = session.stateRevision('progress');
+  const refused = socket.sent
+    .map((data) => JSON.parse(data) as { command?: { command_id: string } })
+    .filter((frame) => frame.command !== undefined)
+    .at(-1)?.command?.command_id;
+  socket.deliver({
+    type: 'error',
+    command_id: refused,
+    code: 'command.state_conflict',
+    category: 'conflict',
+    message: 'the namespace moved on to revision 4',
+  });
+  const afterRefusal = session.stateRevision('progress');
+  // Every send goes through the session's one serialized writer, so the frame
+  // reaches the socket on a later turn. Wait for the queue to drain before the
+  // report reads what was sent.
+  await new Promise((resolve) => setImmediate(resolve));
+
   const report = {
     url,
     stored_resume_token: store.get('mug_resume_token'),
     frames: socket.sent.map((data) => JSON.parse(data)),
+    chat_heard: heard,
+    state_read_back: readBack,
+    state_revision_after_write: afterWrite,
+    state_revision_after_refusal: afterRefusal,
   };
   console.log(JSON.stringify(report));
 }

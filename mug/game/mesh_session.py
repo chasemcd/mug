@@ -31,12 +31,14 @@ say) surfaces as ``verified == False`` rather than a silently split record.
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Awaitable, Callable, Sequence
-from dataclasses import dataclass
+from collections.abc import Awaitable, Callable, Mapping, Sequence
+from dataclasses import dataclass, field
 from typing import Any
 
-from mug.game.mesh import PeerEngine, ReplicaFrame
+from mug.game.bot_authority import BotSeat
+from mug.game.mesh import EndPacket, PeerEngine, ReplicaFrame
 from mug.game.runtime import EpisodeSummary
+from mug.game.seams import SeatActionSource
 from mug.kernel import Digest, UtcInstant
 
 # A study builds one replica per seat from the frozen peer set and the shared seed.
@@ -50,21 +52,55 @@ FrameSink = Callable[[dict[str, Any]], Awaitable[None]]
 
 
 @dataclass(frozen=True)
+class MeshBotSpec:
+    """One seat in a mesh that no person plays: a study's own policy does.
+
+    ``actor_id`` is the seat the mesh reserves in its frozen peer set, so every
+    replica holds it while no engine is built for it. ``controller`` decides its
+    action, and exactly one peer -- the authority the ``P2PBotAuthority`` rule
+    designates -- ever calls it. That peer broadcasts what it produced, and every
+    other peer applies it the way it applies a person's input.
+
+    A peer-to-peer game runs no authoritative server, so a bot with no single
+    source would split the trajectory: a policy reading each peer's own
+    speculative view would produce a different action on each of them.
+    """
+
+    actor_id: str
+    seat_key: str
+    controller: SeatActionSource
+
+
+def _no_bots() -> tuple[MeshBotSpec, ...]:
+    """Return an empty, typed bot-seat tuple for a mesh default."""
+    return ()
+
+
+def _no_bindings() -> dict[str, int]:
+    """Return an empty, typed key-to-action binding map for a mesh default."""
+    return {}
+
+
+@dataclass(frozen=True)
 class MeshGameSpec:
     """One peer-to-peer game channel a study supplies for a mesh of seats.
 
     ``make_replica`` builds one deterministic replica for the frozen peer set and
-    the shared seed, so every seat starts identical. ``action_bindings`` maps a key
-    to a discrete action and ``default_action`` fills a frame with no bound key, the
-    same seam the single-seat loop uses. ``size`` is the number of seats the mesh
-    forms. The engine parameters set the input delay, the snapshot cadence, and the
-    step cap the peer engines run under.
+    the shared seed, so every seat starts identical. ``bots`` are the seats no
+    person plays: the mesh reserves each one in its frozen peer set and one
+    designated peer produces its action. ``action_bindings`` maps a key to a
+    discrete action and ``default_action`` fills a frame with no bound key, the
+    same seam the single-seat loop uses. ``size`` is how many people the mesh waits
+    for, which is **not** the number of seats once it holds a bot. The engine
+    parameters set the input delay, the snapshot cadence, and the step cap the peer
+    engines run under.
     """
 
     channel_key: str
     size: int
     make_replica: MakeReplica
-    action_bindings: dict[str, int]
+    bots: tuple[MeshBotSpec, ...] = field(default_factory=_no_bots)
+    action_bindings: dict[str, int] = field(default_factory=_no_bindings)
     default_action: int = 0
     seed: int = 0
     fps: int = 30
@@ -133,13 +169,39 @@ class MeshSession:
         self._spec = spec
         self._channel_key = spec.channel_key
         self._episode_id = episode_id
-        self._peers = tuple(sorted(seat.actor_id for seat in self._seats))
-        if len(set(self._peers)) != len(self._seats):
+        # The nodes are the peers that run an engine: one per person. The peer set
+        # is the nodes **and** the bot seats, because every replica holds every
+        # seat while only a person's node holds a rollback engine.
+        self._nodes = tuple(sorted(seat.actor_id for seat in self._seats))
+        if len(set(self._nodes)) != len(self._seats):
             raise ValueError("each seat must hold a distinct actor id")
+        bot_actors = tuple(bot.actor_id for bot in spec.bots)
+        if set(bot_actors) & set(self._nodes) or len(set(bot_actors)) != len(
+            bot_actors
+        ):
+            raise ValueError("each bot seat must hold its own distinct actor id")
+        self._peers = tuple(sorted([*self._nodes, *bot_actors]))
+        # The authority is the highest eligible peer actor id, which is the rule the
+        # frozen ``P2PBotAuthority`` record states. It is derived, so every node
+        # agrees on it without being told.
+        authority = self._nodes[-1]
+        self._bots = tuple(
+            BotSeat(
+                bot_actor_id=bot.actor_id,
+                authority_actor_id=authority,
+                controller=bot.controller,
+            )
+            for bot in spec.bots
+        )
 
         self._engines: dict[str, PeerEngine] = {}
+        # What each node's replica last produced, so the authority decides a bot's
+        # action from a real observation rather than from a hash of one.
+        self._seen: dict[str, _Seen] = {}
         for seat in self._seats:
             replica = spec.make_replica(self._peers, spec.seed)
+            seen = _Seen(replica.step)
+            self._seen[seat.actor_id] = seen
             self._engines[seat.actor_id] = PeerEngine(
                 actor_id=seat.actor_id,
                 peer_actor_ids=self._peers,
@@ -148,7 +210,7 @@ class MeshSession:
                 channel_key=spec.channel_key,
                 mesh_membership_digest=mesh_membership_digest,
                 membership_generation=membership_generation,
-                step=replica.step,
+                step=seen,
                 snapshot=replica.snapshot,
                 restore=replica.restore,
                 recorded_at=recorded_at,
@@ -193,23 +255,65 @@ class MeshSession:
             if engine.ended():
                 continue
             packet = engine.submit_local(int(seat.action()))
-            for other in self._peers:
+            for other in self._nodes:
                 if other != seat.actor_id:
+                    self._engines[other].receive_input(packet)
+        self._relay_bots()
+
+    def _relay_bots(self) -> None:
+        """Have the one authority peer produce each bot's action and broadcast it.
+
+        Only the authority calls the study's controller, so a bot contributes one
+        action to the mesh however many peers are in it, and every other peer
+        applies the broadcast input the way it applies a person's. That single
+        source is what keeps a bot from splitting the trajectory.
+        """
+        for bot in self._bots:
+            node = bot.authority_actor_id
+            engine = self._engines[node]
+            if engine.ended():
+                continue
+            packet = engine.submit_for(
+                bot.bot_actor_id, bot.decide(self._seen[node].observation)
+            )
+            for other in self._nodes:
+                if other != node:
                     self._engines[other].receive_input(packet)
 
     def _relay_gossip(self) -> None:
-        """Relay the confirmed-frame hashes and the end packets across the mesh."""
-        for actor in self._peers:
+        """Relay the confirmed-frame hashes and the end packets between the nodes."""
+        for actor in self._nodes:
             engine = self._engines[actor]
             for hash_packet in engine.outbound_hashes():
-                for other in self._peers:
+                for other in self._nodes:
                     if other != actor:
                         self._engines[other].receive_hash(hash_packet)
             end_packet = engine.announce_end()
             if end_packet is not None:
-                for other in self._peers:
+                for other in self._nodes:
                     if other != actor:
                         self._engines[other].receive_end(end_packet)
+                self._speak_for_bots(end_packet)
+
+    def _speak_for_bots(self, packet: EndPacket) -> None:
+        """Announce each bot's end frame on its authority peer's behalf.
+
+        A bot has no engine, so it proposes no end frame of its own and the
+        minimum-end barrier would never close. Its authority speaks for it, and
+        says the only true thing there is to say: the bot sits in the authority's
+        own replica, so its episode ends on the frame that replica's episode ends
+        on. Every node is told, the authority included, because the barrier is a
+        statement about the whole peer set rather than about the others.
+        """
+        for bot in self._bots:
+            if bot.authority_actor_id != packet.sender:
+                continue
+            spoken = EndPacket(
+                sender=bot.bot_actor_id,
+                end_frame_exclusive=packet.end_frame_exclusive,
+            )
+            for node in self._nodes:
+                self._engines[node].receive_end(spoken)
 
     async def _push_frame(self, frame: int) -> None:
         """Push one frame view to every seat from its own engine's perspective."""
@@ -235,22 +339,23 @@ class MeshSession:
         until no engine emits a new packet, so every engine holds every peer's end
         frame before the barrier closes.
         """
-        for _ in range(len(self._peers) + 2):
+        for _ in range(len(self._nodes) + 2):
             moved = False
             for engine in self._engines.values():
                 engine.advance()
-            for actor in self._peers:
+            for actor in self._nodes:
                 engine = self._engines[actor]
                 for hash_packet in engine.outbound_hashes():
                     moved = True
-                    for other in self._peers:
+                    for other in self._nodes:
                         if other != actor:
                             self._engines[other].receive_hash(hash_packet)
                 end_packet = engine.announce_end()
                 if end_packet is not None:
-                    for other in self._peers:
+                    for other in self._nodes:
                         if other != actor:
                             self._engines[other].receive_end(end_packet)
+                    self._speak_for_bots(end_packet)
             if not moved:
                 break
 
@@ -262,14 +367,12 @@ class MeshSession:
 
     def _build_episode(self) -> MeshEpisode:
         """Build the per-seat summaries and the cross-peer parity verdict."""
-        summaries = {
-            actor: self._summary(actor) for actor in self._peers
-        }
-        reference_actor = self._peers[0]
+        summaries = {actor: self._summary(actor) for actor in self._nodes}
+        reference_actor = self._nodes[0]
         reference_rows = _canonical_rows(self._engines[reference_actor])
         verified = all(
             _canonical_rows(self._engines[actor]) == reference_rows
-            for actor in self._peers
+            for actor in self._nodes
         )
         frames = len(reference_rows)
         return MeshEpisode(
@@ -292,6 +395,26 @@ class MeshSession:
             boundary=boundary,
             solved=boundary.kind == "terminal",
         )
+
+
+class _Seen:
+    """Remember the observation one node's replica last produced.
+
+    The engine hashes an observation and does not keep it, which is right for the
+    parity comparison and wrong for a policy that has to read the game. This wraps
+    the replica's step so the authority peer decides a bot's action from what its
+    own replica just produced -- including a speculative frame, which is exactly
+    why only one peer is allowed to decide.
+    """
+
+    def __init__(self, step: Callable[[Mapping[str, int]], ReplicaFrame]) -> None:
+        self._step = step
+        self.observation: Any = None
+
+    def __call__(self, actions: Mapping[str, int]) -> ReplicaFrame:
+        frame = self._step(actions)
+        self.observation = frame.observation
+        return frame
 
 
 def _canonical_rows(engine: PeerEngine) -> list[dict[str, object]]:
@@ -320,6 +443,7 @@ def make_replica_frame(
 __all__ = [
     "FrameSink",
     "MakeReplica",
+    "MeshBotSpec",
     "MeshEpisode",
     "MeshGameSpec",
     "MeshSession",

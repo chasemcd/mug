@@ -4,20 +4,34 @@ These tests drive ``mug.workers.JobQueue`` and ``mug.workers.WorkerPool`` agains
 the in-memory store with a fixed clock and hand-built command contexts. They prove
 the durable-queue properties above the correctness core: a queued job drains to a
 recorded success, a fresh queue rebuilt from the store rediscovers work that was
-accepted but never started, a claimed or terminal job is not rediscovered, a
-duplicate offer is ignored, and concurrent workers each take a distinct job.
+accepted but never started, a job under a live lease and a terminal job are not
+rediscovered, a duplicate offer is ignored, and concurrent workers each take a
+distinct job.
+
+They also prove the cold-restart takeover: a job whose worker went away with its
+lease is rediscovered by a restarted process, and the work key and job kind the
+takeover needs are read from the request, which no claim ever rewrites.
 """
 
 from __future__ import annotations
 
 import asyncio
 import itertools
+import re
 from datetime import datetime, timedelta, timezone
 
+from mug.jobs import JobRequest, JobResult
 from mug.kernel import ArtifactRef, DataHandlingRef, Digest, compute_digest
+from mug.kernel.ids import id_pattern
 from mug.runtime import CommandContext
 from mug.storage import InMemoryStore
-from mug.workers import JobQueue, JobRunner, WorkerPool, WorkOutcome
+from mug.workers import (
+    JobQueue,
+    JobRunner,
+    WorkerPool,
+    WorkOutcome,
+    attempt_aggregate_id,
+)
 
 _DIGEST = Digest(algorithm="sha-256", hex="a" * 64)
 _DH = DataHandlingRef(privacy_labels=["research"])
@@ -159,7 +173,7 @@ async def test_the_pool_drains_a_queued_job_to_success() -> None:
     processed = await _pool(store, runner, queue, factory).drain()
 
     assert processed == 1
-    state = store.load_aggregate(job_id)
+    state = store.load_aggregate(attempt_aggregate_id(job_id))
     assert state is not None
     assert state["status"] == "succeeded"
     assert state["result_digest"] is not None
@@ -173,17 +187,22 @@ async def test_rebuild_rediscovers_a_queued_job_after_a_restart() -> None:
 
     # A restart: a brand-new queue with no in-process memory of the submit.
     queue = JobQueue()
-    assert queue.rebuild(store) == 1
+    assert queue.rebuild(store, runner) == 1
     assert len(queue) == 1
 
     await _pool(store, runner, queue, factory).drain()
-    state = store.load_aggregate(job_id)
+    state = store.load_aggregate(attempt_aggregate_id(job_id))
     assert state is not None
     assert state["status"] == "succeeded"
 
 
-async def test_rebuild_skips_a_claimed_or_terminal_job() -> None:
-    """A job past its request head is not rediscovered by a rebuild."""
+async def test_rebuild_skips_a_live_lease_and_a_terminal_job() -> None:
+    """A job under a live lease, and a finished job, are not rediscovered.
+
+    Both have an attempt: one is running with time left on its lease, the other is
+    terminal. Neither is waiting for a worker, so a rebuild leaves both alone -- the
+    takeover rule is bounded by the lease deadline, not by the restart.
+    """
     store, clock = InMemoryStore(), _Clock()
     runner, factory = _runner(store, clock), _Factory()
 
@@ -201,7 +220,7 @@ async def test_rebuild_skips_a_claimed_or_terminal_job() -> None:
     )
 
     queue = JobQueue()
-    assert queue.rebuild(store) == 0
+    assert queue.rebuild(store, runner) == 0
     assert len(queue) == 0
 
 
@@ -216,12 +235,12 @@ async def test_a_duplicate_offer_is_ignored() -> None:
     assert len(queue) == 1
 
 
-async def test_the_pool_skips_a_job_that_lost_its_queued_head() -> None:
+async def test_the_pool_skips_a_job_under_a_live_lease() -> None:
     """A job claimed out of band is dropped by the pool, not double-run.
 
-    The queue still names the job, but another worker has already claimed it, so
-    its head is a running run. The pool reads the head, finds it is no longer a
-    queued request, and takes no action -- the out-of-band lease is untouched.
+    The queue still names the job, but another worker has already claimed it and its
+    lease is live. The pool asks for a lease, is refused, and takes no action -- the
+    out-of-band lease is untouched.
     """
     store, clock = InMemoryStore(), _Clock()
     runner, factory, queue = _runner(store, clock), _Factory(), JobQueue()
@@ -231,11 +250,12 @@ async def test_the_pool_skips_a_job_that_lost_its_queued_head() -> None:
     # Another worker claims the job before the pool gets to it.
     claim = await runner.claim(context=factory(job_id))
     assert claim is not None
-    revision = store.revision_of(job_id)
+    attempt_id = attempt_aggregate_id(job_id)
+    revision = store.revision_of(attempt_id)
 
     assert await _pool(store, runner, queue, factory).run_once() is True
-    # The pool did not commit anything: the revision is unchanged.
-    assert store.revision_of(job_id) == revision
+    # The pool did not commit anything: the attempt revision is unchanged.
+    assert store.revision_of(attempt_id) == revision
 
 
 async def test_concurrent_workers_each_take_a_distinct_job() -> None:
@@ -254,10 +274,119 @@ async def test_concurrent_workers_each_take_a_distinct_job() -> None:
     assert all(results)
     assert len(queue) == 0
     for job_id in job_ids:
-        state = store.load_aggregate(job_id)
+        state = store.load_aggregate(attempt_aggregate_id(job_id))
         assert state is not None
         assert state["status"] == "succeeded"
         assert state["attempt"] == 1
+
+
+async def test_a_cold_restart_takes_over_a_job_its_worker_went_away_with() -> None:
+    """A job whose worker went away mid-flight is rediscovered and finished.
+
+    The first worker leases the job and then the process it ran in disappears: the
+    test builds a new runner, a new queue, and a new pool over the same store, which
+    is all a restarted container keeps. Once the lease deadline passes, the rebuild
+    rediscovers the job, and the new worker takes the attempt over and completes it.
+    """
+    store, clock = InMemoryStore(), _Clock()
+    runner, factory, queue = _runner(store, clock), _Factory(), JobQueue()
+    job_id = await _submit(runner, factory, _work_key("theta"))
+    queue.offer(job_id)
+    assert await runner.claim(context=factory(job_id)) is not None
+
+    # The process goes away with the lease, and nothing in it survives.
+    del runner, queue
+    clock.advance(_TTL + timedelta(seconds=1))
+    restarted = _runner(store, clock)
+    rebuilt = JobQueue()
+    assert rebuilt.rebuild(store, restarted) == 1
+
+    assert await _pool(store, restarted, rebuilt, factory).drain() == 1
+    state = store.load_aggregate(attempt_aggregate_id(job_id))
+    assert state is not None
+    assert state["status"] == "succeeded"
+    # The second attempt: the takeover raised the generation the store fences on.
+    assert state["attempt"] == 2
+
+
+async def test_a_takeover_reads_the_work_key_from_the_request() -> None:
+    """The work key the takeover records is the one the submission named.
+
+    This is what the two heads buy. The handler is handed the original request, and
+    the durable result the completion binds is keyed by the original work key, so a
+    restarted worker produces the same result as the worker that went away.
+    """
+    store, clock = InMemoryStore(), _Clock()
+    runner, factory = _runner(store, clock), _Factory()
+    work_key = _work_key("iota")
+    job_id = await _submit(runner, factory, work_key)
+    assert await runner.claim(context=factory(job_id)) is not None
+    clock.advance(_TTL + timedelta(seconds=1))
+
+    seen: list[JobRequest] = []
+
+    async def _capture(request: JobRequest) -> WorkOutcome:
+        seen.append(request)
+        return WorkOutcome(outcome="success", result_ref=_ARTIFACT)
+
+    restarted = _runner(store, clock)
+    rebuilt = JobQueue()
+    rebuilt.rebuild(store, restarted)
+    await _pool(store, restarted, rebuilt, factory, handler=_capture).drain()
+
+    assert [request.work_key for request in seen] == [work_key]
+    assert seen[0].job_kind == "simulate-batch"
+    state = store.load_aggregate(attempt_aggregate_id(job_id))
+    assert state is not None
+    # The bound result digest is the digest of the result keyed by that work key.
+    expected = JobResult(
+        job_id=job_id,
+        work_key=work_key,
+        outcome="success",
+        result_ref=_ARTIFACT,
+        completed_at="2026-07-22T00:00:31.000000Z",
+    )
+    assert state["result_digest"] == compute_digest(
+        expected.model_dump(mode="json", exclude_none=True)
+    ).model_dump(mode="json")
+
+
+async def test_the_request_head_outlives_every_attempt() -> None:
+    """No claim and no completion ever rewrites the submitted request."""
+    store, clock = InMemoryStore(), _Clock()
+    runner, factory, queue = _runner(store, clock), _Factory(), JobQueue()
+    work_key = _work_key("kappa")
+    job_id = await _submit(runner, factory, work_key)
+    for _ in range(3):
+        assert await runner.claim(context=factory(job_id)) is not None
+        clock.advance(_TTL + timedelta(seconds=1))
+    queue.offer(job_id)
+    await _pool(store, runner, queue, factory).drain()
+
+    head = store.load_aggregate(job_id)
+    assert head is not None
+    assert head["work_key"] == work_key.model_dump(mode="json")
+    assert "status" not in head
+    # The request was written once, by the submission, and never again.
+    assert store.revision_of(job_id) == 1
+
+
+def test_the_attempt_aggregate_id_is_derived_from_the_job_id_alone() -> None:
+    """The derived id is stable, distinct from the job's, and job-shaped.
+
+    A worker that starts with no memory must find the attempt with no lookup, so the
+    derivation may read nothing but the job id -- no clock, no entropy, no secret.
+    """
+    job_id = _job_id(_work_key("lambda"))
+    other = _job_id(_work_key("mu"))
+
+    derived = attempt_aggregate_id(job_id)
+    assert derived == attempt_aggregate_id(job_id)
+    assert derived != job_id
+    assert derived != attempt_aggregate_id(other)
+    # It is a legal job identifier: the kernel's identifier kinds are frozen, and
+    # the attempt state belongs to the job.
+    assert re.fullmatch(id_pattern("job"), derived) is not None
 
 
 async def test_start_and_close_run_the_worker_loops() -> None:
@@ -271,13 +400,13 @@ async def test_start_and_close_run_the_worker_loops() -> None:
     await pool.start()
     try:
         for _ in range(200):
-            head = store.load_aggregate(job_id)
+            head = store.load_aggregate(attempt_aggregate_id(job_id))
             if head is not None and head.get("status") == "succeeded":
                 break
             await asyncio.sleep(0.01)
     finally:
         await pool.aclose()
 
-    state = store.load_aggregate(job_id)
+    state = store.load_aggregate(attempt_aggregate_id(job_id))
     assert state is not None
     assert state["status"] == "succeeded"

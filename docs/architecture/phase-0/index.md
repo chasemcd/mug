@@ -46,6 +46,8 @@ cross-runtime contract walkthroughs. Phase 0 is split conceptually into:
 - [API catalog](api-catalog.md)
 - [Public Python authoring API](python-authoring-api.md)
 - [API review tracker](api-review-tracker.md)
+- [Contract freeze tracker](contract-freeze.md) — what each bundle pins now that
+  the code is here, and what it still needs
 - [Acceptance scenarios](acceptance-scenarios.md)
 - [Failure and recovery matrix](failure-matrix.md)
 - [Shared-kernel contract](shared-kernel/index.md)

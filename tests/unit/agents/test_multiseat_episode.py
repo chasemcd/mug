@@ -23,8 +23,8 @@ from typing import ClassVar
 from mug.agents import (
     AgentIds,
     AgentSeat,
-    HumanSeat,
     LLMController,
+    LocalSeat,
     MultiAgentEpisode,
     compile_agent,
 )
@@ -222,7 +222,7 @@ def _episode(
     *,
     env: _KitchenEnv,
     seats: list[AgentSeat],
-    humans: list[HumanSeat],
+    local_seats: list[LocalSeat],
     store: InMemoryStore,
     factory: _Factory,
     max_steps: int = 20,
@@ -237,7 +237,7 @@ def _episode(
     return MultiAgentEpisode(
         env=env,
         seats=seats,
-        humans=humans,
+        local_seats=local_seats,
         scheduler=scheduler,
         channel_key="kitchen",
         episode_id="episode_" + _UUID.format(0x7),
@@ -311,7 +311,9 @@ async def test_two_agents_share_one_environment() -> None:
             adapter=right,
         ),
     ]
-    runner = _episode(env=env, seats=seats, humans=[], store=store, factory=factory)
+    runner = _episode(
+        env=env, seats=seats, local_seats=[], store=store, factory=factory
+    )
 
     result = await runner.run()
 
@@ -356,8 +358,10 @@ async def test_a_human_seat_plays_beside_an_llm() -> None:
     # A human seat: its input maps a held key to an action, sampled each frame.
     human_input = InputState(bindings={"ArrowRight": 2}, default_action=0)
     human_input.press(["ArrowRight"])
-    humans = [HumanSeat(seat_key="human", agent_id="chef-1", source=human_input)]
-    runner = _episode(env=env, seats=seats, humans=humans, store=store, factory=factory)
+    local_seats = [LocalSeat(seat_key="human", agent_id="chef-1", source=human_input)]
+    runner = _episode(
+        env=env, seats=seats, local_seats=local_seats, store=store, factory=factory
+    )
 
     result = await runner.run()
 
@@ -399,10 +403,161 @@ async def test_a_posted_message_reaches_every_agent_seat() -> None:
             adapter=b,
         ),
     ]
-    runner = _episode(env=env, seats=seats, humans=[], store=store, factory=factory)
+    runner = _episode(
+        env=env, seats=seats, local_seats=[], store=store, factory=factory
+    )
     runner.post_message(sender="human", text="cover the left side")
 
     await runner.run()
 
     assert any("cover the left side" in p for p in a.prompts())
     assert any("cover the left side" in p for p in b.prompts())
+
+
+# -- an agent that plays and talks (W7, NS-07) -----------------------------------
+
+
+class _TalkingCook(_Cook):
+    """A cook that says something on the same reply it acts on."""
+
+    def say(self, reply: str, env: object, agent_id: str) -> str | None:
+        for line in str(reply).splitlines():
+            if line.startswith("Say: "):
+                return line.removeprefix("Say: ").strip()
+        return None
+
+
+class _TalkingAdapter(_Adapter):
+    """Answer with a line to say and, optionally, a readable action."""
+
+    def __init__(self, action_word: str | None, say: str) -> None:
+        super().__init__(action_word or "")
+        self._say = say
+        self._readable = action_word
+
+    async def __call__(self, call: ModelCall) -> ModelCompletion:
+        self.seen.append(call)
+        action = f"Action: {self._readable}\n" if self._readable else ""
+        # It speaks on its first decision only, so a test can count what was said
+        # exactly. A seat that repeated one reply would show up as more than one.
+        said = f"Say: {self._say}" if len(self.seen) == 1 else "nothing to add"
+        return ModelCompletion(
+            outcome="completed",
+            resolved_model="fake",
+            usage=Usage(input_tokens=1, output_tokens=1, cost_micros=1),
+            output={"text": f"{action}{said}"},
+        )
+
+
+def _talking_episode(
+    adapter: _TalkingAdapter, *, steps: int = 3
+) -> tuple[MultiAgentEpisode, _KitchenEnv, _TalkingAdapter]:
+    env = _KitchenEnv(agents=("chef-1",), steps=steps)
+    store, factory = InMemoryStore(), _Factory()
+    seat = _agent_seat(
+        agent=_TalkingCook(),
+        env=env,
+        store=store,
+        factory=factory,
+        agent_id="chef-1",
+        seat_key="seat-1",
+        tag=1,
+        adapter=adapter,
+    )
+    episode = _episode(
+        env=env, seats=[seat], local_seats=[], store=store, factory=factory
+    )
+    return episode, env, adapter
+
+
+async def test_a_playing_seat_says_what_its_reply_said() -> None:
+    """One reply, two readings: the action steps the env and the words are said."""
+    episode, env, adapter = _talking_episode(_TalkingAdapter("LEFT", "going left"))
+    await episode.run()
+
+    # Said once, out of a whole episode of decisions: the reply that said it is
+    # published once and never repeated on the decisions that followed.
+    assert [text for _actor, text, _frame in episode.take_said()] == ["going left"]
+    assert len(adapter.seen) > 1, (
+        "the episode only ran one decision, so this proves little"
+    )
+    # And it really played: the env stepped the action the same reply named.
+    assert any(actions.get("chef-1") == 1 for actions in env.stepped)
+
+
+async def test_an_unreadable_action_does_not_cost_the_seat_its_message() -> None:
+    """Independent validity: the words are published, the action falls back.
+
+    A partner that says "going left" and then names an action nobody can read has
+    still said it. Judging the two together would lose a message the model really
+    produced, which is the participant's to read.
+    """
+    # The words must not themselves contain an action name, or the default
+    # ``parse_reply`` finds one in them and the reply is readable after all --
+    # which is exactly how this test passed while proving nothing.
+    episode, _env, _adapter = _talking_episode(
+        _TalkingAdapter(None, "I am completely confused")
+    )
+    await episode.run()
+
+    said = [text for _actor, text, _frame in episode.take_said()]
+    assert said == ["I am completely confused"]
+
+
+async def test_a_seat_that_says_nothing_publishes_nothing() -> None:
+    """Silence is the default: an agent talks only when its study writes what to say."""
+    env = _KitchenEnv(agents=("chef-1",), steps=3)
+    store, factory = InMemoryStore(), _Factory()
+    seat = _agent_seat(
+        agent=_Cook(),  # no `say` override
+        env=env,
+        store=store,
+        factory=factory,
+        agent_id="chef-1",
+        seat_key="seat-1",
+        tag=1,
+        adapter=_Adapter("LEFT"),
+    )
+    episode = _episode(
+        env=env, seats=[seat], local_seats=[], store=store, factory=factory
+    )
+    await episode.run()
+    assert episode.take_said() == []
+
+
+class _FailingAfterFirst(_TalkingAdapter):
+    """Say something once, then fail every call after it.
+
+    A failed call is what makes the clearing load-bearing: the controller never
+    runs to the end, so nothing overwrites what the last successful reply said. A
+    seat whose provider went down would otherwise repeat its last words on every
+    fallback decision for the rest of the run.
+    """
+
+    async def __call__(self, call: ModelCall) -> ModelCompletion:
+        if self.seen:
+            self.seen.append(call)
+            raise RuntimeError("the provider is down")
+        return await super().__call__(call)
+
+
+async def test_a_fallback_decision_does_not_repeat_the_last_words() -> None:
+    """A seat whose provider fails falls back on the action and says nothing more."""
+    episode, _env, adapter = _talking_episode(
+        _FailingAfterFirst("LEFT", "going left"), steps=4
+    )
+    await episode.run()
+
+    assert len(adapter.seen) > 1, "the provider never failed, so this proves little"
+    assert [text for _actor, text, _frame in episode.take_said()] == ["going left"]
+
+
+async def test_what_a_seat_said_is_published_once() -> None:
+    """Taking rather than reading is what keeps one reply from being said twice."""
+    episode, _env, adapter = _talking_episode(_TalkingAdapter("LEFT", "once"))
+    await episode.run()
+    # One saying reply among many decisions makes exactly one message, and taking
+    # it leaves nothing behind for the next drain.
+    assert len(adapter.seen) > 1
+    assert [text for _actor, text, _frame in episode.take_said()] == ["once"]
+    assert episode.take_said() == []

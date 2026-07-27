@@ -30,6 +30,7 @@ from mug.kernel import (
     CanonicalizationVectorSet,
     CommandReceipt,
     DomainError,
+    EventCursor,
     InlineBytes,
     ResourceRef,
     SchemaRef,
@@ -64,6 +65,7 @@ _VALIDATORS: dict[str, Callable[[Any], None]] = {
     "WireCommandEnvelope": _model_validator(WireCommandEnvelope.model_validate),
     "CommandReceipt": _model_validator(CommandReceipt.model_validate),
     "DomainError": _model_validator(DomainError.model_validate),
+    "EventCursor": _model_validator(EventCursor.model_validate),
     "ArtifactRef": _model_validator(ArtifactRef.model_validate),
     "SecretRef": _model_validator(SecretRef.model_validate),
     "CanonicalizationVectorSet": _model_validator(

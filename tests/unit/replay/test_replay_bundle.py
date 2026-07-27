@@ -13,11 +13,14 @@ from __future__ import annotations
 
 from typing import Any, cast
 
+import pytest
+
 from mug.game.capture import capture_episode
 from mug.game.env import EnvFactory, GymEnv
 from mug.game.runtime import EpisodeSummary, InputState, run_episode
 from mug.gateway import Gateway
 from mug.kernel import (
+    ArtifactRef,
     DataHandlingRef,
     Digest,
     PrincipalRef,
@@ -100,8 +103,13 @@ def _mint(gateway: Gateway) -> CommandContext:
     )
 
 
-async def _capture(store: InMemoryStore, gateway: Gateway) -> str:
-    """Capture a three-frame episode and return its canonical stream id."""
+async def _capture(store: InMemoryStore, gateway: Gateway) -> tuple[str, ArtifactRef]:
+    """Capture a three-frame episode; return its stream id and recorded trajectory.
+
+    The capture records the run's values beside the ledger digests, exactly as the
+    shipped transports do, so a bundle built from it carries what a replay needs
+    rather than a stream of digests nobody can re-execute.
+    """
     inputs = InputState({"Go": 1}, 0)
 
     async def sink(_packet: Any) -> None:
@@ -121,8 +129,18 @@ async def _capture(store: InMemoryStore, gateway: Gateway) -> str:
         max_steps=10,
     )
     context = _mint(gateway)
-    await capture_episode(summary, visit_id=_VISIT, context=context, store=store)
-    return context.stream_id
+    await capture_episode(
+        summary,
+        visit_id=_VISIT,
+        context=context,
+        store=store,
+        artifacts=store,
+        new_artifact_id=lambda: gateway.new_id("artifact"),
+        new_upload_id=lambda: gateway.new_id("upload"),
+        now=_now,
+    )
+    recorded = cast("dict[str, Any]", store.load_aggregate(_EPISODE))["trajectory"]
+    return context.stream_id, ArtifactRef.model_validate(recorded)
 
 
 def _tape() -> Any:
@@ -159,7 +177,7 @@ def _determinism() -> DeterminismDeclaration:
 async def test_a_fresh_bundle_pins_its_artifacts_and_validates() -> None:
     """The manifest names the stream and tape by digest and re-reads as valid."""
     store, gateway = InMemoryStore(), Gateway()
-    stream_id = await _capture(store, gateway)
+    stream_id, trajectory = await _capture(store, gateway)
 
     bundle = await build_replay_bundle(
         store=store,
@@ -171,13 +189,15 @@ async def test_a_fresh_bundle_pins_its_artifacts_and_validates() -> None:
         now=_now,
         data_handling=_RESEARCH,
         decision_tape=_tape(),
+        trajectory=trajectory,
     )
 
     # The bundle carries the stream's four canonical events plus the tape artifact.
     assert bundle.event_count == 4
     assert stream_id in bundle.stream_artifacts
     # stream artifact + tape artifact + schema bundle are all pinned in the manifest.
-    assert len(bundle.manifest.artifact_refs) == 3
+    # The stream, the decision tape, the schema bundle, and the recorded trajectory.
+    assert len(bundle.manifest.artifact_refs) == 4
     assert bundle.manifest.reproduction_scope == "canonical-only"
     # The manifest validates against the frozen API-16 schema.
     instance = bundle.manifest.model_dump(mode="json", exclude_none=True)
@@ -191,7 +211,7 @@ async def test_a_fresh_bundle_pins_its_artifacts_and_validates() -> None:
 async def test_a_divergent_bundle_is_refused() -> None:
     """A stored artifact whose bytes diverge from the manifest makes it invalid."""
     store, gateway = InMemoryStore(), Gateway()
-    stream_id = await _capture(store, gateway)
+    stream_id, trajectory = await _capture(store, gateway)
     bundle = await build_replay_bundle(
         store=store,
         artifacts=store,
@@ -201,6 +221,7 @@ async def test_a_divergent_bundle_is_refused() -> None:
         new_upload_id=lambda: gateway.new_id("upload"),
         now=_now,
         data_handling=_RESEARCH,
+        trajectory=trajectory,
     )
     tampered = bundle.stream_artifacts[stream_id].artifact_id
     # Diverge the stored bytes behind the pinned digest, as corruption would.
@@ -215,7 +236,7 @@ async def test_a_divergent_bundle_is_refused() -> None:
 async def test_the_deterministic_capability_needs_a_declared_basis() -> None:
     """Without a determinism basis a bundle is visual-only; with one it is not."""
     store, gateway = InMemoryStore(), Gateway()
-    stream_id = await _capture(store, gateway)
+    stream_id, trajectory = await _capture(store, gateway)
 
     visual = await build_replay_bundle(
         store=store,
@@ -226,6 +247,7 @@ async def test_the_deterministic_capability_needs_a_declared_basis() -> None:
         new_upload_id=lambda: gateway.new_id("upload"),
         now=_now,
         data_handling=_RESEARCH,
+        trajectory=trajectory,
     )
     deterministic = await build_replay_bundle(
         store=store,
@@ -237,6 +259,7 @@ async def test_the_deterministic_capability_needs_a_declared_basis() -> None:
         now=_now,
         data_handling=_RESEARCH,
         determinism=_determinism(),
+        trajectory=trajectory,
     )
 
     assert visual.manifest.capability_levels.deterministic is False
@@ -283,7 +306,7 @@ def _experienced() -> ExperiencedInput:
 async def test_an_experienced_bundle_carries_its_stream_and_lineage() -> None:
     """An experienced input widens the scope and pins the experienced stream."""
     store, gateway = InMemoryStore(), Gateway()
-    stream_id = await _capture(store, gateway)
+    stream_id, trajectory = await _capture(store, gateway)
 
     bundle = await build_replay_bundle(
         store=store,
@@ -295,6 +318,7 @@ async def test_an_experienced_bundle_carries_its_stream_and_lineage() -> None:
         now=_now,
         data_handling=_RESEARCH,
         experienced=_experienced(),
+        trajectory=trajectory,
     )
 
     manifest = bundle.manifest
@@ -312,10 +336,72 @@ async def test_an_experienced_bundle_carries_its_stream_and_lineage() -> None:
     assert verdict.valid is True
 
 
+async def test_a_run_that_recorded_nothing_gets_no_bundle() -> None:
+    """A bundle may not claim a replay nobody can perform.
+
+    The frozen manifest has always required a replay to declare a capability, and
+    the assembler used to satisfy that by asserting a visual capability with no
+    frames behind it. A run that recorded no values and no frames is now refused.
+    """
+    store, gateway = InMemoryStore(), Gateway()
+    stream_id, _ = await _capture(store, gateway)
+
+    with pytest.raises(ValueError, match="recorded neither"):
+        await build_replay_bundle(
+            store=store,
+            artifacts=store,
+            interaction_id=_INTERACTION,
+            stream_ids=[stream_id],
+            new_artifact_id=lambda: gateway.new_id("artifact"),
+            new_upload_id=lambda: gateway.new_id("upload"),
+            now=_now,
+            data_handling=_RESEARCH,
+        )
+
+
+async def test_a_declared_determinism_does_not_make_a_replay_without_actions() -> None:
+    """Deterministic replay steps recorded actions, so it needs the trajectory.
+
+    A determinism declaration says the environment *could* replay byte-identically.
+    It is not a substitute for the actions to step, and declaring one over a run
+    that recorded none leaves nothing to replay at all.
+    """
+    store, gateway = InMemoryStore(), Gateway()
+    stream_id, trajectory = await _capture(store, gateway)
+
+    with pytest.raises(ValueError, match="recorded neither"):
+        await build_replay_bundle(
+            store=store,
+            artifacts=store,
+            interaction_id=_INTERACTION,
+            stream_ids=[stream_id],
+            new_artifact_id=lambda: gateway.new_id("artifact"),
+            new_upload_id=lambda: gateway.new_id("upload"),
+            now=_now,
+            data_handling=_RESEARCH,
+            determinism=_determinism(),
+        )
+
+    # With the recorded actions beside it, the same declaration is a real capability.
+    bundle = await build_replay_bundle(
+        store=store,
+        artifacts=store,
+        interaction_id=_INTERACTION,
+        stream_ids=[stream_id],
+        new_artifact_id=lambda: gateway.new_id("artifact"),
+        new_upload_id=lambda: gateway.new_id("upload"),
+        now=_now,
+        data_handling=_RESEARCH,
+        determinism=_determinism(),
+        trajectory=trajectory,
+    )
+    assert bundle.manifest.capability_levels.deterministic is True
+
+
 async def test_p2p_mode_is_refused_until_its_evidence_is_built() -> None:
     """A p2p bundle needs its evidence, so the assembler fails closed on that mode."""
     store, gateway = InMemoryStore(), Gateway()
-    stream_id = await _capture(store, gateway)
+    stream_id, _ = await _capture(store, gateway)
 
     try:
         await build_replay_bundle(

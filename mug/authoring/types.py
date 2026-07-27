@@ -53,6 +53,7 @@ from mug.kernel import (
     TypedObject,
     UtcInstant,
     load_family_schema,
+    sha256_hex,
 )
 from mug.kernel._base import KernelModel
 from mug.kernel.ids import ActivityDefinitionId, FlowNodeDefinitionId, StudyId
@@ -888,6 +889,19 @@ class CompiledStudyCandidate(KernelModel):
     validation_report: ArtifactRef
     scientific_manifest_digest: Digest
     release_eligibility: Literal["design_unpublishable", "release_candidate"]
+
+    @model_validator(mode="after")
+    def _fingerprint_binds_the_inputs(self) -> CompiledStudyCandidate:
+        """The fingerprint is the digest of the inputs, so it cannot drift.
+
+        A candidate is content-bound: two compilations of the same inputs give
+        the same fingerprint, and a fingerprint that names other inputs makes
+        the idempotency of a publish untrue.
+        """
+        expected = sha256_hex(self.inputs.model_dump(mode="json", exclude_none=True))
+        if self.input_fingerprint.hex != expected:
+            raise ValueError("input fingerprint must be the digest of the inputs")
+        return self
 
 
 class StudyPublicationResult(KernelModel):

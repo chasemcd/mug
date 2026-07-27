@@ -40,7 +40,13 @@
 - [ ] Accountable owner and four reviewers assigned
 - [ ] Remaining matchmaking lifecycle details beyond the settled mesh/probe
       rules: group persistence, disconnect, post-formation dissolution, and
-      substitution semantics
+      substitution semantics. **Partly settled by W8** for a formed game group:
+      a seat is given up only by a connection that finished the run, so a
+      participant who reloads is given the seat they already hold rather than
+      put in a new group; a connection that has gone stops being pushed to while
+      its seat keeps stepping the default action; and the interaction is
+      finalized once, by the connection that finished. **Group persistence
+      across processes and substitution are still open.**
 - [ ] Connection-lease fencing and reconnection defined with the shared kernel
 - [ ] Cross-channel causation and modality anchors defined with API-07/08
 - [ ] NS-04 through NS-09 walkthroughs pass
@@ -94,6 +100,45 @@ with its fail-closed callback boundary, and the all-pairs `MeshLatencyProbe`).
 | 2026-07-20 | `0.3 input (docs)` | Recorded settled RP-1/RP-6/RP-7/RP-10 mesh, monitoring, probing, and callback-ownership decisions; exact contract/schema/fixture fold remains pending |
 | 2026-07-20 | `0.3` | Folded RP-1 into the schema bundle: added `P2PMeshMembership` (`mug.api-06.p2p-mesh-membership`) binding interaction/group/game channel, canonical unique 2–64 peer actor IDs, `full-mesh` topology, positive membership generation, and a version stamp; documented cross-object actor/enrollment resolution and generation fencing; added a valid four-peer mesh plus bad-topology, noncanonical-order, and duplicate-peer fixtures; 25 fixtures, 29 tests; bundle digests restamped. RP-6/RP-7/RP-10 remain pending. |
 | 2026-07-20 | `0.3` | Folded RP-6/RP-7/RP-10 into the same `mug.api-06.interaction` bundle: added a server-authoritative `MonitoringPolicy` (`max_rtt`/`max_hidden` thresholds, ordered warn-then-exclude `ladder` with the `ladderOrder` semantic rule, dotted qualified-name researcher `callback` with a fail-closed `on_error` boundary, default `fail_closed`) referenced by a new optional `Interaction.monitoring`; and the all-pairs `MeshLatencyProbe` (`mug.api-06.mesh-latency-probe`) carrying `max_p2p_rtt` and the complete pairwise-RTT set, gated by the `allPairsWithinRtt` semantic rule and coherent with `P2PMeshMembership` and the latency `MatchmakingTicket`. Added four valid (warn-then-exclude policy, fail-open callback, monitored interaction, all-pairs probe) and five invalid (ladder out of order, bad `on_error`, non-qualified callback name, pair over `max_p2p_rtt`, missing pair) fixtures; 34 fixtures, 40 tests; bundle digest restamped to `538a17e3…`. |
+
+## What W18 settles, and what it does not (2026-07-27)
+
+W18 (peer-to-peer across processes) is a **runtime** change. It adds no record, no
+field, and no fixture, and the bundle digest is unchanged. It is noted here because
+it changes what the family's runtime can do, and a reviewer should read it against
+the matchmaking and lease clauses rather than be surprised by it.
+
+**What it settles.**
+
+- **R-18 group formation now spans a deployment.** `MatchmakingTicket` and `Group`
+  were formed from the tickets one process held, so a deployment of several replicas
+  had several waiting rooms and formed no group across them.
+  `mug/interactions/rendezvous.py` puts the waiting list in the shared store, and the
+  store's own revision check makes a claim exactly-once: two processes claiming at
+  the same moment means one of them reads again and finds the tickets gone. The
+  formation itself is unchanged -- the claimed enrollments are cast through the same
+  `MeshFormationService`, so the seats, the actors, the frozen mesh, and the leases
+  are what they always were.
+- **`P2PMeshMembership` is reachable from more than one process.** The room a mesh
+  forms into now names the process that runs it, so a process holding a member's
+  socket knows where to send what that member did.
+
+**What it does not claim.**
+
+- **Lease fencing is unchanged and still per process.** `LeaseBook` holds the current
+  generation for the formation service that issued it, which now means the process
+  that claimed the group. That is sound while one process owns a room, and it is why
+  a room's owner is recorded rather than inferred. A lease is not fenced across a
+  **change** of owner, because ownership does not change.
+- **A room whose owner dies is not taken over.** Its members are aborted and
+  re-pooled, exactly as when a peer disconnects. Taking one over would need the room
+  core's live state in the store, and it is not there.
+- **Nothing about monitoring (RP-6/RP-10) is distributed.** A monitoring callback and
+  its warn-then-exclude ladder run in the process that owns the room, on that room's
+  evidence, which is all the evidence there is.
+- **No sign-off is claimed.** The four reviews above are still Pending, and the
+  runtime/distributed-systems focus line ("lease fencing, reconnection, matchmaking
+  concurrency") now has more to read, not less.
 
 ## Folded decisions (2026-07-18)
 

@@ -12,16 +12,24 @@ from __future__ import annotations
 import importlib
 import json
 from datetime import timedelta
+from importlib import import_module
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
+from mug.app import derived_idempotency_key
+from mug.authoring import GitProvenance
 from mug.cli.session import CliSession, git_provenance, load_envelope
+from mug.content import Study
+from mug.content.publish import PublishedStudy
 from mug.edge import dispatch_command
 from mug.export import export_study_dataset
 from mug.export.dataset import DatasetExport
 from mug.export.types import GitProvenanceRef
-from mug.kernel import CommandReceipt
+from mug.game.capture import recorded_trajectory
+from mug.kernel import ArtifactRef, CommandReceipt, DataHandlingRef
 from mug.kernel.refs import StudyVersionRef
+from mug.platform.deployment import set_disposition
+from mug.platform.types import Deployment, DeploymentDisposition
 from mug.replay import ReplayBundle, build_replay_bundle
 from mug.storage import ArtifactStore, Store
 from mug.workers import JobQueue, JobRunner, WorkerPool, WorkHandler
@@ -62,6 +70,87 @@ async def run_publish(session: CliSession, envelope_path: Path) -> CommandReceip
     )
 
 
+def _cli_git_provenance() -> GitProvenance:
+    """Return the checkout a command-line publish was made from.
+
+    The command line runs in the repository, so it reads the real commit. A dirty
+    tree is declared as a limitation rather than as ``dirty``, because the frozen
+    record only marks a dirty tree with the patch that made it dirty and the command
+    line stages no patch.
+    """
+    found = git_provenance()
+    return GitProvenance(commit=found.commit, branch=found.branch, dirty=False)
+
+
+def _cli_git_limitations() -> list[str]:
+    """Return what a command-line publish could not establish about its source."""
+    return ["provenance.git.dirty_tree"] if git_provenance().dirty else []
+
+
+def load_study(spec: str) -> Study:
+    """Resolve a ``module:attribute`` reference to the study it names.
+
+    A study is Python -- the author writes ``Study(Form(...), Game(...))`` in their
+    own module -- so publishing from the command line names that value rather than a
+    JSON envelope somebody assembled by hand. The attribute may be the study or a
+    callable that returns one, which is how most study modules are written.
+    """
+    module_name, _, attribute = spec.partition(":")
+    if not module_name or not attribute:
+        raise CliError("a study is named as 'module:attribute'")
+    try:
+        module = import_module(module_name)
+    except ImportError as error:
+        raise CliError(f"no module named {module_name!r}") from error
+    found = getattr(module, attribute, None)
+    if found is None:
+        raise CliError(f"{module_name!r} has no {attribute!r}")
+    study = found() if callable(found) else found
+    if not isinstance(study, Study):
+        raise CliError(f"{spec} is not a Study")
+    return study
+
+
+async def run_publish_study(session: CliSession, spec: str) -> PublishedStudy:
+    """Compile the study a module names and publish it through the real handler.
+
+    This is the same compile the application runs on every start, so a study
+    published from the command line and a study published by a running deployment
+    reach the identical version -- the identifiers derive from the study itself.
+    """
+    from mug.content.publish import compile_and_publish
+
+    published = await compile_and_publish(
+        load_study(spec),
+        store=session.store,
+        artifacts=session.store,
+        derive=session.gateway.derived_id,
+        new_context=lambda aggregate_id: session.gateway.mint(
+            session.envelope(
+                command="study.publish",
+                target_id=aggregate_id,
+                data={},
+                idempotency_key=derived_idempotency_key(
+                    session.gateway, f"publish:{aggregate_id}"
+                ),
+            ),
+            principal=session.principal,
+            data_handling=DataHandlingRef(privacy_labels=["research"]),
+        ),
+        new_artifact_id=lambda seed: session.gateway.derived_id("artifact", seed),
+        new_upload_id=lambda: session.gateway.new_id("upload"),
+        now=session.now,
+        git=_cli_git_provenance(),
+        limitations=_cli_git_limitations(),
+    )
+    if not published.published:
+        written = "; ".join(one.safe_message for one in published.report.diagnostics)
+        raise CliError(
+            "the study did not publish: " + (written or "it is no release candidate")
+        )
+    return published
+
+
 async def run_deploy(session: CliSession, envelope_path: Path) -> CommandReceipt:
     """Deploy a published study version by driving ``platform.deploy``."""
     return await dispatch_command(
@@ -73,19 +162,28 @@ async def run_deploy(session: CliSession, envelope_path: Path) -> CommandReceipt
     )
 
 
-def run_stop() -> CommandReceipt:
-    """Report that no stop handler exists yet (a known platform gap).
+async def run_stop(
+    session: CliSession, deployment_id: str, *, start: bool = False
+) -> Deployment:
+    """Stop a deployment, or start a stopped one again.
 
-    The platform models a deployment as an append-only chain of immutable
-    revisions; it has no stop or teardown command handler. The command line does
-    not invent a second path, so ``mug stop`` fails with a clear, honest message
-    until the platform grows a stop command.
+    Stopping is not deleting. The revisions stay, the visits already running are not
+    touched, and starting it again serves the revision it was serving. What changes
+    is that new participants are refused at the door -- which is what a researcher
+    means by pausing recruitment.
     """
-    raise CliError(
-        "mug stop is not available: the platform has no stop command yet "
-        "(a deployment is an append-only chain of revisions). Deploy a new "
-        "revision to change what is served."
+    disposition: DeploymentDisposition = "live" if start else "stopped"
+    _, deployment = await set_disposition(
+        deployment_id=deployment_id,
+        disposition=disposition,
+        context=session.mint_context(
+            command="deployment.set-disposition", target_id=deployment_id
+        ),
+        store=session.store,
     )
+    if deployment is None:
+        raise CliError(f"no deployment {deployment_id!r} in the store")
+    return deployment
 
 
 # --- export: read the whole ledger, one bundle per dataset kind -------------
@@ -135,8 +233,10 @@ async def run_export(
 
     The command line resolves the study version (a flag, else the one published
     version in the store), reads the working tree's git provenance, and runs the
-    export runtime. It then writes each bundle's ndjson to ``out_dir`` and a
-    ``manifest.json`` that names the bundles, their lineage, and the row schema.
+    export runtime. It then writes each bundle's ndjson to ``out_dir``, a
+    ``<kind>.values.ndjson`` per research kind holding what those aggregates
+    committed, and a ``manifest.json`` that names the bundles, their lineage, the
+    values, and the row schema.
     """
     study_version = (
         _load_study_version(study_version_path)
@@ -165,15 +265,63 @@ def _default_kinds() -> list[str]:
     return list(DATASET_KINDS)
 
 
+def _referenced_artifacts(rows: list[dict[str, Any]]) -> list[str]:
+    """Return every artifact a values row points at, in a stable order.
+
+    A values row names its evidence rather than holding it: an episode names its
+    trajectory, a generation names its three forms, a form response names its
+    answers. Writing the rows and not the things they name would put the reader back
+    where the digests-only export left them, so the export follows the references.
+    """
+    found: list[str] = []
+
+    def walk(node: Any) -> None:
+        if isinstance(node, dict):
+            body = cast("dict[str, Any]", node)
+            artifact_id = body.get("artifact_id")
+            if isinstance(artifact_id, str) and "digest" in body:
+                found.append(artifact_id)
+                return
+            for value in body.values():
+                walk(value)
+        elif isinstance(node, list):
+            for value in cast("list[Any]", node):
+                walk(value)
+
+    walk(rows)
+    return sorted(dict.fromkeys(found))
+
+
 async def _write_export(
     store: ArtifactStore, out_dir: Path, export: DatasetExport
 ) -> None:
-    """Write each bundle's ndjson and a manifest of the whole export."""
+    """Write each bundle, its values, the artifacts they name, and one manifest."""
     out_dir.mkdir(parents=True, exist_ok=True)
     for bundle in export.bundles:
         data = await store.read_artifact(bundle.artifact.artifact_id)
         (out_dir / f"{bundle.dataset_kind}.ndjson").write_bytes(data)
+    referenced: list[str] = []
+    for values in export.values:
+        data = await store.read_artifact(values.artifact.artifact_id)
+        (out_dir / f"{values.dataset_kind}.values.ndjson").write_bytes(data)
+        rows = [
+            cast("dict[str, Any]", json.loads(line))
+            for line in data.decode("utf-8").splitlines()
+            if line.strip()
+        ]
+        referenced.extend(_referenced_artifacts(rows))
+    written: list[str] = []
+    if referenced:
+        (out_dir / "artifacts").mkdir(exist_ok=True)
+        for artifact_id in sorted(dict.fromkeys(referenced)):
+            body = await store.read_artifact(artifact_id)
+            (out_dir / "artifacts" / f"{artifact_id}.json").write_bytes(body)
+            written.append(artifact_id)
     manifest = {
+        "artifacts": written,
+        "requests": [
+            r.model_dump(mode="json", exclude_none=True) for r in export.requests
+        ],
         "bundles": [
             b.model_dump(mode="json", exclude_none=True) for b in export.bundles
         ],
@@ -183,6 +331,14 @@ async def _write_export(
         "bindings": [
             b.model_dump(mode="json", exclude_none=True) for b in export.bindings
         ],
+        "values": [
+            {
+                "dataset_kind": v.dataset_kind,
+                "artifact": v.artifact.model_dump(mode="json", exclude_none=True),
+                "row_count": v.row_count,
+            }
+            for v in export.values
+        ],
     }
     (out_dir / "manifest.json").write_text(
         json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
@@ -190,6 +346,18 @@ async def _write_export(
 
 
 # --- replay: assemble one interaction's replay bundle -----------------------
+
+
+def _recorded_trajectory(
+    session: CliSession, stream_ids: list[str]
+) -> ArtifactRef | None:
+    """Return the trajectory the named streams' episode recorded, if there is one."""
+    for stream_id in stream_ids:
+        episode_id = "episode_" + stream_id.split("_", 1)[1]
+        recorded = recorded_trajectory(session.store, episode_id)
+        if recorded is not None:
+            return recorded
+    return None
 
 
 async def run_replay(
@@ -204,9 +372,15 @@ async def run_replay(
     The command line reads the named streams from the store, builds the bundle
     through the replay runtime (artifacts land in the store), and writes the
     manifest to ``out_dir``, so a reviewer can validate the recorded run.
+
+    An episode's stream shares its aggregate's identifier body, so the recorded
+    trajectory is found from the stream alone -- a bundle assembled here carries the
+    same values a bundle assembled by the transport does, and a run that recorded
+    none is refused rather than given a replay it cannot perform.
     """
     if not stream_ids:
         raise CliError("mug replay needs at least one --stream to assemble")
+    trajectory = _recorded_trajectory(session, stream_ids)
     bundle = await build_replay_bundle(
         store=session.store,
         artifacts=session.store,
@@ -216,6 +390,7 @@ async def run_replay(
         new_upload_id=lambda: session.gateway.new_id("upload"),
         now=session.now,
         data_handling=_research(),
+        trajectory=trajectory,
     )
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "replay-manifest.json").write_text(
@@ -264,13 +439,14 @@ async def run_simulate(
     workers: int = 1,
     lease_ttl_seconds: float = 30.0,
 ) -> int:
-    """Rediscover queued jobs in the store and drain them, returning the count.
+    """Rediscover waiting jobs in the store and drain them, returning the count.
 
     The command line composes the durable job runtime -- a fenced ``JobRunner``, a
     ``JobQueue`` rebuilt from the committed store, and a ``WorkerPool`` -- and
     drains the queue over the study's handler. Every claim and completion mints its
     context from the one gateway boundary, so the batch runs on the same command
-    spine a live worker uses. A restart rediscovers the same queued work.
+    spine a live worker uses. A restart rediscovers the same waiting work: a job that
+    never started, and a job whose earlier worker went away with its lease.
     """
     runner = JobRunner(
         store=session.store,
@@ -280,7 +456,7 @@ async def run_simulate(
         new_lease_id=lambda: session.gateway.new_id("lease"),
     )
     queue = JobQueue()
-    queue.rebuild(session.store)
+    queue.rebuild(session.store, runner)
     pool = WorkerPool(
         runner=runner,
         queue=queue,

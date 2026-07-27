@@ -27,9 +27,9 @@
     "artifact_id": "artifact_019b6000-0000-7000-8000-000000000308",
     "digest": {
       "algorithm": "sha-256",
-      "hex": "6666666666666666666666666666666666666666666666666666666666666666"
+      "hex": "19796503c9b11397242b227f3178c214d55304beba47fb31897b0f43d14b3cdb"
     },
-    "size_bytes": 8192,
+    "size_bytes": 3444,
     "media_type": "application/json",
     "content_encoding": "identity",
     "data_handling": {

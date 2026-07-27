@@ -15,6 +15,18 @@ name the same aggregate and the store coalesces the duplicate. The job's stream 
 then the ordered lineage of the run: the request, each leased attempt, and the
 terminal state.
 
+A job keeps two durable heads on that one stream. The ``job_id`` aggregate holds
+the submitted request, which never changes; a second aggregate, derived from the
+job id alone (``attempt_aggregate_id``), holds the current attempt. They are
+separate because the work key and the job kind are written in the request and
+nowhere else: a claim that replaced the head would erase what a later worker needs
+to run the job and to name its result. With the request kept, a worker that starts
+with no memory of the job -- a cold restart after the process that held the lease
+went away -- reads the request, takes the expired lease over with the next
+generation, and completes the job. Both heads are one canonical record, and the
+fencing stays on the one stream, so neither the store nor the contract gains a
+primitive.
+
 A lease is safe because a claim carries a fencing generation equal to its attempt.
 The store installs a strictly greater generation on the job's stream at each claim
 and refuses a write from a generation below the installed one. So a worker whose
@@ -71,6 +83,28 @@ _CLAIM = CommandTypeRef(name="job.claim", version=0)
 _COMPLETE = CommandTypeRef(name="job.complete", version=0)
 
 _INSTANT = "%Y-%m-%dT%H:%M:%S.%fZ"
+
+# The role that separates the derived attempt-state id from the job id it belongs
+# to. It is a constant of the family, not a secret: every process must derive the
+# same id, and a process that restarts holds no key.
+_ATTEMPT_ROLE = "mug.api-22.attempt-state"
+
+
+def attempt_aggregate_id(job_id: str) -> str:
+    """Return the id of the aggregate that holds one job's current attempt.
+
+    The id is a pure function of the job id, so every worker -- including one that
+    starts with no memory of the job -- finds the same aggregate with no lookup and
+    no index. It carries the ``job`` kind because the attempt state belongs to the
+    job and the kernel's identifier kinds are frozen.
+    """
+    raw = bytearray(bytes.fromhex(compute_digest([_ATTEMPT_ROLE, job_id]).hex[:32]))
+    # Force the version and variant nibbles, so the derived body is UUIDv7-shaped
+    # and the identifier passes the kernel pattern for a job id.
+    raw[6] = 0x70 | (raw[6] & 0x0F)
+    raw[8] = 0x80 | (raw[8] & 0x3F)
+    body = raw.hex()
+    return f"job_{body[0:8]}-{body[8:12]}-{body[12:16]}-{body[16:20]}-{body[20:32]}"
 
 
 class LeaseHeld(Exception):
@@ -164,21 +198,22 @@ class JobRunner:
     async def claim(self, *, context: CommandContext) -> JobClaim | None:
         """Lease the job for one attempt, or refuse a job that is not claimable.
 
-        The runner reads the job's current state. A queued request is a first
-        attempt; a running attempt whose lease has expired is a re-attempt with the
-        next generation; a running attempt whose lease is live raises
-        ``LeaseHeld``; a terminal job raises ``JobTerminal``. The claim commits a
-        running ``JobRun`` under a fencing generation equal to the attempt, so the
-        store installs a strictly greater generation on the stream. A concurrent
-        claim that loses the revision race gets a no-effect rejection, and the
-        runner returns ``None``.
+        The runner reads the job's request and its current attempt. No attempt is a
+        first attempt; a running attempt whose lease has expired is a re-attempt
+        with the next generation, whether the worker that held it is in this process
+        or went away with it; a running attempt whose lease is live raises
+        ``LeaseHeld``; a terminal attempt raises ``JobTerminal``. The claim commits a
+        running ``JobRun`` on the attempt aggregate under a fencing generation equal
+        to the attempt, so the store installs a strictly greater generation on the
+        job's stream. A concurrent claim that loses the revision race gets a
+        no-effect rejection, and the runner returns ``None``.
         """
         job_id = context.aggregate_id
-        state = self._store.load_aggregate(job_id)
-        if state is None:
+        if not _is_request(self._store.load_aggregate(job_id)):
             raise JobUnknown(job_id)
-        revision = self._store.revision_of(job_id) or 0
-        attempt = self._next_attempt(state, job_id)
+        attempt_id = attempt_aggregate_id(job_id)
+        revision = self._store.revision_of(attempt_id)
+        attempt = self._next_attempt(self._store.load_aggregate(attempt_id), job_id)
 
         run = JobRun(
             job_id=job_id,
@@ -192,7 +227,7 @@ class JobRunner:
             started_at=self._now_text(),
         )
         receipt = await commit_command(
-            self._fenced(context, attempt),
+            self._on_attempt(self._fenced(context, attempt), attempt_id),
             command=_CLAIM,
             new_state=_state(run),
             result=_typed(run),
@@ -201,7 +236,11 @@ class JobRunner:
         )
         if receipt.outcome != "accepted":
             return None
-        return JobClaim(run=run, generation=attempt, revision=revision + 1)
+        return JobClaim(
+            run=run,
+            generation=attempt,
+            revision=1 if revision is None else revision + 1,
+        )
 
     async def complete(
         self,
@@ -214,15 +253,16 @@ class JobRunner:
     ) -> tuple[CommandReceipt, JobResult]:
         """Record the job's terminal state and its single durable result.
 
-        The completion commits the terminal ``JobRun`` under the claim's fencing
-        generation, so a worker whose lease was taken over cannot complete the job
-        (the store fences the stale generation, and the revision guard refuses it a
-        second way). A successful run binds the result digest, so the result the
-        runner returns is verifiable from the ledger. The result names its artifact
-        for a success and names none for a failure.
+        The completion commits the terminal ``JobRun`` on the attempt aggregate under
+        the claim's fencing generation, so a worker whose lease was taken over cannot
+        complete the job (the store fences the stale generation, and the revision
+        guard refuses it a second way). A successful run binds the result digest, so
+        the result the runner returns is verifiable from the ledger. The result names
+        its artifact for a success and names none for a failure.
         """
+        job_id = context.aggregate_id
         result = JobResult(
-            job_id=context.aggregate_id,
+            job_id=job_id,
             work_key=work_key,
             outcome=outcome,
             result_ref=result_ref,
@@ -230,7 +270,7 @@ class JobRunner:
         )
         succeeded = outcome == "success"
         run = JobRun(
-            job_id=context.aggregate_id,
+            job_id=job_id,
             attempt=claim.generation,
             status="succeeded" if succeeded else "failed",
             lease=claim.run.lease,
@@ -238,7 +278,9 @@ class JobRunner:
             started_at=claim.run.started_at,
         )
         receipt = await commit_command(
-            self._fenced(context, claim.generation),
+            self._on_attempt(
+                self._fenced(context, claim.generation), attempt_aggregate_id(job_id)
+            ),
             command=_COMPLETE,
             new_state=_state(run),
             result=_typed(run),
@@ -247,14 +289,32 @@ class JobRunner:
         )
         return receipt, result
 
+    def claimable(self, job_id: str, state: Any) -> bool:
+        """Return whether a worker may claim this job now.
+
+        ``state`` is the job aggregate's head, as a scan of the store reports it. A
+        job is claimable when that head is a submitted request and its attempt
+        aggregate is either absent (accepted but never started) or a running attempt
+        whose lease has expired (its worker went away, so another may take over).
+
+        This is the read a restart needs: the two answers together cover both ways a
+        job can be waiting for a worker, and neither depends on anything the process
+        that submitted or claimed it held in memory.
+        """
+        if not _is_request(state):
+            return False
+        attempt = self._store.load_aggregate(attempt_aggregate_id(job_id))
+        if attempt is None:
+            return True
+        return attempt.get("status") == "running" and self._expired(attempt)
+
     # -- internals --------------------------------------------------------------
 
-    def _next_attempt(self, state: dict[str, Any], job_id: str) -> int:
-        """Return the attempt number a claim of the current state may take."""
-        status = state.get("status")
-        if status is None:
+    def _next_attempt(self, state: Any, job_id: str) -> int:
+        """Return the attempt number a claim of the current attempt may take."""
+        if state is None:
             return 1
-        if status == "running":
+        if state.get("status") == "running":
             if not self._expired(state):
                 raise LeaseHeld(job_id)
             return int(state["attempt"]) + 1
@@ -263,6 +323,15 @@ class JobRunner:
     def _expired(self, state: dict[str, Any]) -> bool:
         """Return whether the running attempt's lease has passed its deadline."""
         return _lease_expired(state, self._now(), self._lease_ttl)
+
+    def _on_attempt(self, context: CommandContext, attempt_id: str) -> CommandContext:
+        """Return the context rebound to the job's attempt aggregate.
+
+        The caller mints one context on the job's stream, exactly as it does for
+        every other family. Only the aggregate the write lands on moves, so the
+        stream, the lineage, and the fencing are the job's own.
+        """
+        return context.model_copy(update={"aggregate_id": attempt_id})
 
     def _fenced(self, context: CommandContext, generation: int) -> CommandContext:
         """Return the context stamped with the claim's fencing generation."""
@@ -300,27 +369,30 @@ class JobQueue:
 
     The queue holds job ids in arrival order and never a duplicate. A live submit
     offers its job id; a restart calls ``rebuild`` to fold the store's committed
-    state, so a worker rediscovers work that was accepted but never started.
+    state, so a worker rediscovers every job that is waiting for one.
 
-    Rediscovery covers a *queued* job -- one whose aggregate head is still its
-    ``JobRequest``. A job a worker had already claimed carries a ``JobRun`` head
-    that does not retain the work key, so re-completing a mid-flight job after a
-    cold restart stays a follow-up: it needs the request retained beside the run.
+    Rediscovery covers both ways a job waits. A job accepted but never started has
+    no attempt yet. A job a worker had claimed and then went away from -- the
+    process crashed, the container was replaced -- has a running attempt whose lease
+    has expired; the request is still its own head, so the next worker reads the
+    work key and the job kind and takes the attempt over. The runner decides which
+    of the two a job is, because the answer needs its clock and its lease
+    time-to-live.
     """
 
     def __init__(self) -> None:
         self._pending: deque[str] = deque()
         self._seen: set[str] = set()
 
-    def rebuild(self, store: Store) -> int:
-        """Fold the store's committed state and offer every queued job.
+    def rebuild(self, store: Store, runner: JobRunner) -> int:
+        """Fold the store's committed state and offer every claimable job.
 
         Return how many jobs the rebuild added. A job already in the queue is not
         offered twice, so a rebuild is safe to run beside a live submit.
         """
         offered = 0
         for job_id, state in store.scan_aggregates():
-            if _is_queued(state) and self.offer(job_id):
+            if runner.claimable(job_id, state) and self.offer(job_id):
                 offered += 1
         return offered
 
@@ -383,19 +455,20 @@ class WorkerPool:
         self._tasks: list[asyncio.Task[None]] = []
 
     async def run_once(self) -> bool:
-        """Process one queued job, or return False when the queue is empty.
+        """Process one waiting job, or return False when the queue is empty.
 
-        The worker reads the job's request (its head still carries the work key),
-        claims a lease, runs the handler, and completes the job. A job that is no
-        longer a queued request, a claim that is refused, and a claim that loses
-        the revision race each end the attempt with no effect; the worker returns
-        True so the caller keeps draining.
+        The worker reads the job's request -- its own head, which every claim leaves
+        alone, so the work key and the job kind are there whether this is the first
+        attempt or a takeover -- claims a lease, runs the handler, and completes the
+        job. An aggregate that is not a job request, a claim that is refused, and a
+        claim that loses the revision race each end the attempt with no effect; the
+        worker returns True so the caller keeps draining.
         """
         job_id = self._queue.poll()
         if job_id is None:
             return False
         state = self._store.load_aggregate(job_id)
-        if state is None or not _is_queued(state):
+        if not _is_request(state):
             return True
         request = JobRequest.model_validate(state)
         try:
@@ -477,11 +550,13 @@ def _is_job(state: Any) -> bool:
     return isinstance(name, str) and name.startswith("mug.api-22.")
 
 
-def _is_queued(state: Any) -> bool:
-    """Return whether an aggregate is a job still at its request head.
+def _is_request(state: Any) -> bool:
+    """Return whether an aggregate head is a job's submitted request.
 
-    A ``JobRequest`` head carries no ``status`` and still names the work key, so a
-    worker can complete it; a ``JobRun`` head (claimed or terminal) does not.
+    A ``JobRequest`` head names the work key and the job kind and carries no
+    ``status``; an attempt head (``JobRun``) carries one. The job aggregate holds the
+    request and the derived attempt aggregate holds the run, so this also separates
+    the two heads a scan of the store reports.
     """
     return _is_job(state) and "status" not in state
 
@@ -497,4 +572,5 @@ __all__ = [
     "WorkHandler",
     "WorkOutcome",
     "WorkerPool",
+    "attempt_aggregate_id",
 ]

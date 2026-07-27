@@ -21,7 +21,7 @@ clock and no socket.
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Sequence
 from typing import NamedTuple
 
 from mug.game.env import GymEnv, StepResult
@@ -34,6 +34,7 @@ from mug.game.multiseat import (
 from mug.game.seams import Clock, SeatActionSource, SteppableEnv
 from mug.game.spec import RenderFn
 from mug.game.surface import Surface
+from mug.game.trajectory import TrajectoryFrame
 from mug.game.types import EpisodeBoundary, GameTransition, RenderPacket
 from mug.kernel import compute_digest
 
@@ -108,19 +109,27 @@ class EpisodeSummary(NamedTuple):
     transitions: list[GameTransition]
     boundary: EpisodeBoundary
     solved: bool
+    trajectory: Sequence[TrajectoryFrame] = ()
 
 
 def _render_packet(
+    surface: Surface,
     render: RenderFn,
     state: StepResult,
     episode_id: str,
     seat_key: str,
     frame: int,
-    keyframe: bool,
 ) -> RenderPacket:
-    surface = Surface()
+    """Draw one frame onto the episode's surface and pack what changed.
+
+    The surface lives for the whole episode, which is what the object model needs:
+    a persistent object is sent when it is introduced and again when it changes,
+    and a frame that removed one is sent whole. The surface itself decides which
+    this frame is, so nothing here has to be told when a scene is complete.
+    """
+    surface.clear()
     render(surface, state)
-    commands = surface.commands()
+    commands, keyframe = surface.frame()
     digest = compute_digest(
         [command.model_dump(mode="json", exclude_none=True) for command in commands]
     )
@@ -186,16 +195,20 @@ async def run_episode(
     step.
     """
 
+    # One surface for the whole episode: the seat keeps its persistent objects
+    # between frames, so each frame ships what changed rather than everything.
+    surface = Surface()
+
     async def on_start(result: MultiStepResult) -> None:
         state = _solo_state(result, seat_key)
-        await sink(_render_packet(render, state, episode_id, seat_key, 0, True))
+        await sink(_render_packet(surface, render, state, episode_id, seat_key, 0))
         if countdown_seconds > 0:
             await asyncio.sleep(countdown_seconds)
 
     async def observe(info: MultiSeatStepInfo) -> None:
         state = _solo_state(info.result, seat_key)
         await sink(
-            _render_packet(render, state, episode_id, seat_key, info.frame, False)
+            _render_packet(surface, render, state, episode_id, seat_key, info.frame)
         )
         if on_step is not None:
             await on_step(StepInfo(info.frame, info.actions[seat_key], state))
@@ -220,6 +233,7 @@ async def run_episode(
         summary.transitions,
         summary.boundary,
         summary.solved,
+        summary.trajectory,
     )
 
 

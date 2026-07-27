@@ -25,6 +25,11 @@ from mug.kernel.refs import (
     StudyVersionRef,
 )
 from mug.platform.deploy import requirement_gaps
+from mug.platform.deployment import (
+    open_deployment,
+    point_deployment,
+    recorded_deployment,
+)
 from mug.platform.types import (
     ClientBuildBinding,
     DeploymentRequirement,
@@ -73,8 +78,18 @@ async def deploy(
     *,
     context: CommandContext,
     store: Store,
+    deployment_context: CommandContext | None = None,
 ) -> CommandReceipt:
-    """Deploy one study version and return a durable receipt."""
+    """Deploy one study version and return a durable receipt.
+
+    ``deployment_context`` is what makes the deploy complete. A revision is immutable
+    and says nothing about whether it is the one being served; the ``Deployment``
+    beside it is the mutable pointer that does (``mug.platform.deployment``). With a
+    context for it, an accepted deploy also opens that deployment at this revision or
+    moves an existing one to it -- a redeploy and a rollback being the same move.
+    Without one, only the revision is recorded, which is what a test that is not
+    about the pointer wants.
+    """
     requirement_digest = compute_digest(
         command.requirement.model_dump(mode="json", exclude_none=True)
     )
@@ -135,10 +150,40 @@ async def deploy(
         missing_execution_slots=[],
         region_gaps=[],
     )
-    return await commit_command(
+    receipt = await commit_command(
         context,
         command=_DEPLOY_COMMAND,
         new_state=state,
         result=_report_object(report),
         store=store,
     )
+    if receipt.outcome == "accepted" and deployment_context is not None:
+        await _point_at(
+            revision_ref,
+            study_id=command.study_version.study_id,
+            context=deployment_context,
+            store=store,
+        )
+    return receipt
+
+
+async def _point_at(
+    revision: DeploymentRevisionRef,
+    *,
+    study_id: str,
+    context: CommandContext,
+    store: Store,
+) -> None:
+    """Make one accepted revision the deployment's current one.
+
+    A first deploy opens the deployment; a later one moves the pointer. The
+    disposition is never touched here, so redeploying a stopped deployment leaves it
+    stopped -- starting it again is an operator's decision, not a side effect of a
+    build.
+    """
+    if recorded_deployment(store, revision.deployment_id) is None:
+        await open_deployment(
+            study_id=study_id, revision=revision, context=context, store=store
+        )
+        return
+    await point_deployment(revision=revision, context=context, store=store)

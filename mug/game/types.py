@@ -256,9 +256,7 @@ class GameTransition(KernelModel):
 class SurfaceCommand(KernelModel):
     """One drawing command in a render packet's surface command list."""
 
-    op: Literal[
-        "rect", "circle", "ellipse", "line", "polygon", "arc", "text", "image"
-    ]
+    op: Literal["rect", "circle", "ellipse", "line", "polygon", "arc", "text", "image"]
     id: Annotated[str, Field(max_length=128)] | None = None
     persistent: bool | None = None
     relative: bool | None = None
@@ -273,9 +271,9 @@ class SurfaceCommand(KernelModel):
     radius: _Number | None = None
     rx: _Number | None = None
     ry: _Number | None = None
-    points: (
-        Annotated[list[tuple[_Number, _Number]], Field(max_length=4096)] | None
-    ) = None
+    points: Annotated[list[tuple[_Number, _Number]], Field(max_length=4096)] | None = (
+        None
+    )
     start_angle: _Number | None = None
     end_angle: _Number | None = None
     angle: _Number | None = None

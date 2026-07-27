@@ -8,24 +8,25 @@ participant receives, the ``PreferenceResponse`` they return, and the per-respon
 the annotation loop through the shared command spine (``mug.runtime``), so one
 annotation's lineage is a canonical event stream like any other aggregate.
 
-One identity rule keeps it simple: the aggregate is the assignment. Its id is the
-``assignment_id`` and its stream is the ordered lineage of the annotation -- the
-assignment, then the response, then the quality evidence. The three stages advance
-the aggregate head in order, so the aggregate holds exactly three events at most
-and each stage commits against a fixed revision:
+**One record, one aggregate, and the identifiers say how they join.** A store holds
+one state per aggregate, so two records written to one aggregate are one record and
+a lost one -- and what would be lost here is exactly what a study needs: the
+enrollment that answered, the seed the order was committed under, and the choice
+itself. So the protocol, the assignment, the response, and the quality evidence each
+head their own aggregate, and the response's identifier body **is** the
+assignment's (``response_id_for``).
 
-- ``assign`` creates the aggregate (revision 1);
-- ``respond`` commits the response against revision 1 (so the aggregate reaches
-  revision 2);
-- ``attest_quality`` commits the quality evidence against revision 2 (revision 3).
+That shared body keeps the annotation's lineage on **one stream** -- a stream is
+named by the aggregate's own identifier body, so the assignment and its answer land
+on the same one and reading it gives the annotation in order. The quality evidence
+is separate on both counts, because it is separate evidence.
 
-Those fixed revisions give the family its idempotency and its single-response rule
-for free, over the store's own fencing and command-id coalescing: an identical
-retry of any stage replays to the same receipt with no second effect (the store
-coalesces the command id), and a *different* second response reads the same
-expected revision and the store fences it as stale. So a participant is assigned
-once, responds once, and one quality attestation is recorded -- and a dropped
-connection that retries never double-records.
+That shared body is also the whole of the family's idempotency. One assignment can
+address one response aggregate, so a participant responds once: an identical retry
+replays to the same receipt (the store coalesces the command id), and a different
+second answer finds the aggregate taken and is refused with no effect. A dropped
+connection that retries never double-records, and nothing has to remember whether
+this participant has answered -- the identifier already says.
 
 The candidates a participant compares come from recorded evidence -- a replay
 bundle's trajectory artifact, a model-output artifact, a chat segment. So
@@ -45,7 +46,7 @@ from __future__ import annotations
 
 import hashlib
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, Literal
 
 from mug.kernel import (
     ArtifactRef,
@@ -57,6 +58,7 @@ from mug.kernel import (
 )
 from mug.preferences.types import (
     CandidateRef,
+    DimensionRating,
     PreferenceAssignment,
     PreferenceProtocol,
     PreferenceResponse,
@@ -66,20 +68,18 @@ from mug.runtime import CommandContext, commit_command
 from mug.storage import Store, digest_of
 
 _PreferenceRecord = (
-    PreferenceAssignment | PreferenceResponse | QualityEvidence | CandidateRef
+    PreferenceAssignment
+    | PreferenceResponse
+    | QualityEvidence
+    | CandidateRef
+    | PreferenceProtocol
 )
 
+_DECLARE = CommandTypeRef(name="preference.declare", version=0)
 _ASSIGN = CommandTypeRef(name="preference.assign", version=0)
 _RESPOND = CommandTypeRef(name="preference.respond", version=0)
 _ATTEST = CommandTypeRef(name="preference.attest-quality", version=0)
 
-# The assignment lifecycle is a fixed three-stage stream, so each stage commits
-# against the revision the prior stage left behind. See the module docstring.
-_ASSIGNMENT_REVISION = 1
-_RESPONSE_REVISION = 2
-
-_RESPONSE_SCHEMA = "mug.api-18.preference-response"
-_QUALITY_SCHEMA = "mug.api-18.quality-evidence"
 
 
 class UnknownAssignment(Exception):
@@ -130,17 +130,55 @@ def display_order(
     )
 
 
+def response_id_for(assignment_id: str) -> str:
+    """Return the one response identifier an assignment can ever have.
+
+    It shares the assignment's identifier body, so one assignment has one response
+    without anything having to remember which, and a reader joins the two with no
+    index beside the ledger. It is the same convention that puts an aggregate's
+    events on the stream that shares its body.
+    """
+    return "prefresponse_" + assignment_id.split("_", 1)[1]
+
+
 class PreferenceService:
     """Drive one annotation's records through the command spine.
 
-    The service holds only the store; the caller mints a ``CommandContext`` for each
-    stage on the assignment's aggregate. Each method commits one record and returns
-    the commit receipt beside it, so the caller reads ``receipt.outcome`` to tell an
-    accepted stage from a fenced, no-effect one.
+    The service holds only the store; the caller mints a ``CommandContext`` per
+    record -- the assignment's aggregate for the assignment and the response, and
+    the quality evidence's own for the attestation. Each method commits one record
+    and returns the commit receipt beside it, so the caller reads ``receipt.outcome``
+    to tell an accepted write from a fenced, no-effect one.
     """
 
     def __init__(self, *, store: Store) -> None:
         self._store = store
+
+    async def declare(
+        self,
+        *, context: CommandContext, protocol: PreferenceProtocol
+    ) -> tuple[CommandReceipt, PreferenceProtocol]:
+        """Record the protocol a set of annotations is answered under.
+
+        The protocol is what the study asked: whether the candidates were blinded,
+        whether their order was shuffled, whether a tie was on offer, and which
+        dimensions each answer carries. None of that is in an assignment or a
+        response, so without this record an analysis could read the answers and not
+        the question -- and a dataset with no ties would be unreadable, because
+        "none was chosen" and "none was offered" would look the same.
+
+        The aggregate is the protocol version, so a study declares it once however
+        many participants answer under it: the first declaration is accepted and
+        every later one is a no-effect rejection of the same bytes.
+        """
+        receipt = await commit_command(
+            context,
+            command=_DECLARE,
+            new_state=_state(protocol),
+            result=_typed(protocol),
+            store=self._store,
+        )
+        return receipt, protocol
 
     async def assign(
         self,
@@ -184,27 +222,41 @@ class PreferenceService:
         self,
         *,
         context: CommandContext,
-        response_id: str,
+        assignment_id: str,
         choice: str,
         presented_order: Sequence[str],
         submitted_at: UtcInstant,
         receipt_required: bool = False,
+        verdict: str | None = None,
+        ratings: Sequence[DimensionRating] = (),
     ) -> tuple[CommandReceipt, PreferenceResponse]:
         """Record the participant's choice over the order they were shown.
 
-        The response commits against the assignment revision, so a participant
-        responds once: an identical retry replays to the same receipt, and a
-        different second response reads the same expected revision and the store
-        fences it as a no-effect rejection. The record enforces that the choice was
-        one of the presented candidates.
+        The response is its own aggregate, and its identifier body is the
+        assignment's, so one assignment has one response and a reader joins the two
+        by name. That existence guard is what makes a participant respond once: an
+        identical retry replays to the same receipt, and a different second response
+        finds the aggregate taken and is refused with no effect. Keeping it off the
+        assignment is what keeps the assignment readable -- a store holds one state
+        per aggregate, and a response written over it would take the enrollment, the
+        seed commitment, and the blinding with it. The record enforces that the
+        choice was one of the presented candidates.
+
+        ``verdict`` says what the participant meant by the choice. A tie or a
+        both-bad verdict still names a choice, because the choice is what the
+        response resolves to -- in a live conversation, the reply the thread went
+        on with. ``ratings`` are the per-dimension answers the protocol asked for,
+        each naming the candidate it is about.
         """
-        if self._store.load_aggregate(context.aggregate_id) is None:
-            raise UnknownAssignment(context.aggregate_id)
+        if self._store.load_aggregate(assignment_id) is None:
+            raise UnknownAssignment(assignment_id)
         response = PreferenceResponse(
-            response_id=response_id,
-            assignment_id=context.aggregate_id,
+            response_id=context.aggregate_id,
+            assignment_id=assignment_id,
             choice=choice,
             presented_order=list(presented_order),
+            verdict=_verdict_of(verdict),
+            ratings=list(ratings) or None,
             receipt_required=receipt_required,
             submitted_at=submitted_at,
         )
@@ -214,7 +266,6 @@ class PreferenceService:
             new_state=_state(response),
             result=_typed(response),
             store=self._store,
-            expected_revision=_ASSIGNMENT_REVISION,
         )
         return receipt, response
 
@@ -222,25 +273,31 @@ class PreferenceService:
         self,
         *,
         context: CommandContext,
+        assignment_id: str,
         attention_check_passed: bool,
         response_time_ms: int,
         flagged: bool = False,
     ) -> tuple[CommandReceipt, QualityEvidence]:
-        """Attach the per-response quality signals to the response.
+        """Record the per-response quality signals, on the evidence's own aggregate.
 
-        The attestation reads the response id from the aggregate head (the response
-        or, on a retry, the quality evidence already recorded -- both carry the
-        response id), so the caller does not repeat it. It commits against the
-        response revision, so one attestation is recorded: a retry replays and a
-        different attestation is fenced. An attestation before the response exists
-        is refused.
+        The attestation names the response by the assignment it answers, so the
+        caller does not repeat it, and writes to the aggregate the caller's context
+        names -- **which is neither of them**. A store holds the latest state of an
+        aggregate, so an attestation written over the response would overwrite the
+        recorded choice, and the judgement would leave the platform as a digest of
+        something nobody holds. Every record heads its own aggregate, and they are
+        joined by identifier exactly as every other pair of records is.
+
+        One attestation is recorded per response, which the aggregate's own
+        existence guard gives: a retry of the same command replays, and a second,
+        different attestation is refused. An attestation before the response exists
+        is refused too.
         """
-        state = self._store.load_aggregate(context.aggregate_id)
-        if state is None:
-            raise UnknownAssignment(context.aggregate_id)
-        response_id = _response_id_of(state)
-        if response_id is None:
-            raise ResponseRequired(context.aggregate_id)
+        if self._store.load_aggregate(assignment_id) is None:
+            raise UnknownAssignment(assignment_id)
+        response_id = response_id_for(assignment_id)
+        if self._store.load_aggregate(response_id) is None:
+            raise ResponseRequired(assignment_id)
         quality = QualityEvidence(
             response_id=response_id,
             attention_check_passed=attention_check_passed,
@@ -253,22 +310,21 @@ class PreferenceService:
             new_state=_state(quality),
             result=_typed(quality),
             store=self._store,
-            expected_revision=_RESPONSE_REVISION,
         )
         return receipt, quality
 
 
-def _response_id_of(state: dict[str, Any]) -> str | None:
-    """Return the response id from a response or quality-evidence head, else None.
+def _verdict_of(verdict: str | None) -> Literal["choice", "tie", "both-bad"] | None:
+    """Return the verdict a response records, leaving the plain choice unstated.
 
-    The response and the quality evidence both carry ``response_id``; an assignment
-    head does not. So a missing id means the response stage has not run yet.
+    ``choice`` is what an absent verdict means, so a plain preference writes no
+    field and every response recorded before verdicts existed still reads right.
     """
-    name = state.get("schema", {}).get("name")
-    if name in (_RESPONSE_SCHEMA, _QUALITY_SCHEMA):
-        value = state.get("response_id")
-        return value if isinstance(value, str) else None
-    return None
+    if verdict is None or verdict == "choice":
+        return None
+    if verdict in ("tie", "both-bad"):
+        return verdict
+    raise ValueError(f"unknown verdict: {verdict!r}")
 
 
 def _state(record: _PreferenceRecord) -> dict[str, Any]:
@@ -287,4 +343,5 @@ __all__ = [
     "UnknownAssignment",
     "candidate_from_artifact",
     "display_order",
+    "response_id_for",
 ]

@@ -4,13 +4,20 @@
     "version": 0,
     "digest": {
       "algorithm": "sha-256",
-      "hex": "23659cee1b0870cb156470ea50e88501e7158412e6c6d762c3735e54a8114705"
+      "hex": "717b95bd477ea2e7f21fc8f77309896fdb7ad5e2b06b64a6de5b9289564d4db3"
     }
   },
   "manifest_version": "0.2.0",
   "suite": "api-18-preference",
   "contract_version": 0,
   "cases": [
+    {
+      "id": "preference-protocol.valid.dimensional",
+      "instance": "valid/preference-protocol.dimensional.json",
+      "schema_ref": "urn:mug:schema:mug.api-18.preference:0#/$defs/PreferenceProtocol",
+      "expect": "valid",
+      "validation_layer": "semantic"
+    },
     {
       "id": "preference-protocol.valid.minimal-static",
       "instance": "valid/preference-protocol.minimal-static.json",
@@ -40,6 +47,13 @@
       "validation_layer": "semantic"
     },
     {
+      "id": "preference-response.valid.dimensional",
+      "instance": "valid/preference-response.dimensional.json",
+      "schema_ref": "urn:mug:schema:mug.api-18.preference:0#/$defs/PreferenceResponse",
+      "expect": "valid",
+      "validation_layer": "semantic"
+    },
+    {
       "id": "preference-response.valid.minimal-static",
       "instance": "valid/preference-response.minimal-static.json",
       "schema_ref": "urn:mug:schema:mug.api-18.preference:0#/$defs/PreferenceResponse",
@@ -54,16 +68,6 @@
       "validation_layer": "schema"
     },
     {
-      "id": "preference-protocol.invalid.bad-task-kind",
-      "instance": "invalid/preference-protocol.bad-task-kind.json",
-      "schema_ref": "urn:mug:schema:mug.api-18.preference:0#/$defs/PreferenceProtocol",
-      "expect": "invalid",
-      "expected_error": {
-        "keyword": "enum",
-        "instance_pointer": "/task/kind"
-      }
-    },
-    {
       "id": "preference-protocol.invalid.bad-candidate-kind",
       "instance": "invalid/preference-protocol.bad-candidate-kind.json",
       "schema_ref": "urn:mug:schema:mug.api-18.preference:0#/$defs/PreferenceProtocol",
@@ -71,6 +75,16 @@
       "expected_error": {
         "keyword": "enum",
         "instance_pointer": "/candidate_kind"
+      }
+    },
+    {
+      "id": "preference-protocol.invalid.bad-task-kind",
+      "instance": "invalid/preference-protocol.bad-task-kind.json",
+      "schema_ref": "urn:mug:schema:mug.api-18.preference:0#/$defs/PreferenceProtocol",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "enum",
+        "instance_pointer": "/task/kind"
       }
     },
     {
@@ -105,6 +119,16 @@
       }
     },
     {
+      "id": "preference-response.invalid.bad-verdict",
+      "instance": "invalid/preference-response.bad-verdict.json",
+      "schema_ref": "urn:mug:schema:mug.api-18.preference:0#/$defs/PreferenceResponse",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "enum",
+        "instance_pointer": "/verdict"
+      }
+    },
+    {
       "id": "preference-response.invalid.phantom-choice",
       "instance": "invalid/preference-response.phantom-choice.json",
       "schema_ref": "urn:mug:schema:mug.api-18.preference:0#/$defs/PreferenceResponse",
@@ -113,6 +137,28 @@
       "expected_error": {
         "keyword": "choiceNotPresented",
         "instance_pointer": "/choice"
+      }
+    },
+    {
+      "id": "preference-response.invalid.phantom-dimension-candidate",
+      "instance": "invalid/preference-response.phantom-dimension-candidate.json",
+      "schema_ref": "urn:mug:schema:mug.api-18.preference:0#/$defs/PreferenceResponse",
+      "expect": "invalid",
+      "validation_layer": "semantic",
+      "expected_error": {
+        "keyword": "ratingCandidateNotPresented",
+        "instance_pointer": "/ratings/0/candidate_key"
+      }
+    },
+    {
+      "id": "preference-response.invalid.rating-without-candidate",
+      "instance": "invalid/preference-response.rating-without-candidate.json",
+      "schema_ref": "urn:mug:schema:mug.api-18.preference:0#/$defs/PreferenceResponse",
+      "expect": "invalid",
+      "validation_layer": "semantic",
+      "expected_error": {
+        "keyword": "ratingValueWithoutCandidate",
+        "instance_pointer": "/ratings/0/value"
       }
     }
   ]

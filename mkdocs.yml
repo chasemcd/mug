@@ -72,6 +72,7 @@ nav:
       - Overview: architecture/implementation/index.md
       - Coding Standard: architecture/implementation/coding-standard.md
       - Repository Structure: architecture/implementation/repo-structure.md
+      - Authenticated Browser P2P: architecture/implementation/authenticated-browser-p2p.md
     - Runtime Parity Audit:
       - Overview: architecture/runtime-parity/index.md
       - P2P Transport & Authority: architecture/runtime-parity/01-p2p-transport-authority.md

@@ -35,7 +35,7 @@ from fastapi.testclient import TestClient
 
 from mug.edge import build_app
 from mug.gateway import Gateway
-from mug.kernel import PrincipalRef
+from mug.kernel import PrincipalRef, sha256_hex
 from mug.storage import InMemoryStore
 
 _ROOT = Path(__file__).resolve().parents[3] / "docs/architecture/phase-0"
@@ -156,17 +156,20 @@ def _envelope(
 
 def _publish_payload() -> dict[str, Any]:
     version = _load(_API01)
+    inputs = {
+        "git_provenance": version["git_provenance"],
+        "source": version["candidate"],
+        "compiler": _COMPILER,
+        "schema_registry_digest": _DIGEST,
+        "build_context_digest": _DIGEST,
+        "target_platform_contract": _COMPILER["contract"],
+        "compilation_policy": _POLICY,
+    }
     candidate = {
-        "input_fingerprint": _DIGEST,
-        "inputs": {
-            "git_provenance": version["git_provenance"],
-            "source": version["candidate"],
-            "compiler": _COMPILER,
-            "schema_registry_digest": _DIGEST,
-            "build_context_digest": _DIGEST,
-            "target_platform_contract": _COMPILER["contract"],
-            "compilation_policy": _POLICY,
-        },
+        # The candidate is content-bound: the fingerprint is the digest of the
+        # inputs, so it is computed here and never a placeholder.
+        "input_fingerprint": {"algorithm": "sha-256", "hex": sha256_hex(inputs)},
+        "inputs": inputs,
         "manifest_set": version["scientific"],
         "validation_report": version["candidate"],
         "scientific_manifest_digest": version["study_version"]["manifest_digest"],

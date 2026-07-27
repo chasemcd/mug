@@ -22,7 +22,7 @@ from mug.authoring.agents import (
     Step,
     Thoughts,
 )
-from mug.authoring.preferences import Comparison
+from mug.authoring.preferences import Axis, Comparison, Elicit
 from mug.authoring.service import PublishStudyCommand, publish_study
 from mug.authoring.types import (
     AuthoringDocument,
@@ -50,6 +50,7 @@ from mug.authoring.types import (
 
 __all__ = [
     "AuthoringDocument",
+    "Axis",
     "CapabilityRequirement",
     "Chat",
     "ClientManifest",
@@ -59,6 +60,7 @@ __all__ = [
     "CompiledStudyCandidate",
     "Diagnostic",
     "DiagnosticAcknowledgment",
+    "Elicit",
     "Fallback",
     "FlowSpec",
     "GitProvenance",

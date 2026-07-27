@@ -33,9 +33,9 @@ from __future__ import annotations
 import itertools
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
 from typing import Literal
 
+from mug.interactions.leases import LeaseBook
 from mug.interactions.types import (
     ConnectionLease,
     Group,
@@ -50,7 +50,6 @@ from mug.interactions.types import (
 from mug.kernel import (
     Digest,
     Duration,
-    LeaseRef,
     UtcInstant,
     VersionStamp,
     compute_digest,
@@ -66,20 +65,9 @@ Clock = Callable[[], UtcInstant]
 # ids and returns the microseconds for each sorted ``(a, b)`` pair.
 ProbeFn = Callable[[Sequence[str]], Mapping[tuple[str, str], int]]
 
-_INSTANT_FMT = "%Y-%m-%dT%H:%M:%S.%fZ"
-
-
 def _empty_cast() -> dict[str, str]:
     """Return the empty seat-to-actor cast for a non-formed result."""
     return {}
-
-
-def _plus(instant: UtcInstant, microseconds: int) -> UtcInstant:
-    """Return the instant advanced by a whole-microsecond duration."""
-    moved = datetime.strptime(instant, _INSTANT_FMT) + timedelta(
-        microseconds=microseconds
-    )
-    return moved.strftime(_INSTANT_FMT)
 
 
 @dataclass
@@ -152,12 +140,10 @@ class MeshFormationService:
         self._size = size
         self._strategy = strategy
         self._probe = probe
-        self._lease_ttl = lease_ttl or Duration(microseconds=3_600_000_000)
+        self._leases = LeaseBook(new_id=new_id, now=now, ttl=lease_ttl)
 
         self._queue: list[_Entry] = []
         self._failed_pairs: set[frozenset[str]] = set()
-        self._lease_generation: dict[str, int] = {}
-        self._lease_epoch: dict[str, str] = {}
 
     # -- the waiting queue ------------------------------------------------------
 
@@ -189,9 +175,7 @@ class MeshFormationService:
     def waiting(self) -> tuple[MatchmakingTicket, ...]:
         """Return the tickets still waiting to be matched, in arrival order."""
         return tuple(
-            self._ticket(entry)
-            for entry in self._queue
-            if entry.status == "waiting"
+            self._ticket(entry) for entry in self._queue if entry.status == "waiting"
         )
 
     # -- formation --------------------------------------------------------------
@@ -211,8 +195,7 @@ class MeshFormationService:
         interaction_id = self._new_id("interaction")
         group_id = self._new_id("group")
         seats = {
-            f"seat-{index + 1}": self._new_id("actor")
-            for index in range(len(chosen))
+            f"seat-{index + 1}": self._new_id("actor") for index in range(len(chosen))
         }
         cast = dict(sorted(seats.items()))
         actor_ids = tuple(sorted(cast.values()))
@@ -224,12 +207,8 @@ class MeshFormationService:
         group = self._build_group(chosen, group_id)
         membership = self._build_membership(interaction_id, group_id, actor_ids)
         mesh_digest = compute_digest(membership.model_dump(mode="json"))
-        interaction = self._build_interaction(
-            interaction_id, chosen, cast, group_id
-        )
-        leases = tuple(
-            self._issue_lease(interaction_id, actor) for actor in actor_ids
-        )
+        interaction = self._build_interaction(interaction_id, chosen, cast, group_id)
+        leases = tuple(self._issue_lease(interaction_id, actor) for actor in actor_ids)
         for entry in chosen:
             entry.status = "matched"
             entry.group_id = group_id
@@ -253,24 +232,11 @@ class MeshFormationService:
         self, interaction_id: str, lease: ConnectionLease
     ) -> ConnectionLease:
         """Re-issue a lease at the next fencing generation, fencing the prior one."""
-        lease_id = lease.lease.lease_id
-        generation = self._lease_generation.get(lease_id, lease.lease.generation) + 1
-        self._lease_generation[lease_id] = generation
-        return ConnectionLease(
-            lease=LeaseRef(
-                lease_id=lease_id,
-                namespace_epoch_id=lease.lease.namespace_epoch_id,
-                generation=generation,
-            ),
-            interaction_id=interaction_id,
-            actor_id=lease.actor_id,
-            expires_at=_plus(self._now(), self._lease_ttl.microseconds),
-        )
+        return self._leases.reacquire(interaction_id, lease)
 
     def is_current(self, lease: ConnectionLease) -> bool:
-        """Return whether a lease holds the current fencing generation."""
-        current = self._lease_generation.get(lease.lease.lease_id)
-        return current is not None and current == lease.lease.generation
+        """Return whether the complete bound lease is current and unexpired."""
+        return self._leases.is_current(lease)
 
     # -- selection and probing --------------------------------------------------
 
@@ -431,17 +397,7 @@ class MeshFormationService:
 
     def _issue_lease(self, interaction_id: str, actor_id: str) -> ConnectionLease:
         """Issue the first fenced connection lease for one actor."""
-        epoch = self._lease_epoch.setdefault(
-            interaction_id, self._new_id("leaseepoch")
-        )
-        lease_id = self._new_id("lease")
-        self._lease_generation[lease_id] = 1
-        return ConnectionLease(
-            lease=LeaseRef(lease_id=lease_id, namespace_epoch_id=epoch, generation=1),
-            interaction_id=interaction_id,
-            actor_id=actor_id,
-            expires_at=_plus(self._now(), self._lease_ttl.microseconds),
-        )
+        return self._leases.issue(interaction_id, actor_id)
 
     # -- helpers ----------------------------------------------------------------
 

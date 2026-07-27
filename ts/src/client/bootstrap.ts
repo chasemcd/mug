@@ -10,8 +10,11 @@
  */
 
 import { browserSha256 } from '../kernel/index.js';
+import { browserDecoder } from './assets.js';
 import { ParticipantClient } from './client.js';
+import { fetchBrowserPeerConnectionFactory } from './p2pRtc.js';
 import { KeyValueStore, Schedule, Socket, SocketFactory } from './session.js';
+import { uuid7, WireEnv } from './wire.js';
 
 function requireElement(id: string): HTMLElement {
   const element = document.getElementById(id);
@@ -47,9 +50,15 @@ const schedule: Schedule = (callback, delayMillis) => {
 
 function bootstrap(): void {
   const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
+  const status = requireElement('status');
+  const env: WireEnv = {
+    now: () => Date.now(),
+    randomBytes: (count) => crypto.getRandomValues(new Uint8Array(count)),
+    hash: browserSha256,
+  };
   const client = new ParticipantClient({
     app: requireElement('app'),
-    status: requireElement('status'),
+    status,
     keyTarget: window,
     endpoint: {
       wsBase: scheme + '://' + location.host,
@@ -58,11 +67,36 @@ function bootstrap(): void {
     connect,
     store,
     schedule,
-    env: {
-      now: () => Date.now(),
-      randomBytes: (count) => crypto.getRandomValues(new Uint8Array(count)),
-      hash: browserSha256,
+    env,
+    decodeAsset: browserDecoder((url) => fetch(url)),
+    p2p: {
+      prepareConnections: (mesh) =>
+        fetchBrowserPeerConnectionFactory(mesh, (endpoint, init) =>
+          fetch(endpoint, init),
+        ),
+      nextRequestId: () => 'request_' + uuid7(env),
+      setTimer: (handler, delayMillis) => window.setTimeout(handler, delayMillis),
+      clearTimer: (handle) => {
+        if (typeof handle === 'number') {
+          window.clearTimeout(handle);
+        }
+      },
+      onError: (message) => {
+        status.textContent = 'peer mesh failed: ' + message;
+      },
     },
+  });
+  // The one browser-shaped quality input: how long the page spent in the
+  // background. A tab the participant switched away from is not a tab they are
+  // playing in, and a study that screens is entitled to be told.
+  let hiddenSince: number | null = null;
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      hiddenSince = Date.now();
+    } else if (hiddenSince !== null) {
+      client.reportHidden(Date.now() - hiddenSince);
+      hiddenSince = null;
+    }
   });
   client.start();
 }

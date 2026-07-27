@@ -10,6 +10,7 @@ schema and the test compares to the manifest.
 
 from __future__ import annotations
 
+import copy
 import json
 from collections.abc import Callable
 from pathlib import Path
@@ -24,6 +25,17 @@ from mug.client import (
     GateOp,
     InputScheme,
     MonitoringMeasurement,
+    P2PCaptureSubmission,
+    P2PIceGrantRequest,
+    P2PMeshAbort,
+    P2PMeshBootstrap,
+    P2PMeshFinish,
+    P2PMeshStart,
+    P2PPeerComplete,
+    P2PPeerReady,
+    P2PSignal,
+    P2PSignalAck,
+    P2PSignalDelivery,
     RealtimeCommand,
     SeatDelivery,
     TransportAck,
@@ -45,6 +57,17 @@ _VALIDATORS: dict[str, Callable[[Any], Any]] = {
     "BridgeMessage": BridgeMessage.model_validate,
     "MonitoringMeasurement": MonitoringMeasurement.model_validate,
     "GateOp": GateOp.model_validate,
+    "P2PMeshBootstrap": P2PMeshBootstrap.model_validate,
+    "P2PIceGrantRequest": P2PIceGrantRequest.model_validate,
+    "P2PSignal": P2PSignal.model_validate,
+    "P2PSignalDelivery": P2PSignalDelivery.model_validate,
+    "P2PSignalAck": P2PSignalAck.model_validate,
+    "P2PPeerReady": P2PPeerReady.model_validate,
+    "P2PMeshStart": P2PMeshStart.model_validate,
+    "P2PMeshAbort": P2PMeshAbort.model_validate,
+    "P2PPeerComplete": P2PPeerComplete.model_validate,
+    "P2PCaptureSubmission": P2PCaptureSubmission.model_validate,
+    "P2PMeshFinish": P2PMeshFinish.model_validate,
 }
 
 
@@ -63,6 +86,11 @@ def _instance(relative: str) -> Any:
 
 _CASES = _cases()
 _CASE_IDS = [case["id"] for case in _CASES]
+_P2P_VALID_CASES = [
+    case
+    for case in _CASES
+    if case["expect"] == "valid" and _def_name(case["schema_ref"]).startswith("P2P")
+]
 
 
 @pytest.mark.parametrize("case", _CASES, ids=_CASE_IDS)
@@ -117,3 +145,21 @@ def test_pinned_schema_ref_matches_bundle_digest() -> None:
     schema = client_schema()
     handshake = _instance("valid/client-handshake.minimal-static.json")
     assert handshake["schema"]["digest"]["hex"] == schema.bundle_digest
+
+
+@pytest.mark.parametrize("case", _P2P_VALID_CASES, ids=lambda case: case["id"])
+@pytest.mark.parametrize("drift", ["name", "version", "digest"])
+def test_p2p_models_reject_drifted_schema_refs(
+    case: dict[str, Any], drift: str
+) -> None:
+    """Every P2P wire model requires its exact frozen name, version, and digest."""
+    instance = copy.deepcopy(_instance(case["instance"]))
+    if drift == "name":
+        instance["schema"]["name"] = "mug.api-09.p2p-schema-drift"
+    elif drift == "version":
+        instance["schema"]["version"] = 1
+    else:
+        instance["schema"]["digest"]["hex"] = "0" * 64
+
+    with pytest.raises(ValidationError):
+        _VALIDATORS[_def_name(case["schema_ref"])](instance)

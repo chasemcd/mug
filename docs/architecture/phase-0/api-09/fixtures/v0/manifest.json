@@ -4,10 +4,10 @@
     "version": 0,
     "digest": {
       "algorithm": "sha-256",
-      "hex": "a687a1359b23e69f995ab8ccae6a335f99f87848c8dcd524cd4c3d92cfa0506a"
+      "hex": "ec6d3f0019480421a8cdc9ce8db2f2e88f2398e0daf0c7773ced3841ba435029"
     }
   },
-  "manifest_version": "0.3.0",
+  "manifest_version": "0.4.0",
   "suite": "api-09-client",
   "contract_version": 0,
   "cases": [
@@ -228,6 +228,242 @@
       "expected_error": {
         "keyword": "required",
         "instance_pointer": ""
+      }
+    },
+    {
+      "id": "p2p-mesh-bootstrap.valid.full-mesh",
+      "instance": "valid/p2p-mesh-bootstrap.full-mesh.json",
+      "schema_ref": "urn:mug:schema:mug.api-09.client:0#/$defs/P2PMeshBootstrap",
+      "expect": "valid",
+      "validation_layer": "semantic"
+    },
+    {
+      "id": "p2p-ice-grant-request.valid.minimal-static",
+      "instance": "valid/p2p-ice-grant-request.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-09.client:0#/$defs/P2PIceGrantRequest",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "p2p-signal.valid.offer",
+      "instance": "valid/p2p-signal.offer.json",
+      "schema_ref": "urn:mug:schema:mug.api-09.client:0#/$defs/P2PSignal",
+      "expect": "valid",
+      "validation_layer": "semantic"
+    },
+    {
+      "id": "p2p-signal.valid.end-of-candidates",
+      "instance": "valid/p2p-signal.end-of-candidates.json",
+      "schema_ref": "urn:mug:schema:mug.api-09.client:0#/$defs/P2PSignal",
+      "expect": "valid",
+      "validation_layer": "semantic"
+    },
+    {
+      "id": "p2p-signal-delivery.valid.candidate",
+      "instance": "valid/p2p-signal-delivery.candidate.json",
+      "schema_ref": "urn:mug:schema:mug.api-09.client:0#/$defs/P2PSignalDelivery",
+      "expect": "valid",
+      "validation_layer": "semantic"
+    },
+    {
+      "id": "p2p-signal-ack.valid.queued",
+      "instance": "valid/p2p-signal-ack.queued.json",
+      "schema_ref": "urn:mug:schema:mug.api-09.client:0#/$defs/P2PSignalAck",
+      "expect": "valid",
+      "validation_layer": "semantic"
+    },
+    {
+      "id": "p2p-peer-ready.valid.full-mesh",
+      "instance": "valid/p2p-peer-ready.full-mesh.json",
+      "schema_ref": "urn:mug:schema:mug.api-09.client:0#/$defs/P2PPeerReady",
+      "expect": "valid",
+      "validation_layer": "semantic"
+    },
+    {
+      "id": "p2p-mesh-start.valid.minimal-static",
+      "instance": "valid/p2p-mesh-start.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-09.client:0#/$defs/P2PMeshStart",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "p2p-mesh-abort.valid.repool",
+      "instance": "valid/p2p-mesh-abort.repool.json",
+      "schema_ref": "urn:mug:schema:mug.api-09.client:0#/$defs/P2PMeshAbort",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "p2p-peer-complete.valid.minimal-static",
+      "instance": "valid/p2p-peer-complete.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-09.client:0#/$defs/P2PPeerComplete",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "p2p-capture-submission.valid.minimal-static",
+      "instance": "valid/p2p-capture-submission.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-09.client:0#/$defs/P2PCaptureSubmission",
+      "expect": "valid",
+      "validation_layer": "semantic"
+    },
+    {
+      "id": "p2p-mesh-finish.valid.minimal-static",
+      "instance": "valid/p2p-mesh-finish.minimal-static.json",
+      "schema_ref": "urn:mug:schema:mug.api-09.client:0#/$defs/P2PMeshFinish",
+      "expect": "valid",
+      "validation_layer": "schema"
+    },
+    {
+      "id": "p2p-mesh-bootstrap.invalid.duplicate-peer",
+      "instance": "invalid/p2p-mesh-bootstrap.duplicate-peer.json",
+      "schema_ref": "urn:mug:schema:mug.api-09.client:0#/$defs/P2PMeshBootstrap",
+      "expect": "invalid",
+      "validation_layer": "semantic",
+      "expected_error": {
+        "keyword": "bootstrapHandles",
+        "instance_pointer": "/peers"
+      }
+    },
+    {
+      "id": "p2p-mesh-bootstrap.invalid.actor-id",
+      "instance": "invalid/p2p-mesh-bootstrap.actor-id.json",
+      "schema_ref": "urn:mug:schema:mug.api-09.client:0#/$defs/P2PMeshBootstrap",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "pattern",
+        "instance_pointer": "/local_peer_handle"
+      }
+    },
+    {
+      "id": "p2p-ice-grant-request.invalid.secret-field",
+      "instance": "invalid/p2p-ice-grant-request.secret-field.json",
+      "schema_ref": "urn:mug:schema:mug.api-09.client:0#/$defs/P2PIceGrantRequest",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "additionalProperties",
+        "instance_pointer": ""
+      }
+    },
+    {
+      "id": "p2p-signal.invalid.offer-missing-payload",
+      "instance": "invalid/p2p-signal.offer-missing-payload.json",
+      "schema_ref": "urn:mug:schema:mug.api-09.client:0#/$defs/P2PSignal",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "required",
+        "instance_pointer": ""
+      }
+    },
+    {
+      "id": "p2p-signal.invalid.end-with-payload",
+      "instance": "invalid/p2p-signal.end-with-payload.json",
+      "schema_ref": "urn:mug:schema:mug.api-09.client:0#/$defs/P2PSignal",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "not",
+        "instance_pointer": ""
+      }
+    },
+    {
+      "id": "p2p-signal.invalid.sender-field",
+      "instance": "invalid/p2p-signal.sender-field.json",
+      "schema_ref": "urn:mug:schema:mug.api-09.client:0#/$defs/P2PSignal",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "additionalProperties",
+        "instance_pointer": ""
+      }
+    },
+    {
+      "id": "p2p-signal-delivery.invalid.actor-source",
+      "instance": "invalid/p2p-signal-delivery.actor-source.json",
+      "schema_ref": "urn:mug:schema:mug.api-09.client:0#/$defs/P2PSignalDelivery",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "pattern",
+        "instance_pointer": "/source_peer_handle"
+      }
+    },
+    {
+      "id": "p2p-signal-ack.invalid.queued-with-error",
+      "instance": "invalid/p2p-signal-ack.queued-with-error.json",
+      "schema_ref": "urn:mug:schema:mug.api-09.client:0#/$defs/P2PSignalAck",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "not",
+        "instance_pointer": ""
+      }
+    },
+    {
+      "id": "p2p-signal-ack.invalid.rejected-no-error",
+      "instance": "invalid/p2p-signal-ack.rejected-no-error.json",
+      "schema_ref": "urn:mug:schema:mug.api-09.client:0#/$defs/P2PSignalAck",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "required",
+        "instance_pointer": ""
+      }
+    },
+    {
+      "id": "p2p-peer-ready.invalid.duplicate-peer",
+      "instance": "invalid/p2p-peer-ready.duplicate-peer.json",
+      "schema_ref": "urn:mug:schema:mug.api-09.client:0#/$defs/P2PPeerReady",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "uniqueItems",
+        "instance_pointer": "/validated_peer_handles"
+      }
+    },
+    {
+      "id": "p2p-mesh-start.invalid.zero-sequence",
+      "instance": "invalid/p2p-mesh-start.zero-sequence.json",
+      "schema_ref": "urn:mug:schema:mug.api-09.client:0#/$defs/P2PMeshStart",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "minimum",
+        "instance_pointer": "/start_sequence"
+      }
+    },
+    {
+      "id": "p2p-mesh-abort.invalid.reconnect",
+      "instance": "invalid/p2p-mesh-abort.reconnect.json",
+      "schema_ref": "urn:mug:schema:mug.api-09.client:0#/$defs/P2PMeshAbort",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "enum",
+        "instance_pointer": "/disposition"
+      }
+    },
+    {
+      "id": "p2p-peer-complete.invalid.negative-frames",
+      "instance": "invalid/p2p-peer-complete.negative-frames.json",
+      "schema_ref": "urn:mug:schema:mug.api-09.client:0#/$defs/P2PPeerComplete",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "minimum",
+        "instance_pointer": "/frame_count"
+      }
+    },
+    {
+      "id": "p2p-capture-submission.invalid.digest-mismatch",
+      "instance": "invalid/p2p-capture-submission.digest-mismatch.json",
+      "schema_ref": "urn:mug:schema:mug.api-09.client:0#/$defs/P2PCaptureSubmission",
+      "expect": "invalid",
+      "validation_layer": "semantic",
+      "expected_error": {
+        "keyword": "capturePayloadDigest",
+        "instance_pointer": "/payload_digest"
+      }
+    },
+    {
+      "id": "p2p-mesh-finish.invalid.receipt-id",
+      "instance": "invalid/p2p-mesh-finish.receipt-id.json",
+      "schema_ref": "urn:mug:schema:mug.api-09.client:0#/$defs/P2PMeshFinish",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "pattern",
+        "instance_pointer": "/capture_receipt"
       }
     }
   ]

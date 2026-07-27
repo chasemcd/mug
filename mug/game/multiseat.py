@@ -29,8 +29,9 @@ import asyncio
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from typing import Any, NamedTuple, Protocol
 
-from mug.game.env import StepResult
+from mug.game.env import NO_INFO, StepResult
 from mug.game.seams import Clock, SeatActionSource, SteppableEnv
+from mug.game.trajectory import TrajectoryFrame
 from mug.game.types import EpisodeBoundary, GameTransition
 from mug.kernel import compute_digest
 
@@ -47,6 +48,7 @@ class MultiStepResult(NamedTuple):
     rewards: dict[str, float]
     terminated: bool
     truncated: bool
+    info: Mapping[str, Any] = NO_INFO
 
 
 class MultiSeatEnv(Protocol):
@@ -99,6 +101,7 @@ class MultiSeatSummary(NamedTuple):
     transitions: list[GameTransition]
     boundary: EpisodeBoundary
     solved: bool
+    trajectory: Sequence[TrajectoryFrame] = ()
 
 
 def _transition(
@@ -178,6 +181,7 @@ async def run_multiseat_episode(
     if on_start is not None:
         await on_start(result)
     transitions: list[GameTransition] = []
+    trajectory: list[TrajectoryFrame] = []
     frame = 0
     solved = False
     while frame < max_steps:
@@ -198,6 +202,17 @@ async def run_multiseat_episode(
                 now=now,
             )
         )
+        trajectory.append(
+            TrajectoryFrame(
+                frame_number=frame,
+                actions=dict(actions),
+                observations=dict(result.observations),
+                rewards=dict(result.rewards),
+                terminated=result.terminated,
+                truncated=result.truncated,
+                info=dict(result.info),
+            )
+        )
         if on_step is not None:
             await on_step(MultiSeatStepInfo(frame, actions, result))
         if result.terminated:
@@ -212,7 +227,7 @@ async def run_multiseat_episode(
         result, episode_id=episode_id, interaction_id=interaction_id, frame=frame
     )
     return MultiSeatSummary(
-        channel_key, tuple(agent_ids), frame, transitions, boundary, solved
+        channel_key, tuple(agent_ids), frame, transitions, boundary, solved, trajectory
     )
 
 
@@ -245,6 +260,7 @@ class _SoloEnv:
             rewards={self._agent_id: result.reward},
             terminated=result.terminated,
             truncated=result.truncated,
+            info=result.info,
         )
 
 

@@ -1,0 +1,29 @@
+{
+  "schema": {
+    "name": "mug.api-09.p2p-mesh-bootstrap",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "ec6d3f0019480421a8cdc9ce8db2f2e88f2398e0daf0c7773ced3841ba435029"
+    }
+  },
+  "room_handle": "handle_AAAAAAAAAAAAAAAAAAAAAA",
+  "local_peer_handle": "actor_019b6000-0000-7000-8000-000000000901",
+  "capture_owner_handle": "handle_BBBBBBBBBBBBBBBBBBBBBA",
+  "negotiation_generation": 1,
+  "peers": [
+    {
+      "peer_handle": "handle_CCCCCCCCCCCCCCCCCCCCCA",
+      "role": "offerer"
+    }
+  ],
+  "data_channel": {
+    "label": "mug-mesh-data",
+    "ordered": false,
+    "max_retransmits": 0
+  },
+  "validation_timeout_ms": 15000,
+  "ice_grant_handle": "handle_DDDDDDDDDDDDDDDDDDDDDA",
+  "ice_endpoint": "/api/p2p/ice",
+  "ice_expires_at": "2026-08-02T12:10:00.000000Z"
+}

@@ -106,6 +106,25 @@ class CommandContext(KernelModel):
     principal: PrincipalRef
     recorded_at: UtcInstant
     event_data_handling: DataHandlingRef
+    # The event this command answers, when it answers one. It is what relates two
+    # independently ordered streams without inventing one order over both: a model
+    # reply names the message it replied to, wherever each of them sits in its own
+    # stream. Unset means the command answers nothing in particular.
+    causation_event_id: EventId | None = None
+
+
+def answering(context: CommandContext, event_id: str | None) -> CommandContext:
+    """Return the same command context, recording the event it answers.
+
+    A reply names the message that prompted it, wherever the two sit in their own
+    streams. What a command answers is not part of what the command **is**, so the
+    identifiers are untouched and a retry stays idempotent: this adds a fact about
+    the command, not a new command. It mints nothing, so the gateway is still the
+    one entropy boundary.
+    """
+    if event_id is None:
+        return context
+    return context.model_copy(update={"causation_event_id": event_id})
 
 
 def _generation(context: CommandContext) -> int | None:
@@ -128,7 +147,7 @@ def _event_detail(
         "payload_digest": compute_digest(new_state).model_dump(mode="json"),
         "recorded_at": context.recorded_at,
         "data_handling": context.event_data_handling.model_dump(mode="json"),
-        "causation_event_id": None,
+        "causation_event_id": context.causation_event_id,
     }
 
 
@@ -271,7 +290,7 @@ def _captured_detail(context: CommandContext, event: LedgerEvent) -> dict[str, o
         "payload_digest": event.payload_digest.model_dump(mode="json"),
         "recorded_at": context.recorded_at,
         "data_handling": context.event_data_handling.model_dump(mode="json"),
-        "causation_event_id": None,
+        "causation_event_id": context.causation_event_id,
     }
 
 

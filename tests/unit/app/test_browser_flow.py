@@ -50,9 +50,7 @@ def _genuine_episode(
                 "episode_id": manifest["episode_id"],
                 "frame_number": frame,
                 "action_digest": state_hash(action).model_dump(mode="json"),
-                "state_digest": state_hash(state.observation).model_dump(
-                    mode="json"
-                ),
+                "state_digest": state_hash(state.observation).model_dump(mode="json"),
                 "authority": "browser",
                 "applied_decisions": [],
                 "recorded_at": "2026-07-21T00:00:00.000000Z",
@@ -179,9 +177,7 @@ def test_a_run_that_fails_verification_is_refused_without_advancing() -> None:
         # A run whose reported state hashes were forged: the shape is valid, so it
         # parses, but the re-execution does not produce these hashes.
         forged = _genuine_episode(manifest, spec, _ACTIONS)
-        forged["transitions"][0]["state_digest"] = _A_DIGEST.model_dump(
-            mode="json"
-        )
+        forged["transitions"][0]["state_digest"] = _A_DIGEST.model_dump(mode="json")
         socket.send_json(_capture_frame(manifest, spec, episode=forged))
         assert socket.receive_json()["ack"]["ack_kind"] == "parsed"
         error = socket.receive_json()

@@ -29,6 +29,7 @@ import pytest
 from mug.game.mesh import EndPacket, HashPacket, InputPacket, PeerEngine, ReplicaFrame
 from mug.game.wire import (
     PeerLink,
+    PeerLinkClosed,
     PeerNode,
     decode,
     encode_end,
@@ -205,6 +206,99 @@ def test_an_unknown_wire_message_is_refused() -> None:
     """A message with no known kind raises rather than becoming an empty packet."""
     with pytest.raises(ValueError, match="unknown wire message kind"):
         decode({"kind": "gossip"})
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        {"kind": "end", "sender": 7, "end_frame_exclusive": 1},
+        {
+            "kind": "end",
+            "sender": _actor(1),
+            "end_frame_exclusive": 1,
+            "extra": True,
+        },
+        {
+            "kind": "input",
+            "sender": _actor(1),
+            "current_frame": 1,
+            "inputs": [[1, 0], [1, 2]],
+        },
+        {
+            "kind": "input",
+            "sender": _actor(1),
+            "current_frame": 1,
+            "inputs": [[index, 0] for index in range(33)],
+        },
+    ],
+)
+def test_malformed_or_unbounded_peer_packets_are_refused(
+    message: dict[str, Any],
+) -> None:
+    """The data-channel codec accepts only its closed bounded packet shapes."""
+    with pytest.raises(ValueError):
+        decode(message)
+
+
+@pytest.mark.asyncio
+async def test_a_packet_cannot_claim_another_channels_sender() -> None:
+    """The authenticated data channel, not packet JSON, determines the sender."""
+    local, remote = _actor(1), _actor(2)
+
+    class InboundLink:
+        def __init__(self, message: dict[str, Any]) -> None:
+            self.inbound: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
+            self.inbound.put_nowait(message)
+
+        async def send(self, message: Mapping[str, Any]) -> None:
+            del message
+
+        async def recv(self) -> dict[str, Any] | None:
+            return await self.inbound.get()
+
+    link = InboundLink(
+        encode_input(InputPacket(sender=_actor(3), current_frame=0, inputs=((0, 1),)))
+    )
+    node = PeerNode(
+        engine=_engine(local, (local, remote), episode_len=2),
+        actor_id=local,
+        links={remote: link},
+        action=lambda: 1,
+    )
+    node.start()
+    try:
+        await asyncio.sleep(0)
+        with pytest.raises(ValueError, match="does not match its data channel"):
+            await node.tick()
+    finally:
+        await node.stop()
+
+
+@pytest.mark.asyncio
+async def test_a_closed_peer_link_fails_the_mesh_node() -> None:
+    """A peer cannot disappear while the replica continues speculatively."""
+    local, remote = _actor(1), _actor(2)
+
+    class ClosedLink:
+        async def send(self, message: Mapping[str, Any]) -> None:
+            del message
+
+        async def recv(self) -> dict[str, Any] | None:
+            return None
+
+    node = PeerNode(
+        engine=_engine(local, (local, remote), episode_len=2),
+        actor_id=local,
+        links={remote: ClosedLink()},
+        action=lambda: 1,
+    )
+    node.start()
+    try:
+        await asyncio.sleep(0)
+        with pytest.raises(PeerLinkClosed):
+            await node.tick()
+    finally:
+        await node.stop()
 
 
 # -- a lossy, latent mesh still reaches parity ---------------------------------

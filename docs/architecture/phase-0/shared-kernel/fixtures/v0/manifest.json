@@ -72,6 +72,12 @@
       "expect": "valid"
     },
     {
+      "id": "event-cursor.valid.stream-start",
+      "instance": "valid/event-cursor.stream-start.json",
+      "schema_ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/EventCursor",
+      "expect": "valid"
+    },
+    {
       "id": "wire-command.invalid.principal-claim",
       "instance": "invalid/wire-command.principal-claim.json",
       "schema_ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/WireCommandEnvelope",
@@ -325,6 +331,26 @@
       "expected_error": {
         "keyword": "pattern",
         "instance_pointer": "/0"
+      }
+    },
+    {
+      "id": "event-cursor.invalid.negative-sequence",
+      "instance": "invalid/event-cursor.negative-sequence.json",
+      "schema_ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/EventCursor",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "minimum",
+        "instance_pointer": "/after_sequence"
+      }
+    },
+    {
+      "id": "event-cursor.invalid.uuid4-stream",
+      "instance": "invalid/event-cursor.uuid4-stream.json",
+      "schema_ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/EventCursor",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "pattern",
+        "instance_pointer": "/stream_id"
       }
     }
   ]

@@ -82,6 +82,27 @@
       "expect": "valid"
     },
     {
+      "id": "compiled-candidate.valid.release-candidate",
+      "instance": "valid/compiled-candidate.release-candidate.json",
+      "schema_ref": "urn:mug:schema:mug.api-01.study-authoring:0#/$defs/CompiledStudyCandidate",
+      "validation_layer": "semantic",
+      "expect": "valid"
+    },
+    {
+      "id": "publication-result.valid.created",
+      "instance": "valid/publication-result.created.json",
+      "schema_ref": "urn:mug:schema:mug.api-01.study-authoring:0#/$defs/StudyPublicationResult",
+      "validation_layer": "semantic",
+      "expect": "valid"
+    },
+    {
+      "id": "publication-result.valid.resolved-existing",
+      "instance": "valid/publication-result.resolved-existing.json",
+      "schema_ref": "urn:mug:schema:mug.api-01.study-authoring:0#/$defs/StudyPublicationResult",
+      "validation_layer": "semantic",
+      "expect": "valid"
+    },
+    {
       "id": "secret-requirement.invalid.inline-value",
       "instance": "invalid/secret-requirement.inline-value.json",
       "schema_ref": "urn:mug:schema:mug.api-01.study-authoring:0#/$defs/SecretRequirement",
@@ -266,6 +287,27 @@
       "expected_error": {
         "keyword": "minLength",
         "instance_pointer": "/version_string"
+      }
+    },
+    {
+      "id": "compiled-candidate.invalid.fingerprint-mismatch",
+      "instance": "invalid/compiled-candidate.fingerprint-mismatch.json",
+      "schema_ref": "urn:mug:schema:mug.api-01.study-authoring:0#/$defs/CompiledStudyCandidate",
+      "validation_layer": "semantic",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "inputFingerprint",
+        "instance_pointer": "/input_fingerprint/hex"
+      }
+    },
+    {
+      "id": "publication-result.invalid.unknown-outcome",
+      "instance": "invalid/publication-result.unknown-outcome.json",
+      "schema_ref": "urn:mug:schema:mug.api-01.study-authoring:0#/$defs/StudyPublicationResult",
+      "expect": "invalid",
+      "expected_error": {
+        "keyword": "oneOf",
+        "instance_pointer": ""
       }
     }
   ]

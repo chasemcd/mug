@@ -1,0 +1,14 @@
+{
+  "schema": {
+    "name": "mug.api-09.p2p-mesh-abort",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "ec6d3f0019480421a8cdc9ce8db2f2e88f2398e0daf0c7773ced3841ba435029"
+    }
+  },
+  "room_handle": "handle_AAAAAAAAAAAAAAAAAAAAAA",
+  "negotiation_generation": 1,
+  "reason": "negotiation_timeout",
+  "disposition": "repool"
+}

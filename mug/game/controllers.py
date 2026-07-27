@@ -170,9 +170,7 @@ def agent_seats(cast: CastDeclaration) -> set[str]:
     the seat only once a participant is enrolled (API-06), so it is left out.
     """
     return {
-        seat
-        for seat, slot in cast.cast.items()
-        if isinstance(slot, AgentActorSpec)
+        seat for seat, slot in cast.cast.items() if isinstance(slot, AgentActorSpec)
     }
 
 
@@ -197,9 +195,7 @@ def bind_seat_controllers(
             continue
         seat_key = seat_of.get(binding.actor_id)
         if seat_key is None:
-            raise ControllerUnavailable(
-                f"no seat is bound to actor {binding.actor_id}"
-            )
+            raise ControllerUnavailable(f"no seat is bound to actor {binding.actor_id}")
         resolved[seat_key] = registry.resolve(binding)
     return resolved
 

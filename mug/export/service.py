@@ -1,16 +1,20 @@
 """Export one visit's canonical lineage as schema-bound JSONL.
 
 The single export format is newline-delimited JSON (D13-1): one canonical event
-per line, in stream order. A visit's lineage lives on its flow stream (the form
-answers and pointer advances) and on any episode stream a runtime captured (the
-transition per frame and the closing boundary). This service reads the flow
-aggregate to discover those streams, reads each stream's canonical events, and
-serializes them, so the export carries the visit's complete, ordered provenance:
-stream position, producer position, event schema, payload digest, recorded time,
-and data-handling label per event.
+per line, in stream order. A visit's lineage lives on its flow stream (the pointer
+advances) and on any episode stream a runtime captured (the transition per frame
+and the closing boundary). This service reads the flow aggregate to discover those
+streams, reads each stream's canonical events, and serializes them, so the export
+carries the visit's complete, ordered provenance: stream position, producer
+position, event schema, payload digest, recorded time, and data-handling label per
+event.
 
-The export carries digests, never raw observations or answer values, so no
-participant payload and no secret material leaves through it.
+This export is the **spine only**: every row is a canonical event, so it carries
+digests and no values, and no secret material leaves through it. That is not a
+statement that the values do not exist. A form's answers, an episode's trajectory,
+and a generation's text each live in their own content-addressed artifact, bound to
+this spine by the digest their event recorded; ``mug.export.dataset`` is what
+carries them out (one values artifact per kind, and the artifacts those name).
 """
 
 from __future__ import annotations
@@ -18,7 +22,7 @@ from __future__ import annotations
 import json
 from typing import NamedTuple
 
-from mug.content import FlowState
+from mug.content import flow_of
 from mug.runtime import read_ledger
 from mug.storage import Store
 
@@ -47,7 +51,9 @@ def export_visit(store: Store, flow_id: str) -> VisitExport:
     raw = store.load_aggregate(flow_id)
     if raw is None:
         raise LookupError(f"no flow for {flow_id}")
-    state = FlowState.model_validate(raw)
+    state = flow_of(raw)
+    if state is None:
+        raise LookupError(f"no flow for {flow_id}")
     stream_ids = [_stream_of(state.visitplan_id), *state.captured_streams]
 
     lines: list[str] = []

@@ -14,34 +14,86 @@ from __future__ import annotations
 
 import asyncio
 import os
+from collections.abc import Coroutine, Mapping
+from concurrent.futures import ThreadPoolExecutor
+from datetime import timezone
 from pathlib import Path
+from typing import Any, TypeVar, cast
 
-from fastapi import FastAPI, HTTPException, Request, WebSocket
-from fastapi.responses import FileResponse, PlainTextResponse
+from fastapi import FastAPI, HTTPException, Request, Response, WebSocket
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 
+from mug.admission import Admission, AdmissionPolicy
 from mug.agents import AgentGameSpec, TurnBasedGameSpec
+from mug.agents.generation import (
+    GenerationSet,
+    RecordedGeneration,
+    record_generations,
+)
+from mug.authoring import GitProvenance
+from mug.client.ice import IceGrantError
+from mug.client.p2p import P2PIceGrantRequest
+from mug.content import Study, demo_study
+from mug.content.assets import StagedAsset, asset_manifest, by_digest, stage_assets
+from mug.content.publish import PublishedStudy, compile_and_publish
+from mug.content.seats import MultiSeatGame, Seating, seat_game
 from mug.edge import build_app
 from mug.export import export_visit
 from mug.game.browser import BrowserGameSpec
+from mug.game.browser_mesh import browser_mesh_manifest
 from mug.game.mesh_session import MeshGameSpec
 from mug.game.spec import GameSpec
 from mug.gateway import Gateway
-from mug.kernel import PrincipalRef
+from mug.interactions.bus import NodeBus, NodeLink, StoreBus
+from mug.interactions.lifecycle import operator_view
+from mug.interactions.rendezvous import DurableRendezvous
+from mug.kernel import (
+    DataHandlingRef,
+    Digest,
+    PrincipalRef,
+    WireCommandEnvelope,
+)
+from mug.kernel.refs import DeploymentRevisionRef, StudyVersionRef
 from mug.launch import provision_launch_ticket
+from mug.nodes import Node
+from mug.observability import InMemoryTelemetry, Telemetry
 from mug.participant import (
+    ChatMatchmaker,
+    Conversations,
     MeshMatchmaker,
+    MeshRendezvous,
+    NodeMeshMatchmaker,
+    PooledMeshMatchmaker,
+    ServerGameSpec,
+    build_activity_on_game,
     build_agent_on_game,
+    build_browser_p2p_on_game,
+    build_chat_on_game,
+    build_comparison_on_game,
     build_dispatch,
     build_establish,
+    build_measure,
     build_mesh_on_game,
     build_on_game,
     build_open,
+    build_server_on_game,
     build_turnbased_on_game,
 )
+from mug.participant_chat import ChatSpec
+from mug.participant_p2p import P2PCoordinator
+from mug.participant_p2p_types import (
+    BrowserP2PConfig,
+    P2PEdgeError,
+    browser_session_handle,
+)
+from mug.platform.deployment import Deployment, open_deployment
 from mug.realtime import ResolvePrincipal, serve_session
 from mug.replay import ReplayBundle
-from mug.storage import InMemoryStore, Store
+from mug.runtime import CommandContext
+from mug.storage import ArtifactStore, InMemoryStore, Store
+
+_T = TypeVar("_T")
 
 _WEB = Path(__file__).resolve().parent / "webclient"
 _PROTOCOL_VERSION = "0.1.0"
@@ -91,6 +143,31 @@ def _add_web_shell(app: FastAPI, web_root: Path) -> None:
         return FileResponse(web_root / "index.html")
 
 
+def _add_assets(app: FastAPI, store: Store, staged: Mapping[str, StagedAsset]) -> None:
+    """Serve the study's declared pictures, each at the address of its own bytes.
+
+    The digest is the whole address, so the response is immutable: a browser may
+    cache it forever, and no request can reach bytes the study did not declare. A
+    digest nobody declared is a not-found rather than a lookup in the object store,
+    because the artifact layer holds far more than the pictures.
+    """
+    if not staged:
+        return
+    index = by_digest(staged)
+
+    @app.get("/assets/{digest_hex}")
+    async def asset(digest_hex: str) -> Response:  # pyright: ignore[reportUnusedFunction]
+        found = index.get(digest_hex)
+        if found is None:
+            raise HTTPException(status_code=404, detail="no such asset")
+        data = await cast("ArtifactStore", store).read_artifact(found.artifact_id)
+        return Response(
+            content=data,
+            media_type=found.media_type,
+            headers={"Cache-Control": "public, max-age=31536000, immutable"},
+        )
+
+
 def _add_export(app: FastAPI, store: Store) -> None:
     """Serve one visit's canonical lineage as a JSONL download.
 
@@ -108,18 +185,194 @@ def _add_export(app: FastAPI, store: Store) -> None:
         return PlainTextResponse(result.jsonl, media_type="application/x-ndjson")
 
 
+def _add_operator_view(app: FastAPI, store: Store) -> None:
+    """Serve the read-only operator view of the live and completed interactions.
+
+    An operator's first question is what is happening right now, and it is only
+    useful beside what happened. The projection carries interaction ids, activity
+    keys, participant counts, and terminal reasons -- every field internal and
+    pseudonymous. **No external identity and no secret material reaches it**, which
+    is what parity fixture 10 asks for and what keeps this from becoming a second
+    way to reach the study's data.
+
+    It is not authenticated and must not be reachable from outside the deployment,
+    for the same reason the readiness numbers are not: how many people are in a
+    study is not a public fact.
+    """
+
+    @app.get("/operator/interactions")
+    async def interactions() -> JSONResponse:  # pyright: ignore[reportUnusedFunction]
+        rows = [
+            view.model_dump(mode="json", exclude_none=True)
+            for view in operator_view(store)
+        ]
+        live = sum(1 for view in operator_view(store) if view.closed_at is None)
+        return JSONResponse(
+            {"live": live, "total": len(rows), "interactions": rows},
+            headers={"Cache-Control": "no-store"},
+        )
+
+
+def _add_operations(
+    app: FastAPI, admission: Admission, telemetry: InMemoryTelemetry
+) -> None:
+    """Serve the three things an operator asks a running process.
+
+    ``/healthz`` answers whether the process is alive. It says nothing about load, so
+    a supervisor that reads it restarts a process that has stopped serving and leaves
+    a busy one alone.
+
+    ``/readyz`` answers whether the process should be sent more participants. A
+    process at its session bound is alive but not ready: a load balancer that reads
+    this stops adding to it, which is the difference between a queue in front of one
+    process and a refusal at its door.
+
+    ``/metrics`` renders the process's counters in the Prometheus text format. It
+    names no participant and no principal -- the series are labelled by command,
+    outcome, and error category only.
+
+    None of the three is authenticated, and none should be reachable from outside the
+    deployment: the readiness numbers say how loaded a study is.
+    """
+
+    @app.get("/healthz")
+    async def healthz() -> JSONResponse:  # pyright: ignore[reportUnusedFunction]
+        return JSONResponse({"status": "ok"}, headers={"Cache-Control": "no-store"})
+
+    @app.get("/readyz")
+    async def readyz() -> JSONResponse:  # pyright: ignore[reportUnusedFunction]
+        limit = admission.policy.max_sessions
+        open_sessions = admission.open_sessions
+        ready = open_sessions < limit
+        return JSONResponse(
+            {
+                "ready": ready,
+                "open_sessions": open_sessions,
+                "max_sessions": limit,
+            },
+            status_code=200 if ready else 503,
+            headers={"Cache-Control": "no-store"},
+        )
+
+    @app.get("/metrics")
+    async def metrics() -> PlainTextResponse:  # pyright: ignore[reportUnusedFunction]
+        telemetry.gauge("mug_realtime_open_sessions", admission.open_sessions)
+        return PlainTextResponse(
+            telemetry.render_prometheus(),
+            media_type="text/plain; version=0.0.4",
+            headers={"Cache-Control": "no-store"},
+        )
+
+
+def _add_ice_endpoint(app: FastAPI, coordinator: P2PCoordinator) -> None:
+    """Serve the same-origin, one-use ICE redemption for the browser P2P mount.
+
+    The browser posts the grant handle it received in its bootstrap. The server
+    answers with transient WebRTC configuration and nothing else: the response is
+    ``no-store``, it is not a contract model, and it never enters an event, an
+    artifact, a replay, or an export. The long-lived TURN secret stays in this
+    process; the server derives a short-lived credential during redemption.
+
+    The grant itself is the capability: it is unguessable, one-use, short-lived,
+    and bound to one room and one peer, and it is only redeemable while the
+    browser it was issued to holds a live connection seated in that live room.
+    The visit binds it to a browser as a second factor, and this demo reads that
+    visit from a request header when one is present. **A header is not
+    authentication.** A deployment must carry the visit in its own authenticated
+    same-origin session and pass that value here instead; a browser cannot supply
+    it, because the client is never told its own visit. With no header the
+    endpoint rests on the grant handle alone, which is the documented floor.
+    """
+
+    @app.post(coordinator.config.ice_endpoint)
+    async def redeem_ice(  # pyright: ignore[reportUnusedFunction]
+        request: Request,
+    ) -> JSONResponse:
+        visit = request.headers.get("x-mug-visit")
+        session_handle = None if visit is None else browser_session_handle(visit)
+        try:
+            body = P2PIceGrantRequest.model_validate(await request.json())
+        except ValueError as error:
+            raise HTTPException(status_code=400, detail="invalid request") from error
+        try:
+            credentials = await coordinator.redeem_ice(
+                session_handle, body.ice_grant_handle
+            )
+        except (IceGrantError, P2PEdgeError) as refusal:
+            raise HTTPException(
+                status_code=403, detail=refusal.safe_message
+            ) from refusal
+        return JSONResponse(
+            credentials.as_json(), headers={"Cache-Control": "no-store"}
+        )
+
+
+def _seated_games(study: Study, gateway: Gateway) -> dict[str, AgentGameSpec]:
+    """Compile the seat list each game activity wrote into the game it runs.
+
+    A study that wrote no seats compiles nothing, and every mount runs exactly as
+    it did before a seat list could be written. The identifiers a seat carries are
+    derived through the gateway, so two processes over one ledger compile the same
+    seats and a replay names what the run named.
+    """
+    compiled: dict[str, AgentGameSpec] = {}
+    for activity_key, seats in study.seats.items():
+        game = study.games.get(activity_key)
+        if not isinstance(game, MultiSeatGame):
+            raise ValueError(
+                f"the activity {activity_key!r} names seats, so it must name the "
+                "environment they sit in: Game(key, MultiSeatGame(...), seats={...})"
+            )
+        compiled[activity_key] = seat_game(
+            game,
+            cast("Seating", seats),
+            activity_key=activity_key,
+            derived_id=gateway.derived_id,
+        )
+    return compiled
+
+
+def _conversations(
+    gateway: Gateway,
+    store: Store,
+    study: Study | None,
+    study_version: StudyVersionRef | None,
+) -> Conversations | None:
+    """Return the conversations the study wrote on its activities, if it wrote any.
+
+    A study that writes none gets none, and every game mount runs exactly as it did
+    before a conversation could be written beside one.
+    """
+    if study is None or not study.chats:
+        return None
+    return Conversations(gateway, store, study, study_version=study_version)
+
+
 def _add_realtime(
     app: FastAPI,
     gateway: Gateway,
     store: Store,
+    study: Study | None,
     game: GameSpec | None,
     browser_game: BrowserGameSpec | None,
     mesh_game: MeshGameSpec | None,
+    concurrent_mesh: bool,
+    server_game: ServerGameSpec | None,
+    browser_p2p: BrowserP2PConfig | None,
     agent_game: AgentGameSpec | None,
+    seated: Mapping[str, AgentGameSpec],
     turnbased_game: TurnBasedGameSpec | None,
+    chat: ChatSpec | None,
+    generations: Mapping[str, RecordedGeneration],
+    assets: Mapping[str, StagedAsset],
+    deployment: DeploymentRevisionRef | None,
+    study_version: StudyVersionRef | None,
     return_url: str | None,
     require_launch: bool,
     signing_key: bytes,
+    admission: Admission,
+    telemetry: Telemetry,
+    node: Node | None,
 ) -> None:
     """Run the realtime session loop for each websocket connection.
 
@@ -130,15 +383,25 @@ def _add_realtime(
     server ``game`` runs over the stepping loop when the flow reaches the game
     activity; a ``browser_game`` ships the client manifest and captures the run
     the client reports; a ``mesh_game`` rendezvouses the connections at the game
-    activity into a peer-to-peer mesh and runs one shared episode; an ``agent_game``
-    runs a multi-seat model episode the participant watches or plays a seat in,
-    captures it, and assembles its replay bundle. With none configured the game
-    activity is skipped.
+    activity into a peer-to-peer mesh and runs one shared episode; a ``server_game``
+    runs one server-authoritative multi-seat episode where the participant plays one
+    seat and the study's bots play the rest; an ``agent_game`` runs a multi-seat
+    model episode the participant watches or plays a seat in, captures it, and
+    assembles its replay bundle; a ``chat`` runs a conversation between the
+    participant and the study's model seat over the chat channel instead of a game.
+    With none configured the game activity is skipped.
     """
+    mesh_manifest = (
+        browser_mesh_manifest(browser_p2p.game)
+        if browser_p2p is not None and browser_p2p.game is not None
+        else None
+    )
     if game is not None:
         countdown_seconds = game.countdown_seconds
     elif browser_game is not None:
         countdown_seconds = browser_game.countdown_seconds
+    elif mesh_manifest is not None:
+        countdown_seconds = mesh_manifest["countdown_seconds"]
     else:
         countdown_seconds = 0
     resolve = _resolve_subject(gateway)
@@ -151,9 +414,21 @@ def _add_realtime(
         countdown_seconds,
         require_launch,
         signing_key=signing_key,
+        chat=chat is not None,
+        mesh_manifest=mesh_manifest,
+        study=study,
+        deployment=deployment,
+        study_version=study_version,
+        assets=asset_manifest(assets),
     )
-    on_open = build_open(store)
-    if agent_game is not None or turnbased_game is not None:
+    on_open = build_open(gateway, store)
+    on_measure = build_measure(gateway, store)
+    if chat is not None:
+        # Every conversation is a room, including a room of one: that is what
+        # commits the interaction, its channels, and who was in each of them.
+        rendezvous = ChatMatchmaker(gateway, store, chat, study_version=study_version)
+        on_game = build_chat_on_game(gateway, store, chat, rendezvous=rendezvous)
+    elif agent_game is not None or turnbased_game is not None:
         # A watcher can read the assembled replay bundles off the app state.
         bundles: list[ReplayBundle] = []
         app.state.replay_bundles = bundles
@@ -162,17 +437,54 @@ def _add_realtime(
             bundles.append(bundle)
 
         if agent_game is not None:
-            on_game = build_agent_on_game(gateway, store, agent_game, on_bundle=collect)
+            on_game = build_agent_on_game(
+                gateway,
+                store,
+                agent_game,
+                on_bundle=collect,
+                conversations=_conversations(gateway, store, study, study_version),
+                specs=seated,
+            )
         else:
             assert turnbased_game is not None
             on_game = build_turnbased_on_game(
                 gateway, store, turnbased_game, on_bundle=collect
             )
     elif mesh_game is not None:
-        matchmaker = MeshMatchmaker(gateway, store, mesh_game)
+        matchmaker: MeshRendezvous
+        if node is not None:
+            # The waiting room is shared, so the two participants a deployment put
+            # on two processes are matched with each other rather than each waiting
+            # alone. One process then hosts the mesh for both.
+            matchmaker = NodeMeshMatchmaker(gateway, store, mesh_game, node)
+        elif concurrent_mesh:
+            matchmaker = PooledMeshMatchmaker(gateway, store, mesh_game)
+        else:
+            matchmaker = MeshMatchmaker(gateway, store, mesh_game)
         on_game = build_mesh_on_game(gateway, store, matchmaker)
+    elif server_game is not None:
+        on_game = build_server_on_game(gateway, store, server_game)
+    elif browser_p2p is not None:
+        coordinator = P2PCoordinator(gateway, store, browser_p2p, node=node)
+        app.state.p2p_coordinator = coordinator
+        _add_ice_endpoint(app, coordinator)
+        on_game = build_browser_p2p_on_game(gateway, store, coordinator)
     else:
-        on_game = build_on_game(gateway, store, game)
+        # A study writes a conversation on the activity it happens in, so what a
+        # composed activity is comes from the study rather than from a mount: the
+        # same hook plays a game alone or plays and talks at once.
+        on_game = build_on_game(
+            gateway,
+            store,
+            game,
+            conversations=_conversations(gateway, store, study, study_version),
+        )
+    # A comparison activity owns the socket the way a game does, and a study puts
+    # it after the rounds it asks about, so the router keeps both live and the
+    # activity the session is at decides which one runs.
+    on_game = build_activity_on_game(
+        build_comparison_on_game(gateway, store, generations), on_game
+    )
 
     @app.websocket("/ws")
     async def realtime(  # pyright: ignore[reportUnusedFunction]
@@ -186,34 +498,57 @@ def _add_realtime(
             on_establish=on_establish,
             on_open=on_open,
             on_game=on_game,
+            on_measure=on_measure,
+            admission=admission,
+            telemetry=telemetry,
         )
 
 
-def build_demo_app(
+def build_study_app(
     *,
+    study: Study | None = None,
     store: Store | None = None,
     gateway: Gateway | None = None,
     game: GameSpec | None = None,
     browser_game: BrowserGameSpec | None = None,
     mesh_game: MeshGameSpec | None = None,
+    concurrent_mesh: bool = False,
+    server_game: ServerGameSpec | None = None,
+    browser_p2p: BrowserP2PConfig | None = None,
     agent_game: AgentGameSpec | None = None,
     turnbased_game: TurnBasedGameSpec | None = None,
+    chat: ChatSpec | None = None,
+    generate: GenerationSet | None = None,
     return_url: str | None = None,
     require_launch: bool = False,
     signing_key: bytes | None = None,
     web_root: Path | None = None,
+    admission: AdmissionPolicy | None = None,
+    gateway_secret: bytes | None = None,
+    node_id: str | None = None,
+    bus: NodeBus | None = None,
 ) -> FastAPI:
-    """Build one running application: the edge, the web shell, and realtime.
+    """Build one running application for a study: edge, web shell, and realtime.
+
+    ``study`` is the ordered activities one participant walks through -- the
+    author's own consent, surveys, game, and debrief (see ``mug.content.study``).
+    With none, the demo study runs, which is what a local try wants and what the
+    tests use.
 
     The parts are injected for a test, or defaulted for a real run. The default
     store is in-memory, so a plain run keeps no state between restarts. A study
     supplies one of ``game`` (the environment steps on the server), ``browser_game``
     (the environment steps in the browser through Pyodide and the client reports its
     run), ``mesh_game`` (the connections rendezvous at the game activity into a
-    peer-to-peer mesh and run one shared episode), or ``agent_game`` (a multi-seat
+    peer-to-peer mesh and run one shared episode), ``server_game`` (one
+    server-authoritative multi-seat episode, the participant on one seat and the
+    study's bots on the rest), or ``agent_game`` (a multi-seat
     model episode the participant watches or plays a seat in); a study entrypoint
-    supplies one (for example ``examples/mountain_car/native_demo.py``). With none
-    the flow runs
+    supplies one (for example ``examples/mountain_car/native_demo.py``). A study
+    whose activity is a conversation rather than a game supplies ``chat`` instead:
+    the participant talks to the study's model seat over the chat channel, and every
+    message, delivery, and context snapshot is recorded as canonical evidence. With
+    none the flow runs
     the forms and skips the game activity. ``return_url`` is the deployment return
     link the completed flow presents with the completion code.
 
@@ -230,41 +565,361 @@ def build_demo_app(
     must keep return links valid across a restart sets a stable key (see
     ``build_app_from_env``).
 
+    ``concurrent_mesh`` mounts the formation pool for a ``mesh_game``: many rooms of
+    that game form and run at once, rather than one mesh at a time. With it unset the
+    single matchmaker runs one mesh at a time (the default).
+
     ``web_root`` selects the static client directory. It defaults to the bundled
     JavaScript client; a deployment or a test may point it at another built client
     (for example the TypeScript client under ``ts/dist-web``).
+
+    ``admission`` bounds what one process accepts: how many sessions at once, how
+    fast one connection may send commands, and how large a frame may be. It defaults
+    to the working bounds in ``mug.admission``, so a deployment is bounded without
+    saying anything; a deployment that knows its own numbers passes its own policy,
+    and the live session count is on ``app.state.admission``.
+
+    ``gateway_secret`` seeds the content-addressed command identifiers. It defaults
+    to a fresh per-process secret, which is right for one process; a deployment that
+    runs several passes the same secret to each, so a client retry is idempotent
+    whichever process it lands on (see ``build_app_from_env`` and the deployment
+    topology note).
+
+    ``node_id`` names this process, and naming it is what makes a multi-participant
+    activity work across processes: the waiting room moves into the shared store, so
+    two participants the load balancer sent to two replicas are matched with each
+    other. With it unset a process matches only its own connections, which is right
+    for one process and is what a study running locally gets. ``bus`` is how the
+    processes reach each other; it defaults to the shared store, and a deployment
+    with a message broker passes its own.
     """
-    gateway = gateway or Gateway()
+    gateway = gateway or Gateway(secret=gateway_secret)
     store = store or InMemoryStore()
     signing_key = signing_key or os.urandom(32)
+    gate = Admission(admission)
+    sink = InMemoryTelemetry()
+    node = _node(node_id, gateway, store, bus)
     app = build_app(
         store,
         gateway=gateway,
         authenticate=_pseudonymous_participant,
+        telemetry=sink,
     )
+    if node is not None:
+        # The pump needs a running loop, which a builder does not have. It starts
+        # with the application and stops with it, so a process that is never served
+        # never polls.
+        app.router.add_event_handler("startup", node.link.start)
+        app.router.add_event_handler("shutdown", node.link.stop)
+    published = _run_once(_publish(study or demo_study(), gateway, store))
+    app.state.study = published
+    app.state.study_version = published.study_version
     launch_ticket: str | None = None
     if require_launch:
-        provision = asyncio.run(
-            provision_launch_ticket(gateway, store, researcher=_DEMO_RESEARCHER)
+        provision = _run_once(
+            provision_launch_ticket(
+                gateway,
+                store,
+                researcher=_DEMO_RESEARCHER,
+                study_version=published.study_version if published.published else None,
+            )
         )
         launch_ticket = provision.ticket_handle
+        app.state.deployment = provision.deployment
+        deployment = _run_once(
+            _open_deployment(gateway, store, published, provision.deployment)
+        )
+        app.state.deployment_record = deployment
+    running = study or demo_study()
+    seated = _seated_games(running, gateway)
+    if agent_game is None and seated:
+        # A study that wrote its seats on an activity has said what the mount runs,
+        # so nothing else has to be passed to say it again.
+        agent_game = next(iter(seated.values()))
+    staged_assets = _run_once(_stage_study_assets(running, gateway, store))
+    app.state.assets = staged_assets
+    generations: Mapping[str, RecordedGeneration] = (
+        {}
+        if generate is None
+        else _run_once(_record_generations(generate, gateway, store))
+    )
+    app.state.generations = generations
     app.state.launch_ticket = launch_ticket
+    app.state.admission = gate
+    app.state.telemetry = sink
+    _add_operations(app, gate, sink)
+    _add_operator_view(app, store)
     _add_web_shell(app, web_root or _WEB)
+    _add_assets(app, store, staged_assets)
     _add_export(app, store)
     _add_realtime(
         app,
         gateway,
         store,
+        study,
         game,
         browser_game,
         mesh_game,
+        concurrent_mesh,
+        server_game,
+        browser_p2p,
         agent_game,
+        seated,
         turnbased_game,
+        chat,
+        generations,
+        staged_assets,
+        getattr(app.state, "deployment", None),
+        published.study_version,
         return_url,
         require_launch,
         signing_key,
+        gate,
+        sink,
+        node,
     )
     return app
+
+
+# The service principal that runs a study's candidate-generation job. It is derived,
+# so the same deployment always records its generations under the same actor.
+_GENERATION_JOB = "generation-job"
+
+# The researcher principal a study publishes under. It is derived, so one deployment
+# always publishes as the same actor.
+_PUBLISHER = "study-publisher"
+
+_INSTANT = "%Y-%m-%dT%H:%M:%S.%fZ"
+
+_ENVELOPE_DIGEST = Digest(algorithm="sha-256", hex="0" * 64)
+_RESEARCH = DataHandlingRef(privacy_labels=["research"])
+
+
+def _run_once(work: Coroutine[Any, Any, _T]) -> _T:
+    """Run one coroutine to completion from this synchronous builder.
+
+    ``build_study_app`` is called both from a plain script and from inside a running
+    event loop (an async test, an async entrypoint). ``asyncio.run`` refuses the
+    second, so a loop that is already running is served by a fresh loop on a worker
+    thread. The work is the same either way: it finishes before the builder returns.
+    """
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(work)
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        return pool.submit(asyncio.run, work).result()
+
+
+def _generation_context(gateway: Gateway, aggregate_id: str) -> CommandContext:
+    """Mint a fresh command context on one generation aggregate's stream.
+
+    The generation job is server-side work with no participant behind it, so it acts
+    as a derived service principal rather than as anyone. Each generation writes its
+    own aggregate, so the runtime asks for a context per aggregate id.
+    """
+    return _server_context(
+        gateway,
+        aggregate_id,
+        command="generation.record",
+        principal=PrincipalRef(
+            kind="service", id=gateway.derived_id("service", _GENERATION_JOB)
+        ),
+    )
+
+
+def _server_context(
+    gateway: Gateway,
+    aggregate_id: str,
+    *,
+    command: str,
+    principal: PrincipalRef,
+    idempotency_key: str | None = None,
+) -> CommandContext:
+    """Mint one command context for server-side work with no participant behind it."""
+    schema = {
+        "name": "mug.command-envelope",
+        "version": 0,
+        "digest": _ENVELOPE_DIGEST.model_dump(mode="json"),
+    }
+    envelope = WireCommandEnvelope.model_validate(
+        {
+            "schema": schema,
+            "protocol_version": _PROTOCOL_VERSION,
+            "command": {"name": command, "version": 0},
+            "request_id": "request_019b6000-0000-7000-8000-000000000001",
+            "idempotency_key": idempotency_key or _job_idempotency_key(gateway),
+            "target": {"id": aggregate_id},
+            "payload": {
+                "schema": {
+                    "name": "mug.edge.payload",
+                    "version": 0,
+                    "digest": _ENVELOPE_DIGEST.model_dump(mode="json"),
+                },
+                "data": {"aggregate_id": aggregate_id},
+            },
+        }
+    )
+    return gateway.mint(envelope, principal=principal, data_handling=_RESEARCH)
+
+
+def _job_idempotency_key(gateway: Gateway) -> str:
+    """Mint one well-formed idempotency key for a server-side generation command."""
+    body = gateway.new_id("request").split("_", 1)[1].replace("-", "")
+    return "idem_" + body[:21] + "A"
+
+
+def derived_idempotency_key(gateway: Gateway, seed: str) -> str:
+    """Return the one well-formed idempotency key this seed always gives.
+
+    A command that must replay rather than collide -- publishing a study version that
+    is already published -- derives its key, so the store coalesces the retry to the
+    first receipt.
+    """
+    body = gateway.derived_id("request", seed).split("_", 1)[1].replace("-", "")
+    return "idem_" + body[:21] + "A"
+
+
+async def _publish(study: Study, gateway: Gateway, store: Store) -> PublishedStudy:
+    """Compile the study and publish it, before the first participant connects.
+
+    Publishing is idempotent by derivation, so a restart republishes to the same
+    version and an edited study publishes a new one; a deployment that shares its
+    store and its gateway secret publishes once however many processes it runs. A
+    study whose validation found an error is **not** published, and the application
+    still serves it: refusing to start would take a live study down over a
+    compile-time complaint, so the failure surfaces as an unpublished version and the
+    report on ``app.state.study`` rather than as an outage.
+    """
+    git, limitations = _git_provenance()
+    return await compile_and_publish(
+        study,
+        store=store,
+        artifacts=cast("ArtifactStore", store),
+        derive=gateway.derived_id,
+        new_context=lambda aggregate_id: _publication_context(gateway, aggregate_id),
+        new_artifact_id=lambda seed: gateway.derived_id("artifact", seed),
+        new_upload_id=lambda: gateway.new_id("upload"),
+        now=lambda: gateway.clock().astimezone(timezone.utc).strftime(_INSTANT),
+        git=git,
+        limitations=limitations,
+    )
+
+
+def _git_provenance() -> tuple[GitProvenance, list[str]]:
+    """Return the source provenance of the published study, and what it cannot say.
+
+    A build sets ``MUG_GIT_COMMIT`` and ``MUG_GIT_BRANCH``, and the provenance then
+    names the commit the study was built from. With neither set the commit is
+    unknown, and the record cannot say so: ``GitProvenance`` marks a dirty tree only
+    with the patch that made it dirty, and there is no patch to name. So an unknown
+    build records the zero commit -- which no real commit ever is -- and declares the
+    limitation, which is what the provenance manifest's ``limitations`` field is for.
+    A reader is told the provenance is missing rather than shown a clean one.
+    """
+    commit = os.environ.get("MUG_GIT_COMMIT", "")
+    known = len(commit) == 40 and all(c in "0123456789abcdef" for c in commit)
+    provenance = GitProvenance(
+        commit=commit if known else "0" * 40,
+        branch=os.environ.get("MUG_GIT_BRANCH") or None,
+        dirty=False,
+    )
+    return provenance, [] if known else ["provenance.git.unknown"]
+
+
+def _publication_context(gateway: Gateway, aggregate_id: str) -> CommandContext:
+    """Mint the context that publishes one study version, as a researcher.
+
+    The idempotency key derives from the version being published, so republishing an
+    identical study **replays** the first publication instead of colliding with it.
+    A fresh key would make every restart a rejected create against an aggregate that
+    already exists, and the application would come up believing it had not published.
+    """
+    return _server_context(
+        gateway,
+        aggregate_id,
+        command="study.publish",
+        principal=PrincipalRef(
+            kind="researcher", id=gateway.derived_id("researcher", _PUBLISHER)
+        ),
+        idempotency_key=derived_idempotency_key(gateway, f"publish:{aggregate_id}"),
+    )
+
+
+async def _open_deployment(
+    gateway: Gateway,
+    store: Store,
+    published: PublishedStudy,
+    revision: DeploymentRevisionRef,
+) -> Deployment | None:
+    """Record the deployment this process serves, at the revision it is serving.
+
+    A deployment already recorded is left as it stands, so a restart never quietly
+    starts a deployment an operator stopped: the disposition is durable and it
+    outlives the process that set it.
+    """
+    _, deployment = await open_deployment(
+        study_id=published.study_version.study_id,
+        revision=revision,
+        context=_server_context(
+            gateway,
+            revision.deployment_id,
+            command="deployment.open",
+            principal=PrincipalRef(
+                kind="researcher", id=gateway.derived_id("researcher", _PUBLISHER)
+            ),
+            idempotency_key=derived_idempotency_key(
+                gateway, f"deployment:{revision.deployment_revision_id}"
+            ),
+        ),
+        store=store,
+    )
+    return deployment
+
+
+async def _stage_study_assets(
+    study: Study, gateway: Gateway, store: Store
+) -> dict[str, StagedAsset]:
+    """Read and store the study's declared pictures, before anyone connects.
+
+    Staging is idempotent by content: the artifact address is the digest of the
+    bytes, so a restart re-reads the files and reaches the same addresses, and a
+    deployment that shares its object store stores each picture once however many
+    processes it runs.
+    """
+    if not study.assets:
+        return {}
+    return await stage_assets(
+        study.assets,
+        root=Path(study.asset_root) if study.asset_root else Path.cwd(),
+        artifacts=cast("ArtifactStore", store),
+        new_artifact_id=lambda digest_hex: gateway.derived_id(
+            "artifact", f"asset:{digest_hex}"
+        ),
+        new_upload_id=lambda: gateway.new_id("upload"),
+        now=lambda: gateway.clock().astimezone(timezone.utc).strftime(_INSTANT),
+    )
+
+
+async def _record_generations(
+    generate: GenerationSet, gateway: Gateway, store: Store
+) -> dict[str, RecordedGeneration]:
+    """Record the study's candidate generations once, before anyone connects.
+
+    A generation already in the store is returned as it stands, so a restart calls no
+    provider and a deployment that shares its store calls each model once however many
+    processes it runs. That is what lets an annotator answer with every provider
+    offline (NS-02).
+    """
+    return await record_generations(
+        generate,
+        store=store,
+        artifacts=cast("ArtifactStore", store),
+        derive=gateway.derived_id,
+        new_context=lambda aggregate_id: _generation_context(gateway, aggregate_id),
+        new_id=gateway.new_id,
+        now=gateway.clock,
+    )
 
 
 def store_from_env() -> Store:
@@ -282,6 +937,57 @@ def store_from_env() -> Store:
     return asyncio.run(PgStore.open(dsn))
 
 
+def _node(
+    node_id: str | None, gateway: Gateway, store: Store, bus: NodeBus | None
+) -> Node | None:
+    """Build this process's identity on the bus, or None for a single process.
+
+    A process with no name matches only the connections it holds, which is exactly
+    what it did before and exactly right when there is only one. A process that is
+    named joins the shared waiting room, and the bus it reaches the others through
+    defaults to the store they already share, so a two-replica deployment needs no
+    broker to work -- only to be fast.
+    """
+    if node_id is None:
+        return None
+    link = NodeLink(
+        bus or StoreBus(store, new_id=gateway.new_id), node_id, new_id=gateway.new_id
+    )
+    return Node(
+        node_id=node_id,
+        link=link,
+        rendezvous=DurableRendezvous(
+            store,
+            new_id=gateway.new_id,
+            now=lambda: gateway.clock().astimezone(timezone.utc).strftime(_INSTANT),
+        ),
+    )
+
+
+def node_id_from_env() -> str | None:
+    """Return this process's name from ``MUG_NODE_ID``, or None.
+
+    A deployment that runs more than one process gives each a distinct name -- the
+    pod name serves -- so two participants on two replicas are matched with each
+    other rather than each waiting alone. With the variable unset a process matches
+    only the connections it holds, which is right for one process.
+    """
+    return os.environ.get("MUG_NODE_ID") or None
+
+
+def gateway_secret_from_env() -> bytes | None:
+    """Return the gateway identifier secret from ``MUG_GATEWAY_SECRET``, or None.
+
+    A deployment that runs more than one process sets this to one long random secret
+    shared by all of them, so a client retry that lands on a second process derives
+    the identical command identifiers and the store replays it. With the variable
+    unset each process draws its own secret, which is correct for a single process
+    and unsafe for several -- see the deployment topology note.
+    """
+    secret = os.environ.get("MUG_GATEWAY_SECRET")
+    return secret.encode("utf-8") if secret else None
+
+
 def signing_key_from_env() -> bytes | None:
     """Return the return-link signing key from ``MUG_RETURN_LINK_KEY``, or None.
 
@@ -294,33 +1000,71 @@ def signing_key_from_env() -> bytes | None:
     return secret.encode("utf-8") if secret else None
 
 
+def build_demo_app(**config: Any) -> FastAPI:
+    """Build the application over the demo study: consent, survey, game, debrief.
+
+    It is a shortcut for a local try and for the tests, not the way a study is
+    written. A real study writes its own activities and passes them as ``study``
+    to ``build_study_app`` (or ``build_app_from_env``), so its own consent, its
+    own surveys, and its own debrief sit around the game rather than a demo's.
+    """
+    return build_study_app(**config)
+
+
 def build_app_from_env(
     *,
+    study: Study | None = None,
     game: GameSpec | None = None,
     browser_game: BrowserGameSpec | None = None,
     mesh_game: MeshGameSpec | None = None,
+    concurrent_mesh: bool = False,
+    server_game: ServerGameSpec | None = None,
+    browser_p2p: BrowserP2PConfig | None = None,
     agent_game: AgentGameSpec | None = None,
     turnbased_game: TurnBasedGameSpec | None = None,
+    chat: ChatSpec | None = None,
+    generate: GenerationSet | None = None,
     return_url: str | None = None,
     require_launch: bool = False,
+    admission: AdmissionPolicy | None = None,
 ) -> FastAPI:
     """Build the application with the store resolved from the environment.
 
-    A study entrypoint uses this, so the same demo runs on the in-memory store
+    A study entrypoint uses this, so the same study runs on the in-memory store
     for a quick try and on Postgres for a real deployment, with no code change --
-    only ``MUG_PG_DSN``. ``require_launch`` gates entry on a launch ticket, and
-    ``MUG_RETURN_LINK_KEY`` keeps the return links valid across a restart.
+    only ``MUG_PG_DSN``. ``study`` is the ordered activities the participant walks
+    through; with none, the demo study runs. ``require_launch`` gates entry on a
+    launch ticket, and ``MUG_RETURN_LINK_KEY`` keeps the return links valid across
+    a restart.
+
+    Four environment variables are what a deployment sets, and all four are what
+    running more than one process needs: ``MUG_PG_DSN`` shares the ledger,
+    ``MUG_RETURN_LINK_KEY`` makes a return link verify on any process,
+    ``MUG_GATEWAY_SECRET`` makes a client retry idempotent on any process, and
+    ``MUG_NODE_ID`` names this process, so two participants on two replicas meet.
+    See
+    ``docs/architecture/implementation/deployment-topology.md`` for what is safe to
+    replicate and what is not.
     """
-    return build_demo_app(
+    return build_study_app(
+        study=study,
         store=store_from_env(),
         game=game,
         browser_game=browser_game,
         mesh_game=mesh_game,
+        concurrent_mesh=concurrent_mesh,
+        server_game=server_game,
+        browser_p2p=browser_p2p,
         agent_game=agent_game,
         turnbased_game=turnbased_game,
+        chat=chat,
+        generate=generate,
         return_url=return_url,
         require_launch=require_launch,
         signing_key=signing_key_from_env(),
+        admission=admission,
+        gateway_secret=gateway_secret_from_env(),
+        node_id=node_id_from_env(),
     )
 
 

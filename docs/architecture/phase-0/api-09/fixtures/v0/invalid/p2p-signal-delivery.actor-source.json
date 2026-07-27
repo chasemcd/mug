@@ -1,0 +1,15 @@
+{
+  "schema": {
+    "name": "mug.api-09.p2p-signal-delivery",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "ec6d3f0019480421a8cdc9ce8db2f2e88f2398e0daf0c7773ced3841ba435029"
+    }
+  },
+  "room_handle": "handle_AAAAAAAAAAAAAAAAAAAAAA",
+  "source_peer_handle": "actor_019b6000-0000-7000-8000-000000000901",
+  "negotiation_generation": 1,
+  "signal_kind": "candidate",
+  "payload_json": "{\"candidate\":\"candidate:1 1 udp 1 192.0.2.1 5000 typ host\"}"
+}

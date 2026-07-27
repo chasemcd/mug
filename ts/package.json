@@ -17,6 +17,7 @@
     "build": "tsc -p tsconfig.json",
     "build:web": "tsc -p tsconfig.web.json",
     "conformance": "node dist/conformance/run.js",
+    "test:p2p": "node dist/conformance/p2p.js",
     "check": "tsc -p tsconfig.json --noEmit",
     "check:web": "tsc -p tsconfig.web.json --noEmit"
   },

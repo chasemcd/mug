@@ -672,6 +672,797 @@
       },
       "additionalProperties": false
     },
+    "P2PRole": {
+      "enum": [
+        "offerer",
+        "answerer"
+      ]
+    },
+    "P2PSignalKind": {
+      "enum": [
+        "offer",
+        "answer",
+        "candidate",
+        "end_of_candidates"
+      ]
+    },
+    "P2PPeer": {
+      "type": "object",
+      "description": "One remote peer. role is the local browser's server-assigned role for this pair.",
+      "required": [
+        "peer_handle",
+        "role"
+      ],
+      "properties": {
+        "peer_handle": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/PublicHandle"
+        },
+        "role": {
+          "$ref": "#/$defs/P2PRole"
+        }
+      },
+      "additionalProperties": false
+    },
+    "P2PDataChannel": {
+      "type": "object",
+      "description": "The fixed unreliable browser mesh DataChannel configuration.",
+      "required": [
+        "label",
+        "ordered",
+        "max_retransmits"
+      ],
+      "properties": {
+        "label": {
+          "const": "mug-mesh-data"
+        },
+        "ordered": {
+          "const": false
+        },
+        "max_retransmits": {
+          "const": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "P2PIceEndpoint": {
+      "type": "string",
+      "description": "A same-origin HTTPS path with no query or fragment. It redeems an opaque short-lived ICE grant.",
+      "pattern": "^/[A-Za-z0-9](?:[A-Za-z0-9._~!$&'()*+,;=:@/-]*[A-Za-z0-9/_~-])?$",
+      "maxLength": 256
+    },
+    "P2PMeshBootstrapSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-09.p2p-mesh-bootstrap"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "P2PMeshBootstrap": {
+      "type": "object",
+      "description": "The authenticated browser's scoped view of one frozen full-mesh attempt. Every handle is opaque. No actor, membership, lease, or secret value is disclosed.",
+      "required": [
+        "schema",
+        "room_handle",
+        "local_peer_handle",
+        "capture_owner_handle",
+        "negotiation_generation",
+        "peers",
+        "data_channel",
+        "validation_timeout_ms",
+        "ice_grant_handle",
+        "ice_endpoint",
+        "ice_expires_at"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/P2PMeshBootstrapSchemaRef"
+        },
+        "room_handle": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/PublicHandle"
+        },
+        "local_peer_handle": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/PublicHandle"
+        },
+        "capture_owner_handle": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/PublicHandle"
+        },
+        "negotiation_generation": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/PositiveSafeInteger"
+        },
+        "peers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/P2PPeer"
+          },
+          "minItems": 1,
+          "maxItems": 15
+        },
+        "data_channel": {
+          "$ref": "#/$defs/P2PDataChannel"
+        },
+        "validation_timeout_ms": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 60000
+        },
+        "ice_grant_handle": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/PublicHandle"
+        },
+        "ice_endpoint": {
+          "$ref": "#/$defs/P2PIceEndpoint"
+        },
+        "ice_expires_at": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/UtcInstant"
+        }
+      },
+      "additionalProperties": false
+    },
+    "P2PIceGrantRequestSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-09.p2p-ice-grant-request"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "P2PIceGrantRequest": {
+      "type": "object",
+      "description": "Redeem one scoped short-lived ICE grant. The transient response is not a contract model and is never persisted, logged, or exported.",
+      "required": [
+        "schema",
+        "ice_grant_handle"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/P2PIceGrantRequestSchemaRef"
+        },
+        "ice_grant_handle": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/PublicHandle"
+        }
+      },
+      "additionalProperties": false
+    },
+    "P2PSignalSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-09.p2p-signal"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "P2PSignal": {
+      "type": "object",
+      "description": "One volatile client-to-server signaling frame. The authenticated server derives its source and routes the bounded opaque payload.",
+      "required": [
+        "schema",
+        "request_id",
+        "room_handle",
+        "target_peer_handle",
+        "negotiation_generation",
+        "signal_kind"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/P2PSignalSchemaRef"
+        },
+        "request_id": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/RequestId"
+        },
+        "room_handle": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/PublicHandle"
+        },
+        "target_peer_handle": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/PublicHandle"
+        },
+        "negotiation_generation": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/PositiveSafeInteger"
+        },
+        "signal_kind": {
+          "$ref": "#/$defs/P2PSignalKind"
+        },
+        "payload_json": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 65536
+        }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "signal_kind"
+            ],
+            "properties": {
+              "signal_kind": {
+                "const": "end_of_candidates"
+              }
+            }
+          },
+          "then": {
+            "not": {
+              "required": [
+                "payload_json"
+              ]
+            }
+          },
+          "else": {
+            "required": [
+              "payload_json"
+            ]
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "signal_kind"
+            ],
+            "properties": {
+              "signal_kind": {
+                "const": "candidate"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "payload_json": {
+                "maxLength": 4096
+              }
+            }
+          }
+        }
+      ]
+    },
+    "P2PSignalDeliverySchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-09.p2p-signal-delivery"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "P2PSignalDelivery": {
+      "type": "object",
+      "description": "One server-routed signaling delivery. source_peer_handle is server-stamped and is never accepted from the sender.",
+      "required": [
+        "schema",
+        "room_handle",
+        "source_peer_handle",
+        "negotiation_generation",
+        "signal_kind"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/P2PSignalDeliverySchemaRef"
+        },
+        "room_handle": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/PublicHandle"
+        },
+        "source_peer_handle": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/PublicHandle"
+        },
+        "negotiation_generation": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/PositiveSafeInteger"
+        },
+        "signal_kind": {
+          "$ref": "#/$defs/P2PSignalKind"
+        },
+        "payload_json": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 65536
+        }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "signal_kind"
+            ],
+            "properties": {
+              "signal_kind": {
+                "const": "end_of_candidates"
+              }
+            }
+          },
+          "then": {
+            "not": {
+              "required": [
+                "payload_json"
+              ]
+            }
+          },
+          "else": {
+            "required": [
+              "payload_json"
+            ]
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "signal_kind"
+            ],
+            "properties": {
+              "signal_kind": {
+                "const": "candidate"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "payload_json": {
+                "maxLength": 4096
+              }
+            }
+          }
+        }
+      ]
+    },
+    "P2PSignalAckSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-09.p2p-signal-ack"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "P2PSignalErrorCode": {
+      "enum": [
+        "invalid_signal",
+        "lease_expired",
+        "not_a_member",
+        "payload_too_large",
+        "rate_limited",
+        "room_closed",
+        "stale_generation",
+        "unknown_target"
+      ]
+    },
+    "P2PSignalAck": {
+      "type": "object",
+      "description": "A volatile parse-and-route acknowledgment. queued never claims durable acceptance or a command receipt.",
+      "required": [
+        "schema",
+        "request_id",
+        "status"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/P2PSignalAckSchemaRef"
+        },
+        "request_id": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/RequestId"
+        },
+        "status": {
+          "enum": [
+            "queued",
+            "rejected"
+          ]
+        },
+        "error_code": {
+          "$ref": "#/$defs/P2PSignalErrorCode"
+        }
+      },
+      "additionalProperties": false,
+      "if": {
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "const": "queued"
+          }
+        }
+      },
+      "then": {
+        "not": {
+          "required": [
+            "error_code"
+          ]
+        }
+      },
+      "else": {
+        "required": [
+          "error_code"
+        ]
+      }
+    },
+    "P2PPeerReadySchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-09.p2p-peer-ready"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "P2PPeerReady": {
+      "type": "object",
+      "description": "The server accepts this claim only after every named pair passed bidirectional application-level validation.",
+      "required": [
+        "schema",
+        "room_handle",
+        "negotiation_generation",
+        "validated_peer_handles"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/P2PPeerReadySchemaRef"
+        },
+        "room_handle": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/PublicHandle"
+        },
+        "negotiation_generation": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/PositiveSafeInteger"
+        },
+        "validated_peer_handles": {
+          "type": "array",
+          "items": {
+            "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/PublicHandle"
+          },
+          "minItems": 1,
+          "maxItems": 15,
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "P2PMeshStartSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-09.p2p-mesh-start"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "P2PMeshStart": {
+      "type": "object",
+      "description": "The server-authoritative barrier release after all current peers validate the same mesh generation.",
+      "required": [
+        "schema",
+        "room_handle",
+        "negotiation_generation",
+        "seed",
+        "start_sequence",
+        "capture_owner_handle"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/P2PMeshStartSchemaRef"
+        },
+        "room_handle": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/PublicHandle"
+        },
+        "negotiation_generation": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/PositiveSafeInteger"
+        },
+        "seed": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/NonNegativeSafeInteger"
+        },
+        "start_sequence": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/PositiveSafeInteger"
+        },
+        "capture_owner_handle": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/PublicHandle"
+        }
+      },
+      "additionalProperties": false
+    },
+    "P2PMeshAbortSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-09.p2p-mesh-abort"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "P2PAbortReason": {
+      "enum": [
+        "capture_conflict",
+        "capture_timeout",
+        "negotiation_timeout",
+        "peer_disconnected",
+        "room_replaced",
+        "server_unavailable",
+        "stale_connection",
+        "validation_failed"
+      ]
+    },
+    "P2PAbortDisposition": {
+      "enum": [
+        "repool",
+        "resume_flow",
+        "terminal"
+      ]
+    },
+    "P2PMeshAbort": {
+      "type": "object",
+      "description": "A safe terminal transport frame. The disposition prevents silent mesh shrink or accidental game completion.",
+      "required": [
+        "schema",
+        "room_handle",
+        "negotiation_generation",
+        "reason",
+        "disposition"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/P2PMeshAbortSchemaRef"
+        },
+        "room_handle": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/PublicHandle"
+        },
+        "negotiation_generation": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/PositiveSafeInteger"
+        },
+        "reason": {
+          "$ref": "#/$defs/P2PAbortReason"
+        },
+        "disposition": {
+          "$ref": "#/$defs/P2PAbortDisposition"
+        }
+      },
+      "additionalProperties": false
+    },
+    "P2PPeerCompleteSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-09.p2p-peer-complete"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "P2PPeerComplete": {
+      "type": "object",
+      "description": "One peer's final replica evidence. It is a claim until the server reconciles every current peer.",
+      "required": [
+        "schema",
+        "room_handle",
+        "negotiation_generation",
+        "trajectory_digest",
+        "frame_count"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/P2PPeerCompleteSchemaRef"
+        },
+        "room_handle": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/PublicHandle"
+        },
+        "negotiation_generation": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/PositiveSafeInteger"
+        },
+        "trajectory_digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        },
+        "frame_count": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/NonNegativeSafeInteger"
+        }
+      },
+      "additionalProperties": false
+    },
+    "P2PCaptureSubmissionSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-09.p2p-capture-submission"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "P2PCaptureSubmission": {
+      "type": "object",
+      "description": "The designated capture owner's bounded trajectory payload. payload_digest binds its exact UTF-8 bytes; trajectory_digest binds the normalized trajectory.",
+      "required": [
+        "schema",
+        "room_handle",
+        "negotiation_generation",
+        "trajectory_digest",
+        "frame_count",
+        "payload_json",
+        "payload_digest"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/P2PCaptureSubmissionSchemaRef"
+        },
+        "room_handle": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/PublicHandle"
+        },
+        "negotiation_generation": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/PositiveSafeInteger"
+        },
+        "trajectory_digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        },
+        "frame_count": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/NonNegativeSafeInteger"
+        },
+        "payload_json": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1048576
+        },
+        "payload_digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "P2PMeshFinishSchemaRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "properties": {
+        "name": {
+          "const": "mug.api-09.p2p-mesh-finish"
+        },
+        "version": {
+          "const": 0
+        },
+        "digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        }
+      },
+      "additionalProperties": false
+    },
+    "P2PMeshFinish": {
+      "type": "object",
+      "description": "The server's reconciliation result after peer evidence and capture integrity checks agree.",
+      "required": [
+        "schema",
+        "room_handle",
+        "negotiation_generation",
+        "trajectory_digest",
+        "frame_count",
+        "capture_receipt"
+      ],
+      "properties": {
+        "schema": {
+          "$ref": "#/$defs/P2PMeshFinishSchemaRef"
+        },
+        "room_handle": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/PublicHandle"
+        },
+        "negotiation_generation": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/PositiveSafeInteger"
+        },
+        "trajectory_digest": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/Digest"
+        },
+        "frame_count": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/NonNegativeSafeInteger"
+        },
+        "capture_receipt": {
+          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/PublicHandle"
+        }
+      },
+      "additionalProperties": false
+    },
     "FixtureManifestSchemaRef": {
       "type": "object",
       "required": [

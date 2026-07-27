@@ -13,8 +13,10 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
+from pydantic import TypeAdapter
+
 from mug.gateway import Gateway
-from mug.kernel import DataHandlingRef, PrincipalRef, WireCommandEnvelope
+from mug.kernel import DataHandlingRef, PrincipalRef, PublicHandle, WireCommandEnvelope
 
 _UUID = "019b6000-0000-7000-8000-0000000000{:02x}"
 _ENROLLMENT = "enrollment_" + _UUID.format(0x50)
@@ -92,6 +94,16 @@ def test_mint_issues_a_handle_only_for_a_token_command() -> None:
         ).public_handle
         is None
     )
+
+
+def test_gateway_mints_distinct_transient_public_handles() -> None:
+    """A transient room capability uses the kernel public-handle format."""
+    gateway = _gateway()
+    first = gateway.new_handle()
+    second = gateway.new_handle()
+
+    assert TypeAdapter(PublicHandle).validate_python(first) == first
+    assert first != second
 
 
 def test_mint_advances_the_producer_sequence() -> None:

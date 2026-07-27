@@ -29,7 +29,6 @@ one canonical stream), so this builder fails closed on a ``p2p`` execution mode.
 
 from __future__ import annotations
 
-import json
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
@@ -52,7 +51,14 @@ from mug.replay.types import (
     replay_schema,
 )
 from mug.runtime import read_ledger
-from mug.storage import ArtifactStaging, ArtifactStore, Store, digest_of
+from mug.storage import (
+    ArtifactStore,
+    Store,
+    digest_of,
+    json_bytes,
+    jsonl_bytes,
+    stage_artifact,
+)
 
 # The media types the bundle persists: streams as newline-delimited JSON, the
 # manifest sidecars (the tape, the schema bundle) as plain JSON.
@@ -113,6 +119,8 @@ async def build_replay_bundle(
     decision_tape: DecisionTape | None = None,
     determinism: DeterminismDeclaration | None = None,
     experienced: ExperiencedInput | None = None,
+    trajectory: ArtifactRef | None = None,
+    render: ArtifactRef | None = None,
 ) -> ReplayBundle:
     """Assemble one replay bundle from an interaction's canonical streams.
 
@@ -205,6 +213,27 @@ async def build_replay_bundle(
     )
     refs.append(schema_bundle)
 
+    for recorded in (trajectory, render):
+        if recorded is not None:
+            refs.append(recorded)
+
+    # The capabilities the bundle can actually deliver, from the artifacts it
+    # carries. A deterministic replay steps the recorded actions; a visual replay
+    # draws the recorded frames. Neither is a promise the manifest may make alone.
+    capabilities = CapabilityLevels(
+        visual=render is not None or trajectory is not None,
+        deterministic=determinism is not None and trajectory is not None,
+    )
+    if not (capabilities.visual or capabilities.deterministic):
+        # The frozen manifest has always required a replay to declare a capability.
+        # Refusing here says which recorded evidence is missing, instead of failing
+        # inside the model or -- as this did before -- asserting a visual capability
+        # with no frames behind it.
+        raise ValueError(
+            "a replay bundle needs a recorded trajectory or a render stream; "
+            "this run recorded neither, so no replay is possible"
+        )
+
     scope: ReproductionScope = (
         "canonical-and-experienced" if experienced is not None else "canonical-only"
     )
@@ -215,15 +244,14 @@ async def build_replay_bundle(
             "reproduction_scope": scope,
             "artifacts": sorted(ref.digest.hex for ref in refs),
             "schema_bundle": schema_bundle.digest.hex,
-            "deterministic": determinism is not None,
+            "deterministic": capabilities.deterministic,
+            "visual": capabilities.visual,
         }
     )
     manifest = ReplayManifest(
         interaction_id=interaction_id,
         execution_mode=execution_mode,
-        capability_levels=CapabilityLevels(
-            visual=True, deterministic=determinism is not None
-        ),
+        capability_levels=capabilities,
         reproduction_scope=scope,
         experienced_stream_replay=experienced_replay,
         determinism=determinism,
@@ -278,46 +306,7 @@ async def validate_replay_bundle(
     )
 
 
-async def stage_artifact(
-    artifacts: ArtifactStore,
-    *,
-    data: bytes,
-    media_type: str,
-    new_artifact_id: Callable[[], str],
-    new_upload_id: Callable[[], str],
-    now: Callable[[], str],
-    data_handling: DataHandlingRef,
-) -> ArtifactRef:
-    """Stage one blob against its own digest and finalize it into the object store.
-
-    The intended digest and size come from the bytes, so the object store's
-    integrity check finalizes only bytes that match. Returns the finalized reference
-    the manifest names.
-    """
-    staging = ArtifactStaging(
-        upload_id=new_upload_id(),
-        intended_digest=digest_of(data),
-        size_bytes=len(data),
-        media_type=media_type,
-        data_handling=data_handling,
-    )
-    finalized = await artifacts.finalize_artifact(
-        staging, data, artifact_id=new_artifact_id(), finalized_at=now()
-    )
-    return finalized.artifact
-
-
-def _jsonl(records: Sequence[dict[str, object]]) -> bytes:
-    """Serialize records to newline-delimited JSON with sorted keys (D13-1)."""
-    lines = [
-        json.dumps(record, separators=(",", ":"), sort_keys=True) for record in records
-    ]
-    return "".join(f"{line}\n" for line in lines).encode("utf-8")
-
-
-def json_bytes(obj: object) -> bytes:
-    """Serialize one object to canonical, sorted-key JSON bytes."""
-    return json.dumps(obj, separators=(",", ":"), sort_keys=True).encode("utf-8")
+_jsonl = jsonl_bytes
 
 
 __all__ = [

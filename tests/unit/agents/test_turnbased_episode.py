@@ -19,8 +19,8 @@ from typing import ClassVar
 from mug.agents import (
     AgentIds,
     AgentSeat,
-    HumanSeat,
     LLMController,
+    LocalSeat,
     TurnBasedAgentEpisode,
     compile_agent,
 )
@@ -266,7 +266,7 @@ def _episode(
     *,
     env: _DuelAec,
     seats: list[AgentSeat],
-    humans: list[HumanSeat],
+    local_seats: list[LocalSeat],
     store: InMemoryStore,
     factory: _Factory,
     max_steps: int = 20,
@@ -282,7 +282,7 @@ def _episode(
         env=env,
         step_env=AecEnv(env),
         seats=seats,
-        humans=humans,
+        local_seats=local_seats,
         scheduler=scheduler,
         channel_key="duel",
         episode_id="episode_" + _UUID.format(0x7),
@@ -331,7 +331,9 @@ async def test_one_agent_instance_drives_both_seats() -> None:
             adapter=right,
         ),
     ]
-    runner = _episode(env=env, seats=seats, humans=[], store=store, factory=factory)
+    runner = _episode(
+        env=env, seats=seats, local_seats=[], store=store, factory=factory
+    )
 
     result = await runner.run()
 
@@ -373,8 +375,10 @@ async def test_a_human_takes_turns_beside_an_llm() -> None:
     ]
     human_input = InputState(bindings={"ArrowRight": 2}, default_action=0)
     human_input.press(["ArrowRight"])
-    humans = [HumanSeat(seat_key="human", agent_id="a", source=human_input)]
-    runner = _episode(env=env, seats=seats, humans=humans, store=store, factory=factory)
+    local_seats = [LocalSeat(seat_key="human", agent_id="a", source=human_input)]
+    runner = _episode(
+        env=env, seats=seats, local_seats=local_seats, store=store, factory=factory
+    )
 
     result = await runner.run()
 
@@ -414,7 +418,9 @@ async def test_a_posted_message_reaches_every_agent_seat() -> None:
             adapter=b,
         ),
     ]
-    runner = _episode(env=env, seats=seats, humans=[], store=store, factory=factory)
+    runner = _episode(
+        env=env, seats=seats, local_seats=[], store=store, factory=factory
+    )
     runner.post_message(sender="human", text="take the center")
 
     await runner.run()

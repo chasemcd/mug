@@ -17,6 +17,16 @@
 > + freeze) against running code. See `scratch/phase0-review/PROMOTION-PLAN.md`
 > §17 for the closure record. A `Drafted` status below therefore means
 > design-accepted, not frozen.
+>
+> **Update (2026-07-25): the mechanical half of that deferred freeze now runs.**
+> The [contract freeze tracker](contract-freeze.md) pins every bundle's bytes to
+> a digest, reads that digest back through the runtime package that serves the
+> contract, and refuses a change that is not recorded. Every record the corpus
+> declares now has a fixture behind it: the last five that no `$ref` walk reached
+> (API-01's compiler and publication records, the kernel's `EventCursor`) were
+> closed with golden fixtures on the same date, with no schema change. `Drafted`
+> still means what it says above -- the adversarial panel and the accountable
+> owner's sign-off are a person's work, and no bundle carries one yet.
 
 The [API catalog](api-catalog.md) establishes scope. This tracker establishes
 the working order and evidence required to accept each contract. `Not started`

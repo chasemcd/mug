@@ -17,6 +17,7 @@ from typing import Any
 import pytest
 
 from mug.authoring import PublishStudyCommand, publish_study
+from mug.kernel import sha256_hex
 from mug.runtime import CommandContext
 from mug.storage import InMemoryStore
 
@@ -55,17 +56,20 @@ def _version() -> dict[str, Any]:
 
 
 def _candidate(version: dict[str, Any], eligibility: str) -> dict[str, Any]:
+    inputs = {
+        "git_provenance": version["git_provenance"],
+        "source": version["candidate"],
+        "compiler": _COMPILER,
+        "schema_registry_digest": _DIGEST,
+        "build_context_digest": _DIGEST,
+        "target_platform_contract": _COMPILER["contract"],
+        "compilation_policy": _POLICY,
+    }
     return {
-        "input_fingerprint": _DIGEST,
-        "inputs": {
-            "git_provenance": version["git_provenance"],
-            "source": version["candidate"],
-            "compiler": _COMPILER,
-            "schema_registry_digest": _DIGEST,
-            "build_context_digest": _DIGEST,
-            "target_platform_contract": _COMPILER["contract"],
-            "compilation_policy": _POLICY,
-        },
+        # The candidate is content-bound: the fingerprint is the digest of the
+        # inputs, so it is computed here and never a placeholder.
+        "input_fingerprint": {"algorithm": "sha-256", "hex": sha256_hex(inputs)},
+        "inputs": inputs,
         "manifest_set": version["scientific"],
         "validation_report": version["candidate"],
         "scientific_manifest_digest": version["study_version"]["manifest_digest"],

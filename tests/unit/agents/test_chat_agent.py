@@ -157,11 +157,13 @@ async def test_an_admitted_turn_posts_the_model_reply_by_its_digest() -> None:
     reply = await agent.take_turn(turn=_turn(1), recent=recent, new_context=factory)
 
     assert reply is not None
-    assert reply.author_actor_id == _AGENT
-    assert reply.content_digest == compute_digest({"text": "a reply"})
+    assert reply.message.author_actor_id == _AGENT
+    assert reply.message.content_digest == compute_digest({"text": "a reply"})
+    # The raw output rides back to the caller, so a transport can render the text.
+    assert reply.output == {"text": "a reply"}
     assert adapter.calls == 1
     # The posted message and its snapshot are both recorded.
-    assert store.load_aggregate(reply.message_id) is not None
+    assert store.load_aggregate(reply.message.message_id) is not None
     snap = store.load_aggregate("message_" + _UUID.format(0x801))
     assert snap is not None
     assert snap["included_message_ids"] == [recent[0].message_id]
@@ -206,3 +208,73 @@ async def test_the_activation_cap_silences_a_second_free_turn() -> None:
     assert first is not None
     assert second is None
     assert adapter.calls == 1
+
+
+async def test_a_new_turn_restores_the_activation_budget() -> None:
+    """The cap counts one turn, so beginning a new turn lets the model speak again."""
+    store, factory = InMemoryStore(), _Factory()
+    adapter = _CountingProvider()
+    policy = TurnPolicy(
+        channel_key="lobby", activation="free", max_model_activations_per_turn=1
+    )
+    agent = _chat_agent(store, adapter, policy)
+
+    first = await agent.take_turn(
+        turn=_turn(1), recent=[_human_message(1)], new_context=factory
+    )
+    agent.begin_turn()
+    second = await agent.take_turn(
+        turn=_turn(2), recent=[_human_message(2)], new_context=factory
+    )
+
+    assert first is not None
+    assert second is not None
+    assert adapter.calls == 2
+
+
+async def test_a_candidate_set_spends_one_activation_however_many_it_holds() -> None:
+    """D08-5: asking for more candidates must not widen a turn's model budget.
+
+    Three candidates are three model calls -- they are three replies -- but they
+    answer one turn, so the turn is asked for once. Counting each candidate would
+    let a study buy three turns' worth of model budget by writing ``n=3``.
+    """
+    store, factory = InMemoryStore(), _Factory()
+    adapter = _CountingProvider()
+    policy = TurnPolicy(
+        channel_key="lobby", activation="free", max_model_activations_per_turn=1
+    )
+    agent = _chat_agent(store, adapter, policy)
+    turns = [_turn(1), _turn(2), _turn(3)]
+
+    composed = await agent.compose_candidates(
+        turns=turns, recent=[_human_message(1)], new_context=factory
+    )
+    for turn, pending in zip(turns, composed, strict=True):
+        await agent.publish(pending, turn=turn, new_context=factory, counts=False)
+
+    assert len(composed) == 3
+    assert adapter.calls == 3
+    assert agent.activations == 1
+
+
+async def test_a_candidate_set_is_refused_once_the_turn_budget_is_spent() -> None:
+    """The budget is a budget: a second set in one turn calls no model at all."""
+    store, factory = InMemoryStore(), _Factory()
+    adapter = _CountingProvider()
+    policy = TurnPolicy(
+        channel_key="lobby", activation="free", max_model_activations_per_turn=1
+    )
+    agent = _chat_agent(store, adapter, policy)
+
+    first = await agent.compose_candidates(
+        turns=[_turn(1), _turn(2)], recent=[_human_message(1)], new_context=factory
+    )
+    again = await agent.compose_candidates(
+        turns=[_turn(3), _turn(4)], recent=[_human_message(1)], new_context=factory
+    )
+
+    assert len(first) == 2
+    assert again == []
+    assert adapter.calls == 2
+    assert agent.activations == 1

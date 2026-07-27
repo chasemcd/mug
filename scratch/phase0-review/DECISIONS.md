@@ -210,7 +210,9 @@ Spine: **slow agent decisions never block a game frame/input/heartbeat** (async 
 | D12-5 | A choice must be **one of the presented candidates** | No phantom/out-of-set choices | ⬜ |
 | D12-6 | Content/forms have an **enforced WCAG floor** (keyboard+SR at AA) | Distinct from (not blocked by) surface-10 game-input a11y deferral | ⬜ |
 | D12-7 | Multi-annotator **quality + adjudication** first-class | v0: multiple judgments + agreement metrics; full resolution workflow later | ⬜ |
-| D12-8 | **Inline in-chat preference** (RLHF-in-the-loop): live A/B, pick continues the thread | Author-configurable, **sampled by default**, `n=2`; unchosen branch retained | ⬜ |
+| D12-8 | **Inline in-chat preference** (RLHF-in-the-loop): live A/B, pick continues the thread | Author-configurable, `n=2`; unchosen branch retained. **Built 2026-07-27 with one departure**: every turn by default rather than sampled, because writing `elicit_preference=` is already the opt-in and a silent halving is a surprise a reader of the data cannot see; `sample` remains, and which turns it elicits is derived rather than drawn | ✅ |
+| D12-9 | **A comparison is answered on more than one axis** | Author-named axes on the protocol (`scope` pair/each, 1..10 points); a rating names the **candidate key** and never a screen position, and the zero value is the midpoint that favours neither. API-18 rev 0.3 | ✅ |
+| D12-10 | **A tie is recordable, and it is still resolved** | `verdict` (`choice`/`tie`/`both-bad`) says what was meant and `choice` says which candidate the response resolved to, because a live thread must go on with one reply whatever the judgement was; `allow_tie` records whether a tie was offered at all. API-18 rev 0.3 | ✅ |
 
 ### Surface 12 settled open questions
 - Field types → core + slider/rating. · Task types → pairwise + rating. · Candidate sources → all 4. · Inline pref → configurable, sampled default. · Adjudication → agreement metrics v0.

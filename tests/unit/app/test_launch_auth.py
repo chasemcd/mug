@@ -68,9 +68,7 @@ def _expired_ticket() -> LaunchTicket:
 
 def test_a_connection_without_a_ticket_is_refused() -> None:
     """No ticket means no session: entry is refused with an authentication error."""
-    app = build_demo_app(
-        store=InMemoryStore(), gateway=Gateway(), require_launch=True
-    )
+    app = build_demo_app(store=InMemoryStore(), gateway=Gateway(), require_launch=True)
     client = TestClient(app)
     with client.websocket_connect("/ws") as socket:
         refusal = socket.receive_json()
@@ -81,9 +79,7 @@ def test_a_connection_without_a_ticket_is_refused() -> None:
 
 def test_an_unknown_ticket_is_refused() -> None:
     """A ticket handle that names no stored token is refused."""
-    app = build_demo_app(
-        store=InMemoryStore(), gateway=Gateway(), require_launch=True
-    )
+    app = build_demo_app(store=InMemoryStore(), gateway=Gateway(), require_launch=True)
     client = TestClient(app)
     unknown = "handle_" + "Z" * 21 + "A"
     with client.websocket_connect(f"/ws?ticket={unknown}") as socket:
@@ -119,9 +115,7 @@ def test_an_expired_ticket_is_refused() -> None:
 
 def test_a_valid_ticket_enrolls_and_opens_the_flow() -> None:
     """A valid ticket admits the participant and delivers the first form."""
-    app = build_demo_app(
-        store=InMemoryStore(), gateway=Gateway(), require_launch=True
-    )
+    app = build_demo_app(store=InMemoryStore(), gateway=Gateway(), require_launch=True)
     ticket = app.state.launch_ticket
     assert isinstance(ticket, str)
     client = TestClient(app)
@@ -141,9 +135,7 @@ def test_a_valid_ticket_enrolls_and_opens_the_flow() -> None:
 
 def test_a_forged_return_token_is_refused() -> None:
     """A gated reconnection with an unsigned return token is refused, not resumed."""
-    app = build_demo_app(
-        store=InMemoryStore(), gateway=Gateway(), require_launch=True
-    )
+    app = build_demo_app(store=InMemoryStore(), gateway=Gateway(), require_launch=True)
     client = TestClient(app)
     forged = "eyJmbG93X2lkIjoieCJ9.not-a-valid-signature"
     with client.websocket_connect(f"/ws?resume_token={forged}") as socket:

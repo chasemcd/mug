@@ -33,20 +33,36 @@ from mug.agents.adapters import (
     adapter_for,
     httpx_transport,
 )
-from mug.agents.chat import ChatAgent, ChatTurn, ComposePrompt
+from mug.agents.chat import (
+    ChatAgent,
+    ChatReply,
+    ChatTurn,
+    ComposePrompt,
+    PendingReply,
+)
 from mug.agents.episode import AgentEpisode, AgentEpisodeResult
 from mug.agents.game import (
     AgentGameSpec,
     AgentSeatSpec,
+    BotSeatSpec,
     HumanSeatSpec,
     TurnBasedGameSpec,
     build_agent_episode,
     build_turnbased_episode,
 )
+from mug.agents.generation import (
+    GenerationSet,
+    ModelUnderTest,
+    RecordedGeneration,
+    generation_id_for,
+    input_digest_of,
+    record_generations,
+    recorded_generation,
+)
 from mug.agents.multiseat_episode import (
     AgentSeat,
     AgentSeatResult,
-    HumanSeat,
+    LocalSeat,
     MultiAgentEpisode,
     MultiAgentEpisodeResult,
 )
@@ -73,21 +89,27 @@ __all__ = [
     "AgentSeatResult",
     "AgentSeatSpec",
     "AnthropicAdapter",
+    "BotSeatSpec",
     "ChatAdapter",
     "ChatAgent",
+    "ChatReply",
     "ChatTurn",
     "ComposePrompt",
     "ControllerDecodeMiss",
+    "GenerationSet",
     "HttpRequest",
     "HttpResponse",
     "HttpTransport",
-    "HumanSeat",
     "HumanSeatSpec",
     "LLMController",
+    "LocalSeat",
+    "ModelUnderTest",
     "MultiAgentEpisode",
     "MultiAgentEpisodeResult",
     "OllamaAdapter",
     "OpenAIAdapter",
+    "PendingReply",
+    "RecordedGeneration",
     "TransportFailure",
     "TurnBasedAgentEpisode",
     "TurnBasedAgentEpisodeResult",
@@ -96,6 +118,10 @@ __all__ = [
     "build_agent_episode",
     "build_turnbased_episode",
     "compile_agent",
+    "generation_id_for",
     "httpx_transport",
+    "input_digest_of",
+    "record_generations",
+    "recorded_generation",
     "timeout_fallback",
 ]

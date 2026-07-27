@@ -17,12 +17,14 @@ from __future__ import annotations
 
 import itertools
 import json
+from collections.abc import Callable
 from typing import Any, cast
 
 from mug.content import (
     AdvanceFlowCommand,
     MaterializeFlowCommand,
     advance_flow,
+    demo_study,
     materialize_flow,
 )
 from mug.export import (
@@ -41,9 +43,11 @@ from mug.kernel import (
     Digest,
     PrincipalRef,
     WireCommandEnvelope,
+    compute_digest,
 )
 from mug.kernel.refs import StudyVersionRef
 from mug.preferences import PreferenceService
+from mug.preferences.runtime import response_id_for
 from mug.preferences.types import ComparisonTask, PreferenceProtocol
 from mug.runtime import CommandContext
 from mug.storage import InMemoryStore
@@ -163,6 +167,7 @@ async def _advance(
         AdvanceFlowCommand(
             answers=answers, expected_revision=revision, captured_streams=streams
         ),
+        study=demo_study(),
         context=context,
         store=store,
     )
@@ -175,8 +180,9 @@ class _PrefContexts:
         self._aggregate_id = aggregate_id
         self._counter = itertools.count(1)
 
-    def next(self) -> CommandContext:
+    def next(self, aggregate_id: str | None = None) -> CommandContext:
         n = next(self._counter)
+        aggregate = aggregate_id or self._aggregate_id
         body = _UUID.format(0x200 + n)
         return CommandContext.model_validate(
             {
@@ -185,13 +191,13 @@ class _PrefContexts:
                 "error_id": "error_" + body,
                 "idempotency_key": "idem_" + f"{n + 100:021d}" + "A",
                 "event_id": "event_" + body,
-                "stream_id": "stream_" + self._aggregate_id.split("_", 1)[1],
+                "stream_id": "stream_" + aggregate.split("_", 1)[1],
                 "producer": {
                     "epoch_id": "prodepoch_" + _UUID.format(9),
                     "sequence": n,
                     "content_digest": _A_DIGEST.model_dump(mode="json"),
                 },
-                "aggregate_id": self._aggregate_id,
+                "aggregate_id": aggregate,
                 "principal": {
                     "kind": "service",
                     "id": "service_" + _UUID.format(0xA),
@@ -218,10 +224,12 @@ async def _seed_study(store: InMemoryStore) -> None:
     gateway = Gateway()
     await materialize_flow(
         MaterializeFlowCommand(visit_id=_VISIT_ID),
+        study=demo_study(),
         context=_mint(
             gateway, "flow.materialize", _FLOW_ID, {"visit_id": _VISIT_ID}, _idem("m")
         ),
         store=store,
+        **_plan_args(gateway),  # pyright: ignore[reportArgumentType]
     )
     await _advance(gateway, store, 1, {"agree": "yes"}, _idem("c"))
     await _advance(gateway, store, 2, {"mood": 4}, _idem("s"))
@@ -248,8 +256,8 @@ async def _seed_study(store: InMemoryStore) -> None:
     )
     order = assignment.candidate_display_order
     await service.respond(
-        context=contexts.next(),
-        response_id="prefresponse_" + _UUID.format(0x004),
+        context=contexts.next(response_id_for(_ASSIGNMENT)),
+        assignment_id=_ASSIGNMENT,
         choice=order[0],
         presented_order=order,
         submitted_at="2026-07-22T00:00:05.000000Z",
@@ -375,3 +383,99 @@ async def test_the_export_names_its_dataset_kinds_and_binds_the_row_schema() -> 
         assert binding.dataset_kind in DATASET_KINDS
         # Every kind's rows are canonical event envelopes.
         assert binding.row_schema.name == "mug.api-10.event-envelope"
+
+
+async def test_each_research_kind_exports_the_values_behind_its_rows() -> None:
+    """A spine of digests is not a dataset, so the export carries the values too."""
+    store = InMemoryStore()
+    await _seed_study(store)
+
+    export = await _export(store)
+
+    kinds = [values.dataset_kind for values in export.values]
+    # The visit plan travels as values of its own: it is what each participant was
+    # given, and the orders it drew have no other exported trace.
+    assert kinds == ["trajectories", "preferences", "plans"]
+    rows = await _values_rows(store, export, "preferences")
+    # Every record of the annotation, each still the head of its own aggregate: the
+    # assignment says who was asked and under which committed order, and the
+    # response says what they chose. One written over the other would be one record
+    # and one silently lost.
+    states = {row["state"]["schema"]["name"]: row["state"] for row in rows}
+    assert set(states) == {
+        "mug.api-18.preference-assignment",
+        "mug.api-18.preference-response",
+    }
+    choice = states["mug.api-18.preference-response"]
+    assert choice["choice"] in choice["presented_order"]
+    assert states["mug.api-18.preference-assignment"]["enrollment_id"]
+
+
+async def test_a_values_row_re_derives_the_digest_its_exported_row_bound() -> None:
+    """The values are evidence because they check against the exported spine."""
+    store = InMemoryStore()
+    await _seed_study(store)
+
+    export = await _export(store)
+    rows = await _values_rows(store, export, "preferences")
+    bundle = next(b for b in export.bundles if b.dataset_kind == "preferences")
+    data = await store.read_artifact(bundle.artifact.artifact_id)
+    events = [json.loads(line) for line in data.decode("utf-8").splitlines()]
+
+    for row in rows:
+        stream = row["stream_id"]
+        # One stream can carry more than one aggregate -- an annotation's assignment
+        # and its response share a stream, because they are one lineage -- so the
+        # binding a values row must satisfy is that the ledger bound *this* state,
+        # not that it was the last thing the stream recorded.
+        bound = {
+            event["payload_digest"]["hex"]
+            for event in events
+            if event["stream_position"]["stream_id"] == stream
+        }
+        assert compute_digest(row["state"]).hex in bound, (
+            "the exported values are not the values the ledger bound"
+        )
+
+
+async def test_the_exported_values_are_reproducible_from_the_ledger() -> None:
+    """One ledger and one set of injected ids give one values artifact."""
+    store = InMemoryStore()
+    await _seed_study(store)
+
+    first = await _export(store)
+    second = await _export(store)
+
+    for left, right in zip(first.values, second.values, strict=True):
+        assert left.dataset_kind == right.dataset_kind
+        assert left.artifact.digest == right.artifact.digest
+
+
+async def _values_rows(
+    store: InMemoryStore, export: Any, kind: str
+) -> list[dict[str, Any]]:
+    """Read one kind's exported values back into its rows."""
+    values = next(v for v in export.values if v.dataset_kind == kind)
+    data = await store.read_artifact(values.artifact.artifact_id)
+    rows = [json.loads(line) for line in data.decode("utf-8").splitlines()]
+    assert len(rows) == values.row_count
+    return cast("list[dict[str, Any]]", rows)
+
+
+def _seeding(gateway: Gateway) -> Callable[[str], bytes]:
+    """The seed source a plan draws its orders from."""
+    return lambda role: gateway.derived_seed("treatment", role)
+
+
+def _plan_args(gateway: Gateway) -> dict[str, object]:
+    """The identity and seed a plan is drafted with, for a study with no design."""
+    return {
+        "study_version": StudyVersionRef(
+            study_id=gateway.derived_id("study", "test"),
+            study_version_id=gateway.derived_id("studyver", "test"),
+            version_number=1,
+            manifest_digest=Digest(algorithm="sha-256", hex="0" * 64),
+        ),
+        "derive": gateway.derived_id,
+        "seed": _seeding(gateway),
+    }

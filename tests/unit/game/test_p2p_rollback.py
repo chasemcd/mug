@@ -180,8 +180,7 @@ def run_mesh(
     """
     actors = tuple(sorted(actors))
     worlds = {
-        actor: LineWorld(actors, seed=seed, episode_len=episode_len)
-        for actor in actors
+        actor: LineWorld(actors, seed=seed, episode_len=episode_len) for actor in actors
     }
     engines = {
         actor: _build_engine(

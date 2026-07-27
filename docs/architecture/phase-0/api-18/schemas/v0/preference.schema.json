@@ -8,6 +8,47 @@
       "pattern": "^[a-z][a-z0-9]*(?:[-_.][a-z0-9]+)*$",
       "maxLength": 128
     },
+    "Dimension": {
+      "type": "object",
+      "required": [
+        "key",
+        "label",
+        "scope",
+        "points"
+      ],
+      "properties": {
+        "key": {
+          "$ref": "#/$defs/AuthoringKey"
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "scope": {
+          "enum": [
+            "pair",
+            "each"
+          ]
+        },
+        "points": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10
+        },
+        "low_label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "high_label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        }
+      },
+      "additionalProperties": false
+    },
     "ComparisonTask": {
       "type": "object",
       "required": [
@@ -24,6 +65,17 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 1024
+        },
+        "allow_tie": {
+          "type": "boolean"
+        },
+        "dimensions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Dimension"
+          },
+          "minItems": 1,
+          "maxItems": 16
         }
       },
       "additionalProperties": false
@@ -210,6 +262,27 @@
       },
       "additionalProperties": false
     },
+    "DimensionRating": {
+      "type": "object",
+      "required": [
+        "dimension_key",
+        "value"
+      ],
+      "properties": {
+        "dimension_key": {
+          "$ref": "#/$defs/AuthoringKey"
+        },
+        "candidate_key": {
+          "$ref": "#/$defs/AuthoringKey"
+        },
+        "value": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10
+        }
+      },
+      "additionalProperties": false
+    },
     "PreferenceResponseSchemaRef": {
       "type": "object",
       "required": [
@@ -269,6 +342,21 @@
         },
         "submitted_at": {
           "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/UtcInstant"
+        },
+        "verdict": {
+          "enum": [
+            "choice",
+            "tie",
+            "both-bad"
+          ]
+        },
+        "ratings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/DimensionRating"
+          },
+          "minItems": 1,
+          "maxItems": 64
         }
       },
       "additionalProperties": false

@@ -1,9 +1,10 @@
-"""Run one multi-seat episode: many seats, at least one an LLM, on one timeline.
+"""Run one multi-seat episode: any mix of people, models, and bots, on one timeline.
 
-This is the one agent-episode runtime; a single-seat run is its one-seat case
+This is the one multi-seat episode runtime; a single-seat run is its one-seat case
 (``mug.agents.AgentEpisode`` is a thin facade over it). It drives a whole
 interaction of seats over one shared, server-authoritative environment: one LLM,
-a human beside an LLM, or two LLM agents together. Each frame the
+a person beside an LLM, two LLM agents together, or two people and a model
+partner. Each frame the
 shared loop (``mug.game.multiseat.run_multiseat_episode``) steps every seat's
 action at once; this runner samples each LLM seat, fires its decision at its own
 cadence without blocking the frame, and records the frame into each agent's own
@@ -88,12 +89,17 @@ class AgentSeat:
 
 
 @dataclass(frozen=True)
-class HumanSeat:
-    """One human seat in a multi-seat interaction: a websocket drives it.
+class LocalSeat:
+    """One seat in a multi-seat interaction that a local source drives.
 
-    ``agent_id`` is the environment agent the person plays; ``source`` is the seat's
-    input the transport updates each frame (an ``InputState``). The loop reads it
-    beside the model seats through the shared ``SeatActionSource`` seam.
+    ``agent_id`` is the environment agent the seat plays; ``source`` is what the
+    seat holds each frame. A person's source is an ``InputState`` a websocket
+    updates; a bot's is the study's own policy. The loop reads both beside the model
+    seats through the one ``SeatActionSource`` seam, which is why they are one type.
+
+    The seat carries no actor id and no label for what drives it. Who sat here and
+    whether they were a person is recorded by the room that cast the seat, and one
+    record of that is enough.
     """
 
     seat_key: str
@@ -205,10 +211,19 @@ class _AgentSeatDriver:
         self.result = AgentSeatResult(
             seat_key=seat.seat_key, agent_id=seat.agent_id, actor_id=seat.actor_id
         )
+        # What this seat has said and nobody has published yet. The loop must not
+        # wait on a channel commit, so the driver collects and the episode drains.
+        self.said: list[str] = []
+        self.actor_id = seat.actor_id
 
     def deliver(self, message: Message) -> None:
         """Record one chat message on this seat's controller, for its next prompt."""
         self._controller.record_message(message)
+
+    def take_said(self) -> list[str]:
+        """Take everything this seat has said and not yet had published."""
+        said, self.said = self.said, []
+        return said
 
     def record_and_maybe_decide(self, info: MultiSeatStepInfo) -> None:
         """Record the frame, apply a ready decision, and maybe start a new one."""
@@ -283,10 +298,19 @@ class _AgentSeatDriver:
             self._task = None
 
     def _settle(self, outcome: DecisionOutcome) -> None:
-        """Record a decision outcome and set its action as the seat's held action."""
+        """Record a decision outcome and set its action as the seat's held action.
+
+        What the seat said on the same decision is taken here too. It is taken even
+        when the outcome fell back, because falling back is a statement about the
+        **action**: a reply nobody could read an action out of may still have said
+        something, and dropping it would lose a message the model really produced.
+        """
         self.result.decisions.append(outcome)
         self._seat.apply(outcome.action)
         self._last_action = outcome.action
+        said = self._controller.take_message()
+        if said:
+            self.said.append(said)
 
     def _build_request(self) -> DecisionRequest:
         """Mint the decision request for the current frame's state and deadline."""
@@ -309,7 +333,8 @@ class MultiAgentEpisode:
     """Drive a multi-seat interaction through one episode on the built stack.
 
     The caller composes the seats a study composes -- one ``AgentSeat`` per LLM seat
-    (its agent, controller, and held seat) and one ``HumanSeat`` per person -- and
+    (its agent, controller, and held seat) and one ``LocalSeat`` per person or bot
+    -- and
     hands them here with the shared scheduler, store context, and episode identity.
     The runner owns the loop: it steps every seat's action set each frame, samples
     every model seat, fires each decision at its own cadence, and feeds each agent's
@@ -330,19 +355,24 @@ class MultiAgentEpisode:
         new_decision_id: Callable[[], str],
         now: Callable[[], datetime],
         decision_timeout: DecisionTimeout,
-        humans: Sequence[HumanSeat] = (),
+        local_seats: Sequence[LocalSeat] = (),
         step_env: MultiSeatEnv | None = None,
         frame_sink: MultiSeatObserver | None = None,
         fps: int = 0,
         max_steps: int = 200,
     ) -> None:
-        if not seats:
-            raise ValueError("a multi-seat agent episode needs at least one LLM seat")
+        if not seats and not local_seats:
+            # A model seat is no longer what makes an episode: several people in one
+            # environment is an episode too, and it steps through this same loop.
+            raise ValueError("a multi-seat episode needs at least one seat")
         self._env = env
         # An optional per-frame sink the transport wires to push each stepped frame
         # to a watching participant. The loop stays render-neutral; the sink is the
         # human-watching render path the module docstring names.
         self._frame_sink = frame_sink
+        # The frame the loop has reached, so a message a seat said is placed at the
+        # frame it was said at rather than at the end of the run.
+        self._frame = 0
         # A multi-agent study env satisfies both seams, so the loop steps the same
         # object the controllers read; the solo facade passes a lifted step env.
         self._step_env: MultiSeatEnv = (
@@ -354,12 +384,12 @@ class MultiAgentEpisode:
         self._now = now
         self._fps = fps
         self._max_steps = max_steps
-        self._humans = tuple(humans)
+        self._local = tuple(local_seats)
 
-        # The loop steps the agent seats first, then the human seats, in one order.
+        # The loop steps the model seats first, then the local seats, in one order.
         self._agent_ids = tuple(
             [seat.agent_id for seat in seats]
-            + [human.agent_id for human in self._humans]
+            + [seat.agent_id for seat in self._local]
         )
         if len(set(self._agent_ids)) != len(self._agent_ids):
             raise ValueError("each seat must play a distinct environment agent")
@@ -393,8 +423,8 @@ class MultiAgentEpisode:
         sources: dict[str, SeatActionSource] = {
             driver.result.agent_id: driver.source for driver in self._drivers
         }
-        for human in self._humans:
-            sources[human.agent_id] = human.source
+        for seat in self._local:
+            sources[seat.agent_id] = seat.source
 
         summary = await run_multiseat_episode(
             self._step_env,
@@ -416,13 +446,29 @@ class MultiAgentEpisode:
         )
 
     def post_message(self, *, sender: str, text: str, tick: int | None = None) -> None:
-        """Hand one chat message to every agent seat (the transport calls this).
+        """Hand one chat message to every agent seat the transport says may see it.
 
-        A human instruction reaches all the agents, so each reads it in its prompt
-        next decision.
+        A message reaches the seats in the channel it was said on, so each reads it
+        in its prompt next decision. Who may see it is the room's decision and not
+        this runner's: the transport calls this only for the seats the membership
+        admits, which is what keeps a private channel private (W5).
         """
         for driver in self._drivers:
             driver.deliver(Message(sender=sender, text=text, tick=tick))
+
+    def take_said(self) -> list[tuple[str, str, int]]:
+        """Take what every seat has said since the last drain, in seat order.
+
+        Each entry is the seat's actor, its words, and the frame it said them at.
+        The runner collects rather than publishes: committing a message to a
+        channel is a store write, and the stepping loop must never wait on one
+        (NS-06). The transport drains this between frames and publishes.
+        """
+        said: list[tuple[str, str, int]] = []
+        for driver in self._drivers:
+            for text in driver.take_said():
+                said.append((driver.actor_id, text, self._frame))
+        return said
 
     async def _observe(self, info: MultiSeatStepInfo) -> None:
         """Record the frame into every seat, then let a due decision resolve.
@@ -432,6 +478,7 @@ class MultiAgentEpisode:
         delay, so a slow model resolves within a few frames instead of only at the
         episode's end; the second drain applies any that finished on the yield.
         """
+        self._frame = info.frame
         for driver in self._drivers:
             driver.record_and_maybe_decide(info)
         await asyncio.sleep(0)
@@ -451,7 +498,7 @@ def _name(names: Sequence[str], action: int | None) -> str:
 __all__ = [
     "AgentSeat",
     "AgentSeatResult",
-    "HumanSeat",
+    "LocalSeat",
     "MultiAgentEpisode",
     "MultiAgentEpisodeResult",
 ]

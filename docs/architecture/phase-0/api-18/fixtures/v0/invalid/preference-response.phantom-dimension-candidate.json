@@ -1,0 +1,26 @@
+{
+  "schema": {
+    "name": "mug.api-18.preference-response",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "717b95bd477ea2e7f21fc8f77309896fdb7ad5e2b06b64a6de5b9289564d4db3"
+    }
+  },
+  "response_id": "prefresponse_019b6000-0000-7000-8000-000000000f43",
+  "assignment_id": "prefassign_019b6000-0000-7000-8000-000000000f01",
+  "choice": "option-a",
+  "presented_order": [
+    "option-a",
+    "option-b"
+  ],
+  "ratings": [
+    {
+      "dimension_key": "helpful",
+      "candidate_key": "option-c",
+      "value": 2
+    }
+  ],
+  "receipt_required": false,
+  "submitted_at": "2026-08-02T12:18:00.000000Z"
+}

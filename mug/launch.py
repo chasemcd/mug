@@ -87,12 +87,16 @@ def _envelope(
 
 
 async def _seed_deployment(store: Store, revision_id: str, gateway: Gateway) -> None:
-    """Commit a minimal deployment aggregate, as a prior deploy would leave it.
+    """Commit the deployment revision aggregate the launch gate reads.
 
-    The ``launch`` handler gates on the deployment aggregate being present. A full
-    publish/deploy chain is out of the demo slice, so the demo seeds the minimal
-    active record the launch gate reads.
+    The ``launch`` handler gates on the revision aggregate being present. A revision
+    is immutable, and since the study is published its identifier derives from the
+    version -- so a restart finds the revision already there and seeds nothing. The
+    mutable side of a deployment, which revision is current and whether it is live,
+    is the ``Deployment`` record (``mug.platform.deployment``).
     """
+    if store.load_aggregate(revision_id) is not None:
+        return
     await store.commit(
         command_id=gateway.new_id("command"),
         idempotency_key=_idem(gateway),
@@ -109,27 +113,41 @@ async def provision_launch_ticket(
     store: Store,
     *,
     researcher: PrincipalRef,
+    study_version: StudyVersionRef | None = None,
     ttl_seconds: int = 3600,
 ) -> LaunchProvision:
-    """Seed a minimal deployment and issue one genuine launch ticket for the demo.
+    """Seed a deployment and issue one genuine launch ticket for the study.
 
-    It mints the study and deployment identifiers, seeds the deployment the launch
-    gate reads, and issues the ticket through the real ``launch`` handler, so the
-    returned handle is opaque and redeemable. The caller presents the handle in the
-    launch link and gates realtime entry on it.
+    It seeds the deployment the launch gate reads and issues the ticket through the
+    real ``launch`` handler, so the returned handle is opaque and redeemable. The
+    caller presents the handle in the launch link and gates realtime entry on it.
+
+    ``study_version`` is the version the application published and is about to run
+    (``mug.content.publish``), so the ticket, the deployment, and every visit behind
+    them name the study that is actually running. With none it falls back to a minted
+    identifier and a stub manifest digest, which is what a test that is not about
+    publication wants -- and what the whole platform used to do.
     """
-    study_id = gateway.new_id("study")
-    deployment = DeploymentRevisionRef(
-        deployment_id=gateway.new_id("deploy"),
-        deployment_revision_id=gateway.new_id("deployrev"),
-        revision_number=1,
-        study_version=StudyVersionRef(
-            study_id=study_id,
-            study_version_id=gateway.new_id("studyver"),
-            version_number=1,
-            manifest_digest=_STUB_DIGEST,
-        ),
+    published = study_version is not None
+    study_id = study_version.study_id if study_version else gateway.new_id("study")
+    version = study_version or StudyVersionRef(
+        study_id=study_id,
+        study_version_id=gateway.new_id("studyver"),
+        version_number=1,
         manifest_digest=_STUB_DIGEST,
+    )
+    deployment = DeploymentRevisionRef(
+        deployment_id=gateway.derived_id("deploy", f"deployment:{study_id}")
+        if published
+        else gateway.new_id("deploy"),
+        deployment_revision_id=gateway.derived_id(
+            "deployrev", f"deployrev:{version.study_version_id}"
+        )
+        if published
+        else gateway.new_id("deployrev"),
+        revision_number=1,
+        study_version=version,
+        manifest_digest=version.manifest_digest,
     )
     await _seed_deployment(store, deployment.deployment_revision_id, gateway)
 

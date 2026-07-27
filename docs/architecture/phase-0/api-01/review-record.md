@@ -5,7 +5,7 @@
 | Status | Draft |
 | Contract revision | `0.2` |
 | Review opened | 2026-07-17 |
-| Last updated | 2026-07-20 |
+| Last updated | 2026-07-25 |
 | Accountable owner | Unassigned |
 | Target accepted version | `1` |
 | Governing ADRs | [ADR 0013: Git-Native Study Versioning and Stored Compiled Artifacts](../../decisions/0013-git-native-study-versioning.md); [ADR 0015: Governance Is Out of Scope](../../decisions/0015-governance-out-of-scope.md) |
@@ -174,6 +174,7 @@ shared-kernel review-record).
 
 | Date | Revision | Change |
 | --- | --- | --- |
+| 2026-07-25 | `0.2` | Evidence only; the contract bytes did not move and the bundle digest is still `96958cdf…`. Closed the records the [contract freeze](../contract-freeze.md) measured as unreached: added `compiled-candidate.release-candidate` (which reaches `CompiledStudyCandidate`, `CompilationInputs`, and `CompiledStudyCandidateSchemaRef`), `publication-result.created`, and `publication-result.resolved-existing`, plus a fingerprint-mismatch and an unknown-outcome rejection fixture. The candidate fixture closes over the exact bytes of the authoring document, manifest set, validation report, and scientific manifest, and the published version now names the candidate fixture instead of a placeholder digest. `CompiledStudyCandidate.input_fingerprint` is now enforced as the digest of the inputs in the record model |
 | 2026-07-20 | `0.2 correction` | Folded ADR 0015 into API-01: removed the retracted API-21 framework and API-20 coupling, retained pinned ordinary study-code packages against closed MUG-owned protocols, re-homed package security to API-01/API-02/security review and schema-bundle/archive concerns to API-11/API-16, added two one-defect rejection fixtures, and restamped the bundle `8e338707…` → `96958cdf…` against shared-kernel dependency `19f024dc…`; 34 tests pass over 10 valid and 18 invalid fixtures; `0.3` remains reserved for runtime-parity folds |
 | 2026-07-19 | `0.2` | Shared-kernel 0.2 conformance: removed `retention_policy` members from every fixture `data_handling` block (kernel `DataHandlingRef` now carries `privacy_labels` only; `RetentionPolicyRef` retired); dropped the now-unsatisfiable `wave` definition kind (the `wavedef_` prefix left `RegisteredMugId`) and the retired `retpolicy_`/`retpolicyver_` prefixes from the client-disclosure scanner; restamped the bundle digest closure (`28364993…` → `8e338707…`); suite still 31 passing tests |
 | 2026-07-18 | `0.2` | Folded F-1/ADR 0013 (git-native versioning + stored compiled artifact): removed drafts, revisions, head preconditions, revision diffs, and the definition registry; added `GitProvenance` (commit + dirty patch), the hand-typed unique version string with collision rules, published-history definition-key continuity, and the stored resolved artifact; removed API-20 from the consumers row (governance retracted by F-4); regenerated schemas, fixtures, and the digest closure; API-01 suite now 31 passing tests over 10 valid and 16 invalid fixtures |

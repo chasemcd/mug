@@ -3,7 +3,7 @@
 | Field | Value |
 | --- | --- |
 | Status | Draft |
-| Contract revision | `0.3` |
+| Contract revision | `0.4` |
 | Review opened | 2026-07-17 |
 | Accountable owner | Unassigned |
 | Target accepted version | `1` |
@@ -14,7 +14,7 @@
 | --- | --- | --- |
 | Ownership, lifecycles, and boundary | Drafted | [Index](index.md) |
 | Version-0 schemas | Drafted | `client.schema.json` |
-| Golden fixtures and harness | Drafted | 25 fixtures, 28 tests |
+| Golden fixtures and harness | Drafted | 52 fixtures, 82 tests |
 | Scenario/parity trace | Partial | Obligations mapped; concrete walkthroughs open |
 | Version-1 immutable contract | Not started | Blocked by decisions, reviews, and cross-API ports |
 
@@ -42,6 +42,18 @@
       readiness op (block/unblock advance or join over an interaction/flow
       anchor). RP-8's state→env-args path and read-only participant handle stay
       out of scope (open sub-items below)
+- [x] Fold the authenticated browser P2P edge into the 0.4 contract:
+      scoped-public-handle bootstrap, fixed unreliable DataChannel, bounded
+      opaque signaling with explicit end-of-candidates, server-stamped signal
+      delivery, non-durable signal acknowledgments, full-mesh validation/start
+      barrier, closed abort outcomes, per-peer completion, designated capture
+      submission, and reconciled finish receipt
+- [x] Add typed `P2PIceGrantRequest`; keep the transient `no-store` WebRTC
+      configuration response outside Pydantic/event/artifact/log/export
+      surfaces and keep long-lived deployment credentials behind API-02
+      `SecretRef`
+- [x] State the first edge's recovery boundary: no mid-episode reconnect and no
+      silent mesh shrink; failures use `repool`, `resume_flow`, or `terminal`
 - [ ] Exact command payload/result/view schemas for every command and query
 - [ ] Accountable owner and four reviewers assigned
 - [ ] Reconnect, resume, and connection-lease handshake defined with API-06
@@ -54,7 +66,7 @@
 
 | ID | Decision needed | Proposed default | Blocks |
 | --- | --- | --- | --- |
-| A09-O01 | Reconnect and resume protocol | Handshake replays the accepted deployment and resumes from a durable cursor | ['API-06'] |
+| A09-O01 | General non-P2P reconnect and resume protocol | Handshake replays the accepted deployment and resumes from a durable cursor; the 0.4 P2P edge explicitly aborts instead of reconnecting mid-episode | ['API-06'] |
 | A09-O02 | Upload grant scope and expiry | Short-lived opaque grant bound to one upload; finalize verifies digest via API-11 | ['API-11'] |
 | A09-O03 | Client backpressure and rate limits | Per-connection command budget with transport-level backpressure | ['API-06'] |
 
@@ -100,6 +112,7 @@ silently adopted. Only the readiness-gating op was adopted.
 | 2026-07-19 | `0.2` | Re-drafted the schema bundle to the `0.2` docs: added `InputScheme` (typed input over the env's own action space — integer or numeric-vector action values only, `pressed_keys`/`single_keystroke`, typed `on_no_input` fill incl. `repeat_last`, optional `input_delay`, per-seat `seat_key`; `decides_every` structurally excluded per D10-3), `SeatDelivery` (every render-packet/message delivery addressed to exactly one seat; no broadcast field), and `BridgeMessage` (R-13 typed `window.mug` surface: `response.set/get`, `state.set/get`, `advance`; closed shape rejects identity fields; reserved identity/condition/seat keys rejected semantically; `mugGlobals` retired); handshake capability set advertises `mug.client.bridge.v1`; 19 fixtures (8 valid, 11 invalid), 22 tests; bundle digests restamped |
 | 2026-07-20 | `0.3 input (docs)` | Recorded settled RP-6 typed monitoring measurements and RP-8 `mug.gate`; exact wire/schema/fixture fold remains pending |
 | 2026-07-20 | `0.3` | Folded RP-6 and RP-8 into exact bytes: `MonitoringMeasurement` client event (per-seat `rtt`/`hidden` `QualityMeasurement` Duration samples) pinning API-06's server-authoritative `MonitoringPolicy` (`mug.api-06.interaction` `538a17e3…`) as an inert foreign ref, enforcement left to the server; and API-09-owned `mug.gate` `GateOp` (closed `block`/`unblock` action, `advance`/`join` target, interaction/flow `GateAnchor`) formalizing the startButton/advanceButton hacks, with `uniqueMeasurementMetric` and `gateAnchorTarget` semantic rules. RP-8 state→env-args path and read-only participant handle deliberately unscoped. Bundle digest `a687a135…`; 25 fixtures (11 valid, 14 invalid), 28 tests. |
+| 2026-07-23 | `0.4` | Added the authenticated browser P2P wire family: scoped-handle bootstrap and ICE grant redemption request; offer/answer/candidate/end-of-candidates signaling; server-stamped delivery and safe queued/rejected acknowledgment; full-mesh validation/start/abort; peer completion, designated capture submission, and reconciled finish. No browser record carries ActorId, membership, lease, token, or secret material. The transient ICE response is `no-store` and outside contract/persistence/log/export surfaces. Added semantic handle and payload-digest checks plus Python-model conformance; 52 fixtures (23 valid, 29 invalid), 82 tests. Bundle digest `ec6d3f0019480421a8cdc9ce8db2f2e88f2398e0daf0c7773ced3841ba435029`. |
 
 ## Folded decisions (2026-07-18/19)
 

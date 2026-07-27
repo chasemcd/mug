@@ -30,7 +30,14 @@ def build_parser() -> argparse.ArgumentParser:
         "publish", help="publish a compiled study version"
     )
     publish.add_argument(
-        "envelope", type=Path, help="the prepared command envelope the compiler emits"
+        "envelope",
+        type=Path,
+        nargs="?",
+        help="the prepared command envelope the compiler emits",
+    )
+    publish.add_argument(
+        "--study",
+        help="compile and publish the study a module names, as 'module:attribute'",
     )
 
     deploy = subparsers.add_parser("deploy", help="deploy a published study version")
@@ -38,7 +45,11 @@ def build_parser() -> argparse.ArgumentParser:
         "envelope", type=Path, help="the prepared deploy command envelope"
     )
 
-    subparsers.add_parser("stop", help="stop a deployment (not yet available)")
+    stop = subparsers.add_parser("stop", help="stop or start a deployment")
+    stop.add_argument("deployment", help="the deployment identifier")
+    stop.add_argument(
+        "--start", action="store_true", help="start a stopped deployment again"
+    )
 
     export = subparsers.add_parser("export", help="export a study's whole dataset")
     export.add_argument("out", type=Path, help="the directory to write the bundles to")
@@ -88,11 +99,22 @@ def _print_receipt(verb: str, receipt: CommandReceipt) -> None:
 async def _run(args: argparse.Namespace, session: CliSession) -> None:
     """Dispatch one parsed verb to its command coroutine and report."""
     if args.verb == "publish":
-        _print_receipt("publish", await commands.run_publish(session, args.envelope))
+        if args.study:
+            published = await commands.run_publish_study(session, args.study)
+            print(f"published {published.study_version.study_version_id}")
+        elif args.envelope:
+            _print_receipt(
+                "publish", await commands.run_publish(session, args.envelope)
+            )
+        else:
+            raise commands.CliError("publish needs an envelope or --study")
     elif args.verb == "deploy":
         _print_receipt("deploy", await commands.run_deploy(session, args.envelope))
     elif args.verb == "stop":
-        commands.run_stop()
+        deployment = await commands.run_stop(
+            session, args.deployment, start=args.start
+        )
+        print(f"{deployment.deployment_id} is {deployment.disposition}")
     elif args.verb == "export":
         export = await commands.run_export(
             session,

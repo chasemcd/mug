@@ -19,7 +19,7 @@ import pytest
 from mug.kernel import ArtifactRef, DataHandlingRef, Digest, compute_digest
 from mug.runtime import CommandContext, read_ledger
 from mug.storage import InMemoryStore
-from mug.workers import JobRunner, JobUnknown, LeaseHeld
+from mug.workers import JobRunner, JobUnknown, LeaseHeld, attempt_aggregate_id
 
 _DIGEST = Digest(algorithm="sha-256", hex="a" * 64)
 _DH = DataHandlingRef(privacy_labels=["research"])
@@ -204,7 +204,10 @@ async def test_a_second_worker_is_refused_the_held_lease() -> None:
     won = await runner.claim(context=contexts.next())
     assert won is not None
     assert won.generation == 1
-    assert store.revision_of(job_id) == 2
+    # The claim lands on the attempt aggregate; the request head never moves, which
+    # is what keeps the work key readable by a later worker.
+    assert store.revision_of(job_id) == 1
+    assert store.revision_of(attempt_aggregate_id(job_id)) == 1
     with pytest.raises(LeaseHeld):
         await runner.claim(context=contexts.next())
 
@@ -263,7 +266,7 @@ async def test_a_success_binds_the_result_digest_on_the_lineage() -> None:
     assert result.outcome == "success"
     assert result.result_ref is not None
 
-    state: dict[str, Any] | None = store.load_aggregate(job_id)
+    state: dict[str, Any] | None = store.load_aggregate(attempt_aggregate_id(job_id))
     assert state is not None
     assert state["status"] == "succeeded"
     assert state["result_digest"] == compute_digest(
@@ -294,7 +297,7 @@ async def test_a_failure_completes_without_an_artifact() -> None:
     assert receipt.outcome == "accepted"
     assert result.outcome == "failure"
     assert result.result_ref is None
-    state = store.load_aggregate(job_id)
+    state = store.load_aggregate(attempt_aggregate_id(job_id))
     assert state is not None
     assert state["status"] == "failed"
     assert "result_digest" not in state
@@ -356,7 +359,7 @@ async def test_an_expired_lease_is_taken_over_and_the_stale_worker_is_fenced() -
         ),
     )
     assert fresh_receipt.outcome == "accepted"
-    state = store.load_aggregate(job_id)
+    state = store.load_aggregate(attempt_aggregate_id(job_id))
     assert state is not None
     assert state["status"] == "succeeded"
     assert state["attempt"] == 2

@@ -25,11 +25,13 @@ visual fallback, never a faked match.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from mug.game.browser import BrowserGameSpec
 from mug.game.determinism import state_hash, state_hash_chain
 from mug.game.runtime import EpisodeSummary
+from mug.game.trajectory import TrajectoryFrame
 from mug.kernel import Digest
 from mug.replay.types import (
     DeterministicStateHashCheck,
@@ -48,6 +50,12 @@ class VerificationReport:
     per-frame state-hash chain the caller may persist or export.
     ``state_hash_chain_digest`` binds the re-executed trajectory when the
     verification is deterministic. ``reason`` names the fallback cause otherwise.
+
+    ``trajectory`` is what the re-execution saw: the action, the observation, the
+    reward, the flags, and the environment's metrics per frame. A browser reports
+    digests and its own actions, never the values, so a server that verifies a run
+    is the only place those values exist -- and dropping them would leave a
+    browser-run study with no data. A fallback verifies nothing and records none.
     """
 
     verification: str
@@ -55,6 +63,7 @@ class VerificationReport:
     checks: tuple[StateHashCheck, ...]
     state_hash_chain_digest: Digest | None
     reason: str | None
+    trajectory: Sequence[TrajectoryFrame] = ()
 
 
 @dataclass(frozen=True)
@@ -64,9 +73,12 @@ class _ReferenceRun:
     frame_hashes: list[Digest]
     action_hashes: list[Digest]
     final_hash: Digest
+    trajectory: list[TrajectoryFrame]
 
 
-def _reference_run(spec: BrowserGameSpec, actions: list[int]) -> _ReferenceRun:
+def _reference_run(
+    spec: BrowserGameSpec, actions: list[int], seat_key: str
+) -> _ReferenceRun:
     """Re-execute the run from the seed and actions, returning the true hashes.
 
     The environment comes from the same source bundle the browser ran, so the
@@ -86,12 +98,27 @@ def _reference_run(spec: BrowserGameSpec, actions: list[int]) -> _ReferenceRun:
     state = env.reset()
     frame_hashes: list[Digest] = []
     action_hashes: list[Digest] = []
-    for action in actions:
+    trajectory: list[TrajectoryFrame] = []
+    for index, action in enumerate(actions, start=1):
         state = env.step(action)
         frame_hashes.append(state_hash(state.observation))
         action_hashes.append(state_hash(action))
+        # The browser's transition digests commit to the whole action and
+        # observation set for the seat, so the recorded values are keyed the same
+        # way the digests were taken.
+        trajectory.append(
+            TrajectoryFrame(
+                frame_number=index,
+                actions={seat_key: int(action)},
+                observations={seat_key: state.observation},
+                rewards={seat_key: state.reward},
+                terminated=state.terminated,
+                truncated=state.truncated,
+                info=dict(state.info),
+            )
+        )
     final_hash = state_hash(state.observation)
-    return _ReferenceRun(frame_hashes, action_hashes, final_hash)
+    return _ReferenceRun(frame_hashes, action_hashes, final_hash, trajectory)
 
 
 def _visual_fallback(summary: EpisodeSummary, reason: str) -> VerificationReport:
@@ -140,7 +167,7 @@ def verify_browser_episode(
         )
 
     try:
-        reference = _reference_run(spec, actions)
+        reference = _reference_run(spec, actions, summary.seat_key)
     except Exception:
         # Any re-execution failure -- a missing package, a bundle that does not
         # build -- declares a visual fallback rather than a faked match.
@@ -178,6 +205,10 @@ def verify_browser_episode(
         checks=tuple(checks),
         state_hash_chain_digest=chain if verified else None,
         reason=None,
+        # A run that did not verify is not this trajectory, so the values are
+        # withheld: recording them would attach a re-execution to a run that
+        # diverged from it.
+        trajectory=reference.trajectory if verified else (),
     )
 
 

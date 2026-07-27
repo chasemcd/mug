@@ -3,8 +3,8 @@
 The API-08 family (``mug.conversation``) owns six records -- the authored
 ``ChatMessage``, the ``ConversationSegment`` that groups a contiguous run, the
 ``ContextSnapshot`` that pins the context of a model request, the ``TurnPolicy``,
-the ``DeliveryReceipt``, and the ``CandidateReplySet`` -- but adds no runtime. This
-module is the channel runtime over them. It is the chat analog of the game loop:
+the ``DeliveryReceipt``, and the ``CandidateReplySet``. This module is the channel
+runtime over them. It is the chat analog of the game loop:
 where the game loop assigns a frame number and records a transition, the channel
 assigns a sequence number and records a message, both through the shared command
 spine, so a conversation's lineage is a canonical event stream.
@@ -29,11 +29,12 @@ just as the game loop holds the seat seam but never the scheduler.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from datetime import datetime, timezone
 from typing import Any, Literal, cast
 
 from mug.conversation.types import (
+    CandidateReplySet,
     ChatMessage,
     ContextSnapshot,
     ConversationSegment,
@@ -49,11 +50,12 @@ from mug.kernel import (
 from mug.runtime import CommandContext, commit_command
 from mug.storage import Store
 
-_ChannelRecord = ChatMessage | DeliveryReceipt | ContextSnapshot
+_ChannelRecord = ChatMessage | DeliveryReceipt | ContextSnapshot | CandidateReplySet
 
 _POST = CommandTypeRef(name="chat.post", version=0)
 _DELIVER = CommandTypeRef(name="chat.deliver", version=0)
 _SNAPSHOT = CommandTypeRef(name="chat.snapshot", version=0)
+_CANDIDATES = CommandTypeRef(name="chat.candidate-set", version=0)
 
 _INSTANT = "%Y-%m-%dT%H:%M:%S.%fZ"
 
@@ -195,6 +197,42 @@ class ConversationChannel:
             store=self._store,
         )
         return receipt, snap
+
+    async def candidate_set(
+        self,
+        *,
+        context: CommandContext,
+        prompt_message_id: str,
+        candidate_message_ids: Sequence[str],
+        selected_message_id: str,
+        preference_response_id: str,
+    ) -> tuple[CommandReceipt, CandidateReplySet]:
+        """Record the replies one prompt was answered with, and the one kept.
+
+        Every candidate is a posted message of this channel, so the set names them
+        by their own identity rather than copying what they said. The thread went on
+        with ``selected_message_id`` and the rest were never delivered to anybody --
+        which is the whole value of the record, because the unchosen reply exists
+        nowhere else. ``preference_response_id`` is the API-18 response that chose
+        it, so the judgement and the branch are joined without either family
+        holding the other's data.
+        """
+        recorded = CandidateReplySet(
+            channel_key=self._channel_key,
+            prompt_message_id=prompt_message_id,
+            candidate_message_ids=list(candidate_message_ids),
+            selected_message_id=selected_message_id,
+            preference_response_id=preference_response_id,
+            recorded_at=self._instant(),
+        )
+        receipt = await commit_command(
+            context,
+            command=_CANDIDATES,
+            new_state=_state(recorded),
+            result=_typed(recorded),
+            store=self._store,
+        )
+        return receipt, recorded
 
     def segment(
         self, *, message_ids: list[str], start_sequence: int, end_sequence: int

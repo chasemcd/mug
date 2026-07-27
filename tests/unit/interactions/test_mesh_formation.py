@@ -16,7 +16,7 @@ from collections.abc import Mapping, Sequence
 
 from mug.interactions.service import MeshFormationService
 from mug.interactions.types import FifoMatch, LatencyMatch
-from mug.kernel import Digest, Duration, compute_digest
+from mug.kernel import Digest, Duration, LeaseRef, compute_digest
 from mug.kernel.refs import StudyVersionRef
 
 _NOW = "2026-07-22T00:00:00.000000Z"
@@ -243,6 +243,48 @@ def test_a_reacquired_lease_fences_the_prior_generation() -> None:
     assert second.lease.lease_id == first.lease.lease_id
     assert service.is_current(second)
     assert not service.is_current(first)
+
+
+def test_current_lease_checks_every_authoritative_binding() -> None:
+    """An actor, interaction, epoch, expiry, or generation substitution is stale."""
+    service = _service(size=2, strategy=FifoMatch(kind="fifo"))
+    service.submit(enrollment_id=_enrollment(1), visit_id=_visit(1))
+    service.submit(enrollment_id=_enrollment(2), visit_id=_visit(2))
+    lease = service.poll().leases[0]
+
+    wrong_actor = lease.model_copy(
+        update={"actor_id": "actor_019b6000-0000-7000-8000-0000000000ff"}
+    )
+    wrong_interaction = lease.model_copy(
+        update={
+            "interaction_id": "interaction_019b6000-0000-7000-8000-0000000000ff"
+        }
+    )
+    wrong_epoch = lease.model_copy(
+        update={
+            "lease": LeaseRef(
+                lease_id=lease.lease.lease_id,
+                namespace_epoch_id=(
+                    "leaseepoch_019b6000-0000-7000-8000-0000000000ff"
+                ),
+                generation=lease.lease.generation,
+            )
+        }
+    )
+    expired = lease.model_copy(
+        update={"expires_at": "2026-07-21T23:59:59.000000Z"}
+    )
+
+    assert not service.is_current(wrong_actor)
+    assert not service.is_current(wrong_interaction)
+    assert not service.is_current(wrong_epoch)
+    assert not service.is_current(expired)
+    for forged in (wrong_actor, wrong_interaction, wrong_epoch):
+        try:
+            service.reacquire_lease(lease.interaction_id, forged)
+        except ValueError:
+            continue
+        raise AssertionError("a forged connection lease must not be reacquired")
 
 
 # -- constructor guards --------------------------------------------------------

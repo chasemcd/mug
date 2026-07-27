@@ -13,6 +13,7 @@ assignment), and a quality attestation before the response is refused.
 from __future__ import annotations
 
 import itertools
+from typing import Any, cast
 
 from mug.kernel import ArtifactRef, Digest
 from mug.preferences import (
@@ -31,7 +32,9 @@ _DIGEST = Digest(algorithm="sha-256", hex="a" * 64)
 _ASSIGNMENT = "prefassign_" + _UUID.format(0x001)
 _QUERY = "prefquery_" + _UUID.format(0x002)
 _ENROLLMENT = "enrollment_" + _UUID.format(0x003)
-_RESPONSE = "prefresponse_" + _UUID.format(0x004)
+_RESPONSE = "prefresponse_" + _UUID.format(0x001)  # shares the assignment body
+# The quality evidence is its own aggregate, so it has its own identifier.
+_QUALITY = "prefresponse_" + _UUID.format(0x005)
 _HANDLE = "handle_" + "a" * 21 + "A"
 
 
@@ -53,8 +56,9 @@ class _Contexts:
         self._aggregate_id = aggregate_id
         self._counter = itertools.count(1)
 
-    def next(self) -> CommandContext:
+    def next(self, aggregate_id: str | None = None) -> CommandContext:
         n = next(self._counter)
+        aggregate = aggregate_id or self._aggregate_id
         body = _UUID.format(n)
         return CommandContext.model_validate(
             {
@@ -63,13 +67,13 @@ class _Contexts:
                 "error_id": "error_" + body,
                 "idempotency_key": "idem_" + f"{n:021d}" + "A",
                 "event_id": "event_" + body,
-                "stream_id": "stream_" + self._aggregate_id.split("_", 1)[1],
+                "stream_id": "stream_" + aggregate.split("_", 1)[1],
                 "producer": {
                     "epoch_id": "prodepoch_" + _UUID.format(9),
                     "sequence": n,
                     "content_digest": _DIGEST.model_dump(mode="json"),
                 },
-                "aggregate_id": self._aggregate_id,
+                "aggregate_id": aggregate,
                 "principal": {
                     "kind": "service",
                     "id": "service_" + _UUID.format(0xA),
@@ -134,8 +138,14 @@ def test_a_candidate_names_a_recorded_artifact() -> None:
     assert candidate.display_handle == _HANDLE
 
 
-async def test_the_full_annotation_loop_records_one_stream() -> None:
-    """Assign, respond, and attest land as one ordered three-event stream."""
+async def test_the_full_annotation_loop_records_what_the_participant_did() -> None:
+    """Assign and respond are one ordered stream; the evidence is its own record.
+
+    The quality evidence is deliberately not a third event of the assignment. A
+    store holds one state per aggregate, so a third write would overwrite the
+    response and the recorded choice would leave the platform as a digest of
+    something nobody holds. Both records stay readable, joined by the response id.
+    """
     store = InMemoryStore()
     contexts = _Contexts(_ASSIGNMENT)
     service = PreferenceService(store=store)
@@ -153,8 +163,8 @@ async def test_the_full_annotation_loop_records_one_stream() -> None:
     assert assignment.blinded is True
 
     respond_receipt, _ = await service.respond(
-        context=contexts.next(),
-        response_id=_RESPONSE,
+        context=contexts.next(_RESPONSE),
+        assignment_id=_ASSIGNMENT,
         choice=order[0],
         presented_order=order,
         submitted_at="2026-07-22T00:00:01.000000Z",
@@ -162,20 +172,30 @@ async def test_the_full_annotation_loop_records_one_stream() -> None:
     assert respond_receipt.outcome == "accepted"
 
     quality_receipt, quality = await service.attest_quality(
-        context=contexts.next(),
+        context=contexts.next(_QUALITY),
+        assignment_id=_ASSIGNMENT,
         attention_check_passed=True,
         response_time_ms=4200,
     )
     assert quality_receipt.outcome == "accepted"
     assert quality.response_id == _RESPONSE
 
+    # Every record heads its own aggregate, so every one of them is still readable
+    # once the whole annotation is over -- which is the point of them.
     events = read_ledger(store, _stream_id())
-    names = [event.event_schema.name for event in events]
-    assert names == [
+    assert [event.event_schema.name for event in events] == [
         "mug.api-18.preference-assignment",
         "mug.api-18.preference-response",
-        "mug.api-18.quality-evidence",
     ]
+    assigned = cast("dict[str, Any]", store.load_aggregate(_ASSIGNMENT))
+    assert assigned["schema"]["name"] == "mug.api-18.preference-assignment"
+    assert assigned["enrollment_id"] == _ENROLLMENT
+    answered = cast("dict[str, Any]", store.load_aggregate(_RESPONSE))
+    assert answered["schema"]["name"] == "mug.api-18.preference-response"
+    assert answered["choice"] == order[0]
+    attested = cast("dict[str, Any]", store.load_aggregate(_QUALITY))
+    assert attested["schema"]["name"] == "mug.api-18.quality-evidence"
+    assert attested["response_id"] == _RESPONSE
 
 
 async def test_an_identical_response_retry_replays_with_no_second_effect() -> None:
@@ -185,17 +205,17 @@ async def test_an_identical_response_retry_replays_with_no_second_effect() -> No
     await _assigned(store, contexts)
     service = PreferenceService(store=store)
 
-    respond_context = contexts.next()
+    respond_context = contexts.next(_RESPONSE)
     first, _ = await service.respond(
         context=respond_context,
-        response_id=_RESPONSE,
+        assignment_id=_ASSIGNMENT,
         choice="run-a",
         presented_order=["run-a", "run-b"],
         submitted_at="2026-07-22T00:00:01.000000Z",
     )
     retry, _ = await service.respond(
         context=respond_context,
-        response_id=_RESPONSE,
+        assignment_id=_ASSIGNMENT,
         choice="run-a",
         presented_order=["run-a", "run-b"],
         submitted_at="2026-07-22T00:00:01.000000Z",
@@ -203,7 +223,7 @@ async def test_an_identical_response_retry_replays_with_no_second_effect() -> No
 
     assert first.outcome == "accepted"
     assert retry.outcome == "accepted"  # a replay, not a second effect
-    # The stream holds exactly the assignment and the one response.
+    # One response was recorded, not two: the assignment and its one answer.
     assert len(read_ledger(store, _stream_id())) == 2
 
 
@@ -215,22 +235,25 @@ async def test_a_different_second_response_is_fenced() -> None:
     service = PreferenceService(store=store)
 
     first, _ = await service.respond(
-        context=contexts.next(),
-        response_id=_RESPONSE,
+        context=contexts.next(_RESPONSE),
+        assignment_id=_ASSIGNMENT,
         choice="run-a",
         presented_order=["run-a", "run-b"],
         submitted_at="2026-07-22T00:00:01.000000Z",
     )
     second, _ = await service.respond(
-        context=contexts.next(),
-        response_id="prefresponse_" + _UUID.format(0x005),
+        context=contexts.next(_RESPONSE),
+        assignment_id=_ASSIGNMENT,
         choice="run-b",
         presented_order=["run-a", "run-b"],
         submitted_at="2026-07-22T00:00:02.000000Z",
     )
 
     assert first.outcome == "accepted"
-    assert second.outcome != "accepted"  # fenced, no second response
+    assert second.outcome != "accepted"  # the response aggregate is already taken
+    # And the one that was recorded is the first answer, unchanged.
+    kept = cast("dict[str, Any]", store.load_aggregate(_RESPONSE))
+    assert kept["choice"] == "run-a"
     assert len(read_ledger(store, _stream_id())) == 2
 
 
@@ -245,7 +268,8 @@ async def test_a_quality_attestation_before_the_response_is_refused() -> None:
 
     with pytest.raises(ResponseRequired):
         await service.attest_quality(
-            context=contexts.next(),
+            context=contexts.next(_QUALITY),
+            assignment_id=_ASSIGNMENT,
             attention_check_passed=True,
             response_time_ms=1000,
         )

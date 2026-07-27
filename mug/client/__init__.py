@@ -1,15 +1,27 @@
-"""Participant client, realtime, and uploads (API-09, layer L1).
+"""Participant client, realtime, P2P transport, and uploads (API-09, layer L1).
 
-This family owns nine client-facing record types: the ``ClientHandshake`` that
-pins the accepted deployment, the ``RealtimeCommand`` and its ``TransportAck``,
-the ``UploadTicket``, the ``InputScheme`` and ``SeatDelivery`` that shape a seat,
-the ``BridgeMessage`` for trusted page JavaScript, the ``MonitoringMeasurement``
-the server evaluates, and the ``GateOp`` that gates readiness. Each record
-references the kernel (L0) types; the family adds no runtime.
+The family owns the general participant records and the authenticated browser
+P2P wire records. Each record references kernel (L0) types. The family adds no
+runtime and exposes no principal, actor, membership, lease, or secret value.
 """
 
 from __future__ import annotations
 
+from mug.client.p2p import (
+    P2PCaptureSubmission,
+    P2PDataChannel,
+    P2PIceGrantRequest,
+    P2PMeshAbort,
+    P2PMeshBootstrap,
+    P2PMeshFinish,
+    P2PMeshStart,
+    P2PPeer,
+    P2PPeerComplete,
+    P2PPeerReady,
+    P2PSignal,
+    P2PSignalAck,
+    P2PSignalDelivery,
+)
 from mug.client.types import (
     BridgeMessage,
     ClientHandshake,
@@ -29,6 +41,19 @@ __all__ = [
     "GateOp",
     "InputScheme",
     "MonitoringMeasurement",
+    "P2PCaptureSubmission",
+    "P2PDataChannel",
+    "P2PIceGrantRequest",
+    "P2PMeshAbort",
+    "P2PMeshBootstrap",
+    "P2PMeshFinish",
+    "P2PMeshStart",
+    "P2PPeer",
+    "P2PPeerComplete",
+    "P2PPeerReady",
+    "P2PSignal",
+    "P2PSignalAck",
+    "P2PSignalDelivery",
     "RealtimeCommand",
     "SeatDelivery",
     "TransportAck",

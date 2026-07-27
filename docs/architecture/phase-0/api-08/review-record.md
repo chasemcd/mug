@@ -32,7 +32,14 @@
 - [ ] Accountable owner and four reviewers assigned
 - [ ] Routing, visibility, and moderation policy defined
 - [ ] Streaming presentation and delivery-evidence timing defined with API-09
-- [ ] Cross-modality anchors relate game and chat streams (no global clock)
+- [x] Cross-modality anchors relate game and chat streams (no global clock) --
+  built with W6. Causation is `EventEnvelope.causation_event_id`, which was frozen
+  and never written: a reply now names the event of the message it answers. The
+  environment step and render frame have no field on any frozen record, so they are
+  a content-addressed anchor tape (`mug.conversation.anchors`) that the episode
+  aggregate names beside its trajectory, checked against the run by
+  `verify_anchors`. Channel sequence and the server monotonic anchor were already
+  on `ChatMessage` and `EventEnvelope`. No global order is written anywhere.
 - [ ] NS-02 through NS-07 walkthroughs pass
 - [ ] Dependent ADRs accepted; four sign-offs recorded; version-1 bytes frozen
 
@@ -52,6 +59,39 @@
 | Runtime/distributed systems | Unassigned | Pending | — | Ordering, idempotency, activation loops |
 | Data/replay | Unassigned | Pending | — | History, context snapshots, replay readiness |
 | Security/privacy | Unassigned | Pending | — | Visibility, moderation, output escaping |
+
+## What W19 settles, and what it does not (2026-07-27)
+
+**Settles.** `CandidateReplySet` has a producer. A live conversation now presents
+`n` candidate replies for one turn, records the participant's choice as an API-18
+response, continues the thread from the chosen reply, and keeps the unchosen branch
+-- committed to the channel, delivered to nobody, and recorded as a durable
+generation with its own private provenance. `ConversationChannel.candidate_set` is
+the write; `mug/participant_elicit.py` and the chat mount drive it. D12-8 is
+implemented as it was settled, with one departure recorded below.
+
+**One rule carries the whole guarantee.** A candidate is posted through the
+*channel* and handed to the *room* only if it is chosen. A message the room never
+adopts is in no order, so no delivery, no flush, and no reconnection can reach it.
+There is one enforcement point rather than two to keep in step, and a first
+implementation's delivery-watermark guard was deleted once mutation testing showed
+it guarded nothing.
+
+**Departure from D12-8, deliberate.** The decision settled "sampled by default";
+the built default elicits **every** turn, with `sample` as an author knob. Writing
+`elicit_preference=` is already the opt-in, and a silent default that drops half of
+a study's elicitations is a surprise a reader of the data cannot see. Which turns a
+sampling study elicits is derived from the deployment secret and the prompt message,
+so the rate is checkable against the record rather than trusted.
+
+**Does not settle.** No adjudication and no multi-annotator agreement inside a
+conversation (D12-7 stays as it was: several judgements are recordable, resolution
+is deferred). No streaming of candidates as they generate -- a set is presented when
+all of it is recorded. No re-elicitation of a turn already answered. And no owner
+sign-off: this section is evidence, not review.
+
+**No record, field, or fixture was added to API-08.** The bundle digest is
+unchanged. The dimensional and tie surface this needed is API-18 revision 0.3.
 
 ## Change log
 

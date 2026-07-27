@@ -1,0 +1,38 @@
+{
+  "schema": {
+    "name": "mug.api-18.preference-protocol",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "717b95bd477ea2e7f21fc8f77309896fdb7ad5e2b06b64a6de5b9289564d4db3"
+    }
+  },
+  "protocol_version_id": "prefver_019b6000-0000-7000-8000-000000000f14",
+  "protocol_definition_id": "prefdef_019b6000-0000-7000-8000-000000000f15",
+  "candidate_kind": "chat-message",
+  "task": {
+    "kind": "pairwise",
+    "prompt": "Which reply would you rather have received?",
+    "allow_tie": true,
+    "dimensions": [
+      {
+        "key": "helpful",
+        "label": "Which reply is more helpful?",
+        "scope": "pair",
+        "points": 2,
+        "low_label": "Slightly",
+        "high_label": "Much"
+      },
+      {
+        "key": "verbosity",
+        "label": "How verbose is each reply?",
+        "scope": "each",
+        "points": 5,
+        "low_label": "Terse",
+        "high_label": "Long-winded"
+      }
+    ]
+  },
+  "blinded": true,
+  "randomize_order": true
+}

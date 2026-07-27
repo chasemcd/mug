@@ -1,0 +1,12 @@
+{
+  "schema": {
+    "name": "mug.api-09.p2p-signal-ack",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "ec6d3f0019480421a8cdc9ce8db2f2e88f2398e0daf0c7773ced3841ba435029"
+    }
+  },
+  "request_id": "request_019b6000-0000-7000-8000-000000000901",
+  "status": "rejected"
+}

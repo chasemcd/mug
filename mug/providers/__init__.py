@@ -14,6 +14,17 @@ never persisting it.
 
 from __future__ import annotations
 
+from mug.providers.durable_tape import (
+    GENERATION_FORMS,
+    ArtifactOutputTape,
+    GenerationForm,
+    GenerationForms,
+    Normalize,
+    RenderVisible,
+    normalize_output,
+    read_generation_form,
+    render_visible,
+)
 from mug.providers.runtime import (
     FakeProvider,
     ModelCall,
@@ -34,20 +45,29 @@ from mug.providers.types import (
 )
 
 __all__ = [
+    "GENERATION_FORMS",
     "AgentVersion",
+    "ArtifactOutputTape",
     "FakeProvider",
+    "GenerationForm",
+    "GenerationForms",
     "InMemoryOutputTape",
     "ModelCall",
     "ModelCallResult",
     "ModelCompletion",
     "ModelProvider",
+    "Normalize",
     "Output",
     "OutputTape",
     "ProviderAdapter",
     "ProviderError",
     "ProviderRequest",
     "ProviderResponse",
+    "RenderVisible",
     "SecretResolver",
     "Usage",
+    "normalize_output",
     "providers_schema",
+    "read_generation_form",
+    "render_visible",
 ]

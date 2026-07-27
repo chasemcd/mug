@@ -16,6 +16,7 @@ deterministic replica, no socket, and no clock. They prove the two P2P follow-on
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Mapping
 from typing import Any, cast
 
@@ -24,6 +25,12 @@ import pytest
 from mug.game.bot_authority import BotSeat
 from mug.game.desync_repair import resync_peer
 from mug.game.mesh import PeerEngine, ReplicaFrame
+from mug.game.mesh_session import (
+    MeshBotSpec,
+    MeshGameSpec,
+    MeshSession,
+    SeatWiring,
+)
 from mug.kernel import Digest
 
 _INTERACTION = "interaction_019b6000-0000-7000-8000-00000000010f"
@@ -176,6 +183,125 @@ def test_only_the_authority_peer_runs_the_bot_and_the_mesh_agrees() -> None:
     assert controller.calls == length
     assert _rows(engines[human_a]) == _rows(engines[human_b])
     assert len(_rows(engines[human_a])) == length
+
+
+def test_a_mounted_mesh_seats_a_bot_beside_its_people() -> None:
+    """The mesh a study mounts holds a bot seat, and it holds it the same way.
+
+    The test above drove ``BotSeat`` by hand, which is what it had: the rule was
+    built and nothing mounted it, so no study could put a bot in a peer mesh.
+    ``MeshSession`` now does it -- the bot is a seat in the frozen peer set with no
+    engine of its own, one designated peer produces its action, and the two real
+    peers still export byte-identical trajectories.
+    """
+    human_a, human_b, bot = _actor(1), _actor(2), _actor(3)
+    length = 12
+    controller = CountingController()
+    spec = MeshGameSpec(
+        channel_key="line",
+        size=2,
+        make_replica=lambda peers, seed: LineWorld(
+            peers, seed=seed, episode_len=length
+        ),
+        bots=(
+            MeshBotSpec(actor_id=bot, seat_key="seat-bot", controller=controller),
+        ),
+        action_bindings={},
+        default_action=1,
+        seed=7,
+        fps=0,
+        max_steps=length + 20,
+    )
+    seen: dict[str, list[dict[str, Any]]] = {human_a: [], human_b: []}
+
+    def sink(actor: str) -> Any:
+        async def send(frame: dict[str, Any]) -> None:
+            seen[actor].append(frame)
+
+        return send
+
+    session = MeshSession(
+        seats=[
+            SeatWiring(
+                seat_key=f"seat-{index + 1}",
+                actor_id=actor,
+                action=lambda: 2,
+                send=sink(actor),
+            )
+            for index, actor in enumerate((human_a, human_b))
+        ],
+        spec=spec,
+        interaction_id=_INTERACTION,
+        episode_id=_EPISODE,
+        mesh_membership_digest=_MESH_DIGEST,
+        membership_generation=1,
+        recorded_at=_RECORDED_AT,
+    )
+    episode = asyncio.run(session.run())
+
+    # The two people's peers agree, and the mesh reports one run for the pair.
+    assert episode.verified
+    assert set(episode.summaries) == {human_a, human_b}
+    assert episode.frames == length
+    # Only one peer ever ran the controller, so the bot contributed one action per
+    # frame rather than one per peer.
+    assert controller.calls == length
+    # Every peer stepped the bot's seat beside the two people's, with the same
+    # action on both -- which is the whole point of a single source.
+    confirmed = {
+        actor: [
+            frame["confirmed"]["actions"]
+            for frame in frames
+            if frame["confirmed"] is not None
+        ]
+        for actor, frames in seen.items()
+    }
+    assert confirmed[human_a] == confirmed[human_b]
+    assert confirmed[human_a], "no confirmed frame reached either seat"
+    assert all(
+        set(actions) == {human_a, human_b, bot} for actions in confirmed[human_a]
+    )
+    # The bot really moved: it is not a seat pinned to the default action.
+    played = {actions[bot] for actions in confirmed[human_a]}
+    assert len(played) > 1
+
+
+def test_a_bot_seat_may_not_take_a_persons_actor_id() -> None:
+    """Two seats with one identity is a mesh that cannot say who did what."""
+    human_a, human_b = _actor(1), _actor(2)
+    spec = MeshGameSpec(
+        channel_key="line",
+        size=2,
+        make_replica=lambda peers, seed: LineWorld(peers, seed=seed, episode_len=4),
+        bots=(
+            MeshBotSpec(
+                actor_id=human_a, seat_key="seat-bot", controller=CountingController()
+            ),
+        ),
+    )
+    with pytest.raises(ValueError, match="distinct actor id"):
+        MeshSession(
+            seats=[
+                SeatWiring(
+                    seat_key=f"seat-{index + 1}",
+                    actor_id=actor,
+                    action=lambda: 1,
+                    send=_nothing,
+                )
+                for index, actor in enumerate((human_a, human_b))
+            ],
+            spec=spec,
+            interaction_id=_INTERACTION,
+            episode_id=_EPISODE,
+            mesh_membership_digest=_MESH_DIGEST,
+            membership_generation=1,
+            recorded_at=_RECORDED_AT,
+        )
+
+
+async def _nothing(frame: dict[str, Any]) -> None:
+    """Drop one pushed frame; a seat that is only in the mesh to be counted."""
+    return None
 
 
 def test_submit_for_refuses_the_nodes_own_seat_and_a_stranger() -> None:

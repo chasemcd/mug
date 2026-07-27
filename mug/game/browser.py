@@ -17,6 +17,7 @@ refused. The bundle carries no secret material and no private manifest data.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, cast
 
@@ -28,7 +29,7 @@ from mug.game.runtime import EpisodeSummary
 from mug.game.types import EpisodeBoundary, GameTransition
 from mug.kernel import CommandReceipt, Digest
 from mug.runtime import CommandContext, FencingClaim
-from mug.storage import Store
+from mug.storage import ArtifactStore, Store
 
 
 @dataclass(frozen=True)
@@ -161,6 +162,11 @@ async def capture_browser_episode(
     store: Store,
     verification: str = "visual-fallback",
     state_hash_chain_digest: Digest | None = None,
+    artifacts: ArtifactStore | None = None,
+    new_artifact_id: Callable[[], str] | None = None,
+    new_upload_id: Callable[[], str] | None = None,
+    now: Callable[[], str] | None = None,
+    activity_key: str | None = None,
 ) -> CommandReceipt:
     """Commit a client-run episode under browser authority, fenced by generation.
 
@@ -173,6 +179,10 @@ async def capture_browser_episode(
     when it could not re-execute. ``state_hash_chain_digest`` binds the verified
     trajectory when the verification is deterministic. The episode aggregate keeps
     the verdict, so the export shows whether the run was server-verified.
+
+    The artifact store and its minters, when supplied, record the run's trajectory
+    beside the ledger digests. A browser reports no values, so what is recorded is
+    the server's own verified re-execution, handed in on the summary.
     """
     fenced = context.model_copy(
         update={"fencing": FencingClaim(epoch_id=epoch_id, generation=generation)}
@@ -184,6 +194,11 @@ async def capture_browser_episode(
         store=store,
         verification=verification,
         state_hash_chain_digest=state_hash_chain_digest,
+        artifacts=artifacts,
+        new_artifact_id=new_artifact_id,
+        new_upload_id=new_upload_id,
+        now=now,
+        activity_key=activity_key,
     )
 
 

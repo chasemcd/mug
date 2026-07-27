@@ -153,9 +153,7 @@ class GlobalRngEnv:
         self._value = cast("float", state)
 
 
-def _replica(
-    actors: tuple[str, ...], *, horizon: int, seed: int
-) -> MultiAgentReplica:
+def _replica(actors: tuple[str, ...], *, horizon: int, seed: int) -> MultiAgentReplica:
     """Build one multi-agent replica whose actors map to fake env agents."""
     agent_ids = tuple(f"player_{i}" for i in range(len(actors)))
     mapping = dict(zip(actors, agent_ids, strict=True))

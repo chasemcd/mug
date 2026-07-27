@@ -1,0 +1,17 @@
+{
+  "outcome": "created",
+  "study_version": {
+    "study_id": "study_019b6000-0000-7000-8000-000000000001",
+    "study_version_id": "studyver_019b6000-0000-7000-8000-000000000502",
+    "version_number": 1,
+    "manifest_digest": {
+      "algorithm": "sha-256",
+      "hex": "797e066b784164cb2b19c244ddbe8db67fcaf9ad76ad615c84ac57db75037531"
+    }
+  },
+  "version_string": "1.0",
+  "candidate_digest": {
+    "algorithm": "sha-256",
+    "hex": "19796503c9b11397242b227f3178c214d55304beba47fb31897b0f43d14b3cdb"
+  }
+}

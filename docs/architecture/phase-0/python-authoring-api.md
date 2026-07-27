@@ -592,7 +592,14 @@ which_better = activities.Preference(
 )
 
 Chat(key="assistant", respond_with=partner,
-     elicit_preference=Compare.pairwise(n=2))   # inline RLHF: pick a reply, chat continues with it
+     elicit_preference=Elicit.replies(n=2))     # inline RLHF: pick a reply, chat continues with it
+
+Elicit.replies(n=2, ties=True, on=[             # judged on more than one axis
+    Axis("helpful", "Which reply is more helpful?"),      # a slider between the two
+    Axis("safe", "Which reply is safer?", pick=True),     # two buttons, no middle
+    Axis("wordy", "How wordy is each reply?", each=True), # rate each, not compare
+])
+Elicit.between("partner", "rival")              # two model seats answer the same turn
 ```
 
 - Field types: single/multi choice, Likert, short/long text, number, slider,
@@ -603,9 +610,19 @@ Chat(key="assistant", respond_with=partner,
 - Candidates are immutable references, blinded and order-randomized without
   changing identity; a choice must be one of the presented candidates
   (D12-3/4/5). Tasks in v0: pairwise + rating.
-- Inline in-chat elicitation (D12-8): n candidate replies (default 2, sampled
-  turns by default), the pick is recorded, the chosen reply continues the
-  thread, the unchosen branch is retained as data.
+- Inline in-chat elicitation (D12-8): n candidate replies (default 2, every turn
+  by default -- `sample` elicits a fraction, and which turns is derived rather
+  than drawn), the pick is recorded, the chosen reply continues the thread, and
+  the unchosen branch is retained as data with its own provenance.
+- A judgement is more than one bit (D12-9, D12-10): `ties=True` admits "about the
+  same" and "both are bad" without inventing a choice, and `on=[Axis(...)]` adds
+  author-named axes -- a slider between the two replies, a plain pick, or a rating
+  of each. **An answer names a candidate, never a side of the screen**, so a
+  shuffled presentation can not be read back wrong. `Comparison` takes both too.
+- Preferences export as the flat rows the field trains on -- `prompt`, `chosen`,
+  `rejected`, and a conversational `messages` list -- carrying what a published
+  corpus can not: the verdict, each axis resolved to the reply it favoured, which
+  reply was shown first, the response time, and the lineage back to the evidence.
 - Multiple judgments + agreement metrics ship in v0; full adjudication
   workflow is deferred (D12-7).
 

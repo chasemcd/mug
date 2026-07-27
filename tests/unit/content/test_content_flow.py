@@ -9,6 +9,7 @@ refused as not found.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 from mug.content import (
@@ -16,7 +17,10 @@ from mug.content import (
     FlowState,
     MaterializeFlowCommand,
     advance_flow,
+    demo_study,
+    flow_of,
     materialize_flow,
+    plan_of,
     present,
 )
 from mug.gateway import Gateway
@@ -27,6 +31,7 @@ from mug.kernel import (
     PrincipalRef,
     WireCommandEnvelope,
 )
+from mug.kernel.refs import StudyVersionRef
 from mug.runtime import CommandContext
 from mug.storage import InMemoryStore
 
@@ -73,12 +78,23 @@ def _mint(
     )
 
 
+def _flow(store: InMemoryStore) -> FlowState:
+    """Return the runtime flow the visit-plan aggregate carries."""
+    state = flow_of(store.load_aggregate(_FLOW_ID))
+    assert state is not None
+    return state
+
+
 async def _materialize(gateway: Gateway, store: InMemoryStore) -> CommandReceipt:
     context = _mint(
         gateway, "flow.materialize", _FLOW_ID, {"visit_id": _VISIT_ID}, _idem("Ma")
     )
     return await materialize_flow(
-        MaterializeFlowCommand(visit_id=_VISIT_ID), context=context, store=store
+        MaterializeFlowCommand(visit_id=_VISIT_ID),
+        study=demo_study(),
+        context=context,
+        store=store,
+        **_plan_args(gateway),  # pyright: ignore[reportArgumentType]
     )
 
 
@@ -98,6 +114,7 @@ async def _advance(
     )
     return await advance_flow(
         AdvanceFlowCommand(answers=answers, expected_revision=revision),
+        study=demo_study(),
         context=context,
         store=store,
     )
@@ -109,13 +126,19 @@ async def test_materialize_opens_the_flow_at_the_consent_form() -> None:
     receipt = await _materialize(Gateway(), store)
     assert receipt.outcome == "accepted"
 
-    state = FlowState.model_validate(store.load_aggregate(_FLOW_ID))
+    state = _flow(store)
+    plan = plan_of(store.load_aggregate(_FLOW_ID))
+    assert plan is not None
     assert state.pointer == 0
     assert state.activities[0].key == "consent"
-    assert state.activities[0].status == "active"
+    assert state.activities[0].activity_key == "consent"
+    # Progress is the plan's, not the pointer's: the pointer says where, the plan
+    # says what has been done.
+    assert [one.status for one in plan.activities][:2] == ["active", "pending"]
+    assert plan.study_version.version_number == 1
     assert state.status == "in-progress"
 
-    payload = present(state)
+    payload = present(state, demo_study())
     assert payload["kind"] == "form"
     assert payload["form"]["form_key"] == "consent"
 
@@ -129,11 +152,12 @@ async def test_a_valid_answer_advances_to_the_next_activity() -> None:
     receipt = await _advance(gateway, store, {"agree": "yes"}, 1, _idem("Av"))
     assert receipt.outcome == "accepted"
 
-    state = FlowState.model_validate(store.load_aggregate(_FLOW_ID))
+    state = _flow(store)
+    plan = plan_of(store.load_aggregate(_FLOW_ID))
+    assert plan is not None
     assert state.pointer == 1
-    assert state.activities[0].status == "completed"
-    assert state.activities[1].status == "active"
-    assert present(state)["form"]["form_key"] == "survey"
+    assert [one.status for one in plan.activities][:2] == ["completed", "active"]
+    assert present(state, demo_study())["form"]["form_key"] == "survey"
 
 
 async def test_an_invalid_answer_is_refused_before_it_advances() -> None:
@@ -147,7 +171,7 @@ async def test_an_invalid_answer_is_refused_before_it_advances() -> None:
     assert receipt.error is not None
     assert receipt.error.category == "validation"
 
-    state = FlowState.model_validate(store.load_aggregate(_FLOW_ID))
+    state = _flow(store)
     assert state.pointer == 0
 
 
@@ -163,9 +187,9 @@ async def test_the_flow_reaches_completion_at_the_end_of_the_study() -> None:
     receipt = await _advance(gateway, store, {}, 4, _idem("A4"))  # the debrief
     assert receipt.outcome == "accepted"
 
-    state = FlowState.model_validate(store.load_aggregate(_FLOW_ID))
+    state = _flow(store)
     assert state.status == "completed"
-    completed = present(state)
+    completed = present(state, demo_study())
     assert completed["kind"] == "complete"
     assert completed["completion_code"].startswith("MUG-")
 
@@ -177,3 +201,22 @@ async def test_advancing_an_unknown_flow_is_refused() -> None:
     assert receipt.outcome == "rejected"
     assert receipt.error is not None
     assert receipt.error.category == "not_found"
+
+
+def _seeding(gateway: Gateway) -> Callable[[str], bytes]:
+    """The seed source a plan draws its orders from."""
+    return lambda role: gateway.derived_seed("treatment", role)
+
+
+def _plan_args(gateway: Gateway) -> dict[str, object]:
+    """The identity and seed a plan is drafted with, for a study with no design."""
+    return {
+        "study_version": StudyVersionRef(
+            study_id=gateway.derived_id("study", "test"),
+            study_version_id=gateway.derived_id("studyver", "test"),
+            version_number=1,
+            manifest_digest=Digest(algorithm="sha-256", hex="0" * 64),
+        ),
+        "derive": gateway.derived_id,
+        "seed": _seeding(gateway),
+    }

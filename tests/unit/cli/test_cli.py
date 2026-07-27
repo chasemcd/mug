@@ -35,7 +35,7 @@ from mug.game.env import EnvFactory, GymEnv
 from mug.game.runtime import EpisodeSummary, InputState, run_episode
 from mug.game.surface import Surface
 from mug.gateway import Gateway
-from mug.kernel import Digest, WireCommandEnvelope
+from mug.kernel import Digest, WireCommandEnvelope, sha256_hex
 from mug.storage import InMemoryStore
 from mug.workers import JobRunner, WorkOutcome
 
@@ -92,17 +92,20 @@ def _wire(command: str, target_id: str, data: dict[str, Any]) -> WireCommandEnve
 
 def _publish_envelope() -> WireCommandEnvelope:
     version = json.loads((_API01 / "published-version.minimal-static.json").read_text())
+    inputs = {
+        "git_provenance": version["git_provenance"],
+        "source": version["candidate"],
+        "compiler": _COMPILER,
+        "schema_registry_digest": _DIGEST,
+        "build_context_digest": _DIGEST,
+        "target_platform_contract": _COMPILER["contract"],
+        "compilation_policy": _POLICY,
+    }
     candidate = {
-        "input_fingerprint": _DIGEST,
-        "inputs": {
-            "git_provenance": version["git_provenance"],
-            "source": version["candidate"],
-            "compiler": _COMPILER,
-            "schema_registry_digest": _DIGEST,
-            "build_context_digest": _DIGEST,
-            "target_platform_contract": _COMPILER["contract"],
-            "compilation_policy": _POLICY,
-        },
+        # The candidate is content-bound: the fingerprint is the digest of the
+        # inputs, so it is computed here and never a placeholder.
+        "input_fingerprint": {"algorithm": "sha-256", "hex": sha256_hex(inputs)},
+        "inputs": inputs,
         "manifest_set": version["scientific"],
         "validation_report": version["candidate"],
         "scientific_manifest_digest": version["study_version"]["manifest_digest"],
@@ -221,10 +224,15 @@ async def test_export_without_a_published_version_asks_for_the_flag() -> None:
         discover_study_version(session.store)
 
 
-async def test_stop_reports_the_platform_gap() -> None:
-    """The stop verb reports that no stop handler exists, rather than inventing one."""
-    with pytest.raises(CliError, match="not available"):
-        run_stop()
+async def test_stop_refuses_a_deployment_nothing_recorded() -> None:
+    """``mug stop`` names a deployment, so it fails clearly on one that is not there.
+
+    The verb used to report that the platform had no stop handler at all. It has one
+    now (``mug.platform.deployment``), so the only honest refusal left is a
+    deployment identifier the store does not know.
+    """
+    with pytest.raises(CliError, match="no deployment"):
+        await run_stop(_session(), "deploy_019b6000-0000-7000-8000-0000000000aa")
 
 
 def test_git_provenance_reads_the_working_tree() -> None:
@@ -323,6 +331,10 @@ async def test_replay_assembles_a_bundle_from_an_episode(tmp_path: Path) -> None
         visit_id="visit_019b6000-0000-7000-8000-0000000000b0",
         context=context,
         store=store,
+        artifacts=store,
+        new_artifact_id=lambda: session.gateway.new_id("artifact"),
+        new_upload_id=lambda: session.gateway.new_id("upload"),
+        now=session.now,
     )
 
     bundle = await run_replay(
@@ -334,6 +346,9 @@ async def test_replay_assembles_a_bundle_from_an_episode(tmp_path: Path) -> None
 
     assert bundle.event_count > 0
     assert (tmp_path / "replay/replay-manifest.json").exists()
+    # The command line found the run's recorded values from the stream alone, so the
+    # bundle it wrote offers the same replay a transport-assembled one does.
+    assert bundle.manifest.capability_levels.visual is True
 
 
 async def test_replay_needs_at_least_one_stream(tmp_path: Path) -> None:
@@ -354,6 +369,7 @@ def _verb_args(verb: str) -> list[str]:
     fillers = {
         "publish": ["x.json"],
         "deploy": ["x.json"],
+        "stop": ["deploy_019b6000-0000-7000-8000-000000000001"],
         "export": ["out"],
         "replay": ["out", "--interaction", "i"],
         "simulate": ["--handler", "m:f"],
@@ -361,10 +377,10 @@ def _verb_args(verb: str) -> list[str]:
     return fillers.get(verb, [])
 
 
-def test_main_maps_the_stop_gap_to_a_nonzero_exit(
+def test_main_maps_an_unknown_deployment_to_a_nonzero_exit(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """The entry point maps the stop gap to a non-zero exit and a clear message."""
-    code = main(["stop"])
+    """The entry point maps a stop of an unknown deployment to a clear failure."""
+    code = main(["stop", "deploy_019b6000-0000-7000-8000-0000000000aa"])
     assert code == 1
-    assert "not available" in capsys.readouterr().err
+    assert "no deployment" in capsys.readouterr().err

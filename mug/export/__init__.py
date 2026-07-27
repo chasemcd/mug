@@ -10,7 +10,8 @@ visit's canonical streams and serializes them as the single JSONL export format.
 The ``dataset`` module generalizes it to the full study dataset:
 ``export_study_dataset`` reads the whole ledger and produces one ``ExportBundle``
 and ``LineageRecord`` per dataset kind (events, trajectories, preferences,
-conversations), reproducibly from the ledger.
+conversations), reproducibly from the ledger, beside one values artifact per
+research kind holding what those aggregates committed.
 """
 
 from __future__ import annotations
@@ -18,9 +19,11 @@ from __future__ import annotations
 from mug.export.dataset import (
     DATASET_KINDS,
     DatasetExport,
+    DatasetValues,
     GroupedRows,
     build_dataset_export,
     collect_dataset_rows,
+    collect_dataset_values,
     dataset_kinds_of,
     dataset_schema_bindings,
     discover_streams,
@@ -40,6 +43,7 @@ __all__ = [
     "DATASET_KINDS",
     "DatasetExport",
     "DatasetSchemaBinding",
+    "DatasetValues",
     "ExportBundle",
     "ExportRequest",
     "GitProvenanceRef",
@@ -48,6 +52,7 @@ __all__ = [
     "VisitExport",
     "build_dataset_export",
     "collect_dataset_rows",
+    "collect_dataset_values",
     "dataset_kinds_of",
     "dataset_schema_bindings",
     "discover_streams",

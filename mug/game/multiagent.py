@@ -105,9 +105,7 @@ class MultiAgentReplica:
         self._env = factory()
         for method in ("reset", "step", "get_state", "set_state"):
             if not callable(getattr(self._env, method, None)):
-                raise TypeError(
-                    f"a p2p parallel environment must expose {method}()"
-                )
+                raise TypeError(f"a p2p parallel environment must expose {method}()")
         self._actor_agents = dict(actor_agents)
         self._seed = seed
         self._active: tuple[str, ...] = ()

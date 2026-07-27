@@ -196,6 +196,12 @@ class PeerEngine:
             raise ValueError("the frozen peer set must be in canonical sorted order")
         if snapshot_interval < 1:
             raise ValueError("the snapshot interval must be at least one frame")
+        if input_delay < 0:
+            raise ValueError("the input delay must be nonnegative")
+        if not 1 <= redundancy <= 32:
+            raise ValueError("input redundancy must be from 1 to 32 frames")
+        if max_steps < 1:
+            raise ValueError("the maximum step count must be positive")
 
         self._actor_id = actor_id
         self._peers = peer_actor_ids
@@ -420,9 +426,7 @@ class PeerEngine:
             actions, predicted = self._resolve_actions(frame)
             self._maybe_snapshot(frame)
             result = self._step(actions)
-            self._speculative[frame] = self._record(
-                frame, actions, predicted, result
-            )
+            self._speculative[frame] = self._record(frame, actions, predicted, result)
         self._rollback_count += 1
         self._max_rollback_depth = max(self._max_rollback_depth, actions_for_replay)
 
@@ -568,11 +572,15 @@ class PeerEngine:
         from state a snapshot does not cover, so a disputed frame is the mesh's
         signal that one peer's replica has desynchronized. The engine records the
         disputed status (``P2PFrameFinality``); repair is the separate step below.
+
+        The verdict comes from the hash evidence, not from a built record, so a
+        peer that holds no contract identity -- a browser, which holds only public
+        handles -- can still read its own agreement state.
         """
         return [
             frame
             for frame in sorted(self._canonical)
-            if self._finality(frame).status == "disputed"
+            if self._status(frame)[0] == "disputed"
         ]
 
     def local_state_hash(self, frame: int) -> Digest | None:
@@ -668,6 +676,31 @@ class PeerEngine:
             finalities.append(self._finality(frame))
         return finalities
 
+    def _status(
+        self, frame: int
+    ) -> tuple[Literal["confirmed", "verified", "disputed"], Digest | None]:
+        """Return one frame's agreement verdict and its agreed hash, if any.
+
+        A frame stays ``confirmed`` until every peer's hash has arrived. It is
+        ``verified`` when they all agree and ``disputed`` when they do not. The
+        verdict reads the evidence alone, so it needs no contract identity.
+        """
+        evidence_by_peer = self._hash_evidence.get(frame, {})
+        if set(evidence_by_peer) != set(self._peers):
+            return "confirmed", None
+        values = {digest.hex for digest in evidence_by_peer.values()}
+        if len(values) != 1:
+            return "disputed", None
+        return "verified", next(iter(evidence_by_peer.values()))
+
+    def final_end_frame(self) -> int | None:
+        """Return the agreed exclusive end frame, or None before the barrier."""
+        return self._final_end_frame
+
+    def peer_end_frames(self) -> dict[str, int]:
+        """Return the end frame each peer has announced, for the barrier view."""
+        return dict(self._peer_ends)
+
     def _finality(self, frame: int) -> P2PFrameFinality:
         """Build the finality record for one confirmed frame from its evidence."""
         record = self._canonical[frame]
@@ -682,17 +715,7 @@ class PeerEngine:
             P2PPeerHashEvidence(peer_actor_id=peer, state_hash=evidence_by_peer[peer])
             for peer in sorted(evidence_by_peer)
         ]
-        complete_hashes = set(evidence_by_peer) == set(self._peers)
-        agreed: Digest | None = None
-        if complete_hashes:
-            values = {digest.hex for digest in evidence_by_peer.values()}
-            if len(values) == 1:
-                status: Literal["confirmed", "verified", "disputed"] = "verified"
-                agreed = next(iter(evidence_by_peer.values()))
-            else:
-                status = "disputed"
-        else:
-            status = "confirmed"
+        status, agreed = self._status(frame)
         return P2PFrameFinality(
             interaction_id=self._interaction_id,
             channel_key=self._channel_key,

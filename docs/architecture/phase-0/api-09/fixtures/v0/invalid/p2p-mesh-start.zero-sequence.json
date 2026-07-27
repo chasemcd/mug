@@ -1,0 +1,15 @@
+{
+  "schema": {
+    "name": "mug.api-09.p2p-mesh-start",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "ec6d3f0019480421a8cdc9ce8db2f2e88f2398e0daf0c7773ced3841ba435029"
+    }
+  },
+  "room_handle": "handle_AAAAAAAAAAAAAAAAAAAAAA",
+  "negotiation_generation": 1,
+  "seed": 314159,
+  "start_sequence": 0,
+  "capture_owner_handle": "handle_BBBBBBBBBBBBBBBBBBBBBA"
+}

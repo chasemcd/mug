@@ -95,7 +95,11 @@ def test_every_ts_command_validates_against_the_realtime_command_model() -> None
         # The real server model validates the header; a bad id, key, or instant
         # would raise here.
         RealtimeCommand.model_validate(frame["command"])
-        assert frame["command"]["channel_key"] in {"flow.advance", "game.capture"}
+        assert frame["command"]["channel_key"] in {
+            "flow.advance",
+            "game.capture",
+            "state.set",
+        }
         assert "payload" in frame
 
 
@@ -119,3 +123,57 @@ def test_the_ts_client_advances_the_flow_and_reports_input() -> None:
     assert advances and all("answers" in f["payload"] for f in advances)
     inputs = [f for f in frames if f["type"] == "input"]
     assert inputs == [{"type": "input", "keys": ["ArrowLeft"]}]
+
+
+def test_the_ts_client_carries_state_the_way_the_other_client_does() -> None:
+    """The state bridge is the same in both clients, which is what parity means.
+
+    The server delivers what the participant may read, a page writes one namespace
+    against the revision it read, and a **refused** write puts back what it
+    optimistically replaced -- so a page that lost a race is not left one revision
+    ahead of the server and failing every write after it.
+    """
+    report = _run_client()
+    assert report["state_read_back"] == {"seen": ["notes"]}
+    # The write moved the held revision forward, so a second write in the same
+    # activity would name what the first produced.
+    assert report["state_revision_after_write"] == 1
+    # The refusal put it back, so the next write names what the server holds.
+    assert report["state_revision_after_refusal"] == 0
+
+    frames = _frames(report)
+    writes = [
+        f
+        for f in frames
+        if f["type"] == "command" and f["command"]["channel_key"] == "state.set"
+    ]
+    assert len(writes) == 1
+    assert writes[0]["payload"] == {
+        "namespace": "progress",
+        "value": {"seen": ["notes", "debrief"]},
+        "revision": 0,
+    }
+
+
+def test_the_ts_client_speaks_the_chat_frames_the_mount_reads() -> None:
+    """The conversation frames match what ``run_chat_activity`` reads and sends.
+
+    A chat frame is not a command: the mount that owns the socket records the
+    message on the participant's behalf. So this checks the two shapes on the wire
+    -- what the client posts, and that it hands the server's message to its screen
+    rather than treating an unknown frame as a wire violation.
+    """
+    frames = _frames(_run_client())
+    assert [f for f in frames if f["type"] == "chat"] == [
+        {"type": "chat", "text": "I am here for the study."}
+    ]
+    assert [f for f in frames if f["type"] == "chat_end"] == [{"type": "chat_end"}]
+
+    heard: list[dict[str, Any]] = _run_client()["chat_heard"]
+    assert [message["text"] for message in heard] == [
+        "Hello. What brings you here today?"
+    ]
+    # The mount reads exactly these fields off a participant frame, so a client
+    # that renamed one would post a message the server drops.
+    posted = next(f for f in frames if f["type"] == "chat")
+    assert set(posted) == {"type", "text"}

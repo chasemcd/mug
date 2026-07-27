@@ -47,6 +47,7 @@ from typing import Any, NamedTuple, Protocol, cast
 import numpy as np
 
 from mug.game.seams import Clock, SeatActionSource
+from mug.game.trajectory import TrajectoryFrame
 from mug.game.types import EpisodeBoundary, GameTransition
 from mug.kernel import compute_digest
 
@@ -126,6 +127,9 @@ class TurnBasedSummary(NamedTuple):
     Like the multi-seat summary, one turn-based episode holds many seats on one
     timeline, so the summary names every seat and carries the one transition per
     turn and the closing boundary.
+
+    ``trajectory`` is what happened on each turn behind those digests: who moved,
+    what they played, the resulting observations, and the rewards the move earned.
     """
 
     channel_key: str
@@ -134,6 +138,7 @@ class TurnBasedSummary(NamedTuple):
     transitions: list[GameTransition]
     boundary: EpisodeBoundary
     solved: bool
+    trajectory: Sequence[TrajectoryFrame] = ()
 
 
 class AecEnv:
@@ -314,6 +319,7 @@ async def run_turnbased_episode(
     if on_start is not None:
         await on_start(state)
     transitions: list[GameTransition] = []
+    trajectory: list[TrajectoryFrame] = []
     frame = 0
     solved = False
     while frame < max_steps and not state.done:
@@ -335,6 +341,19 @@ async def run_turnbased_episode(
                 now=now,
             )
         )
+        # One turn is one frame, and only the seat in turn acted, so the recorded
+        # values are keyed by that seat exactly as the digests were taken.
+        trajectory.append(
+            TrajectoryFrame(
+                frame_number=frame,
+                actions={agent: int(action)},
+                observations=dict(state.observations),
+                rewards=dict(state.rewards),
+                terminated=state.done and state.solved,
+                truncated=state.done and not state.solved,
+                info={},
+            )
+        )
         if on_step is not None:
             await on_step(TurnStepInfo(frame, agent, action, state))
         if state.done:
@@ -347,7 +366,7 @@ async def run_turnbased_episode(
         state, episode_id=episode_id, interaction_id=interaction_id, frame=frame
     )
     return TurnBasedSummary(
-        channel_key, tuple(agent_ids), frame, transitions, boundary, solved
+        channel_key, tuple(agent_ids), frame, transitions, boundary, solved, trajectory
     )
 
 

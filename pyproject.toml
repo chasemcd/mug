@@ -123,6 +123,8 @@ select = ["E", "F", "I", "UP", "B", "SIM", "TID", "RUF"]
 [tool.pyright]
 # Strict typing for the rewrite only (coding-standard P9). The legacy runtime is
 # excluded until it is removed.
+venvPath = "."
+venv = ".venv"
 include = [
     "mug/kernel",
     "mug/runtime.py",
@@ -152,6 +154,12 @@ include = [
     "mug/gateway.py",
     "mug/realtime.py",
     "mug/participant.py",
+    "mug/participant_chat.py",
+    "mug/participant_elicit.py",
+    "mug/participant_p2p.py",
+    "mug/participant_p2p_capture.py",
+    "mug/participant_p2p_edge.py",
+    "mug/participant_p2p_types.py",
     "mug/returns.py",
     "mug/app.py",
     "tests/unit",
@@ -172,6 +180,14 @@ source_modules = [
     "mug.cli",
     "mug.app",
     "mug.participant",
+    "mug.participant_chat",
+    "mug.participant_comparison",
+    "mug.participant_elicit",
+    "mug.participant_screening",
+    "mug.participant_p2p",
+    "mug.participant_p2p_capture",
+    "mug.participant_p2p_edge",
+    "mug.participant_p2p_types",
     "mug.launch",
     "mug.returns",
     "mug.agents",
@@ -201,6 +217,9 @@ source_modules = [
     "mug.edge",
     "mug.realtime",
     "mug.gateway",
+    "mug.admission",
+    "mug.observability",
+    "mug.nodes",
 ]
 forbidden_modules = [
     "mug.server",
@@ -217,6 +236,12 @@ layers = [
     "mug.cli",
     "mug.app",
     "mug.participant | mug.launch",
+    "mug.participant_chat | mug.participant_comparison | mug.participant_screening",
+    "mug.participant_elicit",
+    "mug.participant_p2p_edge",
+    "mug.participant_p2p",
+    "mug.nodes",
+    "mug.participant_p2p_capture | mug.participant_p2p_types",
     "mug.edge | mug.realtime",
     "mug.gateway",
     "mug.export",
@@ -228,6 +253,6 @@ layers = [
     "mug.identity | mug.visits",
     "mug.authoring | mug.platform | mug.workers",
     "mug.runtime",
-    "mug.storage | mug.events | mug.jobs | mug.returns",
+    "mug.storage | mug.events | mug.jobs | mug.returns | mug.admission | mug.observability",
     "mug.kernel",
 ]

@@ -9,6 +9,11 @@ and digest types.
 The ``service`` module runs the single-participant flow over these records: it
 materializes a flow for a visit, presents the active activity, and advances the
 pointer as the participant answers each form.
+
+The ``study`` module is the author's own surface: ``Study`` and the steps it holds.
+The author's ``Comparison`` (``mug.authoring``) and the treatment vocabulary
+(``mug.visits.design``) are steps and placements of the same study, so both are
+re-exported here and a study is written from one import.
 """
 
 from __future__ import annotations
@@ -18,8 +23,32 @@ from mug.content.service import (
     FlowState,
     MaterializeFlowCommand,
     advance_flow,
+    demo_study,
+    flow_of,
     materialize_flow,
+    plan_of,
     present,
+)
+from mug.content.study import (
+    Activity,
+    Assign,
+    Choice,
+    Comparison,
+    Design,
+    Form,
+    Game,
+    Likert,
+    Order,
+    Page,
+    Placement,
+    Rounds,
+    Scope,
+    Screen,
+    Step,
+    Study,
+    Text,
+    Treatment,
+    Unit,
 )
 from mug.content.types import (
     AccessibilityProfile,
@@ -34,17 +63,39 @@ from mug.content.types import (
 
 __all__ = [
     "AccessibilityProfile",
+    "Activity",
     "AdvanceFlowCommand",
+    "Assign",
+    "Choice",
+    "Comparison",
     "ContentBody",
     "ContentSpec",
+    "Design",
     "FlowState",
+    "Form",
     "FormResponse",
     "FormSpec",
+    "Game",
     "GateControl",
+    "Likert",
     "MaterializeFlowCommand",
+    "Order",
+    "Page",
+    "Placement",
     "PresentationComponent",
+    "Rounds",
+    "Scope",
+    "Screen",
+    "Step",
+    "Study",
+    "Text",
+    "Treatment",
+    "Unit",
     "advance_flow",
     "content_schema",
+    "demo_study",
+    "flow_of",
     "materialize_flow",
+    "plan_of",
     "present",
 ]

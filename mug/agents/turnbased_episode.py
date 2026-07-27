@@ -29,7 +29,7 @@ from datetime import datetime, timedelta, timezone
 from mug.agents.multiseat_episode import (
     AgentSeat,
     AgentSeatResult,
-    HumanSeat,
+    LocalSeat,
 )
 from mug.authoring import Message, Step
 from mug.game.aec import (
@@ -211,7 +211,7 @@ class _TurnSeatDriver:
 class TurnBasedAgentEpisode:
     """Drive a turn-based interaction of seats through one AEC episode.
 
-    The caller composes one ``AgentSeat`` per LLM seat and one ``HumanSeat`` per
+    The caller composes one ``AgentSeat`` per LLM seat and one ``LocalSeat`` per
     person, and hands them here with the shared scheduler, store context, and
     episode identity, plus the ``AecEnv`` that adapts the study's turn-based
     environment. The runner owns the loop: each turn it lets the active seat decide,
@@ -233,7 +233,7 @@ class TurnBasedAgentEpisode:
         new_decision_id: Callable[[], str],
         now: Callable[[], datetime],
         decision_timeout: DecisionTimeout,
-        humans: Sequence[HumanSeat] = (),
+        local_seats: Sequence[LocalSeat] = (),
         frame_sink: TurnBasedObserver | None = None,
         fps: int = 0,
         max_steps: int = 200,
@@ -251,12 +251,12 @@ class TurnBasedAgentEpisode:
         self._now = now
         self._fps = fps
         self._max_steps = max_steps
-        self._humans = tuple(humans)
+        self._local = tuple(local_seats)
 
-        # The seat order for the summary: the agent seats, then the human seats.
+        # The seat order for the summary: the model seats, then the local seats.
         self._agent_ids = tuple(
             [seat.agent_id for seat in seats]
-            + [human.agent_id for human in self._humans]
+            + [seat.agent_id for seat in self._local]
         )
         if len(set(self._agent_ids)) != len(self._agent_ids):
             raise ValueError("each seat must play a distinct environment agent")
@@ -285,8 +285,8 @@ class TurnBasedAgentEpisode:
         sources: dict[str, SeatActionSource] = {
             driver.agent_id: driver.source for driver in self._drivers
         }
-        for human in self._humans:
-            sources[human.agent_id] = human.source
+        for seat in self._local:
+            sources[seat.agent_id] = seat.source
 
         summary = await run_turnbased_episode(
             self._step_env,

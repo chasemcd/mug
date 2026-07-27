@@ -184,6 +184,10 @@ class LLMController:
         # Every model call this seat makes, in call order, so the episode runner can
         # hand them to ``build_decision_tape`` at the end for a replay bundle.
         self.results: list[ModelCallResult] = []
+        # What this seat said on its last decision, waiting to be published. It is
+        # held here rather than returned, because the scheduler decides *actions*:
+        # a deadline and a fallback are about what a seat does, not what it says.
+        self.pending_message: str | None = None
 
     async def decide(self, ctx: DecisionContext) -> int:
         """Build the prompt, call the model, and return the parsed action.
@@ -216,10 +220,26 @@ class LLMController:
         thought = self._agent.reflect(reply, self._env, self._agent_id)
         if thought is not None:
             self.thoughts.append(thought)
+        # What the seat says is read out **before** the action, because an
+        # unreadable action must not cost the participant a message the model
+        # really produced. A reply that says "going left" and then names no action
+        # anybody can read has still said it, and the seat falls back on the action
+        # alone. The two are judged apart, which is what NS-07 asks for.
+        self.pending_message = self._agent.say(reply, self._env, self._agent_id)
         action = self._agent.parse_reply(reply, self._env, self._agent_id)
         if action is None:
             raise ControllerDecodeMiss(f"could not read an action from: {reply!r}")
         return int(action)
+
+    def take_message(self) -> str | None:
+        """Take what this seat said on its last decision, if it said anything.
+
+        Taking rather than reading is what keeps one reply from being published
+        twice: a decision that says something says it once, and a later decision
+        that says nothing does not repeat it.
+        """
+        said, self.pending_message = self.pending_message, None
+        return said
 
     def record_step(self, step: Step) -> None:
         """Append one game transition to the history the agent reads next decision."""

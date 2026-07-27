@@ -7,6 +7,12 @@ and the outbox together. It depends only on the kernel (L0).
 
 from __future__ import annotations
 
+from mug.storage.artifacts import (
+    json_bytes,
+    jsonl_bytes,
+    read_jsonl,
+    stage_artifact,
+)
 from mug.storage.ports import ArtifactStore, Store
 from mug.storage.sqlite_store import SqliteStore
 from mug.storage.store import InMemoryStore, StorageError, digest_of
@@ -29,5 +35,9 @@ __all__ = [
     "Store",
     "UnitOfWorkReceipt",
     "digest_of",
+    "json_bytes",
+    "jsonl_bytes",
+    "read_jsonl",
+    "stage_artifact",
     "storage_schema",
 ]
