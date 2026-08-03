@@ -15,7 +15,7 @@ import itertools
 from datetime import datetime, timedelta, timezone
 
 from mug.agents import AgentIds, LLMController, compile_agent
-from mug.authoring import Chat, Fallback, History, LLMAgent, Provider, Thoughts
+from mug.authoring import Fallback, History, LLMAgent, Provider, Thoughts, Transcript
 from mug.kernel import Digest, Duration
 from mug.providers import (
     InMemoryOutputTape,
@@ -59,7 +59,7 @@ class _Thinker(LLMAgent):
         env: object,
         agent_id: str,
         history: History,
-        chat: Chat,
+        chat: Transcript,
         thoughts: Thoughts,
     ) -> str:
         return (

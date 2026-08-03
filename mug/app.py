@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import asyncio
 import os
-from collections.abc import Coroutine, Mapping
+from collections.abc import Callable, Coroutine, Mapping
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timezone
 from pathlib import Path
@@ -34,10 +34,15 @@ from mug.agents.generation import (
 from mug.authoring import GitProvenance
 from mug.client.ice import IceGrantError
 from mug.client.p2p import P2PIceGrantRequest
-from mug.content import Study, demo_study
+from mug.content import Conversation, Step, Study, demo_study
 from mug.content.assets import StagedAsset, asset_manifest, by_digest, stage_assets
 from mug.content.publish import PublishedStudy, compile_and_publish
 from mug.content.seats import MultiSeatGame, Seating, seat_game
+from mug.diagnostics import (
+    Diagnostics,
+    NullDiagnostics,
+    RecordingDiagnostics,
+)
 from mug.edge import build_app
 from mug.export import export_visit
 from mug.game.browser import BrowserGameSpec
@@ -56,6 +61,13 @@ from mug.kernel import (
 )
 from mug.kernel.refs import DeploymentRevisionRef, StudyVersionRef
 from mug.launch import provision_launch_ticket
+from mug.mounts import (
+    Mount,
+    chat_for,
+    chats_beside_games,
+    chats_for,
+    mounts_for,
+)
 from mug.nodes import Node
 from mug.observability import InMemoryTelemetry, Telemetry
 from mug.participant import (
@@ -70,6 +82,7 @@ from mug.participant import (
     build_agent_on_game,
     build_browser_p2p_on_game,
     build_chat_on_game,
+    build_close,
     build_comparison_on_game,
     build_dispatch,
     build_establish,
@@ -77,8 +90,10 @@ from mug.participant import (
     build_mesh_on_game,
     build_on_game,
     build_open,
+    build_routed_on_game,
     build_server_on_game,
     build_turnbased_on_game,
+    warming,
 )
 from mug.participant_chat import ChatSpec
 from mug.participant_p2p import P2PCoordinator
@@ -88,7 +103,7 @@ from mug.participant_p2p_types import (
     browser_session_handle,
 )
 from mug.platform.deployment import Deployment, open_deployment
-from mug.realtime import ResolvePrincipal, serve_session
+from mug.realtime import Establish, OnGame, ResolvePrincipal, Session, serve_session
 from mug.replay import ReplayBundle
 from mug.runtime import CommandContext
 from mug.storage import ArtifactStore, InMemoryStore, Store
@@ -128,6 +143,28 @@ def _resolve_subject(gateway: Gateway) -> ResolvePrincipal:
     return resolve
 
 
+# The client shell must always be revalidated.
+#
+# A study's declared pictures are served at the address of their own bytes, so a
+# browser may hold them for ever. The shell can not be: it keeps one address and
+# its bytes change when the client is rebuilt. With no ``cache-control`` a
+# browser applies its own heuristic from ``last-modified`` and can serve a shell
+# it fetched days ago -- so a deployment reaches a new participant and not a
+# returning one, and the two are then running different clients against the same
+# study. ``no-cache`` does not stop the browser storing it; it stops the browser
+# using it without asking, which is a conditional request and one 304.
+_REVALIDATE = "no-cache"
+
+
+class _ShellFiles(StaticFiles):
+    """The client's own files, served so a browser always asks if they changed."""
+
+    def file_response(self, *args: Any, **kwargs: Any) -> Response:
+        response = super().file_response(*args, **kwargs)
+        response.headers["cache-control"] = _REVALIDATE
+        return response
+
+
 def _add_web_shell(app: FastAPI, web_root: Path) -> None:
     """Serve the static client shell and its assets from ``web_root``.
 
@@ -136,11 +173,13 @@ def _add_web_shell(app: FastAPI, web_root: Path) -> None:
     under ``ts/dist-web``); the directory must hold an ``index.html`` shell and the
     assets it loads under ``/static``.
     """
-    app.mount("/static", StaticFiles(directory=web_root), name="static")
+    app.mount("/static", _ShellFiles(directory=web_root), name="static")
 
     @app.get("/")
     async def index() -> FileResponse:  # pyright: ignore[reportUnusedFunction]
-        return FileResponse(web_root / "index.html")
+        return FileResponse(
+            web_root / "index.html", headers={"cache-control": _REVALIDATE}
+        )
 
 
 def _add_assets(app: FastAPI, store: Store, staged: Mapping[str, StagedAsset]) -> None:
@@ -264,6 +303,62 @@ def _add_operations(
         )
 
 
+def _add_debug(
+    app: FastAPI,
+    diagnostics: Diagnostics,
+    telemetry: InMemoryTelemetry,
+    admission: Admission,
+) -> None:
+    """Serve what the run said about itself, to the person who is running it.
+
+    Two paths, and both exist only in debug mode. A process that is not in debug mode
+    mounts neither, so the answer to a request for them is the same 404 a study that
+    has never heard of debugging gives -- which is the point. A note holds prompts,
+    replies, and what a participant said; nothing about a live study should be able to
+    ask for those and be answered.
+
+    ``/_debug`` says the process is watching, and carries the counters beside the
+    notes so one read answers "what is this process doing" as well as "what did the
+    model say".
+
+    ``/_debug/notes?since=N`` is the tail. A reader keeps the highest sequence it has
+    seen and asks for what came after it, so a panel that polls twice a second is
+    given what happened between the polls and nothing twice. The answer says which
+    sequence is the oldest still held, so a reader that has fallen behind reads that
+    it missed notes instead of rendering the gap as quiet.
+
+    **This is the debug channel, and it is deliberately not the participant's.** A
+    debugging aid that can break a run is worse than none: nothing here touches the
+    websocket, the frame protocol, or anything a study records.
+    """
+    if not isinstance(diagnostics, RecordingDiagnostics):
+        return
+    watching = diagnostics
+
+    def _status() -> dict[str, Any]:
+        return {
+            "debug": True,
+            "open_sessions": admission.open_sessions,
+            "max_sessions": admission.policy.max_sessions,
+            "telemetry": telemetry.snapshot(),
+        }
+
+    @app.get("/_debug")
+    async def debug_status() -> JSONResponse:  # pyright: ignore[reportUnusedFunction]
+        return JSONResponse(
+            {**_status(), **watching.since(0)}, headers={"Cache-Control": "no-store"}
+        )
+
+    @app.get("/_debug/notes")
+    async def debug_notes(  # pyright: ignore[reportUnusedFunction]
+        since: int = 0,
+    ) -> JSONResponse:
+        return JSONResponse(
+            {**_status(), **watching.since(since)},
+            headers={"Cache-Control": "no-store"},
+        )
+
+
 def _add_ice_endpoint(app: FastAPI, coordinator: P2PCoordinator) -> None:
     """Serve the same-origin, one-use ICE redemption for the browser P2P mount.
 
@@ -317,6 +412,10 @@ def _seated_games(study: Study, gateway: Gateway) -> dict[str, AgentGameSpec]:
     """
     compiled: dict[str, AgentGameSpec] = {}
     for activity_key, seats in study.seats.items():
+        if activity_key in study.game_activities:
+            # The activity named its own environment, so its seating is compiled where
+            # the mount is resolved (``mug.mounts``) and there is nothing to do here.
+            continue
         game = study.games.get(activity_key)
         if not isinstance(game, MultiSeatGame):
             raise ValueError(
@@ -332,6 +431,24 @@ def _seated_games(study: Study, gateway: Gateway) -> dict[str, AgentGameSpec]:
     return compiled
 
 
+def _written_chat(chat: Step) -> Conversation:
+    """Return the conversation a mounted ``chat=`` names, refusing anything else.
+
+    It takes the author's own ``Chat(...)`` and nothing else. It used to take the
+    runtime's ``ChatSpec`` -- twenty fields, none of them a decision an author
+    should be making -- which meant the one way to mount a conversation was to
+    write the thing the platform compiles to.
+    """
+    talk = getattr(chat, "talk", None)
+    if not isinstance(talk, Conversation):
+        raise ValueError(
+            "mount a conversation as the author's own: "
+            'build_study_app(chat=Chat("talk", Model(agent))). It was given a '
+            f"{type(chat).__name__}."
+        )
+    return talk
+
+
 def _conversations(
     gateway: Gateway,
     store: Store,
@@ -345,7 +462,13 @@ def _conversations(
     """
     if study is None or not study.chats:
         return None
-    return Conversations(gateway, store, study, study_version=study_version)
+    return Conversations(
+        gateway,
+        store,
+        study,
+        specs=chats_beside_games(study, derived_id=gateway.derived_id),
+        study_version=study_version,
+    )
 
 
 def _add_realtime(
@@ -363,6 +486,8 @@ def _add_realtime(
     seated: Mapping[str, AgentGameSpec],
     turnbased_game: TurnBasedGameSpec | None,
     chat: ChatSpec | None,
+    resolved: Mapping[str, Mount],
+    talks: Mapping[str, ChatSpec],
     generations: Mapping[str, RecordedGeneration],
     assets: Mapping[str, StagedAsset],
     deployment: DeploymentRevisionRef | None,
@@ -373,6 +498,7 @@ def _add_realtime(
     admission: Admission,
     telemetry: Telemetry,
     node: Node | None,
+    diagnostics: Diagnostics,
 ) -> None:
     """Run the realtime session loop for each websocket connection.
 
@@ -422,12 +548,23 @@ def _add_realtime(
         assets=asset_manifest(assets),
     )
     on_open = build_open(gateway, store)
+    # Reach this process's model seats once, when the first participant arrives and
+    # long before they reach a game. What a warm-up buys is paid on the first call
+    # somebody makes, and paid inside the round it is a partner frozen in a running
+    # kitchen. Here it is paid while they are reading a consent form.
+    warm = warming(
+        gateway, store, _model_games(resolved, seated, agent_game), diagnostics
+    )
     on_measure = build_measure(gateway, store)
+    # A participant who leaves mid-round leaves a run nobody closed.
+    on_close = build_close(gateway, store, browser_game)
     if chat is not None:
         # Every conversation is a room, including a room of one: that is what
         # commits the interaction, its channels, and who was in each of them.
         rendezvous = ChatMatchmaker(gateway, store, chat, study_version=study_version)
-        on_game = build_chat_on_game(gateway, store, chat, rendezvous=rendezvous)
+        on_game = build_chat_on_game(
+            gateway, store, chat, rendezvous=rendezvous, diagnostics=diagnostics
+        )
     elif agent_game is not None or turnbased_game is not None:
         # A watcher can read the assembled replay bundles off the app state.
         bundles: list[ReplayBundle] = []
@@ -444,6 +581,7 @@ def _add_realtime(
                 on_bundle=collect,
                 conversations=_conversations(gateway, store, study, study_version),
                 specs=seated,
+                diagnostics=diagnostics,
             )
         else:
             assert turnbased_game is not None
@@ -479,6 +617,17 @@ def _add_realtime(
             game,
             conversations=_conversations(gateway, store, study, study_version),
         )
+    # A study that named its own environments resolves one runtime per game activity,
+    # so a practice round on the server and a real round with a model partner are two
+    # runtimes in one study. What is mounted through a keyword stays the fallback, so a
+    # study is ported when its author ports it.
+    if resolved or talks:
+        on_game = build_routed_on_game(
+            _activity_hooks(
+                app, gateway, store, resolved, talks, study, study_version, diagnostics
+            ),
+            on_game,
+        )
     # A comparison activity owns the socket the way a game does, and a study puts
     # it after the rounds it asks about, so the router keeps both live and the
     # activity the session is at decides which one runs.
@@ -495,13 +644,156 @@ def _add_realtime(
             resolve_principal=resolve,
             dispatch=dispatch,
             protocol_version=_PROTOCOL_VERSION,
-            on_establish=on_establish,
+            on_establish=_also_warming(on_establish, warm),
             on_open=on_open,
             on_game=on_game,
             on_measure=on_measure,
+            on_close=on_close,
             admission=admission,
             telemetry=telemetry,
         )
+
+
+def _model_games(
+    resolved: Mapping[str, Mount],
+    seated: Mapping[str, AgentGameSpec],
+    mounted: AgentGameSpec | None,
+) -> list[AgentGameSpec]:
+    """Return every game in this study that has a model seat in it, once each.
+
+    A study may reach its games three ways -- an activity that named its own
+    environment, a seating compiled onto an activity, or the older keyword -- and a
+    warm-up wants each game once whichever way it arrived. A game with no model seat
+    is not one of them: there is nothing to reach.
+    """
+    found: list[AgentGameSpec] = []
+    seen: set[int] = set()
+    for spec in (
+        [mount.agent_game for mount in resolved.values()]
+        + list(seated.values())
+        + [mounted]
+    ):
+        if spec is None or not spec.seats or id(spec) in seen:
+            continue
+        seen.add(id(spec))
+        found.append(spec)
+    return found
+
+
+def _also_warming(establish: Establish, warm: Callable[[Session], None]) -> Establish:
+    """Wrap the establish hook so the first session starts the warm-up.
+
+    It wraps rather than replaces, and it starts rather than waits: a participant
+    must never be held at the door by a model, and a provider that cannot be reached
+    must still let them walk the rest of the study.
+    """
+
+    async def establishing(session: Session) -> dict[str, Any]:
+        answer = await establish(session)
+        warm(session)
+        return answer
+
+    return establishing
+
+
+def _activity_hooks(
+    app: FastAPI,
+    gateway: Gateway,
+    store: Store,
+    resolved: Mapping[str, Mount],
+    talks: Mapping[str, ChatSpec],
+    study: Study | None,
+    study_version: StudyVersionRef | None,
+    diagnostics: Diagnostics,
+) -> dict[str, OnGame]:
+    """Build one hook per resolved activity, keyed by the activity it runs.
+
+    Each activity gets the runtime its own environment and seating resolved to, so a
+    study is no longer one mount however many games it holds. The conversation a study
+    wrote on an activity reaches the hook that plays it, because a game and the talk
+    beside it are one interaction. A conversation that **is** the activity gets its own
+    room, so one study may hold a game and a conversation -- which the nine mutually
+    exclusive keywords could not express at all.
+
+    A watcher can read the assembled replay bundles off the application state, the same
+    as it could when one keyword chose the mount for the whole study.
+    """
+    bundles: list[ReplayBundle] = list(getattr(app.state, "replay_bundles", []))
+    app.state.replay_bundles = bundles
+
+    async def collect(bundle: ReplayBundle) -> None:
+        bundles.append(bundle)
+
+    conversations = _conversations(gateway, store, study, study_version)
+    hooks: dict[str, OnGame] = {}
+    for key, mount in resolved.items():
+        if mount.agent_game is not None:
+            hooks[key] = build_agent_on_game(
+                gateway,
+                store,
+                mount.agent_game,
+                on_bundle=collect,
+                conversations=conversations,
+                specs={key: mount.agent_game},
+                diagnostics=diagnostics,
+            )
+        elif mount.turnbased_game is not None:
+            hooks[key] = build_turnbased_on_game(
+                gateway, store, mount.turnbased_game, on_bundle=collect
+            )
+        elif mount.server_game is not None:
+            hooks[key] = build_server_on_game(gateway, store, mount.server_game)
+        elif mount.game is not None:
+            hooks[key] = build_on_game(
+                gateway, store, mount.game, conversations=conversations
+            )
+    for key, spec in talks.items():
+        # Every conversation is a room, including a room of one: that is what commits
+        # the interaction, its channels, and who was in each of them.
+        hooks[key] = build_chat_on_game(
+            gateway,
+            store,
+            spec,
+            rendezvous=ChatMatchmaker(
+                gateway, store, spec, study_version=study_version
+            ),
+            diagnostics=diagnostics,
+        )
+    return hooks
+
+
+def _refuse_unplayable_rounds(study: Study | None, **mounted: object) -> None:
+    """Refuse a study that asks for rounds the mounted execution cannot play.
+
+    Only the two server-stepped modes loop rounds. A browser-executed game is
+    written by the client and captured once, and a peer-to-peer mesh runs one room
+    to its end, so ``Game("play", episodes=5)`` on either would play **one** round
+    and move on.
+
+    That is the worst kind of fault: the author said what they wanted, the platform
+    read it, and nothing in the records would say it had been dropped. So it is
+    refused here, where the author is reading their own code, rather than a
+    participant's run later. A study that wants five rounds of a browser game
+    writes five game activities.
+    """
+    if study is None:
+        return
+    one_round_only = sorted(
+        name for name, value in mounted.items() if value is not None
+    )
+    if not one_round_only:
+        return
+    asked = {
+        key: rounds.count for key, rounds in study.rounds.items() if rounds.count > 1
+    }
+    if not asked:
+        return
+    named = ", ".join(f"{key} ({count} rounds)" for key, count in asked.items())
+    raise ValueError(
+        f"{' and '.join(one_round_only)} plays one round per activity, and {named} "
+        "asks for more; write one game activity per round, or run the game on the "
+        "server"
+    )
 
 
 def build_study_app(
@@ -517,7 +809,7 @@ def build_study_app(
     browser_p2p: BrowserP2PConfig | None = None,
     agent_game: AgentGameSpec | None = None,
     turnbased_game: TurnBasedGameSpec | None = None,
-    chat: ChatSpec | None = None,
+    chat: Step | None = None,
     generate: GenerationSet | None = None,
     return_url: str | None = None,
     require_launch: bool = False,
@@ -527,6 +819,7 @@ def build_study_app(
     gateway_secret: bytes | None = None,
     node_id: str | None = None,
     bus: NodeBus | None = None,
+    debug: bool = False,
 ) -> FastAPI:
     """Build one running application for a study: edge, web shell, and realtime.
 
@@ -592,12 +885,30 @@ def build_study_app(
     for one process and is what a study running locally gets. ``bus`` is how the
     processes reach each other; it defaults to the shared store, and a deployment
     with a message broker passes its own.
+
+    ``debug`` has the run write down what it is doing -- what each model seat was
+    asked, what came back, how long it took, whether an action could be read out of
+    it, and what the seat said -- and serves it at ``/_debug``, where the study's own
+    screen shows it in a panel. It is **off** unless it is asked for, because those
+    notes hold prompts and what a participant wrote: they belong to the person
+    running the study and not to the person in it. ``MUG_DEBUG=1`` is the same switch
+    for a study started through ``build_app_from_env``.
     """
+    _refuse_unplayable_rounds(
+        study,
+        browser_game=browser_game,
+        mesh_game=mesh_game,
+        browser_p2p=browser_p2p,
+    )
     gateway = gateway or Gateway(secret=gateway_secret)
     store = store or InMemoryStore()
     signing_key = signing_key or os.urandom(32)
     gate = Admission(admission)
     sink = InMemoryTelemetry()
+    # What the run says about itself while it runs. It is off unless a process is
+    # started in debug mode, because a note holds prompts, replies, and what a
+    # participant said: the notes of a running study are not a participant's to read.
+    watch: Diagnostics = RecordingDiagnostics() if debug else NullDiagnostics()
     node = _node(node_id, gateway, store, bus)
     app = build_app(
         store,
@@ -631,7 +942,22 @@ def build_study_app(
         )
         app.state.deployment_record = deployment
     running = study or demo_study()
+    # What each game activity runs, resolved from the environment it named and who it
+    # seated in it. A study that named none resolves nothing and every mount runs
+    # exactly as it did before an environment could be named.
+    resolved = mounts_for(running, derived_id=gateway.derived_id)
+    # The conversations the study wrote as activities of their own. A conversation
+    # beside a game stays on the game, because it happens there.
+    talks = chats_for(running, derived_id=gateway.derived_id)
     seated = _seated_games(running, gateway)
+    # A conversation mounted beside the study rather than written into it. It is the
+    # author's own ``Chat(...)``, compiled here where the gateway is, because a model
+    # speaker's pinned build and recorded actor are derived and never written.
+    mounted_chat = (
+        chat_for(_written_chat(chat), derived_id=gateway.derived_id)
+        if chat is not None
+        else None
+    )
     if agent_game is None and seated:
         # A study that wrote its seats on an activity has said what the mount runs,
         # so nothing else has to be passed to say it again.
@@ -647,7 +973,9 @@ def build_study_app(
     app.state.launch_ticket = launch_ticket
     app.state.admission = gate
     app.state.telemetry = sink
+    app.state.diagnostics = watch
     _add_operations(app, gate, sink)
+    _add_debug(app, watch, sink, gate)
     _add_operator_view(app, store)
     _add_web_shell(app, web_root or _WEB)
     _add_assets(app, store, staged_assets)
@@ -666,7 +994,9 @@ def build_study_app(
         agent_game,
         seated,
         turnbased_game,
-        chat,
+        mounted_chat,
+        resolved,
+        talks,
         generations,
         staged_assets,
         getattr(app.state, "deployment", None),
@@ -677,6 +1007,7 @@ def build_study_app(
         gate,
         sink,
         node,
+        watch,
     )
     return app
 
@@ -975,6 +1306,17 @@ def node_id_from_env() -> str | None:
     return os.environ.get("MUG_NODE_ID") or None
 
 
+def debug_from_env() -> bool:
+    """Return whether ``MUG_DEBUG`` asks this process to write down what it does.
+
+    Anything but an off word turns it on, because somebody who wrote ``MUG_DEBUG=yes``
+    meant yes. A deployment that serves participants leaves it unset: the notes hold
+    prompts and what a participant wrote.
+    """
+    said = os.environ.get("MUG_DEBUG", "").strip().lower()
+    return said not in ("", "0", "no", "off", "false")
+
+
 def gateway_secret_from_env() -> bytes | None:
     """Return the gateway identifier secret from ``MUG_GATEWAY_SECRET``, or None.
 
@@ -1022,11 +1364,12 @@ def build_app_from_env(
     browser_p2p: BrowserP2PConfig | None = None,
     agent_game: AgentGameSpec | None = None,
     turnbased_game: TurnBasedGameSpec | None = None,
-    chat: ChatSpec | None = None,
+    chat: Step | None = None,
     generate: GenerationSet | None = None,
     return_url: str | None = None,
     require_launch: bool = False,
     admission: AdmissionPolicy | None = None,
+    debug: bool | None = None,
 ) -> FastAPI:
     """Build the application with the store resolved from the environment.
 
@@ -1045,6 +1388,11 @@ def build_app_from_env(
     See
     ``docs/architecture/implementation/deployment-topology.md`` for what is safe to
     replicate and what is not.
+
+    ``MUG_DEBUG=1`` has the run write down what it asked its models and what came
+    back, and puts a panel on the study's own screen that reads it. It is off unless
+    it is set. An entrypoint that passes ``debug`` says so itself and the environment
+    is not read.
     """
     return build_study_app(
         study=study,
@@ -1065,6 +1413,7 @@ def build_app_from_env(
         admission=admission,
         gateway_secret=gateway_secret_from_env(),
         node_id=node_id_from_env(),
+        debug=debug_from_env() if debug is None else debug,
     )
 
 

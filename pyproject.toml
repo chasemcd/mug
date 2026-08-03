@@ -43,10 +43,13 @@ postgres = [
 serve = [
     "uvicorn[standard]>=0.30",
 ]
-# The Gymnasium environment adapter (mug.game.env). The server-authoritative
-# stepping loop needs it to run a real environment; it stays optional.
+# The environment APIs a study's game may be written against (mug.game.env,
+# mug.game.environments). The platform recognizes them and implements neither: a
+# study names its own environment and the platform reads what it is. Both stay
+# optional, because a study of forms and conversations runs no environment at all.
 game = [
     "gymnasium>=0.29",
+    "pettingzoo>=1.24",
 ]
 # The real LLM provider adapters (mug.agents.adapters). They reach Ollama,
 # Anthropic, and OpenAI over plain HTTP with httpx and no vendor SDK; the core
@@ -161,6 +164,7 @@ include = [
     "mug/participant_p2p_edge.py",
     "mug/participant_p2p_types.py",
     "mug/returns.py",
+    "mug/mounts.py",
     "mug/app.py",
     "tests/unit",
 ]
@@ -179,6 +183,7 @@ type = "forbidden"
 source_modules = [
     "mug.cli",
     "mug.app",
+    "mug.mounts",
     "mug.participant",
     "mug.participant_chat",
     "mug.participant_comparison",
@@ -235,6 +240,7 @@ type = "layers"
 layers = [
     "mug.cli",
     "mug.app",
+    "mug.mounts",
     "mug.participant | mug.launch",
     "mug.participant_chat | mug.participant_comparison | mug.participant_screening",
     "mug.participant_elicit",

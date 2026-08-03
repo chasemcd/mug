@@ -29,13 +29,13 @@ from mug.agents.generation import (
 )
 from mug.app import build_study_app
 from mug.authoring import (
-    Chat,
     Comparison,
     Fallback,
     History,
     LLMAgent,
     Provider,
     Thoughts,
+    Transcript,
 )
 from mug.content import Page, Study
 from mug.export import export_study_dataset
@@ -77,7 +77,7 @@ class _Writer(LLMAgent):
         env: object,
         agent_id: str,
         history: History,
-        chat: Chat,
+        chat: Transcript,
         thoughts: Thoughts,
     ) -> str:
         return ""

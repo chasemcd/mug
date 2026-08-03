@@ -10,6 +10,11 @@ does the work it refused is not a bound.
 Every refusal reuses a contract error category (``backpressure``, ``rate_limit``,
 ``protocol``), which the HTTP edge already maps to a status, so nothing here invents
 an error kind.
+
+The frame bound was briefly derived from the study, because a browser-run game
+reported in a single command is as large as the game is long. A run is reported in
+parts now (``mug.game.capture_parts``), so the bound is a constant of the transport
+again and the reporting cadence is what fits it.
 """
 
 from __future__ import annotations
@@ -18,6 +23,7 @@ import pytest
 from fastapi import FastAPI, WebSocket
 from fastapi.testclient import TestClient
 
+from examples.mountain_car.browser_env import mountain_car_browser_spec
 from mug.admission import (
     Admission,
     AdmissionPolicy,
@@ -25,10 +31,15 @@ from mug.admission import (
     SessionBudget,
     SessionOverloaded,
     TokenBucket,
+    capture_frame_bytes,
 )
+from mug.app import build_demo_app
 from mug.client import RealtimeCommand
+from mug.game.capture_parts import FRAMES_PER_PART
+from mug.gateway import Gateway
 from mug.kernel import CommandReceipt, Digest, PrincipalRef, SchemaRef
 from mug.realtime import Session, serve_session
+from mug.storage import InMemoryStore
 
 _PARTICIPANT = PrincipalRef(
     kind="participant", id="participant_019b6000-0000-7000-8000-0000000000aa"
@@ -166,6 +177,38 @@ def test_an_oversized_frame_is_refused_as_a_protocol_error() -> None:
     assert refusal.category == "protocol"
     # Waiting does not make an oversized frame acceptable.
     assert refusal.retry_after_ms is None
+
+
+def test_the_capture_bound_grows_with_the_run_it_has_to_hold() -> None:
+    """A longer game is a larger report, and the bound follows it.
+
+    The frame bound is otherwise a guess, and a guess refuses the run at the end,
+    after the participant has played the whole game.
+    """
+    assert capture_frame_bytes(600) > capture_frame_bytes(200)
+    assert capture_frame_bytes(600) - capture_frame_bytes(200) == 400 * 1024
+    # A game of no length still has a report: the envelope and the boundary.
+    assert capture_frame_bytes(0) > 0
+
+
+def test_the_frame_bound_is_a_constant_again() -> None:
+    """A run is reported in parts now, so the bound stops being a study's business.
+
+    It was briefly derived from how long the longest browser game ran, because a
+    whole run reported in one command is as large as the game is long. Reporting in
+    parts puts the size back under the transport's own control, which is where a
+    transport bound belongs -- ``FRAMES_PER_PART`` is chosen to fit it, and
+    ``tests/unit/game/test_capture_parts.py`` holds it to that.
+    """
+    spec = mountain_car_browser_spec()
+    default = AdmissionPolicy().max_frame_bytes
+
+    served = build_demo_app(
+        store=InMemoryStore(), gateway=Gateway(), browser_game=spec
+    )
+
+    assert served.state.admission.policy.max_frame_bytes == default
+    assert capture_frame_bytes(FRAMES_PER_PART) <= default
 
 
 def test_a_session_refuses_to_queue_deliveries_without_a_limit() -> None:

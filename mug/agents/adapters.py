@@ -139,11 +139,13 @@ class ChatAdapter:
         timeout: float = 30.0,
         temperature: float | None = None,
         max_tokens: int = 1024,
+        keep_alive: str = "1h",
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._transport = transport or httpx_transport(timeout=timeout)
         self._default_temperature = temperature
         self._max_tokens = max_tokens
+        self._keep_alive = keep_alive
 
     async def __call__(self, call: ModelCall) -> ModelCompletion:
         """Run one model call: build the request, send it, and read the reply."""
@@ -213,14 +215,28 @@ class OllamaAdapter(ChatAdapter):
     provider_name: ClassVar[str] = "oss"
 
     def _request(self, call: ModelCall) -> HttpRequest:
+        # ``num_predict`` is Ollama's name for the generation bound, and without it
+        # the runner generates until the model decides to stop. A study asks for
+        # three lines; a model that answers with an essay instead costs the wait for
+        # every token of it, and on a machine with no GPU that is seconds a call
+        # nobody asked for. The bound was **declared** and dropped here before, so a
+        # study that set ``max_tokens`` was not bounded at all.
+        options: dict[str, Any] = {"num_predict": self._max_tokens}
+        temperature = self._temperature(call)
+        if temperature is not None:
+            options["temperature"] = temperature
         body: dict[str, Any] = {
             "model": call.model_selector,
             "messages": _messages(call),
             "stream": False,
+            "options": options,
+            # How long the runner holds the model in memory after a call. The
+            # default is five minutes, which is shorter than a participant spends
+            # on the consent form and the instructions -- so the first call of the
+            # first round pays to load the model again, in front of somebody who is
+            # now looking at the game.
+            "keep_alive": self._keep_alive,
         }
-        temperature = self._temperature(call)
-        if temperature is not None:
-            body["options"] = {"temperature": temperature}
         return HttpRequest(
             url=f"{self._base_url}/api/chat", headers=dict(_JSON_HEADERS), json=body
         )
@@ -303,6 +319,7 @@ class OpenAIAdapter(ChatAdapter):
         body: dict[str, Any] = {
             "model": call.model_selector,
             "messages": _messages(call),
+            "max_completion_tokens": self._max_tokens,
         }
         temperature = self._temperature(call)
         if temperature is not None:
@@ -390,13 +407,37 @@ def adapter_for(
 
 
 def _messages(call: ModelCall) -> Messages:
-    """Return the chat messages the controller rendered into the payload."""
+    """Return the chat messages the caller rendered, in the shape a provider reads.
+
+    Every one of the three providers names the words of a message ``content``. A
+    message that names them something else is a message the provider reads as empty,
+    which is worse than an error: Ollama answers the empty question it was asked and
+    Anthropic refuses the request, and either way the participant is answered by a
+    model that was never told what they said. So the words are put where the provider
+    looks for them here, at the one place every adapter passes through.
+    """
     payload = call.payload
     if isinstance(payload, dict):
         messages = cast("dict[str, Any]", payload).get("messages")
         if isinstance(messages, list):
-            return cast("Messages", messages)
+            return [_message(one) for one in cast("list[Any]", messages)]
     return []
+
+
+def _message(one: Any) -> dict[str, Any]:
+    """Return one message with its words under ``content`` and a role beside them.
+
+    Anything else the caller put on the message is kept, because a provider reads
+    more than two fields -- an Anthropic ``content`` is a list of blocks as often as
+    it is a string. Only an absent ``content`` is filled in, from ``text``.
+    """
+    mapping = dict(_as_dict(one))
+    if "content" not in mapping:
+        text = mapping.pop("text", None)
+        mapping["content"] = text if isinstance(text, str) else ""
+    if not isinstance(mapping.get("role"), str):
+        mapping["role"] = "user"
+    return mapping
 
 
 def _anthropic_text(blocks: Any) -> str | None:

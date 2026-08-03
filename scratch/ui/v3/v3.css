@@ -1,0 +1,719 @@
+/* Third pass -- between the two.
+ *
+ * The first pass was generic: a rounded panel for everything, a soft shadow
+ * under it, and a rectangle that lit up under the pointer. The second pass took
+ * all of that away and went too far the other way: a page of ruled text, where
+ * an action was a word with a line under it and a participant had to read the
+ * screen to find out what was clickable.
+ *
+ * This one keeps the containers and gives them a reason to exist:
+ *   - A message is in a bubble, and the two parties are on opposite sides. That
+ *     is what makes a conversation readable at a glance.
+ *   - An action is a real control with a fill and an edge, not a word.
+ *   - A surface is held by an edge, not by a shadow. Nothing floats.
+ *   - Nothing fills under the pointer that was not already filled. A pointer
+ *     darkens an edge or a fill that is there; it never makes a new one.
+ *
+ * Reading text is set in Charter, and the interface around it in a plain
+ * grotesk. A participant then always knows what somebody said from what the
+ * screen is asking.
+ *
+ * These documents use ASD-STE100 Simplified Technical English.
+ */
+
+:root {
+  --paper: #f6f4ef;
+  --surface: #ffffff;
+  --surface-sunk: #efece4;
+  --you: #e6edf1;
+  --you-line: #c6d5de;
+
+  --ink: #1e1c18;
+  --ink-quiet: #6a655c;
+  --ink-faint: #948e83;
+
+  --line: #e3ded3;
+  --line-strong: #cdc6b7;
+
+  --accent: #1f4f6b;
+  --accent-hover: #163b52;
+  --accent-ink: #ffffff;
+
+  --warn: #9c4a1f;
+  --warn-soft: #fbf1e8;
+
+  --serif: "Bitstream Charter", Charter, Georgia, "Noto Serif", serif;
+  --sans: "Helvetica Neue", Helvetica, Arial, "Liberation Sans", sans-serif;
+
+  --bubble: 14px;
+  --control: 8px;
+  --thread: 44rem;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.011em;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+/* -- the head ----------------------------------------------------------- */
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.85rem 1.5rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.head__study {
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.head__spacer {
+  flex: 1;
+}
+
+/* Where the participant is, as a bar that is filled up to here. It promises no
+ * time, because no study can honestly give one. */
+.progress {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.8125rem;
+  color: var(--ink-quiet);
+}
+
+.progress__track {
+  width: 6.5rem;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--surface-sunk);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+
+.progress__fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.state {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.8125rem;
+  color: var(--ink-quiet);
+}
+
+.state::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #4b8f5e;
+}
+
+.state--weak::before {
+  background: var(--warn);
+}
+
+/* -- controls ----------------------------------------------------------- */
+
+.btn {
+  font-family: var(--sans);
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.4;
+  padding: 0.52rem 0.95rem;
+  border-radius: var(--control);
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+/* The pointer darkens an edge that is already drawn. It does not add a fill,
+ * and nothing moves. */
+.btn:hover:not(:disabled) {
+  border-color: var(--ink-quiet);
+}
+
+.btn--primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+.btn--primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+.btn--quiet {
+  border-color: transparent;
+  background: transparent;
+  color: var(--ink-quiet);
+  padding-left: 0.55rem;
+  padding-right: 0.55rem;
+}
+
+.btn--quiet:hover:not(:disabled) {
+  border-color: var(--line-strong);
+  color: var(--ink);
+}
+
+.btn--small {
+  font-size: 0.8125rem;
+  padding: 0.36rem 0.7rem;
+}
+
+.btn--wide {
+  width: 100%;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* -- the conversation --------------------------------------------------- */
+
+.scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.75rem 1.5rem 0;
+}
+
+.thread {
+  max-width: var(--thread);
+  margin: 0 auto;
+  padding-bottom: 1.5rem;
+}
+
+/* A turn is a name and a bubble. The two parties are on opposite sides, which
+ * is the whole reason a conversation can be read without reading it. */
+.turn {
+  display: flex;
+  flex-direction: column;
+  /* The bubble holds the words and stops. A bubble that fills the column
+   * whatever is in it makes six words look like a paragraph. */
+  align-items: flex-start;
+  margin-bottom: 1.35rem;
+  max-width: 82%;
+}
+
+.turn--you {
+  margin-left: auto;
+  align-items: flex-end;
+}
+
+.turn__who {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--ink-quiet);
+  margin: 0 0.25rem 0.28rem;
+}
+
+/* A small mark, so a party is found by colour as well as by name. In a room of
+ * several people this is what makes the thread scannable. */
+.turn__mark {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--line-strong);
+}
+
+.turn--you .turn__mark {
+  background: var(--accent);
+}
+
+.turn__text {
+  font-family: var(--serif);
+  font-size: 16px;
+  line-height: 1.58;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--bubble);
+  border-top-left-radius: 4px;
+  padding: 0.7rem 0.95rem;
+}
+
+.turn--you .turn__text {
+  background: var(--you);
+  border-color: var(--you-line);
+  border-top-left-radius: var(--bubble);
+  border-top-right-radius: 4px;
+}
+
+/* What stands where a reply is going to be. It is the same bubble, so nothing
+ * moves when the words arrive. */
+.dots {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  height: 1.58em;
+}
+
+.dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ink-faint);
+  animation: bob 1.25s ease-in-out infinite;
+}
+
+.dots span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.dots span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes bob {
+  0%,
+  62%,
+  100% {
+    opacity: 0.28;
+  }
+  31% {
+    opacity: 0.95;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dots span {
+    animation: none;
+    opacity: 0.5;
+  }
+}
+
+/* In a room of several people, everybody who is not you needs a name and a
+ * mark. The wire already carries ``author_actor_id`` on every message; the
+ * client today collapses all of them to "Them", so a room of four reads the
+ * same as a conversation of two. A colour says nothing about whether a party is
+ * a person or a model, which is the one thing the screen may not say. */
+.turn--amber .turn__mark {
+  background: #c98a2b;
+}
+.turn--slate .turn__mark {
+  background: #5f7d99;
+}
+
+/* The channels this participant is in. A channel they are not in is never
+ * sent, so it can not be drawn. */
+.channels {
+  max-width: var(--thread);
+  margin: 0 auto 1.35rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.channels button {
+  font-family: var(--sans);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  padding: 0.3rem 0.7rem;
+  border-radius: var(--control);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--ink-quiet);
+  cursor: pointer;
+}
+
+.channels button:hover {
+  border-color: var(--line-strong);
+  color: var(--ink);
+}
+
+.channels button[aria-selected="true"] {
+  background: var(--surface);
+  border-color: var(--line-strong);
+  color: var(--ink);
+}
+
+.channels .right {
+  margin-left: auto;
+  font-size: 0.75rem;
+  color: var(--ink-quiet);
+}
+
+/* A reply that is not coming. It is not a bubble, because nobody said it. */
+.notice {
+  max-width: var(--thread);
+  margin: 0 auto 1.35rem;
+  display: flex;
+  gap: 0.6rem;
+  padding: 0.6rem 0.85rem;
+  background: var(--warn-soft);
+  border: 1px solid #eddcc9;
+  border-radius: var(--control);
+  font-size: 0.875rem;
+}
+
+.notice__mark {
+  color: var(--warn);
+  font-weight: 700;
+}
+
+/* -- the composer ------------------------------------------------------- */
+
+.dock {
+  padding: 0.5rem 1.5rem 1.1rem;
+  background: linear-gradient(to bottom, transparent, var(--paper) 40%);
+  position: sticky;
+  bottom: 0;
+}
+
+.composer {
+  max-width: var(--thread);
+  margin: 0 auto;
+  display: flex;
+  align-items: flex-end;
+  gap: 0.6rem;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--bubble);
+  padding: 0.5rem 0.5rem 0.45rem 0.85rem;
+}
+
+.composer:focus-within {
+  border-color: var(--accent);
+}
+
+.composer textarea {
+  flex: 1;
+  font-family: var(--serif);
+  font-size: 16px;
+  line-height: 1.5;
+  color: inherit;
+  background: none;
+  border: 0;
+  outline: 0;
+  resize: none;
+  padding: 0.28rem 0;
+  max-height: 10rem;
+}
+
+.composer textarea::placeholder {
+  color: var(--ink-faint);
+}
+
+.send {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--control);
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--accent-ink);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.send:hover:not(:disabled) {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+.send:disabled {
+  background: var(--surface-sunk);
+  border-color: var(--line-strong);
+  color: var(--ink-faint);
+  cursor: not-allowed;
+}
+
+.hint {
+  max-width: var(--thread);
+  margin: 0.45rem auto 0;
+  font-size: 0.75rem;
+  color: var(--ink-faint);
+}
+
+/* -- the judgement ------------------------------------------------------ */
+
+.judgement {
+  max-width: min(56rem, 100%);
+  margin: 0 auto 1.5rem;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.judgement__head {
+  padding: 0.95rem 1.15rem;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-sunk);
+}
+
+.judgement__ask {
+  font-size: 1rem;
+}
+
+.judgement__note {
+  font-size: 0.8125rem;
+  color: var(--ink-quiet);
+  margin-top: 0.15rem;
+}
+
+/* One grid, one track rule, one hairline between. No rule anywhere styles the
+ * first one, and the two columns stretch together so the action under a short
+ * reply can not sit higher than the action under a long one. */
+.pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
+}
+
+.pair > * + * {
+  border-left: 1px solid var(--line);
+}
+
+.option {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.option__key {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--ink-quiet);
+  padding: 0.7rem 1.15rem 0;
+}
+
+.option__text {
+  font-family: var(--serif);
+  font-size: 16px;
+  line-height: 1.58;
+  white-space: pre-wrap;
+  padding: 0.5rem 1.15rem 1rem;
+  flex: 1;
+}
+
+.option__act {
+  padding: 0 1.15rem 1.15rem;
+}
+
+/* A run that was played is shown, not summarised into a sentence. */
+.replay {
+  aspect-ratio: 3 / 2;
+  margin: 0.6rem 1.15rem 0;
+  border: 1px solid var(--line);
+  border-radius: var(--control);
+  background: var(--surface-sunk);
+  display: grid;
+  place-items: center;
+  color: var(--ink-faint);
+  font-size: 0.8125rem;
+}
+
+.stats {
+  display: flex;
+  gap: 1.5rem;
+  padding: 0.85rem 1.15rem;
+}
+
+.stat__value {
+  font-size: 1.05rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat__label {
+  font-size: 0.75rem;
+  color: var(--ink-quiet);
+}
+
+/* -- the axes ----------------------------------------------------------- */
+
+.axes {
+  border-top: 1px solid var(--line);
+  padding: 1.15rem;
+  display: grid;
+  gap: 1.3rem;
+}
+
+.axis {
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.axis__ask {
+  padding: 0;
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin-bottom: 0.55rem;
+}
+
+/* A row of cells, and nothing is chosen at the start. A slider has to start
+ * somewhere, and a participant who never moves it still sends the value it
+ * started on, so the study records a judgement nobody gave. */
+.cells {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--control);
+  overflow: hidden;
+}
+
+.cells label {
+  border-right: 1px solid var(--line);
+  height: 2.3rem;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  font-size: 0.8125rem;
+  color: var(--ink-faint);
+  background: var(--surface);
+}
+
+.cells label:last-child {
+  border-right: 0;
+}
+
+/* The pointer draws a rule under the cell. It does not fill it, because a fill
+ * is what a chosen cell is. */
+.cells label:hover {
+  box-shadow: inset 0 -3px 0 0 var(--line-strong);
+  color: var(--ink);
+}
+
+.cells label:has(input:checked) {
+  background: var(--accent);
+  color: var(--accent-ink);
+  box-shadow: none;
+}
+
+.cells label:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.cells input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.ends {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 0.35rem;
+  font-size: 0.75rem;
+  color: var(--ink-quiet);
+}
+
+.ends span:nth-child(2) {
+  text-align: center;
+}
+
+.each {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.15rem;
+}
+
+.each__key {
+  padding: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--ink-quiet);
+  margin-bottom: 0.35rem;
+}
+
+.judgement__foot {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.85rem 1.15rem;
+  border-top: 1px solid var(--line);
+  background: var(--surface-sunk);
+}
+
+.judgement__foot .right {
+  margin-left: auto;
+}
+
+/* -- the strip that says this is a mock-up ------------------------------ */
+
+.mock {
+  display: flex;
+  gap: 1.25rem;
+  align-items: center;
+  padding: 0.45rem 1.5rem;
+  background: var(--surface-sunk);
+  border-bottom: 1px solid var(--line);
+  font-size: 0.75rem;
+  color: var(--ink-quiet);
+}
+
+.mock a {
+  color: var(--ink-quiet);
+}
+
+.mock .right {
+  margin-left: auto;
+}
+
+@media (max-width: 52rem) {
+  .pair,
+  .each {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .pair > * + * {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+  .turn {
+    max-width: 92%;
+  }
+}

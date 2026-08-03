@@ -73,13 +73,26 @@ def test_a_command_carries_what_the_drawing_said_and_nothing_else() -> None:
 
 
 def test_an_atlas_frame_travels_with_the_image_command() -> None:
-    """A sprite sheet draws one frame, so the frame is part of the drawing."""
+    """A sprite sheet draws one frame, so the frame is part of the drawing.
+
+    The frame is the name it was packed under. An index would mean nothing on its own:
+    re-pack the sheet and every index after the change moves, while every drawing goes
+    on working and draws something else.
+    """
     surface = Surface()
-    surface.image(image_name="hero", x=0.1, y=0.1, w=0.1, h=0.1, frame=2, angle=1.5)
+    surface.image(
+        image_name="hero",
+        x=0.1,
+        y=0.1,
+        w=0.1,
+        h=0.1,
+        frame="walk-2.png",
+        angle=1.5,
+    )
     drawn = surface.commands()[0]
 
     assert drawn.image_name == "hero"
-    assert drawn.frame == 2
+    assert drawn.frame == "walk-2.png"
     assert drawn.angle == 1.5
 
 

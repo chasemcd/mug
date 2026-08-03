@@ -85,6 +85,10 @@ def _ensure_web_built() -> None:
 def _assemble_web_root(destination: Path) -> Path:
     """Lay out the served root: the shell plus the compiled client and kernel."""
     shutil.copy(_SHELL, destination / "index.html")
+    shutil.copy(
+        _SHELL.parents[3] / "mug" / "webclient" / "app.css",
+        destination / "app.css",
+    )
     shutil.copytree(_DIST_WEB / "client", destination / "client")
     shutil.copytree(_DIST_WEB / "kernel", destination / "kernel")
     return destination
@@ -163,8 +167,8 @@ def _play_the_forms(page: Page) -> None:
     participant reads, so the status has already moved on to reporting that.
     """
     page.wait_for_selector("input[name='agree'][value='yes']", timeout=30_000)
-    page.locator("input[name='agree'][value='yes']").check()
-    page.locator("input[name='data-sharing'][value='yes']").check()
+    page.locator("label:has(input[name='agree'][value='yes'])").click()
+    page.locator("label:has(input[name='data-sharing'][value='yes'])").click()
     page.get_by_role("button", name="Continue").click()
 
     # The instructions page: the author's markdown, with nothing to answer.
@@ -173,8 +177,8 @@ def _play_the_forms(page: Page) -> None:
 
     # The pre-survey the author wrote, on the scales the author chose.
     page.wait_for_selector("input[name='games-experience']", timeout=10_000)
-    page.locator("input[name='games-experience'][value='3']").check()
-    page.locator("input[name='cooperation-comfort'][value='5']").check()
+    page.locator("label:has(input[name='games-experience'][value='3'])").click()
+    page.locator("label:has(input[name='cooperation-comfort'][value='5'])").click()
     page.get_by_role("button", name="Continue").click()
 
 
@@ -215,8 +219,8 @@ def test_two_real_browsers_play_one_peer_to_peer_episode(
         # rendered next, from the same specification, in the same browser.
         for page in (first, second):
             page.wait_for_selector("input[name='teamwork']", timeout=30_000)
-            page.locator("input[name='teamwork'][value='6']").check()
-            page.locator("input[name='partner-strategy'][value='4']").check()
+            page.locator("label:has(input[name='teamwork'][value='6'])").click()
+            page.locator("label:has(input[name='partner-strategy'][value='4'])").click()
             page.get_by_role("button", name="Continue").click()
             page.wait_for_selector("text=Thank you", timeout=15_000)
     finally:

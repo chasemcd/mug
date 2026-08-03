@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en" data-theme="light" data-thread="flat">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mock-up 5 -- a game and a conversation at once</title>
+    <link rel="stylesheet" href="mug-ui.css" />
+    <style>
+      .board {
+        aspect-ratio: 4 / 3;
+        border-radius: var(--radius);
+        background: #dfe7f5;
+        border: 1px solid var(--line);
+        display: grid;
+        place-items: center;
+        color: #5a6b86;
+        font-size: 0.8125rem;
+      }
+      :root[data-theme="dark"] .board {
+        background: #253044;
+        color: #93a4c2;
+      }
+      /* The conversation inside a pane is the same thread, at a smaller size.
+         It is not a second design. */
+      .pane .turn {
+        margin-bottom: 1.1rem;
+        gap: 0.6rem;
+      }
+      .pane .turn__who {
+        width: 22px;
+        height: 22px;
+        border-radius: 6px;
+        font-size: 0.625rem;
+      }
+      .pane .turn__text {
+        font-size: 0.875rem;
+      }
+      .pane .composer {
+        box-shadow: none;
+        border-radius: var(--radius);
+        padding: 0.4rem 0.4rem 0.35rem 0.7rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <div class="mock">
+        <a href="index.html">&larr; all mock-ups</a>
+        <strong>5. A game and a conversation at once</strong>
+        <span class="spacer"></span>
+        <span>keys go to</span>
+        <span class="segmented">
+          <button type="button" data-hold="game" aria-pressed="true">The game</button>
+          <button type="button" data-hold="chat" aria-pressed="false">The message box</button>
+        </span>
+        <span>theme</span>
+        <span class="segmented">
+          <button type="button" data-theme-pick="light">Light</button>
+          <button type="button" data-theme-pick="dark">Dark</button>
+        </span>
+      </div>
+
+      <header class="topbar">
+        <span class="topbar__title">Cook and talk</span>
+        <span class="topbar__sub">Round 2 of 3</span>
+        <span class="topbar__spacer"></span>
+        <span class="link-state">Connected</span>
+      </header>
+
+      <div class="panes">
+        <!-- Which pane the keys go to is said in words as well as drawn. The
+             old client changed an outline colour and nothing else, so a
+             participant who pressed a key and saw no chef move had to work out
+             what happened. -->
+        <section class="pane pane--held" data-pane="game" aria-label="The game">
+          <div class="pane__head">
+            The kitchen
+            <span class="pane__badge" data-badge="game">Your keys move the chef</span>
+            <span class="topbar__spacer"></span>
+            <span class="topbar__sub"><kbd>Tab</kbd> to write a message</span>
+          </div>
+          <div class="pane__body">
+            <div class="board">the game draws here</div>
+          </div>
+          <div class="hud">
+            <span><span class="hud__label">Delivered</span> 4</span>
+            <span><span class="hud__label">Time left</span> 0:47</span>
+          </div>
+        </section>
+
+        <section class="pane" data-pane="chat" aria-label="The conversation">
+          <div class="pane__head">
+            Talk to your partner
+            <span class="pane__badge" data-badge="chat">Not writing</span>
+          </div>
+          <div class="pane__body">
+            <div role="log" aria-label="Conversation">
+              <div class="turn turn--them">
+                <div class="turn__who" aria-hidden="true">T</div>
+                <div class="turn__body">
+                  <div class="turn__name">Them</div>
+                  <div class="turn__text">I will keep filling the pot. Can you take the dishes?</div>
+                </div>
+              </div>
+              <div class="turn turn--you">
+                <div class="turn__who" aria-hidden="true">Y</div>
+                <div class="turn__body">
+                  <div class="turn__name">You</div>
+                  <div class="turn__text">Yes. Leave the second pot to me as well.</div>
+                </div>
+              </div>
+              <div class="turn turn--them">
+                <div class="turn__who" aria-hidden="true">T</div>
+                <div class="turn__body">
+                  <div class="turn__name">Them</div>
+                  <div class="thinking" role="status" aria-label="Waiting for a reply">
+                    <span></span><span></span><span></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div style="padding: 0.6rem; border-top: 1px solid var(--line)">
+            <form class="composer">
+              <label class="sr-only" for="msg">Your message</label>
+              <textarea id="msg" rows="1" placeholder="Write a message"></textarea>
+              <button type="submit" class="composer__send" aria-label="Send" disabled>
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <path d="M8 13V3M8 3L3.5 7.5M8 3l4.5 4.5" stroke="currentColor"
+                        stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </button>
+            </form>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <script src="mock.js"></script>
+    <script>
+      // Mock-up only: show what the two states of the pane hold look like.
+      const words = {
+        game: { game: "Your keys move the chef", chat: "Not writing" },
+        chat: { game: "The chef is standing still", chat: "Your keys write here" },
+      };
+      document.addEventListener("click", (event) => {
+        const pick = event.target.closest("[data-hold]");
+        if (!pick) return;
+        const held = pick.dataset.hold;
+        for (const button of document.querySelectorAll("[data-hold]")) {
+          button.setAttribute("aria-pressed", String(button.dataset.hold === held));
+        }
+        for (const pane of document.querySelectorAll("[data-pane]")) {
+          pane.classList.toggle("pane--held", pane.dataset.pane === held);
+        }
+        for (const badge of document.querySelectorAll("[data-badge]")) {
+          badge.textContent = words[held][badge.dataset.badge];
+        }
+      });
+    </script>
+  </body>
+</html>

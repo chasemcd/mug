@@ -36,6 +36,7 @@ from mug.kernel import (
     PublicHandle,
     SchemaBundle,
     SchemaRef,
+    SeatKey,
     StreamPosition,
     UtcInstant,
     load_family_schema,
@@ -164,7 +165,7 @@ class InputScheme(KernelModel):
     schema: SchemaRef = Field(  # pyright: ignore[reportIncompatibleMethodOverride]
         default_factory=lambda: _schema_ref("mug.api-09.input-scheme")
     )
-    seat_key: _AuthoringKey
+    seat_key: SeatKey
     mode: Literal["pressed_keys", "single_keystroke"]
     bindings: Annotated[
         dict[_KeyName, _EnvActionValue], Field(min_length=1, max_length=128)
@@ -179,7 +180,7 @@ class SeatDelivery(KernelModel):
     schema: SchemaRef = Field(  # pyright: ignore[reportIncompatibleMethodOverride]
         default_factory=lambda: _schema_ref("mug.api-09.seat-delivery")
     )
-    seat_key: _AuthoringKey
+    seat_key: SeatKey
     delivery_kind: Literal["render_packet", "message"]
     payload_schema: SchemaRef
     payload_digest: Digest
@@ -239,7 +240,7 @@ class MonitoringMeasurement(KernelModel):
         default_factory=lambda: _schema_ref("mug.api-09.monitoring-measurement")
     )
     policy: MonitoringPolicyRef
-    seat_key: _AuthoringKey
+    seat_key: SeatKey
     measurements: Annotated[
         list[QualityMeasurement], Field(min_length=1, max_length=16)
     ]

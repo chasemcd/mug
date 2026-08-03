@@ -27,7 +27,7 @@ from fastapi import WebSocketDisconnect
 
 from mug.agents import AgentIds
 from mug.agents.generation import recorded_generation
-from mug.authoring import Chat, Fallback, History, LLMAgent, Provider, Thoughts
+from mug.authoring import Fallback, History, LLMAgent, Provider, Thoughts, Transcript
 from mug.conversation.transcript import (
     is_current,
     read_transcript,
@@ -46,8 +46,10 @@ from mug.providers import ModelCall, ModelCompletion, Usage
 from mug.realtime import Session
 from mug.runtime import CommandContext
 from mug.storage import InMemoryStore
+from tests.support.chat import chat_spec
 
 _UUID = "019b6000-0000-7000-8000-{:012x}"
+
 _START = datetime(2026, 7, 27, 0, 0, 0, tzinfo=timezone.utc)
 _DIGEST = Digest(algorithm="sha-256", hex="a" * 64)
 _AGENT_ACTOR = "actor_" + _UUID.format(0x300)
@@ -68,18 +70,32 @@ class _Partner(LLMAgent):
         env: object,
         agent_id: str,
         history: History,
-        chat: Chat,
+        chat: Transcript,
         thoughts: Thoughts,
     ) -> str:
-        return ""
+        # The shape the shipped example writes. A double whose prompt says nothing
+        # would let the mount drop the author's words and still pass.
+        return "\n".join(f"{one.sender}: {one.text}" for one in chat.last(50))
+
+
+def _said_to(payload: Any) -> str:
+    """Return the last thing a participant said, out of what the model was sent.
+
+    The words are read from ``content``, which is where all three providers look
+    for them. A double that reads them from anywhere else passes while the real
+    model is sent an empty question.
+    """
+    messages = cast("list[Any]", cast("dict[str, Any]", payload)["messages"])
+    spoken = str(cast("dict[str, Any]", messages[-1])["content"])
+    lines = [line for line in spoken.splitlines() if line.startswith("user: ")]
+    return lines[-1][len("user: ") :] if lines else spoken
 
 
 class _EchoAdapter:
     """A fake provider that echoes the last payload text."""
 
     async def __call__(self, call: ModelCall) -> ModelCompletion:
-        payload = cast("dict[str, Any]", call.payload)
-        last = cast("list[dict[str, str]]", payload["messages"])[-1]["text"]
+        last = _said_to(call.payload)
         return ModelCompletion(
             outcome="completed",
             resolved_model="fake-local",
@@ -149,7 +165,7 @@ class _Ids:
 
 
 def _spec() -> ChatSpec:
-    return ChatSpec(
+    return chat_spec(
         seat=ChatSeatSpec(
             agent=_Partner(),
             adapter=_EchoAdapter(),

@@ -77,7 +77,10 @@ class _ReferenceRun:
 
 
 def _reference_run(
-    spec: BrowserGameSpec, actions: list[int], seat_key: str
+    spec: BrowserGameSpec,
+    actions: list[int],
+    seat_key: str,
+    partner_actions: Sequence[int] = (),
 ) -> _ReferenceRun:
     """Re-execute the run from the seed and actions, returning the true hashes.
 
@@ -85,6 +88,14 @@ def _reference_run(
     server checks the real environment, not a second copy that could drift. It
     imports the environment adapter lazily, so this module loads without the game
     extra and only needs it to actually verify.
+
+    A run with an exported partner is re-executed under **both** action sequences.
+    The partner is scored by the browser's own inference runtime, which the server
+    has no copy of, so its decisions travel with the run the way the participant's
+    do and are handed back to the bundle here. What that verifies is unchanged in
+    kind: the state hashes are the consequence of running the real environment
+    under the reported inputs, and a client that reports inputs the environment
+    would not have produced this trajectory from fails.
     """
     from mug.game.env import GymEnv
 
@@ -94,12 +105,15 @@ def _reference_run(
     exec(spec.source_bundle, namespace)
     factory = namespace["make_env"]
     env = GymEnv(factory, seed=spec.seed)  # pyright: ignore[reportArgumentType]
+    partner_acts = namespace.get("partner_acts") if spec.partner is not None else None
 
     state = env.reset()
     frame_hashes: list[Digest] = []
     action_hashes: list[Digest] = []
     trajectory: list[TrajectoryFrame] = []
     for index, action in enumerate(actions, start=1):
+        if callable(partner_acts) and index <= len(partner_actions):
+            partner_acts(int(partner_actions[index - 1]))
         state = env.step(action)
         frame_hashes.append(state_hash(state.observation))
         action_hashes.append(state_hash(action))
@@ -147,6 +161,7 @@ def verify_browser_episode(
     *,
     actions: list[int],
     summary: EpisodeSummary,
+    partner_actions: Sequence[int] = (),
 ) -> VerificationReport:
     """Re-execute a browser-reported run and check every state hash against it.
 
@@ -157,6 +172,13 @@ def verify_browser_episode(
     count, or an environment it cannot re-execute leaves ``verified`` false, so
     the caller refuses a divergent run and never commits a faked match.
     """
+    if spec.verification != "deterministic":
+        # The study has said its environment does not repeat. Re-executing it would
+        # produce a different trajectory from an honest run and refuse it, so every
+        # participant's round would be discarded at the end with nothing recorded.
+        # What is recorded instead is the run as reported, carrying the verdict that
+        # says it was not checked -- which a reader can act on, unlike an absence.
+        return _visual_fallback(summary, "environment-not-reproducible")
     if len(actions) != len(summary.transitions):
         return VerificationReport(
             verification="deterministic",
@@ -165,9 +187,20 @@ def verify_browser_episode(
             state_hash_chain_digest=None,
             reason="action-count-mismatch",
         )
+    if spec.partner is not None and len(partner_actions) != len(actions):
+        # A partner that acted on every frame reported an action for every frame.
+        # A run that says otherwise cannot be re-executed as it was played, so it
+        # is refused rather than re-executed against a partner that stood still.
+        return VerificationReport(
+            verification="deterministic",
+            verified=False,
+            checks=(),
+            state_hash_chain_digest=None,
+            reason="partner-action-count-mismatch",
+        )
 
     try:
-        reference = _reference_run(spec, actions, summary.seat_key)
+        reference = _reference_run(spec, actions, summary.seat_key, partner_actions)
     except Exception:
         # Any re-execution failure -- a missing package, a bundle that does not
         # build -- declares a visual fallback rather than a faked match.

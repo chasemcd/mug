@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MUG participant interface -- mock-ups</title>
+    <link rel="stylesheet" href="mug-ui.css" />
+    <style>
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+        gap: 0.85rem;
+        margin: 1.25rem 0 2.5rem;
+      }
+      .tile {
+        display: block;
+        text-decoration: none;
+        color: inherit;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-lg);
+        padding: 1rem;
+        box-shadow: var(--shadow-sm);
+        transition: box-shadow 0.14s ease, transform 0.06s ease;
+      }
+      .tile:hover {
+        box-shadow: var(--shadow-lift);
+        transform: translateY(-1px);
+      }
+      .tile__n {
+        font-size: 0.6875rem;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--accent);
+      }
+      .tile__t {
+        font-weight: 600;
+        margin: 0.2rem 0 0.3rem;
+      }
+      .tile__d {
+        font-size: 0.8125rem;
+        color: var(--ink-muted);
+        line-height: 1.5;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.875rem;
+        margin: 0 0 1.5rem;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 0.5rem 0.75rem;
+        border-bottom: 1px solid var(--line);
+        vertical-align: top;
+      }
+      th {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--ink-muted);
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="sheet" style="max-width: 52rem">
+      <div style="display: flex; align-items: center; gap: 1rem">
+        <h1>The participant interface</h1>
+        <span class="topbar__spacer"></span>
+        <span class="segmented">
+          <button type="button" data-theme-pick="light">Light</button>
+          <button type="button" data-theme-pick="dark">Dark</button>
+        </span>
+      </div>
+      <p style="color: var(--ink-muted); margin-top: 0.5rem">
+        Six mock-ups of one design. Nothing here is wired into the platform: they are
+        static files, and they are made to be argued with.
+      </p>
+      <p style="margin-top: -0.4rem">
+        <strong>This is the first pass, and it is the generic one</strong> -- rounded
+        panels, soft shadows, one teal accent, and a rectangle that lights up under
+        the pointer. <a href="v2/index.html">The second pass gives two directions that
+        are none of those things &rarr;</a>
+      </p>
+
+      <div class="grid">
+        <a class="tile" href="01-chat.html">
+          <div class="tile__n">Mock-up 1</div>
+          <div class="tile__t">The conversation</div>
+          <div class="tile__d">
+            One thread, two readings of it, the wait for a reply, and a reply that does
+            not come.
+          </div>
+        </a>
+        <a class="tile" href="02-inline-preference.html">
+          <div class="tile__n">Mock-up 2</div>
+          <div class="tile__t">The judgement inside the conversation</div>
+          <div class="tile__d">
+            Two replies were written. The one that is chosen is the one the conversation
+            goes on with.
+          </div>
+        </a>
+        <a class="tile" href="03-comparison.html">
+          <div class="tile__n">Mock-up 3</div>
+          <div class="tile__t">The comparison activity</div>
+          <div class="tile__d">
+            Two rounds that were played, and two things that were written, in one card
+            grammar.
+          </div>
+        </a>
+        <a class="tile" href="04-study-shell.html">
+          <div class="tile__n">Mock-up 4</div>
+          <div class="tile__t">Reading, answering, finishing</div>
+          <div class="tile__d">
+            Instructions, a form with a scale that is readable, and the last screen.
+          </div>
+        </a>
+        <a class="tile" href="05-game-and-chat.html">
+          <div class="tile__n">Mock-up 5</div>
+          <div class="tile__t">A game and a conversation at once</div>
+          <div class="tile__d">
+            Two panes, and a clear answer to "where are my keys going?".
+          </div>
+        </a>
+        <a class="tile" href="06-shared-room.html">
+          <div class="tile__n">Mock-up 6</div>
+          <div class="tile__t">A conversation several people share</div>
+          <div class="tile__d">
+            Channels, and everybody in the room with a name instead of "Them".
+          </div>
+        </a>
+      </div>
+
+      <div class="prose">
+        <h2>The three rules this design keeps</h2>
+        <ol>
+          <li>
+            <strong>The screen never says whether the other party is a person or a
+            model.</strong> Only the study knows that, and only the study may say it. So
+            there is no robot icon, no "Assistant", and no brand mark on a reply.
+          </li>
+          <li>
+            <strong>Two things a participant is asked to compare must look the
+            same.</strong> The two cards are one grid with one track rule, and no rule
+            anywhere styles "the first one". A card that is wider or brighter is a
+            measurement error, not a style choice.
+          </li>
+          <li>
+            <strong>Every control keeps a visible focus ring.</strong> A game pane and a
+            chat pane are changed with the Tab key, so a participant who can not see the
+            focus can not play.
+          </li>
+        </ol>
+
+        <h2>What is different from the interface today</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Today</th>
+              <th>Here</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>A message is <code>&lt;p&gt;&lt;strong&gt;You: &lt;/strong&gt;text&lt;/p&gt;</code>.</td>
+              <td>A turn is a row: a mark, a name, and the words, with air between turns.</td>
+            </tr>
+            <tr>
+              <td>The message box is an <code>&lt;input&gt;</code> at 70% width.</td>
+              <td>A box that grows to what is written and stops, with the send inside it.</td>
+            </tr>
+            <tr>
+              <td>Everybody who is not you is "Them", in a room of four as well.</td>
+              <td>
+                Every other party gets a name and a colour. The server already sends
+                <code>author_actor_id</code> on every message; the screen throws it away.
+              </td>
+            </tr>
+            <tr>
+              <td>A comparison is a column of default buttons.</td>
+              <td>Two cards of one width, and for a round that was played, the round.</td>
+            </tr>
+            <tr>
+              <td>A scale is seven loose radio dots with no words at the ends.</td>
+              <td>One row of marks, with both ends written out.</td>
+            </tr>
+            <tr>
+              <td>
+                An axis is a slider that starts in the middle. It draws a filled bar to
+                the left before anybody touches it, and a participant who never touches
+                it still sends the middle value.
+              </td>
+              <td>
+                A row of marks with nothing chosen. "The same" is a mark somebody picks,
+                not a place the control was parked.
+              </td>
+            </tr>
+            <tr>
+              <td>The pane that holds the keys is a blue outline and nothing else.</td>
+              <td>An outline <em>and</em> a badge that says where the keys are going.</td>
+            </tr>
+            <tr>
+              <td>Dark only, <code>#0f1115</code>, at every screen size.</td>
+              <td>Light and dark, from one set of tokens.</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h2>What to argue with</h2>
+        <ul>
+          <li>
+            <strong>Flat or bubbles.</strong> Mock-up 1 has both. Flat reads as a
+            document and holds long replies better; bubbles make it obvious which words
+            are yours. Pick one.
+          </li>
+          <li>
+            <strong>Light or dark as the default.</strong> A participant is on an unknown
+            screen in an unknown room, and a study is often read before it is played.
+          </li>
+          <li>
+            <strong>The two cards stack on a narrow screen.</strong> Side by side, the
+            order is shuffled and carries no signal. Stacked, one is above the other and
+            is read first. That is a question about the data, not about the layout.
+          </li>
+          <li>
+            <strong>Colour names for the other parties.</strong> They say nothing about
+            whether a party is a person or a model, which is the rule. Somebody may still
+            find them odd.
+          </li>
+          <li>
+            <strong>The step marks.</strong> They say where the participant is and
+            promise no time, because no study can honestly give one. A study with 30
+            steps needs a different mark.
+          </li>
+        </ul>
+      </div>
+    </main>
+    <script src="mock.js"></script>
+  </body>
+</html>

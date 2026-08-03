@@ -130,7 +130,7 @@ async def test_ollama_carries_a_temperature_into_the_options() -> None:
 
     await adapter(_call())
 
-    assert transport.requests[0].json["options"] == {"temperature": 0.2}
+    assert transport.requests[0].json["options"]["temperature"] == 0.2
 
 
 async def test_the_payload_temperature_overrides_the_adapter_default() -> None:
@@ -147,7 +147,38 @@ async def test_the_payload_temperature_overrides_the_adapter_default() -> None:
 
     await adapter(call)
 
-    assert transport.requests[0].json["options"] == {"temperature": 0.9}
+    assert transport.requests[0].json["options"]["temperature"] == 0.9
+
+
+async def test_ollama_is_told_how_much_to_generate_and_how_long_to_stay_loaded() -> (
+    None
+):
+    """The declared bound reaches the runner, and the model is kept in memory.
+
+    ``max_tokens`` was declared on every adapter and read by exactly one of them, so
+    a study that bounded its replies was not bounded on a local runner at all: with
+    no ``num_predict`` Ollama generates until the model stops, and a model that
+    answers a three-line question with an essay costs the wait for every token of
+    it. On a machine with no GPU that is seconds a call.
+
+    ``keep_alive`` is the other half. The runner unloads after five minutes by
+    default, which is less time than a participant spends on the consent form and
+    the instructions -- so the first call of the first round paid to load the model
+    again, in front of somebody who was by then looking at the game.
+    """
+    transport = _Transport(body=_OLLAMA_REPLY)
+    adapter = OllamaAdapter(
+        base_url="http://localhost:11434", transport=transport, max_tokens=64
+    )
+
+    await adapter(_call())
+
+    sent = transport.requests[0].json
+    assert sent["options"]["num_predict"] == 64, (
+        "the runner was given no generation bound, so a rambling reply is waited "
+        "for in full"
+    )
+    assert sent["keep_alive"], "the model is left to be unloaded between rounds"
 
 
 # -- Anthropic ----------------------------------------------------------------
@@ -284,6 +315,94 @@ async def test_a_malformed_reply_maps_to_an_error_not_a_crash() -> None:
 
     assert completion.outcome == "error"
     assert completion.error_class == "provider-error"
+
+
+# -- the words of a message reach the provider --------------------------------
+#
+# All three providers name the words of a message ``content``. A caller that names
+# them anything else sends a message the provider reads as empty, and each provider
+# fails differently and quietly: Ollama answers the empty question it was asked, and
+# Anthropic refuses the request, which the adapter maps to silence. Neither reaches
+# the participant as a fault, so the study looks broken with nothing in the logs.
+#
+# The chat mount really did this. It composed every message as ``text``, and every
+# test of it used a double that read ``text`` back, so the whole suite passed while
+# no conversation on any provider could work. These tests are at the one boundary
+# that faces the provider, and they read only what a provider reads.
+
+
+@pytest.mark.parametrize(
+    "adapter",
+    [
+        OllamaAdapter(base_url="http://x", transport=None),
+        AnthropicAdapter(base_url="http://x", transport=None),
+        OpenAIAdapter(base_url="http://x", transport=None),
+    ],
+    ids=["ollama", "anthropic", "openai"],
+)
+async def test_every_message_reaches_the_provider_with_its_words(
+    adapter: Any,
+) -> None:
+    """No adapter may send a message with nothing in the field a provider reads."""
+    transport = _Transport(status=500, body={})
+    adapter._transport = transport
+    call = ModelCall(
+        model_selector="a-model",
+        payload={
+            "messages": [
+                {"role": "user", "content": "what I said"},
+                {"role": "assistant", "content": "what it said"},
+            ]
+        },
+        secret=None,
+    )
+
+    await adapter(call)
+
+    sent = transport.requests[0].json["messages"]
+    assert [one["content"] for one in sent] == ["what I said", "what it said"]
+
+
+async def test_a_message_that_names_its_words_text_still_carries_them() -> None:
+    """A composer that writes ``text`` is repaired rather than sent empty.
+
+    ``ChatSpec.compose`` is an author seam, and the shape the platform itself wrote
+    for a year was ``text``. A study that copied it must not be answered by a model
+    that was told nothing, so the words are put where the provider looks for them.
+    """
+    transport = _Transport(body=_OLLAMA_REPLY)
+    adapter = OllamaAdapter(base_url="http://localhost:11434", transport=transport)
+
+    await adapter(
+        ModelCall(
+            model_selector="a-model",
+            payload={"messages": [{"role": "user", "text": "what I said"}]},
+            secret=None,
+        )
+    )
+
+    assert transport.requests[0].json["messages"] == [
+        {"role": "user", "content": "what I said"}
+    ]
+
+
+async def test_a_message_whose_content_is_a_block_list_is_passed_through() -> None:
+    """An Anthropic content array is content already, and is not flattened."""
+    transport = _Transport(body=_ANTHROPIC_REPLY)
+    adapter = AnthropicAdapter(
+        base_url="https://api.anthropic.com", transport=transport
+    )
+    blocks = [{"type": "text", "text": "look at this"}]
+
+    await adapter(
+        ModelCall(
+            model_selector="a-model",
+            payload={"messages": [{"role": "user", "content": blocks}]},
+            secret="k",
+        )
+    )
+
+    assert transport.requests[0].json["messages"][0]["content"] == blocks
 
 
 # -- the registry -------------------------------------------------------------

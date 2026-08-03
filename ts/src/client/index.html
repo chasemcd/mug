@@ -4,34 +4,26 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>MUG</title>
-    <style>
-      body {
-        margin: 0;
-        font-family: system-ui, sans-serif;
-        background: #0f1115;
-        color: #e6e6e6;
-        display: grid;
-        place-items: center;
-        height: 100vh;
-      }
-      main {
-        text-align: center;
-      }
-      #status {
-        font-size: 0.9rem;
-        color: #9aa0a6;
-      }
-      #status.ok {
-        color: #7ee787;
-      }
-    </style>
+    <!-- The stylesheet is the one in ``mug/webclient/app.css``. Both clients
+         serve the same bytes, so a change to the look can not reach one
+         participant and not the other. -->
+    <link rel="stylesheet" href="/static/app.css" />
   </head>
   <body>
-    <main>
-      <h1>MUG</h1>
-      <p id="status">connecting...</p>
+    <div class="app">
+      <header class="head">
+        <span class="brand">
+          <span class="brand__mark" aria-hidden="true"></span>
+          <span class="brand__name">MUG</span>
+        </span>
+        <span class="head__rule" aria-hidden="true"></span>
+        <span class="head__study" id="study"></span>
+        <span class="head__spacer"></span>
+        <span class="progress" id="where" hidden></span>
+        <span class="state" id="status">connecting...</span>
+      </header>
       <div id="app"></div>
-    </main>
+    </div>
     <script type="module" src="/static/client/bootstrap.js"></script>
   </body>
 </html>

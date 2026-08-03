@@ -33,11 +33,13 @@ without calling the model again.
 
 from __future__ import annotations
 
+import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Literal, cast
 
+from mug.diagnostics import Diagnostics, NullDiagnostics
 from mug.kernel import (
     CommandReceipt,
     CommandTypeRef,
@@ -86,6 +88,16 @@ class ModelCall:
     model_selector: str
     payload: Payload
     secret: str | None
+    # Why the call is being made. ``decision`` is a call the study asked for.
+    # ``warm-up`` is the platform reaching the model once before a round, to load it
+    # and to find out that it answers before a participant is looking at a game.
+    #
+    # An adapter for a real provider does not care: a call is a call. An adapter
+    # that answers **by sequence** does -- a script, a simulation, a test double --
+    # because a warm-up would otherwise take the first answer meant for a decision
+    # and every answer after it would be one behind. So it is named rather than
+    # left to be guessed at from the payload.
+    purpose: str = "decision"
 
 
 @dataclass(frozen=True)
@@ -147,6 +159,7 @@ class ModelProvider:
         now: Callable[[], datetime],
         new_generation_id: Callable[[], str],
         output_tape: OutputTape | None = None,
+        diagnostics: Diagnostics | None = None,
     ) -> None:
         self._store = store
         self._adapter = adapter
@@ -156,6 +169,12 @@ class ModelProvider:
         # content-addressed by its digest and rehydrated on a replay, so a decision
         # replays its reply exactly. Unset by default, so nothing is persisted.
         self._output_tape = output_tape
+        # Where this call says what it asked and what came back, for a person
+        # watching the run. It is every model call the platform makes -- a playing
+        # seat's, a conversation's, a generated candidate's -- because they all come
+        # through here, which is what makes this the one place worth watching.
+        # The default discards, so an unwatched call costs one method call.
+        self._diagnostics: Diagnostics = diagnostics or NullDiagnostics()
 
     async def invoke(
         self,
@@ -166,6 +185,7 @@ class ModelProvider:
         new_context: NewContext,
         resolve_secret: SecretResolver | None = None,
         secret_name: str | None = None,
+        purpose: str = "decision",
     ) -> ModelCallResult:
         """Run one model call, record the request and its outcome, and return both.
 
@@ -182,6 +202,12 @@ class ModelProvider:
             )
         head = self._store.load_aggregate(modelcall_id)
         if head is not None and _is_terminal(head):
+            self._diagnostics.note(
+                "model.replayed",
+                subject=agent_version.agent_key,
+                modelcall_id=modelcall_id,
+                model=agent_version.model_selector,
+            )
             return await self._replay(modelcall_id, head)
 
         request = ProviderRequest(
@@ -201,13 +227,47 @@ class ModelProvider:
             )
         revision = self._store.revision_of(modelcall_id) or 0
 
+        # What the model was asked. The credential is **named** and never valued,
+        # which is the same rule the record follows: the resolved secret is one line
+        # below this and is the one thing a note may not carry.
+        self._diagnostics.note(
+            "model.call",
+            subject=agent_version.agent_key,
+            modelcall_id=modelcall_id,
+            model=agent_version.model_selector,
+            agent_version_id=agent_version.agent_version_id,
+            secret_name=name,
+            payload=payload,
+            purpose=purpose,
+        )
         secret = resolve_secret(name) if resolve_secret is not None else None
-        completion = await self._adapter(
-            ModelCall(
-                model_selector=agent_version.model_selector,
-                payload=payload,
-                secret=secret,
+        started = time.perf_counter()
+        try:
+            completion = await self._adapter(
+                ModelCall(
+                    model_selector=agent_version.model_selector,
+                    payload=payload,
+                    secret=secret,
+                    purpose=purpose,
+                )
             )
+        except Exception as raised:
+            # An adapter that raises is the failure a study most often has in front
+            # of it -- a refused connection, a model that is not pulled, a bad URL --
+            # and it is the one the ledger says least about, because the call never
+            # reached an outcome to record. So it is written down before it is
+            # raised on, and the exception goes on exactly where it went before.
+            self._diagnostics.note(
+                "model.raised",
+                subject=agent_version.agent_key,
+                modelcall_id=modelcall_id,
+                error=type(raised).__name__,
+                message=str(raised),
+                took_ms=_since(started),
+            )
+            raise
+        self._note_completion(
+            modelcall_id, agent_version, completion, started, purpose
         )
         return await self._record(
             modelcall_id=modelcall_id,
@@ -218,6 +278,49 @@ class ModelProvider:
         )
 
     # -- internals --------------------------------------------------------------
+
+    def _note_completion(
+        self,
+        modelcall_id: str,
+        agent_version: AgentVersion,
+        completion: ModelCompletion,
+        started: float,
+        purpose: str,
+    ) -> None:
+        """Write down what came back: the reply, what it cost, and how long it took.
+
+        A refusal and an error are written under their own kinds rather than as a
+        reply with a flag on it, because the three are read differently: a reply is
+        read, a refusal is a content filter to look at, and an error is a provider to
+        go and fix.
+        """
+        common: dict[str, Any] = {
+            "modelcall_id": modelcall_id,
+            "model": completion.resolved_model,
+            "took_ms": _since(started),
+            # A reader has to be able to tell the platform's own warm-up from a call
+            # the study asked for, or the first reply of every round reads as an
+            # answer to a question nobody can find in the study.
+            "purpose": purpose,
+        }
+        if completion.outcome == "error":
+            self._diagnostics.note(
+                "model.error",
+                subject=agent_version.agent_key,
+                error_class=completion.error_class or "provider-error",
+                retryable=completion.retryable,
+                **common,
+            )
+            return
+        self._diagnostics.note(
+            "model.reply" if completion.outcome == "completed" else "model.refused",
+            subject=agent_version.agent_key,
+            output=completion.output,
+            input_tokens=completion.usage.input_tokens,
+            output_tokens=completion.usage.output_tokens,
+            cost_micros=completion.usage.cost_micros,
+            **common,
+        )
 
     async def _record(
         self,
@@ -352,6 +455,15 @@ class FakeProvider:
             usage=self._usage,
             output=self._respond(call.payload),
         )
+
+
+def _since(started: float) -> int:
+    """Return how long a call took, in whole milliseconds.
+
+    It is a wall-clock reading and not a recorded instant: how long a model took is
+    a fact about this machine and this moment, and nothing replays it.
+    """
+    return int((time.perf_counter() - started) * 1000)
 
 
 def _state(record: _Record) -> dict[str, Any]:

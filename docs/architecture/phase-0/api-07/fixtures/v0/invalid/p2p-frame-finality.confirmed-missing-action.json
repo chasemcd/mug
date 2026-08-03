@@ -1,10 +1,20 @@
 {
-  "schema": {"name": "mug.api-07.p2p-frame-finality", "version": 0, "digest": {"algorithm": "sha-256", "hex": "2c41f0fe7bacf95174dc6c1cc1e57a4ce478d1deca1aeadd9d857f91d7d2caaa"}},
+  "schema": {
+    "name": "mug.api-07.p2p-frame-finality",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "b58e8ca5143b68c216fa8c8734341439b8749a044c56d9dcfc810b237e82f25d"
+    }
+  },
   "interaction_id": "interaction_019b6000-0000-7000-8000-000000000420",
   "channel_key": "board",
   "episode_id": "episode_019b6000-0000-7000-8000-000000000800",
   "frame_number": 42,
-  "mesh_membership_digest": {"algorithm": "sha-256", "hex": "5f9103cfaa1ea55b01c4f9e8b6765447f60c6ff6ba5c8ad53ab251bfb7feb2b0"},
+  "mesh_membership_digest": {
+    "algorithm": "sha-256",
+    "hex": "5f9103cfaa1ea55b01c4f9e8b6765447f60c6ff6ba5c8ad53ab251bfb7feb2b0"
+  },
   "membership_generation": 3,
   "status": "confirmed",
   "frozen_peer_actor_ids": [
@@ -14,9 +24,27 @@
     "actor_019b6000-0000-7000-8000-000000000413"
   ],
   "actions": [
-    {"peer_actor_id": "actor_019b6000-0000-7000-8000-000000000410", "action_digest": {"algorithm": "sha-256", "hex": "1111111111111111111111111111111111111111111111111111111111111111"}},
-    {"peer_actor_id": "actor_019b6000-0000-7000-8000-000000000411", "action_digest": {"algorithm": "sha-256", "hex": "2222222222222222222222222222222222222222222222222222222222222222"}},
-    {"peer_actor_id": "actor_019b6000-0000-7000-8000-000000000412", "action_digest": {"algorithm": "sha-256", "hex": "3333333333333333333333333333333333333333333333333333333333333333"}}
+    {
+      "peer_actor_id": "actor_019b6000-0000-7000-8000-000000000410",
+      "action_digest": {
+        "algorithm": "sha-256",
+        "hex": "1111111111111111111111111111111111111111111111111111111111111111"
+      }
+    },
+    {
+      "peer_actor_id": "actor_019b6000-0000-7000-8000-000000000411",
+      "action_digest": {
+        "algorithm": "sha-256",
+        "hex": "2222222222222222222222222222222222222222222222222222222222222222"
+      }
+    },
+    {
+      "peer_actor_id": "actor_019b6000-0000-7000-8000-000000000412",
+      "action_digest": {
+        "algorithm": "sha-256",
+        "hex": "3333333333333333333333333333333333333333333333333333333333333333"
+      }
+    }
   ],
   "hash_evidence": [],
   "recorded_at": "2026-08-02T12:05:00.100000Z"

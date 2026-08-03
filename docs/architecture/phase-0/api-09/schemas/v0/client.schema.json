@@ -8,6 +8,11 @@
       "pattern": "^[a-z][a-z0-9]*(?:[-_.][a-z0-9]+)*$",
       "maxLength": 128
     },
+    "SeatKey": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9]*(?:[-_.][a-z0-9]+)*$",
+      "maxLength": 128
+    },
     "KeyName": {
       "type": "string",
       "pattern": "^[a-z][a-z0-9]*(?:[-_][a-z0-9]+)*$",
@@ -286,7 +291,7 @@
           "$ref": "#/$defs/InputSchemeSchemaRef"
         },
         "seat_key": {
-          "$ref": "#/$defs/AuthoringKey"
+          "$ref": "#/$defs/SeatKey"
         },
         "mode": {
           "$ref": "#/$defs/InputMode"
@@ -346,7 +351,7 @@
           "$ref": "#/$defs/SeatDeliverySchemaRef"
         },
         "seat_key": {
-          "$ref": "#/$defs/AuthoringKey"
+          "$ref": "#/$defs/SeatKey"
         },
         "delivery_kind": {
           "enum": [
@@ -570,7 +575,7 @@
           "$ref": "#/$defs/MonitoringPolicyRef"
         },
         "seat_key": {
-          "$ref": "#/$defs/AuthoringKey"
+          "$ref": "#/$defs/SeatKey"
         },
         "measurements": {
           "type": "array",

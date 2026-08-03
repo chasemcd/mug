@@ -4,7 +4,7 @@
     "version": 0,
     "digest": {
       "algorithm": "sha-256",
-      "hex": "df3da1e10ffec853c052c7188e617cd2f2f529876c19b86d852164ba97552c1f"
+      "hex": "4562b13e005ff07cbe2262a05ab0a5ebdc4ee0a3a1e5c84c7b643fa47dc19a47"
     }
   },
   "manifest_version": "0.3.0",
@@ -17,6 +17,13 @@
       "schema_ref": "urn:mug:schema:mug.api-05.actor:0#/$defs/SeatDefinition",
       "expect": "valid",
       "validation_layer": "schema"
+    },
+    {
+      "id": "seat-definition.valid.numbered-agent",
+      "instance": "valid/seat-definition.numbered-agent.json",
+      "schema_ref": "urn:mug:schema:mug.api-05.actor:0#/$defs/SeatDefinition",
+      "validation_layer": "schema",
+      "expect": "valid"
     },
     {
       "id": "actor-instance.valid.human",

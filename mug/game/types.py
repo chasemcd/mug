@@ -38,6 +38,7 @@ from mug.kernel import (
     Digest,
     SchemaBundle,
     SchemaRef,
+    SeatKey,
     UtcInstant,
     load_family_schema,
 )
@@ -283,7 +284,11 @@ class SurfaceCommand(KernelModel):
     text: Annotated[str, Field(max_length=4096)] | None = None
     font_size: _Number | None = None
     image_name: Annotated[str, Field(max_length=128)] | None = None
-    frame: NonNegativeSafeInteger | None = None
+    # One frame of a sheet, by the name it was packed under ("counter.png"). It is a
+    # name for the same reason ``image_name`` is: an index means nothing on its own, so
+    # a sheet re-packed with one more sprite moves every index after it and every
+    # drawing goes on working, wrongly.
+    frame: Annotated[str, Field(max_length=128)] | None = None
     extras: Annotated[dict[str, Any], Field(max_length=64)] | None = None
 
 
@@ -294,7 +299,7 @@ class RenderPacket(KernelModel):
         default_factory=lambda: _schema_ref("mug.api-07.render-packet")
     )
     episode_id: EpisodeId
-    seat_key: _AuthoringKey
+    seat_key: SeatKey
     frame_number: NonNegativeSafeInteger
     render_digest: Digest
     keyframe: bool

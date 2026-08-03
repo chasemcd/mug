@@ -6,10 +6,7 @@ These tests use mock environments -- no running server or browser needed.
 
 from __future__ import annotations
 
-import collections
 from unittest.mock import patch
-
-import pytest
 
 from mug.configurations import configuration_constants
 from mug.server.remote_game import GameStatus, ServerGame

@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>v3 -- the comparison activity</title>
+    <link rel="stylesheet" href="v3.css" />
+  </head>
+  <body>
+    <div class="app">
+      <nav class="mock">
+        <a href="index.html">Third pass</a>
+        <span>The comparison activity</span>
+        <span class="right">
+          <a href="chat.html">Conversation</a> &middot;
+          <a href="judgement.html">Judgement</a> &middot;
+          <a href="room.html">Shared room</a>
+        </span>
+      </nav>
+
+      <header class="head">
+        <span class="head__study">Overcooked &mdash; which partner</span>
+        <span class="head__spacer"></span>
+        <span class="progress">
+          <span class="progress__track">
+            <span class="progress__fill" style="width: 75%"></span>
+          </span>
+          Step 5 of 6
+        </span>
+        <span class="state">Connected</span>
+      </header>
+
+      <div class="scroll">
+        <!-- A round that was played is shown, not turned into a sentence. The
+             platform can redraw a recorded round, so the card holds the round.
+             The two cards are one grid with one track rule. -->
+        <section class="judgement" aria-labelledby="ask">
+          <div class="judgement__head">
+            <h2 class="judgement__ask" id="ask">
+              Did you prefer your first or your second partner?
+            </h2>
+            <div class="judgement__note">You played one round with each.</div>
+          </div>
+
+          <div class="pair">
+            <article class="option">
+              <div class="option__key">Your first partner</div>
+              <div class="replay">your first round</div>
+              <div class="stats">
+                <!-- What the participant did, not what the platform counted.
+                     "600 frames" is a unit of the recording. -->
+                <div>
+                  <div class="stat__value">7</div>
+                  <div class="stat__label">dishes delivered</div>
+                </div>
+                <div>
+                  <div class="stat__value">0:45</div>
+                  <div class="stat__label">how long you played</div>
+                </div>
+              </div>
+              <div class="option__act">
+                <button type="button" class="btn btn--primary btn--wide">
+                  I preferred this partner
+                </button>
+              </div>
+            </article>
+
+            <article class="option">
+              <div class="option__key">Your second partner</div>
+              <div class="replay">your second round</div>
+              <div class="stats">
+                <div>
+                  <div class="stat__value">10</div>
+                  <div class="stat__label">dishes delivered</div>
+                </div>
+                <div>
+                  <div class="stat__value">0:45</div>
+                  <div class="stat__label">how long you played</div>
+                </div>
+              </div>
+              <div class="option__act">
+                <button type="button" class="btn btn--primary btn--wide">
+                  I preferred this partner
+                </button>
+              </div>
+            </article>
+          </div>
+
+          <div class="axes">
+            <fieldset class="axis">
+              <legend class="axis__ask">We coordinated our actions well together.</legend>
+              <div class="cells">
+                <label><input type="radio" name="coord" value="f3" /></label>
+                <label><input type="radio" name="coord" value="f2" /></label>
+                <label><input type="radio" name="coord" value="f1" /></label>
+                <label><input type="radio" name="coord" value="0" />=</label>
+                <label><input type="radio" name="coord" value="s1" /></label>
+                <label><input type="radio" name="coord" value="s2" /></label>
+                <label><input type="radio" name="coord" value="s3" /></label>
+              </div>
+              <div class="ends">
+                <span>The first, clearly</span>
+                <span>The same</span>
+                <span>The second, clearly</span>
+              </div>
+            </fieldset>
+
+            <div class="axis">
+              <div class="axis__ask">How helpful was each partner?</div>
+              <div class="each">
+                <fieldset class="axis">
+                  <legend class="each__key">The first partner</legend>
+                  <div class="cells">
+                    <label><input type="radio" name="h1" value="1" />1</label>
+                    <label><input type="radio" name="h1" value="2" />2</label>
+                    <label><input type="radio" name="h1" value="3" />3</label>
+                    <label><input type="radio" name="h1" value="4" />4</label>
+                    <label><input type="radio" name="h1" value="5" />5</label>
+                    <label><input type="radio" name="h1" value="6" />6</label>
+                    <label><input type="radio" name="h1" value="7" />7</label>
+                  </div>
+                  <div class="ends">
+                    <span>Not at all</span>
+                    <span>Very</span>
+                  </div>
+                </fieldset>
+                <fieldset class="axis">
+                  <legend class="each__key">The second partner</legend>
+                  <div class="cells">
+                    <label><input type="radio" name="h2" value="1" />1</label>
+                    <label><input type="radio" name="h2" value="2" />2</label>
+                    <label><input type="radio" name="h2" value="3" />3</label>
+                    <label><input type="radio" name="h2" value="4" />4</label>
+                    <label><input type="radio" name="h2" value="5" />5</label>
+                    <label><input type="radio" name="h2" value="6" />6</label>
+                    <label><input type="radio" name="h2" value="7" />7</label>
+                  </div>
+                  <div class="ends">
+                    <span>Not at all</span>
+                    <span>Very</span>
+                  </div>
+                </fieldset>
+              </div>
+            </div>
+          </div>
+
+          <div class="judgement__foot">
+            <button type="button" class="btn btn--small">They were about the same</button>
+            <span class="right">
+              <span class="judgement__note">
+                Your answer is recorded against the partner, not the side of the screen.
+              </span>
+            </span>
+          </div>
+        </section>
+
+        <!-- The same activity when the things compared are written. One card
+             grammar, so a study that compares text and a study that compares
+             rounds do not look like two products. -->
+        <section class="judgement" aria-labelledby="ask2">
+          <div class="judgement__head">
+            <h2 class="judgement__ask" id="ask2">Which summary would you rather receive?</h2>
+          </div>
+          <div class="pair">
+            <article class="option">
+              <div class="option__key">Summary A</div>
+              <div class="option__text">The team agreed to move the release to the 14th. Priya will tell the two customers who asked for the earlier date, and Sam will rewrite the note that goes with it.</div>
+              <div class="option__act">
+                <button type="button" class="btn btn--primary btn--wide">Choose this one</button>
+              </div>
+            </article>
+            <article class="option">
+              <div class="option__key">Summary B</div>
+              <div class="option__text">Release moved to 14 May. Owners: Priya (customer notice, two accounts), Sam (release note). Nothing else changed.</div>
+              <div class="option__act">
+                <button type="button" class="btn btn--primary btn--wide">Choose this one</button>
+              </div>
+            </article>
+          </div>
+          <div class="judgement__foot">
+            <button type="button" class="btn btn--small">They are about the same</button>
+            <button type="button" class="btn btn--small">Both are bad</button>
+            <span class="right">
+              <button type="button" class="btn btn--quiet btn--small">Skip this one</button>
+            </span>
+          </div>
+        </section>
+      </div>
+    </div>
+    <script src="mock.js"></script>
+  </body>
+</html>

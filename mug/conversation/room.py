@@ -371,6 +371,18 @@ class ChatRoom:
         """
         self._watchers.append(watcher)
 
+    def unwatch(self, watcher: Watcher) -> None:
+        """Stop telling one watcher about messages, if it is still watching.
+
+        A watcher belongs to something with a shorter life than the room: an
+        activity of several rounds runs one episode per round, and a watcher left
+        behind by a finished round would go on writing into it. It is not an error
+        to remove one twice, because the caller that removes it is usually a
+        ``finally`` and a run that failed early may never have added it.
+        """
+        if watcher in self._watchers:
+            self._watchers.remove(watcher)
+
     def carry(self, message: ChatMessage, text: str) -> None:
         """Take a message from an earlier run of this channel into the room.
 

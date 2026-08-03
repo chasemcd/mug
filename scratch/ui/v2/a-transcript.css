@@ -1,0 +1,513 @@
+/* Direction A -- Transcript.
+ *
+ * A conversation between two parties, written down and attributed in the
+ * margin, is an interview transcript. So it is set as one: a reading serif at a
+ * reading size, the speakers in the left margin, and no container around
+ * anything. The type does the work that a box was doing.
+ *
+ * What is deliberately absent:
+ *   - No card, no shadow, no corner radius, no gradient.
+ *   - No shape that fills or lifts under the pointer. The pointer changes an
+ *     underline or a mark, and it changes nothing else.
+ *   - No coloured accent for decoration. Ink is the accent.
+ *
+ * These documents use ASD-STE100 Simplified Technical English.
+ */
+
+:root {
+  --paper: #fbfaf6;
+  --ink: #17150f;
+  --ink-quiet: #6d6959;
+  --ink-faint: #9d9887;
+  --rule: #ddd8ca;
+  --rule-strong: #b8b2a1;
+  --mark: #17150f;
+
+  --serif: "Bitstream Charter", Charter, Georgia, "Noto Serif", serif;
+  --sans: "Helvetica Neue", Helvetica, Arial, "Liberation Sans", sans-serif;
+
+  --gutter: 7.5rem;
+  --measure: 34rem;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 17.5px;
+  line-height: 1.62;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* One measure, with the margin the attributions live in. */
+.page {
+  max-width: calc(var(--gutter) + var(--measure));
+  margin: 0 auto;
+  padding: 0 1.5rem;
+}
+
+/* -- the head ----------------------------------------------------------- */
+
+.head {
+  border-bottom: 1px solid var(--rule);
+  padding: 1.6rem 0 0.7rem;
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+}
+
+.head__study {
+  font-size: 0.9375rem;
+  font-style: italic;
+}
+
+.head__where,
+.head__state {
+  font-family: var(--sans);
+  font-size: 0.6875rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-quiet);
+}
+
+.head__state {
+  margin-left: auto;
+}
+
+.head__leave {
+  font: inherit;
+  font-family: var(--sans);
+  font-size: 0.6875rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-quiet);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  border-bottom: 1px solid var(--rule-strong);
+}
+
+.head__leave:hover {
+  color: var(--ink);
+  border-bottom-color: var(--ink);
+}
+
+/* -- the transcript ----------------------------------------------------- */
+
+.transcript {
+  padding: 2.25rem 0 1rem;
+}
+
+.turn {
+  display: grid;
+  grid-template-columns: var(--gutter) minmax(0, 1fr);
+  margin-bottom: 1.9rem;
+}
+
+/* The attribution sits in the margin, on the baseline of the first line it
+ * belongs to. A name in the margin is how a transcript says who spoke, and it
+ * takes no width from the words. */
+.turn__who {
+  font-family: var(--sans);
+  font-size: 0.6875rem;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  text-align: right;
+  padding-right: 1.75rem;
+  /* Hold the label on the first baseline of the serif beside it. */
+  padding-top: 0.42rem;
+}
+
+/* The participant's own words are attributed in full ink. That is the whole
+ * difference between the two parties: who is named darker. */
+.turn--you .turn__who {
+  color: var(--ink);
+}
+
+.turn__text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* What stands where a reply is going to be. It holds the line rather than
+ * animating a row of circles. */
+.waiting {
+  color: var(--ink-faint);
+  letter-spacing: 0.15em;
+  animation: fade 1.9s ease-in-out infinite;
+}
+
+@keyframes fade {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .waiting {
+    animation: none;
+  }
+}
+
+/* A reply that is not coming. It is set apart from the words by an aside rule,
+ * not by a coloured panel. */
+.aside {
+  grid-column: 2;
+  border-left: 2px solid var(--rule-strong);
+  padding-left: 1rem;
+  margin: 0 0 1.9rem;
+  font-size: 0.9375rem;
+  color: var(--ink-quiet);
+  font-style: italic;
+}
+
+/* -- what the participant writes ---------------------------------------- */
+
+.write {
+  border-top: 1px solid var(--rule);
+  padding: 1.1rem 0 2rem;
+  display: grid;
+  grid-template-columns: var(--gutter) minmax(0, 1fr);
+}
+
+.write__label {
+  font-family: var(--sans);
+  font-size: 0.6875rem;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--ink);
+  text-align: right;
+  padding-right: 1.75rem;
+  padding-top: 0.42rem;
+}
+
+.write textarea {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  outline: 0;
+  resize: none;
+  width: 100%;
+  padding: 0;
+  line-height: 1.62;
+  max-height: 10rem;
+}
+
+.write textarea::placeholder {
+  color: var(--ink-faint);
+  font-style: italic;
+}
+
+.write__foot {
+  grid-column: 2;
+  display: flex;
+  align-items: baseline;
+  gap: 1.25rem;
+  margin-top: 0.6rem;
+  font-family: var(--sans);
+  font-size: 0.6875rem;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint);
+}
+
+/* An action is a word with a rule under it. The rule gets heavier under the
+ * pointer. Nothing fills, and nothing moves. */
+.act {
+  font: inherit;
+  font-family: var(--sans);
+  font-size: 0.6875rem;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--ink);
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--ink);
+  padding: 0 0 1px;
+  cursor: pointer;
+}
+
+.act:hover:not(:disabled) {
+  border-bottom-width: 2px;
+  padding-bottom: 0;
+}
+
+.act:disabled {
+  color: var(--ink-faint);
+  border-bottom-color: var(--rule);
+  cursor: not-allowed;
+}
+
+.act--quiet {
+  color: var(--ink-quiet);
+  border-bottom-color: var(--rule-strong);
+}
+
+.act--quiet:hover {
+  color: var(--ink);
+  border-bottom-color: var(--ink);
+}
+
+:focus-visible {
+  outline: 1px solid var(--ink);
+  outline-offset: 3px;
+}
+
+/* -- the judgement ------------------------------------------------------ */
+
+.judgement {
+  border-top: 1px solid var(--rule-strong);
+  padding-top: 1.4rem;
+  margin-bottom: 2.5rem;
+}
+
+.judgement__kind {
+  font-family: var(--sans);
+  font-size: 0.6875rem;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 0.35rem;
+}
+
+.judgement__ask {
+  font-size: 1.3125rem;
+  font-weight: 400;
+  line-height: 1.35;
+  margin: 0 0 0.3rem;
+}
+
+.judgement__note {
+  font-style: italic;
+  color: var(--ink-quiet);
+  font-size: 0.9375rem;
+  margin: 0 0 1.6rem;
+}
+
+/* The two replies are one grid with one track rule, divided by one hairline.
+ * Neither column is styled, so neither can be favoured. */
+.pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 2.5rem;
+  border-top: 1px solid var(--rule);
+  padding-top: 1.1rem;
+  align-items: stretch;
+}
+
+.pair > * + * {
+  border-left: 1px solid var(--rule);
+  padding-left: 2.5rem;
+  margin-left: -1.25rem;
+}
+
+/* The two replies are rarely the same length, so the action under the shorter
+ * one would sit higher on the screen and be reached first. Both actions are
+ * held on one line instead: the affordance must not favour a reply for being
+ * short. */
+.pair > * {
+  display: flex;
+  flex-direction: column;
+}
+
+.pair .reply__text {
+  flex: 1;
+}
+
+.pair .act {
+  align-self: start;
+}
+
+.reply__label {
+  font-family: var(--sans);
+  font-size: 0.6875rem;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 0.7rem;
+}
+
+.reply__text {
+  white-space: pre-wrap;
+  margin-bottom: 1.1rem;
+}
+
+/* -- the axes ----------------------------------------------------------- */
+
+.axis {
+  border: 0;
+  margin: 2.1rem 0 0;
+  padding: 0;
+}
+
+.axis__ask {
+  padding: 0;
+  font-size: 1rem;
+  margin-bottom: 0.85rem;
+}
+
+/* A row of ticks on a rule. Nothing is chosen at the start, so "the same" is a
+ * tick somebody puts a mark on and not a place a control was parked. */
+.ticks {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  border-bottom: 1px solid var(--rule-strong);
+}
+
+.ticks label {
+  position: relative;
+  height: 1.9rem;
+  cursor: pointer;
+  display: grid;
+  place-items: end center;
+}
+
+.ticks input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* The unmarked tick: a hairline standing on the rule. */
+.ticks label::after {
+  content: "";
+  width: 1px;
+  height: 11px;
+  background: var(--rule-strong);
+}
+
+.ticks label:hover::after {
+  height: 17px;
+  background: var(--ink-quiet);
+}
+
+/* The marked tick: a square sitting on the rule. */
+.ticks label:has(input:checked)::after {
+  width: 9px;
+  height: 9px;
+  background: var(--mark);
+  margin-bottom: -5px;
+}
+
+.ticks label:has(input:focus-visible) {
+  outline: 1px solid var(--ink);
+  outline-offset: -1px;
+}
+
+.ticks--middle label[data-middle]::after {
+  height: 17px;
+}
+
+.ends {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 0.45rem;
+  font-family: var(--sans);
+  font-size: 0.6875rem;
+  letter-spacing: 0.04em;
+  color: var(--ink-quiet);
+}
+
+.ends span:nth-child(2) {
+  text-align: center;
+}
+
+.each {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 2.5rem;
+}
+
+.each__label {
+  font-family: var(--sans);
+  font-size: 0.6875rem;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 0.5rem;
+  padding: 0;
+}
+
+.judgement__foot {
+  display: flex;
+  align-items: baseline;
+  gap: 1.5rem;
+  margin-top: 2.1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--rule);
+}
+
+.judgement__foot .right {
+  margin-left: auto;
+}
+
+/* -- the strip that says this is a mock-up ------------------------------ */
+
+.mock {
+  border-bottom: 1px solid var(--rule);
+  font-family: var(--sans);
+  font-size: 0.6875rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.mock div {
+  max-width: calc(var(--gutter) + var(--measure));
+  margin: 0 auto;
+  padding: 0.55rem 1.5rem;
+  display: flex;
+  gap: 1.25rem;
+}
+
+.mock a {
+  color: var(--ink-quiet);
+}
+
+.mock .right {
+  margin-left: auto;
+}
+
+@media (max-width: 44rem) {
+  :root {
+    --gutter: 0rem;
+  }
+  .turn,
+  .write {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .turn__who,
+  .write__label {
+    text-align: left;
+    padding: 0 0 0.15rem;
+  }
+  .aside,
+  .write__foot {
+    grid-column: 1;
+  }
+  .pair,
+  .each {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .pair > * + * {
+    border-left: 0;
+    border-top: 1px solid var(--rule);
+    padding: 1.1rem 0 0;
+    margin: 1.1rem 0 0;
+  }
+}

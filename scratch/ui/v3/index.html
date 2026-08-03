@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>v3 -- between the two</title>
+    <link rel="stylesheet" href="v3.css" />
+    <style>
+      .sheet {
+        max-width: 46rem;
+        margin: 0 auto;
+        padding: 2.75rem 1.5rem 4rem;
+      }
+      h1 {
+        font-size: 1.6rem;
+        margin-bottom: 0.5rem;
+      }
+      .lede {
+        font-family: var(--serif);
+        font-size: 17px;
+        line-height: 1.6;
+        color: var(--ink-quiet);
+        margin: 0 0 2.25rem;
+      }
+      .tiles {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+        gap: 0.75rem;
+        margin-bottom: 2.75rem;
+      }
+      .tile {
+        display: block;
+        text-decoration: none;
+        color: inherit;
+        background: var(--surface);
+        border: 1px solid var(--line-strong);
+        border-radius: 12px;
+        padding: 0.95rem 1rem;
+      }
+      .tile:hover {
+        border-color: var(--ink-quiet);
+      }
+      .tile b {
+        display: block;
+        font-size: 0.9375rem;
+        margin-bottom: 0.2rem;
+      }
+      .tile span {
+        font-size: 0.8125rem;
+        color: var(--ink-quiet);
+        line-height: 1.5;
+      }
+      h2 {
+        font-size: 1.0625rem;
+        margin: 0 0 0.75rem;
+      }
+      .rows {
+        list-style: none;
+        margin: 0 0 2.5rem;
+        padding: 0;
+        border-top: 1px solid var(--line);
+      }
+      .rows li {
+        display: grid;
+        grid-template-columns: 11rem minmax(0, 1fr);
+        gap: 1.25rem;
+        padding: 0.7rem 0;
+        border-bottom: 1px solid var(--line);
+        font-size: 0.9375rem;
+      }
+      .rows b {
+        font-size: 0.8125rem;
+        font-weight: 600;
+        color: var(--ink-quiet);
+      }
+    </style>
+  </head>
+  <body>
+    <nav class="mock">
+      <a href="../index.html">First pass</a>
+      <a href="../v2/index.html">Second pass</a>
+      <span class="right">
+        Third pass &mdash; between the two &middot;
+        <a href="../v4/index.html">Fourth pass &rarr;</a>
+      </span>
+    </nav>
+
+    <main class="sheet">
+      <h1>Between the two</h1>
+      <p class="lede">
+        The first pass was generic. The second took the containers away and went too
+        far: a page of ruled text, where an action was a word with a line under it and
+        a participant had to read the screen to find what was clickable. This one puts
+        the containers back and gives them a reason to be there.
+      </p>
+
+      <div class="tiles">
+        <a class="tile" href="chat.html">
+          <b>The conversation</b>
+          <span>Bubbles on opposite sides, the wait for a reply, a reply that does not come.</span>
+        </a>
+        <a class="tile" href="judgement.html">
+          <b>The judgement</b>
+          <span>Two replies were written, and the one you pick is the one you get.</span>
+        </a>
+        <a class="tile" href="comparison.html">
+          <b>The comparison</b>
+          <span>Two rounds that were played, and two things that were written.</span>
+        </a>
+        <a class="tile" href="room.html">
+          <b>The shared room</b>
+          <span>Several people, channels, and everybody with a name and a mark.</span>
+        </a>
+      </div>
+
+      <h2>What it takes from each</h2>
+      <ul class="rows">
+        <li>
+          <b>From the first pass</b>
+          <span>
+            The bubble, the card, the filled button, and the two sides of a
+            conversation. A participant should never have to read a screen to find
+            what can be pressed.
+          </span>
+        </li>
+        <li>
+          <b>From the second pass</b>
+          <span>
+            Charter for everything somebody said or wrote, a plain grotesk for
+            everything the screen is asking, one accent used for actions and nothing
+            else, and no shadow anywhere. A surface is held by an edge.
+          </span>
+        </li>
+        <li>
+          <b>From neither</b>
+          <span>
+            The hover fill. A pointer darkens an edge that is already drawn, or draws a
+            rule under a cell. It never puts a new fill on a shape that had none, which
+            is the cheapest signal there is.
+          </span>
+        </li>
+      </ul>
+
+      <h2>What is kept from the earlier findings</h2>
+      <ul class="rows">
+        <li>
+          <b>Axes are cells</b>
+          <span>
+            Not a slider. A slider has to start somewhere, and a participant who never
+            touches it still sends the value it started on, so the study records a
+            judgement nobody gave. Nothing is chosen at the start.
+          </span>
+        </li>
+        <li>
+          <b>The pair stretches</b>
+          <span>
+            Both columns are one grid with one track rule, and both actions sit on one
+            line. An affordance must not favour a reply for being short.
+          </span>
+        </li>
+        <li>
+          <b>Names, not "Them"</b>
+          <span>
+            The wire already carries <code>author_actor_id</code> on every message. In
+            a room of four, the client today collapses all of them to "Them".
+          </span>
+        </li>
+      </ul>
+    </main>
+  </body>
+</html>

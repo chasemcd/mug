@@ -70,9 +70,9 @@ def test_a_participant_plays_the_server_game_in_a_real_browser(
     page.wait_for_selector("text=connected", timeout=10_000)
 
     # Consent, then survey.
-    page.locator("input[name='agree'][value='yes']").check()
+    page.locator("label:has(input[name='agree'][value='yes'])").click()
     page.get_by_role("button", name="Continue").click()
-    page.locator("input[name='mood'][value='4']").check()
+    page.locator("label:has(input[name='mood'][value='4'])").click()
     page.get_by_role("button", name="Continue").click()
 
     # The game mounts a canvas; the episode plays and the flow reaches the debrief.

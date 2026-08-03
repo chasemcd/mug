@@ -21,12 +21,12 @@ from typing import Any, ClassVar
 
 from mug.agents import AgentEpisode, AgentIds, LLMController, compile_agent
 from mug.authoring import (
-    Chat,
     Fallback,
     History,
     LLMAgent,
     Provider,
     Thoughts,
+    Transcript,
 )
 from mug.game.controllers import ScheduledSeat
 from mug.game.env import StepResult
@@ -101,7 +101,7 @@ class GridRunner(LLMAgent):
         env: object,
         agent_id: str,
         history: History,
-        chat: Chat,
+        chat: Transcript,
         thoughts: Thoughts,
     ) -> str:
         moves = ", ".join(a or "-" for a in history.actions_of(agent_id))
@@ -253,18 +253,33 @@ async def test_the_runner_drives_a_full_episode() -> None:
     assert call_head["schema"]["name"] == "mug.api-13.provider-response"
 
 
-async def test_a_rare_cadence_fires_no_decision() -> None:
-    """A cadence wider than the episode never calls the model; the seat defaults."""
+async def test_a_rare_cadence_decides_once_and_then_waits() -> None:
+    """A cadence wider than the episode still gets the seat one decision: the first.
+
+    ``decides_every`` is a floor on the **interval between** decisions -- it stops a
+    fast model re-choosing a job it has not started yet. It was read as a delay
+    before the first one too, so a study whose rounds were shorter than its cadence
+    had a model seat that never decided at all, and one whose cadence was a second
+    had a partner that stood still for a second of every round before it was even
+    asked. At the opening frame the seat holds no choice, so there is nothing for a
+    cadence to protect.
+
+    So: one decision here, and then none, because no later frame lands on the
+    cadence.
+    """
     env, adapter = _GridEnv(steps=6), _Adapter()
     runner, _ = _episode(env=env, adapter=adapter, decides_every=100)
 
     result = await runner.run()
 
-    # No frame lands on the cadence, so no decision runs and no model call is made.
-    assert result.decisions == []
-    assert adapter.seen == []
-    # The seat holds its default action the whole episode; history is still fed.
-    assert env.actions == [0, 0, 0, 0, 0, 0]
+    assert len(result.decisions) == 1, (
+        f"the seat decided {len(result.decisions)} times; the opening frame asks "
+        "once and the cadence holds every frame after it"
+    )
+    assert len(adapter.seen) == 1
+    # The history is still fed every frame, and the seat holds the default action
+    # until its one decision lands.
+    assert env.actions[0] == 0
     assert len(result.history) == 6
 
 

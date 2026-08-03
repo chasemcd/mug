@@ -14,7 +14,8 @@ What each frame does:
 
 - **frame 0** draws all eight primitives, the declared image, and one atlas frame;
 - **frame 1** moves the persistent marker, which travels as a delta and tweens;
-- **frame 2** removes the marker, which makes the frame a keyframe without it;
+- **frame 2** holds the marker still, so the delta must not send it again;
+- **frame 3** removes the marker, which makes the frame a keyframe without it;
 - throughout, two overlapping blocks prove depth: the deeper one is on top.
 
 Run it with ``uvicorn examples.render_conformance.scene:app``.
@@ -28,8 +29,8 @@ from typing import Any, ClassVar, cast
 
 import gymnasium
 
-from mug.content import Choice, Form, Game, Page, Study
-from mug.content.assets import Atlas, Image
+from mug.content import Choice, Form, Game, Human, Page, Study
+from mug.content.assets import Image, Sheet
 from mug.game.env import StepResult
 from mug.game.spec import GameSpec
 from mug.game.surface import Surface
@@ -79,14 +80,21 @@ def render(surface: Surface, state: StepResult) -> None:
 
     # -- assets: one declared image, and one frame of a declared atlas ------------
     surface.image(image_name="badge", x=0.80, y=0.02, w=0.14, h=0.14)
-    surface.image(image_name="sprites", x=0.80, y=0.22, w=0.14, h=0.14, frame=1)
+    surface.image(
+        image_name="sprites", x=0.80, y=0.22, w=0.14, h=0.14, frame="second.png"
+    )
 
     # -- depth: the deeper block covers the shallower one ------------------------
     surface.rect(x=0.20, y=0.55, w=0.20, h=0.14, color=UNDER, depth=1)
     surface.rect(x=0.25, y=0.58, w=0.10, h=0.08, color=OVER, depth=2)
 
-    # -- an object with a life: it is introduced, it moves, then it is removed ----
-    if step >= 2:
+    # -- an object with a life: introduced, moved, held still, then removed -------
+    #
+    # The frame that holds it still is not decoration. A delta carries the
+    # persistent objects that changed, so a marker that stayed where it was must
+    # not be sent again. Without a frame where nothing moves, "it is a delta" and
+    # "it redraws the whole scene every frame" look exactly alike.
+    if step >= 3:
         surface.remove("marker")
     else:
         x, y = MARKER_START if step == 0 else MARKER_END
@@ -130,7 +138,12 @@ class _Counter(gymnasium.Env[Any, Any]):
 
 
 def conformance_spec() -> GameSpec:
-    """Return the game specification that draws the conformance scene."""
+    """Return the scene as a written specification, for a test that wants one.
+
+    The study below names the environment instead. This stays because the drawing
+    contract is what several tests are about, and a specification is the smallest
+    thing that holds a drawing and an environment together.
+    """
     return GameSpec(
         channel_key="render-conformance",
         make_env=_Counter,
@@ -146,14 +159,29 @@ def conformance_study() -> Study:
     """Return the study that walks a participant into the conformance scene."""
     return Study(
         Form("consent", Choice("agree", "Do you consent to take part?", ["yes", "no"])),
-        Game("play", conformance_spec()),
+        Game(
+            "play",
+            _Counter,
+            seats={"agent": Human()},
+            keys={"ArrowLeft": 0, "ArrowRight": 1},
+            held_actions=False,
+            default_action=0,
+            fps=4,
+            render=render,
+        ),
         Page("debrief", "# Thank you\n\nYou have finished the study."),
         assets=[
             Image("badge", "assets/badge.png"),
-            Atlas(
+            # A sheet with no packer file beside it, so the study names each frame
+            # and the rectangle it occupies. A packed sheet uses `Atlas` and the
+            # platform reads the names out of the atlas.
+            Sheet(
                 "sprites",
                 "assets/sprites.png",
-                frames=[(0, 0, 16, 16), (16, 0, 16, 16)],
+                frames={
+                    "first.png": (0, 0, 16, 16),
+                    "second.png": (16, 0, 16, 16),
+                },
             ),
         ],
         asset_root=str(Path(__file__).resolve().parent),
@@ -164,4 +192,4 @@ def build() -> Any:
     """Build the application that serves the conformance scene."""
     from mug.app import build_app_from_env
 
-    return build_app_from_env(study=conformance_study(), game=conformance_spec())
+    return build_app_from_env(study=conformance_study())

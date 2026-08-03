@@ -28,9 +28,23 @@ AbortReason = Literal[
 AbortDisposition = Literal["repool", "resume_flow", "terminal"]
 
 
+# The deadline a room uses when nothing named a game to derive one from. A mount
+# that runs a browser mesh always names one; a mount that verifies a study's own
+# capture payload does not, and the platform has no episode length to read.
+DEFAULT_CAPTURE_TIMEOUT_SECONDS = 60.0
+
+
 @dataclass(frozen=True)
 class RoomLimits:
-    """The bounded resources one live room permits."""
+    """The bounded resources one live room permits.
+
+    ``capture_timeout_seconds`` is how long the room waits, from the start
+    barrier, for the trajectory the peers agreed on. It is unset by default
+    because the answer belongs to the game the room plays and these limits are
+    transport-neutral: the mount derives it from its own game specification
+    (``BrowserP2PConfig.room_limits``). A number set here is the author's own and
+    is used as written.
+    """
 
     validation_timeout_seconds: float = 15.0
     max_signal_bytes: int = 65_536
@@ -39,7 +53,13 @@ class RoomLimits:
     signal_window_seconds: float = 1.0
     max_capture_bytes: int = 1_048_576
     max_frame_count: int = 10_000_000
-    capture_timeout_seconds: float = 60.0
+    capture_timeout_seconds: float | None = None
+
+    def capture_deadline(self) -> float:
+        """Return the capture deadline, resolved for a room that is about to run."""
+        if self.capture_timeout_seconds is None:
+            return DEFAULT_CAPTURE_TIMEOUT_SECONDS
+        return self.capture_timeout_seconds
 
 
 @dataclass(frozen=True)
@@ -142,6 +162,7 @@ class RoomRuntime:
 
 
 __all__ = [
+    "DEFAULT_CAPTURE_TIMEOUT_SECONDS",
     "AbortDisposition",
     "AbortReason",
     "BoundPeer",

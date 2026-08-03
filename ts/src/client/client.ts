@@ -20,6 +20,7 @@ import {
   preloadMeshRuntime,
 } from './p2pGame.js';
 import { AssetManifest, DecodeAsset, LoadedAssets } from './assets.js';
+import { renderMarkdown } from './markdown.js';
 import { RenderPacket, Renderer, createRenderer } from './renderer.js';
 import {
   Endpoint,
@@ -37,6 +38,7 @@ import {
 } from './browserGame.js';
 import {
   ChatScreen,
+  clearKeepingHead,
   ComparisonDelivery,
   ComparisonScreen,
   Delivery,
@@ -53,6 +55,21 @@ import {
   renderContent,
   renderForm,
 } from './ui.js';
+
+/**
+ * How large a picture is when the study says nothing: what every game was drawn
+ * at before a study could say how large its own picture is.
+ */
+const DRAWN_AT: readonly [number, number] = [600, 400];
+
+/** How large the picture is, as the study said it, in pixels. */
+function sizeOf(size?: readonly number[]): readonly [number, number] {
+  if (!Array.isArray(size) || size.length !== 2) {
+    return DRAWN_AT;
+  }
+  const [wide, tall] = size as [number, number];
+  return wide > 0 && tall > 0 ? [wide, tall] : DRAWN_AT;
+}
 
 /** A target for keyboard listeners; the browser `window` satisfies it. */
 export interface KeyTarget {
@@ -77,7 +94,7 @@ export interface ClientConfig {
    * that itself, because playing the game is the client's job and the transport
    * only hands it open channels.
    */
-  p2p?: Omit<P2PEdgeConfig, 'executor'> | undefined;
+  p2p?: Omit<P2PEdgeConfig, 'newExecutor'> | undefined;
   /**
    * Turn one declared asset into something a canvas can draw.
    *
@@ -95,7 +112,21 @@ export class ParticipantClient {
   private readonly session: ParticipantSession;
   private readonly p2pEdge: P2PEdge | null;
   private renderer: Renderer | null = null;
+
+  // The game delivery the current activity mounted, held for the rounds after the
+  // first. A round loop announces the activity once and then sends an interval
+  // before each later round; without this the second round has no screen to draw
+  // on, and every frame of it is dropped where the renderer is read.
+  private playing: GameDelivery | null = null;
   private gameContainer: HTMLElement | null = null;
+  // The game on the screen now and the shape it is drawn in, so the picture is
+  // fitted again when the window changes size.
+  private fitting: {
+    canvas: HTMLCanvasElement;
+    container: HTMLElement;
+    body: HTMLElement;
+    size: readonly [number, number];
+  } | null = null;
   private readonly pressed = new Set<string>();
   // The two panes of a composed activity, or null when the activity is one screen.
   private panes: Panes | null = null;
@@ -169,7 +200,7 @@ export class ParticipantClient {
     this.p2pEdge =
       config.p2p === undefined
         ? null
-        : new P2PEdge({ ...config.p2p, executor: this.meshExecutor() });
+        : new P2PEdge({ ...config.p2p, newExecutor: () => this.meshExecutor() });
     this.session = new ParticipantSession({
       endpoint: config.endpoint,
       connect: config.connect,
@@ -186,18 +217,35 @@ export class ParticipantClient {
           this.report('connected -- protocol ' + ack.protocol_version, true);
         },
         onDelivery: (delivery) => this.render(delivery as unknown as Delivery),
-        onRender: (packet) => this.renderer?.draw(packet as unknown as RenderPacket),
+        onRender: (packet) => {
+          // A frame that arrives with no canvas to draw it on is a fault, and it
+          // used to be dropped without a word: every round after the first of a
+          // study with `episodes=N` was pushed, dropped here, and never seen.
+          if (this.renderer) {
+            this.renderer.draw(packet as unknown as RenderPacket);
+          } else {
+            this.report('a game frame arrived with no canvas to draw it on', false);
+          }
+        },
         onChat: (message) =>
           this.chat?.append(
             message.author === 'you' ? 'you' : 'them',
             message.text,
             message.channel,
           ),
-        onChatPending: () => this.report('waiting for a reply', true),
+        onChatPending: () => {
+          this.report('waiting for a reply', true);
+          this.chat?.waiting(true);
+        },
+        // A reply that is not coming. Saying so is the difference between a study
+        // that is slow and one the participant can tell is broken.
+        onChatNotice: (frame) =>
+          this.chat?.notice(frame.message ?? 'The assistant could not reply.'),
         onChatCandidates: (frame) => {
           // One key per elicited turn, so a retry of the same judgement replays
           // rather than recording a second one (NS-10).
           this.candidateKey = idempotencyKey(this.config.env);
+          this.chat?.waiting(false);
           this.chat?.elicit(frame);
         },
         onChatCandidatesError: (frame) => this.report('error: ' + frame.message, false),
@@ -234,8 +282,18 @@ export class ParticipantClient {
           this.stopGame();
           // Only the game pane is repainted, so a composed activity's
           // conversation goes on while the participant reads the screen.
-          renderInterval(this.gameHost(), frame, () =>
-            this.session.sendIntervalDone(),
+          renderInterval(
+            this.gameHost(),
+            frame,
+            () => {
+              this.session.sendIntervalDone();
+              // The next round is the same activity, so nothing more is
+              // announced: the server steps and pushes frames. The screen those
+              // frames need is built here, from the delivery that opened the
+              // activity.
+              void this.startNextRound();
+            },
+            this.assets,
           );
         },
         onError: (message) => this.report('error: ' + message, false),
@@ -285,12 +343,14 @@ export class ParticipantClient {
       this.startPreload(delivery.manifest);
       return;
     }
-    if (delivery.kind !== 'game') {
+    if (delivery.kind !== 'game' && delivery.kind !== 'chat') {
       // The flow moved past the interactive activity, so the screen it mounted is
       // gone: the next activity rewrites the app element over it.
       this.chat = null;
       this.chatChannels = [];
       this.panes = null;
+      // The activity is over, so the round it could still mount is over with it.
+      this.playing = null;
       if (this.renderer) {
         this.stopGame();
       }
@@ -301,13 +361,20 @@ export class ParticipantClient {
     if (delivery.kind === 'form') {
       renderForm(this.config.app, delivery as FormDelivery, (answers) => this.advance(answers));
     } else if (delivery.kind === 'content') {
-      renderContent(this.config.app, delivery as ContentDelivery, (answers) =>
-        this.advance(answers),
+      renderContent(
+        this.config.app,
+        delivery as ContentDelivery,
+        (answers) => this.advance(answers),
+        this.assets,
       );
     } else if (delivery.kind === 'game' && (delivery as GameDelivery).mode === 'browser') {
       void this.startBrowserGame(delivery as GameDelivery);
     } else if (delivery.kind === 'game' && (delivery as GameDelivery).mode === 'peer') {
       void this.startPeerGame(delivery as GameDelivery);
+    } else if (delivery.kind === 'chat') {
+      // A conversation is its own activity kind. The mode on a game is the older
+      // spelling and still arrives, so both reach the same screen.
+      this.startChat();
     } else if (delivery.kind === 'game' && (delivery as GameDelivery).mode === 'chat') {
       this.startChat();
     } else if (delivery.kind === 'game' && (delivery as GameDelivery).chat) {
@@ -346,15 +413,29 @@ export class ParticipantClient {
     return this.panes ? this.panes.game : this.config.app;
   }
 
-  private mountCanvas(): void {
-    const app = this.gameHost();
-    app.innerHTML = '';
-    const heading = document.createElement('p');
-    heading.textContent = 'Use the left and right arrow keys to reach the flag.';
-    app.appendChild(heading);
+  private mountCanvas(caption?: string, size?: readonly number[]): void {
+    const app = clearKeepingHead(this.gameHost());
+    // What the participant reads while they play is the study's to write. The
+    // client used to ship one study's instructions to every study it ran.
+    if (caption !== undefined && caption !== '') {
+      const legend = document.createElement('div');
+      legend.dataset['testid'] = 'game-caption';
+      legend.style.margin = '0 0 0.5rem';
+      legend.style.maxWidth = '600px';
+      legend.style.textAlign = 'left';
+      renderMarkdown(legend, caption, this.assets);
+      app.appendChild(legend);
+      // A caption with pictures in it is one line tall until they arrive and two
+      // afterwards, so the picture is fitted again as each one lands. Without
+      // this the first round is fitted to a caption still being written.
+      legend
+        .querySelectorAll('img')
+        .forEach((picture) => picture.addEventListener('load', this.onResize));
+    }
+    const drawn = sizeOf(size);
     const canvas = document.createElement('canvas');
-    canvas.width = 600;
-    canvas.height = 400;
+    canvas.width = drawn[0];
+    canvas.height = drawn[1];
     canvas.style.background = '#dfe7f5';
     canvas.style.border = '1px solid #333';
     canvas.style.display = 'block';
@@ -368,15 +449,74 @@ export class ParticipantClient {
     // countdown sits on top of the canvas and never takes its own layout space.
     const container = document.createElement('div');
     container.style.position = 'relative';
-    container.style.width = '600px';
     container.style.maxWidth = '100%';
     container.appendChild(canvas);
     app.appendChild(container);
     this.gameContainer = container;
-    this.renderer = createRenderer(canvas, { assets: this.assets });
+    this.renderer = createRenderer(canvas, {
+      assets: this.assets,
+      logical: { w: canvas.width, h: canvas.height },
+    });
+    this.fitting = { canvas, container, body: app, size: drawn };
+    this.fitCanvas();
+    window.addEventListener('resize', this.onResize);
     this.panes?.useCanvas(canvas);
     this.config.keyTarget.addEventListener('keydown', this.onKeyDown);
     this.config.keyTarget.addEventListener('keyup', this.onKeyUp);
+  }
+
+  private readonly onResize = (): void => {
+    this.fitCanvas();
+  };
+
+  /**
+   * Draw the picture at the size the study said, and smaller when there is not
+   * room for it.
+   *
+   * It is never drawn larger: a drawing is relative, so a kitchen of five squares
+   * by four put into somebody else's 600 by 400 is a picture larger than the game
+   * in it, with every square stretched to a shape its sprites are not.
+   */
+  private fitCanvas(): void {
+    const fitting = this.fitting;
+    if (fitting === null) {
+      return;
+    }
+    const { canvas, container, body, size } = fitting;
+    const style = getComputedStyle(body);
+    const sides =
+      parseFloat(style.paddingLeft || '0') + parseFloat(style.paddingRight || '0');
+    // What the picture may fill. A pane is a box of its own and says how wide it
+    // is and where it ends; a game that owns the whole screen is bounded by the
+    // **window** instead, because the box it is drawn in is only as large as what
+    // is in it -- so asking it would be asking the picture how big the picture is
+    // allowed to be, and it would keep whatever size it already had.
+    const box = container.getBoundingClientRect();
+    const room =
+      this.panes === null
+        ? Math.max(160, window.innerWidth - box.left - sides)
+        : Math.max(160, body.clientWidth - sides);
+    const floor =
+      this.panes === null
+        ? window.innerHeight - 24
+        : body.getBoundingClientRect().bottom -
+          parseFloat(style.paddingBottom || '0');
+    const tall = Math.max(120, floor - box.top);
+    // One scale for both sides, so a picture that has to shrink keeps its shape.
+    const part = Math.min(1, room / size[0], tall / size[1]);
+    const wide = Math.round(size[0] * part);
+    const high = Math.round(size[1] * part);
+    container.style.width = `${wide}px`;
+    canvas.style.width = `${wide}px`;
+    canvas.style.height = `${high}px`;
+    // The canvas holds real device pixels, so the picture is drawn at the size it
+    // is shown at rather than blown up from a smaller one. It is capped, because
+    // past two the pixels cost memory and nobody can see them.
+    const density = Math.min(window.devicePixelRatio || 1, 2);
+    this.renderer?.resize(
+      Math.round(wide * density),
+      Math.round(high * density),
+    );
   }
 
   // A pre-roll countdown after the participant continues, so the episode does not
@@ -410,8 +550,24 @@ export class ParticipantClient {
 
   private async startServerGame(delivery: GameDelivery): Promise<void> {
     this.inputMode = 'server';
-    this.mountCanvas();
+    this.playing = delivery;
+    this.mountCanvas(delivery.caption, delivery.size);
     await this.countdown(delivery.countdown);
+  }
+
+  // Mount the game screen again for the round the participant just asked for.
+  private async startNextRound(): Promise<void> {
+    const playing = this.playing;
+    if (!playing) {
+      return;
+    }
+    if (playing.chat) {
+      await this.startComposed(playing, true);
+    } else if (playing.mode === 'browser') {
+      await this.startBrowserGame(playing);
+    } else {
+      await this.startServerGame(playing);
+    }
   }
 
   // Begin downloading Pyodide and the packages as soon as the study announces the
@@ -435,7 +591,7 @@ export class ParticipantClient {
   // run over `game.capture`. The server validates and commits it under a fence.
   private async startBrowserGame(delivery: GameDelivery): Promise<void> {
     this.inputMode = 'browser';
-    this.mountCanvas();
+    this.mountCanvas(delivery.caption, delivery.size);
     const manifest = delivery.manifest;
     if (!manifest || manifest.mode !== 'browser') {
       this.report('the browser game is missing its manifest', false);
@@ -446,17 +602,27 @@ export class ParticipantClient {
       this.report('preparing the environment...', true);
       const runtime = await this.preloadPromise!;
       await this.countdown(delivery.countdown);
-      const run = await playBrowserEpisode(runtime, manifest, {
+      // Each slice is reported as it is played, so a participant who shuts the
+      // tab part-way through leaves the frames they played rather than nothing.
+      await playBrowserEpisode(runtime, manifest, {
         renderer: this.renderer ?? undefined,
         pressed: this.pressed,
         hash: this.config.env.hash,
         onStatus: (text) => this.report(text, true),
+        onPart: async (part) => {
+          const episode = part.boundary
+            ? { transitions: part.transitions, boundary: part.boundary }
+            : { transitions: part.transitions };
+          const payload = {
+            episode,
+            actions: part.actions,
+            first_frame: part.first_frame,
+            final: part.final,
+            generation: 1,
+          };
+          await this.session.sendCommand('game.capture', payload as unknown as JsonValue);
+        },
       });
-      // The action sequence rides alongside the episode, so the server can
-      // re-execute the run under the same inputs and verify the state hashes.
-      const episode = { transitions: run.transitions, boundary: run.boundary };
-      const payload = { episode, actions: run.actions, generation: 1 };
-      void this.session.sendCommand('game.capture', payload as unknown as JsonValue);
     } catch (error) {
       this.report('browser environment failed: ' + String(error), false);
     }
@@ -492,10 +658,24 @@ export class ParticipantClient {
   // One activity that is a game and a conversation at once. The conversation is
   // mounted first, so a message that arrives while the countdown is still running
   // has somewhere to land.
-  private async startComposed(delivery: GameDelivery): Promise<void> {
-    const placement = delivery.chat?.placement ?? 'beside';
-    this.panes = renderPanes(this.config.app, placement, () => this.releaseKeys());
-    this.startChat(this.panes.chat);
+  // `again` is a later round of an activity already on the screen. The two panes
+  // are left standing and only the game is mounted again, because the conversation
+  // is the **activity's** and not the round's: what the pair have said is still
+  // true in the next round, and the model they are talking to still remembers it.
+  // Building the panes again would replace the transcript with an empty one, so
+  // the participant would read "you can carry on the same conversation" on the
+  // rest screen and then watch it disappear.
+  private async startComposed(
+    delivery: GameDelivery,
+    again = false,
+  ): Promise<void> {
+    if (!again || !this.panes) {
+      const placement = delivery.chat?.placement ?? 'beside';
+      this.panes = renderPanes(this.config.app, placement, () =>
+        this.releaseKeys(),
+      );
+      this.startChat(this.panes.chat);
+    }
     if (delivery.mode === 'browser') {
       await this.startBrowserGame(delivery);
       return;
@@ -523,7 +703,7 @@ export class ParticipantClient {
   // canvas and the keys, and the executor plays when the room starts.
   private async startPeerGame(delivery: GameDelivery): Promise<void> {
     this.inputMode = 'browser';
-    this.mountCanvas();
+    this.mountCanvas(delivery.caption, delivery.size);
     const manifest = delivery.manifest;
     if (manifest && manifest.mode === 'peer') {
       this.startMeshPreload(manifest);
@@ -556,6 +736,8 @@ export class ParticipantClient {
   private stopGame(): void {
     this.config.keyTarget.removeEventListener('keydown', this.onKeyDown);
     this.config.keyTarget.removeEventListener('keyup', this.onKeyUp);
+    window.removeEventListener('resize', this.onResize);
+    this.fitting = null;
     this.pressed.clear();
     this.renderer = null;
   }

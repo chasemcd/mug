@@ -29,6 +29,7 @@ for new decisions.
 | [0013](0013-git-native-study-versioning.md) | Git-native study versioning and stored compiled artifacts | Accepted (2026-07-20) |
 | [0014](0014-mug-scope-identity-not-recruitment.md) | MUG owns participant identity, not recruitment | Accepted (2026-07-20) |
 | [0015](0015-governance-out-of-scope.md) | Governance out of scope; API-20 removed, API-21 retracted for v0 | Accepted (2026-07-20) |
+| [0016](0016-external-client-activity.md) | The external-client activity (Unity/WebGL): withdraw from v0 and specify a successor | Accepted (2026-07-29) — parity fixture 9 is withdrawn, the successor stays specified, and legacy removal is unblocked |
 
 ## Required Phase 0 decision queue
 

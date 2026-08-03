@@ -22,7 +22,7 @@ from starlette.testclient import WebSocketTestSession
 
 from mug.agents import AgentIds
 from mug.app import build_demo_app
-from mug.authoring import Chat, Fallback, History, LLMAgent, Provider, Thoughts
+from mug.authoring import Fallback, History, LLMAgent, Provider, Thoughts, Transcript
 from mug.client import RealtimeCommand
 from mug.content import flow_of
 from mug.conversation import TurnPolicy
@@ -31,8 +31,10 @@ from mug.kernel import Digest, SchemaRef, compute_digest
 from mug.participant_chat import ChatSeatSpec, ChatSpec
 from mug.providers import ModelCall, ModelCompletion, Usage
 from mug.storage import InMemoryStore, Store
+from tests.support.chat import written_chat
 
 _A_DIGEST = Digest(algorithm="sha-256", hex="a" * 64)
+
 _UUID = "019b6000-0000-7000-8000-{:012x}"
 _AGENT_ACTOR = "actor_" + _UUID.format(0x300)
 
@@ -50,16 +52,25 @@ class _Partner(LLMAgent):
         env: object,
         agent_id: str,
         history: History,
-        chat: Chat,
+        chat: Transcript,
         thoughts: Thoughts,
     ) -> str:
-        return ""
+        # The shape the shipped example writes. A double whose prompt says nothing
+        # would let the mount drop the author's words and still pass.
+        return "\n".join(f"{one.sender}: {one.text}" for one in chat.last(50))
 
 
 async def _adapter(call: ModelCall) -> ModelCompletion:
-    """Answer with the number of messages the payload carried, so replies differ."""
+    """Answer with how many messages the model was sent, so replies differ.
+
+    The prompt is read from ``content``, which is where every provider looks for the
+    words of a message. A double that reads them from anywhere else passes while the
+    real model is sent nothing at all.
+    """
     payload: Any = call.payload
-    turns = len(payload["messages"])
+    turns = len(
+        "\n".join(str(one["content"]) for one in payload["messages"]).splitlines()
+    )
     return ModelCompletion(
         outcome="completed",
         resolved_model="fake-local",
@@ -96,7 +107,7 @@ def _seat(adapter: Any = _adapter) -> ChatSeatSpec:
 def _spec(**overrides: Any) -> ChatSpec:
     fields: dict[str, Any] = {"seat": _seat(), "channel_key": "interview"}
     fields.update(overrides)
-    return ChatSpec(**fields)
+    return written_chat(**fields)
 
 
 def _advance_frame(answers: dict[str, Any], tag: str) -> dict[str, Any]:
@@ -322,7 +333,8 @@ def test_a_silent_model_still_records_what_the_participant_said() -> None:
         _drive_to_chat(socket, ("01", "02"))
         socket.send_json({"type": "chat", "text": "Anyone there?"})
         socket.send_json({"type": "chat_end"})
-        # No reply frame arrives; the next frame is the flow moving on.
+        # No reply frame arrives, but the participant is told why.
+        assert socket.receive_json()["type"] == "chat_notice"
         assert socket.receive_json()["delivery"]["kind"] == "content"
 
     messages = _messages_of(store, "interview")

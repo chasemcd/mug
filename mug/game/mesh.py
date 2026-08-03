@@ -31,7 +31,12 @@ correctness core:
 - prediction only ever affects the speculative buffer, which is client-local and
   never exported. A frame reaches the canonical buffer only after it is confirmed
   (every peer's real input is known), by which point any wrong prediction has
-  already forced a rollback that re-recorded it from the real inputs.
+  already forced a rollback that re-recorded it from the real inputs. **The barrier
+  holds to this too**: ``finalize`` refuses to close over a frame that is not
+  confirmed, rather than exporting what this peer guessed. It used to force-promote
+  the tail, which made the last frames of an episode the only ones a peer could
+  export from a prediction -- and two peers missing different tail inputs then held
+  different trajectories.
 - a snapshot restores the whole replica -- the environment and every random-number
   generator -- so a replay reproduces the exact state the confirmed inputs imply
   (API-07 ``P2PSnapshotCoverage``). The study's snapshot callable owns that
@@ -86,6 +91,10 @@ class ReplicaFrame:
 StepFn = Callable[[Mapping[str, int]], ReplicaFrame]
 SnapshotFn = Callable[[], object]
 RestoreFn = Callable[[object], None]
+
+
+class MeshEngineError(RuntimeError):
+    """The engine was asked for something its own rules say cannot happen."""
 
 
 @dataclass(frozen=True)
@@ -231,6 +240,7 @@ class PeerEngine:
         self._canonical: dict[int, FrameRecord] = {}
         self._confirmed = -1
         self._promoted = -1
+        self._verified_through = -1
         self._pending_rollback: int | None = None
         self._ended = False
         self._end_frame: int | None = None
@@ -286,6 +296,30 @@ class PeerEngine:
         recent = tuple(history[-self._redundancy :])
         return InputPacket(sender=actor, current_frame=self._frame, inputs=recent)
 
+    def resend_recent(self) -> InputPacket | None:
+        """Return this peer's recent inputs again, scheduling nothing new.
+
+        A peer stops submitting once its own episode has ended, and until this
+        existed it stopped speaking as well. That left the **tail** of every episode
+        the least protected part of it: mid-episode, a lost input is repeated by the
+        next ``redundancy`` packets, but nothing follows the last one. A peer whose
+        partner's final inputs were lost could never learn them, and the barrier then
+        closed over frames it had only predicted.
+
+        So a peer that has ended keeps repeating what it already played until the
+        barrier closes. It schedules no input -- the episode's length is already
+        fixed -- and a repeat the receiver already holds is ignored, so this is free
+        wherever nothing was lost.
+        """
+        history = self._local_history.get(self._actor_id)
+        if not history:
+            return None
+        return InputPacket(
+            sender=self._actor_id,
+            current_frame=self._frame,
+            inputs=tuple(history[-self._redundancy :]),
+        )
+
     def receive_input(self, packet: InputPacket) -> None:
         """Store a peer's inputs and arm a rollback if one contradicts a prediction.
 
@@ -330,6 +364,8 @@ class PeerEngine:
 
         self._update_confirmed()
         self._promote_confirmed()
+        self._update_verified()
+        self._prune_snapshots()
 
         if self._ended:
             return
@@ -387,6 +423,47 @@ class PeerEngine:
         if frame % self._snapshot_interval == 0:
             self._snapshots[frame] = self._snapshot()
 
+    def _update_verified(self) -> None:
+        """Advance the verified frame over the run of frames every peer agreed on."""
+        frame = self._verified_through + 1
+        while frame <= self._promoted and self._status(frame)[0] == "verified":
+            frame += 1
+        self._verified_through = frame - 1
+
+    def _prune_snapshots(self) -> None:
+        """Drop the snapshots nothing can need again.
+
+        Two things restore a snapshot, and the retention bound is the earlier of what
+        each of them can still reach.
+
+        **A rollback cannot target a confirmed frame.** A frame is confirmed once
+        every peer's real input for it is known, and ``receive_input`` ignores an
+        input for a peer a frame already holds -- so there is no prediction left on a
+        confirmed frame to contradict. The earliest a rollback can target is
+        ``confirmed + 1``.
+
+        **A repair cannot target a verified frame.** ``repair_snapshot`` serves a
+        diverged peer a snapshot at or before a **disputed** frame, and a disputed
+        frame is a confirmed one whose peer hashes disagree. So confirmation is not
+        far enough back: a frame stays reachable until every peer's hash for it has
+        arrived and agreed. That is what verification means, and it lags confirmation
+        by about one round trip, so the bound stays close behind.
+
+        Both consumers anchor on the latest snapshot **at or before** their target, so
+        what survives is the latest snapshot at or before the earlier of the two, and
+        everything after it.
+
+        Without this a snapshot of the whole replica accumulated every few frames for
+        the length of the episode and none was ever freed. A long round in a browser
+        pays that in memory it cannot spare.
+        """
+        target = min(self._confirmed + 1, self._verified_through + 1)
+        anchor = max((f for f in self._snapshots if f <= target), default=None)
+        if anchor is None:
+            return
+        for frame in [f for f in self._snapshots if f < anchor]:
+            del self._snapshots[frame]
+
     def _record(
         self,
         frame: int,
@@ -416,7 +493,17 @@ class PeerEngine:
         refreshes the on-cadence snapshots and re-records the speculative frames
         with the corrected inputs, so a later rollback anchors on a correct state.
         """
-        anchor = max(f for f in self._snapshots if f <= target)
+        anchor = max((f for f in self._snapshots if f <= target), default=None)
+        if anchor is None:
+            # Unreachable while ``_prune_snapshots`` keeps the anchor for
+            # ``confirmed + 1``, which is the earliest a rollback can target. It is
+            # said out loud rather than left as an empty-sequence error, because the
+            # two rules have to be changed together.
+            raise MeshEngineError(
+                f"a rollback to frame {target} has no snapshot at or before it; the "
+                f"oldest kept is {min(self._snapshots, default=None)} and the "
+                f"confirmed frame is {self._confirmed}"
+            )
         self._restore(self._snapshots[anchor])
         current = self._frame
         for frame in range(anchor, current):
@@ -504,39 +591,55 @@ class PeerEngine:
         """Store one peer's proposed end frame for the minimum-end barrier."""
         self._peer_ends[packet.sender] = packet.end_frame_exclusive
 
+    def barrier_frame(self) -> int | None:
+        """Return the agreed end frame, once every peer has announced one."""
+        if len(self._peer_ends) != len(self._peers):
+            return None
+        return min(self._peer_ends.values())
+
+    def ready_to_finalize(self) -> bool:
+        """Say whether the barrier is agreed **and** every frame in it is confirmed.
+
+        The second half is the point. A peer may know where the episode ends long
+        before it knows what everybody did in it, and closing the barrier at that
+        moment is what used to export a prediction.
+        """
+        end = self.barrier_frame()
+        return end is not None and self._confirmed >= end - 1
+
     def finalize(self) -> None:
         """Close the episode on the exclusive minimum end frame across the peers.
 
-        Once every peer's end frame is known, the barrier is the minimum, so every
-        peer exports the same frame range. The engine force-promotes the remaining
-        speculative frames inside the barrier and truncates the canonical buffer to
-        it, so the exported trajectory ends on the agreed frame.
+        Once every peer's end frame is known the barrier is the minimum, so every
+        peer exports the same frame range. **Every frame in that range must already
+        be confirmed**, and the engine refuses to close the barrier otherwise.
+
+        It used to force-promote whatever was still speculative inside the barrier.
+        That made the last frames of an episode the only ones a peer could export
+        from a **prediction**: a peer whose partner's final inputs never arrived
+        wrote down what it had guessed. Two peers missing different inputs then held
+        different trajectories, agreed on nothing, and the room refused the round --
+        after the participants had played it. The frames were marked
+        ``was_speculative`` and nothing read the mark.
+
+        Refusing here is what makes the mark unnecessary. A round that cannot be
+        confirmed is not exported at all, and the caller waits (the peers keep
+        repeating their inputs -- ``resend_recent``) or gives up and says so.
         """
-        if len(self._peer_ends) != len(self._peers):
+        end = self.barrier_frame()
+        if end is None:
             raise ValueError("every peer must announce its end frame to finalize")
-        end = min(self._peer_ends.values())
-        self._final_end_frame = end
-        for frame in range(self._promoted + 1, end):
-            record = self._speculative.get(frame)
-            if record is None:
-                continue
-            self._canonical[frame] = FrameRecord(
-                frame_number=record.frame_number,
-                actions=record.actions,
-                rewards=record.rewards,
-                terminated=record.terminated,
-                truncated=record.truncated,
-                info=record.info,
-                state_hash=record.state_hash,
-                was_speculative=True,
-                predicted_peers=record.predicted_peers,
+        if self._confirmed < end - 1:
+            raise MeshEngineError(
+                f"the barrier closes at frame {end} and only frames up to "
+                f"{self._confirmed} are confirmed: frame {self._confirmed + 1} is "
+                "still missing a peer's real input. Exporting it would export a "
+                "prediction, so the episode is not finalized."
             )
-            self._promoted = max(self._promoted, frame)
+        self._final_end_frame = end
         for frame in list(self._canonical):
             if frame >= end:
                 del self._canonical[frame]
-
-    # -- outputs ---------------------------------------------------------------
 
     def ended(self) -> bool:
         """Return whether the local episode has ended."""
@@ -550,6 +653,15 @@ class PeerEngine:
         autonomous node over a real link must wait for every peer's end packet.
         """
         return len(self._peer_ends) == len(self._peers)
+
+    def held_snapshot_frames(self) -> tuple[int, ...]:
+        """Return the frames this engine still holds a snapshot for.
+
+        It exists so a test can say what is kept rather than how much memory is
+        used. A retention rule nothing measures is a retention rule that quietly
+        stops retaining, or quietly stops pruning.
+        """
+        return tuple(sorted(self._snapshots))
 
     def rollback_count(self) -> int:
         """Return how many rollbacks the engine has run this episode."""

@@ -36,6 +36,7 @@ from mug.kernel import (
     Duration,
     SchemaBundle,
     SchemaRef,
+    SeatKey,
     load_family_schema,
 )
 from mug.kernel._base import KernelModel
@@ -99,7 +100,7 @@ class SeatDefinition(KernelModel):
         default_factory=lambda: _schema_ref("mug.api-05.seat-definition")
     )
     seat_definition_id: SeatDefinitionId
-    seat_key: _AuthoringKey
+    seat_key: SeatKey
     occupancy: Literal["human", "software", "either"]
     modality_capabilities: CapabilitySet
 
@@ -125,7 +126,7 @@ class ActorInstance(KernelModel):
     actor_id: ActorInstanceId
     interaction_id: InteractionId
     seat_definition_id: SeatDefinitionId
-    seat_key: _AuthoringKey
+    seat_key: SeatKey
     kind: Literal["human", "software"]
     human_subject: HumanSubject | None = None
     software_subject: SoftwareSubject | None = None
@@ -250,7 +251,7 @@ class SeatAgentBinding(KernelModel):
     seat_agent_binding_id: _SeatAgentBindingId
     interaction_id: InteractionId
     actor_id: ActorInstanceId
-    seat_key: _AuthoringKey
+    seat_key: SeatKey
     env_agent_id: _EnvAgentId
 
 

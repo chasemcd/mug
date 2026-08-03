@@ -8,8 +8,17 @@ import {
   isSha256Hex,
 } from '../kernel/index.js';
 
+// The api-09 schema bundle this client will accept a P2P frame under. It is the
+// canonical digest of `docs/architecture/phase-0/api-09/schemas/v0/client.schema.json`,
+// and it is written here rather than fetched because a peer must be able to refuse a
+// frame from a client built against a different contract.
+//
+// **It moves whenever that bundle moves.** A stale value here refuses every P2P frame
+// with "schema must identify ...", which is a working server, a working peer, and a
+// mesh that never forms. `tests/unit/client/test_wire_twin_pins.py` fails when this
+// and the Python bundle disagree, because nothing else noticed the last time.
 export const P2P_CLIENT_BUNDLE_DIGEST =
-  'ec6d3f0019480421a8cdc9ce8db2f2e88f2398e0daf0c7773ced3841ba435029';
+  '8d3a7245555870295a7546bb3c2bc91e2f94c2fded93b07ae779d1ad885a79b6';
 const REQUEST_ID =
   /^request_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 

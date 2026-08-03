@@ -104,10 +104,16 @@ def test_two_treatments_that_read_alike_are_still_two_factors() -> None:
 
 
 def test_a_site_with_no_treatment_delivers_what_the_author_wrote() -> None:
-    """A study that manipulates nothing reads exactly as it did before."""
-    study = Study(Page("intro", _EASY), Game("play", "the mounted spec"))
+    """A study that manipulates nothing reads exactly as it did before.
+
+    The specification is a plain object rather than a name: a name is what an
+    environment is registered under, and ``Game`` refuses one so that an author who
+    writes the registered id is told what to write instead.
+    """
+    mounted = object()
+    study = Study(Page("intro", _EASY), Game("play", mounted))
     assert declared_treatments(study) == ()
-    assert spec_for(study, "play", {}) == "the mounted spec"
+    assert spec_for(study, "play", {}) is mounted
 
 
 # -- what the compiler refuses ----------------------------------------------------

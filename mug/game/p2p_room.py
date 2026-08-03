@@ -222,7 +222,7 @@ class P2PRoom:
             capture_owner_handle=self._capture_owner,
         )
         self._state = "running"
-        self._deadline = self._monotonic() + self.limits.capture_timeout_seconds
+        self._deadline = self._monotonic() + self.limits.capture_deadline()
         return effect
 
     def report_complete(

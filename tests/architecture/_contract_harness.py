@@ -12,9 +12,10 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+from collections.abc import Callable, Iterable
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, Callable, Iterable
+from typing import Any
 
 import rfc8785
 from jsonschema import Draft202012Validator, ValidationError
@@ -164,6 +165,7 @@ def load_family(api_dirname: str, schema_filename: str) -> SimpleNamespace:
         )
 
     return SimpleNamespace(
+        api_dirname=api_dirname,
         api_root=api_root,
         schema=schema,
         manifest=manifest,
@@ -241,14 +243,28 @@ def check_manifest_complete(family: SimpleNamespace, manifest_schema_ref: str) -
 
 
 def check_bundle_binding(family: SimpleNamespace, bundle_names: set[str]) -> None:
+    """Every reference to this family's own bundle carries the bundle's digest.
+
+    The names are read from the corpus rather than taken from ``bundle_names``. A
+    hand-written list is a list that goes stale, and this one had: eleven api-09 P2P
+    records were added without it, so this check had stopped covering half the family.
+    Their digests were still right, because the runtime conformance suite pins the same
+    bundle and would have failed -- but that is a second line of defence catching what
+    the first had quietly stopped looking at. ``bundle_names`` is still asserted, as a
+    cross-check that the list has not drifted the other way.
+    """
     expected = canonical_digest(family.schema)
+    prefix = f"mug.{family.api_dirname}."
     paths = [
         family.manifest_path,
         *(family.fixture_root / case["instance"] for case in family.cases),
     ]
+    seen: set[str] = set()
     for path in paths:
         document = strict_json_load(path)
         for schema_ref in iter_schema_ref_objects(document):
-            if schema_ref["name"] in bundle_names:
+            if schema_ref["name"].startswith(prefix):
+                seen.add(schema_ref["name"])
                 assert schema_ref["version"] == 0, path
                 assert schema_ref["digest"]["hex"] == expected, path
+    assert bundle_names <= seen, f"named but never evidenced: {bundle_names - seen}"

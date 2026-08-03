@@ -2,7 +2,7 @@
 
 | Field | Value |
 | --- | --- |
-| Status | Live v0.3 — Phase-1 native demo COMPLETE (single + multiplayer P2P); records-only foundation COMPLETE for all 22 families; **durable-jobs runtime BUILT (API-22 `mug/workers`)**; **agent stack BUILT through P3f** (P3a casting controllers, P3b providers, P3c scheduler, LLMAgent facade + episode/multi-seat/AEC runners + durable thought tape, **P3d tools, P3e memory, P3f conversation**), now **wired onto the websocket transport** (agent + turn-based game modes) with the **decision tape folded into a replay bundle**; **P4 replay COMPLETE** (`mug/replay/` bundle + safe player/branching + p2p evidence + experienced-stream, contract frozen); **P5 preferences BUILT** (`mug/preferences/runtime.py` annotation loop, contract frozen); **P6 dataset export, P7 CLI, P8 kernel-twin + TS client, P9 external identity, P10 P2P/multi-agent follow-ons all BUILT**; P10 grew into the **authenticated browser P2P transport, built and mounted** (API-09 rev 0.4). EVERY PLANNED PHASE IS DONE, but a **2026-07-26 requirements audit** found four of the seven required north-star capabilities unreachable by a participant and three phases (P4 replay, P5 preferences, API-07 capture) reported complete on a runtime with no caller -- see **§13**, which is now the list of what is left. **W1-W16 and W18-W23 are DONE (2026-07-27)** -- a run records what happened, a participant reaches a preference over trajectories and over model outputs, a form records what was answered, and the study that runs is compiled and published; a study screens who may enter and who may stay, both clients draw every primitive parity asks for and keep an object model, a study declares its assets and they are served by digest, one activity plays several rounds, an interaction records why it ended where an operator can read it, a conversation survives a refresh, two participants and any number of model seats share one conversation with one canonical order, a channel one participant is not in never reaches them, and **the north-star acceptance story runs**: a study writes one map of who plays each of the environment's agents, and two participants, a model partner that plays and talks, and a chat-only coach are one interaction over one stepped environment, which a participant who reloads mid-game comes back into at the seat they left. So capabilities 1, 2, and 4 to 7 are reachable, a questionnaire is no longer discarded, a study can manipulate something and record which condition each participant was given and reached, `mug export` can export a real run, and **legacy removal's two blockers (W12 and W15) are cleared**. **W18 is done too**: the waiting room moved into the shared store behind the store's own revision fence, and both peer-to-peer runtimes now work across processes, so a deployment of several replicas matches two participants with each other rather than leaving each to wait alone. **W19 is done too**: a participant is shown two replies to what they just said, picks one, and the conversation goes on from it -- judged on the author's own axes and with a tie recordable (API-18 revision 0.3, the first schema change since the freeze was gated) -- and the judgement leaves the platform as the flat prompt/chosen/rejected rows a reward model is trained on. **Every item of the §13 register is now closed**, and legacy removal is unblocked. Wiring the export found three records whose own producer overwrote them and one that was never committed at all; each record now heads its own aggregate. **W19-W23 were all added 2026-07-26** by a records-with-no-producer sweep the original audit did not run; the largest was **W21**, now done (see §13e). Gate **2852 pass / 183 skip**. What remains is finishing work, not new families (§0c): the **contract freeze is now pinned and gated for all 22 bundles, with every declared record evidenced** (§12r, §12s; open: no owner sign-off), and **production hardening is BUILT** (§12t: cold-restart job takeover, transport admission and backpressure, telemetry + trace context + operator probes, and the deployment topology note), leaving legacy removal |
+| Status | Live v0.3 — Phase-1 native demo COMPLETE (single + multiplayer P2P); records-only foundation COMPLETE for all 22 families; **durable-jobs runtime BUILT (API-22 `mug/workers`)**; **agent stack BUILT through P3f** (P3a casting controllers, P3b providers, P3c scheduler, LLMAgent facade + episode/multi-seat/AEC runners + durable thought tape, **P3d tools, P3e memory, P3f conversation**), now **wired onto the websocket transport** (agent + turn-based game modes) with the **decision tape folded into a replay bundle**; **P4 replay COMPLETE** (`mug/replay/` bundle + safe player/branching + p2p evidence + experienced-stream, contract frozen); **P5 preferences BUILT** (`mug/preferences/runtime.py` annotation loop, contract frozen); **P6 dataset export, P7 CLI, P8 kernel-twin + TS client, P9 external identity, P10 P2P/multi-agent follow-ons all BUILT**; P10 grew into the **authenticated browser P2P transport, built and mounted** (API-09 rev 0.4). EVERY PLANNED PHASE IS DONE, but a **2026-07-26 requirements audit** found four of the seven required north-star capabilities unreachable by a participant and three phases (P4 replay, P5 preferences, API-07 capture) reported complete on a runtime with no caller -- see **§13**, which is now the list of what is left. **W1-W16 and W18-W23 are DONE (2026-07-27)** -- a run records what happened, a participant reaches a preference over trajectories and over model outputs, a form records what was answered, and the study that runs is compiled and published; a study screens who may enter and who may stay, both clients draw every primitive parity asks for and keep an object model, a study declares its assets and they are served by digest, one activity plays several rounds, an interaction records why it ended where an operator can read it, a conversation survives a refresh, two participants and any number of model seats share one conversation with one canonical order, a channel one participant is not in never reaches them, and **the north-star acceptance story runs**: a study writes one map of who plays each of the environment's agents, and two participants, a model partner that plays and talks, and a chat-only coach are one interaction over one stepped environment, which a participant who reloads mid-game comes back into at the seat they left. So capabilities 1, 2, and 4 to 7 are reachable, a questionnaire is no longer discarded, a study can manipulate something and record which condition each participant was given and reached, `mug export` can export a real run, and **legacy removal's two blockers (W12 and W15) are cleared**. **W18 is done too**: the waiting room moved into the shared store behind the store's own revision fence, and both peer-to-peer runtimes now work across processes, so a deployment of several replicas matches two participants with each other rather than leaving each to wait alone. **W19 is done too**: a participant is shown two replies to what they just said, picks one, and the conversation goes on from it -- judged on the author's own axes and with a tie recordable (API-18 revision 0.3, the first schema change since the freeze was gated) -- and the judgement leaves the platform as the flat prompt/chosen/rejected rows a reward model is trained on. **Every item of the §13 register is now closed**, and legacy removal is unblocked. Wiring the export found three records whose own producer overwrote them and one that was never committed at all; each record now heads its own aggregate. **W19-W23 were all added 2026-07-26** by a records-with-no-producer sweep the original audit did not run; the largest was **W21**, now done (see §13e). Gate **2996 pass / 179 skip** (with Postgres and `onnxruntime` present). **2026-07-28 (§13g): the owner ran two of the ported examples and neither worked while the gate was green** -- the platform dropped the frame metrics a drawing reads, a multi-seat game had no `render` at all, and a capture past 256 frames raised; every example is now played in a real browser and its pixels are read back. What remains is finishing work, not new families (§0c): the **contract freeze is now pinned and gated for all 22 bundles, with every declared record evidenced** (§12r, §12s; open: no owner sign-off), and **production hardening is BUILT** (§12t: cold-restart job takeover, transport admission and backpressure, telemetry + trace context + operator probes, and the deployment topology note), leaving legacy removal. **2026-07-29: the parity gate passes.** The owner decided W17 -- ADR-0016 is accepted, **v0 ships no Unity or WebGL activity**, and the ADR is kept because it holds the specification a later version would build against. Fixture 9 is withdrawn rather than open, `decision_status` reads the ADR's own status so a test can not approve a removal, and **legacy removal is unblocked**. The platform also no longer depends on a simulation environment: `cogrid` left `[project.dependencies]`, so an example installs the environment it wants and the READMEs say which. Removing it found the browser Overcooked study could not compose without `cogrid` **on the server**, which is the one thing that study exists to avoid |
 | Date | 2026-07-25 |
 | Purpose | Track the plan, the repo structure, the coding rules, and the current build state for the MUG runtime |
 | Style | This document uses ASD-STE100 Simplified Technical English |
@@ -121,8 +121,9 @@ each, the end-to-end proof that closes it, and the order. In summary:
    its assets and they are served by digest, and an interaction records why it ended
    where an operator can read it. **These were legacy removal's blockers, and they
    are cleared.**
-6. **W17 and the two standing items.** The Unity and WebGL adapter is an owner
-   decision (build, or remove by ADR). **W18 is now DONE**: two participants the load
+6. **W17 and the two standing items. W17 is now DECIDED (2026-07-29):** ADR-0016 is
+   accepted, so **v0 has no Unity or WebGL activity**, the successor stays specified
+   for a later version, and **the parity gate passes**. **W18 is now DONE**: two participants the load
    balancer sent to two replicas are matched with each other, and both peer-to-peer
    runtimes work across processes (§12t). **Legacy removal** (§10) is now unblocked,
    with the parity fixtures as its gate. **No bundle carries an owner sign-off**
@@ -1578,7 +1579,8 @@ and 2 they **are** the remaining work.
   observable, and the topology is written down and pinned by a test. What that work
   opened rather than closed is named in §0c item 5.
 - **Legacy removal.** As each native family reaches parity, retire the matching
-  legacy module under `mug/server` etc.; the parity fixtures (`tests/e2e`) are the
+  legacy module under `mug/server` etc.; the parity fixtures (**`tests/parity` as
+  of 2026-07-27**, not `tests/e2e`) are the
   gate. **State: not started.** 12,780 lines remain across `mug/server` (1.5M),
   `mug/scenes`, `mug/configurations`, `mug/rendering`, `mug/utils`. They are
   import-forbidden and inert, but they cost the build every day: the maintained
@@ -1915,6 +1917,199 @@ bounds the process, makes it readable, and says what may be replicated.
 
 ---
 
+### §13i — the HUD, the pages, the model, and the frame skip (2026-07-28)
+
+The owner read the ported examples and named four things the rewrite had lost or
+never expressed. Each was real, and two of them were platform faults rather than
+example ones.
+
+**1. The client shipped one study's instructions to every study.** `mountCanvas()`
+wrote *"Use the left and right arrow keys to reach the flag."* above every game any
+study ran, and a content page was rendered as `pre.textContent`, so a page that
+wrote `**W**` showed the stars and a page could not show a picture at all. Both
+shipped clients did it. Now: `Game(..., caption=...)` is the study's own line beside
+its game, and `mug/webclient/markdown.js` (with its twin `ts/src/client/markdown.ts`)
+renders pages, interval screens, and captions. A picture is written
+`![alt](name =WxH)` where the name is a **declared study asset**, resolved through
+the same table the renderer resolves a sprite through; a name nobody declared leaves
+the alternative text. Neither module contains `innerHTML`.
+
+**2. The status line had no expression at all.** `GameSpec(hud=...)` and its twins
+on `MultiSeatGame`, `AgentGameSpec`, and `ServerGameSpec`. `render_packet` draws it
+after the study's own drawing, so it is **surface commands**: in the packet, in the
+record, and in a replay. The frozen API-07 `RenderPacket` was not touched.
+
+**3. ONNX now runs everywhere.** `BrowserPartner` on `BrowserGameSpec`: the study
+names a declared asset holding the `.onnx`, and the client loads onnxruntime-web and
+scores it beside the Pyodide environment. The server has no copy of that runtime, so
+the partner's decisions are reported with the run and replayed into the
+re-execution; a missing or mismatched partner sequence fails verification, so no
+trajectory is ever recorded against a partner that was not played.
+`examples/cogrid/overcooked_human_ai_browser.py` is the whole human-AI study with
+nothing computed on the server.
+
+**4. The frame skip, and what it costs.** `Pace(every, between)` on both local
+controllers. `between` is what the seat does on the frames it does not decide on,
+and it is not a detail: the legacy loop idled the bot between decisions rather than
+repeating its action, and a policy trained to act once per environment step plays a
+different policy when its last move is repeated. The Overcooked examples are set to
+**5** as instructed. Measured over 600 frames of `cramped_room` with a busy cook
+beside it, the pair delivered 13 dishes at `decide_every=1`, 1 at 2 or 5, and **10
+with no partner at all** — so at 5 the trained partner is in the way. This is stated
+in `examples/cogrid/README.md` with the table, and one argument changes it.
+
+**5. Two more silent drops, found while writing the browser example.** Only the
+two **server-stepped** modes loop rounds. A browser-executed game is written by the
+client and captured once, and a peer-to-peer room runs once to its end, so
+`Game("play", episodes=N)` on either played **one** round and moved on with nothing
+in the records to say so. `overcooked_human_human.py` shipped `episodes=5` and
+played one. `build_study_app` now refuses either pairing where the author is
+reading their own code, and both examples play one round and say why.
+
+**6. Tweening was tied to persistence, so every character jumped.** The owner
+reported the Overcooked chefs moving jumpily. The renderer only remembered
+**persistent** objects, and only remembered objects could tween -- so a sprite
+redrawn whole each frame (which is what a character that changes what it carries
+and which way it faces must be) had its `tween_duration` read and thrown away.
+Both renderers now track every object with an `id`, and a tween runs from where the
+object **is on the screen now** rather than from where it was last told to be, so a
+second move mid-tween does not snap backwards.
+
+**7. Every peer-to-peer bundle drew rectangles of no size.** Found while fixing the
+tween: `tandem`, `slime_volleyball`, `overcooked`, and the parity fixture all wrote
+`"width"` and `"height"` where `SurfaceCommand` says `w` and `h`. The frozen record
+**forbids** the extra field, and both renderers read `command.w`, so every mesh
+study painted an empty canvas -- and the only check was that commands existed.
+`test_a_shipped_mesh_bundle_draws_commands_a_renderer_can_read` now validates what
+a bundle draws against the contract itself and refuses a shape of no size.
+
+**8. Every key press lasted as long as the finger did.** The owner reported that
+a quick tap of the pick-up key dropped a dish and picked it straight back up, and
+that movement went several squares. The loop read the keys a participant was
+**holding** and mapped them to an action on every frame, so a tap of a tenth of a
+second was three actions at thirty frames a second. The frozen contract already had
+both readings -- API-09 `InputScheme.mode` is `pressed_keys` or `single_keystroke`
+-- and `mug/client/types.py` held the record. **Nothing produced it and nothing
+read it**, so every study got the held reading whatever it meant. `InputState` now
+implements both, `input_mode` is on every game specification and in the browser
+manifest, and the Overcooked games count presses while slime volleyball keeps the
+held reading. A press is counted when the key **arrives**, so a chord still works.
+
+**9. A chord was a string with a `+` in it.** It is now the **sequence of keys**
+it is -- `("ArrowUp", "ArrowLeft"): UPLEFT` -- which is what the owner asked for and
+what the contract already required: API-09 `KeyName` is
+`^[a-z][a-z0-9]*(?:[-_][a-z0-9]+)*$`, so a name holding a `+` was never legal.
+`mug/game/keys.py` owns the vocabulary (`Bindings`, `Chord`, `chord_of`,
+`single_keys`, `chords`); a chord cannot key a JSON object, so it travels on the
+wire as `action_chords: [{keys, action}]` beside the single-key `action_bindings`,
+and both clients read it without splitting a string.
+
+**Evidence.** `tests/unit/game/test_pace_and_hud.py`,
+`tests/unit/game/test_browser_exported_partner.py`,
+`tests/e2e_native/test_pages_and_hud_browser.py` (reads `naturalWidth`, so an image
+element with nothing behind it fails), and
+`tests/e2e_native/test_overcooked_browser_partner.py` (real Chromium, real Pyodide,
+real onnxruntime-web), and `tests/e2e_native/test_tweening_browser.py` (reads the canvas **between** the two places, so a renderer that teleported would fail). `tests/unit/game/test_input_modes.py` and `tests/e2e_native/test_key_presses_browser.py` (holds a key for a second under a real keyboard and counts the squares it moved). Gate **2126 pass / 185 skip**. All were mutation-checked: dropping the HUD draw,
+reverting the page to plain text, stubbing out the browser partner, re-tying the
+tween to persistence, and putting `width`/`height` back each fail the tests that
+claim them.
+
+**Not verified here, and one gap that is deliberate.** The `ts/` workspace could
+not be compiled: node on this machine is v12 and the workspace's TypeScript needs
+newer, so `test_ts_client_browser.py` skips. The TypeScript client's markdown and
+caption changes are source parity only. The exported **partner** was not added to
+`ts/src/client/browserGame.ts`: it is the one change that could not be compiled or
+played, and its absence fails loudly rather than quietly — a TypeScript client
+serving a study with a declared partner reports no partner actions, and the server
+refuses the run with `partner-action-count-mismatch` instead of recording a
+trajectory nobody played.
+
+### §13j — no LLM chat worked, on any provider (2026-07-28)
+
+The owner reported that the chat studies produced nothing at all: a message went in
+and no reply ever came back, on Ollama and on Anthropic both. Two faults, and a
+third that hid them.
+
+**1. The mount sent a payload no provider could read.** `_default_compose` named
+the words of each message `text`. All three providers name them `content`. Ollama
+therefore answered the empty question it was asked, Anthropic refused the request
+with a 400, and the adapter mapped the refusal to silence. The words are now under
+`content`, and `mug/agents/adapters.py::_messages` normalizes every message at the
+one boundary that faces a provider, so no adapter can send a message with nothing
+in it. A message that already carries a `content` block list is passed through.
+
+**2. The author's prompt was never asked for.** `LLMAgent.get_prompt` is the one
+hook an author writes, and its contract is that MUG sends exactly the string it
+returns. The chat mount composed a bare transcript of its own instead, so every
+instruction an author had written — the whole of `examples/preference_chat/agent.py`'s
+`PROMPT` — was dropped on the way to the provider. `_default_compose` is now built
+per seat from that seat's agent, exactly as `mug/agents/runtime.py` builds a game
+seat's prompt, and the agent's `temperature` travels with it. An agent that writes
+no prompt still gets the labelled transcript.
+
+**3. A failed turn was indistinguishable from a working study.** `_take_turns`
+returned an empty list both when no seat was activated (the study's own rule
+working) and when every model call errored (the study broken), and the loop treated
+both as nothing to do. A participant saw their own message and then an empty pane,
+for ever. `_take_turns` now returns `_Answered(published, asked)`, and a turn that
+was asked and produced nothing sends a `chat_notice` frame the client renders. The
+elicited path sends it too. The client also shows a placeholder between a message
+and its reply, because a local model takes seconds and a pane that shows nothing
+reads as broken rather than slow.
+
+**Why the suite passed.** Every double in every chat test read `payload[...]["text"]`
+— the shape the mount wrote. The tests agreed with the mount all the way down and
+proved only that the platform was consistent with itself. Seven test modules were
+rewritten to read `content`, and the fix is now held by two things a double cannot
+fake: `tests/unit/agents/test_provider_adapters.py` asserts at the provider-facing
+boundary that no adapter sends a message without its words, and
+`tests/unit/conversation/test_live_local_model_chat.py` holds a real two-turn
+conversation with a real model on the local Ollama runner, keeps the real HTTP
+transport, and inspects the request that actually left the process. It skips when
+no runner answers.
+
+**Watched, not only built.** The conversation was run against `llama3.2:1b`: the
+author's instruction arrived and was obeyed, the participant's words arrived, and
+the second turn's prompt carried the first exchange. What the model then *does* with
+the conversation is deliberately not asserted — a one-billion-parameter model fails
+a recall question about one run in ten, and that failure would be about the model.
+
+**FIFTH failure kind, for §13e.** A record with a producer, a reader, and a test —
+**whose shape no consumer outside the platform can read**. It is the "record with no
+producer" fault turned inside out: everything inside the boundary agrees, and the
+one party that has to understand the value is on the far side of an HTTP call.
+
+### §13k — the platform stopped depending on a simulation environment (2026-07-29)
+
+`cogrid>=0.3.2` was in `[project.dependencies]`, so installing the platform
+installed one research environment. Nothing in `mug/` imports it: three legacy
+docstrings name its asset paths and that is all. The repository's own words said
+the opposite of its packaging -- `examples/cogrid/README.md` says "The platform
+does not depend on it", and `tests/unit/test_examples_build.py` says the example
+environments "are not dependencies of this repository". Import-linter can not see
+this layer, so the standing "core is environment-agnostic" rule held in the import
+graph and was broken in the metadata.
+
+It is removed. An example installs the environment it wants, the root README and
+each example README give the command, and the tests that need one already skip
+without it.
+
+**Removing it found a real defect in the example it is for.** The measurement was
+the gate run with `cogrid`, `slime_volleyball`, and `onnxruntime` blocked at
+`sys.meta_path`: 10 tests skip, which is expected, and **2 failed**, which is not.
+`examples/cogrid/overcooked_human_ai_browser.py` could not **compose** without
+`cogrid` installed **on the server** -- the one thing that study exists to avoid,
+since its kitchen runs in the participant's browser. `overcooked_browser()` read
+its feature list out of `kitchen_config()`, which builds a `DeliveryReward` and so
+imports the package, to interpolate nine strings the study itself chose.
+`KITCHEN_FEATURES` is now plain data beside the config that uses it.
+`test_a_browser_study_builds_with_no_environment_beside_the_application` makes
+`_cogrid` refuse and builds the study anyway; it fails if the read comes back.
+
+The general shape: **a dependency that is declared but unused hides a dependency
+that is used and should not be.** Nothing could see the second one while the first
+was installed everywhere.
+
 ## 13. The completion plan (from the 2026-07-26 requirements audit)
 
 Every phase in §12 is built, and §0c used to be the list of what was left. That
@@ -1970,7 +2165,7 @@ the end-to-end proof that closes it.
 | W14 | Parity "multiple episodes, reset transitions, limits, inter-episode UI" | ✅ DONE -- `Game(..., episodes=3, between=...)`, participant-paced interval, one trajectory per round | S |
 | W15 | Parity "live operator visibility", "session history and terminal reasons", "mid-game exclusion and partner loss"; fixture 10 | ✅ DONE -- seven terminal reasons, the durable projection, `GET /operator/interactions` | M |
 | W16 | NS-03 pass conditions | ✅ DONE -- durable transcript, restored pending turn, discarded generations, each reply a durable generation | S |
-| W17 | Parity "Unity/WebGL activity integration" | Not built; the parity gate allows removal by an approved ADR instead | owner |
+| W17 | Parity "Unity/WebGL activity integration" | ✅ DECIDED (2026-07-29) -- ADR-0016 accepted: withdrawn from v0, the successor stays specified for a later version, and the parity gate passes | owner |
 | W18 | §12t | ✅ DONE -- shared waiting room in the store behind the store's own revision fence, a node bus, and both peer-to-peer runtimes mounted on them | L |
 | W19 | D12-8, API-08 `CandidateReplySet` | ✅ DONE -- candidate replies elicited inside the conversation, judged on the author's axes with a tie recordable (API-18 rev 0.3), and exported as the pairs a reward model reads | L |
 
@@ -2972,13 +3167,30 @@ real: an entry-refusal check in `participant_screening` that `_refuse_ineligible
 already enforced before the handshake (deleted -- one enforcement point, not two to
 keep in step), and one mutation of mine that was a no-op.
 
-#### W17. Unity and WebGL activities · owner decision
+#### W17. Unity and WebGL activities · owner decision -- ✅ DECIDED (2026-07-29)
 
 Parity lists a versioned external-client activity adapter, with "or an approved
 replacement milestone". The parity gate passes only when every capability is
 accepted, deliberately replaced, or **explicitly removed by an ADR approved by the
-product owner**. This one has no ADR either way. It is a decision, not a build
-task, until the owner makes it.
+product owner**. It was a decision, not a build task.
+
+**The owner deferred it.** ADR-0016 is **accepted**: v0 has no Unity or WebGL
+activity, and the capability may return in a later version. The ADR is kept
+rather than closed, because it holds the specification the successor needs -- the
+five invariants, the schema additions each would take, and the reason the port of
+`unityEpisodeEnd` is not the thing to build. The sharpest invariant: **an
+unverifiable run must be recorded as unverifiable**, because an external client is
+the first execution mode the platform can not re-execute.
+
+The subtraction is real and it is recorded as one. A study that needs a Unity
+build (`examples/footsies/`) runs on the legacy runtime until the successor lands.
+
+The gate now reads the decision rather than repeating it:
+`tests/parity/_parity_manifest.py::decision_status` takes the status out of the
+ADR, so the gate shuts again if that word changes. A test can not approve a
+removal.
+
+**Legacy removal (§10) is unblocked.** It waited on this and on nothing else.
 
 #### W18. Peer-to-peer across processes · size L -- ✅ DONE (2026-07-27)
 
@@ -3417,10 +3629,216 @@ Then W19, which needed W16 before it (the durable chat reply) and nothing else. 
 W19, W20, W21, W22, and W23 were all found after the audit rather than by it,
 by the records-with-no-producer sweep. See §13e.
 
-The owner items (W17, the sign-offs) run whenever they are wanted. W18 is done.
+**W17 is decided (2026-07-29)**: ADR-0016 accepted, no Unity or WebGL in v0, the
+successor kept specified. The bundle sign-offs are the one owner item left. W18 is
+done.
 
-Legacy removal (§10) comes last. It waited on W12 and W15; both are built, so it is
-unblocked, and the parity fixtures are its gate as they always were.
+Legacy removal (§10) comes last. It waited on W12 and W15, then on the fixture 9
+decision. All three are settled, **the parity gate passes**, and removal is a
+decision to take whenever it is wanted rather than a thing that is blocked.
+
+### 13f. The parity fixtures and the examples (2026-07-27)
+
+Every §13 item was closed, and the two things left were the **owner sign-offs**
+and **legacy removal**. Removal's gate has always been the ten reference fixtures
+in `docs/architecture/functional-parity.md`, and they did not exist as a suite:
+`tests/unit/acceptance/test_phase1_fixtures.py` covered parts of fixtures 1 and 7
+at unit level, and nothing mapped the code to the list.
+
+**Nine of the ten are now built** (`tests/parity`, one module per fixture) and the
+suite is held to the document rather than to itself: `_parity_manifest.py` names
+each fixture, and `test_parity_manifest.py` parses the requirement list and fails
+if a fixture is missing, unmapped, reworded, or renumbered. A fixture runs in the
+gate, so it uses only environments this repository owns; it states one scenario
+rather than a matrix (fixture 4 runs latency, packet loss, and a hidden tab
+**together**, which no earlier test did); and it names its own number in its
+docstring, which the manifest also enforces.
+
+**Fixture 9 was an owner decision, and it is now made (2026-07-29).** The rewrite
+has no external-client activity and the legacy runtime does.
+`docs/architecture/decisions/0016-external-client-activity.md` is **accepted**:
+the capability is withdrawn from v0, the successor stays specified for a later
+version, and the invariants a successor must keep are kept with it -- the sharpest
+being that **an unverifiable run must be recorded as unverifiable**, because a
+Unity build is the first execution mode the platform can not re-execute. **The
+parity gate now passes**, and legacy removal is unblocked.
+
+**Two new examples, and a second author-surface gap they found (2026-07-28).**
+`examples/preference_chat/` shows W19 where it is most useful: a participant talks
+to a model, sees **two** candidate replies on each turn, judges them on the study's
+axes, and the conversation goes on from the one they chose. Two entry points, one
+study: `ollama.py` on a local runner (no key, no participant text leaving the
+machine) and `anthropic.py` on a hosted model. The pair exists to show that a
+preference study is not tied to a provider.
+
+Writing them found the gap: **a chat activity's model seat had no minimal author
+spelling.** A game wrote `Game(..., seats={"chef": Model(agent)})` and the mount
+derived the agent version, definition, prompt version, fallback key, and actor id.
+A conversation had to hand-write all five in an `AgentIds` plus an `actor_id`,
+which is exactly the plumbing [[minimal-author-surface]] forbids. Closed by
+`ChatSpec.speaker`/`speakers` (author's spelling, a plain `Model`) compiled at the
+mount by `with_speakers`, beside `_seated_games`; `_ids_for` became the public
+`agent_ids_for` because a talking seat and a playing seat are the same kind of
+thing. `seat`/`seats` still work, and naming both is refused.
+
+`tests/unit/app/test_preference_chat_examples.py` drives both studies end to end
+over a real websocket with a fake HTTP transport in the **real** adapters, so the
+whole path runs with no network and no key -- including the sharpest claim: the
+API key reaches the `x-api-key` header of every request and appears in **nothing**
+the deployment wrote down.
+
+**One consequence, stated rather than hidden.** `tests/fixtures/*` -- the support
+modules for the legacy `tests/e2e` playwright suite -- import the legacy example
+modules that were replaced, so that suite can no longer run. Pytest does not
+collect those files (`python_files = "test_*.py"` and they are named `*_test.py`),
+so nothing in the gate is affected. `tests/e2e` was already excluded from the gate
+for its event-loop policy, and it needed `cogrid` and `slime_volleyball` to run at
+all; `tests/e2e_native` and `tests/parity` replace what it proved. Recovering it
+means restoring the legacy examples from `7d92d9e`.
+
+**Every example is now on the new stack.** The legacy versions (21 of 27 modules
+imported `mug.scenes`, `mug.configurations`, `mug.server`, or `mug.rendering`)
+were replaced rather than kept beside them; they are in git at `7d92d9e`.
+`tests/unit/test_examples_build.py` holds each one to composing a study.
+
+**What the port found, and it is a real gap the audit missed: the legacy runtime
+bound key chords and the rewrite did not.** `resolve_action` returned the first
+bound key, so `("ArrowUp", "ArrowLeft") -> UPLEFT` could not be expressed and
+Slime Volleyball lost its diagonal jump. Fixed in `mug/game/runtime.py` and in
+both browser twins (`ts/src/client/bindings.ts`, `mug/webclient/browser_game.js`),
+which have to agree with the server: a browser run is verified by re-executing it,
+so a client that read a different action would make an honest participant's run
+unverifiable. No schema change -- the API-09 `KeyName` pattern already admits a
+joined name. **The lesson: a capability can be missing with no record and no
+failing test, because nothing on the new stack had ever asked for it.** Porting a
+real study is what asked.
+
+### 13g. An example nobody watched (2026-07-28)
+
+The owner ran two of the ported examples -- `examples.cogrid.overcooked_human_ai`
+and a Slime Volleyball study -- and neither one worked. The gate was green at 2942
+tests. This is §13's own standing lesson again, one level further out: **done means
+a participant can reach it**, and nothing here had ever looked at the screen.
+
+`tests/unit/test_examples_build.py` called each study function and checked what came
+back. It never built an environment, never stepped one, and never drew a frame. So
+every fault below was invisible.
+
+**Five faults. Four of them are the platform's.**
+
+1. **`_solo_state` dropped the frame's own metrics.** `mug/game/runtime.py` rebuilt
+   the seat's `StepResult` for the drawing without `info`, which is where a drawing
+   of a whole board reads the board from. Mountain Car draws from the observation
+   alone, so the one example anybody had run was the only one immune; Overcooked and
+   Slime Volleyball each pushed one render packet per frame with **zero commands** in
+   it. The server saw a healthy run and the participant saw a blank canvas.
+2. **A multi-seat game had no drawing at all.** `MultiSeatGame`, `AgentGameSpec`, and
+   `ServerGameSpec` carried no `render`, and both multi-seat transports pushed
+   `{"type": "frame"}`, which neither shipped client draws. Every seated game --
+   parity fixture 5, the whole of W8 -- ran with nobody able to see it. Fixed by
+   adding `render` to the three specifications and giving `_Table` **one `Surface`
+   per watcher**: everybody watches one board, but a delta belongs to a connection,
+   so a person who joins late or reconnects is sent the whole scene and the others
+   are not sent it again. `mug/game/runtime.py` now exports `render_packet` and
+   `watched_state` for the transports to share.
+3. **A capture longer than 256 frames raised.** API-11 caps `committed_event_ids` at
+   256 and an episode commits one event per frame, so any game past about 250 frames
+   died **after it was played**, in the commit. `commit_capture` now commits the run
+   in consecutive parts, each with an idempotency key derived from the minted one
+   (`_derive_idempotency_key`), so a repeat of the whole capture re-derives the same
+   keys and the same event ids and adds nothing.
+4. **CoGrid 0.2.1 numbers its agents**, so `{"agent-0": ...}` raised `KeyError: 0` on
+   the first step; and it writes its stepped state back onto the grid objects **only
+   when it is asked to draw**, so a study that read `env.grid` saw the opening frame
+   for the whole run. The example names its seats for the records and translates in
+   one place, and `caught_up()` asks for the write-back without making the
+   environment produce a picture nobody reads.
+5. **`slime_volleyball` builds its render object lazily too**, so the object the
+   drawing read was `None` on every frame; and the court is 2.4 to 1, so dividing
+   both axes by the width put the whole game in the bottom quarter of the canvas.
+
+**The design rule that came out of it: what the drawing reads must be data a record
+can hold.** Both examples now put a plain scene in the frame's metrics
+(`kitchen_scene`, `court_scene`) and the drawing is a pure function of it. That is
+not a workaround for the serializer -- a frame is recorded, so a drawing that reads a
+live environment object can never be drawn again from the record.
+
+**The standing rule: a test must read the pixels.** A render packet full of drawing
+commands and a blank canvas are indistinguishable from the server, so no
+server-side assertion can close this class of fault.
+`tests/e2e_native/test_examples_render_browser.py` opens the real client in
+Chromium, plays each example, and reads `getImageData` back: something was painted,
+the picture kept moving, the study's own colour count reached the canvas, a key
+press changes what the participant sees, and two browsers at one table both see the
+game. The fast counterparts in the gate are
+`test_an_example_game_steps_and_draws`, which runs each game through the real loop
+and checks the packets carry commands and differ frame to frame, and
+`test_a_shipped_mesh_bundle_builds_a_replica_and_draws_it`, which executes each
+peer-to-peer bundle in an empty scope -- which is all a browser gives it -- and found
+that the Overcooked bundle named an environment only the **server** had registered.
+
+### 13h. As robust as the platform it replaces (2026-07-28)
+
+The owner asked the obvious next question after §13g: the legacy suite tested many
+concurrent connections, data persistence, rollbacks, and real games in two
+browsers, and it validated the **exported data** rather than a frame counter. Is
+the rewrite at least as well covered?
+
+`tests/e2e` holds **35 tests**. Reading them against the new stack: most were
+already covered (the fault fixtures, both browser clients, the mesh suite), and
+five capabilities were not covered at all. `tests/robustness` is those five, and
+`tests/robustness/_legacy_manifest.py` is the map from each of the 35 to what
+covers it now -- checked by `test_legacy_coverage.py`, which fails when a legacy
+test is unmapped, when a replacement names a module that is gone, or when a
+replacement has no tests in it. **Legacy removal is gated on that map, so it is
+written down rather than asserted.**
+
+Three replacements are deliberately not like-for-like, and each entry says so:
+
+- **The two-file comparison.** Two peers used to write two files that had to match.
+  The rewrite records **one** agreed run, so the claim becomes: the peers agreed,
+  the record is what they agreed on, and the record is complete and re-exportable.
+  Two identical files can both be wrong; a content-addressed record cannot.
+- **The focus-loss timeout.** There is no client-side timer any more. An empty seat
+  holds no key and the environment goes on, which is what the timeout was
+  protecting the other participant from.
+- **The browser policy tests** watched for fatal script errors; the replacements
+  read the pixels (§13g).
+
+**Four faults were found by writing the tests, and three of them are the
+platform's.**
+
+1. **`Game(..., MultiSeatGame(...), episodes=N)` was silently ignored.** `_rounds_at`
+   was read only by the single-seat path, so every seated study played **one**
+   round whatever it declared -- `examples/cogrid/overcooked_server_auth.py` ships
+   with `episodes=5`. The author API expressed the capability and the runtime threw
+   it away, which is a worse version of the fourth failure kind. Fixed by making
+   the table round-aware: one barrier, one claim, and one outcome **per round**, and
+   the input reader lives for the round rather than for the activity, because two
+   readers on one socket lose the frame that says the participant is ready.
+2. **`SqliteStore` could not be used from a second thread.** `sqlite3.connect` was
+   opened with its own thread guard, so a store built on one thread and used by the
+   server on another raised on the first commit. Each thread now opens its own
+   connection, and the in-memory case goes through a shared-cache URI so it is
+   still one database.
+3. **The simulated browser minted colliding idempotency keys at ten participants.**
+   Browser 1's first command and browser 10's first command produced the same key,
+   so the second was refused as a repeat -- which reads as a platform fault in
+   exactly the test that is meant to find one. The browser number is now written to
+   a fixed width.
+4. **The harness assumed strict frame ordering.** Under load a room forms while a
+   browser is still answering a form, so a bootstrap lands between a command and
+   its acknowledgement. Frames that arrive early are now held back instead of
+   failing the read.
+
+**What the five new modules hold the platform to.** What a finished run wrote down
+(contiguous frames, every seat on every frame, the closing hash of the last frame,
+an export that repeats byte for byte); twelve people at once in **both** execution
+modes; two rounds back to back, a table that loses a seat while others play, a
+partner who leaves after the game, and a room that aborts beside one that finishes;
+a run that outlives the process that recorded it, on SQLite reopened over the same
+file and on real Postgres; and an exported network that plays a seat and is
+recorded under its own name.
 
 ### 13e. The blind spot the register had, and the triage of every inert record
 

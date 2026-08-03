@@ -24,12 +24,63 @@ from typing import Any, cast
 from pydantic import ValidationError
 
 from mug.game.capture import capture_episode
+from mug.game.capture_parts import FRAMES_PER_PART, ClaimedPart
 from mug.game.determinism import state_hash_source
+from mug.game.keys import Bindings, chords, single_keys
 from mug.game.runtime import EpisodeSummary
 from mug.game.types import EpisodeBoundary, GameTransition
 from mug.kernel import CommandReceipt, Digest
 from mug.runtime import CommandContext, FencingClaim
 from mug.storage import ArtifactStore, Store
+
+# Where the client gets the inference runtime that scores an exported network.
+# A deployment that must not reach a public network serves its own copy and names
+# it here, so this is a default rather than an address the platform insists on.
+ONNX_RUNTIME_URL = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.2/dist/ort.min.js"
+
+
+@dataclass(frozen=True)
+class BrowserPartner:
+    """An exported network that plays a seat in the participant's own browser.
+
+    The environment steps in Pyodide, where no ONNX runtime can be installed, so
+    the network is scored by the browser's own runtime beside it -- the same model
+    file the server plays, run by the JavaScript build of the same runtime. This is
+    what lets one study run a human-AI task with no server in the loop at all.
+
+    ``model`` is the **name** of a declared study asset, never a path or a URL: the
+    client resolves it against the same collection the renderer resolves a sprite
+    against, so a study names a network exactly as it names a picture.
+    ``input_name`` and ``output_name`` are what the exported graph calls its
+    observation input and its action scores.
+
+    ``decide_every`` is the frame skip -- how many frames pass between decisions,
+    with the action held between (the browser twin of ``Pace``). ``selection`` is
+    how scores become an action: ``argmax`` takes the greatest, ``sample`` draws
+    from the softmax at ``temperature``, seeded from the episode seed so the run
+    stays reproducible. ``default_action`` is what the seat does before the first
+    decision and whenever the runtime is unavailable.
+
+    The bundle meets this with two functions: ``partner_observation()`` returns the
+    numbers to score, and ``partner_acts(action)`` hands back what was chosen. A
+    study that declares a partner and defines neither is refused at publication
+    rather than playing a whole round against a seat that never moves.
+    """
+
+    model: str
+    input_name: str = "input"
+    output_name: str = "logits"
+    decide_every: int = 1
+    selection: str = "argmax"
+    temperature: float = 1.0
+    default_action: int = 0
+    runtime_url: str = ONNX_RUNTIME_URL
+
+    def __post_init__(self) -> None:
+        if self.decide_every < 1:
+            raise ValueError("a partner decides at least once every frame")
+        if self.selection not in ("argmax", "sample"):
+            raise ValueError("a partner selects by argmax or by sample")
 
 
 @dataclass(frozen=True)
@@ -42,19 +93,63 @@ class BrowserGameSpec:
     the episode seed the client must use, and ``hooks`` declares the determinism
     hooks the environment supports. ``server_notes`` stands for private server
     manifest data; it never reaches the client manifest.
+
+    ``input_mode`` says how long a press lasts, and the client must read it the
+    same way the server does: a browser run is verified by re-executing it, so a
+    client that counted one press where the server counted three would make an
+    honest participant's run unverifiable.
+
+    ``partner`` seats an exported network beside the participant, scored by the
+    browser's own inference runtime. Its decisions are reported with the run and
+    replayed when the server re-executes it, so a partner the participant played
+    against is part of the record rather than something that has to be guessed at.
+
+    ``verification`` is what this environment can support, which is a property of
+    the environment and not of the platform. The default, ``deterministic``, says
+    the run can be re-executed from its seed and its actions: the server checks
+    every state hash and refuses a run that does not match, which is what makes a
+    client-written record evidence. ``visual-fallback`` says it cannot -- and a
+    study must be able to say so, because otherwise an environment that does not
+    repeat refuses **every** participant's run, at the end, and records nothing.
+    That is what an unseeded environment did here, and the study had no way to
+    express it. A run recorded under ``visual-fallback`` carries that verdict, so a
+    reader can always tell what was checked rather than assuming it was.
     """
 
     channel_key: str
     source_bundle: str
     requires: tuple[str, ...]
-    action_bindings: dict[str, int]
+    action_bindings: Bindings
     default_action: int
     seed: int
     hooks: tuple[str, ...] = ("snapshot-restore", "state-hash")
     fps: int = 30
     max_steps: int = 200
     countdown_seconds: int = 3
+    input_mode: str = "pressed_keys"
+    partner: BrowserPartner | None = None
+    verification: str = "deterministic"
     server_notes: str | None = field(default=None)
+
+    def __post_init__(self) -> None:
+        if self.verification not in ("deterministic", "visual-fallback"):
+            raise ValueError(
+                "verification is 'deterministic' or 'visual-fallback'; "
+                f"{self.verification!r} is neither"
+            )
+        if self.partner is None:
+            return
+        missing = [
+            name
+            for name in ("partner_observation", "partner_acts")
+            if f"def {name}" not in self.source_bundle
+        ]
+        if missing:
+            raise ValueError(
+                "a browser game with an exported partner must define "
+                + " and ".join(missing)
+                + " in its bundle"
+            )
 
 
 def client_manifest(
@@ -72,20 +167,42 @@ def client_manifest(
     ships too, so the client computes each state hash the exact way the server
     re-computes it when it verifies the run.
     """
+    partner = (
+        None
+        if spec.partner is None
+        else {
+            "model": spec.partner.model,
+            "input_name": spec.partner.input_name,
+            "output_name": spec.partner.output_name,
+            "decide_every": spec.partner.decide_every,
+            "selection": spec.partner.selection,
+            "temperature": spec.partner.temperature,
+            "default_action": spec.partner.default_action,
+            "runtime_url": spec.partner.runtime_url,
+        }
+    )
     return {
         "mode": "browser",
         "channel_key": spec.channel_key,
+        "partner": partner,
         "episode_id": episode_id,
         "interaction_id": interaction_id,
         "seat_key": seat_key,
         "source_bundle": spec.source_bundle,
         "requires": list(spec.requires),
-        "action_bindings": dict(spec.action_bindings),
+        "action_bindings": single_keys(spec.action_bindings),
+        "action_chords": chords(spec.action_bindings),
         "default_action": spec.default_action,
+        "input_mode": spec.input_mode,
         "seed": spec.seed,
         "hooks": list(spec.hooks),
         "fps": spec.fps,
         "max_steps": spec.max_steps,
+        # How often the client reports what it has played. The server sets the
+        # cadence because the server is what has to hold the parts: a client that
+        # chose its own could report once at the end, which is the failure this
+        # exists to remove.
+        "frames_per_part": FRAMES_PER_PART,
         "countdown_seconds": spec.countdown_seconds,
         "state_hash_source": state_hash_source(),
     }
@@ -93,6 +210,94 @@ def client_manifest(
 
 class ClientEpisodeError(ValueError):
     """The client-reported episode did not meet the transition contract."""
+
+
+def parse_client_part(
+    payload: object,
+    *,
+    expected_channel_key: str,
+    expected_episode_id: str,
+) -> ClaimedPart:
+    """Validate one slice of a run as the client reported it while playing.
+
+    A run arrives in parts now, so the frames are checked where they arrive rather
+    than only at the end: a part that does not validate is refused while the
+    participant is still playing and can be reported again, and nothing invalid is
+    ever staged.
+
+    ``first_frame`` counts from one and the transitions must run on from it without a
+    gap. A payload naming no ``first_frame`` is a whole run reported at once, which is
+    what a client that has not been updated sends, so it means frame one and the last
+    part together.
+    """
+    if not isinstance(payload, dict):
+        raise ClientEpisodeError("the episode payload is not an object")
+    data = cast("dict[str, Any]", payload)
+    episode = data.get("episode")
+    if not isinstance(episode, dict):
+        raise ClientEpisodeError("the part names no episode")
+    body = cast("dict[str, Any]", episode)
+    raw_transitions = body.get("transitions")
+    if not isinstance(raw_transitions, list):
+        raise ClientEpisodeError("the part names no transitions")
+
+    first_frame = data.get("first_frame", 1)
+    if not isinstance(first_frame, int) or isinstance(first_frame, bool):
+        raise ClientEpisodeError("first_frame is not a whole number")
+    if first_frame < 1:
+        raise ClientEpisodeError("a run's frames are numbered from one")
+    # Absent means the whole run in one report, which is the closing part by
+    # definition. A client that reports parts says which one this is.
+    final = bool(data.get("final", True))
+
+    transitions: list[dict[str, Any]] = []
+    for index, raw in enumerate(cast("list[Any]", raw_transitions)):
+        try:
+            transition = GameTransition.model_validate(raw)
+        except ValidationError as error:
+            raise ClientEpisodeError("a transition did not validate") from error
+        if transition.authority != "browser":
+            raise ClientEpisodeError("a browser transition claims browser authority")
+        if transition.channel_key != expected_channel_key:
+            raise ClientEpisodeError("a transition names the wrong channel")
+        if transition.episode_id != expected_episode_id:
+            raise ClientEpisodeError("a transition names the wrong episode")
+        if transition.frame_number != first_frame + index:
+            raise ClientEpisodeError("the transitions are not a contiguous run")
+        transitions.append(transition.model_dump(mode="json", exclude_none=True))
+    if not transitions and not final:
+        raise ClientEpisodeError("a part that does not close the run carries no frames")
+
+    boundary = body.get("boundary")
+    if final:
+        if not isinstance(boundary, dict):
+            raise ClientEpisodeError("the closing part names no boundary")
+        try:
+            EpisodeBoundary.model_validate(boundary)
+        except ValidationError as error:
+            raise ClientEpisodeError("the boundary did not validate") from error
+    elif boundary is not None:
+        raise ClientEpisodeError("only the closing part carries a boundary")
+
+    return ClaimedPart(
+        first_frame=first_frame,
+        transitions=transitions,
+        actions=_whole_numbers(data.get("actions")),
+        partner_actions=_whole_numbers(data.get("partner_actions")),
+        final=final,
+        boundary=cast("dict[str, Any] | None", boundary) if final else None,
+    )
+
+
+def _whole_numbers(value: object) -> list[int]:
+    """Read one reported action sequence; a bool is not an action."""
+    if not isinstance(value, list):
+        return []
+    return [
+        one
+        for one in cast("list[Any]", value)
+        if isinstance(one, int) and not isinstance(one, bool)
+    ]
 
 
 def parse_client_episode(
@@ -203,9 +408,12 @@ async def capture_browser_episode(
 
 
 __all__ = [
+    "ONNX_RUNTIME_URL",
     "BrowserGameSpec",
+    "BrowserPartner",
     "ClientEpisodeError",
     "capture_browser_episode",
     "client_manifest",
     "parse_client_episode",
+    "parse_client_part",
 ]

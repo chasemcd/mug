@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en" data-theme="light" data-thread="flat">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mock-up 1 -- the conversation</title>
+    <link rel="stylesheet" href="mug-ui.css" />
+  </head>
+  <body>
+    <div class="app">
+      <!-- Not part of the design: the switches that let one file show two
+           readings. -->
+      <div class="mock">
+        <a href="index.html">&larr; all mock-ups</a>
+        <strong>1. The conversation</strong>
+        <span class="spacer"></span>
+        <span>thread</span>
+        <span class="segmented">
+          <button type="button" data-thread-pick="flat">Flat</button>
+          <button type="button" data-thread-pick="bubble">Bubbles</button>
+        </span>
+        <span>theme</span>
+        <span class="segmented">
+          <button type="button" data-theme-pick="light">Light</button>
+          <button type="button" data-theme-pick="dark">Dark</button>
+        </span>
+      </div>
+
+      <header class="topbar">
+        <span class="topbar__title">Advice and preference</span>
+        <span class="topbar__sub">Step 3 of 6</span>
+        <span class="steps" role="img" aria-label="Step 3 of 6">
+          <span class="steps__mark steps__mark--done"></span>
+          <span class="steps__mark steps__mark--done"></span>
+          <span class="steps__mark steps__mark--now"></span>
+          <span class="steps__mark"></span>
+          <span class="steps__mark"></span>
+          <span class="steps__mark"></span>
+        </span>
+        <span class="topbar__spacer"></span>
+        <span class="link-state">Connected</span>
+        <button type="button" class="btn btn--ghost btn--small">End the conversation</button>
+      </header>
+
+      <div class="thread-area">
+        <div class="thread" role="log" aria-label="Conversation">
+          <div class="turn turn--them">
+            <div class="turn__who" aria-hidden="true">T</div>
+            <div class="turn__body">
+              <div class="turn__name">Them</div>
+              <div class="turn__text">Hello. What would you like to talk about?</div>
+            </div>
+          </div>
+
+          <div class="turn turn--you">
+            <div class="turn__who" aria-hidden="true">Y</div>
+            <div class="turn__body">
+              <div class="turn__name">You</div>
+              <div class="turn__text">I have to give a ten minute talk to my team on Thursday and I keep rewriting the opening. Where do I start?</div>
+            </div>
+          </div>
+
+          <div class="turn turn--them">
+            <div class="turn__who" aria-hidden="true">T</div>
+            <div class="turn__body">
+              <div class="turn__name">Them</div>
+              <div class="turn__text">Start at the end. Write the one sentence you want somebody to repeat to a colleague on Friday, then work backwards from it.
+
+Ten minutes holds about three points. If the opening is hard to write, it is often because the talk has five.</div>
+            </div>
+          </div>
+
+          <div class="turn turn--you">
+            <div class="turn__who" aria-hidden="true">Y</div>
+            <div class="turn__body">
+              <div class="turn__name">You</div>
+              <div class="turn__text">That is the problem. I have five and they all feel necessary.</div>
+            </div>
+          </div>
+
+          <!-- What stands where a reply is going to be. It keeps the same shape
+               as a turn, so nothing moves when the reply lands. -->
+          <div class="turn turn--them">
+            <div class="turn__who" aria-hidden="true">T</div>
+            <div class="turn__body">
+              <div class="turn__name">Them</div>
+              <div class="thinking" role="status" aria-label="Waiting for a reply">
+                <span></span><span></span><span></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- A reply that is not coming. The old client wrote this as a plain
+               line in the transcript, where it read like something that was
+               said. -->
+          <div class="notice" role="status">
+            The other party could not reply this time. You can send your message again.
+          </div>
+        </div>
+      </div>
+
+      <div class="composer-dock">
+        <form class="composer">
+          <label class="sr-only" for="message">Your message</label>
+          <textarea id="message" name="message" rows="1" placeholder="Write a message"></textarea>
+          <button type="submit" class="composer__send" aria-label="Send" disabled>
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M8 13V3M8 3L3.5 7.5M8 3l4.5 4.5" stroke="currentColor"
+                    stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </button>
+        </form>
+        <p class="composer-hint">
+          <span><kbd>Enter</kbd> sends</span>
+          <span><kbd>Shift</kbd> + <kbd>Enter</kbd> makes a new line</span>
+        </p>
+      </div>
+    </div>
+    <script src="mock.js"></script>
+  </body>
+</html>

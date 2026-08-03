@@ -65,6 +65,7 @@ from mug.kernel.refs import (
     PublicHandle,
     ResourceRef,
     SchemaRef,
+    SeatKey,
     SecretRef,
     SemVer,
     TraceContext,
@@ -107,6 +108,7 @@ __all__ = [  # noqa: RUF022  (grouped by contract area for readability, not alph
     "CapabilitySet",
     "TraceContext",
     "SemVer",
+    "SeatKey",
     "UtcInstant",
     # privacy
     "PrivacyClassification",

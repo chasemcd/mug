@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en" data-theme="light" data-thread="flat">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mock-up 6 -- a conversation several people share</title>
+    <link rel="stylesheet" href="mug-ui.css" />
+    <style>
+      /* Every other party gets a stable name and a colour, both derived from
+         the actor the server already sends. The wire carries
+         ``author_actor_id`` on every message today; the screen throws it away
+         and writes "Them", so in a room of four everybody reads the same.
+         A colour name says nothing about whether a party is a person or a
+         model, which is the one thing the screen may not say. */
+      .turn--amber .turn__who {
+        background: #fdf1df;
+        border-color: #e8c896;
+        color: #8a5a11;
+      }
+      .turn--slate .turn__who {
+        background: #eaeef4;
+        border-color: #bcc7d8;
+        color: #40546f;
+      }
+      :root[data-theme="dark"] .turn--amber .turn__who {
+        background: #322613;
+        border-color: #5c4520;
+        color: #d7a95a;
+      }
+      :root[data-theme="dark"] .turn--slate .turn__who {
+        background: #1e2733;
+        border-color: #34455c;
+        color: #9db2ce;
+      }
+      .channels {
+        max-width: var(--thread);
+        margin: 0 auto 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+      }
+      .who-list {
+        display: flex;
+        gap: 0.4rem;
+        margin-left: auto;
+        font-size: 0.75rem;
+        color: var(--ink-muted);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <div class="mock">
+        <a href="index.html">&larr; all mock-ups</a>
+        <strong>6. A conversation several people share</strong>
+        <span class="spacer"></span>
+        <span>theme</span>
+        <span class="segmented">
+          <button type="button" data-theme-pick="light">Light</button>
+          <button type="button" data-theme-pick="dark">Dark</button>
+        </span>
+      </div>
+
+      <header class="topbar">
+        <span class="topbar__title">Three in a room</span>
+        <span class="topbar__sub">Step 4 of 6</span>
+        <span class="topbar__spacer"></span>
+        <span class="link-state">Connected</span>
+        <button type="button" class="btn btn--ghost btn--small">End the conversation</button>
+      </header>
+
+      <div class="thread-area">
+        <!-- A channel this participant is not in is never sent, so it can not
+             be drawn. What is drawn is only what they are in. -->
+        <div class="channels">
+          <span class="segmented" role="tablist" aria-label="Channels">
+            <button type="button" role="tab" aria-selected="true">Everyone</button>
+            <button type="button" role="tab" aria-selected="false">You and Amber</button>
+          </span>
+          <span class="who-list">In this channel: You, Amber, Slate</span>
+        </div>
+
+        <div class="thread" role="log" aria-label="Conversation">
+          <div class="turn turn--amber">
+            <div class="turn__who" aria-hidden="true">A</div>
+            <div class="turn__body">
+              <div class="turn__name">Amber</div>
+              <div class="turn__text">Shall we each take one job and stay with it, or swap when a pot is full?</div>
+            </div>
+          </div>
+
+          <div class="turn turn--slate">
+            <div class="turn__who" aria-hidden="true">S</div>
+            <div class="turn__body">
+              <div class="turn__name">Slate</div>
+              <div class="turn__text">Stay with one. We lost the last round to walking.</div>
+            </div>
+          </div>
+
+          <div class="turn turn--you">
+            <div class="turn__who" aria-hidden="true">Y</div>
+            <div class="turn__body">
+              <div class="turn__name">You</div>
+              <div class="turn__text">Then I will cut and you two carry. Tell me if a pot is waiting.</div>
+            </div>
+          </div>
+
+          <div class="turn turn--amber">
+            <div class="turn__who" aria-hidden="true">A</div>
+            <div class="turn__body">
+              <div class="turn__name">Amber</div>
+              <div class="thinking" role="status" aria-label="Waiting for a reply">
+                <span></span><span></span><span></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="composer-dock">
+        <form class="composer">
+          <label class="sr-only" for="message">Your message to Everyone</label>
+          <textarea id="message" rows="1" placeholder="Write to everyone"></textarea>
+          <button type="submit" class="composer__send" aria-label="Send" disabled>
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M8 13V3M8 3L3.5 7.5M8 3l4.5 4.5" stroke="currentColor"
+                    stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </button>
+        </form>
+        <p class="composer-hint">
+          <span>Everybody in this channel reads what you write.</span>
+        </p>
+      </div>
+    </div>
+    <script src="mock.js"></script>
+  </body>
+</html>

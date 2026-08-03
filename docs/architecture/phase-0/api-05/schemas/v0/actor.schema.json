@@ -8,6 +8,11 @@
       "pattern": "^[a-z][a-z0-9]*(?:[-_.][a-z0-9]+)*$",
       "maxLength": 128
     },
+    "SeatKey": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9]*(?:[-_.][a-z0-9]+)*$",
+      "maxLength": 128
+    },
     "VersionedRef": {
       "type": "string",
       "pattern": "^[a-z][a-z0-9]*(?:[-_.][a-z0-9]+)*@[A-Za-z0-9][A-Za-z0-9._-]{0,63}$",
@@ -56,7 +61,7 @@
           "pattern": "^seatdef_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
         },
         "seat_key": {
-          "$ref": "#/$defs/AuthoringKey"
+          "$ref": "#/$defs/SeatKey"
         },
         "occupancy": {
           "enum": [
@@ -144,7 +149,7 @@
           "pattern": "^seatdef_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
         },
         "seat_key": {
-          "$ref": "#/$defs/AuthoringKey"
+          "$ref": "#/$defs/SeatKey"
         },
         "kind": {
           "enum": [
@@ -555,7 +560,7 @@
           "pattern": "^actor_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
         },
         "seat_key": {
-          "$ref": "#/$defs/AuthoringKey"
+          "$ref": "#/$defs/SeatKey"
         },
         "env_agent_id": {
           "$ref": "#/$defs/EnvAgentId"

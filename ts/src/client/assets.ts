@@ -4,7 +4,7 @@
  * The handshake carries one entry per declared asset: the digest that addresses
  * it, the media type, the address to fetch it from, and the atlas frames when it
  * has any. This module fetches them all, decodes them, and answers the renderer's
- * two questions -- what image is `ball`, and where is frame 2 of `hero`.
+ * two questions -- what image is `ball`, and where is `hero`'s "walk-1.png".
  *
  * **Nothing is drawn from a name nobody declared.** An unknown name answers null
  * and the renderer draws nothing, rather than a placeholder that would let a
@@ -22,7 +22,7 @@ export interface DeclaredAsset {
   digest: string;
   media_type: string;
   url: string;
-  frames?: readonly AtlasFrame[];
+  frames?: Readonly<Record<string, AtlasFrame>>;
 }
 
 /** The declared assets of one study, keyed by the name an environment draws by. */
@@ -39,18 +39,35 @@ export type FetchAsset = (url: string) => Promise<Response>;
 /** The renderer's asset table, plus the loading it needs done first. */
 export class LoadedAssets implements AssetTable {
   private readonly images = new Map<string, CanvasImageSource>();
-  private readonly frames = new Map<string, readonly AtlasFrame[]>();
+  private readonly frames = new Map<string, Readonly<Record<string, AtlasFrame>>>();
+  private readonly addresses = new Map<string, string>();
 
   image(name: string): CanvasImageSource | null {
     return this.images.get(name) ?? null;
   }
 
-  frame(name: string, index: number): AtlasFrame | null {
+  /**
+   * Where a declared file is served, by the name the study gave it.
+   *
+   * A written page shows a picture by name and the address is looked up here, so
+   * nothing a study writes becomes a request to somewhere it did not declare.
+   */
+  url(name: string): string | null {
+    return this.addresses.get(name) ?? null;
+  }
+
+  /**
+   * One frame of a sheet, by the name it was packed under.
+   *
+   * A name the sheet does not hold answers null and the renderer draws the whole
+   * image, rather than drawing whichever sprite happened to sit at an index.
+   */
+  frame(name: string, packed: string): AtlasFrame | null {
     const sheet = this.frames.get(name);
-    if (sheet === undefined || index < 0 || index >= sheet.length) {
+    if (sheet === undefined) {
       return null;
     }
-    return sheet[index] ?? null;
+    return sheet[packed] ?? null;
   }
 
   /** Whether anything at all was loaded, so a caller can skip the table. */
@@ -73,8 +90,19 @@ export class LoadedAssets implements AssetTable {
         if (declared === undefined) {
           return;
         }
-        if (declared.frames !== undefined && declared.frames.length > 0) {
+        this.addresses.set(name, declared.url);
+        if (
+          declared.frames !== undefined &&
+          Object.keys(declared.frames).length > 0
+        ) {
           this.frames.set(name, declared.frames);
+        }
+        // A study may ship a file that is not a picture -- an exported network a
+        // browser-run partner plays with. It is served the same way and has an
+        // address like everything else, but decoding it as an image would fail
+        // once per load and say nothing, so it is not attempted.
+        if (!declared.media_type.startsWith('image/')) {
+          return;
         }
         try {
           const image = await decode(declared);

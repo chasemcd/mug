@@ -10,7 +10,13 @@ from __future__ import annotations
 
 from typing import Annotated, Literal
 
-from pydantic import AfterValidator, Field, TypeAdapter, model_validator
+from pydantic import (
+    AfterValidator,
+    BeforeValidator,
+    Field,
+    TypeAdapter,
+    model_validator,
+)
 
 from mug.kernel._base import KernelModel
 from mug.kernel.ids import RegisteredMugId, id_pattern
@@ -42,6 +48,34 @@ SchemaName = Annotated[
 ]
 PublicHandle = Annotated[
     str, Field(pattern=r"^handle_[A-Za-z0-9_-]{21}[AQgw]$", max_length=29)
+]
+
+
+def _written_down(value: object) -> object:
+    """Write a whole number down as the text a record holds.
+
+    A seat is named by the environment's own agent, and an environment names its
+    agents with whatever it likes -- a PettingZoo environment that numbers them
+    answers ``[0, 1]``. Every identifier in a record is **text**, so the number is
+    written down here rather than each caller remembering to do it. What travels is
+    still a string, so nothing that reads a record has two shapes to handle.
+    """
+    whole = isinstance(value, int) and not isinstance(value, bool)
+    return str(value) if whole else value
+
+
+# What a seat is called: the environment's own name for the agent that seat plays.
+#
+# It differs from an authoring key in one way -- it may **start with a digit** --
+# because a seat name is not a name a study invented. Numbering agents is ordinary in
+# both standard environment APIs, and the contract already accepts ``0`` as an
+# environment agent id (``env_agent_id``) while refusing it as a seat key. That was an
+# oversight, and it was not a small one: a study that seated a numbering environment
+# composed, mounted, and stepped, and was then refused on the first drawn frame.
+SeatKey = Annotated[
+    str,
+    BeforeValidator(_written_down),
+    Field(pattern=r"^[a-z0-9][a-z0-9]*(?:[-_.][a-z0-9]+)*$", max_length=128),
 ]
 
 

@@ -1,0 +1,1611 @@
+/* The participant interface.
+ *
+ * The identity:
+ *   THE NOTCH -- every surface that holds something somebody said or made has
+ *   one square corner where the others are round. A bubble, a card, a badge,
+ *   and the mark in the head are the same shape at four sizes.
+ *   TWO FACES -- a reading serif for everything a person said, wrote, or is
+ *   asked; a plain grotesk for everything the screen says about itself.
+ *   ONE BLUE AND ONE AMBER -- blue is what you can do and what you chose; amber
+ *   is what is live now. Nothing else takes a colour, and neither side of a
+ *   comparison ever does.
+ *
+ * The rules it keeps:
+ *   The screen never says whether the other party is a person or a model. Only
+ *   the study knows that, and only the study may say it.
+ *   Two things a participant compares are one grid with one track rule, they
+ *   stretch together, and the chosen fill is drawn only after a choice.
+ *   No scale is preset, so the study never records a judgement nobody gave.
+ *   Nothing fills under the pointer that was not already filled.
+ *
+ * These documents use ASD-STE100 Simplified Technical English.
+ */
+
+/* -- tokens ------------------------------------------------------------- */
+
+:root {
+  --paper: #f5f2eb;
+  --surface: #ffffff;
+  --sunk: #efebe1;
+  --you: #e4edf2;
+  --you-line: #bcd2de;
+
+  --ink: #1a1815;
+  --ink-quiet: #67625a;
+  --ink-faint: #948e84;
+
+  --line: #e1dbcf;
+  --line-strong: #c9c1b1;
+
+  --blue: #17475c;
+  --blue-hover: #103446;
+  --blue-soft: #e4edf2;
+  --blue-ink: #ffffff;
+
+  --amber: #a85f16;
+  --amber-soft: #fbf0e3;
+
+  --good: #3f7a52;
+
+  --serif: "Bitstream Charter", Charter, Georgia, "Noto Serif", serif;
+  --sans: "Helvetica Neue", Helvetica, Arial, "Liberation Sans", sans-serif;
+
+  --r: 12px;
+  --r-sm: 7px;
+  --notch: 3px;
+  --thread: 44rem;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  font-weight: 600;
+  line-height: 1.28;
+  letter-spacing: -0.012em;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* -- the head ----------------------------------------------------------- */
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+  padding: 0.7rem 1.5rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line-strong);
+}
+
+/* The mark is the notch: a square with one corner cut back. */
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.brand__mark {
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  border-top-left-radius: var(--notch);
+  background: var(--blue);
+}
+
+.brand__name {
+  font-family: var(--serif);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.head__rule {
+  width: 1px;
+  height: 20px;
+  background: var(--line);
+}
+
+.head__study {
+  font-family: var(--serif);
+  font-size: 1rem;
+}
+
+.head__spacer {
+  flex: 1;
+}
+
+.progress {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.8125rem;
+  color: var(--ink-quiet);
+}
+
+.progress__track {
+  display: flex;
+  gap: 3px;
+}
+
+.progress__mark {
+  width: 15px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line-strong);
+}
+
+.progress__mark--done {
+  background: var(--blue);
+  opacity: 0.4;
+}
+
+.progress__mark--now {
+  background: var(--blue);
+  width: 26px;
+}
+
+.state {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.8125rem;
+  color: var(--ink-quiet);
+}
+
+.state::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--good);
+}
+
+.state--weak::before {
+  background: var(--amber);
+}
+
+/* -- the section key: the repeated label of the whole system ------------ */
+
+.key {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-family: var(--sans);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-quiet);
+}
+
+.key::before {
+  content: "";
+  width: 14px;
+  height: 2px;
+  background: var(--blue);
+}
+
+/* A numbered step. The work of a judgement runs 1, 2, 3 down the panel. */
+.key__n {
+  display: grid;
+  place-items: center;
+  width: 17px;
+  height: 17px;
+  border-radius: 5px;
+  border-top-left-radius: var(--notch);
+  background: var(--blue);
+  color: var(--blue-ink);
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.key--step::before {
+  display: none;
+}
+
+/* -- controls ----------------------------------------------------------- */
+
+.btn {
+  font-family: var(--sans);
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.4;
+  padding: 0.64rem 1.15rem;
+  /* The same corner as a choice, so a thing you press has one shape whether it
+   * is a row or a button. */
+  border-radius: 10px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  transition:
+    background-color 0.16s ease,
+    border-color 0.16s ease,
+    color 0.16s ease;
+}
+
+/* A press deepens the fill. It does not move the button: a control that jumps
+ * under the finger is the tell this design set out to avoid. */
+.btn:active:not(:disabled) {
+  transition-duration: 0.04s;
+}
+
+/* The pointer darkens an edge that is already drawn. It never puts a fill on a
+ * shape that had none. */
+.btn:hover:not(:disabled) {
+  border-color: var(--ink-quiet);
+}
+
+.btn--primary {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: var(--blue-ink);
+}
+
+.btn--primary:hover:not(:disabled) {
+  background: var(--blue-hover);
+  border-color: var(--blue-hover);
+}
+
+.btn--primary:active:not(:disabled) {
+  background: #0c2a39;
+  border-color: #0c2a39;
+}
+
+.btn:active:not(:disabled):not(.btn--primary) {
+  background: var(--sunk);
+}
+
+.btn--quiet {
+  border-color: transparent;
+  background: transparent;
+  color: var(--ink-quiet);
+}
+
+.btn--quiet:hover:not(:disabled) {
+  border-color: var(--line-strong);
+  color: var(--ink);
+}
+
+.btn--small {
+  font-size: 0.8125rem;
+  padding: 0.38rem 0.72rem;
+}
+
+.btn--wide {
+  width: 100%;
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* -- the conversation --------------------------------------------------- */
+
+/* The element every activity is drawn into. It has to be a flex box that fills
+ * what is left of the shell, or a scrolling region inside it has no height to
+ * scroll within: it grows with its content instead, the page scrolls, and a new
+ * message arrives below the fold with nothing to bring it into view. */
+#app {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* A screen that scrolls a region of itself is exactly the viewport tall, so the
+ * region scrolls and what the participant writes stays docked under it. A
+ * screen that is a document -- a form, a page of instructions -- grows, and the
+ * page scrolls as a page should. */
+.app:has(.scroll),
+.app:has(.panes) {
+  height: 100vh;
+  height: 100dvh;
+}
+
+.scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 1.75rem 1.5rem 0;
+}
+
+.thread {
+  max-width: var(--thread);
+  margin: 0 auto;
+  padding-bottom: 1.5rem;
+}
+
+.turn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  max-width: 84%;
+  margin-bottom: 1.3rem;
+}
+
+.turn--you {
+  margin-left: auto;
+  align-items: flex-end;
+}
+
+.turn__who {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--ink-quiet);
+  margin: 0 0.3rem 0.3rem;
+}
+
+.turn__mark {
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+  border-top-left-radius: 1px;
+  background: var(--line-strong);
+}
+
+.turn--you .turn__mark {
+  background: var(--blue);
+}
+
+.turn--amber .turn__mark {
+  background: #c9871f;
+}
+
+.turn--slate .turn__mark {
+  background: #5c7c99;
+}
+
+.bubble {
+  font-family: var(--serif);
+  font-size: 16.5px;
+  line-height: 1.56;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  border-top-left-radius: var(--notch);
+  padding: 0.7rem 0.95rem;
+}
+
+.turn--you .bubble {
+  background: var(--you);
+  border-color: var(--you-line);
+  border-top-left-radius: var(--r);
+  border-top-right-radius: var(--notch);
+}
+
+.dots {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  height: 1.56em;
+}
+
+.dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ink-faint);
+  animation: bob 1.25s ease-in-out infinite;
+}
+
+.dots span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.dots span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes bob {
+  0%,
+  62%,
+  100% {
+    opacity: 0.25;
+  }
+  31% {
+    opacity: 0.95;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dots span {
+    animation: none;
+    opacity: 0.5;
+  }
+}
+
+/* The transcript keeps a size before anything is said. A pane that collapses to
+ * nothing reads as broken rather than empty. */
+.log {
+  min-height: 6rem;
+}
+
+/* A reply that is not coming. It is not a bubble, because nobody said it. */
+.notice {
+  max-width: var(--thread);
+  margin: 0 auto 1.3rem;
+  display: flex;
+  gap: 0.65rem;
+  padding: 0.65rem 0.9rem;
+  background: var(--amber-soft);
+  border: 1px solid #ecd8be;
+  border-radius: var(--r-sm);
+  font-size: 0.875rem;
+}
+
+.notice b {
+  color: var(--amber);
+}
+
+/* -- the composer ------------------------------------------------------- */
+
+.dock {
+  position: sticky;
+  bottom: 0;
+  padding: 0.5rem 1.5rem 1.1rem;
+  background: linear-gradient(to bottom, transparent, var(--paper) 40%);
+}
+
+.composer {
+  max-width: var(--thread);
+  margin: 0 auto;
+  display: flex;
+  align-items: flex-end;
+  gap: 0.55rem;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r);
+  border-top-left-radius: var(--notch);
+  padding: 0.5rem 0.5rem 0.45rem 0.9rem;
+}
+
+.composer:focus-within {
+  border-color: var(--blue);
+}
+
+.composer textarea {
+  flex: 1;
+  font-family: var(--serif);
+  font-size: 16.5px;
+  line-height: 1.5;
+  color: inherit;
+  background: none;
+  border: 0;
+  outline: 0;
+  resize: none;
+  padding: 0.3rem 0;
+  max-height: 10rem;
+}
+
+.composer textarea::placeholder {
+  color: var(--ink-faint);
+}
+
+.send {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  transition:
+    background-color 0.16s ease,
+    border-color 0.16s ease;
+  border: 1px solid var(--blue);
+  background: var(--blue);
+  color: var(--blue-ink);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.send:hover:not(:disabled) {
+  background: var(--blue-hover);
+  border-color: var(--blue-hover);
+}
+
+.send:disabled {
+  background: var(--sunk);
+  border-color: var(--line-strong);
+  color: var(--ink-faint);
+  cursor: not-allowed;
+}
+
+.hint {
+  max-width: var(--thread);
+  margin: 0.45rem auto 0;
+  font-size: 0.75rem;
+  color: var(--ink-faint);
+}
+
+/* -- the panel: judgement, comparison, form ----------------------------- */
+
+.panel {
+  max-width: min(58rem, 100%);
+  margin: 0 auto 1.75rem;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r);
+  border-top-left-radius: var(--notch);
+  overflow: hidden;
+}
+
+.panel__head {
+  padding: 1rem 1.25rem;
+  background: var(--sunk);
+  border-bottom: 1px solid var(--line);
+}
+
+.panel__ask {
+  font-family: var(--serif);
+  font-size: 1.3125rem;
+  font-weight: 600;
+  margin-top: 0.4rem;
+}
+
+.panel__note {
+  font-size: 0.8125rem;
+  color: var(--ink-quiet);
+  margin-top: 0.25rem;
+}
+
+.block {
+  padding: 1.15rem 1.25rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.block__head {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.9rem;
+}
+
+.block__head .right {
+  margin-left: auto;
+}
+
+/* A block whose content is a full-width grid keeps its key inset and lets the
+ * grid run to the edges. */
+.block--flush {
+  padding: 1.15rem 0 0;
+}
+
+.block--flush .block__head {
+  padding: 0 1.25rem;
+}
+
+/* -- the pair: two things that must look the same ----------------------- */
+
+/* One grid, one track rule, one hairline between. No rule anywhere styles the
+ * first one, and both columns stretch together, so the action under a short
+ * option can never sit higher than the action under a long one. */
+.pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
+}
+
+.pair > * + * {
+  border-left: 1px solid var(--line);
+}
+
+.option {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 1.15rem 1.25rem;
+}
+
+/* The option is the control. A participant chooses a reply by pressing the
+ * reply, which is where their attention already is -- not by finding the
+ * matching button somewhere under it. The whole cell is one label around one
+ * radio, so the keyboard and a screen reader get a real radio group. */
+.option--pick {
+  cursor: pointer;
+}
+
+.option--pick input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* The affordance is a mark and a word at the foot of the cell, so the cell can
+ * not be mistaken for something to read only. */
+.option__pick {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-top: 1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--line);
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--ink-quiet);
+}
+
+.option__dot {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1.5px solid var(--line-strong);
+  display: grid;
+  place-items: center;
+  color: transparent;
+  font-size: 0.75rem;
+  flex: 0 0 auto;
+}
+
+/* The pointer darkens the mark. It puts no fill on the cell, because a fill is
+ * what a chosen cell is. */
+.option--pick:hover .option__dot {
+  border-color: var(--ink-quiet);
+}
+
+.option--pick:hover .option__pick {
+  color: var(--ink);
+}
+
+.option--pick:has(input:focus-visible) {
+  outline: 2px solid var(--blue);
+  outline-offset: -2px;
+}
+
+/* The badge is the notch again. Both options carry the same one in the same
+ * ink: an option is named by where it is, never coloured by which it is. */
+.badge {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  border-top-left-radius: var(--notch);
+  background: var(--sunk);
+  border: 1px solid var(--line-strong);
+  font-family: var(--serif);
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.badge--lg {
+  width: 32px;
+  height: 32px;
+  font-size: 1.0625rem;
+}
+
+.option__head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.75rem;
+}
+
+.option__name {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-quiet);
+}
+
+.option__text {
+  font-family: var(--serif);
+  font-size: 16.5px;
+  line-height: 1.56;
+  white-space: pre-wrap;
+  flex: 1;
+}
+
+/* The chosen option. It is drawn only after a choice, so it can not push one
+ * side before the participant has decided. */
+.option:has(input:checked) {
+  background: var(--blue-soft);
+}
+
+.option:has(input:checked) .badge {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: var(--blue-ink);
+}
+
+.option:has(input:checked) .option__pick {
+  color: var(--blue);
+  border-top-color: var(--you-line);
+}
+
+.option:has(input:checked) .option__dot {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: var(--blue-ink);
+}
+
+/* -- what a round was --------------------------------------------------- */
+
+.replay {
+  position: relative;
+  aspect-ratio: 3 / 2;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--sunk);
+  display: grid;
+  place-items: center;
+  color: var(--ink-faint);
+  font-size: 0.8125rem;
+  margin-bottom: 0.85rem;
+}
+
+.replay__play {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  color: var(--ink);
+}
+
+.replay__play:hover {
+  border-color: var(--ink-quiet);
+}
+
+.stats {
+  display: flex;
+  gap: 1.5rem;
+  padding-bottom: 0.95rem;
+  margin-bottom: 0.95rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.stat__value {
+  font-family: var(--serif);
+  font-size: 1.35rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+}
+
+.stat__label {
+  font-size: 0.75rem;
+  color: var(--ink-quiet);
+}
+
+/* -- scales ------------------------------------------------------------- */
+
+.axis {
+  border: 0;
+  margin: 0 0 1.5rem;
+  padding: 0;
+}
+
+.axis:last-child {
+  margin-bottom: 0;
+}
+
+.axis__ask {
+  padding: 0;
+  font-family: var(--serif);
+  font-size: 1.0625rem;
+  margin-bottom: 0.7rem;
+}
+
+/* A comparison scale is anchored by the two badges, so which end is which is
+ * read and not remembered. */
+.scale {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.cells {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.cells label {
+  border-right: 1px solid var(--line);
+  height: 2.6rem;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--ink-faint);
+  position: relative;
+}
+
+.cells label:last-child {
+  border-right: 0;
+}
+
+/* The pointer draws a rule under a cell. A fill is what a chosen cell is. */
+.cells label:hover {
+  box-shadow: inset 0 -3px 0 0 var(--line-strong);
+  color: var(--ink);
+}
+
+.cells label:has(input:checked) {
+  background: var(--blue);
+  color: var(--blue-ink);
+  box-shadow: none;
+}
+
+.cells label:has(input:focus-visible) {
+  outline: 2px solid var(--blue);
+  outline-offset: -2px;
+}
+
+.cells input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* The middle of a comparison is "the same". It is named by its glyph and by
+ * nothing else: a tint would put weight on the tie, and a scale must not
+ * recommend an answer before it is given. */
+.cells label[data-middle] {
+  color: var(--ink-quiet);
+}
+
+.scale__end {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.6875rem;
+  color: var(--ink-quiet);
+  width: 3.4rem;
+  text-align: center;
+  line-height: 1.25;
+}
+
+/* The screen says back what the participant said, in words. A mark on a row of
+ * cells is never the only record of what somebody meant. */
+.readout {
+  margin-top: 0.55rem;
+  font-family: var(--serif);
+  font-size: 0.9375rem;
+  color: var(--ink-quiet);
+  min-height: 1.45rem;
+}
+
+.readout--set {
+  color: var(--ink);
+}
+
+.readout b {
+  font-weight: 700;
+}
+
+.ends {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 0.35rem;
+  font-size: 0.75rem;
+  color: var(--ink-quiet);
+}
+
+.each {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.25rem;
+}
+
+.each__head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  padding: 0;
+}
+
+.each__head .badge {
+  width: 21px;
+  height: 21px;
+  font-size: 0.8125rem;
+}
+
+.each__name {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-quiet);
+}
+
+.answered {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--ink-quiet);
+}
+
+.answered--all {
+  color: var(--good);
+}
+
+.panel__foot {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.9rem 1.25rem;
+  background: var(--sunk);
+}
+
+.panel__foot .right {
+  margin-left: auto;
+}
+
+/* -- channels ----------------------------------------------------------- */
+
+.channels {
+  max-width: var(--thread);
+  margin: 0 auto 1.3rem;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.channels button {
+  font-family: var(--sans);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  padding: 0.32rem 0.72rem;
+  border-radius: var(--r-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--ink-quiet);
+  cursor: pointer;
+}
+
+.channels button:hover {
+  border-color: var(--line-strong);
+  color: var(--ink);
+}
+
+.channels button[aria-selected="true"] {
+  background: var(--surface);
+  border-color: var(--line-strong);
+  color: var(--ink);
+}
+
+.channels .right {
+  margin-left: auto;
+  font-size: 0.75rem;
+  color: var(--ink-quiet);
+}
+
+/* -- a game beside a conversation --------------------------------------- */
+
+.panes {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(21rem, 25rem);
+  gap: 1rem;
+  padding: 1rem 1.5rem 1.25rem;
+  align-items: stretch;
+}
+
+.pane {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r);
+  border-top-left-radius: var(--notch);
+  overflow: hidden;
+}
+
+/* Which pane the keys go to. It is said in words as well as drawn: a
+ * participant who presses a key and sees no chef move must be told where the
+ * key went. */
+.pane--held {
+  border-color: var(--blue);
+  box-shadow: inset 0 0 0 1px var(--blue);
+}
+
+.pane__head {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.6rem 0.9rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.pane__name {
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.pane__badge {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  padding: 0.14rem 0.5rem;
+  border-radius: 999px;
+  background: var(--sunk);
+  border: 1px solid var(--line);
+  color: var(--ink-quiet);
+}
+
+.pane--held .pane__badge {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: var(--blue-ink);
+}
+
+.pane__hint {
+  margin-left: auto;
+  font-size: 0.75rem;
+  color: var(--ink-faint);
+}
+
+.pane__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0.9rem;
+}
+
+/* The game's own surface. It keeps the size the study drew it at, so the
+ * picture is never stretched to fit a box the study did not choose. */
+.canvas {
+  display: block;
+  max-width: 100%;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  background: #dde5f0;
+}
+
+.board {
+  aspect-ratio: 4 / 3;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  background: #dde5f0;
+  display: grid;
+  place-items: center;
+  color: #5b6c88;
+  font-size: 0.8125rem;
+}
+
+/* The status line is what the study is telling the participant, so it is amber:
+ * it is live, and it is not something they can press. */
+/* The status line is above the game, not below it. What it says -- the score
+ * and the time left -- changes what a participant does next, and a number under
+ * the board is read after the move it should have changed. */
+.hud {
+  display: flex;
+  gap: 1.5rem;
+  padding: 0.6rem 0.9rem;
+  border-bottom: 1px solid var(--line);
+  background: var(--sunk);
+  font-variant-numeric: tabular-nums;
+}
+
+.hud__label {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-quiet);
+}
+
+.hud__value {
+  font-family: var(--serif);
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--amber);
+}
+
+/* The conversation inside a pane is the same thread, smaller. Not a second
+ * design. */
+.pane .turn {
+  max-width: 94%;
+  margin-bottom: 0.9rem;
+}
+
+.pane .bubble {
+  font-size: 15px;
+  padding: 0.55rem 0.75rem;
+}
+
+.pane .composer {
+  border-radius: var(--r-sm);
+  padding: 0.4rem 0.4rem 0.35rem 0.7rem;
+}
+
+.pane .composer textarea {
+  font-size: 15px;
+}
+
+.pane__foot {
+  padding: 0.6rem;
+  border-top: 1px solid var(--line);
+}
+
+/* -- reading and answering ---------------------------------------------- */
+
+.sheet {
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: 2.25rem 1.5rem 3.5rem;
+}
+
+/* The screen a game owns. The reading column is what prose wants and not what a
+ * picture wants: the drawing is fitted to the room it has, so the room has to be
+ * the screen rather than a column of text. What is written beside it keeps its
+ * own reading width. */
+.sheet--game {
+  max-width: none;
+  padding-bottom: 1.5rem;
+}
+
+.prose {
+  font-family: var(--serif);
+  font-size: 17px;
+  line-height: 1.62;
+}
+
+.prose h2 {
+  font-family: var(--serif);
+  font-size: 1.25rem;
+  margin: 1.9rem 0 0.55rem;
+}
+
+.prose h2:first-child {
+  margin-top: 0;
+}
+
+.prose p {
+  margin: 0 0 1em;
+}
+
+.prose ul {
+  margin: 0 0 1em;
+  padding-left: 1.25rem;
+}
+
+.prose li {
+  margin-bottom: 0.35em;
+}
+
+.keys {
+  display: flex;
+  gap: 0.5rem;
+  margin: 0 0 1em;
+}
+
+kbd {
+  font-family: var(--sans);
+  font-size: 0.75rem;
+  font-weight: 600;
+  min-width: 2rem;
+  padding: 0.28rem 0.5rem;
+  text-align: center;
+  border: 1px solid var(--line-strong);
+  border-bottom-width: 2px;
+  border-radius: var(--r-sm);
+  background: var(--surface);
+}
+
+/* A question is a row with a rule under it. It is a ``fieldset`` when it holds a
+ * group of radios, so the browser's own border and margin are cleared: without
+ * this the browser draws a box round the options and the legend cuts through
+ * it. ``min-width: 0`` stops a fieldset refusing to shrink inside a grid. */
+.field {
+  padding: 1.1rem 1.25rem;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  margin: 0;
+  min-width: 0;
+}
+
+.field > legend.field__label {
+  padding: 0;
+  float: left;
+  width: 100%;
+}
+
+/* A floated legend takes itself out of the flow, so the row after it is put
+ * back below. */
+.field > legend.field__label + * {
+  clear: both;
+}
+
+.field:last-of-type {
+  border-bottom: 0;
+}
+
+.field__label {
+  display: block;
+  font-family: var(--serif);
+  font-size: 1.0625rem;
+  margin-bottom: 0.6rem;
+  padding: 0;
+}
+
+.field__need {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-left: 0.4rem;
+}
+
+.field input[type="text"],
+.field textarea {
+  width: 100%;
+  font-family: var(--serif);
+  font-size: 16px;
+  color: inherit;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-sm);
+  padding: 0.55rem 0.7rem;
+}
+
+.field input[type="text"]:focus,
+.field textarea:focus {
+  outline: 0;
+  border-color: var(--blue);
+  box-shadow: inset 0 0 0 1px var(--blue);
+}
+
+.choices {
+  display: grid;
+  gap: 0.4rem;
+}
+
+/* One option of a choice.
+ *
+ * The mark is drawn here rather than left to the browser, for two reasons: the
+ * browser's own radio is the one part of a form that looks like nothing else on
+ * the sheet, and a drawn mark can carry the change of state as a movement of
+ * the mark instead of a jump of the whole row. The row itself still does not
+ * gain a fill under the pointer -- a fill is what a chosen row is. */
+.choices label {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.72rem 0.95rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  cursor: pointer;
+  font-family: var(--serif);
+  font-size: 16px;
+  transition:
+    border-color 0.16s ease,
+    background-color 0.16s ease;
+}
+
+.choices input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* The ring. */
+.choices label::before {
+  content: "";
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1.5px solid var(--line-strong);
+  background: var(--surface);
+  transition: border-color 0.16s ease;
+}
+
+/* The dot inside it, which grows into place rather than appearing. */
+.choices label::after {
+  content: "";
+  position: absolute;
+  left: calc(0.95rem + 5px);
+  top: 50%;
+  margin-top: -4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--blue);
+  transform: scale(0);
+  transition: transform 0.18s cubic-bezier(0.2, 0.85, 0.3, 1.3);
+}
+
+.choices label:hover {
+  border-color: var(--ink-quiet);
+}
+
+.choices label:hover::before {
+  border-color: var(--ink-quiet);
+}
+
+.choices label:has(input:checked) {
+  border-color: var(--blue);
+  background: var(--blue-soft);
+}
+
+.choices label:has(input:checked)::before {
+  border-color: var(--blue);
+}
+
+.choices label:has(input:checked)::after {
+  transform: scale(1);
+}
+
+.choices label:has(input:focus-visible) {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .choices label,
+  .choices label::before,
+  .choices label::after {
+    transition: none;
+  }
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  margin-top: 1.5rem;
+}
+
+.done {
+  text-align: center;
+  padding-top: 3rem;
+}
+
+.code {
+  display: inline-block;
+  font-family: var(--serif);
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  padding: 0.7rem 1.1rem;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-sm);
+  border-top-left-radius: var(--notch);
+  user-select: all;
+}
+
+@media (max-width: 58rem) {
+  .pair,
+  .each,
+  .choose {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .pair > * + * {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+  .panes {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .turn {
+    max-width: 94%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn,
+  .send {
+    transition: none;
+  }
+}
+
+/* -- the debug drawer ---------------------------------------------------- *
+ *
+ * What the run says about itself, for the person running it. It is only ever
+ * built in debug mode, and it is deliberately **over** the study rather than
+ * beside it: the picture the participant plays is sized by the study, and a
+ * panel that took part of the width would resize the game to make room for a
+ * debugging aid.
+ *
+ * It is dark on purpose. Nothing on this screen is what a participant reads,
+ * and the difference has to be visible from across a room.
+ */
+
+.debug {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  width: min(34rem, 100vw);
+  background: #16151a;
+  color: #d8d4cc;
+  border-left: 1px solid #2f2d35;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  transform: translateX(100%);
+  transition: transform 0.16s ease;
+}
+
+.debug[data-open="true"] {
+  transform: translateX(0);
+}
+
+.debug__toggle {
+  position: fixed;
+  top: 0.6rem;
+  right: 0.6rem;
+  z-index: 41;
+  padding: 0.3rem 0.6rem;
+  background: #16151a;
+  color: #d8d4cc;
+  border: 1px solid #2f2d35;
+  border-radius: var(--r-sm);
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.debug__head {
+  flex: 0 0 auto;
+  padding: 0.5rem 0.7rem;
+  border-bottom: 1px solid #2f2d35;
+}
+
+.debug__status {
+  margin: 0 0 0.4rem;
+  color: #8f8a80;
+}
+
+.debug__kinds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.debug__kind {
+  padding: 0.1rem 0.4rem;
+  background: transparent;
+  color: #8f8a80;
+  border: 1px solid #2f2d35;
+  border-radius: var(--notch);
+  font: inherit;
+  cursor: pointer;
+}
+
+.debug__kind[aria-pressed="true"] {
+  background: #2f2d35;
+  color: #ede9e1;
+}
+
+.debug__notes {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 0.4rem 0.7rem 1rem;
+}
+
+.debug__note {
+  padding: 0.3rem 0 0.35rem;
+  border-bottom: 1px solid #221f27;
+}
+
+.debug__when {
+  color: #6b665e;
+}
+
+.debug__what {
+  color: #cbb26a;
+}
+
+.debug__note[data-family="model"] .debug__what {
+  color: #7fb3c8;
+}
+
+.debug__note[data-family="round"] .debug__what {
+  color: #8fbf87;
+}
+
+.debug__note[data-family="chat"] .debug__what {
+  color: #c39bd0;
+}
+
+.debug__note[data-bad="true"] .debug__what {
+  color: #e08a7a;
+}
+
+.debug__who {
+  color: #8f8a80;
+}
+
+.debug__field {
+  margin: 0.1rem 0 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.debug__name {
+  color: #6b665e;
+}
+
+.debug__long {
+  margin: 0.15rem 0 0;
+  padding: 0.3rem 0.45rem;
+  max-height: 11rem;
+  overflow: auto;
+  background: #100f13;
+  border: 1px solid #221f27;
+  border-radius: var(--notch);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.debug__gap {
+  padding: 0.3rem 0;
+  color: #e08a7a;
+}

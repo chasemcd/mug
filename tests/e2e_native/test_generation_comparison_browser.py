@@ -27,13 +27,13 @@ from playwright.sync_api import Page, expect
 from mug.agents.generation import GenerationSet, ModelUnderTest
 from mug.app import build_study_app
 from mug.authoring import (
-    Chat,
     Comparison,
     Fallback,
     History,
     LLMAgent,
     Provider,
     Thoughts,
+    Transcript,
 )
 from mug.content import Page as StudyPage
 from mug.content import Study
@@ -67,7 +67,7 @@ class _Writer(LLMAgent):
         env: object,
         agent_id: str,
         history: History,
-        chat: Chat,
+        chat: Transcript,
         thoughts: Thoughts,
     ) -> str:
         return ""
@@ -175,6 +175,10 @@ def ts_generation_server_url(tmp_path: Path) -> Iterator[str]:
     if not _BOOTSTRAP.exists():
         pytest.skip("ts/dist-web is not built; run `npm run build:web` in ts/")
     shutil.copy(_SHELL, tmp_path / "index.html")
+    shutil.copy(
+        _SHELL.parents[3] / "mug" / "webclient" / "app.css",
+        tmp_path / "app.css",
+    )
     shutil.copytree(_DIST_WEB / "client", tmp_path / "client")
     shutil.copytree(_DIST_WEB / "kernel", tmp_path / "kernel")
     yield from _serve(tmp_path)
@@ -187,18 +191,22 @@ def _answer_the_comparison(page: Page, url: str) -> None:
     page.get_by_role("button", name="Continue").click()
 
     expect(page.get_by_text(_ASK)).to_be_visible(timeout=20_000)
-    options = page.locator("[data-testid='comparison-options'] button")
+    options = page.locator("[data-testid='comparison-options'] .option")
     expect(options).to_have_count(2, timeout=10_000)
 
     # The screen is the two answers themselves. Nothing on it says which model
     # wrote which, and the vendor's own fields never left the raw artifact.
-    texts = sorted(option.inner_text() for option in options.all())
+    texts = sorted(
+        option.locator(".option__text").inner_text() for option in options.all()
+    )
     assert texts == sorted([_DRY, _WARM])
     assert "provider-internal-42" not in page.content()
     assert "fake-local" not in page.content()
     expect(page.get_by_text("Warm")).to_have_count(0)
 
+    # The option is the control, and one submit sends what was picked.
     options.first.click()
+    page.locator("[data-testid='comparison-submit']").click()
     expect(page.get_by_text("Thank you")).to_be_visible(timeout=10_000)
 
 

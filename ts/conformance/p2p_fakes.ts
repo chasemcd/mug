@@ -8,6 +8,7 @@ import {
   RtcJsonObject,
 } from '../src/client/p2pRtc.js';
 import { P2PBootstrap, P2PSignal } from '../src/client/p2pWire.js';
+import { P2P_CLIENT_BUNDLE_DIGEST } from '../src/client/p2pWireFields.js';
 
 type Handler = () => void;
 
@@ -15,9 +16,12 @@ export function publicHandle(letter: string): string {
   return 'handle_' + letter.repeat(21) + 'A';
 }
 
+// The bundle the client really pins, read from the client rather than written out
+// again here. A copy of it goes stale the first time the contract moves, and then
+// the conformance runner refuses every frame the client would have accepted.
 const BUNDLE_DIGEST = {
   algorithm: 'sha-256' as const,
-  hex: 'ec6d3f0019480421a8cdc9ce8db2f2e88f2398e0daf0c7773ced3841ba435029',
+  hex: P2P_CLIENT_BUNDLE_DIGEST,
 };
 
 export function bootstrap(local: string, members: readonly string[]): P2PBootstrap {

@@ -31,7 +31,7 @@ from mug.agents.multiseat_episode import (
     AgentSeatResult,
     LocalSeat,
 )
-from mug.authoring import Message, Step
+from mug.authoring import Fallback, Message, Step
 from mug.game.aec import (
     TurnBasedEnv,
     TurnBasedObserver,
@@ -168,8 +168,14 @@ class _TurnSeatDriver:
             last_action=self._last_action,
         )
         self.result.decisions.append(outcome)
-        self._seat.apply(outcome.action)
-        self._last_action = outcome.action
+        # A fallback is read through the agent's own rule, exactly as it is in a
+        # simultaneous game: ``REPEAT_LAST`` keeps the choice, ``WAIT`` leaves the
+        # seat with none, and the last **decided** choice is kept either way so a
+        # repeat has something real to repeat.
+        waited = outcome.used_fallback and self._agent.on_timeout is Fallback.WAIT
+        self._seat.apply(None if waited else outcome.action)
+        if not outcome.used_fallback:
+            self._last_action = outcome.action
 
     def record(self, info: TurnStepInfo) -> None:
         """Record one turn into this seat's history: the one mover and the rewards.

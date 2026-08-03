@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>v4 -- the conversation</title>
+    <link rel="stylesheet" href="v4.css" />
+  </head>
+  <body>
+    <div class="app">
+      <nav class="mock">
+        <a href="index.html">v4</a>
+        <span>The conversation</span>
+        <span class="right">
+          <a href="judgement.html">Judgement</a> &middot;
+          <a href="comparison.html">Comparison</a> &middot;
+          <a href="room.html">Room</a> &middot;
+          <a href="game-and-chat.html">Game and chat</a> &middot;
+          <a href="study.html">Study</a>
+        </span>
+      </nav>
+
+      <header class="head">
+        <span class="brand">
+          <span class="brand__mark" aria-hidden="true"></span>
+          <span class="brand__name">MUG</span>
+        </span>
+        <span class="head__rule" aria-hidden="true"></span>
+        <span class="head__study">Advice and preference</span>
+        <span class="head__spacer"></span>
+        <span class="progress">
+          <span class="progress__track" role="img" aria-label="Step 3 of 6">
+            <span class="progress__mark progress__mark--done"></span>
+            <span class="progress__mark progress__mark--done"></span>
+            <span class="progress__mark progress__mark--now"></span>
+            <span class="progress__mark"></span>
+            <span class="progress__mark"></span>
+            <span class="progress__mark"></span>
+          </span>
+          Step 3 of 6
+        </span>
+        <span class="state">Connected</span>
+        <button type="button" class="btn btn--quiet btn--small">End</button>
+      </header>
+
+      <div class="scroll">
+        <div class="thread" role="log" aria-label="Conversation">
+          <div class="turn turn--them">
+            <div class="turn__who"><span class="turn__mark"></span>Them</div>
+            <div class="bubble">Hello. What would you like to talk about?</div>
+          </div>
+
+          <div class="turn turn--you">
+            <div class="turn__who"><span class="turn__mark"></span>You</div>
+            <div class="bubble">I have to give a ten minute talk to my team on Thursday and I keep rewriting the opening. Where do I start?</div>
+          </div>
+
+          <div class="turn turn--them">
+            <div class="turn__who"><span class="turn__mark"></span>Them</div>
+            <div class="bubble">Start at the end. Write the one sentence you want somebody to repeat to a colleague on Friday, then work backwards from it.
+
+Ten minutes holds about three points. If the opening is hard to write, it is often because the talk has five.</div>
+          </div>
+
+          <div class="turn turn--you">
+            <div class="turn__who"><span class="turn__mark"></span>You</div>
+            <div class="bubble">That is the problem. I have five and they all feel necessary.</div>
+          </div>
+
+          <!-- What stands where a reply is going to be: the same bubble, so
+               nothing moves when the words arrive. -->
+          <div class="turn turn--them">
+            <div class="turn__who"><span class="turn__mark"></span>Them</div>
+            <div class="bubble"><span class="dots" role="status" aria-label="Waiting for a reply"><span></span><span></span><span></span></span></div>
+          </div>
+        </div>
+
+        <!-- A reply that is not coming. It is not a bubble, because nobody
+             said it, and it is amber because it is live. -->
+        <div class="notice" role="status">
+          <b aria-hidden="true">!</b>
+          <span>The other party could not reply this time. You can send your message again.</span>
+        </div>
+      </div>
+
+      <div class="dock">
+        <form class="composer">
+          <label class="sr-only" for="message">Your message</label>
+          <textarea id="message" rows="1" placeholder="Write a message"></textarea>
+          <button type="submit" class="send" aria-label="Send" disabled>
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M8 13V3.5M8 3.5 3.8 7.7M8 3.5l4.2 4.2" stroke="currentColor"
+                    stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </button>
+        </form>
+        <p class="hint">Return sends. Shift and return make a new line.</p>
+      </div>
+    </div>
+    <script src="mock.js"></script>
+  </body>
+</html>

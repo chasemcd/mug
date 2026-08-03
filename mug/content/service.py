@@ -70,7 +70,7 @@ _RESULT_SCHEMA_NAME = "mug.command-result.visit-transition"
 _AuthoringKey = Annotated[
     str, Field(pattern=r"^[a-z][a-z0-9]*(?:[-_.][a-z0-9]+)*$", max_length=128)
 ]
-_ActivityKind = Literal["form", "content", "game", "comparison"]
+_ActivityKind = Literal["form", "content", "game", "chat", "comparison"]
 
 
 class FlowActivity(KernelModel):
@@ -263,6 +263,11 @@ def present(
             **where,
             "ask": study.comparison(activity.key).ask,
         }
+    if activity.kind == "chat":
+        # A conversation is its own kind. It used to be delivered as a game, so the
+        # recorded kind said the participant played one and the screen that rendered
+        # it said "chat" -- two names for one activity, and the wrong one recorded.
+        return {"kind": "chat", **where}
     return {"kind": "game", **where}
 
 

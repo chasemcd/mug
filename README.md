@@ -25,6 +25,18 @@ Get started by reading the [documentation](https://multi-user-gymnasium.readthed
 pip install multi-user-gymnasium[server]
 ```
 
+**MUG installs no simulation environment.** The environment is the study's own
+choice, so an example installs its own:
+
+```bash
+uv pip install cogrid==0.3.2   # examples/cogrid — Overcooked
+uv pip install slimevb         # examples/slime_volleyball
+uv pip install onnxruntime     # to score a trained policy on the server
+```
+
+An example says which package it wants rather than failing part way through a
+run, and each example directory has a README with the command.
+
 <div align="center">
   <img src="docs/assets/images/overcooked_example.apng" alt="Overcooked human-AI demo" width="600"/>
 </div>
@@ -38,11 +50,15 @@ MUG uses [uv](https://docs.astral.sh/uv/) for package management. From a cloned 
 # Create the environment and install all dependencies (server, test, docs)
 uv sync --all-extras
 
+# The example environments are not dependencies; the tests that need one skip
+# without it. Install them to run the whole suite.
+uv pip install cogrid==0.3.2 slimevb onnxruntime
+
 # Run the unit tests
 uv run pytest tests/unit
 
 # Run an example
-uv run python -m examples.slime_volleyball.slimevb_human_ai
+uv run uvicorn examples.slime_volleyball.human_ai:app
 ```
 
 Dependencies are locked in `uv.lock`; after changing dependencies in

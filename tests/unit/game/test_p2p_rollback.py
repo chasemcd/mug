@@ -25,10 +25,13 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import cast
 
+import pytest
+
 from mug.game.mesh import (
     EndPacket,
     HashPacket,
     InputPacket,
+    MeshEngineError,
     PeerEngine,
     Prediction,
     ReplicaFrame,
@@ -554,3 +557,202 @@ def test_a_frame_disputes_when_the_peer_hashes_disagree() -> None:
     )
     assert finality.status == "disputed"
     assert finality.agreed_state_hash is None
+
+
+# -- only confirmed frames are exported -----------------------------------------
+
+
+def test_the_barrier_will_not_close_over_a_frame_nobody_confirmed() -> None:
+    """A round that cannot be confirmed is refused, not exported from a guess.
+
+    ``finalize`` used to force-promote whatever was still speculative inside the
+    barrier, so the **last** frames of an episode were the only ones a peer could
+    export from a prediction. Two peers missing different tail inputs then held
+    different trajectories: a real Chromium pair diverged that way about one round
+    in six on a bad link, and the room refused the round after it had been played.
+    """
+    actors = (_actor(1), _actor(2))
+    world = LineWorld(actors, seed=3, episode_len=4)
+    engine = _build_engine(
+        actors[0], actors, world, input_delay=0, snapshot_interval=2, max_steps=3,
+        default_action=1,
+        prediction="repeat-last",
+    )
+    other = actors[1]
+    # The partner's input for the last frame never arrives, so frame 2 stays
+    # speculative however long the barrier waits.
+    engine.receive_input(InputPacket(sender=other, current_frame=0, inputs=((0, 1),)))
+    engine.receive_input(InputPacket(sender=other, current_frame=1, inputs=((1, 1),)))
+    for action in (1, 1, 1):
+        engine.submit_local(action)
+        engine.advance()
+    engine.advance()
+    engine.receive_end(EndPacket(sender=other, end_frame_exclusive=3))
+
+    assert engine.barrier_frame() == 3
+    assert not engine.ready_to_finalize(), "a missing input must hold the barrier open"
+    with pytest.raises(MeshEngineError, match="would export a prediction"):
+        engine.finalize()
+
+
+def test_the_barrier_closes_once_the_missing_input_arrives() -> None:
+    """The same round finalizes as soon as the tail input lands, and exports it."""
+    actors = (_actor(1), _actor(2))
+    world = LineWorld(actors, seed=3, episode_len=4)
+    engine = _build_engine(
+        actors[0], actors, world, input_delay=0, snapshot_interval=2, max_steps=3,
+        default_action=1,
+        prediction="repeat-last",
+    )
+    other = actors[1]
+    engine.receive_input(InputPacket(sender=other, current_frame=0, inputs=((0, 1),)))
+    engine.receive_input(InputPacket(sender=other, current_frame=1, inputs=((1, 1),)))
+    for action in (1, 1, 1):
+        engine.submit_local(action)
+        engine.advance()
+    engine.receive_end(EndPacket(sender=other, end_frame_exclusive=3))
+
+    engine.receive_input(InputPacket(sender=other, current_frame=2, inputs=((2, 2),)))
+    engine.advance()
+
+    assert engine.ready_to_finalize()
+    engine.finalize()
+    assert len(engine.canonical_trajectory()) == 3
+
+
+def test_a_peer_that_has_ended_keeps_repeating_what_it_played() -> None:
+    """The tail is protected the way the middle of an episode already was.
+
+    Mid-episode a lost input is repeated by the packets that follow it. Nothing
+    follows the last one, so until a peer that had ended went on speaking, the tail
+    was the one part of a run a loss could not be recovered from.
+    """
+    actors = (_actor(1), _actor(2))
+    world = LineWorld(actors, seed=5, episode_len=3)
+    engine = _build_engine(
+        actors[0], actors, world, input_delay=0, snapshot_interval=2, max_steps=2,
+        default_action=1,
+        prediction="repeat-last",
+    )
+    for action in (1, 2):
+        engine.submit_local(action)
+        engine.advance()
+    engine.advance()
+
+    assert engine.ended()
+    repeat = engine.resend_recent()
+    assert repeat is not None
+    assert repeat.sender == actors[0]
+    assert dict(repeat.inputs) == {0: 1, 1: 2}, (
+        "a peer that has ended must repeat what it played, and schedule nothing new"
+    )
+
+
+# -- the snapshots that are kept -------------------------------------------------
+
+
+def test_the_snapshots_below_what_can_still_be_reached_are_dropped() -> None:
+    """Memory is bounded by how far back anything can still need to go.
+
+    A snapshot of the whole replica was taken every few frames and none was ever
+    freed, so a long round paid for the whole episode at once.
+    """
+    actors = (_actor(1), _actor(2))
+    world = LineWorld(actors, seed=11, episode_len=60)
+    engine = _build_engine(
+        actors[0], actors, world, input_delay=0, snapshot_interval=5, max_steps=40,
+        default_action=1,
+        prediction="repeat-last",
+    )
+    other = actors[1]
+    for frame in range(30):
+        # Every peer's input and hash arrive at once, so confirmation and
+        # verification both keep pace with the frame.
+        engine.receive_input(
+            InputPacket(sender=other, current_frame=frame, inputs=((frame, 1),))
+        )
+        engine.submit_local(1)
+        engine.advance()
+        for packet in engine.outbound_hashes():
+            engine.receive_hash(
+                HashPacket(
+                    sender=other,
+                    frame_number=packet.frame_number,
+                    state_hash=packet.state_hash,
+                )
+            )
+
+    kept = sorted(engine.held_snapshot_frames())
+    assert kept, "the engine kept no snapshot at all"
+    assert len(kept) <= 4, (
+        f"a run of 30 confirmed and verified frames kept {len(kept)} snapshots "
+        f"({kept}); nothing can reach below the verified frontier"
+    )
+
+
+def test_a_rollback_still_reaches_the_earliest_frame_it_may_target() -> None:
+    """Pruning must not take the anchor a legal rollback needs.
+
+    The earliest a rollback can target is the first unconfirmed frame, and it
+    anchors on the latest snapshot at or **before** that -- which is an earlier
+    frame whenever the cadence does not divide it. Keeping back to the target rather
+    than to its anchor passes every other test here and leaves a legal rollback with
+    nowhere to stand.
+    """
+    actors = (_actor(1), _actor(2))
+    world = LineWorld(actors, seed=13, episode_len=40)
+    engine = _build_engine(
+        actors[0],
+        actors,
+        world,
+        input_delay=0,
+        snapshot_interval=5,
+        max_steps=30,
+        default_action=1,
+        prediction="repeat-last",
+    )
+    other = actors[1]
+    # Confirm **and verify** through frame 11, so the retention bound is really 12
+    # and the anchor it must keep is the snapshot at 10.
+    for frame in range(12):
+        engine.receive_input(
+            InputPacket(sender=other, current_frame=frame, inputs=((frame, 1),))
+        )
+        engine.submit_local(1)
+        engine.advance()
+        for packet in engine.outbound_hashes():
+            engine.receive_hash(
+                HashPacket(
+                    sender=other,
+                    frame_number=packet.frame_number,
+                    state_hash=packet.state_hash,
+                )
+            )
+    engine.advance()
+    for packet in engine.outbound_hashes():
+        engine.receive_hash(
+            HashPacket(
+                sender=other,
+                frame_number=packet.frame_number,
+                state_hash=packet.state_hash,
+            )
+        )
+    engine.advance()
+    # Step on with the partner predicted, so frames 12 onward are speculative.
+    for _ in range(6):
+        engine.submit_local(1)
+        engine.advance()
+
+    kept = engine.held_snapshot_frames()
+    assert min(kept) <= 12, (
+        f"the snapshots kept are {kept}; a rollback to frame 12 anchors on the "
+        "snapshot at 10, and pruning took it"
+    )
+
+    # The partner's real input for frame 12 contradicts what was predicted, so the
+    # engine must roll back to it -- through the anchor pruning had to keep.
+    engine.receive_input(InputPacket(sender=other, current_frame=17, inputs=((12, 2),)))
+    engine.submit_local(1)
+    engine.advance()
+
+    assert engine.rollback_count() >= 1, "the contradiction did not force a rollback"

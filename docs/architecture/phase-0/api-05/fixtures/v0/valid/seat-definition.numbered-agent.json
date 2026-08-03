@@ -1,0 +1,16 @@
+{
+  "schema": {
+    "name": "mug.api-05.seat-definition",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "4562b13e005ff07cbe2262a05ab0a5ebdc4ee0a3a1e5c84c7b643fa47dc19a47"
+    }
+  },
+  "seat_definition_id": "seatdef_019b6000-0000-7000-8000-000000000404",
+  "seat_key": "0",
+  "occupancy": "either",
+  "modality_capabilities": [
+    "mug.game.action.v1"
+  ]
+}

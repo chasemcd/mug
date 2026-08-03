@@ -42,6 +42,9 @@ export type {
 export { ParticipantClient } from './client.js';
 export type { ClientConfig, KeyTarget } from './client.js';
 
+export { startDebug, debugIfServed } from './debug.js';
+export type { DebugAnswer, DebugDrawer, DebugNote, Fetcher, Ticker } from './debug.js';
+
 export { PeerMesh } from './p2p.js';
 export type { PeerMeshConfig, MeshTimer } from './p2p.js';
 export { P2PEdge } from './p2pEdge.js';

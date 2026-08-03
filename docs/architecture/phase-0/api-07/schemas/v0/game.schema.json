@@ -8,6 +8,11 @@
       "pattern": "^[a-z][a-z0-9]*(?:[-_.][a-z0-9]+)*$",
       "maxLength": 128
     },
+    "SeatKey": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9]*(?:[-_.][a-z0-9]+)*$",
+      "maxLength": 128
+    },
     "ActorId": {
       "type": "string",
       "pattern": "^actor_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
@@ -610,7 +615,8 @@
           "maxLength": 128
         },
         "frame": {
-          "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/NonNegativeSafeInteger"
+          "type": "string",
+          "maxLength": 128
         },
         "extras": {
           "type": "object",
@@ -659,7 +665,7 @@
           "pattern": "^episode_[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
         },
         "seat_key": {
-          "$ref": "#/$defs/AuthoringKey"
+          "$ref": "#/$defs/SeatKey"
         },
         "frame_number": {
           "$ref": "urn:mug:schema:mug.shared-kernel:0#/$defs/NonNegativeSafeInteger"

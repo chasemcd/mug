@@ -12,13 +12,14 @@ from __future__ import annotations
 
 import itertools
 import json
+from dataclasses import replace
 from datetime import datetime, timezone
 from typing import Any, cast
 
 from fastapi import WebSocketDisconnect
 
 from mug.agents import AgentIds
-from mug.authoring import Chat, Fallback, History, LLMAgent, Provider, Thoughts
+from mug.authoring import Fallback, History, LLMAgent, Provider, Thoughts, Transcript
 from mug.conversation import ChatMessage, TurnPolicy
 from mug.kernel import Digest
 from mug.participant_chat import ChatSeatSpec, ChatSpec, run_chat_activity
@@ -27,15 +28,23 @@ from mug.providers.runtime import Payload
 from mug.realtime import Session
 from mug.runtime import CommandContext
 from mug.storage import InMemoryStore, StorageError, Store
+from tests.support.chat import chat_spec
 
 _UUID = "019b6000-0000-7000-8000-{:012x}"
+
 _START = datetime(2026, 7, 25, 0, 0, 0, tzinfo=timezone.utc)
 _DIGEST = Digest(algorithm="sha-256", hex="a" * 64)
 _AGENT_ACTOR = "actor_" + _UUID.format(0x300)
 
 
 class _Partner(LLMAgent):
-    """An author's chat agent: a keyless local runner."""
+    """An author's chat agent: a keyless local runner.
+
+    ``get_prompt`` renders the conversation the way the shipped example does, because
+    that is the one hook an author writes and the mount has to send what it returns.
+    A double whose prompt says nothing would let the mount drop the author's words
+    and still pass.
+    """
 
     provider = Provider.OSS
     model = "fake-local"
@@ -47,27 +56,57 @@ class _Partner(LLMAgent):
         env: object,
         agent_id: str,
         history: History,
-        chat: Chat,
+        chat: Transcript,
         thoughts: Thoughts,
     ) -> str:
+        return "\n".join(f"{one.sender}: {one.text}" for one in chat.last(50))
+
+
+def said_to(payload: Any) -> str:
+    """Return the last thing a participant said, read out of what the model was sent.
+
+    An agent with a prompt of its own sends one message holding the whole rendered
+    conversation; an agent with none sends the labelled transcript. The double reads
+    both, because both are shapes a study really runs.
+    """
+    messages = cast("list[Any]", cast("dict[str, Any]", payload)["messages"])
+    spoken = [
+        str(cast("dict[str, Any]", one)["content"])
+        for one in messages
+        if cast("dict[str, Any]", one).get("role") == "user"
+    ]
+    if not spoken:
         return ""
+    lines = [line for line in spoken[-1].splitlines() if line.startswith("user: ")]
+    return lines[-1][len("user: ") :] if lines else spoken[-1]
+
+
+def prompt_of(payload: Any) -> str:
+    """Return the one prompt string a payload carries, in the shape a provider reads.
+
+    Every provider names the words of a message ``content``. Reading it under any
+    other name here is what let the mount send a payload no provider could read.
+    """
+    messages = cast("dict[str, Any]", payload)["messages"]
+    return "\n".join(
+        str(cast("dict[str, Any]", one)["content"])
+        for one in cast("list[Any]", messages)
+    )
 
 
 class _EchoAdapter:
-    """A fake provider that echoes the last payload text and keeps every payload."""
+    """A fake provider that echoes the last thing said and keeps every payload."""
 
     def __init__(self) -> None:
         self.payloads: list[Any] = []
 
     async def __call__(self, call: ModelCall) -> ModelCompletion:
         self.payloads.append(call.payload)
-        payload = cast("dict[str, Any]", call.payload)
-        last = cast("list[dict[str, str]]", payload["messages"])[-1]["text"]
         return ModelCompletion(
             outcome="completed",
             resolved_model="fake-local",
             usage=Usage(input_tokens=1, output_tokens=1, cost_micros=0),
-            output={"text": f"you said {last}"},
+            output={"text": f"you said {said_to(call.payload)}"},
         )
 
 
@@ -212,7 +251,7 @@ async def test_a_disconnect_mid_conversation_keeps_what_was_already_said() -> No
     """The participant closes the tab: the exchange so far is recorded, not lost."""
     adapter = _EchoAdapter()
     socket, streams, store = await _run(
-        [{"type": "chat", "text": "first"}], ChatSpec(seat=_seat(adapter))
+        [{"type": "chat", "text": "first"}], chat_spec(seat=_seat(adapter))
     )
 
     # The script ran out, which the socket reports as a disconnect.
@@ -224,7 +263,7 @@ async def test_a_disconnect_mid_conversation_keeps_what_was_already_said() -> No
 
 async def test_a_disconnect_before_the_first_message_records_nothing() -> None:
     """A participant who leaves at once leaves an empty conversation behind."""
-    _socket, streams, store = await _run([], ChatSpec(seat=_seat(_EchoAdapter())))
+    _socket, streams, store = await _run([], chat_spec(seat=_seat(_EchoAdapter())))
 
     assert streams == []
     assert _messages(store) == []
@@ -241,7 +280,7 @@ async def test_a_malformed_frame_does_not_end_the_activity() -> None:
             {"type": "chat", "text": "still here"},
             {"type": "chat_end"},
         ],
-        ChatSpec(seat=_seat(adapter)),
+        chat_spec(seat=_seat(adapter)),
     )
 
     assert len(socket.chats) == 1
@@ -258,7 +297,7 @@ async def test_an_unknown_frame_type_is_ignored() -> None:
             {"type": "chat", "text": "hello"},
             {"type": "chat_end"},
         ],
-        ChatSpec(seat=_seat(adapter)),
+        chat_spec(seat=_seat(adapter)),
     )
 
     assert len(socket.chats) == 1
@@ -270,7 +309,7 @@ async def test_a_message_with_no_text_field_is_ignored() -> None:
     adapter = _EchoAdapter()
     _socket, streams, store = await _run(
         [{"type": "chat"}, {"type": "chat", "text": 17}, {"type": "chat_end"}],
-        ChatSpec(seat=_seat(adapter)),
+        chat_spec(seat=_seat(adapter)),
     )
 
     assert streams == []
@@ -283,12 +322,10 @@ async def test_long_text_is_trimmed_to_the_bound() -> None:
     adapter = _EchoAdapter()
     await _run(
         [{"type": "chat", "text": "x" * 5000}, {"type": "chat_end"}],
-        ChatSpec(seat=_seat(adapter), max_message_length=100),
+        chat_spec(seat=_seat(adapter), max_message_length=100),
     )
 
-    payload = cast("dict[str, Any]", adapter.payloads[0])
-    said = cast("list[dict[str, str]]", payload["messages"])[0]["text"]
-    assert len(said) == 100
+    assert len(said_to(adapter.payloads[0])) == 100
 
 
 async def test_a_moderated_policy_stays_silent_with_no_moderator() -> None:
@@ -299,7 +336,7 @@ async def test_a_moderated_policy_stays_silent_with_no_moderator() -> None:
     )
     socket, _streams, store = await _run(
         [{"type": "chat", "text": "hello"}, {"type": "chat_end"}],
-        ChatSpec(seat=_seat(adapter), policy=policy),
+        chat_spec(seat=_seat(adapter), policy=policy),
     )
 
     assert socket.chats == []
@@ -316,16 +353,92 @@ async def test_the_default_prompt_carries_the_transcript_with_its_roles() -> Non
             {"type": "chat", "text": "two"},
             {"type": "chat_end"},
         ],
-        ChatSpec(seat=_seat(adapter)),
+        chat_spec(seat=_seat(adapter)),
     )
 
     assert len(adapter.payloads) == 2
-    second = cast("dict[str, Any]", adapter.payloads[1])
-    assert second["messages"] == [
-        {"role": "user", "text": "one"},
-        {"role": "assistant", "text": "you said one"},
-        {"role": "user", "text": "two"},
+    assert prompt_of(adapter.payloads[1]).splitlines() == [
+        "user: one",
+        "assistant: you said one",
+        "user: two",
     ]
+
+
+async def test_the_provider_is_sent_the_prompt_the_author_wrote() -> None:
+    """The one hook an author has is the one the mount sends.
+
+    ``LLMAgent.get_prompt`` says what a model is for, and its contract is that MUG
+    sends exactly the string it returns. The mount used to send a transcript of its
+    own instead, so every instruction an author wrote was dropped on the way to the
+    provider and the model answered with no idea what it was there to do.
+    """
+
+    class _Instructed(_Partner):
+        def get_prompt(
+            self,
+            env: object,
+            agent_id: str,
+            history: History,
+            chat: Transcript,
+            thoughts: Thoughts,
+        ) -> str:
+            return "ANSWER ONLY IN LATIN\n" + "\n".join(
+                f"{one.sender}: {one.text}" for one in chat.last(50)
+            )
+
+    adapter = _EchoAdapter()
+    seat = replace(_seat(adapter), agent=_Instructed())
+    await _run(
+        [{"type": "chat", "text": "hello"}, {"type": "chat_end"}], chat_spec(seat=seat)
+    )
+
+    sent = cast("dict[str, Any]", adapter.payloads[0])["messages"]
+    assert sent == [{"role": "user", "content": "ANSWER ONLY IN LATIN\nuser: hello"}]
+
+
+async def test_an_agent_that_writes_no_prompt_still_reads_the_conversation() -> None:
+    """A model with no instructions is sent the labelled transcript, and talks.
+
+    The words go under ``content`` in this shape too, because that is where every
+    provider looks for them: Ollama answers the empty question it was asked and
+    Anthropic refuses the request outright.
+    """
+
+    class _Silent(LLMAgent):
+        provider = Provider.OSS
+        model = "fake-local"
+
+    adapter = _EchoAdapter()
+    seat = replace(_seat(adapter), agent=_Silent())
+    await _run(
+        [
+            {"type": "chat", "text": "one"},
+            {"type": "chat", "text": "two"},
+            {"type": "chat_end"},
+        ],
+        chat_spec(seat=seat),
+    )
+
+    assert cast("dict[str, Any]", adapter.payloads[1])["messages"] == [
+        {"role": "user", "content": "one"},
+        {"role": "assistant", "content": "you said one"},
+        {"role": "user", "content": "two"},
+    ]
+
+
+async def test_the_agents_own_temperature_reaches_the_provider() -> None:
+    """A field an author sets on the agent is a field the call carries."""
+
+    class _Warm(_Partner):
+        temperature = 0.25
+
+    adapter = _EchoAdapter()
+    seat = replace(_seat(adapter), agent=_Warm())
+    await _run(
+        [{"type": "chat", "text": "hello"}, {"type": "chat_end"}], chat_spec(seat=seat)
+    )
+
+    assert cast("dict[str, Any]", adapter.payloads[0])["temperature"] == 0.25
 
 
 async def test_the_context_window_bounds_what_the_model_reads() -> None:
@@ -338,12 +451,12 @@ async def test_the_context_window_bounds_what_the_model_reads() -> None:
             {"type": "chat", "text": "three"},
             {"type": "chat_end"},
         ],
-        ChatSpec(seat=_seat(adapter), context_messages=2),
+        chat_spec(seat=_seat(adapter), context_messages=2),
     )
 
-    third = cast("dict[str, Any]", adapter.payloads[2])
-    assert len(third["messages"]) == 2
-    assert third["messages"][-1] == {"role": "user", "text": "three"}
+    read = prompt_of(adapter.payloads[2]).splitlines()
+    assert len(read) == 2
+    assert read[-1] == "user: three"
 
 
 async def test_a_study_may_replace_the_prompt_and_the_reply_rendering() -> None:
@@ -366,7 +479,7 @@ async def test_a_study_may_replace_the_prompt_and_the_reply_rendering() -> None:
 
     socket, _streams, _store = await _run(
         [{"type": "chat", "text": "hello"}, {"type": "chat_end"}],
-        ChatSpec(seat=_seat(adapter), compose=compose, render_reply=render),
+        chat_spec(seat=_seat(adapter), compose=compose, render_reply=render),
     )
 
     assert socket.chats[0]["text"] == "[1]"
@@ -381,7 +494,7 @@ async def test_the_conversation_runs_on_one_interaction() -> None:
             {"type": "chat", "text": "two"},
             {"type": "chat_end"},
         ],
-        ChatSpec(seat=_seat(adapter), channel_key="interview"),
+        chat_spec(seat=_seat(adapter), channel_key="interview"),
     )
 
     messages = _messages(store)
@@ -411,7 +524,7 @@ async def test_a_refused_post_is_dropped_whole_and_never_reaches_the_model() -> 
     adapter = _EchoAdapter()
     socket, streams, store = await _run(
         [{"type": "chat", "text": "hello"}, {"type": "chat_end"}],
-        ChatSpec(seat=_seat(adapter)),
+        chat_spec(seat=_seat(adapter)),
         store=_RefusingStore(),
     )
 
@@ -429,7 +542,7 @@ async def test_an_activity_with_no_flow_records_nothing() -> None:
     streams = await run_chat_activity(
         cast("Any", _FakeSocket([{"type": "chat", "text": "hello"}])),
         session,
-        ChatSpec(seat=_seat(_EchoAdapter())),
+        chat_spec(seat=_seat(_EchoAdapter())),
         store=store,
         new_context=_Contexts(),
         new_id=_Ids(),

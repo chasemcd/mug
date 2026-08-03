@@ -76,6 +76,61 @@ def test_resolve_action_uses_the_study_bindings() -> None:
     assert resolve_action([], _BINDINGS, 0) == 0
 
 
+# A study whose jump and direction are different keys: holding both means "jump
+# that way", which is its own action and not either key alone.
+_CHORDS = {
+    "ArrowLeft": 1,
+    "ArrowRight": 2,
+    "ArrowUp": 3,
+    ("ArrowUp", "ArrowLeft"): 4,
+    ("ArrowUp", "ArrowRight"): 5,
+}
+
+
+def test_two_keys_held_together_are_their_own_action() -> None:
+    """The gap this closes: the legacy runtime bound chords and this did not.
+
+    A game where a player jumps diagonally can not be expressed by "the first
+    bound key wins" -- whichever key that was, the other one is thrown away and
+    the player never jumps in a direction.
+    """
+    assert resolve_action(["ArrowUp", "ArrowLeft"], _CHORDS, 0) == 4
+    assert resolve_action(["ArrowLeft", "ArrowUp"], _CHORDS, 0) == 4
+    assert resolve_action(["ArrowUp", "ArrowRight"], _CHORDS, 0) == 5
+
+
+def test_a_chord_beats_either_of_the_keys_in_it() -> None:
+    """The most specific thing the player is doing is what the seat does.
+
+    Without this the answer would depend on the order the browser reported the
+    held keys, so the same two fingers would mean different things on different
+    frames.
+    """
+    assert resolve_action(["ArrowUp"], _CHORDS, 0) == 3
+    assert resolve_action(["ArrowLeft"], _CHORDS, 0) == 1
+    assert resolve_action(["ArrowUp", "ArrowLeft"], _CHORDS, 0) == 4
+
+
+def test_a_longer_chord_beats_a_shorter_one() -> None:
+    """Three keys held is more specific than two of them, so it wins."""
+    bindings = {("a", "b"): 1, ("a", "b", "c"): 2}
+    assert resolve_action(["a", "b"], bindings, 0) == 1
+    assert resolve_action(["a", "b", "c"], bindings, 0) == 2
+
+
+def test_a_chord_that_is_not_fully_held_does_not_fire() -> None:
+    """Every key in a chord must be down, or it is not that chord."""
+    assert resolve_action(["ArrowUp"], {("ArrowUp", "ArrowLeft"): 4}, 0) == 0
+    assert resolve_action(["ArrowLeft"], {("ArrowUp", "ArrowLeft"): 4}, 0) == 0
+
+
+def test_a_study_with_no_chords_resolves_exactly_as_it_always_did() -> None:
+    """The rule is added, not changed: nothing an old study did moves."""
+    assert resolve_action(["Go", "Other"], _BINDINGS, 7) == 1
+    assert resolve_action(["Other", "Go"], _BINDINGS, 7) == 1
+    assert resolve_action(["Nothing"], _BINDINGS, 7) == 7
+
+
 def test_the_adapter_resets_and_steps_any_environment() -> None:
     """The adapter returns a json-able observation and a per-step reward."""
     env = _env()

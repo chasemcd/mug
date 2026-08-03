@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>v4 -- reading, answering, finishing</title>
+    <link rel="stylesheet" href="v4.css" />
+  </head>
+  <body>
+    <div class="app">
+      <nav class="mock">
+        <a href="index.html">v4</a>
+        <span>Reading, answering, finishing</span>
+        <span class="switch">
+          <button type="button" data-screen="read" aria-pressed="true">Instructions</button>
+          <button type="button" data-screen="form" aria-pressed="false">Questions</button>
+          <button type="button" data-screen="done" aria-pressed="false">Finished</button>
+        </span>
+        <span class="right">
+          <a href="chat.html">Conversation</a> &middot;
+          <a href="judgement.html">Judgement</a> &middot;
+          <a href="comparison.html">Comparison</a> &middot;
+          <a href="room.html">Room</a> &middot;
+          <a href="game-and-chat.html">Game and chat</a>
+        </span>
+      </nav>
+
+      <header class="head">
+        <span class="brand">
+          <span class="brand__mark" aria-hidden="true"></span>
+          <span class="brand__name">MUG</span>
+        </span>
+        <span class="head__rule" aria-hidden="true"></span>
+        <span class="head__study">Overcooked &mdash; which partner</span>
+        <span class="head__spacer"></span>
+        <span class="progress">
+          <span class="progress__track" role="img" aria-label="Step 2 of 6">
+            <span class="progress__mark progress__mark--done"></span>
+            <span class="progress__mark progress__mark--now"></span>
+            <span class="progress__mark"></span>
+            <span class="progress__mark"></span>
+            <span class="progress__mark"></span>
+            <span class="progress__mark"></span>
+          </span>
+          Step 2 of 6
+        </span>
+        <span class="state">Connected</span>
+      </header>
+
+      <!-- A page the participant reads. The old client set a width and an
+           alignment and stopped there, so a page with a heading, a list, and a
+           picture in it read as one block of text. -->
+      <main class="sheet" data-panel="read">
+        <div class="key" style="margin-bottom: 0.7rem">Before you play</div>
+        <div class="prose" tabindex="0" role="region" aria-label="Study instructions">
+          <h2>The kitchen</h2>
+          <p>
+            You and a partner cook onion soup in a small kitchen. Neither of you can
+            finish a dish alone in the time you are given, so you must divide the work.
+          </p>
+          <h2>What to do</h2>
+          <ul>
+            <li>Pick up an onion and put three of them in a pot.</li>
+            <li>Wait for the soup, then take a dish and fill it.</li>
+            <li>Carry the dish to the grey square to deliver it.</li>
+          </ul>
+          <h2>The keys</h2>
+          <div class="keys">
+            <kbd>&larr;</kbd><kbd>&uarr;</kbd><kbd>&darr;</kbd><kbd>&rarr;</kbd>
+            <kbd style="min-width: 5rem">Space</kbd>
+          </div>
+          <p>
+            The arrow keys move you. The space bar picks a thing up and puts it down.
+            One press is one move.
+          </p>
+          <p>
+            You play two rounds with two different partners. After the second round we
+            ask you which partner you preferred.
+          </p>
+        </div>
+        <div class="actions">
+          <button type="button" class="btn btn--primary">Continue</button>
+          <span class="panel__note">You can read this again at any time.</span>
+        </div>
+      </main>
+
+      <!-- A form. Every question is one row with a rule under it, a scale is
+           one row of cells with its ends written out, and a choice is a row the
+           whole width of which can be pressed. -->
+      <main class="sheet" data-panel="form" hidden>
+        <section class="panel">
+          <div class="panel__head">
+            <div class="key">A few questions</div>
+            <h2 class="panel__ask">Before you start</h2>
+            <div class="panel__note">Four questions. Three of them are needed.</div>
+          </div>
+
+          <form>
+            <div class="field">
+              <label class="field__label" for="q-age">
+                What is your age? <span class="field__need">Needed</span>
+              </label>
+              <input id="q-age" type="text" inputmode="numeric" />
+            </div>
+
+            <fieldset class="field" style="border: 0; margin: 0">
+              <legend class="field__label">
+                How often do you play video games? <span class="field__need">Needed</span>
+              </legend>
+              <div class="choices">
+                <label><input type="radio" name="games" /> Every day</label>
+                <label><input type="radio" name="games" /> Most weeks</label>
+                <label><input type="radio" name="games" /> A few times a year</label>
+                <label><input type="radio" name="games" /> Never</label>
+              </div>
+            </fieldset>
+
+            <fieldset class="field axis" style="border: 0; margin: 0">
+              <legend class="field__label">
+                I am comfortable working with somebody I can not talk to.
+                <span class="field__need">Needed</span>
+              </legend>
+              <div class="cells">
+                <label data-say="1 of 7, you do not agree at all"><input type="radio" name="comfort" />1</label>
+                <label data-say="2 of 7"><input type="radio" name="comfort" />2</label>
+                <label data-say="3 of 7"><input type="radio" name="comfort" />3</label>
+                <label data-say="4 of 7"><input type="radio" name="comfort" />4</label>
+                <label data-say="5 of 7"><input type="radio" name="comfort" />5</label>
+                <label data-say="6 of 7"><input type="radio" name="comfort" />6</label>
+                <label data-say="7 of 7, you agree fully"><input type="radio" name="comfort" />7</label>
+              </div>
+              <div class="ends">
+                <span>Do not agree at all</span>
+                <span>Agree fully</span>
+              </div>
+              <div class="readout" role="status"></div>
+            </fieldset>
+
+            <div class="field">
+              <label class="field__label" for="q-note">
+                Anything else you want to tell us?
+                <span class="field__need">You can leave this empty</span>
+              </label>
+              <textarea id="q-note" rows="3"></textarea>
+            </div>
+
+            <div class="panel__foot">
+              <button type="submit" class="btn btn--primary">Continue</button>
+              <span class="right panel__note">
+                A question that is needed is marked, and nothing is answered for you.
+              </span>
+            </div>
+          </form>
+        </section>
+      </main>
+
+      <main class="sheet done" data-panel="done" hidden>
+        <div class="brand" style="justify-content: center; margin-bottom: 1.25rem">
+          <span class="brand__mark" aria-hidden="true"></span>
+        </div>
+        <h1 style="font-family: var(--serif); font-size: 1.75rem">
+          You are finished. Thank you.
+        </h1>
+        <p class="panel__note" style="margin-top: 0.5rem">
+          Your answers are recorded. Copy the code before you close this page.
+        </p>
+        <p style="margin: 1.5rem 0"><span class="code">C1F4-QK92-7ZTD</span></p>
+        <div class="actions" style="justify-content: center">
+          <button type="button" class="btn btn--primary">Return to the study</button>
+        </div>
+      </main>
+    </div>
+    <script src="mock.js"></script>
+  </body>
+</html>

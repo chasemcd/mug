@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>B -- the judgement as an instrument</title>
+    <link rel="stylesheet" href="b-instrument.css" />
+  </head>
+  <body>
+    <nav class="mock">
+      <a href="index.html">All directions</a>
+      <span>B &mdash; Instrument</span>
+      <span class="right"><a href="a-judgement.html">&larr; See A</a></span>
+    </nav>
+
+    <div class="sheet">
+      <header class="head">
+        <div class="head__key">Study</div>
+        <div class="head__study">Advice and preference</div>
+        <div class="head__meta">
+          <span>Step <span class="live">3</span> / 6</span>
+          <span>Connected</span>
+          <button type="button" class="act act--quiet">End</button>
+        </div>
+      </header>
+
+      <div class="log" role="log" aria-label="Conversation">
+        <div class="turn turn--them">
+          <div class="turn__who">Them</div>
+          <div class="turn__text">Ten minutes holds about three points. If the opening is hard to write, it is often because the talk has five.</div>
+        </div>
+        <div class="turn turn--you">
+          <div class="turn__who">You</div>
+          <div class="turn__text">That is the problem. I have five and they all feel necessary.</div>
+        </div>
+      </div>
+
+      <!-- The judgement is a row of the same instrument, not a panel put on top
+           of it. The two replies are one grid with one track rule, divided by
+           one hairline, and no rule anywhere styles the first one. -->
+      <section aria-labelledby="ask">
+        <div class="row" style="grid-template-columns: 8.5rem minmax(0, 1fr)">
+          <div class="row__key">Judgement</div>
+          <h2 class="ask" id="ask" style="padding-left: 1.5rem">
+            Which reply would you rather have had?
+            <small>The one you pick is the one the conversation goes on with</small>
+          </h2>
+        </div>
+
+        <div class="pair">
+          <article class="reply">
+            <div class="reply__key">Reply A</div>
+            <div class="reply__text">Then keep all five, but say four of them in one sentence each and give the whole of the rest to the one that changes what somebody does on Friday.
+
+A point that only needs a sentence is not a small point. It is a point that is already agreed.</div>
+            <div class="reply__act">
+              <button type="button" class="act">Go on with A</button>
+            </div>
+          </article>
+
+          <article class="reply">
+            <div class="reply__key">Reply B</div>
+            <div class="reply__text">Five is not too many if four of them are the same point. Write each in one line, put the lines side by side, and you will usually find two collapse into one.
+
+If they truly do not, the talk is a memo. Send it, and use the ten minutes for the question people will have after reading it.</div>
+            <div class="reply__act">
+              <button type="button" class="act">Go on with B</button>
+            </div>
+          </article>
+        </div>
+
+        <fieldset class="axis">
+          <legend class="axis__ask">Helpful</legend>
+          <div class="axis__body">
+            <div class="axis__words">Which reply is more helpful?</div>
+            <div class="cells">
+              <label><input type="radio" name="helpful" value="a3" /></label>
+              <label><input type="radio" name="helpful" value="a2" /></label>
+              <label><input type="radio" name="helpful" value="a1" /></label>
+              <label><input type="radio" name="helpful" value="0" />=</label>
+              <label><input type="radio" name="helpful" value="b1" /></label>
+              <label><input type="radio" name="helpful" value="b2" /></label>
+              <label><input type="radio" name="helpful" value="b3" /></label>
+            </div>
+            <div class="ends">
+              <span>A, clearly</span>
+              <span>The same</span>
+              <span>B, clearly</span>
+            </div>
+          </div>
+        </fieldset>
+
+        <fieldset class="axis">
+          <legend class="axis__ask">Careful</legend>
+          <div class="axis__body">
+            <div class="axis__words">
+              Which reply is more careful about what it does not know?
+            </div>
+            <div class="cells">
+              <label><input type="radio" name="honest" value="a3" /></label>
+              <label><input type="radio" name="honest" value="a2" /></label>
+              <label><input type="radio" name="honest" value="a1" /></label>
+              <label><input type="radio" name="honest" value="0" />=</label>
+              <label><input type="radio" name="honest" value="b1" /></label>
+              <label><input type="radio" name="honest" value="b2" /></label>
+              <label><input type="radio" name="honest" value="b3" /></label>
+            </div>
+            <div class="ends">
+              <span>A, clearly</span>
+              <span>The same</span>
+              <span>B, clearly</span>
+            </div>
+          </div>
+        </fieldset>
+
+        <!-- An axis that rates each reply on its own is not a comparison, so it
+             is not drawn as one. -->
+        <div class="axis">
+          <div class="axis__ask">Tone</div>
+          <div class="axis__body">
+            <div class="axis__words">
+              How well does each reply match the tone you wanted?
+            </div>
+            <div class="each">
+              <fieldset style="border: 0; margin: 0; padding: 0">
+                <legend class="each__key">Reply A</legend>
+                <div class="cells">
+                  <label><input type="radio" name="tone-a" value="1" />1</label>
+                  <label><input type="radio" name="tone-a" value="2" />2</label>
+                  <label><input type="radio" name="tone-a" value="3" />3</label>
+                  <label><input type="radio" name="tone-a" value="4" />4</label>
+                  <label><input type="radio" name="tone-a" value="5" />5</label>
+                  <label><input type="radio" name="tone-a" value="6" />6</label>
+                  <label><input type="radio" name="tone-a" value="7" />7</label>
+                </div>
+                <div class="ends">
+                  <span>Not at all</span>
+                  <span>Exactly</span>
+                </div>
+              </fieldset>
+              <fieldset style="border: 0; margin: 0; padding: 0">
+                <legend class="each__key">Reply B</legend>
+                <div class="cells">
+                  <label><input type="radio" name="tone-b" value="1" />1</label>
+                  <label><input type="radio" name="tone-b" value="2" />2</label>
+                  <label><input type="radio" name="tone-b" value="3" />3</label>
+                  <label><input type="radio" name="tone-b" value="4" />4</label>
+                  <label><input type="radio" name="tone-b" value="5" />5</label>
+                  <label><input type="radio" name="tone-b" value="6" />6</label>
+                  <label><input type="radio" name="tone-b" value="7" />7</label>
+                </div>
+                <div class="ends">
+                  <span>Not at all</span>
+                  <span>Exactly</span>
+                </div>
+              </fieldset>
+            </div>
+          </div>
+        </div>
+
+        <div class="foot">
+          <button type="button" class="act act--quiet">About the same</button>
+          <button type="button" class="act act--quiet">Both are bad</button>
+          <span class="right">
+            <button type="button" class="act act--quiet">Skip</button>
+          </span>
+        </div>
+      </section>
+    </div>
+
+    <script src="mock.js"></script>
+  </body>
+</html>

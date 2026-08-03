@@ -159,7 +159,7 @@ class Elicit:
     data, with everything MUG knows about where it came from.
 
     ```python
-    Chat(seat=partner, elicit_preference=Elicit.replies())
+    Transcript(seat=partner, elicit_preference=Elicit.replies())
     Elicit.replies(n=3, ties=True, on=[Axis("helpful", "Which is more helpful?")])
     Elicit.between("partner", "rival")        # two models answer, one is picked
     ```

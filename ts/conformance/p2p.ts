@@ -32,6 +32,7 @@ import {
   P2POutboundFrame,
   P2PSignalDelivery,
 } from '../src/client/p2pWire.js';
+import { P2P_CLIENT_BUNDLE_DIGEST } from '../src/client/p2pWireFields.js';
 import {
   acceptValidationMessage,
   channelValidation,
@@ -49,9 +50,13 @@ import {
   publicHandle,
 } from './p2p_fakes.js';
 
+// The bundle the client really pins, read from the client rather than written out
+// again here. A copy of it goes stale the first time the contract moves, and then
+// this runner refuses every frame the client would have accepted -- and says the
+// schema is wrong, whatever the vector was really about.
 const DIGEST: Digest = {
   algorithm: 'sha-256',
-  hex: 'ec6d3f0019480421a8cdc9ce8db2f2e88f2398e0daf0c7773ced3841ba435029',
+  hex: P2P_CLIENT_BUNDLE_DIGEST,
 };
 const nodeSha256: HashBytes = async (bytes) =>
   createHash('sha256').update(Buffer.from(bytes)).digest('hex');
@@ -101,6 +106,7 @@ function signalDelivery(
   kind: P2PSignalDelivery['signal_kind'],
   payload?: object,
   generation = 1,
+  room = publicHandle('R'),
 ): P2PSignalDelivery {
   return {
     schema: {
@@ -108,7 +114,7 @@ function signalDelivery(
       version: 0,
       digest: DIGEST,
     },
-    room_handle: publicHandle('R'),
+    room_handle: room,
     source_peer_handle: source,
     negotiation_generation: generation,
     signal_kind: kind,
@@ -440,7 +446,7 @@ async function testCoordinatorLifecycle(): Promise<void> {
     prepareConnections: async () => network.factory(local),
     nextRequestId,
     ...timers(),
-    executor: executor(probes[index]!),
+    newExecutor: () => executor(probes[index]!),
     onError: (message) => { throw new Error(message); },
   }));
   ports = members.map((_local, index) => edgePort(index, members, edges, outbound));
@@ -598,7 +604,7 @@ async function testMeshExecutorPlaysAnEpisode(): Promise<void> {
     prepareConnections: async () => network.factory(local),
     nextRequestId,
     ...timers(),
-    executor: executors[index]!,
+    newExecutor: () => executors[index]!,
     onError: (message) => { throw new Error(message); },
   }));
   const ports = members.map((_local, index) =>
@@ -638,6 +644,109 @@ async function testMeshExecutorPlaysAnEpisode(): Promise<void> {
   );
 }
 
+// -- more than one room on one connection ---------------------------------------
+
+// A study may hold several game activities: a practice round and then the real
+// one. Each forms its own room over its own connections. The edge builds one
+// executor per room, because an executor binds one room's channels and settles
+// one promise when that room's barrier closes; an edge that kept the first one
+// would listen on channels that had closed and ignore every start after the
+// first, and the participant would sit on a dead screen until the server gave
+// up on the room.
+async function testAnEdgePlaysEveryRoomItIsGiven(): Promise<void> {
+  const members = [publicHandle('B'), publicHandle('C')];
+  // A room negotiates its own connections, so each one gets its own fake
+  // network. The fake keeps one pair per peer pair for the life of a network,
+  // and a second room over the first room's closed channels is not what a
+  // browser does.
+  let network = new FakeRtcNetwork();
+  const built: EdgeProbe[][] = [[], []];
+  const outbound: P2POutboundFrame[][] = [[], []];
+  let edges: P2PEdge[] = [];
+  edges = members.map((local, index) => new P2PEdge({
+    prepareConnections: async () => network.factory(local),
+    nextRequestId,
+    ...timers(),
+    newExecutor: () => {
+      const probe = emptyProbe();
+      built[index]!.push(probe);
+      return executor(probe);
+    },
+    onError: (message) => { throw new Error(message); },
+  }));
+  // The shared port helper relays every signal into one fixed room. A study with
+  // two rounds has two, so this one carries each signal into the room and the
+  // generation the sender named.
+  const port = (index: number): P2PControlPort => ({
+    socketEpoch: 1,
+    close: () => true,
+    send: async (frame) => {
+      outbound[index]!.push(frame);
+      if (frame.type === 'p2p_signal') {
+        const target = frame.signal.target_peer_handle === members[0] ? 0 : 1;
+        edges[target]!.receive({
+          type: 'p2p_signal_delivery',
+          signal: signalDelivery(
+            members[index]!,
+            frame.signal.signal_kind,
+            frame.signal.payload_json === undefined
+              ? undefined
+              : JSON.parse(frame.signal.payload_json) as object,
+            frame.signal.negotiation_generation,
+            frame.signal.room_handle,
+          ),
+        }, port(target));
+      }
+      return true;
+    },
+  });
+  const ports = members.map((_local, index) => port(index));
+
+  const playRoom = async (letter: string, ordinal: number): Promise<void> => {
+    const room = publicHandle(letter);
+    const generation = ordinal;
+    network = new FakeRtcNetwork();
+    edges.forEach((edge, index) => edge.receive({
+      type: 'p2p_bootstrap',
+      bootstrap: {
+        ...bootstrap(members[index]!, members),
+        room_handle: room,
+        negotiation_generation: generation,
+      },
+    }, ports[index]!));
+    // One executor for each room so far, and the newest one holds this room's
+    // channels. An edge that kept the first executor stops at one.
+    await eventually(() => built.every(
+      (made) => made.length === ordinal && made[ordinal - 1]!.ready === 1,
+    ));
+    edges.forEach((edge, index) => edge.receive({
+      type: 'p2p_mesh_start',
+      start: { ...meshStart(), room_handle: room, negotiation_generation: generation },
+    }, ports[index]!));
+    edges.forEach((edge, index) => edge.receive({
+      type: 'p2p_mesh_finish',
+      finish: { ...meshFinish(), room_handle: room, negotiation_generation: generation },
+    }, ports[index]!));
+  };
+
+  await playRoom('R', 1);
+  await playRoom('S', 2);
+
+  for (const made of built) {
+    assert.equal(made.length, 2, 'the edge built one executor for each room');
+    assert.deepEqual(
+      made.map((probe) => probe.starts), [1, 1],
+      'the second room started as well as the first',
+    );
+    assert.deepEqual(made.map((probe) => probe.finishes), [1, 1]);
+    assert.ok(
+      made[1]!.readyHandoff !== null &&
+      made[1]!.readyHandoff !== made[0]!.readyHandoff,
+      'the second room was played over its own channels',
+    );
+  }
+}
+
 async function main(): Promise<void> {
   testStrictWireParser();
   testSignalAndBoundaryParserFailures();
@@ -649,7 +758,8 @@ async function main(): Promise<void> {
   await testIceGrantRedemption();
   await testCoordinatorLifecycle();
   await testMeshExecutorPlaysAnEpisode();
-  console.log('browser P2P conformance: 10 scenario(s) OK');
+  await testAnEdgePlaysEveryRoomItIsGiven();
+  console.log('browser P2P conformance: 11 scenario(s) OK');
 }
 
 main().catch((error) => {

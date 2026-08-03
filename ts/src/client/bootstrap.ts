@@ -12,6 +12,7 @@
 import { browserSha256 } from '../kernel/index.js';
 import { browserDecoder } from './assets.js';
 import { ParticipantClient } from './client.js';
+import { debugIfServed } from './debug.js';
 import { fetchBrowserPeerConnectionFactory } from './p2pRtc.js';
 import { KeyValueStore, Schedule, Socket, SocketFactory } from './session.js';
 import { uuid7, WireEnv } from './wire.js';
@@ -99,6 +100,17 @@ function bootstrap(): void {
     }
   });
   client.start();
+  // The debug drawer, when the server is in debug mode. It is asked for once and
+  // built beside everything else, so it survives a round ending, an activity
+  // changing, and a reconnection -- all of which repaint the study's own screen.
+  void debugIfServed(
+    document.body,
+    (url) => fetch(url, { cache: 'no-store' }),
+    {
+      every: (handler, delayMillis) => window.setInterval(handler, delayMillis),
+      stop: (handle) => window.clearInterval(handle),
+    },
+  );
 }
 
 bootstrap();

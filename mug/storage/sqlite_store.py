@@ -9,12 +9,25 @@ never drift. The production asyncpg backend follows the same shape.
 The writes are ``async`` to match the Protocol but do synchronous sqlite work, as
 the in-memory backend does; a genuine asyncpg backend awaits its driver instead.
 The object store and the outbox stay with the in-memory backend for now.
+
+**One database, one connection per thread.** A deployment does not keep its store
+on the thread that built it: a server runs it from the event-loop thread while a
+worker or an operator command drives it from another. A sqlite connection belongs
+to the thread that opened it, so each thread opens its own and sqlite does the
+locking between them, which is what it is for. Without this the store raises as
+soon as a second thread reads it, and the run it recorded is unreachable.
+
+An in-memory database is private to its connection, so the memory case is opened
+through a shared-cache URI and one connection is held open for the lifetime of the
+store. Otherwise each thread would get a database of its own and a run written by
+one would be invisible to the next.
 """
 
 from __future__ import annotations
 
 import json
 import sqlite3
+import threading
 from collections.abc import Mapping, Sequence
 from typing import Any, Literal
 
@@ -58,9 +71,40 @@ class SqliteStore:
     """A relational Unit of Work on sqlite, with the same semantics as memory."""
 
     def __init__(self, path: str = ":memory:") -> None:
-        self._db = sqlite3.connect(path)
-        self._db.executescript(_SCHEMA)
-        self._db.commit()
+        if path == ":memory:":
+            self._name = f"file:mug-{id(self):x}?mode=memory&cache=shared"
+            self._uri = True
+        else:
+            self._name = path
+            self._uri = False
+        self._local = threading.local()
+        # One connection outlives every thread's own. A shared-cache in-memory
+        # database exists only while a connection to it is open, so this is what
+        # keeps the store from disappearing between two callers.
+        self._kept = self._connect()
+        self._kept.executescript(_SCHEMA)
+        self._kept.commit()
+
+    def _connect(self) -> sqlite3.Connection:
+        """Open one connection to this store's database."""
+        return sqlite3.connect(self._name, uri=self._uri)
+
+    @property
+    def _db(self) -> sqlite3.Connection:
+        """Return this thread's own connection, opening it the first time."""
+        found: sqlite3.Connection | None = getattr(self._local, "db", None)
+        if found is None:
+            found = self._connect()
+            self._local.db = found
+        return found
+
+    def close(self) -> None:
+        """Close this thread's connection and the one the store keeps open."""
+        found: sqlite3.Connection | None = getattr(self._local, "db", None)
+        if found is not None:
+            found.close()
+            self._local.db = None
+        self._kept.close()
 
     # --- reads --------------------------------------------------------------
     def _heads(self) -> dict[str, int]:

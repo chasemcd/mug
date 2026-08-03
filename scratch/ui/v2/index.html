@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Two directions</title>
+    <link rel="stylesheet" href="a-transcript.css" />
+    <style>
+      .index {
+        max-width: 44rem;
+        margin: 0 auto;
+        padding: 3rem 1.5rem 5rem;
+      }
+      h1 {
+        font-size: 1.75rem;
+        font-weight: 400;
+        margin: 0 0 0.4rem;
+        letter-spacing: -0.012em;
+      }
+      .lede {
+        font-style: italic;
+        color: var(--ink-quiet);
+        margin: 0 0 2.75rem;
+      }
+      h2 {
+        font-size: 1.1875rem;
+        font-weight: 400;
+        margin: 0 0 0.25rem;
+      }
+      .dir {
+        border-top: 1px solid var(--rule-strong);
+        padding-top: 1.1rem;
+        margin-bottom: 2.75rem;
+      }
+      .dir__n {
+        font-family: var(--sans);
+        font-size: 0.6875rem;
+        letter-spacing: 0.11em;
+        text-transform: uppercase;
+        color: var(--ink-faint);
+        margin-bottom: 0.5rem;
+      }
+      .dir p {
+        margin: 0 0 0.9rem;
+      }
+      .links {
+        display: flex;
+        gap: 1.5rem;
+        margin-top: 1.1rem;
+      }
+      .links a {
+        font-family: var(--sans);
+        font-size: 0.6875rem;
+        letter-spacing: 0.11em;
+        text-transform: uppercase;
+        color: var(--ink);
+        text-decoration: none;
+        border-bottom: 1px solid var(--ink);
+        padding-bottom: 1px;
+      }
+      .links a:hover {
+        border-bottom-width: 2px;
+        padding-bottom: 0;
+      }
+      .gone {
+        border-top: 1px solid var(--rule-strong);
+        padding-top: 1.1rem;
+      }
+      .gone ul {
+        margin: 0.6rem 0 0;
+        padding: 0;
+        list-style: none;
+      }
+      .gone li {
+        border-bottom: 1px solid var(--rule);
+        padding: 0.55rem 0;
+        display: grid;
+        grid-template-columns: 13rem minmax(0, 1fr);
+        gap: 1.5rem;
+        font-size: 0.9375rem;
+      }
+      .gone b {
+        font-family: var(--sans);
+        font-size: 0.6875rem;
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+        font-weight: 400;
+        color: var(--ink-faint);
+        padding-top: 0.28rem;
+      }
+    </style>
+  </head>
+  <body>
+    <nav class="mock">
+      <div>
+        <a href="../index.html">First pass</a>
+        <span class="right">
+          Second pass &mdash; two directions &middot;
+          <a href="../v3/index.html">Third pass &rarr;</a>
+        </span>
+      </div>
+    </nav>
+
+    <main class="index">
+      <h1>Two directions, neither of them a card</h1>
+      <p class="lede">
+        The first pass was competent and generic: rounded panels, soft shadows, a
+        teal accent, and a rectangle that lights up under the pointer. These two
+        start from what the platform is instead.
+      </p>
+
+      <section class="dir">
+        <div class="dir__n">Direction A</div>
+        <h2>Transcript</h2>
+        <p>
+          A conversation between two parties, written down and attributed in the
+          margin, is an interview transcript. So it is set as one: Charter at a
+          reading size, the speakers in the left margin in small sans, and no
+          container around anything. A reply and the participant's own words are
+          the same face at the same size, because they are the same kind of thing.
+        </p>
+        <p>
+          The two replies of a judgement are divided by one hairline and nothing
+          else. There is no panel to make one of them look heavier, which is the
+          hardest thing to get right and the easiest thing to get wrong.
+        </p>
+        <div class="links">
+          <a href="a-chat.html">The conversation</a>
+          <a href="a-judgement.html">The judgement</a>
+        </div>
+      </section>
+
+      <section class="dir">
+        <div class="dir__n">Direction B</div>
+        <h2>Instrument</h2>
+        <p>
+          The platform is a measuring device, so the screen is drawn as one. A
+          fixed left column names every row, hairlines run the full width, and the
+          sheet is held by two rules rather than floated on a shadow. Every label
+          is monospaced and every reading is not, so a participant can always tell
+          what the machine is saying from what a person said.
+        </p>
+        <p>
+          One colour, used only for what is live now. Everything the participant
+          chose is black.
+        </p>
+        <div class="links">
+          <a href="b-chat.html">The conversation</a>
+          <a href="b-judgement.html">The judgement</a>
+        </div>
+      </section>
+
+      <section class="gone">
+        <div class="dir__n">What both directions remove</div>
+        <ul>
+          <li>
+            <b>Fill on hover</b>
+            <span>
+              A rectangle that lights up under the pointer is the cheapest signal
+              there is. A pointer now moves an underline (A) or one marker
+              character (B), and changes nothing else.
+            </span>
+          </li>
+          <li>
+            <b>The card</b>
+            <span>
+              No radius, no shadow, no floating panel. Structure is a hairline and
+              a column, which is what structure is on paper.
+            </span>
+          </li>
+          <li>
+            <b>Avatars</b>
+            <span>
+              A rounded square holding the first letter of a name says nothing.
+              The name says it.
+            </span>
+          </li>
+          <li>
+            <b>The accent</b>
+            <span>
+              A is black on paper. B keeps one colour and spends it only on what is
+              live now, never on decoration.
+            </span>
+          </li>
+          <li>
+            <b>Pill switches</b>
+            <span>
+              And the theme toggle with them. Each direction commits to one look,
+              which is the difference between a design and a set of options.
+            </span>
+          </li>
+          <li>
+            <b>system-ui</b>
+            <span>
+              A is set in Charter, a reading face. B is set in a plain grotesk with
+              a monospaced face for everything the machine says.
+            </span>
+          </li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>

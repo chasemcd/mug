@@ -36,6 +36,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from mug.game.bot_authority import BotSeat
+from mug.game.keys import Bindings
 from mug.game.mesh import EndPacket, PeerEngine, ReplicaFrame
 from mug.game.runtime import EpisodeSummary
 from mug.game.seams import SeatActionSource
@@ -100,7 +101,7 @@ class MeshGameSpec:
     size: int
     make_replica: MakeReplica
     bots: tuple[MeshBotSpec, ...] = field(default_factory=_no_bots)
-    action_bindings: dict[str, int] = field(default_factory=_no_bindings)
+    action_bindings: Bindings = field(default_factory=_no_bindings)
     default_action: int = 0
     seed: int = 0
     fps: int = 30
@@ -253,6 +254,14 @@ class MeshSession:
         for seat in self._seats:
             engine = self._engines[seat.actor_id]
             if engine.ended():
+                # The episode's length is fixed, so nothing new is scheduled -- but a
+                # peer that has ended keeps repeating what it played until the
+                # barrier closes, so a lost tail input can still arrive.
+                repeat = engine.resend_recent()
+                if repeat is not None:
+                    for other in self._nodes:
+                        if other != seat.actor_id:
+                            self._engines[other].receive_input(repeat)
                 continue
             packet = engine.submit_local(int(seat.action()))
             for other in self._nodes:

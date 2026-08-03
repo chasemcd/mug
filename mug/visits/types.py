@@ -28,6 +28,7 @@ from mug.kernel import (
     Digest,
     SchemaBundle,
     SchemaRef,
+    SeatKey,
     UtcInstant,
     VersionStamp,
     load_family_schema,
@@ -144,7 +145,7 @@ class CastSlotSite(KernelModel):
 
     kind: Literal["cast-slot"]
     activity_key: _AuthoringKey
-    seat_key: _AuthoringKey
+    seat_key: SeatKey
 
 
 class ParameterSite(KernelModel):

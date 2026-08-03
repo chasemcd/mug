@@ -64,7 +64,7 @@ reviewed in Phase 0.
 | Default actions, held inputs, frame skipping, and composite keys | Explicit input and action-cadence specifications | 1 |
 | WebRTC direct connection with TURN fallback | Declared P2P transport configuration and operational secret references | 1 and 6 |
 | Disconnect, reconnect, focus loss, and partner-loss handling | Explicit connection leases and interaction recovery/termination policies | 1–2 |
-| Unity/WebGL activity integration | Versioned external-client activity adapter with episode and score events | 2 or an approved replacement milestone |
+| Unity/WebGL activity integration | **Withdrawn from v0** by ADR-0016 (accepted 2026-07-29). A later version may add a declared external-client activity; the ADR holds its invariants | deferred |
 
 ### Humans and conventional policies
 
@@ -150,3 +150,30 @@ The parity gate passes only when:
 - Every retained capability has at least one acceptance scenario.
 - The acceptance definition tests outcomes rather than old internal structure.
 - Known correctness and security bugs are not enshrined as required behavior.
+
+## Gate status (2026-07-29) -- the gate passes
+
+**Nine of the ten fixtures are built and run in the gate.** They live in
+`tests/parity`, one module per fixture, and `tests/parity/_parity_manifest.py`
+maps each one to the requirement above. The map is not documentation:
+`test_parity_manifest.py` reads this document and fails if a fixture is missing,
+unmapped, reworded, or renumbered.
+
+**Fixture 9 is withdrawn from v0 by an accepted decision.**
+`docs/architecture/decisions/0016-external-client-activity.md` was accepted on
+2026-07-29: **v0 has no Unity or WebGL activity**. The capability is deferred,
+not cancelled -- the ADR keeps the successor specified, with the five invariants
+any external-client activity must hold, because a later version may build it.
+
+This is a real subtraction and it is recorded as one. The legacy runtime has the
+capability and the rewrite does not, so a study that needs a Unity build (the
+`examples/footsies/` study is the one that does) runs on the legacy runtime until
+the successor lands.
+
+The gate reads the decision rather than repeating it:
+`test_a_capability_is_withdrawn_only_by_an_accepted_decision` takes the status out
+of the ADR itself, so the gate shuts again if that word changes. A test can not
+approve a removal.
+
+Legacy removal waited on this decision and on nothing else. It is now unblocked,
+and it is a separate decision (plan §10).

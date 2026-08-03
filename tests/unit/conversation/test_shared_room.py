@@ -30,7 +30,7 @@ import pytest
 from fastapi import WebSocketDisconnect
 
 from mug.agents import AgentIds
-from mug.authoring import Chat, Fallback, History, LLMAgent, Provider, Thoughts
+from mug.authoring import Fallback, History, LLMAgent, Provider, Thoughts, Transcript
 from mug.conversation.room import ChatRoom, RoomChannel, RoomMember
 from mug.gateway import Gateway
 from mug.kernel import Digest
@@ -40,8 +40,10 @@ from mug.providers import ModelCall, ModelCompletion, Usage
 from mug.realtime import Session
 from mug.runtime import CommandContext
 from mug.storage import InMemoryStore, Store
+from tests.support.chat import chat_spec
 
 _UUID = "019b6000-0000-7000-8000-{:012x}"
+
 _START = datetime(2026, 7, 27, 0, 0, 0, tzinfo=timezone.utc)
 _DIGEST = Digest(algorithm="sha-256", hex="a" * 64)
 _AGENT_ACTOR = "actor_" + _UUID.format(0x300)
@@ -61,22 +63,36 @@ class _Partner(LLMAgent):
         env: object,
         agent_id: str,
         history: History,
-        chat: Chat,
+        chat: Transcript,
         thoughts: Thoughts,
     ) -> str:
-        return ""
+        # The shape the shipped example writes. A double whose prompt says nothing
+        # would let the mount drop the author's words and still pass.
+        return "\n".join(f"{one.sender}: {one.text}" for one in chat.last(50))
+
+
+def _said_to(payload: Any) -> str:
+    """Return the last thing a participant said, out of what the model was sent.
+
+    The words are read from ``content``, which is where all three providers look for
+    them. A double that reads them from anywhere else passes while the real model is
+    sent an empty question.
+    """
+    messages = cast("list[Any]", cast("dict[str, Any]", payload)["messages"])
+    spoken = str(cast("dict[str, Any]", messages[-1])["content"])
+    lines = [line for line in spoken.splitlines() if line.startswith("user: ")]
+    return lines[-1][len("user: ") :] if lines else spoken
 
 
 class _EchoAdapter:
-    """A fake provider that echoes the last payload text and keeps every payload."""
+    """A fake provider that echoes the last thing said and keeps every payload."""
 
     def __init__(self) -> None:
         self.payloads: list[Any] = []
 
     async def __call__(self, call: ModelCall) -> ModelCompletion:
         self.payloads.append(call.payload)
-        payload = cast("dict[str, Any]", call.payload)
-        last = cast("list[dict[str, str]]", payload["messages"])[-1]["text"]
+        last = _said_to(call.payload)
         return ModelCompletion(
             outcome="completed",
             resolved_model="fake-local",
@@ -276,7 +292,7 @@ async def _two_participants(
 async def test_two_participants_and_one_model_hold_one_conversation() -> None:
     """The proof: one interaction, one order, and both people in it."""
     store = InMemoryStore()
-    spec = ChatSpec(seat=_seat(_EchoAdapter()), participants=2, max_messages=4)
+    spec = chat_spec(seat=_seat(_EchoAdapter()), participants=2, max_messages=4)
     first, second = await _two_participants(
         [
             ("a", {"type": "chat", "text": "one"}),
@@ -303,7 +319,7 @@ async def test_two_participants_and_one_model_hold_one_conversation() -> None:
 async def test_the_canonical_order_is_one_order_with_no_gap() -> None:
     """The server assigns the sequence, so the order is one order for everybody."""
     store = InMemoryStore()
-    spec = ChatSpec(seat=_seat(_EchoAdapter()), participants=2, max_messages=4)
+    spec = chat_spec(seat=_seat(_EchoAdapter()), participants=2, max_messages=4)
     await _two_participants(
         [
             ("a", {"type": "chat", "text": "one"}),
@@ -324,7 +340,7 @@ async def test_the_canonical_order_is_one_order_with_no_gap() -> None:
 async def test_each_participant_reads_the_other_and_never_their_own_echo() -> None:
     """One order, many deliveries: what each person received is not the same set."""
     store = InMemoryStore()
-    spec = ChatSpec(seat=_seat(_EchoAdapter()), participants=2, max_messages=4)
+    spec = chat_spec(seat=_seat(_EchoAdapter()), participants=2, max_messages=4)
     first, second = await _two_participants(
         [
             ("a", {"type": "chat", "text": "from a"}),
@@ -348,7 +364,7 @@ async def test_each_participant_reads_the_other_and_never_their_own_echo() -> No
 async def test_every_delivery_names_the_one_recipient_it_reached() -> None:
     """A delivery receipt is per member, so a room of three writes three of them."""
     store = InMemoryStore()
-    spec = ChatSpec(seat=_seat(_EchoAdapter()), participants=2, max_messages=4)
+    spec = chat_spec(seat=_seat(_EchoAdapter()), participants=2, max_messages=4)
     await _two_participants(
         [
             ("a", {"type": "chat", "text": "hello"}),
@@ -384,7 +400,7 @@ async def test_the_snapshot_names_exactly_the_messages_the_model_saw() -> None:
     """
     store = InMemoryStore()
     adapter = _EchoAdapter()
-    spec = ChatSpec(seat=_seat(adapter), participants=2, max_messages=4)
+    spec = chat_spec(seat=_seat(adapter), participants=2, max_messages=4)
     await _two_participants(
         [
             ("a", {"type": "chat", "text": "one"}),
@@ -445,7 +461,7 @@ async def test_a_fenced_connection_can_no_longer_speak_for_its_actor() -> None:
     """A refresh takes the lease on; whatever the old connection holds is refused."""
     store = InMemoryStore()
     gateway = Gateway(secret=_SECRET)
-    spec = ChatSpec(seat=_seat(_EchoAdapter()), participants=1)
+    spec = chat_spec(seat=_seat(_EchoAdapter()), participants=1)
     rendezvous = ChatMatchmaker(gateway, store, spec)
 
     visit = "visit_" + _UUID.format(0x63)

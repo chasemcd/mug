@@ -1,140 +1,94 @@
-"""
-Overcooked Server-Authoritative Example
+"""Two people cook together, with the server stepping the kitchen: the whole study.
 
-This example demonstrates a server-authoritative Overcooked experiment where:
-- The environment runs entirely on the server (not in the browser via Pyodide)
-- Clients are thin renderers that receive game state via server_render_state events
-- Player actions are sent to the server via player_action socket events
-- The server maps key presses to environment actions and steps the environment
+The same task as ``overcooked_human_human``, run the other way. The server holds
+the environment, reads both participants' keys, and pushes every frame, so nobody's
+machine decides what happened.
 
-This is in contrast to the P2P (Pyodide) approach where each client runs their own
-copy of the environment. Server-authoritative mode is useful when:
-- The environment is too heavy to run in the browser
-- You need a single source of truth for the game state
-- You want to prevent client-side cheating
+Choose this over the peer-to-peer version when the environment is too heavy for a
+browser, when the study must not trust a participant's machine, or when a
+participant's connection cannot carry a data channel. The cost is a round trip per
+frame, which a fast game feels and this one does not.
 
-Usage:
-    python -m examples.cogrid.overcooked_server_auth --experiment-id my_experiment
+Run it with::
 
-Then open two browser windows to http://localhost:5703 and play together!
+    uv run uvicorn examples.cogrid.overcooked_server_auth:app
+
+Install the environment first: ``uv pip install cogrid==0.3.2``.
 """
 
 from __future__ import annotations
 
-import eventlet
-
-eventlet.monkey_patch()
-
-import argparse
-
-from examples.cogrid import overcooked_utils
-from examples.cogrid.scenes.scenes import (HUMAN_HUMAN_POLICY_MAPPING, Noop,
-                                           action_mapping, end_scene,
-                                           multiplayer_feedback_scene)
-from mug.configurations import configuration_constants, experiment_config
-from mug.scenes import gym_scene, stager, static_scene
-from mug.server import app
-
-
-def _create_overcooked_env(**kwargs):
-    """Lazy env_creator that imports cogrid only when the server actually creates the env.
-
-    This avoids importing the heavy cogrid environment initialization module at
-    import time, which allows the example to be imported for inspection without
-    requiring cogrid to be installed.
-    """
-    from examples.cogrid.environments.overcooked_hh_template import (
-        OvercookedEnv, overcooked_config)
-
-    return OvercookedEnv(config=overcooked_config, **kwargs)
-
-# Start scene: landing page for participants
-hh_start_scene = (
-    static_scene.StartScene()
-    .scene(
-        scene_id="overcooked_server_auth_start_scene",
-        experiment_config={},
-        should_export_metadata=True,
-    )
-    .display(
-        scene_header="Welcome",
-        scene_body_filepath="examples/cogrid/html_pages/overcooked_hh_instructions.html",
-    )
+from examples.cogrid import pages
+from examples.cogrid.env import (
+    ACTION_BINDINGS,
+    CHEF_ONE,
+    CHEF_TWO,
+    FPS,
+    NOOP,
+    kitchen_hud,
+    kitchen_size,
+    overcooked_kitchen,
+    overcooked_scene,
+    render,
 )
+from examples.cogrid.sprites import overcooked_assets
+from mug.app import build_app_from_env
+from mug.content import Choice, Form, Game, Human, Likert, Page, Study, Text
 
-# Server-authoritative Overcooked scene
-# Key differences from P2P multiplayer:
-# - Uses .multiplayer(mode='server_authoritative') instead of P2P mode
-# - Uses .environment(env_creator=..., env_config=...) since server creates the env
-# - Does NOT use .runtime(run_through_pyodide=True) since there is no Pyodide
-server_auth_scene = (
-    gym_scene.GymScene()
-    .scene(scene_id="cramped_room_server_auth", experiment_config={})
-    .policies(policy_mapping=HUMAN_HUMAN_POLICY_MAPPING)
-    .environment(
-        env_creator=_create_overcooked_env,
-        env_config={"render_mode": "mug"},
-    )
-    .rendering(
-        fps=30,
-        hud_text_fn=overcooked_utils.hud_text_fn,
-        game_width=overcooked_utils.TILE_SIZE * 5,
-        game_height=overcooked_utils.TILE_SIZE * 4,
-        background="#e6b453",
-    )
-    .gameplay(
-        default_action=Noop,
-        action_mapping=action_mapping,
-        num_episodes=5,
-        max_steps=1350,
-        input_mode=configuration_constants.InputModes.SingleKeystroke,
-    )
-    .content(
-        scene_header="Overcooked - Server Authoritative",
-        scene_body="<center><p>"
-        "You'll now play with another human participant! "
-        "Please wait in the lobby for your partner to join. "
-        "<br><br> "
-        "You will be playing on the layout pictured below. "
-        '<center><img src="examples/cogrid/assets/overcooked/cramped_room.png" alt="Annotated Overcooked environment." height="270" width="315"></center>'
-        "Work together to prepare and deliver as many dishes as possible. "
-        "</p></center>",
-        game_page_html_fn=overcooked_utils.overcooked_game_page_header_fn,
-        in_game_scene_body=overcooked_utils.overcooked_two_column_layout(
-            "You and your partner control the two chefs."
-            "<br>Coordinate to deliver as many dishes as possible."
+INSTRUCTIONS = pages.instructions(partner=pages.HUMAN_HUMAN)
+
+# The kitchen this deployment runs, and how long one round lasts.
+LAYOUT = "cramped_room"
+ROUND_STEPS = 1350
+
+
+def overcooked_server_auth_study() -> Study:
+    """Return the ordered activities one participant walks through."""
+    return Study(
+        Form(
+            "consent",
+            Choice(
+                "agree",
+                "I have read the information sheet and agree to take part.",
+                ["yes", "no"],
+            ),
         ),
+        Page("instructions", INSTRUCTIONS),
+        # Who cooks which chef is written down rather than taken from the order
+        # two people happened to connect in. The chefs are CoGrid's own agents, so
+        # there is no map from a seat name to an environment agent to get wrong.
+        Game(
+            "play",
+            overcooked_kitchen(LAYOUT, ROUND_STEPS),
+            seats={CHEF_ONE: Human(), CHEF_TWO: Human()},
+            keys=ACTION_BINDINGS,
+            held_actions=False,
+            default_action=NOOP,
+            fps=FPS,
+            render=render,
+            scene=overcooked_scene(LAYOUT),
+            hud=kitchen_hud,
+            size=kitchen_size(LAYOUT),
+            episodes=5,
+            between=pages.BETWEEN_ROUNDS,
+            caption=pages.IN_GAME,
+        ),
+        Form(
+            "post-survey",
+            Likert(
+                "effective", "How effective was your partner as a teammate?", scale=7
+            ),
+            Likert("enjoyed", "How much did you enjoy playing with them?", scale=7),
+            Text("comments", "Anything to add? (optional)", required=False),
+        ),
+        Page("debrief", pages.DEBRIEF_PEOPLE),
+        assets=overcooked_assets(),
     )
-    .multiplayer(mode="server_authoritative")
-)
 
-# Create stager with server-auth scenes
-stager = stager.Stager(
-    scenes=[
-        hh_start_scene,
-        server_auth_scene,
-        multiplayer_feedback_scene,
-        end_scene,
-    ]
-)
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Run Overcooked server-authoritative experiment"
-    )
-    parser.add_argument(
-        "--port", type=int, default=5703, help="Port number to listen on"
-    )
-    parser.add_argument(
-        "--experiment-id", type=str, help="Experiment ID", required=True
-    )
-    args = parser.parse_args()
+def build() -> object:
+    """Build the application that runs this study."""
+    return build_app_from_env(study=overcooked_server_auth_study())
 
-    experiment_config = (
-        experiment_config.ExperimentConfig()
-        .experiment(stager=stager, experiment_id=args.experiment_id)
-        .hosting(port=args.port, host="0.0.0.0")
-        .static_files(directories=["examples/cogrid/assets", "examples/shared/assets"])
-    )
 
-    app.run(experiment_config)
+app = build()

@@ -1,0 +1,28 @@
+{
+  "schema": {
+    "name": "mug.api-07.render-packet",
+    "version": 0,
+    "digest": {
+      "algorithm": "sha-256",
+      "hex": "b58e8ca5143b68c216fa8c8734341439b8749a044c56d9dcfc810b237e82f25d"
+    }
+  },
+  "episode_id": "episode_019b6000-0000-7000-8000-000000000800",
+  "seat_key": "0",
+  "frame_number": 1,
+  "render_digest": {
+    "algorithm": "sha-256",
+    "hex": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1"
+  },
+  "keyframe": true,
+  "commands": [
+    {
+      "op": "circle",
+      "x": 120.5,
+      "y": 96.25,
+      "radius": 6,
+      "color": "crimson",
+      "depth": 1
+    }
+  ]
+}

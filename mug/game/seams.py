@@ -16,13 +16,28 @@ multi-seat loop lifts it into its own seam with ``solo_env``.
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Protocol
+from typing import Any, Protocol
 
 from mug.game.env import StepResult
 
 # Return one instant in the canonical wire form. The loop reads it once per frame
 # to stamp the recorded transition, so the caller injects the clock (no wall time).
 Clock = Callable[[], str]
+
+# What one seat is shown, when its own observation is not enough: read off the live
+# environment, for that seat, once a frame.
+#
+# A policy decides from an observation, which is what the loop hands it. A seat that
+# **plans** does not: a partner walking a kitchen needs the grid and the pots, and a
+# partner on a court needs the ball's velocity. None of that is in an observation, and
+# a study cannot hold the environment itself -- one study object serves every
+# participant at once, so a study that kept the environment it built would hand one
+# participant's kitchen to another's partner.
+#
+# So the loop asks. It is the same shape as an LLM seat's ``TextView``, which reads the
+# environment for a seat and returns text; this returns whatever the study's own
+# controller decides from.
+SeatView = Callable[[Any, str], Any]
 
 
 class SeatActionSource(Protocol):
@@ -32,9 +47,27 @@ class SeatActionSource(Protocol):
     controller (API-05) decides from the observation; a scheduled seat holds the
     latest decided action. All satisfy this seam, so a loop drives a bot exactly as
     it drives a person -- the source of the action is the only difference.
+
+    A source may also carry ``sees``, a ``SeatView``. With one, the loop shows it that
+    view of the live environment instead of the seat's observation.
     """
 
     def decide(self, observation: object) -> int: ...
+
+
+def what_a_seat_reads(
+    env: Any, source: Any, agent_id: str, observation: Any
+) -> Any:
+    """Return what one seat decides from: its own view of the environment, or its
+    observation.
+
+    Every loop reads its seats through this, so a view is never honoured on one path
+    and quietly dropped on another.
+    """
+    view = getattr(source, "sees", None)
+    if view is None:
+        return observation
+    return view(getattr(env, "env", env), agent_id)
 
 
 class SteppableEnv(Protocol):
@@ -50,4 +83,10 @@ class SteppableEnv(Protocol):
     def step(self, action: int) -> StepResult: ...
 
 
-__all__ = ["Clock", "SeatActionSource", "SteppableEnv"]
+__all__ = [
+    "Clock",
+    "SeatActionSource",
+    "SeatView",
+    "SteppableEnv",
+    "what_a_seat_reads",
+]

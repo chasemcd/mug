@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en" data-theme="light" data-thread="flat">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mock-up 2 -- the judgement inside the conversation</title>
+    <link rel="stylesheet" href="mug-ui.css" />
+  </head>
+  <body>
+    <div class="app">
+      <div class="mock">
+        <a href="index.html">&larr; all mock-ups</a>
+        <strong>2. The judgement inside the conversation</strong>
+        <span class="spacer"></span>
+        <span>theme</span>
+        <span class="segmented">
+          <button type="button" data-theme-pick="light">Light</button>
+          <button type="button" data-theme-pick="dark">Dark</button>
+        </span>
+      </div>
+
+      <header class="topbar">
+        <span class="topbar__title">Advice and preference</span>
+        <span class="topbar__sub">Step 3 of 6</span>
+        <span class="topbar__spacer"></span>
+        <span class="link-state">Connected</span>
+        <button type="button" class="btn btn--ghost btn--small">End the conversation</button>
+      </header>
+
+      <div class="thread-area">
+        <div class="thread" role="log" aria-label="Conversation">
+          <div class="turn turn--them">
+            <div class="turn__who" aria-hidden="true">T</div>
+            <div class="turn__body">
+              <div class="turn__name">Them</div>
+              <div class="turn__text">Ten minutes holds about three points. If the opening is hard to write, it is often because the talk has five.</div>
+            </div>
+          </div>
+
+          <div class="turn turn--you">
+            <div class="turn__who" aria-hidden="true">Y</div>
+            <div class="turn__body">
+              <div class="turn__name">You</div>
+              <div class="turn__text">That is the problem. I have five and they all feel necessary.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- The judgement. Two replies were written; the one that is chosen is
+             the one the conversation goes on with, so this is not a survey
+             about the conversation, it is a turn in it.
+
+             Nothing here may carry an order signal. The two cards are one grid
+             with one track rule, no rule styles "the first one", and the sides
+             are shuffled for each participant. The answer records the handle
+             the server sent, never the side of the screen. -->
+        <section class="elicit" aria-labelledby="ask">
+          <div class="elicit__head">
+            <h2 class="elicit__ask" id="ask">Two replies were written. Which would you rather have had?</h2>
+            <span class="elicit__note">The one you pick is the one you get.</span>
+          </div>
+
+          <div class="options">
+            <article class="option">
+              <div class="option__tag">Reply A</div>
+              <div class="option__text">Then keep all five, but say four of them in one sentence each and give the whole of the rest to the one that changes what somebody does on Friday.
+
+A point that only needs a sentence is not a small point. It is a point that is already agreed.</div>
+              <button type="button" class="btn btn--primary">Continue with A</button>
+            </article>
+
+            <article class="option">
+              <div class="option__tag">Reply B</div>
+              <div class="option__text">Five is not too many if four of them are the same point. Write each in one line, put the lines side by side, and you will usually find two collapse into one.
+
+If they truly do not, the talk is a memo. Send it, and use the ten minutes for the question people will have after reading it.</div>
+              <button type="button" class="btn btn--primary">Continue with B</button>
+            </article>
+          </div>
+
+          <div class="axes">
+            <fieldset class="axis" style="border: 0; margin: 0; padding: 0">
+              <legend class="axis__ask">Which reply is more helpful?</legend>
+              <div class="axis__marks">
+                <div class="axis__row axis__row--dots">
+                  <label><input type="radio" name="helpful" value="a3" /></label>
+                  <label><input type="radio" name="helpful" value="a2" /></label>
+                  <label><input type="radio" name="helpful" value="a1" /></label>
+                  <label data-middle><input type="radio" name="helpful" value="0" /></label>
+                  <label><input type="radio" name="helpful" value="b1" /></label>
+                  <label><input type="radio" name="helpful" value="b2" /></label>
+                  <label><input type="radio" name="helpful" value="b3" /></label>
+                </div>
+                <div class="axis__ends">
+                  <span>A, clearly</span>
+                  <span>The same</span>
+                  <span>B, clearly</span>
+                </div>
+              </div>
+            </fieldset>
+
+            <fieldset class="axis" style="border: 0; margin: 0; padding: 0">
+              <legend class="axis__ask">
+                Which reply is more careful about what it does not know?
+              </legend>
+              <div class="axis__marks">
+                <div class="axis__row axis__row--dots">
+                  <label><input type="radio" name="honest" value="a3" /></label>
+                  <label><input type="radio" name="honest" value="a2" /></label>
+                  <label><input type="radio" name="honest" value="a1" /></label>
+                  <label data-middle><input type="radio" name="honest" value="0" /></label>
+                  <label><input type="radio" name="honest" value="b1" /></label>
+                  <label><input type="radio" name="honest" value="b2" /></label>
+                  <label><input type="radio" name="honest" value="b3" /></label>
+                </div>
+                <div class="axis__ends">
+                  <span>A, clearly</span>
+                  <span>The same</span>
+                  <span>B, clearly</span>
+                </div>
+              </div>
+            </fieldset>
+
+            <!-- An axis with each=True is two absolute scales, not a
+                 comparison. A reward model reads them differently, so the
+                 screen must not make them look like the same question. -->
+            <div class="axis">
+              <div class="axis__ask">How well does each reply match the tone you wanted?</div>
+              <div class="axis__each">
+                <fieldset class="axis__each-one" style="border: 0; margin: 0; padding: 0">
+                  <legend class="axis__each-label">Reply A</legend>
+                  <div class="axis__row">
+                    <label><input type="radio" name="tone-a" value="1" />1</label>
+                    <label><input type="radio" name="tone-a" value="2" />2</label>
+                    <label><input type="radio" name="tone-a" value="3" />3</label>
+                    <label><input type="radio" name="tone-a" value="4" />4</label>
+                    <label><input type="radio" name="tone-a" value="5" />5</label>
+                    <label><input type="radio" name="tone-a" value="6" />6</label>
+                    <label><input type="radio" name="tone-a" value="7" />7</label>
+                  </div>
+                  <div class="axis__ends">
+                    <span>Not at all</span>
+                    <span>Exactly</span>
+                  </div>
+                </fieldset>
+                <fieldset class="axis__each-one" style="border: 0; margin: 0; padding: 0">
+                  <legend class="axis__each-label">Reply B</legend>
+                  <div class="axis__row">
+                    <label><input type="radio" name="tone-b" value="1" />1</label>
+                    <label><input type="radio" name="tone-b" value="2" />2</label>
+                    <label><input type="radio" name="tone-b" value="3" />3</label>
+                    <label><input type="radio" name="tone-b" value="4" />4</label>
+                    <label><input type="radio" name="tone-b" value="5" />5</label>
+                    <label><input type="radio" name="tone-b" value="6" />6</label>
+                    <label><input type="radio" name="tone-b" value="7" />7</label>
+                  </div>
+                  <div class="axis__ends">
+                    <span>Not at all</span>
+                    <span>Exactly</span>
+                  </div>
+                </fieldset>
+              </div>
+            </div>
+          </div>
+
+          <div class="elicit__foot">
+            <button type="button" class="btn btn--small">They are about the same</button>
+            <button type="button" class="btn btn--small">Both are bad</button>
+            <span class="spacer"></span>
+            <button type="button" class="btn btn--ghost btn--small">Skip this one</button>
+          </div>
+        </section>
+      </div>
+
+      <div class="composer-dock">
+        <form class="composer">
+          <label class="sr-only" for="message">Your message</label>
+          <textarea id="message" name="message" rows="1"
+                    placeholder="Answer above to go on with the conversation" disabled></textarea>
+          <button type="submit" class="composer__send" aria-label="Send" disabled>
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M8 13V3M8 3L3.5 7.5M8 3l4.5 4.5" stroke="currentColor"
+                    stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </button>
+        </form>
+        <p class="composer-hint">
+          <span>The conversation goes on from the reply you choose.</span>
+        </p>
+      </div>
+    </div>
+    <script src="mock.js"></script>
+  </body>
+</html>

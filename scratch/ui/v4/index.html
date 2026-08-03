@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>v4 -- the whole set</title>
+    <link rel="stylesheet" href="v4.css" />
+    <style>
+      .tiles {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+        gap: 0.75rem;
+        margin: 1.25rem 0 2.5rem;
+      }
+      .tile {
+        display: block;
+        text-decoration: none;
+        color: inherit;
+        background: var(--surface);
+        border: 1px solid var(--line-strong);
+        border-radius: var(--r);
+        border-top-left-radius: var(--notch);
+        padding: 0.95rem 1rem;
+      }
+      .tile:hover {
+        border-color: var(--ink-quiet);
+      }
+      .tile b {
+        display: block;
+        font-family: var(--serif);
+        font-size: 1.0625rem;
+        margin: 0.35rem 0 0.25rem;
+      }
+      .tile span {
+        font-size: 0.8125rem;
+        color: var(--ink-quiet);
+        line-height: 1.5;
+      }
+      .rows {
+        list-style: none;
+        margin: 0 0 2.25rem;
+        padding: 0;
+        border-top: 1px solid var(--line);
+      }
+      .rows li {
+        display: grid;
+        grid-template-columns: 10rem minmax(0, 1fr);
+        gap: 1.25rem;
+        padding: 0.7rem 0;
+        border-bottom: 1px solid var(--line);
+      }
+      .rows b {
+        font-size: 0.75rem;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: var(--ink-quiet);
+        padding-top: 0.15rem;
+      }
+      .swatches {
+        display: flex;
+        gap: 0.5rem;
+        margin-top: 0.4rem;
+      }
+      .sw {
+        width: 34px;
+        height: 34px;
+        border-radius: 9px;
+        border-top-left-radius: var(--notch);
+        border: 1px solid var(--line-strong);
+      }
+    </style>
+  </head>
+  <body>
+    <nav class="mock">
+      <a href="../index.html">v1</a>
+      <a href="../v2/index.html">v2</a>
+      <a href="../v3/index.html">v3</a>
+      <span class="right">v4 &mdash; the whole set</span>
+    </nav>
+
+    <main class="sheet" style="max-width: 48rem">
+      <div class="brand" style="margin-bottom: 1.1rem">
+        <span class="brand__mark" aria-hidden="true"></span>
+        <span class="brand__name">MUG</span>
+      </div>
+      <h1 style="font-family: var(--serif); font-size: 1.75rem">The whole set</h1>
+      <p class="prose" style="color: var(--ink-quiet); margin-top: 0.5rem">
+        Every screen a participant reaches, in one design language, with the parts
+        that carry a judgement given a stronger hand. Nothing here is wired into the
+        platform.
+      </p>
+
+      <div class="tiles">
+        <a class="tile" href="chat.html">
+          <span class="key">Talk</span>
+          <b>The conversation</b>
+          <span>Bubbles on opposite sides, the wait for a reply, a reply that does not come.</span>
+        </a>
+        <a class="tile" href="judgement.html">
+          <span class="key">Judge</span>
+          <b>The judgement</b>
+          <span>Read, compare, choose &mdash; numbered, in that order, down the panel.</span>
+        </a>
+        <a class="tile" href="comparison.html">
+          <span class="key">Judge</span>
+          <b>The comparison</b>
+          <span>Two rounds you can watch again, and two things that were written.</span>
+        </a>
+        <a class="tile" href="room.html">
+          <span class="key">Talk</span>
+          <b>The shared room</b>
+          <span>Channels, and everybody in the room with a name and a mark.</span>
+        </a>
+        <a class="tile" href="game-and-chat.html">
+          <span class="key">Play</span>
+          <b>A game and a conversation</b>
+          <span>Two panes, a status line, and a plain answer to "where are my keys going?".</span>
+        </a>
+        <a class="tile" href="study.html">
+          <span class="key">Read</span>
+          <b>Reading, answering, finishing</b>
+          <span>Instructions, a form, and the last screen with the code.</span>
+        </a>
+      </div>
+
+      <h2 style="font-family: var(--serif); font-size: 1.25rem; margin-bottom: 0.75rem">
+        What carries the identity
+      </h2>
+      <ul class="rows">
+        <li>
+          <b>The notch</b>
+          <span>
+            Every surface that holds something somebody said or made has one square
+            corner where the others are round. A bubble, a card, a badge, and the mark
+            in the head are the same shape at four sizes.
+            <span class="swatches">
+              <span class="sw" style="background: var(--surface)"></span>
+              <span class="sw" style="background: var(--you); border-color: var(--you-line)"></span>
+              <span class="sw" style="background: var(--blue); border-color: var(--blue)"></span>
+            </span>
+          </span>
+        </li>
+        <li>
+          <b>Two faces</b>
+          <span>
+            Charter for anything a person said, wrote, or is asked. A plain grotesk for
+            anything the screen says about itself. A participant always knows which is
+            which.
+          </span>
+        </li>
+        <li>
+          <b>One blue, one amber</b>
+          <span>
+            Blue is what you can do and what you chose. Amber is what is live now: the
+            clock, the score, a reply that failed. Nothing else takes a colour, and
+            neither side of a comparison ever takes one.
+          </span>
+        </li>
+      </ul>
+
+      <h2 style="font-family: var(--serif); font-size: 1.25rem; margin-bottom: 0.75rem">
+        What makes it intuitive
+      </h2>
+      <ul class="rows">
+        <li>
+          <b>Numbered work</b>
+          <span>
+            A judgement says <b>1</b> read, <b>2</b> compare, <b>3</b> choose, in that
+            order, down the panel. Nobody has to work out what to do first.
+          </span>
+        </li>
+        <li>
+          <b>It says back what you said</b>
+          <span>
+            Every scale writes the answer under it in words &mdash; "You said: <b>A is
+            more helpful</b>". A mark on a row of cells is never the only record of
+            what somebody meant, and a misread scale is caught by the person who
+            answered it.
+          </span>
+        </li>
+        <li>
+          <b>The badge anchors the scale</b>
+          <span>
+            The two ends of a comparison carry the same badges as the two options, so
+            which end is which is read and not remembered.
+          </span>
+        </li>
+        <li>
+          <b>It counts what is left</b>
+          <span>
+            "2 of 4 answered" on the judgement, and on the form.
+          </span>
+        </li>
+        <li>
+          <b>Nothing is preset</b>
+          <span>
+            No scale starts in the middle, so the study never records a judgement
+            nobody gave. The tie is a place somebody chooses, and it carries no tint
+            that would recommend it.
+          </span>
+        </li>
+      </ul>
+
+      <h2 style="font-family: var(--serif); font-size: 1.25rem; margin-bottom: 0.75rem">
+        What is still refused
+      </h2>
+      <ul class="rows">
+        <li>
+          <b>The hover fill</b>
+          <span>
+            A pointer darkens an edge that is already drawn, or draws a rule under a
+            cell. It never puts a fill on a shape that had none.
+          </span>
+        </li>
+        <li>
+          <b>The shadow</b>
+          <span>Nothing floats. A surface is held by an edge.</span>
+        </li>
+        <li>
+          <b>A side that wins</b>
+          <span>
+            The two options are one grid with one track rule, they stretch together,
+            both badges are the same ink, and the chosen fill is drawn only after a
+            choice.
+          </span>
+        </li>
+      </ul>
+    </main>
+    <script src="mock.js"></script>
+  </body>
+</html>

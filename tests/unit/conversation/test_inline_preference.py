@@ -34,13 +34,13 @@ from mug.agents import AgentIds
 from mug.agents.generation import recorded_generation
 from mug.authoring import (
     Axis,
-    Chat,
     Elicit,
     Fallback,
     History,
     LLMAgent,
     Provider,
     Thoughts,
+    Transcript,
 )
 from mug.conversation import TurnPolicy
 from mug.gateway import Gateway
@@ -56,8 +56,10 @@ from mug.providers import ModelCall, ModelCompletion, Usage
 from mug.realtime import Session
 from mug.runtime import CommandContext
 from mug.storage import InMemoryStore
+from tests.support.chat import chat_spec
 
 _UUID = "019b6000-0000-7000-8000-{:012x}"
+
 _START = datetime(2026, 7, 27, 0, 0, 0, tzinfo=timezone.utc)
 _DIGEST = Digest(algorithm="sha-256", hex="a" * 64)
 _PARTNER_ACTOR = "actor_" + _UUID.format(0x300)
@@ -80,10 +82,26 @@ class _Partner(LLMAgent):
         env: object,
         agent_id: str,
         history: History,
-        chat: Chat,
+        chat: Transcript,
         thoughts: Thoughts,
     ) -> str:
-        return ""
+        # The shape the shipped example writes. A double whose prompt says nothing
+        # would let the mount drop the author's words and still pass.
+        return "\n".join(f"{one.sender}: {one.text}" for one in chat.last(50))
+
+
+
+def _said_to(payload: Any) -> str:
+    """Return the last thing a participant said, out of what the model was sent.
+
+    The words are read from ``content``, which is where all three providers look
+    for them. A double that reads them from anywhere else passes while the real
+    model is sent an empty question.
+    """
+    messages = cast("list[Any]", cast("dict[str, Any]", payload)["messages"])
+    spoken = str(cast("dict[str, Any]", messages[-1])["content"])
+    lines = [line for line in spoken.splitlines() if line.startswith("user: ")]
+    return lines[-1][len("user: ") :] if lines else spoken
 
 
 class _Sampler:
@@ -96,8 +114,7 @@ class _Sampler:
 
     async def __call__(self, call: ModelCall) -> ModelCompletion:
         self.calls += 1
-        payload = cast("dict[str, Any]", call.payload)
-        last = cast("list[dict[str, str]]", payload["messages"])[-1]["text"]
+        last = _said_to(call.payload)
         return ModelCompletion(
             outcome="completed",
             resolved_model="fake-local",
@@ -220,11 +237,11 @@ def _spec(elicit: Elicit | None, adapter: Any, *, second: Any = None) -> ChatSpe
     seats = [_seat(_PARTNER_ACTOR, adapter, "partner", 0)]
     if second is not None:
         seats.append(_seat(_RIVAL_ACTOR, second, "rival", 1))
-    return ChatSpec(
+    return chat_spec(
         seats=tuple(seats),
         max_messages=4,
         max_activations_per_turn=len(seats),
-        elicit_preference=elicit,
+        elicit=elicit,
     )
 
 
@@ -688,13 +705,13 @@ async def test_one_candidate_set_costs_one_model_activation() -> None:
     store = InMemoryStore()
     gateway = Gateway(secret=_SECRET)
     adapter = _Sampler()
-    spec = ChatSpec(
+    spec = chat_spec(
         seat=_seat(_PARTNER_ACTOR, adapter, "partner", 0),
         max_messages=4,
         policy=TurnPolicy(
             channel_key="chat", activation="free", max_model_activations_per_turn=1
         ),
-        elicit_preference=Elicit.replies(n=3),
+        elicit=Elicit.replies(n=3),
     )
     socket = await _run(
         [{"type": "chat", "text": "hello"}], store, gateway, spec, answer=_pick(0)

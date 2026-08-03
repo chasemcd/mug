@@ -25,12 +25,12 @@ from mug.agents import (
     compile_agent,
 )
 from mug.authoring import (
-    Chat,
     Fallback,
     History,
     LLMAgent,
     Provider,
     Thoughts,
+    Transcript,
 )
 from mug.game.aec import AecEnv
 from mug.game.controllers import ScheduledSeat
@@ -135,7 +135,7 @@ class _Duelist(LLMAgent):
         env: object,
         agent_id: str,
         history: History,
-        chat: Chat,
+        chat: Transcript,
         thoughts: Thoughts,
     ) -> str:
         moves = ", ".join(

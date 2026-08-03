@@ -29,12 +29,12 @@ from mug.agents import (
     compile_agent,
 )
 from mug.authoring import (
-    Chat,
     Fallback,
     History,
     LLMAgent,
     Provider,
     Thoughts,
+    Transcript,
 )
 from mug.game.controllers import ScheduledSeat
 from mug.game.multiseat import MultiStepResult
@@ -122,7 +122,7 @@ class _Cook(LLMAgent):
         env: object,
         agent_id: str,
         history: History,
-        chat: Chat,
+        chat: Transcript,
         thoughts: Thoughts,
     ) -> str:
         partner_moves = ", ".join(

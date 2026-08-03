@@ -129,7 +129,7 @@ class Message:
         self.tick = tick
 
 
-class Chat:
+class Transcript:
     """The interaction's chat so far: a read-only, ordered list of messages.
 
     The runtime records the chat channel and hands the agent this view, so a human
@@ -190,11 +190,27 @@ class LLMAgent:
     Set ``provider`` and ``model`` as class attributes. Set ``secret`` (the
     credential name, bound at deploy) for a hosted provider; leave it unset for a
     local provider that needs no key, such as ``Provider.OLLAMA``. ``decides_every``,
-    ``on_timeout``, and ``temperature`` are optional. Override ``get_prompt`` to
-    build the whole prompt. Optionally override ``available_actions`` (defaults to
-    the env's legal actions), ``parse_reply`` (defaults to the last legal action name
-    in the reply), and ``reflect`` (defaults to carrying the whole reply forward as
-    the next thought).
+    ``on_timeout``, ``answers_within``, and ``temperature`` are optional. Override
+    ``get_prompt`` to build the whole prompt. Optionally override
+    ``available_actions`` (defaults to the env's legal actions), ``parse_reply``
+    (defaults to the last name in the reply), and ``reflect`` (defaults to carrying
+    the whole reply forward as the next thought).
+
+    **An agent may decide at a coarser grain than the environment steps.** A model
+    that answers in seconds cannot usefully choose one frame of movement, so it
+    chooses something that lasts -- "fetch an onion", "take the next exit" -- and
+    the study says what carrying that out looks like on any one frame. Two methods
+    say the whole of it, and both default to the environment's own actions, so an
+    agent that writes neither decides an environment action and holds it:
+
+    - ``decides_among`` -- the names this agent chooses between;
+    - ``carry_out`` -- one environment action that carries the choice forward, asked
+      once for every frame the seat is read.
+
+    ``available_actions`` is **not** either of those. It stays the environment's own
+    action names, because it is what the runtime names every seat's moves with when
+    it writes this agent's history. An agent that made it the coarser list would
+    have its partner's moves recorded under names that partner never chose.
     """
 
     provider: Provider
@@ -202,6 +218,7 @@ class LLMAgent:
     secret: str | None = None
     decides_every: int = 1
     on_timeout: Fallback = Fallback.REPEAT_LAST
+    answers_within: float = 1.0
     temperature: float | None = None
 
     def get_prompt(
@@ -209,7 +226,7 @@ class LLMAgent:
         env: Any,
         agent_id: str,
         history: History,
-        chat: Chat,
+        chat: Transcript,
         thoughts: Thoughts,
     ) -> str:
         """Return the whole prompt the model sees. MUG sends exactly this string.
@@ -219,6 +236,15 @@ class LLMAgent:
         ``agent_id`` is which player the model is, ``history`` is what happened,
         ``chat`` is what was said on the chat channel (so a human can instruct the
         agent), and ``thoughts`` is the model's own earlier reasoning.
+
+        **Put what does not change first, and what changes last.** A model runner
+        reuses its cached reading of the longest prefix this prompt shares with the
+        last one, so the game state near the top means everything after it is read
+        again from nothing on every decision. Moving the state to the end of the
+        shipped kitchen prompt took the reading of it from 824 ms to 333 ms on a
+        local llama3.2 -- half a second off every decision, for the same words in a
+        different order. Your rules, your action list and your answer shape go
+        first; the board, the transcript and the carried plan go last.
         """
         raise NotImplementedError("an LLMAgent must implement get_prompt")
 
@@ -230,14 +256,53 @@ class LLMAgent:
         """
         return list(env.legal_actions(agent_id))
 
-    def parse_reply(self, reply: str, env: Any, agent_id: str) -> int | None:
-        """Turn the model's reply into an action, or None to fall back.
+    def decides_among(self, env: Any, agent_id: str) -> list[str]:
+        """Return the names this agent chooses between, in the order it chooses them.
 
-        The default picks the last legal action name that appears in the reply, so a
-        reply that reasons first and ends with the action just works. It returns the
-        action's position in ``available_actions``. Override for a richer format.
+        The default is ``available_actions``, so an agent decides one environment
+        action, which is what every agent did before a coarser grain was possible.
+
+        Override it to decide something that lasts longer than a frame -- a job, a
+        destination, a manoeuvre -- and write ``carry_out`` to say what doing that
+        looks like on any one frame. The two go together: a coarser list with no
+        ``carry_out`` would be read as environment actions and stepped as whatever
+        happened to be at that position.
         """
-        actions = self.available_actions(env, agent_id)
+        return self.available_actions(env, agent_id)
+
+    def carry_out(self, env: Any, agent_id: str, chosen: int | None) -> int | None:
+        """Return one environment action that carries the choice forward, this frame.
+
+        It is asked once for every frame the seat is read, against the environment
+        the loop is stepping -- so it plans in the run this participant is in and
+        never in another's. It is the only place a decision that lasts several
+        seconds meets a loop that steps thirty times a second.
+
+        ``chosen`` is the position in ``decides_among`` of what this seat last
+        decided. It is ``None`` before the first decision and after one that fell
+        back, and both mean the same thing: nobody has told this seat what to do.
+
+        Answering ``None`` means there is nothing to do this frame, and the seat
+        takes the game's own ``default_action``. So a study never has to know what
+        the idle action is to say "stand still", and the two ``None`` values read
+        the same way round: nothing chosen in, nothing to do out.
+
+        The default holds the choice and steps it as an environment action, which is
+        right when ``decides_among`` is the environment's own action list, and is
+        what every model seat did before a coarser grain was possible.
+        """
+        return chosen
+
+    def parse_reply(self, reply: str, env: Any, agent_id: str) -> int | None:
+        """Turn the model's reply into a choice, or None to fall back.
+
+        The default picks the last name that appears in the reply, so a reply that
+        reasons first and ends with its answer just works. It returns that name's
+        position in ``decides_among``. Override for a richer format -- and override
+        it for certain if the agent also talks, because what it **says** would
+        otherwise be read for what it **does**.
+        """
+        actions = self.decides_among(env, agent_id)
         text = str(reply).upper()
         best_index: int | None = None
         best_pos = -1
@@ -278,7 +343,6 @@ class LLMAgent:
 
 
 __all__ = [
-    "Chat",
     "Fallback",
     "History",
     "LLMAgent",
@@ -286,4 +350,5 @@ __all__ = [
     "Provider",
     "Step",
     "Thoughts",
+    "Transcript",
 ]

@@ -26,7 +26,7 @@ from starlette.testclient import WebSocketTestSession
 
 from mug.agents import AgentGameSpec, AgentIds, HumanSeatSpec
 from mug.app import build_study_app
-from mug.authoring import Chat, Fallback, History, LLMAgent, Provider, Thoughts
+from mug.authoring import Fallback, History, LLMAgent, Provider, Thoughts, Transcript
 from mug.content import Game, Page, Study
 from mug.content.seats import Bot, Human, Model, MultiSeatGame, seat_game
 from mug.game.multiseat import MultiStepResult
@@ -39,8 +39,11 @@ from mug.participant import (
 from mug.participant_chat import ChatSeatSpec, ChatSpec
 from mug.providers import ModelCall, ModelCompletion, Usage
 from mug.storage import InMemoryStore, Store
+from tests.support.agents import warmed, warming
+from tests.support.chat import written_chat
 
 _AGENTS = ("chef-0", "chef-1", "chef-2")
+
 _UUID = "019b6000-0000-7000-8000-{:012x}"
 _EPISODE_LEN = 8
 
@@ -102,7 +105,7 @@ class _Partner(LLMAgent):
         env: object,
         agent_id: str,
         history: History,
-        chat: Chat,
+        chat: Transcript,
         thoughts: Thoughts,
     ) -> str:
         heard = "; ".join(message.text for message in chat.last(5))
@@ -123,6 +126,8 @@ class _Adapter:
         self.prompts: list[str] = []
 
     async def __call__(self, call: ModelCall) -> ModelCompletion:
+        if warming(call):
+            return warmed()
         payload: Any = call.payload
         self.prompts.append(payload["messages"][0]["content"])
         # It speaks once, so a test can count the messages rather than race a loop.
@@ -531,7 +536,7 @@ class _Coach(LLMAgent):
         env: object,
         agent_id: str,
         history: History,
-        chat: Chat,
+        chat: Transcript,
         thoughts: Thoughts,
     ) -> str:
         return "; ".join(message.text for message in chat.last(5)) or "say hello"
@@ -570,8 +575,8 @@ def test_a_coach_talks_in_a_channel_it_does_not_play_in() -> None:
             "chef-1": Human(),
             "chef-2": Model(_Partner(), adapter=_Adapter(), text_view=_view),
         },
-        chat=ChatSpec(
-            channel_key="team",
+        chat=written_chat(
+            "team",
             seats=(_coach_seat(_Adapter(say="watch the pot"), "team"),),
         ),
     )
@@ -624,7 +629,7 @@ def test_the_model_partner_plays_and_talks_to_both_people() -> None:
         },
         # The conversation does not say how many people are in it. The game
         # seats them, so a room that formed for one would be two rooms here.
-        chat=ChatSpec(channel_key="team"),
+        chat=written_chat("team"),
     )
     client = _client(store, study)
     with (

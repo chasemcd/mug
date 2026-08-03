@@ -10,6 +10,7 @@
 import { JsonValue } from '../kernel/index.js';
 import { BrowserManifest } from './browserGame.js';
 import { MeshManifest } from './p2pGame.js';
+import { PictureAddresses, renderMarkdown } from './markdown.js';
 import { ChatAxisFrame, ChatCandidatesFrame } from './session.js';
 
 /** A single form field. */
@@ -53,9 +54,30 @@ export interface GameDelivery {
   activity_key: string;
   mode: 'server' | 'browser' | 'peer' | 'chat';
   countdown?: number;
+  /** What the participant reads beside the game while they play it. */
+  caption?: string;
+  /**
+   * How large the picture this game draws is, in pixels. A drawing is relative,
+   * so it has no size of its own and only the study knows how large it should be.
+   * With none said, 600 by 400 stands.
+   */
+  size?: readonly number[];
   manifest?: BrowserManifest | MeshManifest;
   /** Set when this activity is a game and a conversation at once, and where. */
   chat?: { placement?: 'beside' | 'below' | 'drawer' };
+}
+
+/**
+ * A conversation activity: the participant talks, and the client renders a transcript.
+ *
+ * It is its own kind. A conversation used to be delivered as a game with `mode:
+ * 'chat'` -- which still arrives, so both are read -- and the recorded activity kind
+ * then said the participant played a game.
+ */
+export interface ChatDelivery {
+  kind: 'chat';
+  activity_key: string;
+  occurrence_key?: string;
 }
 
 /**
@@ -106,6 +128,7 @@ export type Delivery =
   | FormDelivery
   | ContentDelivery
   | GameDelivery
+  | ChatDelivery
   | ComparisonDelivery
   | CompleteDelivery;
 
@@ -121,7 +144,6 @@ function addRadio(
   // The label wraps the input, so clicking the text selects the option and a
   // screen reader reads the option's own name with it.
   const wrap = document.createElement('label');
-  wrap.style.marginRight = '1rem';
   const input = document.createElement('input');
   input.type = 'radio';
   input.name = name;
@@ -132,6 +154,38 @@ function addRadio(
   parent.appendChild(wrap);
 }
 
+/**
+ * One cell of a scale.
+ *
+ * The whole cell is the hit area, and nothing is chosen at the start: a control
+ * that starts in the middle sends the middle when nobody touches it, so the
+ * study would record an answer that was never given.
+ */
+function addCell(
+  parent: HTMLElement,
+  name: string,
+  value: string,
+  required?: boolean,
+): void {
+  const wrap = document.createElement('label');
+  const input = document.createElement('input');
+  input.type = 'radio';
+  input.name = name;
+  input.value = value;
+  if (required) input.required = true;
+  wrap.appendChild(input);
+  wrap.append(value);
+  parent.appendChild(wrap);
+}
+
+/** A question that must be answered says so where it is asked. */
+function needMark(text: string): HTMLElement {
+  const mark = document.createElement('span');
+  mark.className = 'field__need';
+  mark.textContent = text;
+  return mark;
+}
+
 /** Render a form and submit the collected answers through `onAdvance`. */
 export function renderForm(
   app: HTMLElement,
@@ -140,10 +194,24 @@ export function renderForm(
 ): void {
   const spec = delivery.form;
   app.innerHTML = '';
-  const form = document.createElement('form');
+  const sheet = document.createElement('div');
+  sheet.className = 'sheet';
+  const panel = document.createElement('section');
+  panel.className = 'panel';
+  const head = document.createElement('div');
+  head.className = 'panel__head';
+  const key = document.createElement('div');
+  key.className = 'key';
+  key.textContent = 'A few questions';
+  head.appendChild(key);
   const heading = document.createElement('h2');
+  heading.className = 'panel__ask';
   heading.textContent = spec.form_key;
-  form.appendChild(heading);
+  head.appendChild(heading);
+  panel.appendChild(head);
+  const form = document.createElement('form');
+  panel.appendChild(form);
+  sheet.appendChild(panel);
 
   for (const field of spec.fields) {
     // A choice or a scale is a group of radios, so it is a fieldset with a
@@ -151,43 +219,56 @@ export function renderForm(
     // belong to. A free-text field is one control, so its label is tied by id.
     if (field.kind === 'choice' || field.kind === 'likert') {
       const group = document.createElement('fieldset');
-      group.style.border = 'none';
-      group.style.margin = '0.75rem 0 0.25rem';
-      group.style.padding = '0';
+      group.className = 'field';
       const legend = document.createElement('legend');
+      legend.className = 'field__label';
       legend.textContent = field.label;
+      if (field.required) legend.appendChild(needMark('Needed'));
       group.appendChild(legend);
-      const values =
-        field.kind === 'choice'
-          ? (field.options ?? [])
-          : Array.from({ length: field.scale ?? 0 }, (_, n) => String(n + 1));
-      for (const option of values) {
-        addRadio(group, field.field_key, option, field.required);
+      if (field.kind === 'likert') {
+        const cells = document.createElement('div');
+        cells.className = 'cells';
+        for (let n = 1; n <= (field.scale ?? 0); n++) {
+          addCell(cells, field.field_key, String(n), field.required);
+        }
+        group.appendChild(cells);
+      } else {
+        const choices = document.createElement('div');
+        choices.className = 'choices';
+        for (const option of field.options ?? []) {
+          addRadio(choices, field.field_key, option, field.required);
+        }
+        group.appendChild(choices);
       }
       form.appendChild(group);
     } else {
       const id = `field-${field.field_key}`;
+      const wrap = document.createElement('div');
+      wrap.className = 'field';
       const label = document.createElement('label');
+      label.className = 'field__label';
       label.textContent = field.label;
       label.htmlFor = id;
-      label.style.display = 'block';
-      label.style.margin = '0.75rem 0 0.25rem';
-      form.appendChild(label);
+      if (field.required) label.appendChild(needMark('Needed'));
+      wrap.appendChild(label);
       const input = document.createElement('input');
       input.type = 'text';
       input.name = field.field_key;
       input.id = id;
       if (field.required) input.required = true;
-      form.appendChild(input);
+      wrap.appendChild(input);
+      form.appendChild(wrap);
     }
   }
 
+  const foot = document.createElement('div');
+  foot.className = 'panel__foot';
   const submit = document.createElement('button');
   submit.type = 'submit';
+  submit.className = 'btn btn--primary';
   submit.textContent = 'Continue';
-  submit.style.display = 'block';
-  submit.style.marginTop = '1rem';
-  form.appendChild(submit);
+  foot.appendChild(submit);
+  form.appendChild(foot);
 
   form.addEventListener('submit', (event) => {
     event.preventDefault();
@@ -201,7 +282,7 @@ export function renderForm(
     }
     onAdvance(answers);
   });
-  app.appendChild(form);
+  app.appendChild(sheet);
 }
 
 /** Render a content page with a Continue button that advances the flow. */
@@ -209,21 +290,31 @@ export function renderContent(
   app: HTMLElement,
   delivery: ContentDelivery,
   onAdvance: (answers: JsonValue) => void,
+  assets: PictureAddresses | null = null,
 ): void {
   app.innerHTML = '';
-  const pre = document.createElement('pre');
-  pre.textContent = delivery.content.body.text ?? '';
-  pre.style.whiteSpace = 'pre-wrap';
-  // A <pre> is not a landmark, so name the region and let a keyboard reach it:
+  const sheet = document.createElement('div');
+  sheet.className = 'sheet';
+  const page = document.createElement('div');
+  page.dataset['testid'] = 'content-page';
+  page.className = 'prose';
+  // The page is not a landmark, so name the region and let a keyboard reach it:
   // long instructions must be scrollable without a mouse.
-  pre.tabIndex = 0;
-  pre.setAttribute('role', 'region');
-  pre.setAttribute('aria-label', 'Study instructions');
-  app.appendChild(pre);
+  page.tabIndex = 0;
+  page.setAttribute('role', 'region');
+  page.setAttribute('aria-label', 'Study instructions');
+  renderMarkdown(page, delivery.content.body.text ?? '', assets);
+  sheet.appendChild(page);
+  const actions = document.createElement('div');
+  actions.className = 'actions';
   const next = document.createElement('button');
+  next.type = 'button';
+  next.className = 'btn btn--primary';
   next.textContent = 'Continue';
   next.addEventListener('click', () => onAdvance({}));
-  app.appendChild(next);
+  actions.appendChild(next);
+  sheet.appendChild(actions);
+  app.appendChild(sheet);
 }
 
 /** One between-rounds screen, as the mount describes it. */
@@ -245,24 +336,31 @@ export function renderInterval(
   app: HTMLElement,
   frame: IntervalFrame,
   onContinue: () => void,
+  assets: PictureAddresses | null = null,
 ): void {
-  app.innerHTML = '';
+  clearKeepingHead(app);
+  // The rest owns everything it puts on the screen, in one element, so it can be
+  // told apart from a content page whether or not the study wrote anything to
+  // read. It is drawn inside the game's own host, which the next round clears.
+  const rest = document.createElement('div');
+  rest.dataset['testid'] = 'between-rounds';
+  app.appendChild(rest);
   const heading = document.createElement('h2');
   heading.textContent = 'Round ' + frame.round + ' of ' + frame.of;
-  app.appendChild(heading);
+  rest.appendChild(heading);
   if (frame.markdown) {
-    const body = document.createElement('pre');
-    body.textContent = frame.markdown;
-    body.style.whiteSpace = 'pre-wrap';
+    const body = document.createElement('div');
+    body.className = 'prose';
     body.tabIndex = 0;
     body.setAttribute('role', 'region');
     body.setAttribute('aria-label', 'Between rounds');
-    app.appendChild(body);
+    renderMarkdown(body, frame.markdown, assets);
+    rest.appendChild(body);
   }
   const next = document.createElement('button');
   next.textContent = 'Continue';
   next.addEventListener('click', () => onContinue());
-  app.appendChild(next);
+  rest.appendChild(next);
   next.focus();
 }
 
@@ -296,6 +394,68 @@ export interface Panes {
  * the channel tabs unreachable, and a private channel that needs a mouse is not
  * usable by keyboard. Escape is the fast way back to the game.
  */
+/**
+ * A pane's head: what it is, and whether the keys are going to it.
+ *
+ * The badge is the answer beside the thing it is about, so a participant who
+ * presses a key and sees nothing move does not have to look elsewhere.
+ */
+function paneHead(name: string, on: string, off: string): HTMLElement {
+  const head = document.createElement('div');
+  head.className = 'pane__head';
+  const label = document.createElement('span');
+  label.className = 'pane__name';
+  label.textContent = name;
+  const badge = document.createElement('span');
+  badge.className = 'pane__badge';
+  badge.dataset['on'] = on;
+  badge.dataset['off'] = off;
+  badge.textContent = off;
+  head.appendChild(label);
+  head.appendChild(badge);
+  return head;
+}
+
+/**
+ * One turn of a conversation: a name with a mark, and a bubble under it.
+ *
+ * The two parties are on opposite sides, which is what makes a conversation
+ * readable without reading it. The screen never says whether the other party is
+ * a person or a model, so the mark carries no meaning beyond "not you".
+ */
+export function renderTurn(author: string, name: string): HTMLElement {
+  const one = document.createElement('div');
+  one.className = author === 'you' ? 'turn turn--you' : 'turn turn--them';
+  one.dataset['author'] = author;
+  const who = document.createElement('div');
+  who.className = 'turn__who';
+  const mark = document.createElement('span');
+  mark.className = 'turn__mark';
+  who.appendChild(mark);
+  who.append(name);
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+  one.appendChild(who);
+  one.appendChild(bubble);
+  return one;
+}
+
+/**
+ * Empty one host, and keep the pane head if it has one.
+ *
+ * A pane's head says what the pane is and where the keys are going. It belongs to
+ * the pane and not to the activity inside it, so it survives the activity being
+ * drawn again -- the badge used to disappear the first time a canvas mounted.
+ */
+export function clearKeepingHead(host: HTMLElement): HTMLElement {
+  const head = host.querySelector(':scope > .pane__head');
+  host.innerHTML = '';
+  if (head !== null) {
+    host.appendChild(head);
+  }
+  return host;
+}
+
 export function renderPanes(
   app: HTMLElement,
   placement: 'beside' | 'below' | 'drawer',
@@ -305,37 +465,44 @@ export function renderPanes(
   const frame = document.createElement('div');
   frame.dataset['testid'] = 'composed';
   frame.dataset['placement'] = placement;
-  frame.style.display = 'flex';
-  frame.style.gap = '1rem';
-  frame.style.alignItems = 'flex-start';
+  frame.className = 'panes';
   const beside = placement === 'beside' && window.innerWidth >= 760;
-  frame.style.flexDirection = beside ? 'row' : 'column';
+  if (!beside) {
+    frame.style.gridTemplateColumns = 'minmax(0, 1fr)';
+  }
 
-  const game = document.createElement('div');
+  const game = document.createElement('section');
   game.dataset['testid'] = 'game-pane';
-  game.style.flex = '0 1 auto';
-  const chat = document.createElement('div');
+  game.dataset['pane'] = 'game';
+  game.className = 'pane';
+  game.setAttribute('aria-label', 'The game');
+  const chat = document.createElement('section');
   chat.dataset['testid'] = 'chat-pane';
-  chat.style.flex = beside ? '1 1 18rem' : '1 1 auto';
-  chat.style.minWidth = '0';
-  chat.style.width = beside ? 'auto' : '100%';
+  chat.dataset['pane'] = 'chat';
+  chat.className = 'pane';
+  chat.setAttribute('aria-label', 'The conversation');
   frame.appendChild(game);
   frame.appendChild(chat);
 
   // Which pane has the keyboard, said out loud. A participant whose arrow keys
-  // stopped working needs to be able to see why, not guess.
+  // stopped working needs to be able to see why, not guess. It is a badge in
+  // each pane's head as well, so the answer is beside the thing it is about.
   const where = document.createElement('p');
   where.dataset['testid'] = 'focus-hint';
   where.setAttribute('role', 'status');
   where.setAttribute('aria-live', 'polite');
-  where.style.margin = '0.5rem 0 0';
-  where.style.fontSize = '0.85rem';
+  where.className = 'hint';
   app.appendChild(frame);
   app.appendChild(where);
 
+  game.appendChild(paneHead('The game', 'Your keys play', 'The game is paused'));
+  chat.appendChild(
+    paneHead('The conversation', 'Your keys write here', 'Not writing'),
+  );
+
   let canvas: HTMLElement | null = null;
   const stops = (): HTMLElement[] => {
-    const input = chat.querySelector('input[name=message]');
+    const input = chat.querySelector('[name=message]');
     const tab = chat.querySelector('[role=tablist] button');
     return [canvas, input as HTMLElement | null, tab as HTMLElement | null].filter(
       (one): one is HTMLElement => one !== null,
@@ -349,9 +516,14 @@ export function renderPanes(
       const inGame = game.contains(document.activeElement);
       const held = inGame ? game : chat;
       for (const pane of [game, chat]) {
-        pane.style.outline =
-          pane === held ? '2px solid #2b6cb0' : '2px solid transparent';
-        pane.style.outlineOffset = '4px';
+        const mine = pane === held;
+        pane.classList.toggle('pane--held', mine);
+        const badge = pane.querySelector('.pane__badge');
+        if (badge instanceof HTMLElement) {
+          badge.textContent = mine
+            ? (badge.dataset['on'] ?? '')
+            : (badge.dataset['off'] ?? '');
+        }
       }
       where.textContent = inGame
         ? 'The game has the keyboard. Press Tab to write a message.'
@@ -401,6 +573,10 @@ export interface ChatScreen {
   append(author: 'you' | 'them', text: string, channel?: string): void;
   /** Name the channels this participant is in; two or more get a tab each. */
   channels(keys: string[], seat?: string): void;
+  /** Show, or take away, the placeholder that stands where a reply will be. */
+  waiting(on: boolean): void;
+  /** Say that a reply is not coming, rather than leave the pane empty. */
+  notice(text: string): void;
   /** Ask the participant to choose between the replies this turn wrote. */
   elicit(frame: ChatCandidatesFrame): void;
   /** Take the elicitation off the screen, once the judgement is recorded. */
@@ -493,53 +669,110 @@ export function renderChat(
   handlers: ChatHandlers,
   composed = false,
 ): ChatScreen {
+  // A pane's head belongs to the pane and not to the activity inside it, so it
+  // survives the activity being drawn again.
+  const keepHead = app.querySelector(':scope > .pane__head');
   app.innerHTML = '';
+  if (keepHead !== null) {
+    app.appendChild(keepHead);
+  }
+
+  // A standalone conversation owns the screen, so it scrolls the thread and
+  // docks what the participant writes at the foot. Inside a pane the pane is
+  // already the frame, so the same parts sit in it without a second one.
+  const scroll = document.createElement('div');
+  scroll.className = composed ? 'pane__body' : 'scroll';
+  const thread = document.createElement('div');
+  thread.className = composed ? '' : 'thread';
+  const scrollDown = (): void => {
+    scroll.scrollTop = scroll.scrollHeight;
+  };
+
   const tabs = document.createElement('div');
   tabs.setAttribute('role', 'tablist');
   tabs.dataset['testid'] = 'chat-channels';
-  tabs.style.margin = '0 0 0.5rem';
-  app.appendChild(tabs);
+  tabs.className = 'channels';
+  tabs.hidden = true;
+  thread.appendChild(tabs);
 
   const transcript = document.createElement('div');
   transcript.setAttribute('role', 'log');
+  transcript.setAttribute('aria-label', 'Conversation');
   transcript.dataset['testid'] = 'chat-transcript';
-  transcript.style.margin = '0 0 1rem';
-  // The rail keeps its size before anything is said. A transcript that
-  // collapses to nothing reads as a broken pane rather than an empty one.
-  transcript.style.minHeight = '8rem';
-  transcript.style.maxHeight = '20rem';
-  transcript.style.overflowY = 'auto';
-  app.appendChild(transcript);
+  // The transcript keeps a size before anything is said. A pane that collapses
+  // to nothing reads as broken rather than empty.
+  transcript.className = 'log';
+  thread.appendChild(transcript);
+  scroll.appendChild(thread);
+  app.appendChild(scroll);
 
+  const dock = document.createElement('div');
+  dock.className = composed ? 'pane__foot' : 'dock';
   const form = document.createElement('form');
-  const input = document.createElement('input');
-  input.type = 'text';
+  form.className = 'composer';
+  // The box grows to what is written and stops. A held size tells a participant
+  // to write one line; an unbounded one pushes the conversation off the screen.
+  const input = document.createElement('textarea');
   input.name = 'message';
+  input.rows = 1;
   input.autocomplete = 'off';
+  input.placeholder = 'Write a message';
   input.setAttribute('aria-label', 'Your message');
-  input.style.width = '70%';
   const send = document.createElement('button');
   send.type = 'submit';
-  send.textContent = 'Send';
+  send.className = 'send';
+  send.disabled = true;
+  send.setAttribute('aria-label', 'Send');
+  send.innerHTML =
+    '<svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">' +
+    '<path d="M8 13V3.5M8 3.5 3.8 7.7M8 3.5l4.2 4.2" stroke="currentColor" ' +
+    'stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   form.appendChild(input);
   form.appendChild(send);
-  app.appendChild(form);
+  dock.appendChild(form);
+
+  const grow = (): void => {
+    input.style.height = 'auto';
+    input.style.height = String(Math.min(input.scrollHeight, 160)) + 'px';
+    send.disabled = input.value.trim() === '';
+  };
+  input.addEventListener('input', grow);
+  // Return sends and shift with return breaks the line, which is what a person
+  // who has used any other message box expects.
+  input.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      form.requestSubmit();
+    }
+  });
 
   // Only a standalone conversation is ended by the participant. A composed
   // activity ends when its rounds end, so leaving the conversation early would
   // leave them playing a game they can no longer talk about.
   const leave = document.createElement('button');
   leave.type = 'button';
+  leave.className = 'btn btn--quiet btn--small';
   leave.textContent = 'End the conversation';
-  leave.style.marginTop = '1rem';
   if (!composed) {
-    app.appendChild(leave);
+    const hint = document.createElement('p');
+    hint.className = 'hint';
+    hint.textContent = 'Return sends. Shift and return make a new line.';
+    dock.appendChild(hint);
+    const foot = document.createElement('div');
+    foot.className = 'hint';
+    foot.appendChild(leave);
+    dock.appendChild(foot);
   }
+  app.appendChild(dock);
+  grow();
 
   // One channel is shown at a time. A message that belongs to another channel is
   // held rather than dropped, so moving to it shows what was said there.
   const lines = new Map<string, HTMLElement[]>();
   let current: string | null = null;
+  // The placeholder that stands where a reply is going to be, or null when the
+  // conversation is not waiting for one.
+  let pending: HTMLElement | null = null;
 
   const show = (channel: string): void => {
     current = channel;
@@ -547,7 +780,7 @@ export function renderChat(
     for (const line of lines.get(channel) ?? []) {
       transcript.appendChild(line);
     }
-    transcript.scrollTop = transcript.scrollHeight;
+    scrollDown();
     for (const tab of Array.from(tabs.children)) {
       tab.setAttribute(
         'aria-selected',
@@ -671,6 +904,7 @@ export function renderChat(
     channels(keys, seat) {
       current = keys[0] ?? null;
       tabs.innerHTML = '';
+      tabs.hidden = keys.length < 2;
       tabs.dataset['seat'] = seat ?? '';
       if (keys.length < 2) {
         return;
@@ -681,7 +915,6 @@ export function renderChat(
         tab.setAttribute('role', 'tab');
         tab.dataset['channel'] = key;
         tab.textContent = key;
-        tab.style.marginRight = '0.5rem';
         tab.addEventListener('click', () => show(key));
         tabs.appendChild(tab);
       }
@@ -689,25 +922,71 @@ export function renderChat(
         show(current);
       }
     },
+    // What the screen says between a message and its reply. A model on a local
+    // runner takes seconds to answer, and a pane that shows nothing at all while
+    // it thinks reads as a broken study rather than a slow one.
+    waiting(on) {
+      if (on) {
+        if (pending !== null) {
+          return;
+        }
+        // It is the same bubble the words will arrive in, so nothing on the
+        // screen moves when they do.
+        pending = renderTurn('them', 'Them');
+        pending.dataset['testid'] = 'chat-waiting';
+        const dots = document.createElement('span');
+        dots.className = 'dots';
+        dots.setAttribute('role', 'status');
+        dots.setAttribute('aria-label', 'Waiting for a reply');
+        dots.innerHTML = '<span></span><span></span><span></span>';
+        pending.querySelector('.bubble')?.appendChild(dots);
+        transcript.appendChild(pending);
+        scrollDown();
+        return;
+      }
+      if (pending !== null) {
+        pending.remove();
+      }
+      pending = null;
+    },
+    // A reply that is never coming. The mount says so rather than leaving the
+    // participant to work it out from an empty pane. It is not a bubble,
+    // because nobody said it.
+    notice(text) {
+      screen.waiting(false);
+      const line = document.createElement('div');
+      line.className = 'notice';
+      line.dataset['testid'] = 'chat-notice';
+      line.setAttribute('role', 'status');
+      const mark = document.createElement('b');
+      mark.setAttribute('aria-hidden', 'true');
+      mark.textContent = '!';
+      line.appendChild(mark);
+      const words = document.createElement('span');
+      words.textContent = text;
+      line.appendChild(words);
+      transcript.appendChild(line);
+      scrollDown();
+    },
     append(author, text, channel) {
+      // The reply has arrived, so what stood in for it goes.
+      if (author !== 'you') {
+        screen.waiting(false);
+      }
       const key = channel ?? current ?? '';
-      const line = document.createElement('p');
-      line.dataset['author'] = author;
+      const line = renderTurn(author, author === 'you' ? 'You' : 'Them');
       line.dataset['channel'] = key;
-      line.style.margin = '0.25rem 0';
-      const who = document.createElement('strong');
-      who.textContent = author === 'you' ? 'You: ' : 'Them: ';
-      line.appendChild(who);
-      line.append(text);
+      line.querySelector('.bubble')?.append(text);
       const held = lines.get(key) ?? [];
       held.push(line);
       lines.set(key, held);
       if (current === null || key === current) {
         transcript.appendChild(line);
-        transcript.scrollTop = transcript.scrollHeight;
+        scrollDown();
       }
     },
     close() {
+      screen.waiting(false);
       input.disabled = true;
       send.disabled = true;
       leave.disabled = true;
@@ -722,6 +1001,14 @@ export function renderChat(
     }
     input.value = '';
     screen.append('you', text, current ?? undefined);
+    // Only a conversation that is the whole activity is owed a reply, so only it
+    // says one is coming. Beside a game the other party is a **player**: it
+    // answers when it is free and it is allowed to say nothing at all, so a
+    // "typing" bubble raised by every message is a promise nobody made -- and
+    // one the participant then watches for the rest of the round.
+    if (!composed) {
+      screen.waiting(true);
+    }
     handlers.onSend(text, current ?? undefined);
   });
   leave.addEventListener('click', () => {
@@ -755,84 +1042,173 @@ export function renderComparison(
   onChoose: (handle: string) => void,
 ): ComparisonScreen {
   app.innerHTML = '';
+  const sheet = document.createElement('div');
+  sheet.className = 'scroll';
+  const panel = document.createElement('section');
+  panel.className = 'panel';
+  const head = document.createElement('div');
+  head.className = 'panel__head';
+  const key = document.createElement('div');
+  key.className = 'key';
+  key.textContent = 'A comparison';
+  head.appendChild(key);
   const heading = document.createElement('h2');
+  heading.className = 'panel__ask';
   heading.textContent = delivery.ask;
-  app.appendChild(heading);
+  head.appendChild(heading);
+  panel.appendChild(head);
   const waiting = document.createElement('p');
   waiting.dataset['testid'] = 'comparison-waiting';
+  waiting.className = 'block';
   waiting.textContent = 'Loading what you are being asked about...';
-  app.appendChild(waiting);
+  panel.appendChild(waiting);
+  sheet.appendChild(panel);
+  app.appendChild(sheet);
 
   const list = document.createElement('div');
   list.dataset['testid'] = 'comparison-options';
   // The options are a group and the question is its name, so a screen reader
   // announces what is being asked before it reads the first option.
   heading.id = 'comparison-ask';
-  list.setAttribute('role', 'group');
+  list.className = 'pair';
+  list.setAttribute('role', 'radiogroup');
   list.setAttribute('aria-labelledby', 'comparison-ask');
 
-  const buttons = (): HTMLButtonElement[] =>
-    Array.from(list.querySelectorAll('button'));
+  const foot = document.createElement('div');
+  foot.className = 'panel__foot';
+  // One submit. The choice is made on the option, which is where the
+  // participant is already looking; the button says which one it will send.
+  const submit = document.createElement('button');
+  submit.type = 'button';
+  submit.className = 'btn btn--primary';
+  submit.dataset['testid'] = 'comparison-submit';
+  submit.textContent = 'Pick one above';
+  submit.disabled = true;
+  foot.appendChild(submit);
+
+  const inputs = (): HTMLInputElement[] =>
+    Array.from(list.querySelectorAll('input'));
+
+  const LETTERS = 'ABCDEFGH';
 
   return {
     present(options) {
       heading.textContent = options.ask;
       waiting.remove();
       list.innerHTML = '';
-      for (const option of options.options) {
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.dataset['handle'] = option.handle;
-        button.style.display = 'block';
-        button.style.margin = '0.5rem 0';
+      options.options.forEach((option, at) => {
+        // The option cell is the control. Both cells are one grid with one
+        // track rule, they stretch together, and both badges are the same ink,
+        // so the layout carries no signal about which is which.
+        const cell = document.createElement('label');
+        cell.className = 'option option--pick';
+        cell.dataset['handle'] = option.handle;
+        const input = document.createElement('input');
+        input.type = 'radio';
+        input.name = 'comparison-choice';
+        input.value = option.handle;
+        cell.appendChild(input);
+
+        const top = document.createElement('div');
+        top.className = 'option__head';
+        const badge = document.createElement('span');
+        badge.className = 'badge badge--lg';
+        badge.textContent = LETTERS[at] ?? String(at + 1);
+        top.appendChild(badge);
+        const name = document.createElement('span');
+        name.className = 'option__name';
+        const body = document.createElement('div');
+        body.className = 'option__text';
         // An option shows what it recorded: a run shows how long it went and
         // what it earned, a model output shows the text it produced. Neither
         // says which condition it was, which is what the blinding is for.
         if (typeof option.text === 'string') {
-          button.textContent = option.text;
-          button.style.whiteSpace = 'pre-wrap';
-          button.style.textAlign = 'left';
-          button.style.maxWidth = '40rem';
+          name.textContent = 'Option ' + String(badge.textContent);
+          body.textContent = option.text;
         } else {
           const summary = option.summary ?? { frames: 0, reward: 0 };
-          button.textContent =
-            'Round ' + String(option.played ?? 0) + ' -- ' +
-            String(summary.frames) + ' frames, score ' +
-            String(summary.reward);
+          name.textContent = 'Round ' + String(option.played ?? 0);
+          body.textContent =
+            String(summary.frames) + ' frames, score ' + String(summary.reward);
         }
-        button.addEventListener('click', () => {
-          this.close();
-          onChoose(option.handle);
+        top.appendChild(name);
+        cell.appendChild(top);
+        cell.appendChild(body);
+
+        const pick = document.createElement('div');
+        pick.className = 'option__pick';
+        const dot = document.createElement('span');
+        dot.className = 'option__dot';
+        dot.setAttribute('aria-hidden', 'true');
+        dot.textContent = '✓';
+        pick.appendChild(dot);
+        const word = document.createElement('span');
+        word.textContent = 'Choose this one';
+        pick.appendChild(word);
+        cell.appendChild(pick);
+
+        input.addEventListener('change', () => {
+          submit.disabled = false;
+          submit.textContent = 'Send: option ' + String(badge.textContent);
         });
-        list.appendChild(button);
-      }
-      app.appendChild(list);
+        list.appendChild(cell);
+      });
+      panel.appendChild(list);
+      panel.appendChild(foot);
+      submit.addEventListener('click', () => {
+        const picked = inputs().find((one) => one.checked);
+        if (!picked) return;
+        this.close();
+        onChoose(picked.value);
+      });
     },
     reopen() {
-      for (const button of buttons()) {
-        button.disabled = false;
+      for (const input of inputs()) {
+        input.disabled = false;
       }
+      submit.disabled = false;
     },
     close() {
-      for (const button of buttons()) {
-        button.disabled = true;
+      for (const input of inputs()) {
+        input.disabled = true;
       }
+      submit.disabled = true;
     },
   };
 }
 
 /** Render the completion screen: the code and the optional return link. */
 export function renderComplete(app: HTMLElement, delivery: CompleteDelivery): void {
-  app.innerHTML = '<h2>All done. Thank you.</h2>';
+  app.innerHTML = '';
+  const done = document.createElement('div');
+  done.className = 'sheet done';
+  const heading = document.createElement('h1');
+  heading.textContent = 'All done. Thank you.';
+  done.appendChild(heading);
   if (delivery.completion_code) {
-    const code = document.createElement('p');
-    code.textContent = 'Completion code: ' + delivery.completion_code;
-    app.appendChild(code);
+    // The code is what the participant is paid on, so it is the largest thing
+    // on the screen and it selects in one press.
+    const note = document.createElement('p');
+    note.className = 'panel__note';
+    note.textContent = 'Copy this code before you close the page.';
+    done.appendChild(note);
+    const line = document.createElement('p');
+    const code = document.createElement('span');
+    code.className = 'code';
+    code.textContent = delivery.completion_code;
+    line.appendChild(code);
+    done.appendChild(line);
   }
   if (delivery.return_url) {
+    const actions = document.createElement('div');
+    actions.className = 'actions';
+    actions.style.justifyContent = 'center';
     const link = document.createElement('a');
+    link.className = 'btn btn--primary';
     link.href = delivery.return_url;
     link.textContent = 'Return to the study';
-    app.appendChild(link);
+    actions.appendChild(link);
+    done.appendChild(actions);
   }
+  app.appendChild(done);
 }

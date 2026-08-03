@@ -36,7 +36,7 @@ from datetime import datetime, timedelta, timezone
 from typing import cast
 
 from mug.agents.runtime import LLMController
-from mug.authoring import LLMAgent, Message, Step
+from mug.authoring import Fallback, LLMAgent, Message, Step
 from mug.game.controllers import ScheduledSeat
 from mug.game.multiseat import (
     MultiSeatEnv,
@@ -206,6 +206,14 @@ class _AgentSeatDriver:
         self._latest_obs: object = None
         self._last_action: int | None = None
         self._task: asyncio.Task[DecisionOutcome] | None = None
+        # Set when somebody speaks to this seat, cleared when a decision starts. It
+        # is what lets a partner answer as soon as it is free instead of at its
+        # next turn.
+        self._woken = False
+        # Whether this seat has been asked anything at all this round. Until it has,
+        # it holds no choice, so there is nothing for the cadence to protect and the
+        # first frame asks.
+        self._ever_asked = False
         # The held-action seat the loop reads each frame, exposed for the episode.
         self.source: SeatActionSource = seat.seat
         self.result = AgentSeatResult(
@@ -217,20 +225,70 @@ class _AgentSeatDriver:
         self.actor_id = seat.actor_id
 
     def deliver(self, message: Message) -> None:
-        """Record one chat message on this seat's controller, for its next prompt."""
+        """Record one chat message on this seat's controller, and wake it.
+
+        Waking is what makes a partner answerable. A seat decides at its own
+        cadence, which for a model that plays is once every ``decides_every``
+        frames; without this, somebody who typed "get a plate" would wait out the
+        rest of that cadence for any sign they had been heard, and a partner you
+        have to wait on is not one you talk to.
+
+        It sets a flag rather than starting a decision, so the decision still starts
+        on the loop's own frame and never on the socket's thread of control. A seat
+        already deciding is not disturbed: the message is in its history and the
+        decision in flight has not been sent yet or cannot be recalled, and either
+        way the next one reads it.
+        """
         self._controller.record_message(message)
+        self._woken = True
+        self._controller.diagnostics.note(
+            "agent.heard",
+            subject=self._controller.label,
+            sender=message.sender,
+            text=message.text,
+            deciding=self._task is not None,
+        )
 
     def take_said(self) -> list[str]:
         """Take everything this seat has said and not yet had published."""
         said, self.said = self.said, []
         return said
 
+    async def warm_up(self, modelcall_id: str, *, on: AgentEnv = None) -> bool:
+        """Reach this seat's model before the round, and say whether it answered."""
+        return await self._controller.warm_up(modelcall_id, on=on)
+
+    async def answer(self, modelcall_id: str) -> None:
+        """Say something back, with nothing stepping and no action to read.
+
+        The loop is not running, so nothing here is a decision: no deadline is
+        applied and no fallback stands in for an answer that did not come. A seat
+        that says nothing has answered, and the wake is spent either way.
+        """
+        self._woken = False
+        said = await self._controller.answer(modelcall_id)
+        if said:
+            self.said.append(said)
+
     def record_and_maybe_decide(self, info: MultiSeatStepInfo) -> None:
-        """Record the frame, apply a ready decision, and maybe start a new one."""
+        """Record the frame, apply a ready decision, and maybe start a new one.
+
+        A seat somebody has spoken to decides on this frame whatever its cadence
+        says, so it answers as soon as it is free rather than at its next turn.
+
+        **A seat that has not been asked anything yet is asked now.** The cadence
+        exists to stop a seat re-choosing a job it has not started; at the first
+        frame of a round there is no job to protect, so waiting out a whole cadence
+        period buys nothing and costs the participant every frame of it. It cost a
+        second at ``decides_every=30`` and thirty frames a second -- one second of a
+        partner standing still before the model was even asked, on top of however
+        long the model then took.
+        """
         self._latest_obs = info.result.observations.get(self._agent_id)
         self._record_step(info)
         self._apply_ready()
-        if info.frame % self._agent.decides_every == 0:
+        due = info.frame % self._agent.decides_every == 0
+        if not self._ever_asked or due or self._woken:
             self._start_decision()
 
     def drain(self) -> None:
@@ -275,9 +333,25 @@ class _AgentSeatDriver:
         )
 
     def _start_decision(self) -> None:
-        """Start a background decision, unless one is already in flight."""
+        """Start a background decision, unless one is already in flight.
+
+        A seat that was woken and could not start keeps its wake, so somebody who
+        spoke while the seat was mid-decision is answered on the frame after it
+        returns rather than losing their turn to it.
+        """
         if self._task is not None:
+            # The cadence came round and the last decision has not come back. It is
+            # the reading behind "the partner only moves every few seconds": the
+            # model is slower than the rate the study asked it to decide at, and
+            # nothing else in the run says so.
+            self._controller.diagnostics.note(
+                "agent.busy",
+                subject=self._controller.label,
+                decides_every=self._agent.decides_every,
+            )
             return
+        self._woken = False
+        self._ever_asked = True
         self._task = asyncio.create_task(self._decide(self._build_request()))
 
     async def _decide(self, request: DecisionRequest) -> DecisionOutcome:
@@ -298,7 +372,21 @@ class _AgentSeatDriver:
             self._task = None
 
     def _settle(self, outcome: DecisionOutcome) -> None:
-        """Record a decision outcome and set its action as the seat's held action.
+        """Record a decision outcome and set what the seat has chosen.
+
+        A decision that fell back is read through the agent's own ``on_timeout``,
+        because the two rules mean different things to a seat that decides at a
+        coarser grain than the environment steps:
+
+        - ``REPEAT_LAST`` keeps the choice, which is the whole point of a choice that
+          lasts: a partner half way to the pot goes on to the pot.
+        - ``WAIT`` leaves the seat with **no** choice, which is not the same as
+          choosing the idle action. ``carry_out`` is told nobody has said what to do
+          and answers for itself; a seat with no ``carry_out`` takes the game's
+          default action, exactly as it did before.
+
+        The last **decided** choice is kept either way, so a repeat-last fallback
+        has something real to repeat rather than repeating a fallback.
 
         What the seat said on the same decision is taken here too. It is taken even
         when the outcome fell back, because falling back is a statement about the
@@ -306,8 +394,22 @@ class _AgentSeatDriver:
         something, and dropping it would lose a message the model really produced.
         """
         self.result.decisions.append(outcome)
-        self._seat.apply(outcome.action)
-        self._last_action = outcome.action
+        waited = outcome.used_fallback and self._agent.on_timeout is Fallback.WAIT
+        if outcome.used_fallback:
+            # The seat did not choose this; the rule did. A partner that plays the
+            # same move all round is either a model repeating itself or a fallback
+            # firing every decision, and from the screen the two are the same
+            # picture.
+            self._controller.diagnostics.note(
+                "agent.fallback",
+                subject=self._controller.label,
+                rule=self._agent.on_timeout.name,
+                action=None if waited else outcome.action,
+                waited_ms=int(self._timeout * 1000),
+            )
+        self._seat.apply(None if waited else outcome.action)
+        if not outcome.used_fallback:
+            self._last_action = outcome.action
         said = self._controller.take_message()
         if said:
             self.said.append(said)
@@ -360,6 +462,7 @@ class MultiAgentEpisode:
         frame_sink: MultiSeatObserver | None = None,
         fps: int = 0,
         max_steps: int = 200,
+        make_env: Callable[[], AgentEnv] | None = None,
     ) -> None:
         if not seats and not local_seats:
             # A model seat is no longer what makes an episode: several people in one
@@ -385,6 +488,9 @@ class MultiAgentEpisode:
         self._fps = fps
         self._max_steps = max_steps
         self._local = tuple(local_seats)
+        # How to make one more environment of the same kind, for a warm-up to read.
+        # A round is never warmed up on the environment it is about to be played on.
+        self._make_env = make_env
 
         # The loop steps the model seats first, then the local seats, in one order.
         self._agent_ids = tuple(
@@ -455,6 +561,57 @@ class MultiAgentEpisode:
         """
         for driver in self._drivers:
             driver.deliver(Message(sender=sender, text=text, tick=tick))
+
+    async def warm_up(self, new_modelcall_id: Callable[[], str]) -> list[str]:
+        """Reach every model seat once before the round, and name the ones that fail.
+
+        A provider that cannot be reached draws itself as a partner that stands
+        still, which is the one picture a participant cannot read. Reaching it
+        before the first frame turns that into something the study knows: the seats
+        that answered, and the seats that did not.
+
+        It also pays for loading the model and for reading the fixed part of the
+        study's prompt, which a runner does on the first call after a quiet spell --
+        and the quiet spell is the consent form and the instructions. A wait before
+        a game starts is a wait somebody can read.
+
+        Nothing here touches the environment or what a seat carries, so a round that
+        is warmed up plays exactly the round it would have played. Every seat is
+        reached at once, so a table of several models waits for one of them.
+        """
+        # One throwaway environment for every seat: it is read to build the prompts
+        # and then dropped. The round's own environment is never touched, so a round
+        # that was warmed up plays exactly the round it would have played -- which
+        # is why this is not simply the round's environment reset early.
+        spare = self._make_env() if self._make_env is not None else None
+        answered = await asyncio.gather(
+            *[driver.warm_up(new_modelcall_id(), on=spare) for driver in self._drivers]
+        )
+        return [
+            driver.result.seat_key
+            for driver, ready in zip(self._drivers, answered, strict=True)
+            if not ready
+        ]
+
+    async def answer(self, new_modelcall_id: Callable[[], str]) -> None:
+        """Let every model seat answer what it has been told, with nothing stepping.
+
+        This is the seat between rounds. The loop has ended and the environment is
+        standing at the state the round left it in, which is what the seat is asked
+        about: the kitchen as it ended is exactly what "we ran out of time on that
+        last soup" is about.
+
+        Nothing is recorded as a decision, because nothing decided anything: the
+        turn leaves a model call and, when the seat says something, a message. What
+        is said is collected here and published by the transport, the same way a
+        seat's words are published during a round.
+
+        Every seat is asked at once, so a table of several models answers in the
+        time one of them takes.
+        """
+        await asyncio.gather(
+            *[driver.answer(new_modelcall_id()) for driver in self._drivers]
+        )
 
     def take_said(self) -> list[tuple[str, str, int]]:
         """Take what every seat has said since the last drain, in seat order.

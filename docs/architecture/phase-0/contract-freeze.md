@@ -59,12 +59,12 @@ the right contract, which is what the review panel was for.
 | `api-01` Study authoring, compilation, and publication | 0.2 | `96958cdf…` | 18 | — | `mug.authoring` | 2026-07-25 | — |
 | `api-02` Platform composition and deployment | 0.2 | `4fe71236…` | 5 | — | `mug.platform` | 2026-07-25 | — |
 | `api-03` Identity, launch, and enrollment | 0.2 | `9e1a5bbf…` | 3 | — | `mug.identity` | 2026-07-25 | — |
-| `api-04` Visit plans, flow, treatment, exposure, and state | 0.3 | `5985bd0d…` | 8 | — | `mug.visits` | 2026-07-25 | — |
-| `api-05` Seats, actor instances, capabilities, and controller bindings | 0.3 | `df3da1e1…` | 7 | — | `mug.casting` | 2026-07-25 | — |
+| `api-04` Visit plans, flow, treatment, exposure, and state | 0.3 | `d245b518…` | 8 | — | `mug.visits` | 2026-07-30 | — |
+| `api-05` Seats, actor instances, capabilities, and controller bindings | 0.3 | `4562b13e…` | 7 | — | `mug.casting` | 2026-07-30 | — |
 | `api-06` Interactions, channels, membership, matchmaking, and leases | 0.3 | `538a17e3…` | 9 | — | `mug.interactions` | 2026-07-25 | — |
-| `api-07` Environment, game, input, rendering, and execution modes | 0.3 | `2c41f0fe…` | 6 | — | `mug.game` | 2026-07-25 | — |
+| `api-07` Environment, game, input, rendering, and execution modes | 0.3 | `b58e8ca5…` | 6 | — | `mug.game` | 2026-07-30 | — |
 | `api-08` Conversation, routing, history, streaming, and delivery | 0.2 | `0e305fb3…` | 6 | — | `mug.conversation` | 2026-07-25 | — |
-| `api-09` Participant client, realtime, browser P2P, HTTP, and uploads | 0.4 | `ec6d3f00…` | 20 | — | `mug.client` | 2026-07-25 | — |
+| `api-09` Participant client, realtime, browser P2P, HTTP, and uploads | 0.4 | `8d3a7245…` | 20 | — | `mug.client` | 2026-07-30 | — |
 | `api-10` Events, capture, provenance, and projections | 0.3 | `f8d8da4c…` | 3 | — | `mug.events` | 2026-07-25 | — |
 | `api-11` Storage, artifacts, repositories, transactions, and outbox | 0.2 | `007023d2…` | 4 | — | `mug.storage` | 2026-07-25 | — |
 | `api-12` Automated controllers, scheduling, and execution | 0.3 | `b7ac5272…` | 6 | — | `mug.scheduling` | 2026-07-25 | — |
@@ -129,10 +129,10 @@ Tombstones carry no bytes and can hold no freeze record: `api-20`, `api-21`.
 ### `api-04` — Visit plans, flow, treatment, exposure, and state
 
 - Schema: `docs/architecture/phase-0/api-04/schemas/v0/visit-plan.schema.json`
-- Bundle digest: `5985bd0df049a1a3fa2fc730e66fe0fe89c7a49038e40d1ce07a46f6a0fea161`
+- Bundle digest: `d245b51899a51d1de97d5d9d5b1a849dea3ff079546ea8f362cda9301f401e4c`
 - Fixtures: `docs/architecture/phase-0/api-04/fixtures/v0/manifest.json`
-- Fixture digest: `2c5a3505f8988366577e5d51d8255dbf7bd1f5889cf31f7adc9aa6d9212f0f38`
-- Fixture bytes: `2c8d0a7fd329180f812e10c82c27384617a19e0663ed7e799ef4b85a3e62464d`
+- Fixture digest: `12c292fd5c6c2b1a4cf8cd3c664e86d180385d1bd9a95228af2c4df52d64a65c`
+- Fixture bytes: `6347df71de67c0ff3babe8d6d1b44b7491c3090611e1fa33605c6f53ca729816`
 - Runtime: `mug.visits.visits_schema()`
 - Conformance: `tests/unit/visits/test_visits_conformance.py`
 - Records (8): `AllocationState`, `EligibilityCallback`, `StateDocument`, `TreatmentAssignment`, `TreatmentExposure`, `TreatmentPlan`, `Visit`, `VisitPlan`
@@ -140,10 +140,10 @@ Tombstones carry no bytes and can hold no freeze record: `api-20`, `api-21`.
 ### `api-05` — Seats, actor instances, capabilities, and controller bindings
 
 - Schema: `docs/architecture/phase-0/api-05/schemas/v0/actor.schema.json`
-- Bundle digest: `df3da1e10ffec853c052c7188e617cd2f2f529876c19b86d852164ba97552c1f`
+- Bundle digest: `4562b13e005ff07cbe2262a05ab0a5ebdc4ee0a3a1e5c84c7b643fa47dc19a47`
 - Fixtures: `docs/architecture/phase-0/api-05/fixtures/v0/manifest.json`
-- Fixture digest: `3a746a5a13efd44a446645978c7fd02d460b9f4ea363ed55d2a6f0f265292f8e`
-- Fixture bytes: `0c472248d405aa963491c23ac157486ee323be745c95b69776d82aeb89248336`
+- Fixture digest: `0e4c85e316e328db2e02f7b3f769015e5e7f4acc948e4a7a45e32a1a70c0687a`
+- Fixture bytes: `a2131db3a45c848a17a752f580ab816ac1722923ad56bd95c3ede425b90c42b5`
 - Runtime: `mug.casting.casting_schema()`
 - Conformance: `tests/unit/casting/test_casting_conformance.py`
 - Records (7): `ActorInstance`, `CastDeclaration`, `ControllerBinding`, `Group`, `OnnxPolicy`, `SeatAgentBinding`, `SeatDefinition`
@@ -162,10 +162,10 @@ Tombstones carry no bytes and can hold no freeze record: `api-20`, `api-21`.
 ### `api-07` — Environment, game, input, rendering, and execution modes
 
 - Schema: `docs/architecture/phase-0/api-07/schemas/v0/game.schema.json`
-- Bundle digest: `2c41f0fe7bacf95174dc6c1cc1e57a4ce478d1deca1aeadd9d857f91d7d2caaa`
+- Bundle digest: `b58e8ca5143b68c216fa8c8734341439b8749a044c56d9dcfc810b237e82f25d`
 - Fixtures: `docs/architecture/phase-0/api-07/fixtures/v0/manifest.json`
-- Fixture digest: `d5b0c18c033f4c6b826c92be122c83c461bb0911a99607a1b4ac683983a0162c`
-- Fixture bytes: `2b8aa37bf73833eab0be35c0b2b9804d005e29407cf68427508d4dcf30055142`
+- Fixture digest: `44603b7fc4e5ced1258e1ab2c4b1d12eadaa5cf19531be49f0441353ed78cdee`
+- Fixture bytes: `4e7bcf0664570c9a019c65990894f9bb6384de3e7a3f7d442fcccffde53b12e2`
 - Runtime: `mug.game.game_schema()`
 - Conformance: `tests/unit/game/test_game_conformance.py`
 - Records (6): `EnvFactory`, `EpisodeBoundary`, `ExecutionMode`, `GameTransition`, `P2PFrameFinality`, `RenderPacket`
@@ -184,10 +184,10 @@ Tombstones carry no bytes and can hold no freeze record: `api-20`, `api-21`.
 ### `api-09` — Participant client, realtime, browser P2P, HTTP, and uploads
 
 - Schema: `docs/architecture/phase-0/api-09/schemas/v0/client.schema.json`
-- Bundle digest: `ec6d3f0019480421a8cdc9ce8db2f2e88f2398e0daf0c7773ced3841ba435029`
+- Bundle digest: `8d3a7245555870295a7546bb3c2bc91e2f94c2fded93b07ae779d1ad885a79b6`
 - Fixtures: `docs/architecture/phase-0/api-09/fixtures/v0/manifest.json`
-- Fixture digest: `7736d2d39e5044caca0626248ff7b38b1a830af9bef3fb0165cd80f39f34bba6`
-- Fixture bytes: `3585dfc813bb2d566ff577683782f33a0a901ec53f08e8b33fc973c6f43ad542`
+- Fixture digest: `eb2e376e0c3a4420d8a0929430d7ecac6286b1616e0b3e1b79aa2b4d90f82542`
+- Fixture bytes: `32bf9cc86f0ddea59400fdcff4a00a72e3c93cebdc48108bd375334374cdc75d`
 - Runtime: `mug.client.client_schema()`
 - Conformance: `tests/unit/client/test_client_conformance.py`
 - Records (20): `BridgeMessage`, `ClientHandshake`, `GateOp`, `InputScheme`, `MonitoringMeasurement`, `P2PCaptureSubmission`, `P2PIceGrantRequest`, `P2PMeshAbort`, `P2PMeshBootstrap`, `P2PMeshFinish`, `P2PMeshStart`, `P2PPeerComplete`, `P2PPeerReady`, `P2PSignal`, `P2PSignalAck`, `P2PSignalDelivery`, `RealtimeCommand`, `SeatDelivery`, `TransportAck`, `UploadTicket`

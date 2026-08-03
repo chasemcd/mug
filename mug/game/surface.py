@@ -264,7 +264,7 @@ class Surface:
         y: _Number,
         w: _Number,
         h: _Number,
-        frame: int | None = None,
+        frame: str | None = None,
         angle: _Number | None = None,
         object_id: str | None = None,
         **common: Any,
@@ -274,6 +274,11 @@ class Surface:
         ``image_name`` names an asset the study declared (``mug.content.assets``).
         The renderer resolves it against the collection in the client manifest, so
         the environment names a picture and never a path or a URL.
+
+        ``frame`` names one frame of a sheet by the name it was packed under --
+        ``frame="counter.png"``. It is a name and not an index for the same reason
+        ``image_name`` is: an index means nothing on its own, so a re-packed sheet
+        would move every index after the change and go on drawing, wrongly.
         """
         self._draw(
             "image",

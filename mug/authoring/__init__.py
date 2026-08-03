@@ -13,7 +13,6 @@ record references the kernel (L0) types; the family adds no runtime.
 from __future__ import annotations
 
 from mug.authoring.agents import (
-    Chat,
     Fallback,
     History,
     LLMAgent,
@@ -21,6 +20,7 @@ from mug.authoring.agents import (
     Provider,
     Step,
     Thoughts,
+    Transcript,
 )
 from mug.authoring.preferences import Axis, Comparison, Elicit
 from mug.authoring.service import PublishStudyCommand, publish_study
@@ -52,7 +52,6 @@ __all__ = [
     "AuthoringDocument",
     "Axis",
     "CapabilityRequirement",
-    "Chat",
     "ClientManifest",
     "CodePackageRef",
     "Comparison",
@@ -80,6 +79,7 @@ __all__ = [
     "StudyPublicationResult",
     "StudyServerManifest",
     "Thoughts",
+    "Transcript",
     "ValidationReport",
     "authoring_schema",
     "publish_study",

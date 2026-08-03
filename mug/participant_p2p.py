@@ -133,7 +133,7 @@ class P2PCoordinator:
                 size=config.size,
                 seed=config.seed,
                 study_version=config.study_version,
-                limits=config.limits,
+                limits=config.room_limits,
                 verify_capture=config.capture_verifier,
             ),
             RoomPoolRuntime(

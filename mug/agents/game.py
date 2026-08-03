@@ -29,10 +29,12 @@ limitation the episode runtime already carries.
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 
 from mug.agents.multiseat_episode import (
     AgentSeat,
@@ -42,11 +44,14 @@ from mug.agents.multiseat_episode import (
 )
 from mug.agents.runtime import AgentIds, LLMController, compile_agent
 from mug.agents.turnbased_episode import TurnBasedAgentEpisode
-from mug.authoring import Fallback, LLMAgent
+from mug.authoring import Fallback, LLMAgent, Thoughts, Transcript
+from mug.diagnostics import Diagnostics
 from mug.game.aec import AecEnv, TurnBasedEnv, TurnBasedObserver
 from mug.game.controllers import ScheduledSeat
+from mug.game.keys import Bindings
 from mug.game.multiseat import MultiSeatEnv, MultiSeatObserver
 from mug.game.seams import SeatActionSource
+from mug.game.spec import HudFn, RenderFn
 from mug.providers import ModelProvider
 from mug.providers.runtime import NewContext, ProviderAdapter, SecretResolver
 from mug.scheduling import FallbackRule, Scheduler
@@ -102,6 +107,49 @@ class BotSeatSpec:
     actor_id: str | None = None
 
 
+class SeatMemory:
+    """What a model seat carries from one round of an activity into the next.
+
+    An activity of several rounds runs one episode per round: a fresh environment,
+    a fresh trajectory, and -- until this held it -- a fresh controller, which meant
+    a partner walked into round two having forgotten every word of round one. The
+    conversation had not forgotten, because the room is the activity's and outlives
+    the round. A partner that can be reminded of what it agreed to and has no memory
+    of agreeing is worse than one that never agreed.
+
+    So two things are carried and one is not:
+
+    - **thoughts** carry, because a plan is about the task and not about the round.
+    - **the transcript** carries, because it is one conversation. It is the same
+      conversation the participant can see the whole of on their own screen.
+    - **the history** does not, because it is the episode's own transitions. Each
+      round is its own episode with its own trajectory and its own frame numbers,
+      and joining two of them would make one list whose ticks run 1..600, 1..600.
+      What carried between rounds is then exactly what was said and what was
+      planned, which is also the cleaner thing to write a paper about.
+
+    It is held per activity by whatever owns the rounds, and it is keyed by the
+    environment agent a seat plays, so a seat gets its own memory back and never
+    another seat's.
+    """
+
+    def __init__(self) -> None:
+        self._thoughts: dict[str, Thoughts] = {}
+        self._chat: dict[str, Transcript] = {}
+
+    def knows(self, agent_id: str) -> bool:
+        """Return whether this seat has played a round of the activity already."""
+        return agent_id in self._chat
+
+    def thoughts_of(self, agent_id: str) -> Thoughts:
+        """Return one seat's carried reasoning, empty before its first round."""
+        return self._thoughts.setdefault(agent_id, Thoughts())
+
+    def chat_of(self, agent_id: str) -> Transcript:
+        """Return one seat's carried transcript, empty before its first round."""
+        return self._chat.setdefault(agent_id, Transcript())
+
+
 def _no_bindings() -> dict[str, int]:
     """Return an empty, typed key-to-action binding map for a spec default."""
     return {}
@@ -137,6 +185,10 @@ class AgentGameSpec:
     it names one human seat. Naming both is refused, because two statements of who
     sits where is one too many.
 
+    ``render`` draws one frame for whoever is watching; the transport gives each
+    watching connection its own surface and pushes what changed. A game with none
+    draws nothing, which is right for seats that are all models.
+
     ``action_bindings`` and ``default_action`` map a human seat's keys;
     ``decision_timeout`` bounds each model decision, and ``fps`` / ``max_steps``
     shape the loop.
@@ -144,11 +196,14 @@ class AgentGameSpec:
 
     channel_key: str
     make_env: Callable[[], MultiSeatEnv]
+    render: RenderFn | None = None
+    hud: HudFn | None = None
+    input_mode: str = "pressed_keys"
     seats: tuple[AgentSeatSpec, ...] = field(default_factory=_no_model_seats)
     human: HumanSeatSpec | None = None
     humans: tuple[HumanSeatSpec, ...] = field(default_factory=_no_human_seats)
     bots: tuple[BotSeatSpec, ...] = field(default_factory=_no_bot_seats)
-    action_bindings: dict[str, int] = field(default_factory=_no_bindings)
+    action_bindings: Bindings = field(default_factory=_no_bindings)
     default_action: int = 0
     decision_timeout: float = 1.0
     fps: int = 0
@@ -183,7 +238,7 @@ class TurnBasedGameSpec:
     seats: tuple[AgentSeatSpec, ...]
     step_env: Callable[[Any], TurnBasedEnv] = AecEnv
     human: HumanSeatSpec | None = None
-    action_bindings: dict[str, int] = field(default_factory=_no_bindings)
+    action_bindings: Bindings = field(default_factory=_no_bindings)
     default_action: int = 0
     decision_timeout: float = 1.0
     fps: int = 0
@@ -199,6 +254,8 @@ def _compose_seats(
     new_generation_id: Callable[[], str],
     now: Callable[[], datetime],
     default_action: int,
+    memory: SeatMemory | None = None,
+    diagnostics: Diagnostics | None = None,
 ) -> tuple[Scheduler, list[AgentSeat]]:
     """Compose one scheduler and one model seat per spec over the shared stack.
 
@@ -226,6 +283,7 @@ def _compose_seats(
             adapter=seat_spec.adapter,
             now=now,
             new_generation_id=new_generation_id,
+            diagnostics=diagnostics,
         )
         controller = LLMController(
             agent=seat_spec.agent,
@@ -235,6 +293,13 @@ def _compose_seats(
             agent_id=seat_spec.agent_id,
             new_context=new_context,
             resolve_secret=seat_spec.resolve_secret,
+            # What this seat carries out of the last round, when something owns the
+            # rounds and kept it. The history is deliberately not among it: it is
+            # the episode's own transitions, and this episode is a new one.
+            chat=memory.chat_of(seat_spec.agent_id) if memory else None,
+            thoughts=memory.thoughts_of(seat_spec.agent_id) if memory else None,
+            diagnostics=diagnostics,
+            seat_key=seat_spec.seat_key,
         )
         seats.append(
             AgentSeat(
@@ -243,11 +308,42 @@ def _compose_seats(
                 actor_id=seat_spec.actor_id,
                 agent=seat_spec.agent,
                 controller=controller,
-                seat=ScheduledSeat(default_action=default_action),
+                seat=ScheduledSeat(
+                    default_action=default_action,
+                    carry_out=_carrying_out(seat_spec.agent, env, seat_spec.agent_id),
+                ),
                 text_view=seat_spec.text_view,
             )
         )
     return scheduler, seats
+
+
+def _carrying_out(
+    agent: LLMAgent, env: Any, agent_id: str
+) -> Callable[[int | None], int | None] | None:
+    """Bind one agent's ``carry_out`` to the seat it plays, if it wrote one.
+
+    An agent that wrote none is answered ``None``, and the seat then holds its
+    choice and steps it -- which is what every scheduled seat did before an agent
+    could decide at a coarser grain than the environment steps. Asking the base
+    method once a frame instead would be the same answer at the cost of a call and,
+    worse, would make the two cases indistinguishable to anything reading the seat.
+    """
+    if type(agent).carry_out is LLMAgent.carry_out:
+        return None
+    return lambda chosen: agent.carry_out(env, agent_id, chosen)
+
+
+def _waits_for(seat_specs: tuple[AgentSeatSpec, ...], written: float) -> float:
+    """Return how long a decision has, given every model seat in one activity.
+
+    The seats share one scheduler, so there is one deadline, and it is the longest
+    any of them asked for: a shorter one would make a slower model fall back on
+    every decision it ever made, with nothing in the records to say the study had
+    never waited for it.
+    """
+    asked = [seat.agent.answers_within for seat in seat_specs]
+    return max([written, *asked]) if asked else written
 
 
 def _held(
@@ -334,6 +430,8 @@ def build_agent_episode(
     human_source: SeatActionSource | None = None,
     human_sources: Mapping[str, SeatActionSource] | None = None,
     frame_sink: MultiSeatObserver | None = None,
+    memory: SeatMemory | None = None,
+    diagnostics: Diagnostics | None = None,
 ) -> MultiAgentEpisode:
     """Compose the built stack for one simultaneous multi-seat game into an episode.
 
@@ -343,6 +441,8 @@ def build_agent_episode(
     participants, a model partner, and a scripted bot are one episode over one
     environment. ``human_sources`` names each person's input by seat key; the
     ``frame_sink`` is the transport's per-frame push to whoever is watching.
+    ``diagnostics`` is where each seat says what it was asked and what came back, for
+    a process started in debug mode; with none, nothing is written down.
     """
     env = spec.make_env()
     scheduler, seats = _compose_seats(
@@ -353,6 +453,8 @@ def build_agent_episode(
         new_generation_id=new_generation_id,
         now=now,
         default_action=spec.default_action,
+        memory=memory,
+        diagnostics=diagnostics,
     )
     return MultiAgentEpisode(
         env=env,
@@ -365,12 +467,86 @@ def build_agent_episode(
         new_context=new_context,
         new_decision_id=new_decision_id,
         now=now,
-        decision_timeout=spec.decision_timeout,
+        decision_timeout=_waits_for(spec.seats, spec.decision_timeout),
         local_seats=_local_seats(spec, human_source, human_sources),
         frame_sink=frame_sink,
         fps=spec.fps,
         max_steps=spec.max_steps,
+        make_env=_spare_env(spec),
     )
+
+
+async def warm_up_seats(
+    spec: AgentGameSpec,
+    *,
+    store: Store,
+    new_context: NewContext,
+    new_modelcall_id: Callable[[], str],
+    new_generation_id: Callable[[], str],
+    now: Callable[[], datetime],
+    diagnostics: Diagnostics | None = None,
+) -> list[str]:
+    """Reach every model seat of a game once, and name the ones that did not answer.
+
+    This is the warm-up as a study can run it **before there is a round**, which is
+    the only place it is worth anything. Two things are paid on the first call a
+    model seat makes: loading the model, which a runner does after a quiet spell,
+    and reading the fixed part of the study's prompt. Paid inside the round they are
+    a partner frozen in a running kitchen; paid while the participant is still on
+    the consent form they are paid by nobody.
+
+    So it composes seats of its own over an environment of its own -- neither the
+    round's seats nor the round's environment, which do not exist yet -- asks each
+    one the study's real question, and throws all of it away. What is left behind is
+    a model in the runner's memory, a prompt prefix in its cache, and the answer to
+    "does this provider answer": which is the whole of what a warm-up is for.
+
+    A game with no model seat needs none and makes no call.
+    """
+    if not spec.seats:
+        return []
+    spare = _spare_env(spec)
+    env = spare() if spare is not None else None
+    _scheduler, seats = _compose_seats(
+        spec.seats,
+        env,
+        store=store,
+        new_context=new_context,
+        new_generation_id=new_generation_id,
+        now=now,
+        default_action=spec.default_action,
+        diagnostics=diagnostics,
+    )
+    answered = await asyncio.gather(
+        *[seat.controller.warm_up(new_modelcall_id(), on=env) for seat in seats]
+    )
+    return [
+        seat.seat_key
+        for seat, ready in zip(seats, answered, strict=True)
+        if not ready
+    ]
+
+
+def _spare_env(spec: AgentGameSpec) -> Callable[[], Any] | None:
+    """Return how to make one throwaway environment, for a warm-up to read.
+
+    A warm-up asks the study's own question, which means reading an environment --
+    and the one the round is about to be played on must not be read or reset by
+    anything but the round. So it reads one of its own, built the same way and
+    thrown away. A game with no model seat needs none and is given none.
+    """
+    if not spec.seats:
+        return None
+
+    def spare() -> Any:
+        env = spec.make_env()
+        # A fresh environment has nothing in it until it is reset, and a study's
+        # prompt is written about a kitchen that exists.
+        with contextlib.suppress(Exception):
+            cast("Any", env).reset()
+        return env
+
+    return spare
 
 
 def build_turnbased_episode(
@@ -416,7 +592,7 @@ def build_turnbased_episode(
         new_context=new_context,
         new_decision_id=new_decision_id,
         now=now,
-        decision_timeout=spec.decision_timeout,
+        decision_timeout=_waits_for(spec.seats, spec.decision_timeout),
         local_seats=_turnbased_local_seats(spec.human, human_source),
         frame_sink=frame_sink,
         fps=spec.fps,
@@ -432,4 +608,5 @@ __all__ = [
     "TurnBasedGameSpec",
     "build_agent_episode",
     "build_turnbased_episode",
+    "warm_up_seats",
 ]

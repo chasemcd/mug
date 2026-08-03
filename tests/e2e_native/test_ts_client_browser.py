@@ -74,6 +74,10 @@ def _ensure_web_built() -> None:
 def _assemble_web_root(destination: Path) -> Path:
     """Lay out the served root: the shell plus the compiled client and kernel."""
     shutil.copy(_SHELL, destination / "index.html")
+    shutil.copy(
+        _SHELL.parents[3] / "mug" / "webclient" / "app.css",
+        destination / "app.css",
+    )
     shutil.copytree(_DIST_WEB / "client", destination / "client")
     shutil.copytree(_DIST_WEB / "kernel", destination / "kernel")
     return destination
@@ -117,9 +121,9 @@ def test_a_participant_completes_a_study_in_the_typescript_client(
     page.wait_for_selector("text=connected", timeout=10_000)
 
     # Consent, then survey.
-    page.locator("input[name='agree'][value='yes']").check()
+    page.locator("label:has(input[name='agree'][value='yes'])").click()
     page.get_by_role("button", name="Continue").click()
-    page.locator("input[name='mood'][value='4']").check()
+    page.locator("label:has(input[name='mood'][value='4'])").click()
     page.get_by_role("button", name="Continue").click()
 
     # The game mounts a canvas; the episode plays and the flow reaches the debrief.

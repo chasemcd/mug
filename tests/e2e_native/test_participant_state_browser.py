@@ -85,7 +85,8 @@ def test_a_page_writes_state_and_a_later_activity_reads_it(
     assert page.evaluate("window.mug.state.get('progress')") == {}
 
     page.evaluate("window.mug.state.set('progress', {answered: ['consent']})")
-    page.get_by_role("radio", name="yes").check()
+    page.get_by_role("radio", name="yes").focus()
+    page.keyboard.press("Space")
     page.get_by_role("button", name="Continue").click()
     expect(page.get_by_text("Halfway")).to_be_visible(timeout=10_000)
 
@@ -95,9 +96,7 @@ def test_a_page_writes_state_and_a_later_activity_reads_it(
     }
 
     # A second write in the same activity names the revision the first produced.
-    page.evaluate(
-        "window.mug.state.set('progress', {answered: ['consent', 'middle']})"
-    )
+    page.evaluate("window.mug.state.set('progress', {answered: ['consent', 'middle']})")
     page.wait_for_function(
         "() => window.mug.state.revision('progress') === 2", timeout=10_000
     )
@@ -131,7 +130,8 @@ def test_a_page_cannot_write_a_namespace_the_study_keeps_to_itself(
     assert page.evaluate("window.mug.state.get('scoring')") == {}
 
     # The participant carries on; a refused write is not a broken session.
-    page.get_by_role("radio", name="yes").check()
+    page.get_by_role("radio", name="yes").focus()
+    page.keyboard.press("Space")
     page.get_by_role("button", name="Continue").click()
     expect(page.get_by_text("Halfway")).to_be_visible(timeout=10_000)
     # The refused write reached no store: the namespace is still empty.

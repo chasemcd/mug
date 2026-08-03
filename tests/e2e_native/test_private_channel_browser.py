@@ -32,17 +32,19 @@ from playwright.sync_api import Page, expect
 
 from mug.agents import AgentIds
 from mug.app import build_study_app
-from mug.authoring import Chat, Fallback, History, LLMAgent, Provider, Thoughts
+from mug.authoring import Fallback, History, LLMAgent, Provider, Thoughts, Transcript
 from mug.content import Choice, Form, Game, Study
 from mug.content import Page as StudyPage
 from mug.gateway import Gateway
 from mug.participant_chat import ChatChannel, ChatSeatSpec, ChatSpec
 from mug.providers import ModelCall, ModelCompletion, Usage
 from mug.storage import InMemoryStore
+from tests.support.chat import written_chat
 
 pytestmark = pytest.mark.e2e
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
+
 _TS_ROOT = _REPO_ROOT / "ts"
 _SHELL = _TS_ROOT / "src" / "client" / "index.html"
 _DIST_WEB = _TS_ROOT / "dist-web"
@@ -66,10 +68,12 @@ class _Model(LLMAgent):
         env: object,
         agent_id: str,
         history: History,
-        chat: Chat,
+        chat: Transcript,
         thoughts: Thoughts,
     ) -> str:
-        return ""
+        # The shape the shipped example writes. A double whose prompt says nothing
+        # would let the mount drop the author's words and still pass.
+        return "\n".join(f"{one.sender}: {one.text}" for one in chat.last(50))
 
 
 def _voice(name: str) -> Any:
@@ -77,7 +81,12 @@ def _voice(name: str) -> Any:
 
     async def adapter(call: ModelCall) -> ModelCompletion:
         payload: Any = call.payload
-        said = payload["messages"][-1]["text"]
+        # ``content`` is where every provider reads the words of a message. A
+        # double that reads them anywhere else passes while the real model is
+        # sent nothing at all.
+        spoken = str(payload["messages"][-1]["content"]).splitlines()
+        lines = [one for one in spoken if one.startswith("user: ")]
+        said = lines[-1][len("user: ") :] if lines else spoken[-1]
         return ModelCompletion(
             outcome="completed",
             resolved_model="fake-local",
@@ -110,7 +119,7 @@ def _coached_study() -> Study:
 
 def _coached_spec() -> ChatSpec:
     """A partner on the public channel and a coach on a channel of its own."""
-    return ChatSpec(
+    return written_chat(
         seats=(
             ChatSeatSpec(
                 agent=_Model(),
@@ -181,6 +190,10 @@ def ts_coached_url(tmp_path: Path) -> Iterator[str]:
     if not _BOOTSTRAP.exists():
         pytest.skip("ts/dist-web is not built; run `npm run build:web` in ts/")
     shutil.copy(_SHELL, tmp_path / "index.html")
+    shutil.copy(
+        _SHELL.parents[3] / "mug" / "webclient" / "app.css",
+        tmp_path / "app.css",
+    )
     shutil.copytree(_DIST_WEB / "client", tmp_path / "client")
     shutil.copytree(_DIST_WEB / "kernel", tmp_path / "kernel")
     yield from _serve(tmp_path)
@@ -190,7 +203,7 @@ def _two_channels_stay_apart(page: Page, url: str) -> None:
     """Talk on both channels, and read each answer where it belongs."""
     page.goto(url)
     page.wait_for_selector("input[name='agree']", timeout=10_000)
-    page.locator("input[name='agree'][value='yes']").check()
+    page.locator("label:has(input[name='agree'][value='yes'])").click()
     page.get_by_role("button", name="Continue").click()
 
     # The client was told which channels this participant is in, and drew one tab
@@ -204,22 +217,28 @@ def _two_channels_stay_apart(page: Page, url: str) -> None:
     # A message on the public channel is answered by the partner, on that channel.
     page.get_by_label("Your message").fill("hello there")
     page.get_by_role("button", name="Send").click()
-    expect(page.get_by_text("Them: partner heard: hello there")).to_be_visible(
-        timeout=10_000
-    )
+    expect(
+        page.locator(
+            "[data-author=them] .bubble", has_text="partner heard: hello there"
+        )
+    ).to_be_visible(timeout=10_000)
     # The coach answered too, but on its own channel, which is not the one shown.
     expect(page.get_by_text("coach heard: hello there")).not_to_be_visible()
 
     # Move to the coaching channel: its answer is there, and the public one is not.
     tabs.nth(1).click()
-    expect(page.get_by_text("Them: coach heard: hello there")).to_be_visible(
-        timeout=10_000
-    )
+    expect(
+        page.locator("[data-author=them] .bubble", has_text="coach heard: hello there")
+    ).to_be_visible(timeout=10_000)
     expect(page.get_by_text("partner heard: hello there")).not_to_be_visible()
 
     # And back again: the public conversation is where it was left.
     tabs.nth(0).click()
-    expect(page.get_by_text("Them: partner heard: hello there")).to_be_visible()
+    expect(
+        page.locator(
+            "[data-author=them] .bubble", has_text="partner heard: hello there"
+        )
+    ).to_be_visible()
 
     page.get_by_role("button", name="End the conversation").click()
     expect(page.get_by_text("Thank you")).to_be_visible(timeout=10_000)

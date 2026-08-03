@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Mock-up 3 -- the comparison activity</title>
+    <link rel="stylesheet" href="mug-ui.css" />
+    <style>
+      /* A run is compared by what it was, not by a number that stands for it.
+         The platform can already redraw a recorded round, so the card holds the
+         round rather than a sentence about it. */
+      .replay {
+        aspect-ratio: 3 / 2;
+        border-radius: var(--radius);
+        border: 1px solid var(--line);
+        background:
+          repeating-linear-gradient(
+            45deg,
+            var(--surface-sunk) 0 10px,
+            transparent 10px 20px
+          ),
+          var(--surface-sunk);
+        display: grid;
+        place-items: center;
+        color: var(--ink-faint);
+        font-size: 0.8125rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <div class="mock">
+        <a href="index.html">&larr; all mock-ups</a>
+        <strong>3. The comparison activity</strong>
+        <span class="spacer"></span>
+        <span>theme</span>
+        <span class="segmented">
+          <button type="button" data-theme-pick="light">Light</button>
+          <button type="button" data-theme-pick="dark">Dark</button>
+        </span>
+      </div>
+
+      <header class="topbar">
+        <span class="topbar__title">Overcooked -- which partner</span>
+        <span class="topbar__sub">Step 5 of 6</span>
+        <span class="steps" role="img" aria-label="Step 5 of 6">
+          <span class="steps__mark steps__mark--done"></span>
+          <span class="steps__mark steps__mark--done"></span>
+          <span class="steps__mark steps__mark--done"></span>
+          <span class="steps__mark steps__mark--done"></span>
+          <span class="steps__mark steps__mark--now"></span>
+          <span class="steps__mark"></span>
+        </span>
+        <span class="topbar__spacer"></span>
+        <span class="link-state">Connected</span>
+      </header>
+
+      <div class="thread-area">
+        <section class="elicit" aria-labelledby="ask">
+          <div class="elicit__head">
+            <h2 class="elicit__ask" id="ask">Did you prefer your first or your second partner?</h2>
+            <span class="elicit__note">You played one round with each.</span>
+          </div>
+
+          <div class="options">
+            <article class="option">
+              <div class="option__tag">First partner</div>
+              <div class="replay">your first round</div>
+              <div class="option__stats">
+                <!-- A participant is told what they did, not what the platform
+                     counted. "600 frames" is a unit of the recording. -->
+                <div>
+                  <div class="stat__value">7</div>
+                  <div class="stat__label">dishes delivered</div>
+                </div>
+                <div>
+                  <div class="stat__value">0:45</div>
+                  <div class="stat__label">how long you played</div>
+                </div>
+              </div>
+              <button type="button" class="btn btn--primary">I preferred this partner</button>
+            </article>
+
+            <article class="option">
+              <div class="option__tag">Second partner</div>
+              <div class="replay">your second round</div>
+              <div class="option__stats">
+                <div>
+                  <div class="stat__value">10</div>
+                  <div class="stat__label">dishes delivered</div>
+                </div>
+                <div>
+                  <div class="stat__value">0:45</div>
+                  <div class="stat__label">how long you played</div>
+                </div>
+              </div>
+              <button type="button" class="btn btn--primary">I preferred this partner</button>
+            </article>
+          </div>
+
+          <div class="axes">
+            <fieldset class="axis" style="border: 0; margin: 0; padding: 0">
+              <legend class="axis__ask">We coordinated our actions well together.</legend>
+              <div class="axis__marks">
+                <div class="axis__row axis__row--dots">
+                  <label><input type="radio" name="coord" value="f3" /></label>
+                  <label><input type="radio" name="coord" value="f2" /></label>
+                  <label><input type="radio" name="coord" value="f1" /></label>
+                  <label data-middle><input type="radio" name="coord" value="0" /></label>
+                  <label><input type="radio" name="coord" value="s1" /></label>
+                  <label><input type="radio" name="coord" value="s2" /></label>
+                  <label><input type="radio" name="coord" value="s3" /></label>
+                </div>
+                <div class="axis__ends">
+                  <span>The first partner, clearly</span>
+                  <span>The same</span>
+                  <span>The second partner, clearly</span>
+                </div>
+              </div>
+            </fieldset>
+
+            <div class="axis">
+              <div class="axis__ask">How helpful was each partner?</div>
+              <div class="axis__each">
+                <fieldset class="axis__each-one" style="border: 0; margin: 0; padding: 0">
+                  <legend class="axis__each-label">The first partner</legend>
+                  <div class="axis__row">
+                    <label><input type="radio" name="help-1" value="1" />1</label>
+                    <label><input type="radio" name="help-1" value="2" />2</label>
+                    <label><input type="radio" name="help-1" value="3" />3</label>
+                    <label><input type="radio" name="help-1" value="4" />4</label>
+                    <label><input type="radio" name="help-1" value="5" />5</label>
+                    <label><input type="radio" name="help-1" value="6" />6</label>
+                    <label><input type="radio" name="help-1" value="7" />7</label>
+                  </div>
+                  <div class="axis__ends">
+                    <span>Not at all</span>
+                    <span>Very</span>
+                  </div>
+                </fieldset>
+                <fieldset class="axis__each-one" style="border: 0; margin: 0; padding: 0">
+                  <legend class="axis__each-label">The second partner</legend>
+                  <div class="axis__row">
+                    <label><input type="radio" name="help-2" value="1" />1</label>
+                    <label><input type="radio" name="help-2" value="2" />2</label>
+                    <label><input type="radio" name="help-2" value="3" />3</label>
+                    <label><input type="radio" name="help-2" value="4" />4</label>
+                    <label><input type="radio" name="help-2" value="5" />5</label>
+                    <label><input type="radio" name="help-2" value="6" />6</label>
+                    <label><input type="radio" name="help-2" value="7" />7</label>
+                  </div>
+                  <div class="axis__ends">
+                    <span>Not at all</span>
+                    <span>Very</span>
+                  </div>
+                </fieldset>
+              </div>
+            </div>
+          </div>
+
+          <div class="elicit__foot">
+            <button type="button" class="btn btn--small">They were about the same</button>
+            <span class="spacer"></span>
+            <span class="topbar__sub">Your answer is recorded against the partner, not the side of the screen.</span>
+          </div>
+        </section>
+
+        <!-- The same activity when the things compared are written, not played.
+             One card grammar, so a study that compares text and a study that
+             compares rounds do not look like two products. -->
+        <section class="elicit" aria-labelledby="ask2" style="margin-top: 2rem">
+          <div class="elicit__head">
+            <h2 class="elicit__ask" id="ask2">Which summary would you rather receive?</h2>
+          </div>
+          <div class="options">
+            <article class="option">
+              <div class="option__tag">Summary A</div>
+              <div class="option__text">The team agreed to move the release to the 14th. Priya will tell the two customers who asked for the earlier date, and Sam will rewrite the note that goes with it.</div>
+              <button type="button" class="btn btn--primary">Choose A</button>
+            </article>
+            <article class="option">
+              <div class="option__tag">Summary B</div>
+              <div class="option__text">Release moved to 14 May. Owners: Priya (customer notice, two accounts), Sam (release note). Nothing else changed.</div>
+              <button type="button" class="btn btn--primary">Choose B</button>
+            </article>
+          </div>
+          <div class="elicit__foot">
+            <button type="button" class="btn btn--small">They are about the same</button>
+            <button type="button" class="btn btn--small">Both are bad</button>
+            <span class="spacer"></span>
+            <button type="button" class="btn btn--ghost btn--small">Skip this one</button>
+          </div>
+        </section>
+      </div>
+    </div>
+    <script src="mock.js"></script>
+  </body>
+</html>

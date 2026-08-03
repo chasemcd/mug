@@ -19,18 +19,28 @@ placeholders) and the data channels themselves.
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import threading
-from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, field
-from typing import Any, TypeVar
+from collections.abc import Callable, Iterator, Mapping, Sequence
+from contextlib import ExitStack, contextmanager
+from dataclasses import dataclass, field, replace
+from typing import Any, TypeVar, cast
 
 from fastapi import FastAPI
+from fastapi.testclient import TestClient
 from starlette.testclient import WebSocketTestSession
 
-from mug.game.browser_mesh import mesh_run_config
+from examples.tandem.browser_mesh_env import tandem_mesh_spec
+from mug.app import build_study_app
+from mug.game.browser_mesh import BrowserMeshSpec, mesh_run_config
 from mug.game.browser_mesh_driver import MeshDriver, boot_mesh_driver
+from mug.gateway import Gateway
+from mug.kernel import PrincipalRef
+from mug.launch import provision_launch_ticket
+from mug.participant_p2p_types import BrowserP2PConfig
+from mug.storage import InMemoryStore, Store
 
 _T = TypeVar("_T")
 
@@ -120,6 +130,11 @@ class BrowserSim:
         self.abort: dict[str, Any] | None = None
         self.answered: list[str] = []
         self._requests = 0
+        # Frames that arrived before the one being waited for. Under load a room
+        # forms while a browser is still answering a form, so the bootstrap can
+        # land between a command and its acknowledgement. Keeping it here is what
+        # lets one browser read in its own order without losing anything.
+        self._pending: list[dict[str, Any]] = []
 
     # -- the flow --------------------------------------------------------------
 
@@ -175,10 +190,23 @@ class BrowserSim:
                 )
         raise AssertionError(f"browser {self.tag} never reached a {kind} activity")
 
+    def _read(self) -> dict[str, Any]:
+        """Return the next frame, from what is held back or from the socket."""
+        if self._pending:
+            return self._pending.pop(0)
+        return cast("dict[str, Any]", self.socket.receive_json())
+
+    def _read_for(self, kind: str, limit: int = 40) -> dict[str, Any]:
+        """Return the next frame of one kind, and hold back what came first."""
+        for _ in range(limit):
+            message = self._read()
+            if message.get("type") == kind:
+                return message
+            self._pending.append(message)
+        raise AssertionError(f"browser {self.tag} never received a {kind} frame")
+
     def _delivery(self) -> dict[str, Any]:
-        message: dict[str, Any] = self.socket.receive_json()
-        assert message["type"] == "delivery", message
-        return message["delivery"]
+        return self._read_for("delivery")["delivery"]
 
     def _advance(self, answers: dict[str, Any]) -> None:
         """Submit one flow-advance command and read both acknowledgements."""
@@ -200,13 +228,19 @@ class BrowserSim:
                 "payload": {"answers": answers},
             }
         )
-        assert self.socket.receive_json()["ack"]["ack_kind"] == "parsed"
-        assert self.socket.receive_json()["ack"]["ack_kind"] == "accepted"
+        assert self._read_for("ack")["ack"]["ack_kind"] == "parsed"
+        assert self._read_for("ack")["ack"]["ack_kind"] == "accepted"
 
     def _next(self, width: int) -> str:
-        """Return one fresh, well-formed identifier body for this browser."""
+        """Return one fresh, well-formed identifier body for this browser.
+
+        The browser's own number is written to a fixed width. Without that,
+        browser 1's first command and browser 10's first command mint the same
+        idempotency key, and the second of them is refused as a repeat of the
+        first -- which a test at ten participants reads as a platform fault.
+        """
         self._requests += 1
-        return f"{self.tag}{self._requests:0{width - len(self.tag)}d}"
+        return f"{int(self.tag):03d}{self._requests:0{width - 3}d}"
 
     # -- the room --------------------------------------------------------------
 
@@ -219,7 +253,7 @@ class BrowserSim:
         went wrong than the abort reason does.
         """
         for _ in range(limit):
-            message: dict[str, Any] = self.socket.receive_json()
+            message: dict[str, Any] = self._read()
             if message.get("type") == "p2p_mesh_abort":
                 self.abort = message["abort"]
             if message.get("type") == "p2p_mesh_finish":
@@ -460,13 +494,149 @@ def launch_urls(app: FastAPI, tickets: Sequence[str]) -> list[str]:
     return [f"/ws?ticket={ticket}" for ticket in tickets]
 
 
+# -- one running application, and the participants who join it --------------------
+
+
+_RESEARCHER = PrincipalRef(
+    kind="researcher", id="researcher_019b6000-0000-7000-8000-0000000000ab"
+)
+
+
+def short_tandem(**changes: Any) -> BrowserMeshSpec:
+    """Return a short Tandem run, so a test is quick but still plays a game."""
+    return replace(tandem_mesh_spec(), max_steps=24, **changes)
+
+
+class Session:
+    """One running application plus the launch tickets its participants need."""
+
+    def __init__(self, app: FastAPI, client: TestClient, tickets: list[str]) -> None:
+        self.app = app
+        self.client = client
+        self.tickets = tickets
+        self.store: Store = app.state.store
+
+
+def build_session(
+    *,
+    size: int = 2,
+    participants: int = 2,
+    spec: BrowserMeshSpec | None = None,
+    activities: Any = None,
+) -> Session:
+    """Build the launch-gated browser peer-to-peer application under test.
+
+    ``activities`` is the authored study the participants walk through. With none
+    the demo study runs, which is what most tests want: they are about the game,
+    not about what surrounds it.
+    """
+
+    def build() -> Session:
+        store: Store = InMemoryStore()
+        gateway = Gateway()
+        app = build_study_app(
+            study=activities,
+            store=store,
+            gateway=gateway,
+            browser_p2p=BrowserP2PConfig(
+                channel_key="tandem", size=size, game=spec or short_tandem(), seed=9
+            ),
+            require_launch=True,
+        )
+        app.state.store = store
+        # A test that reads a derived record needs the same gateway the server
+        # derived it with, so the session keeps it rather than rebuild one.
+        app.state.gateway = gateway
+        tickets = [str(app.state.launch_ticket)]
+        for _ in range(participants - 1):
+            issued = asyncio.run(
+                provision_launch_ticket(gateway, store, researcher=_RESEARCHER)
+            )
+            tickets.append(issued.ticket_handle)
+        return Session(app, TestClient(app), tickets)
+
+    return off_thread(build)
+
+
+def open_browser(session: Session, stack: ExitStack, index: int) -> BrowserSim:
+    """Connect the participant holding that launch ticket and play to the game."""
+    url = launch_urls(session.app, session.tickets)[index]
+    socket = stack.enter_context(session.client.websocket_connect(url))
+    browser = BrowserSim(socket, tag=f"{index + 1}")
+    browser.play_to_the_game()
+    return browser
+
+
+def open_browsers(
+    session: Session, stack: ExitStack, count: int | None = None
+) -> list[BrowserSim]:
+    """Connect that many browsers and play each of them up to the game."""
+    total = count or len(session.tickets)
+    return [open_browser(session, stack, index) for index in range(total)]
+
+
+@contextmanager
+def study_session(**changes: Any) -> Iterator[tuple[Session, ExitStack]]:
+    """Run one application and close its websockets before its event loop.
+
+    The order matters: a websocket closed after the test client has exited waits
+    on an event loop that is already gone, and the test hangs rather than fails.
+    """
+    session = build_session(**changes)
+    with session.client, ExitStack() as sockets:
+        yield session, sockets
+
+
+def play_one_room(
+    browsers: Sequence[BrowserSim],
+    *,
+    link: Link | Callable[[Sequence[BrowserSim]], Link] | None = None,
+    **kwargs: Any,
+) -> None:
+    """Take a formed room all the way from bootstrap to the finish frame.
+
+    ``link`` may be a function of the browsers rather than a fixed profile. A
+    fault aimed at one participant -- a tab that goes to the background -- is
+    named by that browser's room handle, and the handle is not known until the
+    server has sent the bootstrap.
+    """
+    for browser in browsers:
+        browser.take_bootstrap()
+    if callable(link):
+        link = link(browsers)
+    negotiate(browsers)
+    for browser in browsers:
+        browser.start = browser.await_frame("p2p_mesh_start")["start"]
+    run_room_mesh(browsers, link=link, **kwargs)
+    report_and_capture(browsers)
+    for browser in browsers:
+        browser.await_frame("p2p_mesh_finish")
+
+
+def peer_episodes(store: Store) -> list[dict[str, Any]]:
+    """Return every peer-authority episode aggregate the ledger holds."""
+    return [
+        cast("dict[str, Any]", state)
+        for _, state in store.scan_aggregates()
+        if isinstance(state, dict) and state.get("authority") == "peer"
+    ]
+
+
 __all__ = [
     "BrowserSim",
     "Link",
     "Rng",
+    "Session",
+    "build_session",
     "launch_urls",
     "negotiate",
     "off_thread",
+    "open_browser",
+    "open_browsers",
+    "peer_episodes",
+    "play_one_room",
     "report_and_capture",
     "run_room_mesh",
+    "short_tandem",
+    "study_session",
 ]

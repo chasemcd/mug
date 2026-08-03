@@ -1,4 +1,9 @@
-"""Who plays a game activity: the author's seating, and what it compiles to.
+"""What an author's seating compiles into: the seats, actors, and builds it names.
+
+The three kinds a study writes -- ``Human``, ``Model``, ``Bot`` -- are in
+``mug.content.players``, so the study surface can name them without this module's
+whole agent stack. They are re-exported here, because a seating and what it compiles
+to read as one thing.
 
 A study says who is in an environment by naming the environment's own agents and
 who plays each one::
@@ -48,6 +53,7 @@ from __future__ import annotations
 import re
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
+from typing import Any
 
 from mug.agents import (
     AgentGameSpec,
@@ -57,62 +63,20 @@ from mug.agents import (
     HumanSeatSpec,
     adapter_for,
 )
-from mug.agents.multiseat_episode import TextView
 from mug.authoring import LLMAgent
+from mug.content.players import Bot, Human, Model, Seat, Seating
+from mug.game.keys import Bindings
 from mug.game.multiseat import MultiSeatEnv
-from mug.game.seams import SeatActionSource
-from mug.providers.runtime import ProviderAdapter, SecretResolver
+from mug.game.spec import HudFn, RenderFn
 
 # What a derived identifier is minted through: a kind and the words that fix it.
 DeriveId = Callable[[str, str], str]
 
 _KEY = re.compile(r"[^a-z0-9]+")
 
-
-@dataclass(frozen=True)
-class Human:
-    """A person plays this seat.
-
-    Which agent they play is the key this is written under, so a person's seat
-    holds nothing of its own.
-    """
-
-
-@dataclass(frozen=True)
-class Model:
-    """A model plays this seat, and talks on the conversation beside it (W7).
-
-    ``agent`` is the author's ``LLMAgent`` and is the only thing a study must
-    write: the provider adapter is the one its declared provider names, and the
-    pinned build is derived from the activity and the seat.
-
-    ``key`` names the agent in the records; with none it is read from the class
-    name. ``text_view`` renders the game for this seat's prompt, and
-    ``resolve_secret`` resolves its credential (a keyless local runner needs none).
-    """
-
-    agent: LLMAgent
-    key: str | None = None
-    adapter: ProviderAdapter | None = None
-    text_view: TextView | None = None
-    resolve_secret: SecretResolver | None = None
-
-
-@dataclass(frozen=True)
-class Bot:
-    """A local policy plays this seat: a heuristic, or an exported network.
-
-    ``controller`` decides the action from an observation. It reaches no provider
-    and keeps no thoughts, which is what makes it a different kind of seat from a
-    ``Model`` rather than a model with the provider left out.
-    """
-
-    controller: SeatActionSource
-
-
-# One player of a game activity, and the seating that says which agent each plays.
-Seat = Human | Model | Bot
-Seating = Mapping[str, Seat]
+# The seat-key rule, as the contract states it (``mug.kernel.SeatKey``). It is matched
+# here rather than assumed, so a name this module hands on is one a record can hold.
+_SEAT_NAME = re.compile(r"^[a-z0-9][a-z0-9]*(?:[-_.][a-z0-9]+)*$")
 
 
 def _no_bindings() -> Mapping[str, int]:
@@ -128,14 +92,22 @@ class MultiSeatGame:
     reads. It names no agents: the seating on the activity does, because that is
     where a study says who plays what.
 
+    ``render`` draws one frame for the people watching. It is the same drawing a
+    one-person ``GameSpec`` writes, because it is the same environment: everybody at
+    the table watches one board. A game with none pushes the stepped frames and
+    draws nothing, which is right for two models playing with nobody reading.
+
     ``action_bindings`` maps a held key to a discrete action for the people at it,
     and ``default_action`` is what a seat holding no key does. ``fps`` and
     ``max_steps`` shape the loop; ``decision_timeout`` bounds one model decision.
     """
 
     make_env: Callable[[], MultiSeatEnv]
+    render: RenderFn | None = None
+    hud: HudFn | None = None
+    input_mode: str = "pressed_keys"
     channel_key: str = "game"
-    action_bindings: Mapping[str, int] = field(default_factory=_no_bindings)
+    action_bindings: Bindings = field(default_factory=_no_bindings)
     default_action: int = 0
     decision_timeout: float = 1.0
     fps: int = 0
@@ -153,8 +125,36 @@ def _slug(name: str) -> str:
     return key or "agent"
 
 
-def _ids_for(agent: LLMAgent, key: str, scope: str, derived_id: DeriveId) -> AgentIds:
+def seat_name(agent: Any) -> str:
+    """Return the name records give one of the environment's agents.
+
+    **A name the contract accepts is kept exactly.** An environment's own word for an
+    agent is the best name a record can carry, so ``0`` stays ``0`` and ``agent_left``
+    stays ``agent_left``. A seat key admits a leading digit, because numbering agents is
+    ordinary in both standard environment APIs and a seat name is not a name a study
+    invented (``mug.kernel.SeatKey``).
+
+    Anything the contract cannot carry -- a capital, a space -- is folded until it can,
+    rather than refused: a study should not have to rename its environment's agents to
+    seat people in them.
+    """
+    written = str(agent).strip().lower()
+    if _SEAT_NAME.match(written):
+        return written
+    folded = "".join(one if one.isalnum() else "-" for one in written).strip("-")
+    while "--" in folded:
+        folded = folded.replace("--", "-")
+    return folded or "agent"
+
+
+def agent_ids_for(
+    agent: LLMAgent, key: str, scope: str, derived_id: DeriveId
+) -> AgentIds:
     """Derive the pinned build one model seat's records name.
+
+    It is public because a conversation needs it too: a model that only talks is
+    the same kind of seat as one that plays, and it must not be the one an author
+    has to write six identifiers for.
 
     A study that has not published a catalogue still records a build, and the same
     study run twice records the same one, because every identifier here is derived
@@ -192,10 +192,14 @@ def seat_game(
     models: list[AgentSeatSpec] = []
     people: list[HumanSeatSpec] = []
     bots: list[BotSeatSpec] = []
-    for agent_id, seat in seats.items():
-        # The seat is named for the part it plays, so a record of "the traffic
+    for written_agent, seat in seats.items():
+        # The agent is whatever the environment calls it, so it may be a number: a
+        # PettingZoo environment that numbers its agents answers ``[0, 1]``. The
+        # records name it as text, because every identifier in the contract is text,
+        # and the seat is named for the part it plays -- so a record of "the traffic
         # light did this" reads as one rather than as "seat 3 did this".
-        seat_key = agent_id
+        agent_id = str(written_agent)
+        seat_key = seat_name(written_agent)
         scope = f"{activity_key}:{seat_key}"
         if isinstance(seat, Human):
             people.append(HumanSeatSpec(agent_id=agent_id, seat_key=seat_key))
@@ -214,7 +218,7 @@ def seat_game(
                 AgentSeatSpec(
                     agent=seat.agent,
                     adapter=seat.adapter or adapter_for(seat.agent.provider.value),
-                    ids=_ids_for(seat.agent, key, scope, derived_id),
+                    ids=agent_ids_for(seat.agent, key, scope, derived_id),
                     agent_id=agent_id,
                     seat_key=seat_key,
                     actor_id=derived_id("actor", scope),
@@ -225,10 +229,15 @@ def seat_game(
     return AgentGameSpec(
         channel_key=game.channel_key,
         make_env=game.make_env,
+        render=game.render,
+        hud=game.hud,
+        input_mode=game.input_mode,
         seats=tuple(models),
         humans=tuple(people),
         bots=tuple(bots),
-        action_bindings=dict(game.action_bindings),
+        # The bindings pass through as written: a chord is a sequence of keys,
+        # and copying them into a narrower map would flatten one back to a name.
+        action_bindings=game.action_bindings,
         default_action=game.default_action,
         decision_timeout=game.decision_timeout,
         fps=game.fps,
@@ -243,5 +252,7 @@ __all__ = [
     "MultiSeatGame",
     "Seat",
     "Seating",
+    "agent_ids_for",
     "seat_game",
+    "seat_name",
 ]

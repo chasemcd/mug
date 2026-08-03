@@ -56,13 +56,24 @@ export interface P2PEdgeConfig {
   nextRequestId(): string;
   setTimer(handler: () => void, delayMillis: number): unknown;
   clearTimer(handle: unknown): void;
-  executor: P2PExecutor;
+  /**
+   * Build the executor for one room.
+   *
+   * One executor plays one episode: it binds that room's channels, runs its
+   * frames, and settles one promise when the barrier closes. A study may hold
+   * several game activities -- a practice round and then the real one -- and each
+   * forms its own room over its own connections, so each gets its own executor.
+   * An edge that reused one would bind the first room's channels forever and
+   * ignore every start after the first.
+   */
+  newExecutor(): P2PExecutor;
   onError(message: string): void;
 }
 
 interface Attempt {
   bootstrap: P2PBootstrap;
   control: P2PControlPort;
+  executor: P2PExecutor;
   mesh: PeerMesh | null;
   channels: ReadonlyMap<string, MeshDataChannel> | null;
   handoff: P2PMeshHandoff | null;
@@ -111,7 +122,7 @@ export class P2PEdge {
     }
     attempt.mesh?.close();
     this.attempt = null;
-    this.config.executor.onConnectionLost(socketEpoch);
+    attempt.executor.onConnectionLost(socketEpoch);
   }
 
   stop(): void {
@@ -128,6 +139,7 @@ export class P2PEdge {
     const attempt: Attempt = {
       bootstrap,
       control,
+      executor: this.config.newExecutor(),
       mesh: null,
       channels: null,
       handoff: null,
@@ -194,7 +206,7 @@ export class P2PEdge {
     attempt.handoff = handoff;
     // The executor takes the channels before this peer reports readiness, so by
     // the time any peer can start, every peer is already listening.
-    this.config.executor.onMeshReady(attempt.bootstrap, handoff);
+    attempt.executor.onMeshReady(attempt.bootstrap, handoff);
     const sent = await attempt.control.send(
       peerReadyFrame(attempt.bootstrap, [...channels.keys()]),
     );
@@ -285,7 +297,7 @@ export class P2PEdge {
       return;
     }
     attempt.started = true;
-    this.config.executor.onMeshStart(start, attempt.handoff);
+    attempt.executor.onMeshStart(start, attempt.handoff);
   }
 
   private abort(abort: P2PMeshAbort, control: P2PControlPort): void {
@@ -295,7 +307,7 @@ export class P2PEdge {
     }
     attempt.mesh?.close();
     this.attempt = null;
-    this.config.executor.onMeshAbort(abort);
+    attempt.executor.onMeshAbort(abort);
   }
 
   private finish(finish: P2PMeshFinish, control: P2PControlPort): void {
@@ -305,7 +317,7 @@ export class P2PEdge {
     }
     attempt.mesh?.close();
     this.attempt = null;
-    this.config.executor.onMeshFinish(finish);
+    attempt.executor.onMeshFinish(finish);
   }
 
   private currentFor(
@@ -347,7 +359,7 @@ export class P2PEdge {
     attempt.mesh?.close();
     this.attempt = null;
     attempt.control.close();
-    this.config.executor.onConnectionLost(attempt.control.socketEpoch);
+    attempt.executor.onConnectionLost(attempt.control.socketEpoch);
     this.config.onError(error.message);
   }
 }

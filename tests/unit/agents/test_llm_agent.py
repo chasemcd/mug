@@ -19,7 +19,6 @@ import pytest
 from mug.agents import LOCAL_NO_KEY, AgentIds, LLMController, compile_agent
 from mug.agents.adapters import HttpRequest, HttpResponse, OllamaAdapter
 from mug.authoring import (
-    Chat,
     Fallback,
     History,
     LLMAgent,
@@ -27,6 +26,7 @@ from mug.authoring import (
     Provider,
     Step,
     Thoughts,
+    Transcript,
 )
 from mug.kernel import Digest, Duration
 from mug.providers import ModelCall, ModelCompletion, ModelProvider, Usage
@@ -81,7 +81,7 @@ class CookingPartner(LLMAgent):
         env: object,
         agent_id: str,
         history: History,
-        chat: Chat,
+        chat: Transcript,
         thoughts: Thoughts,
     ) -> str:
         partner = ", ".join(step.action_of("chef-1") or "-" for step in history.last(3))
@@ -204,7 +204,7 @@ class LocalRunner(LLMAgent):
         env: object,
         agent_id: str,
         history: History,
-        chat: Chat,
+        chat: Transcript,
         thoughts: Thoughts,
     ) -> str:
         return (
@@ -242,7 +242,7 @@ def test_compile_agent_requires_a_secret_for_a_hosted_provider() -> None:
             env: object,
             agent_id: str,
             history: History,
-            chat: Chat,
+            chat: Transcript,
             thoughts: Thoughts,
         ) -> str:
             return "decide"

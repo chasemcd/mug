@@ -25,136 +25,30 @@ from __future__ import annotations
 import asyncio
 import json
 import time
-from collections.abc import Callable, Iterator, Sequence
-from contextlib import ExitStack, contextmanager
-from dataclasses import replace
+from collections.abc import Callable
 from typing import Any
 
 import pytest
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
 
-from examples.tandem.browser_mesh_env import tandem_mesh_spec
 from examples.tandem.study import tandem_study
-from mug.app import build_study_app
 from mug.content import Form, Game, Likert
 from mug.content import Study as AuthoredStudy
-from mug.game.browser_mesh import BrowserMeshSpec
-from mug.gateway import Gateway
-from mug.kernel import PrincipalRef
-from mug.launch import provision_launch_ticket
-from mug.participant_p2p_types import BrowserP2PConfig
-from mug.storage import InMemoryStore, Store
+from mug.storage import Store
 from tests.e2e_native.browser_sim import (
     BrowserSim,
     Link,
-    launch_urls,
     negotiate,
     off_thread,
+    open_browser,
+    open_browsers,
+    play_one_room,
     report_and_capture,
     run_room_mesh,
+    study_session,
 )
-
-_RESEARCHER = PrincipalRef(
-    kind="researcher", id="researcher_019b6000-0000-7000-8000-0000000000ab"
+from tests.e2e_native.browser_sim import (
+    peer_episodes as episodes_in,
 )
-
-
-def _spec(**changes: Any) -> BrowserMeshSpec:
-    """Return a short Tandem run, so a test is quick but still plays a game."""
-    return replace(tandem_mesh_spec(), max_steps=24, **changes)
-
-
-class Study:
-    """One running application plus the launch tickets its participants need."""
-
-    def __init__(self, app: FastAPI, client: TestClient, tickets: list[str]) -> None:
-        self.app = app
-        self.client = client
-        self.tickets = tickets
-        self.store: Store = app.state.store
-
-
-def build_study(
-    *,
-    size: int = 2,
-    participants: int = 2,
-    spec: BrowserMeshSpec | None = None,
-    activities: AuthoredStudy | None = None,
-) -> Study:
-    """Build the launch-gated browser peer-to-peer application under test.
-
-    ``activities`` is the authored study the participants walk through. With none
-    the demo study runs, which is what most of these tests want: they are about
-    the game, not about what surrounds it.
-    """
-
-    def build() -> Study:
-        store: Store = InMemoryStore()
-        gateway = Gateway()
-        app = build_study_app(
-            study=activities,
-            store=store,
-            gateway=gateway,
-            browser_p2p=BrowserP2PConfig(
-                channel_key="tandem", size=size, game=spec or _spec(), seed=9
-            ),
-            require_launch=True,
-        )
-        app.state.store = store
-        tickets = [str(app.state.launch_ticket)]
-        for _ in range(participants - 1):
-            issued = asyncio.run(
-                provision_launch_ticket(gateway, store, researcher=_RESEARCHER)
-            )
-            tickets.append(issued.ticket_handle)
-        return Study(app, TestClient(app), tickets)
-
-    return off_thread(build)
-
-
-def open_browser(study: Study, stack: ExitStack, index: int) -> BrowserSim:
-    """Connect the participant holding that launch ticket and play to the game."""
-    url = launch_urls(study.app, study.tickets)[index]
-    socket = stack.enter_context(study.client.websocket_connect(url))
-    browser = BrowserSim(socket, tag=f"{index + 1}")
-    browser.play_to_the_game()
-    return browser
-
-
-def open_browsers(
-    study: Study, stack: ExitStack, count: int | None = None
-) -> list[BrowserSim]:
-    """Connect that many browsers and play each of them up to the game."""
-    total = count or len(study.tickets)
-    return [open_browser(study, stack, index) for index in range(total)]
-
-
-@contextmanager
-def study_session(**changes: Any) -> Iterator[tuple[Study, ExitStack]]:
-    """Run one application and close its websockets before its event loop.
-
-    The order matters: a websocket closed after the test client has exited waits
-    on an event loop that is already gone, and the test hangs rather than fails.
-    """
-    study = build_study(**changes)
-    with study.client, ExitStack() as sockets:
-        yield study, sockets
-
-
-def play_one_room(
-    browsers: Sequence[BrowserSim], *, link: Link | None = None, **kwargs: Any
-) -> None:
-    """Take a formed room all the way from bootstrap to the finish frame."""
-    for browser in browsers:
-        browser.take_bootstrap()
-    negotiate(browsers)
-    for browser in browsers:
-        browser.start = browser.await_frame("p2p_mesh_start")["start"]
-    run_room_mesh(browsers, link=link, **kwargs)
-    report_and_capture(browsers)
-    for browser in browsers:
-        browser.await_frame("p2p_mesh_finish")
 
 
 def wait_until(condition: Callable[[], bool], *, seconds: float = 5.0) -> None:
@@ -165,15 +59,6 @@ def wait_until(condition: Callable[[], bool], *, seconds: float = 5.0) -> None:
             return
         time.sleep(0.01)
     raise AssertionError("the server never reached the expected state")
-
-
-def episodes_in(store: Store) -> list[dict[str, Any]]:
-    """Return every peer-authority episode aggregate the ledger holds."""
-    return [
-        state
-        for _, state in store.scan_aggregates()
-        if isinstance(state, dict) and state.get("authority") == "peer"
-    ]
 
 
 # -- the flow ------------------------------------------------------------------

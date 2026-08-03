@@ -416,7 +416,7 @@ activities.Interaction(
     seats=["p1", "p2"],
     channels=[
         Game(key="board", env=make_env, render=render,
-             input=controls, requires=["cogrid==0.2.1"],
+             input=controls, requires=["cogrid==0.3.2"],
              mode=ExecutionMode.SERVER),
         Chat(key="talk"),                       # no membership → every seat read/write
     ],
@@ -527,6 +527,30 @@ controls = Input(
     input_delay=2,                              # human netcode feel (rollback/pacing)
 )
 ```
+
+**How a composite is spelled in the built runtime (2026-07-27).** The shipped
+authoring surface takes key names rather than a `Key` enum, so a composite is one
+binding whose name joins its keys with `+`:
+
+```python
+action_bindings = {
+    "ArrowUp": UP,
+    "ArrowLeft": LEFT,
+    "ArrowUp+ArrowLeft": UPLEFT,   # composite: both keys held
+}
+```
+
+A chord beats a single key, and a longer chord beats a shorter one, so the most
+specific thing the participant is doing is what the seat does. The server
+(`mug/game/runtime.py`) and both shipped clients resolve it identically, which
+they must: a browser run is verified by re-execution, so a client that read a
+different action would make an honest participant's run unverifiable.
+
+This was **specified here from the start and not implemented** until a real study
+was ported: `resolve_action` returned the first bound key, so Slime Volleyball's
+diagonal jump could not be expressed. No record lacked a producer and no runtime
+lacked a caller, so neither standing check would have found it. See
+`examples/slime_volleyball/README.md`.
 
 Bindings map to the **environment's actual action space** — an env-provided
 `IntEnum` for readability or raw `Discrete`/`MultiDiscrete`/`Box` values. MUG
@@ -862,7 +886,7 @@ game = activities.Interaction(
     channels=[
         Game(key="board", env=make_env,                      # factory by name, not an instance
              render=render, input=controls,
-             requires=["cogrid==0.2.1"],                     # browser deps, pinned at publish
+             requires=["cogrid==0.3.2"],                     # browser deps, pinned at publish
              hud=lambda state: f"Score: {state.score}",
              seat_view=lambda seat: f"<b>You are the {seat.key} forager.</b>",
              mode=ExecutionMode.SERVER),

@@ -30,7 +30,12 @@ from collections.abc import Awaitable, Callable, Mapping, Sequence
 from typing import Any, NamedTuple, Protocol
 
 from mug.game.env import NO_INFO, StepResult
-from mug.game.seams import Clock, SeatActionSource, SteppableEnv
+from mug.game.seams import (
+    Clock,
+    SeatActionSource,
+    SteppableEnv,
+    what_a_seat_reads,
+)
 from mug.game.trajectory import TrajectoryFrame
 from mug.game.types import EpisodeBoundary, GameTransition
 from mug.kernel import compute_digest
@@ -186,7 +191,16 @@ async def run_multiseat_episode(
     solved = False
     while frame < max_steps:
         actions = {
-            agent_id: int(sources[agent_id].decide(result.observations.get(agent_id)))
+            agent_id: int(
+                sources[agent_id].decide(
+                    what_a_seat_reads(
+                        env,
+                        sources[agent_id],
+                        agent_id,
+                        result.observations.get(agent_id),
+                    )
+                )
+            )
             for agent_id in agent_ids
         }
         result = env.step(actions)

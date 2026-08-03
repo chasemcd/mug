@@ -37,7 +37,7 @@ from starlette.testclient import WebSocketTestSession
 from examples.mountain_car.native_env import mountain_car_spec
 from mug.agents import AgentIds
 from mug.app import build_study_app
-from mug.authoring import Chat, Fallback, History, LLMAgent, Provider, Thoughts
+from mug.authoring import Fallback, History, LLMAgent, Provider, Thoughts, Transcript
 from mug.content import Game, Page, Study
 from mug.conversation.anchors import read_anchors
 from mug.gateway import Gateway
@@ -45,8 +45,10 @@ from mug.participant_chat import ChatSeatSpec, ChatSpec
 from mug.providers import ModelCall, ModelCompletion, Usage
 from mug.runtime import read_ledger
 from mug.storage import InMemoryStore, Store
+from tests.support.chat import written_chat
 
 _UUID = "019b6000-0000-7000-8000-{:012x}"
+
 _PARTNER = "actor_" + _UUID.format(0x500)
 # The game channel is the one the specification names, not the activity key: an
 # activity is a step of the study, and a channel is what runs inside it.
@@ -66,16 +68,25 @@ class _Partner(LLMAgent):
         env: object,
         agent_id: str,
         history: History,
-        chat: Chat,
+        chat: Transcript,
         thoughts: Thoughts,
     ) -> str:
-        return ""
+        # The shape the shipped example writes. A double whose prompt says nothing
+        # would let the mount drop the author's words and still pass.
+        return "\n".join(f"{one.sender}: {one.text}" for one in chat.last(50))
 
 
 async def _adapter(call: ModelCall) -> ModelCompletion:
-    """Answer with how many messages were in the prompt, so replies differ."""
+    """Answer with how many messages were in the prompt, so replies differ.
+
+    The prompt is read from ``content``, which is where every provider looks for the
+    words of a message. A double that reads them from anywhere else passes while the
+    real model is sent nothing at all.
+    """
     payload: Any = call.payload
-    turns = len(payload["messages"])
+    turns = len(
+        "\n".join(str(one["content"]) for one in payload["messages"]).splitlines()
+    )
     return ModelCompletion(
         outcome="completed",
         resolved_model="fake-local",
@@ -109,7 +120,7 @@ def _seat(adapter: Any = _adapter) -> ChatSeatSpec:
 def _chat(seat: ChatSeatSpec | None = None, **overrides: Any) -> ChatSpec:
     fields: dict[str, Any] = {"seat": seat or _seat(), "channel_key": "talk"}
     fields.update(overrides)
-    return ChatSpec(**fields)
+    return written_chat(**fields)
 
 
 def _game(max_steps: int = 6) -> Any:

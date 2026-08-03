@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>A -- the conversation as a transcript</title>
+    <link rel="stylesheet" href="a-transcript.css" />
+  </head>
+  <body>
+    <nav class="mock">
+      <div>
+        <a href="index.html">All directions</a>
+        <span>A &mdash; Transcript</span>
+        <span class="right"><a href="b-chat.html">See B &rarr;</a></span>
+      </div>
+    </nav>
+
+    <div class="page">
+      <header class="head">
+        <span class="head__study">Advice and preference</span>
+        <span class="head__where">Three of six</span>
+        <span class="head__state">Connected</span>
+        <button type="button" class="head__leave">End</button>
+      </header>
+
+      <div class="transcript" role="log" aria-label="Conversation">
+        <div class="turn turn--them">
+          <div class="turn__who">Them</div>
+          <div class="turn__text">Hello. What would you like to talk about?</div>
+        </div>
+
+        <div class="turn turn--you">
+          <div class="turn__who">You</div>
+          <div class="turn__text">I have to give a ten minute talk to my team on Thursday and I keep rewriting the opening. Where do I start?</div>
+        </div>
+
+        <div class="turn turn--them">
+          <div class="turn__who">Them</div>
+          <div class="turn__text">Start at the end. Write the one sentence you want somebody to repeat to a colleague on Friday, then work backwards from it.
+
+Ten minutes holds about three points. If the opening is hard to write, it is often because the talk has five.</div>
+        </div>
+
+        <div class="turn turn--you">
+          <div class="turn__who">You</div>
+          <div class="turn__text">That is the problem. I have five and they all feel necessary.</div>
+        </div>
+
+        <div class="turn turn--them">
+          <div class="turn__who">Them</div>
+          <div class="turn__text"><span class="waiting" role="status" aria-label="Waiting for a reply">. . .</span></div>
+        </div>
+
+        <p class="aside" role="status">
+          The other party could not reply this time. You can send your message again.
+        </p>
+      </div>
+
+      <form class="write">
+        <label class="write__label" for="message">You</label>
+        <textarea id="message" rows="1" placeholder="Write here"></textarea>
+        <div class="write__foot">
+          <button type="submit" class="act" disabled>Send</button>
+          <span>Return sends. Shift and return make a new line.</span>
+        </div>
+      </form>
+    </div>
+
+    <script src="mock.js"></script>
+  </body>
+</html>

@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>v4 -- the judgement inside the conversation</title>
+    <link rel="stylesheet" href="v4.css" />
+  </head>
+  <body>
+    <div class="app">
+      <nav class="mock">
+        <a href="index.html">v4</a>
+        <span>The judgement inside the conversation</span>
+        <span class="right">
+          <a href="chat.html">Conversation</a> &middot;
+          <a href="comparison.html">Comparison</a> &middot;
+          <a href="room.html">Room</a> &middot;
+          <a href="game-and-chat.html">Game and chat</a> &middot;
+          <a href="study.html">Study</a>
+        </span>
+      </nav>
+
+      <header class="head">
+        <span class="brand">
+          <span class="brand__mark" aria-hidden="true"></span>
+          <span class="brand__name">MUG</span>
+        </span>
+        <span class="head__rule" aria-hidden="true"></span>
+        <span class="head__study">Advice and preference</span>
+        <span class="head__spacer"></span>
+        <span class="progress">
+          <span class="progress__track" role="img" aria-label="Step 3 of 6">
+            <span class="progress__mark progress__mark--done"></span>
+            <span class="progress__mark progress__mark--done"></span>
+            <span class="progress__mark progress__mark--now"></span>
+            <span class="progress__mark"></span>
+            <span class="progress__mark"></span>
+            <span class="progress__mark"></span>
+          </span>
+          Step 3 of 6
+        </span>
+        <span class="state">Connected</span>
+        <button type="button" class="btn btn--quiet btn--small">End</button>
+      </header>
+
+      <div class="scroll">
+        <div class="thread" role="log" aria-label="Conversation">
+          <div class="turn turn--them">
+            <div class="turn__who"><span class="turn__mark"></span>Them</div>
+            <div class="bubble">Ten minutes holds about three points. If the opening is hard to write, it is often because the talk has five.</div>
+          </div>
+          <div class="turn turn--you">
+            <div class="turn__who"><span class="turn__mark"></span>You</div>
+            <div class="bubble">That is the problem. I have five and they all feel necessary.</div>
+          </div>
+        </div>
+
+        <!-- The judgement is a turn in the conversation, not a survey about it:
+             the reply that is chosen is the reply the conversation goes on
+             with. The work runs 1, 2, 3 down the panel.
+
+             Nothing here may carry an order signal. The two options are one
+             grid with one track rule, they stretch together, both badges are
+             the same ink, and no rule anywhere styles the first one. The sides
+             are shuffled for each participant, and the answer records the
+             handle the server sent. -->
+        <section class="panel" aria-labelledby="ask">
+          <div class="panel__head">
+            <div class="key">A judgement</div>
+            <h2 class="panel__ask" id="ask">Two replies were written. Which would you rather have had?</h2>
+            <div class="panel__note">The conversation goes on from the one you choose.</div>
+          </div>
+
+          <div class="block block--flush">
+            <div class="block__head">
+              <span class="key key--step"><span class="key__n">1</span> Read both, and pick the one you want</span>
+            </div>
+            <div class="pair">
+              <label class="option option--pick" data-option="a">
+                <input type="radio" name="choice" value="a" />
+                <div class="option__head">
+                  <span class="badge badge--lg">A</span>
+                  <span class="option__name">Reply A</span>
+                </div>
+                <div class="option__text">Then keep all five, but say four of them in one sentence each and give the whole of the rest to the one that changes what somebody does on Friday.
+
+A point that only needs a sentence is not a small point. It is a point that is already agreed.</div>
+                <div class="option__pick">
+                  <span class="option__dot" aria-hidden="true">&#10003;</span>
+                  <span>Choose this reply</span>
+                </div>
+              </label>
+              <label class="option option--pick" data-option="b">
+                <input type="radio" name="choice" value="b" />
+                <div class="option__head">
+                  <span class="badge badge--lg">B</span>
+                  <span class="option__name">Reply B</span>
+                </div>
+                <div class="option__text">Five is not too many if four of them are the same point. Write each in one line, put the lines side by side, and you will usually find two collapse into one.
+
+If they truly do not, the talk is a memo. Send it, and use the ten minutes for the question people will have after reading it.</div>
+                <div class="option__pick">
+                  <span class="option__dot" aria-hidden="true">&#10003;</span>
+                  <span>Choose this reply</span>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <div class="block">
+            <div class="block__head">
+              <span class="key key--step"><span class="key__n">2</span> How do they compare?</span>
+              <span class="answered right" data-count></span>
+            </div>
+
+            <fieldset class="axis">
+              <legend class="axis__ask">Which reply is more helpful?</legend>
+              <div class="scale">
+                <span class="scale__end"><span class="badge">A</span>more</span>
+                <div class="cells">
+                  <label data-say="A is clearly more helpful"><input type="radio" name="helpful" /></label>
+                  <label data-say="A is more helpful"><input type="radio" name="helpful" /></label>
+                  <label data-say="A is a little more helpful"><input type="radio" name="helpful" /></label>
+                  <label data-middle data-say="They are the same"><input type="radio" name="helpful" />=</label>
+                  <label data-say="B is a little more helpful"><input type="radio" name="helpful" /></label>
+                  <label data-say="B is more helpful"><input type="radio" name="helpful" /></label>
+                  <label data-say="B is clearly more helpful"><input type="radio" name="helpful" /></label>
+                </div>
+                <span class="scale__end"><span class="badge">B</span>more</span>
+              </div>
+              <div class="readout" role="status"></div>
+            </fieldset>
+
+            <fieldset class="axis">
+              <legend class="axis__ask">
+                Which reply is more careful about what it does not know?
+              </legend>
+              <div class="scale">
+                <span class="scale__end"><span class="badge">A</span>more</span>
+                <div class="cells">
+                  <label data-say="A is clearly more careful"><input type="radio" name="careful" /></label>
+                  <label data-say="A is more careful"><input type="radio" name="careful" /></label>
+                  <label data-say="A is a little more careful"><input type="radio" name="careful" /></label>
+                  <label data-middle data-say="They are the same"><input type="radio" name="careful" />=</label>
+                  <label data-say="B is a little more careful"><input type="radio" name="careful" /></label>
+                  <label data-say="B is more careful"><input type="radio" name="careful" /></label>
+                  <label data-say="B is clearly more careful"><input type="radio" name="careful" /></label>
+                </div>
+                <span class="scale__end"><span class="badge">B</span>more</span>
+              </div>
+              <div class="readout" role="status"></div>
+            </fieldset>
+
+            <!-- An axis that rates each reply on its own is not a comparison,
+                 so it is not drawn as one. A reward model reads the two as
+                 different data. -->
+            <div class="axis">
+              <div class="axis__ask">How well does each reply match the tone you wanted?</div>
+              <div class="each">
+                <fieldset class="axis" style="margin: 0">
+                  <legend class="each__head">
+                    <span class="badge">A</span><span class="each__name">Reply A</span>
+                  </legend>
+                  <div class="cells">
+                    <label data-say="A matches the tone: 1 of 7, not at all"><input type="radio" name="tone-a" />1</label>
+                    <label data-say="A matches the tone: 2 of 7"><input type="radio" name="tone-a" />2</label>
+                    <label data-say="A matches the tone: 3 of 7"><input type="radio" name="tone-a" />3</label>
+                    <label data-say="A matches the tone: 4 of 7"><input type="radio" name="tone-a" />4</label>
+                    <label data-say="A matches the tone: 5 of 7"><input type="radio" name="tone-a" />5</label>
+                    <label data-say="A matches the tone: 6 of 7"><input type="radio" name="tone-a" />6</label>
+                    <label data-say="A matches the tone: 7 of 7, exactly"><input type="radio" name="tone-a" />7</label>
+                  </div>
+                  <div class="ends"><span>Not at all</span><span>Exactly</span></div>
+                  <div class="readout" role="status"></div>
+                </fieldset>
+                <fieldset class="axis" style="margin: 0">
+                  <legend class="each__head">
+                    <span class="badge">B</span><span class="each__name">Reply B</span>
+                  </legend>
+                  <div class="cells">
+                    <label data-say="B matches the tone: 1 of 7, not at all"><input type="radio" name="tone-b" />1</label>
+                    <label data-say="B matches the tone: 2 of 7"><input type="radio" name="tone-b" />2</label>
+                    <label data-say="B matches the tone: 3 of 7"><input type="radio" name="tone-b" />3</label>
+                    <label data-say="B matches the tone: 4 of 7"><input type="radio" name="tone-b" />4</label>
+                    <label data-say="B matches the tone: 5 of 7"><input type="radio" name="tone-b" />5</label>
+                    <label data-say="B matches the tone: 6 of 7"><input type="radio" name="tone-b" />6</label>
+                    <label data-say="B matches the tone: 7 of 7, exactly"><input type="radio" name="tone-b" />7</label>
+                  </div>
+                  <div class="ends"><span>Not at all</span><span>Exactly</span></div>
+                  <div class="readout" role="status"></div>
+                </fieldset>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel__foot">
+            <button type="button" class="btn btn--primary" data-submit
+                    data-empty="Pick a reply above" data-ready="Go on with Reply {}" disabled>
+              Pick a reply above
+            </button>
+            <button type="button" class="btn btn--small">They are about the same</button>
+            <button type="button" class="btn btn--small">Both are bad</button>
+            <span class="right">
+              <button type="button" class="btn btn--quiet btn--small">Skip this one</button>
+            </span>
+          </div>
+        </section>
+      </div>
+
+      <div class="dock">
+        <form class="composer">
+          <textarea rows="1" placeholder="Choose a reply above to go on"
+                    disabled aria-label="Your message"></textarea>
+          <button type="submit" class="send" aria-label="Send" disabled>
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M8 13V3.5M8 3.5 3.8 7.7M8 3.5l4.2 4.2" stroke="currentColor"
+                    stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </button>
+        </form>
+      </div>
+    </div>
+    <script src="mock.js"></script>
+  </body>
+</html>

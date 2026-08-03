@@ -1,0 +1,509 @@
+/* Direction B -- Instrument.
+ *
+ * The platform is a measuring device, so the screen is drawn as one. Structure
+ * comes from a fixed left column and full-width hairlines, not from containers.
+ * Every label is in the monospaced face and every reading is in the plain one,
+ * so a participant can always tell what the machine is saying from what a
+ * person said.
+ *
+ * What is deliberately absent:
+ *   - No corner radius, no shadow, no gradient, no floating panel.
+ *   - Nothing fills or lifts under the pointer. A pointer moves a marker in the
+ *     left column, one character wide.
+ *   - One colour, and it is used only for what is live now. Everything a
+ *     participant chose is black.
+ *
+ * These documents use ASD-STE100 Simplified Technical English.
+ */
+
+:root {
+  --field: #f4f4f1;
+  --sheet: #ffffff;
+  --ink: #111111;
+  --ink-quiet: #63635c;
+  --ink-faint: #91918a;
+  --rule: #dcdcd6;
+  --rule-strong: #111111;
+  --live: #b23a1c;
+
+  --mono: "Andale Mono", "DejaVu Sans Mono", ui-monospace, monospace;
+  --sans: "Helvetica Neue", Helvetica, Arial, "Liberation Sans", sans-serif;
+
+  --col: 8.5rem;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--field);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* The sheet is not a card. It has no radius and no shadow: it is the lit part
+ * of the field, held by one rule on each side. */
+.sheet {
+  max-width: 62rem;
+  margin: 0 auto;
+  background: var(--sheet);
+  border-left: 1px solid var(--rule);
+  border-right: 1px solid var(--rule);
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Every row of the instrument is the same two columns: what it is, and what it
+ * says. */
+.row {
+  display: grid;
+  grid-template-columns: var(--col) minmax(0, 1fr);
+  border-bottom: 1px solid var(--rule);
+}
+
+.row__key,
+.key {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  padding: 0.9rem 1rem 0.9rem 1.5rem;
+  border-right: 1px solid var(--rule);
+}
+
+.row__value {
+  padding: 0.85rem 1.5rem;
+  min-width: 0;
+}
+
+/* -- the head ----------------------------------------------------------- */
+
+.head {
+  display: grid;
+  grid-template-columns: var(--col) minmax(0, 1fr) auto;
+  border-bottom: 1px solid var(--rule-strong);
+  align-items: stretch;
+}
+
+.head__key {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  padding: 0.85rem 1rem 0.85rem 1.5rem;
+  border-right: 1px solid var(--rule);
+}
+
+.head__study {
+  padding: 0.8rem 1.5rem;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.head__meta {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 0 1.5rem;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--ink-quiet);
+}
+
+/* The one coloured thing on the screen is what is live now. */
+.live {
+  color: var(--live);
+}
+
+/* -- the transcript ----------------------------------------------------- */
+
+.log {
+  flex: 1;
+}
+
+.turn {
+  display: grid;
+  grid-template-columns: var(--col) minmax(0, 1fr);
+  border-bottom: 1px solid var(--rule);
+}
+
+.turn__who {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  padding: 1.05rem 1rem 1.05rem 1.5rem;
+  border-right: 1px solid var(--rule);
+}
+
+/* The participant's own turns are named in full ink. That is the only
+ * difference between the two parties, and it needs no second colour. */
+.turn--you .turn__who {
+  color: var(--ink);
+}
+
+.turn__text {
+  padding: 1rem 1.5rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+/* What stands where a reply is going to be: a block that blinks on the line the
+ * words will start on. */
+.caret {
+  display: inline-block;
+  width: 7px;
+  height: 1.05em;
+  background: var(--ink-faint);
+  vertical-align: text-bottom;
+  animation: blink 1.15s steps(1) infinite;
+}
+
+@keyframes blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .caret {
+    animation: none;
+    opacity: 0.5;
+  }
+}
+
+.note {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--live);
+  padding: 1rem 1.5rem;
+}
+
+/* -- what the participant writes ---------------------------------------- */
+
+.write {
+  display: grid;
+  grid-template-columns: var(--col) minmax(0, 1fr);
+  border-top: 1px solid var(--rule-strong);
+}
+
+.write__body {
+  padding: 1rem 1.5rem;
+}
+
+.write textarea {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  outline: 0;
+  resize: none;
+  width: 100%;
+  padding: 0;
+  max-height: 9rem;
+}
+
+.write textarea::placeholder {
+  color: var(--ink-faint);
+}
+
+.write__foot {
+  display: flex;
+  align-items: baseline;
+  gap: 1.5rem;
+  margin-top: 0.7rem;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+/* An action is a word behind a marker. The marker is what answers the pointer:
+ * it takes the one colour, and nothing else on the row changes. */
+.act {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--ink);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  display: inline-flex;
+  gap: 0.55em;
+}
+
+.act::before {
+  content: "\25B8";
+  color: var(--rule);
+}
+
+.act:hover:not(:disabled)::before {
+  color: var(--live);
+}
+
+.act:disabled {
+  color: var(--ink-faint);
+  cursor: not-allowed;
+}
+
+.act--quiet {
+  color: var(--ink-quiet);
+}
+
+.act--quiet:hover {
+  color: var(--ink);
+}
+
+:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+/* -- the judgement ------------------------------------------------------ */
+
+.ask {
+  padding: 1.1rem 1.5rem;
+  font-size: 1.0625rem;
+  font-weight: 700;
+  letter-spacing: -0.011em;
+}
+
+.ask small {
+  display: block;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-top: 0.35rem;
+}
+
+/* Two readings of the same measurement, in one grid with one track rule and
+ * one hairline between them. Neither column has a rule of its own. */
+.pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-bottom: 1px solid var(--rule);
+}
+
+.pair > * + * {
+  border-left: 1px solid var(--rule);
+}
+
+.reply {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.reply__key {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  padding: 0.7rem 1.5rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.reply__text {
+  padding: 1rem 1.5rem 1.2rem;
+  white-space: pre-wrap;
+  flex: 1;
+}
+
+.reply__act {
+  padding: 0.85rem 1.5rem;
+  border-top: 1px solid var(--rule);
+}
+
+/* -- the axes ----------------------------------------------------------- */
+
+.axis {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: var(--col) minmax(0, 1fr);
+  border-bottom: 1px solid var(--rule);
+}
+
+.axis__ask {
+  padding: 1.05rem 1rem 1.05rem 1.5rem;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  border-right: 1px solid var(--rule);
+  float: left; /* a legend does not take a grid cell without this */
+  width: var(--col);
+}
+
+.axis__body {
+  padding: 0.9rem 1.5rem 1rem;
+  grid-column: 2;
+}
+
+.axis__words {
+  font-size: 0.9375rem;
+  margin-bottom: 0.7rem;
+}
+
+/* The scale is a row of cells, ruled like a sheet a reading is written on.
+ * Nothing is chosen at the start. A cell fills only when it is chosen: the
+ * pointer moves a rule under a cell and fills nothing. */
+.cells {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  border: 1px solid var(--rule);
+}
+
+.cells label {
+  border-right: 1px solid var(--rule);
+  height: 2.15rem;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-faint);
+  box-shadow: inset 0 0 0 0 var(--ink);
+}
+
+.cells label:last-child {
+  border-right: 0;
+}
+
+.cells label:hover {
+  box-shadow: inset 0 -2px 0 0 var(--ink);
+  color: var(--ink);
+}
+
+.cells label:has(input:checked) {
+  background: var(--ink);
+  color: var(--sheet);
+  box-shadow: none;
+}
+
+.cells label:has(input:focus-visible) {
+  outline: 2px solid var(--ink);
+  outline-offset: -2px;
+}
+
+.cells input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.ends {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 0.4rem;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-quiet);
+}
+
+.ends span:nth-child(2) {
+  text-align: center;
+}
+
+.each {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 2rem;
+}
+
+.each__key {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 0.45rem;
+  padding: 0;
+}
+
+.foot {
+  display: flex;
+  align-items: center;
+  gap: 1.75rem;
+  padding: 0.95rem 1.5rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.foot .right {
+  margin-left: auto;
+}
+
+/* -- the strip that says this is a mock-up ------------------------------ */
+
+.mock {
+  max-width: 62rem;
+  margin: 0 auto;
+  border-left: 1px solid var(--rule);
+  border-right: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+  background: var(--sheet);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  padding: 0.5rem 1.5rem;
+  display: flex;
+  gap: 1.5rem;
+}
+
+.mock a {
+  color: var(--ink-quiet);
+}
+
+.mock .right {
+  margin-left: auto;
+}
+
+@media (max-width: 46rem) {
+  :root {
+    --col: 5.5rem;
+  }
+  .pair,
+  .each {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .pair > * + * {
+    border-left: 0;
+    border-top: 1px solid var(--rule);
+  }
+}

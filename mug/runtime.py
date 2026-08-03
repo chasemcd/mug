@@ -15,6 +15,7 @@ store guards the revision either way.
 
 from __future__ import annotations
 
+import base64
 import hashlib
 from pathlib import Path
 from typing import NamedTuple
@@ -171,9 +172,7 @@ def result_ref(name: str) -> SchemaRef:
     return SchemaRef(
         name=name,
         version=0,
-        digest=Digest(
-            algorithm="sha-256", hex=command_results_schema().bundle_digest
-        ),
+        digest=Digest(algorithm="sha-256", hex=command_results_schema().bundle_digest),
     )
 
 
@@ -277,9 +276,29 @@ def _derive_event_id(base_event_id: str, index: int) -> str:
     raw[8] = 0x80 | (raw[8] & 0x3F)
     hexed = raw.hex()
     return (
-        f"event_{hexed[0:8]}-{hexed[8:12]}-{hexed[12:16]}"
-        f"-{hexed[16:20]}-{hexed[20:32]}"
+        f"event_{hexed[0:8]}-{hexed[8:12]}-{hexed[12:16]}-{hexed[16:20]}-{hexed[20:32]}"
     )
+
+
+# How many committed events one unit-of-work receipt can name (API-11 caps the
+# list at 256). A run with more frames than this is committed in consecutive parts.
+_EVENTS_PER_RECEIPT = 256
+
+
+def _derive_idempotency_key(base_key: str, part: int) -> str:
+    """Derive the idempotency key for one part of a batched capture.
+
+    The first part keeps the key the gateway minted, so a capture that fits in one
+    commit is unchanged. Each later part derives its own key from that one and the
+    part number, so a repeat of the whole capture re-derives the same keys and the
+    store recognizes every part as the repeat it is. No new entropy enters here; the
+    gateway stays the single entropy boundary.
+    """
+    if part == 0:
+        return base_key
+    body = base_key.split("_", 1)[1]
+    raw = hashlib.sha256(f"{body}:part{part}".encode()).digest()[:16]
+    return "idem_" + base64.urlsafe_b64encode(raw).decode().rstrip("=")
 
 
 def _captured_detail(context: CommandContext, event: LedgerEvent) -> dict[str, object]:
@@ -308,40 +327,56 @@ async def commit_capture(
 
     The single-event ``commit_command`` appends the command's own event; a
     captured run appends one event per recorded record -- a transition per frame
-    and the closing boundary -- all on the aggregate's stream in one atomic
-    commit. Each event binds its own record digest, so the stream is the full,
-    ordered lineage of the run. A store conflict becomes a no-effect rejection.
+    and the closing boundary -- all on the aggregate's stream. Each event binds its
+    own record digest, so the stream is the full, ordered lineage of the run. A
+    store conflict becomes a no-effect rejection.
+
+    **A run longer than one receipt can name is committed in parts.** A unit-of-work
+    receipt names at most ``_EVENTS_PER_RECEIPT`` committed events (API-11), and an
+    episode has one event per frame, so a game of a few thousand frames is more than
+    one commit can report. The parts are consecutive appends to the one stream in
+    frame order, each with its own derived idempotency key, so a repeat of the whole
+    capture re-derives the same keys and the same event ids and adds nothing. The
+    aggregate head is the finished run and is written by every part, because the
+    capture runs after the episode ended and the head is already known.
     """
-    event_ids = [
-        _derive_event_id(context.event_id, index) for index in range(len(events))
-    ]
-    stream_events = [(context.stream_id, event_id) for event_id in event_ids]
-    event_details = {
-        event_id: _captured_detail(context, event)
-        for event_id, event in zip(event_ids, events, strict=True)
-    }
-    try:
-        uow = await store.commit(
-            command_id=context.command_id,
-            idempotency_key=context.idempotency_key,
-            aggregate_id=context.aggregate_id,
-            expected_revision=expected_revision,
-            new_state=new_state,
-            stream_events=stream_events,
-            event_details=event_details,
-            producer_generation=_generation(context),
-            durability_profile=command.name,
-        )
-    except StorageError as error:
-        category, retry = _STORE_CONFLICT.get(error.code, ("internal", "never"))
-        return reject_command(
-            context,
-            command=command,
-            code=error.code,
-            category=category,
-            message=error.code,
-            retry=retry,
-        )
+    revision = expected_revision
+    uow = None
+    for part, start in enumerate(range(0, max(len(events), 1), _EVENTS_PER_RECEIPT)):
+        batch = events[start : start + _EVENTS_PER_RECEIPT]
+        event_ids = [
+            _derive_event_id(context.event_id, start + index)
+            for index in range(len(batch))
+        ]
+        stream_events = [(context.stream_id, event_id) for event_id in event_ids]
+        event_details = {
+            event_id: _captured_detail(context, event)
+            for event_id, event in zip(event_ids, batch, strict=True)
+        }
+        try:
+            uow = await store.commit(
+                command_id=context.command_id,
+                idempotency_key=_derive_idempotency_key(context.idempotency_key, part),
+                aggregate_id=context.aggregate_id,
+                expected_revision=revision,
+                new_state=new_state,
+                stream_events=stream_events,
+                event_details=event_details,
+                producer_generation=_generation(context),
+                durability_profile=command.name,
+            )
+        except StorageError as error:
+            category, retry = _STORE_CONFLICT.get(error.code, ("internal", "never"))
+            return reject_command(
+                context,
+                command=command,
+                code=error.code,
+                category=category,
+                message=error.code,
+                retry=retry,
+            )
+        revision = uow.aggregate_version.revision if uow.aggregate_version else None
+    assert uow is not None
     return _accepted_receipt(context, command, uow, store, result)
 
 
@@ -441,8 +476,7 @@ def read_ledger(
     envelope itself, since the events family is an independent sibling.
     """
     return [
-        _envelope(record)
-        for record in store.stream_records(stream_id, after_sequence)
+        _envelope(record) for record in store.stream_records(stream_id, after_sequence)
     ]
 
 

@@ -17,7 +17,7 @@ from starlette.testclient import WebSocketTestSession
 
 from mug.agents import AgentIds, AgentSeatSpec, TurnBasedGameSpec
 from mug.app import build_demo_app
-from mug.authoring import Chat, Fallback, History, LLMAgent, Provider, Thoughts
+from mug.authoring import Fallback, History, LLMAgent, Provider, Thoughts, Transcript
 from mug.client import RealtimeCommand
 from mug.gateway import Gateway
 from mug.kernel import Digest, SchemaRef
@@ -98,7 +98,7 @@ class _Duelist(LLMAgent):
         env: object,
         agent_id: str,
         history: History,
-        chat: Chat,
+        chat: Transcript,
         thoughts: Thoughts,
     ) -> str:
         return f"{env.text_view(agent_id)}"  # type: ignore[attr-defined]

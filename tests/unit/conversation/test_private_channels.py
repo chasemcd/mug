@@ -30,7 +30,7 @@ import pytest
 from fastapi import WebSocketDisconnect
 
 from mug.agents import AgentIds
-from mug.authoring import Chat, Fallback, History, LLMAgent, Provider, Thoughts
+from mug.authoring import Fallback, History, LLMAgent, Provider, Thoughts, Transcript
 from mug.conversation import TurnPolicy
 from mug.gateway import Gateway
 from mug.kernel import Digest
@@ -45,8 +45,10 @@ from mug.providers import ModelCall, ModelCompletion, Usage
 from mug.realtime import Session
 from mug.runtime import CommandContext
 from mug.storage import InMemoryStore, Store
+from tests.support.chat import chat_spec
 
 _UUID = "019b6000-0000-7000-8000-{:012x}"
+
 _START = datetime(2026, 7, 27, 0, 0, 0, tzinfo=timezone.utc)
 _DIGEST = Digest(algorithm="sha-256", hex="a" * 64)
 _SECRET = b"a-shared-deployment-secret------"
@@ -69,10 +71,12 @@ class _Model(LLMAgent):
         env: object,
         agent_id: str,
         history: History,
-        chat: Chat,
+        chat: Transcript,
         thoughts: Thoughts,
     ) -> str:
-        return ""
+        # The shape the shipped example writes. A double whose prompt says nothing
+        # would let the mount drop the author's words and still pass.
+        return "\n".join(f"{one.sender}: {one.text}" for one in chat.last(50))
 
 
 class _Voice:
@@ -299,7 +303,7 @@ async def test_two_model_seats_both_answer_one_message() -> None:
     coach = _Voice("coach")
     socket, store = await _alone(
         [{"type": "chat", "text": "hello"}, {"type": "chat_end"}],
-        ChatSpec(
+        chat_spec(
             seats=(
                 _seat(_PARTNER_ACTOR, partner, "partner"),
                 _seat(_COACH_ACTOR, coach, "coach"),
@@ -323,7 +327,7 @@ async def test_the_declared_order_wins_over_whichever_model_answered_first() -> 
     fast = _Voice("coach", yields=0, finished=finished)
     _socket, store = await _alone(
         [{"type": "chat", "text": "hello"}, {"type": "chat_end"}],
-        ChatSpec(
+        chat_spec(
             seats=(
                 _seat(_PARTNER_ACTOR, slow, "partner"),
                 _seat(_COACH_ACTOR, fast, "coach"),
@@ -345,7 +349,7 @@ async def test_the_activation_budget_stops_a_response_storm_before_the_calls() -
     voices = [_Voice(name) for name in ("one", "two", "three")]
     _socket, store = await _alone(
         [{"type": "chat", "text": "everybody talk"}, {"type": "chat_end"}],
-        ChatSpec(
+        chat_spec(
             seats=(
                 _seat(_PARTNER_ACTOR, voices[0], "one"),
                 _seat(_COACH_ACTOR, voices[1], "two"),
@@ -368,7 +372,7 @@ async def test_a_seat_that_stays_quiet_does_not_spend_the_budget() -> None:
     voices = [_Voice(name) for name in ("quiet", "one", "two")]
     _socket, _store = await _alone(
         [{"type": "chat", "text": "hello everyone"}, {"type": "chat_end"}],
-        ChatSpec(
+        chat_spec(
             seats=(
                 _seat(
                     _PARTNER_ACTOR,
@@ -393,7 +397,7 @@ async def test_a_seat_that_was_not_named_stays_quiet_while_another_answers() -> 
     coach = _Voice("coach")
     socket, _store = await _alone(
         [{"type": "chat", "text": "just chatting"}, {"type": "chat_end"}],
-        ChatSpec(
+        chat_spec(
             seats=(
                 _seat(_PARTNER_ACTOR, partner, "partner"),
                 _seat(
@@ -415,7 +419,7 @@ async def test_a_seat_that_was_not_named_stays_quiet_while_another_answers() -> 
 def test_a_seat_that_names_a_channel_the_study_did_not_declare_is_refused() -> None:
     """A seat speaking into nowhere would be silent with nothing to say why."""
     with pytest.raises(ValueError, match="undeclared channels: advice"):
-        ChatSpec(
+        chat_spec(
             seats=(_seat(_COACH_ACTOR, _Voice("coach"), "coach", channel="advice"),),
             channels=(ChatChannel(key="chat"),),
         )
@@ -426,7 +430,7 @@ def test_a_seat_that_names_a_channel_the_study_did_not_declare_is_refused() -> N
 
 def _coached_study() -> ChatSpec:
     """Two participants, a partner everybody shares, and a coach for seat one."""
-    return ChatSpec(
+    return chat_spec(
         seats=(
             _seat(_PARTNER_ACTOR, _Voice("partner"), "partner"),
             _seat(
@@ -558,7 +562,7 @@ async def test_a_model_seat_never_reads_a_channel_it_is_not_in() -> None:
     store = InMemoryStore()
     partner = _Voice("partner")
     coach = _Voice("coach")
-    spec = ChatSpec(
+    spec = chat_spec(
         seats=(
             _seat(_PARTNER_ACTOR, partner, "partner"),
             _seat(_COACH_ACTOR, coach, "coach", channel="coach", hears=("chat",)),
@@ -584,10 +588,16 @@ async def test_a_model_seat_never_reads_a_channel_it_is_not_in() -> None:
     said: list[str] = []
     for payload in partner.payloads:
         lines = cast("dict[str, Any]", payload)["messages"]
-        said += [line["text"] for line in cast("list[dict[str, str]]", lines)]
-    assert "first" in said, "the partner read the public channel"
+        # ``content`` is where a provider reads the words of a message, so it is
+        # where a test that asks what the model read has to look.
+        said += [
+            str(cast("dict[str, Any]", line)["content"])
+            for line in cast("list[Any]", lines)
+        ]
+    read = "\n".join(said)
+    assert "first" in read, "the partner read the public channel"
     assert coach.calls >= 1, "the coach answered on its private channel"
-    assert not any("coach says so" in line for line in said)
+    assert "coach says so" not in read
 
 
 async def test_who_was_in_which_channel_is_recorded_and_not_only_remembered(

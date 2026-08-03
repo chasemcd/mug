@@ -51,6 +51,13 @@ ResolvePrincipal = Callable[[WebSocket], PrincipalRef]
 Establish = Callable[["Session"], Awaitable[dict[str, Any]]]
 # Seed a session once the handshake completes (for example, open the flow).
 OnOpen = Callable[["Session"], Awaitable[None]]
+
+# What runs when a connection ends, however it ends. It is where work a participant
+# left unfinished is closed off: a browser game reports its run in parts while it is
+# played, and a participant who shuts the tab mid-round never sends the last one. The
+# hook is given the session so it can seal what did arrive. It must not touch the
+# socket -- by the time it runs there is nothing to write to.
+OnClose = Callable[["Session"], Awaitable[None]]
 # Run a server-driven activity (for example, the game stepping loop) that takes
 # the socket over, reads its own input frames, and pushes its own frames.
 OnGame = Callable[[WebSocket, "Session"], Awaitable[None]]
@@ -479,6 +486,7 @@ async def serve_session(
     on_open: OnOpen | None = None,
     on_game: OnGame | None = None,
     on_measure: OnMeasure | None = None,
+    on_close: OnClose | None = None,
     admission: Admission | None = None,
     telemetry: Telemetry | None = None,
 ) -> None:
@@ -493,6 +501,13 @@ async def serve_session(
     ``telemetry`` is where the transport reports how many sessions are open and what
     it refused. It defaults to a sink that discards.
 
+    ``on_close`` runs when the connection ends, whichever way it ends, and is where
+    a participant's unfinished work is closed off. A browser game is reported in
+    parts while it is played, so a participant who shuts the tab mid-round leaves a
+    run nobody closed; the hook is what turns that into the frames they did play
+    rather than nothing. It runs after the socket is gone, so it must not write to
+    it, and a failure in it must not lose the connection's place.
+
     The handshake resolves the acting principal and reports the resume cursor the
     client asked for. ``on_establish`` runs first, before the handshake, to resume
     or open the session; the fields it returns join the handshake (for example a
@@ -506,6 +521,7 @@ async def serve_session(
     """
     sink: Telemetry = telemetry or NullTelemetry()
     await websocket.accept()
+    opened: list[Session] = []
     budget: SessionBudget | None = None
     if admission is not None:
         admitted = admission.admit()
@@ -528,6 +544,7 @@ async def serve_session(
             on_open=on_open,
             on_game=on_game,
             on_measure=on_measure,
+            started=opened.append,
         )
     except SessionOverloaded:
         # The work queued for one participant ran away. Close rather than grow: the
@@ -545,6 +562,11 @@ async def serve_session(
         if admission is not None and budget is not None:
             admission.release()
             _report(sink, admission)
+        if on_close is not None and opened:
+            # However the connection ended. A participant who shut the tab
+            # mid-round is exactly the case this exists for, and that arrives here
+            # as a disconnect rather than as anything the client said.
+            await on_close(opened[0])
 
 
 def _report(
@@ -573,8 +595,14 @@ async def _serve_admitted(
     on_open: OnOpen | None,
     on_game: OnGame | None,
     on_measure: OnMeasure | None = None,
+    started: Callable[[Session], None] | None = None,
 ) -> None:
-    """Serve one admitted connection: handshake, then the frame loop."""
+    """Serve one admitted connection: handshake, then the frame loop.
+
+    ``started`` is told the session as soon as there is one, so the caller can close
+    it off however the connection ends -- including by an exception, which is the
+    case a hook called at the end of this function would miss.
+    """
     principal = resolve_principal(websocket)
     session = Session(
         principal,
@@ -583,6 +611,8 @@ async def _serve_admitted(
             budget.max_pending_deliveries if budget is not None else None
         ),
     )
+    if started is not None:
+        started(session)
     token = websocket.query_params.get("resume_token")
     if token is not None:
         session.state["resume_token"] = token

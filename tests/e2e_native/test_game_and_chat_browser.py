@@ -38,17 +38,19 @@ from playwright.sync_api import Page, expect
 from examples.mountain_car.native_env import mountain_car_spec
 from mug.agents import AgentIds
 from mug.app import build_study_app
-from mug.authoring import Chat, Fallback, History, LLMAgent, Provider, Thoughts
+from mug.authoring import Fallback, History, LLMAgent, Provider, Thoughts, Transcript
 from mug.content import Choice, Form, Game, Study
 from mug.content import Page as StudyPage
 from mug.gateway import Gateway
 from mug.participant_chat import ChatSeatSpec, ChatSpec
 from mug.providers import ModelCall, ModelCompletion, Usage
 from mug.storage import InMemoryStore
+from tests.support.chat import written_chat
 
 pytestmark = pytest.mark.e2e
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
+
 _TS_ROOT = _REPO_ROOT / "ts"
 _SHELL = _TS_ROOT / "src" / "client" / "index.html"
 _DIST_WEB = _TS_ROOT / "dist-web"
@@ -71,16 +73,23 @@ class _Model(LLMAgent):
         env: object,
         agent_id: str,
         history: History,
-        chat: Chat,
+        chat: Transcript,
         thoughts: Thoughts,
     ) -> str:
-        return ""
+        # The shape the shipped example writes. A double whose prompt says nothing
+        # would let the mount drop the author's words and still pass.
+        return "\n".join(f"{one.sender}: {one.text}" for one in chat.last(50))
 
 
 async def _adapter(call: ModelCall) -> ModelCompletion:
     """Answer with what was said, so the reply is recognisable on the screen."""
     payload: Any = call.payload
-    said = payload["messages"][-1]["text"]
+    # ``content`` is where every provider reads the words of a message. A
+    # double that reads them anywhere else passes while the real model is
+    # sent nothing at all.
+    spoken = str(payload["messages"][-1]["content"]).splitlines()
+    lines = [one for one in spoken if one.startswith("user: ")]
+    said = lines[-1][len("user: ") :] if lines else spoken[-1]
     return ModelCompletion(
         outcome="completed",
         resolved_model="fake-local",
@@ -91,7 +100,7 @@ async def _adapter(call: ModelCall) -> ModelCompletion:
 
 def _spec() -> ChatSpec:
     """One partner seat, in the conversation that sits beside the game."""
-    return ChatSpec(
+    return written_chat(
         seat=ChatSeatSpec(
             agent=_Model(),
             adapter=_adapter,
@@ -170,6 +179,10 @@ def ts_composed_url(tmp_path: Path) -> Iterator[str]:
     if not _BOOTSTRAP.exists():
         pytest.skip("ts/dist-web is not built; run `npm run build:web` in ts/")
     shutil.copy(_SHELL, tmp_path / "index.html")
+    shutil.copy(
+        _SHELL.parents[3] / "mug" / "webclient" / "app.css",
+        tmp_path / "app.css",
+    )
     shutil.copytree(_DIST_WEB / "client", tmp_path / "client")
     shutil.copytree(_DIST_WEB / "kernel", tmp_path / "kernel")
     yield from _serve(tmp_path)
@@ -179,7 +192,7 @@ def _plays_and_talks(page: Page, url: str) -> None:
     """Play and write at the same time, and keep the keyboard where it is put."""
     page.goto(url)
     page.wait_for_selector("input[name='agree']", timeout=10_000)
-    page.locator("input[name='agree'][value='yes']").check()
+    page.locator("label:has(input[name='agree'][value='yes'])").click()
     page.get_by_role("button", name="Continue").click()
 
     # Two panes, both mounted, with the conversation beside the canvas.
@@ -224,9 +237,9 @@ def _plays_and_talks(page: Page, url: str) -> None:
     # The message goes through while the run is still playing, and is answered.
     box.fill("go left")
     page.keyboard.press("Enter")
-    expect(page.get_by_text("Them: partner heard: go left")).to_be_visible(
-        timeout=10_000
-    )
+    expect(
+        page.locator("[data-author=them] .bubble", has_text="partner heard: go left")
+    ).to_be_visible(timeout=10_000)
     # The run did not end while they typed: the game pane is still the game.
     expect(page.locator("[data-testid='game-pane'] canvas")).to_be_visible()
 

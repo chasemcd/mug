@@ -163,6 +163,15 @@ class MeshDriver:
         outbound: list[Mapping[str, Any]] = []
         if not self._engine.ended():
             outbound.append(encode_input(self._engine.submit_local(int(action))))
+        else:
+            # The episode's length is fixed, so nothing new is scheduled -- but this
+            # peer keeps repeating what it played until the barrier closes. The tail
+            # of an episode is otherwise its least protected part: mid-episode a lost
+            # input is repeated by the packets that follow it, and nothing follows
+            # the last one.
+            repeat = self._engine.resend_recent()
+            if repeat is not None:
+                outbound.append(encode_input(repeat))
         self._engine.advance()
         for hash_packet in self._engine.outbound_hashes():
             outbound.append(encode_hash(hash_packet))
@@ -199,8 +208,8 @@ class MeshDriver:
         return self._engine.ended()
 
     def ready_to_finalize(self) -> bool:
-        """Return whether every peer's end frame is known, so the barrier closes."""
-        return self._engine.ended() and self._engine.all_ends_known()
+        """Say whether the barrier is agreed and every frame in it is confirmed."""
+        return self._engine.ended() and self._engine.ready_to_finalize()
 
     def finalize(self) -> None:
         """Close the episode on the agreed minimum end frame."""

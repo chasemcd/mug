@@ -122,6 +122,10 @@ def ts_comparison_server_url(tmp_path: Path) -> Iterator[str]:
     if not _BOOTSTRAP.exists():
         pytest.skip("ts/dist-web is not built; run `npm run build:web` in ts/")
     shutil.copy(_SHELL, tmp_path / "index.html")
+    shutil.copy(
+        _SHELL.parents[3] / "mug" / "webclient" / "app.css",
+        tmp_path / "app.css",
+    )
     shutil.copytree(_DIST_WEB / "client", tmp_path / "client")
     shutil.copytree(_DIST_WEB / "kernel", tmp_path / "kernel")
     yield from _serve(tmp_path)
@@ -134,14 +138,20 @@ def _answer_the_comparison(page: Page, url: str) -> None:
     # question is the first thing that waits for the participant.
     expect(page.get_by_text(_ASK)).to_be_visible(timeout=20_000)
 
-    options = page.locator("[data-testid='comparison-options'] button")
+    options = page.locator("[data-testid='comparison-options'] .option")
     expect(options).to_have_count(2, timeout=10_000)
     # The screen says which of the participant's own rounds each option was and
     # what it recorded. It never says which condition it was.
     expect(options.first).to_contain_text("frames")
     expect(page.get_by_text("Practice")).to_have_count(0)
 
+    # The option is the control: an answer is given by pressing the thing it is
+    # about, and sent by one submit that names what it is going to send.
+    submit = page.locator("[data-testid='comparison-submit']")
+    expect(submit).to_be_disabled()
     options.first.click()
+    expect(submit).to_be_enabled()
+    submit.click()
     expect(page.get_by_text("Thank you")).to_be_visible(timeout=10_000)
 
 

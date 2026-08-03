@@ -109,6 +109,10 @@ def ts_scene_url(tmp_path: Path) -> Iterator[str]:
     if not _BOOTSTRAP.exists():
         pytest.skip("ts/dist-web is not built; run `npm run build:web` in ts/")
     shutil.copy(_SHELL, tmp_path / "index.html")
+    shutil.copy(
+        _SHELL.parents[3] / "mug" / "webclient" / "app.css",
+        tmp_path / "app.css",
+    )
     shutil.copytree(_DIST_WEB / "client", tmp_path / "client")
     shutil.copytree(_DIST_WEB / "kernel", tmp_path / "kernel")
     yield from _serve(tmp_path)
@@ -134,7 +138,8 @@ def _reach_the_scene(page: Page, url: str) -> None:
     """Consent, and wait for the canvas the conformance scene draws on."""
     page.goto(url)
     page.wait_for_selector("text=connected", timeout=20_000)
-    page.get_by_role("radio", name="yes").check()
+    page.get_by_role("radio", name="yes").focus()
+    page.keyboard.press("Space")
     page.get_by_role("button", name="Continue").click()
     page.wait_for_selector("canvas", timeout=20_000)
     # The first frame is pushed as soon as the episode opens; give it one moment

@@ -111,6 +111,15 @@ export interface ChatMessage {
   restored?: boolean;
 }
 
+/** A reply that is not coming: the provider errored, refused, or timed out. */
+export interface ChatNoticeFrame {
+  type: 'chat_notice';
+  /** Why there is no reply. `no-reply` is a model that said nothing at all. */
+  code: string;
+  /** What to put on the screen, written for the participant rather than the log. */
+  message: string;
+}
+
 /** A model turn that was still running when this connection opened. */
 export interface ChatPendingFrame {
   type: 'chat_pending';
@@ -241,6 +250,7 @@ export interface SessionHandlers {
   onInterval?(frame: IntervalFrame): void;
   /** A model turn was already running when this connection opened. */
   onChatPending?(frame: ChatPendingFrame): void;
+  onChatNotice?(frame: ChatNoticeFrame): void;
   /** The turn is asking the participant to choose between candidate replies. */
   onChatCandidates?(frame: ChatCandidatesFrame): void;
   onChatCandidatesError?(frame: ChatCandidatesErrorFrame): void;
@@ -299,6 +309,7 @@ type IncomingFrame =
   | ScreeningFrame
   | IntervalFrame
   | ChatPendingFrame
+  | ChatNoticeFrame
   | ChatCandidatesFrame
   | ChatCandidatesErrorFrame
   | ChatCandidatesAckFrame
@@ -641,6 +652,9 @@ export class ParticipantSession {
         break;
       case 'chat_pending':
         this.config.handlers.onChatPending?.(message);
+        break;
+      case 'chat_notice':
+        this.config.handlers.onChatNotice?.(message);
         break;
       case 'chat_candidates':
         this.config.handlers.onChatCandidates?.(message);

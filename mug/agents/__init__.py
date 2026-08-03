@@ -46,9 +46,11 @@ from mug.agents.game import (
     AgentSeatSpec,
     BotSeatSpec,
     HumanSeatSpec,
+    SeatMemory,
     TurnBasedGameSpec,
     build_agent_episode,
     build_turnbased_episode,
+    warm_up_seats,
 )
 from mug.agents.generation import (
     GenerationSet,
@@ -110,6 +112,7 @@ __all__ = [
     "OpenAIAdapter",
     "PendingReply",
     "RecordedGeneration",
+    "SeatMemory",
     "TransportFailure",
     "TurnBasedAgentEpisode",
     "TurnBasedAgentEpisodeResult",
@@ -124,4 +127,5 @@ __all__ = [
     "record_generations",
     "recorded_generation",
     "timeout_fallback",
+    "warm_up_seats",
 ]

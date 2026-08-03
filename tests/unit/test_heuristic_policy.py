@@ -18,7 +18,9 @@ import pytest
 
 from mug.configurations import configuration_constants
 from mug.configurations.configuration_constants import (
-    HEURISTIC_POLICY_PREFIX, HeuristicPolicy)
+    HEURISTIC_POLICY_PREFIX,
+    HeuristicPolicy,
+)
 from mug.scenes import gym_scene
 from mug.server.remote_game import ServerGame
 

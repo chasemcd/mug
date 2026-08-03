@@ -10,7 +10,7 @@ A human collaborates with an ONNX AI teammate to prepare and deliver dishes on t
 
 **Source:** [`examples/cogrid/overcooked_human_ai.py`](https://github.com/chasemcd/mug/blob/main/examples/cogrid/overcooked_human_ai.py)
 
-See [Examples](index.md) for install and run instructions. This example also requires the [CoGrid Overcooked environment](https://github.com/chasemcd/cogrid), which we install in the user's browser (install locally with `pip install cogrid==0.2.1` if you want to run the environment outside the experiment).
+See [Examples](index.md) for install and run instructions. This example also requires the [CoGrid Overcooked environment](https://github.com/chasemcd/cogrid), which we install in the user's browser (install locally with `pip install cogrid==0.3.2` if you want to run the environment outside the experiment).
 
 ## File Structure
 
@@ -100,7 +100,7 @@ cramped_room_sp_0 = (
         environment_initialization_code_filepath=(
             "examples/cogrid/environments/cramped_room_environment_initialization.py"
         ),
-        packages_to_install=["numpy", "cogrid==0.2.1", "opencv-python"],
+        packages_to_install=["numpy", "cogrid==0.3.2", "opencv-python"],
     )
 )
 ```

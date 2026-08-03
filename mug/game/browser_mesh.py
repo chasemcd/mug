@@ -36,6 +36,7 @@ from typing import Any, cast
 from mug.game import browser_mesh_driver, mesh, wire
 from mug.game.browser_mesh_driver import CAPTURE_SCHEMA, CAPTURE_VERSION
 from mug.game.determinism import state_hash, state_hash_chain, state_hash_source
+from mug.game.keys import Bindings, chords, single_keys
 from mug.game.p2p_capture import VerifiedCapture
 from mug.game.runtime import EpisodeSummary
 from mug.game.types import (
@@ -198,7 +199,7 @@ class BrowserMeshSpec:
 
     channel_key: str
     source_bundle: str
-    action_bindings: dict[str, int]
+    action_bindings: Bindings
     requires: tuple[str, ...] = ()
     default_action: int = 0
     fps: int = 30
@@ -221,6 +222,44 @@ class BrowserMeshSpec:
             raise ValueError("input redundancy must be from 1 to 32 frames")
 
 
+# How long a room allows for its browsers to be ready before the first frame.
+# The server releases the start barrier as soon as every peer's data channels are
+# validated, and only then do the browsers download the Python runtime from a
+# CDN. So the download is inside the room's deadline and the server cannot see it
+# end. A participant opening their first study pays for it once.
+RUNTIME_ALLOWANCE_SECONDS = 90.0
+
+# How long it allows after the last frame: the closing barrier, one capture
+# submission, and the ordinary slack of a frame loop that ran a little behind.
+CAPTURE_BUFFER_SECONDS = 20.0
+
+
+def capture_timeout_for(spec: BrowserMeshSpec) -> float:
+    """Return how long one room of this game may take, from the start barrier.
+
+    The deadline belongs to the game, not to a fixed number. It is how long the
+    episode itself lasts, plus the countdown the participants read before it,
+    plus what the room allows around both. A flat value is either too short for a
+    long round -- and a round it cannot cover records nothing at all, because the
+    room aborts and discards the run -- or needlessly long for a short one.
+
+    An uncapped frame rate is counted as one frame a second. The server cannot
+    know how fast a browser will step, and a deadline that is too long only
+    delays reclaiming a room that is already dead.
+    """
+    return (
+        RUNTIME_ALLOWANCE_SECONDS
+        + spec.countdown_seconds
+        + episode_seconds(spec)
+        + CAPTURE_BUFFER_SECONDS
+    )
+
+
+def episode_seconds(spec: BrowserMeshSpec) -> float:
+    """Return how long the episode itself lasts, with no allowance around it."""
+    return spec.max_steps / spec.fps if spec.fps > 0 else float(spec.max_steps)
+
+
 def browser_mesh_manifest(spec: BrowserMeshSpec) -> dict[str, Any]:
     """Project the public browser manifest for one browser-executed mesh channel.
 
@@ -234,7 +273,8 @@ def browser_mesh_manifest(spec: BrowserMeshSpec) -> dict[str, Any]:
         "channel_key": spec.channel_key,
         "source_bundle": spec.source_bundle,
         "requires": list(spec.requires),
-        "action_bindings": dict(spec.action_bindings),
+        "action_bindings": single_keys(spec.action_bindings),
+        "action_chords": chords(spec.action_bindings),
         "default_action": spec.default_action,
         "fps": spec.fps,
         "countdown_seconds": spec.countdown_seconds,
@@ -485,11 +525,15 @@ def verify_mesh_capture(payload_json: str) -> VerifiedCapture:
 
 
 __all__ = [
+    "CAPTURE_BUFFER_SECONDS",
     "MAX_CAPTURE_FRAMES",
+    "RUNTIME_ALLOWANCE_SECONDS",
     "BrowserMeshSpec",
     "MeshCaptureBinding",
     "MeshCaptureError",
     "browser_mesh_manifest",
+    "capture_timeout_for",
+    "episode_seconds",
     "mesh_episode_summary",
     "mesh_prelude_source",
     "mesh_run_config",

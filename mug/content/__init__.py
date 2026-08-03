@@ -10,7 +10,9 @@ The ``service`` module runs the single-participant flow over these records: it
 materializes a flow for a visit, presents the active activity, and advances the
 pointer as the participant answers each form.
 
-The ``study`` module is the author's own surface: ``Study`` and the steps it holds.
+The ``study`` module is the author's own surface: ``Study`` and the steps it holds,
+and ``players`` holds the three kinds a seating names -- ``Human``, ``Model``, and
+``Bot``. Both are re-exported here, so a whole study is written from one import.
 The author's ``Comparison`` (``mug.authoring``) and the treatment vocabulary
 (``mug.visits.design``) are steps and placements of the same study, so both are
 re-exported here and a study is written from one import.
@@ -18,6 +20,7 @@ re-exported here and a study is written from one import.
 
 from __future__ import annotations
 
+from mug.content.players import Bot, Human, Model
 from mug.content.service import (
     AdvanceFlowCommand,
     FlowState,
@@ -32,11 +35,15 @@ from mug.content.service import (
 from mug.content.study import (
     Activity,
     Assign,
+    Chat,
     Choice,
     Comparison,
+    Conversation,
     Design,
+    Execution,
     Form,
     Game,
+    GameActivity,
     Likert,
     Order,
     Page,
@@ -66,19 +73,26 @@ __all__ = [
     "Activity",
     "AdvanceFlowCommand",
     "Assign",
+    "Bot",
+    "Chat",
     "Choice",
     "Comparison",
     "ContentBody",
     "ContentSpec",
+    "Conversation",
     "Design",
+    "Execution",
     "FlowState",
     "Form",
     "FormResponse",
     "FormSpec",
     "Game",
+    "GameActivity",
     "GateControl",
+    "Human",
     "Likert",
     "MaterializeFlowCommand",
+    "Model",
     "Order",
     "Page",
     "Placement",

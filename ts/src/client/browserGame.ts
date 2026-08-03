@@ -15,6 +15,7 @@
  * the same commands.
  */
 
+import { Chord, resolveAction } from "./bindings.js";
 import { computeDigest, Digest, HashBytes, JsonValue } from '../kernel/index.js';
 import { Renderer, SurfaceCommand } from './renderer.js';
 
@@ -71,9 +72,13 @@ export interface BrowserManifest {
   channel_key: string;
   seed: number;
   max_steps: number;
+  // How many frames the client plays before it reports what it has played.
+  frames_per_part?: number | undefined;
   fps: number;
   countdown_seconds: number;
   action_bindings: { [key: string]: number };
+  /** Chords: sequences of keys held together, each with the action it means. */
+  action_chords?: readonly Chord[];
   default_action: number;
   hooks: string[];
   requires: string[];
@@ -131,21 +136,35 @@ export interface BrowserRuntime {
   actionHash: (action: number) => string;
 }
 
+/** One slice of a run, as it is reported while the episode is played. */
+export interface EpisodePart {
+  first_frame: number;
+  final: boolean;
+  transitions: GameTransition[];
+  actions: number[];
+  boundary?: EpisodeBoundary | undefined;
+}
+
 /** Options for the browser episode. */
 export interface EpisodeOptions {
   renderer?: Renderer | undefined;
   pressed: Set<string>;
   hash: HashBytes;
   onStatus?: ((text: string) => void) | undefined;
+  // Called with each slice of the run, and with the last one when the episode
+  // ends. Reporting while the round is played is what makes leaving early cost
+  // the tail rather than everything: a run held in the tab until the end is lost
+  // in full if the tab does not reach the end.
+  onPart?: ((part: EpisodePart) => Promise<void> | void) | undefined;
 }
 
 function actionFor(manifest: BrowserManifest, pressed: Set<string>): number {
-  for (const key of pressed) {
-    if (key in manifest.action_bindings) {
-      return manifest.action_bindings[key] as number;
-    }
-  }
-  return manifest.default_action;
+  return resolveAction(
+    pressed,
+    manifest.action_bindings,
+    manifest.default_action,
+    manifest.action_chords ?? [],
+  );
 }
 
 function transitionFor(
@@ -222,7 +241,7 @@ export async function playBrowserEpisode(
   manifest: BrowserManifest,
   options: EpisodeOptions,
 ): Promise<EpisodeRun> {
-  const { renderer, pressed, hash, onStatus } = options;
+  const { renderer, pressed, hash, onStatus, onPart } = options;
   const toCommands = (): SurfaceCommand[] =>
     runtime.commands().toJs({ create_proxies: false }) as SurfaceCommand[];
   const drawFrame = async (frame: number, keyframe: boolean): Promise<void> => {
@@ -243,6 +262,25 @@ export async function playBrowserEpisode(
   let frame = 0;
   let solved = false;
 
+  // The server sets the cadence, because the server is what has to hold the
+  // parts; a client choosing its own could report once at the end.
+  const perPart = manifest.frames_per_part ?? 0;
+  let reportedTo = 0;
+  const report = async (final: boolean, boundary?: EpisodeBoundary): Promise<void> => {
+    if (!onPart) return;
+    if (!final && (perPart <= 0 || frame - reportedTo < perPart)) return;
+    if (final && frame === reportedTo && !boundary) return;
+    const part: EpisodePart = {
+      first_frame: reportedTo + 1,
+      final,
+      transitions: transitions.slice(reportedTo),
+      actions: actions.slice(reportedTo),
+      boundary,
+    };
+    reportedTo = frame;
+    await onPart(part);
+  };
+
   await drawFrame(0, true);
 
   while (frame < manifest.max_steps) {
@@ -257,6 +295,7 @@ export async function playBrowserEpisode(
     transitions.push(transitionFor(manifest, runtime, frame, action));
     actions.push(action);
     await drawFrame(frame, false);
+    await report(false, undefined);
 
     if (terminated) {
       solved = true;
@@ -278,6 +317,7 @@ export async function playBrowserEpisode(
     authority: 'browser',
     state_hash: { algorithm: 'sha-256', hex: runtime.obsHash() },
   };
+  await report(true, boundary);
   onStatus?.(solved ? 'reached the goal' : 'episode ended');
   return { transitions, boundary, actions };
 }

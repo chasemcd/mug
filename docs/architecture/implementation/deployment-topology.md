@@ -144,6 +144,26 @@ deployment: the readiness numbers say how loaded a study is. The series are labe
 by command, outcome, and error category only -- never by a participant or a
 principal -- so a scrape cannot leak who was in the study.
 
+## What a researcher watches, and why a deployment must not
+
+There is a fourth surface, and it is not one of the three above. `MUG_DEBUG=1` (or
+`build_study_app(debug=True)`) has a process write down what its model seats were
+asked, what came back, how long it took, whether an action could be read out of the
+reply, and what each seat said (`mug/diagnostics.py`). A drawer on the study's own
+screen reads it; `/_debug/notes?since=N` is the same thing for a script.
+
+**It is off unless it is asked for, and a deployment that serves participants leaves
+it off.** These notes are the one thing on the process that holds content: the whole
+prompt, the whole reply, and what a participant wrote. A deception study's prompt
+says what the deception is. So the routes are not mounted at all unless the process
+was started in debug mode -- there is no gate to get past, because there is nothing
+there. The resolved credential is never in a note in either mode: a note names the
+credential and never values it, the same rule every record follows.
+
+Nothing here is persisted, exported, replayed, or digested, and no schema names a
+note. The debug channel also shares nothing with the participant's transport: it is
+plain HTTP, so an aid for watching a run cannot break the run it is watching.
+
 ## What is still open
 
 - Taking over a live room whose owning process died. Its members are aborted and

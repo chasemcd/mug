@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>v4 -- a game and a conversation at once</title>
+    <link rel="stylesheet" href="v4.css" />
+  </head>
+  <body>
+    <div class="app">
+      <nav class="mock">
+        <a href="index.html">v4</a>
+        <span>A game and a conversation at once</span>
+        <span>keys go to</span>
+        <span class="switch">
+          <button type="button" data-hold="game" aria-pressed="true">The game</button>
+          <button type="button" data-hold="chat" aria-pressed="false">The message box</button>
+        </span>
+        <span class="right">
+          <a href="chat.html">Conversation</a> &middot;
+          <a href="judgement.html">Judgement</a> &middot;
+          <a href="comparison.html">Comparison</a> &middot;
+          <a href="room.html">Room</a> &middot;
+          <a href="study.html">Study</a>
+        </span>
+      </nav>
+
+      <header class="head">
+        <span class="brand">
+          <span class="brand__mark" aria-hidden="true"></span>
+          <span class="brand__name">MUG</span>
+        </span>
+        <span class="head__rule" aria-hidden="true"></span>
+        <span class="head__study">Cook and talk</span>
+        <span class="head__spacer"></span>
+        <span class="progress">
+          <span class="progress__track" role="img" aria-label="Round 2 of 3">
+            <span class="progress__mark progress__mark--done"></span>
+            <span class="progress__mark progress__mark--now"></span>
+            <span class="progress__mark"></span>
+          </span>
+          Round 2 of 3
+        </span>
+        <span class="state">Connected</span>
+      </header>
+
+      <div class="panes">
+        <!-- Which pane the keys go to is said in words as well as drawn. A
+             participant who presses a key and sees no chef move has to be told
+             where the key went. -->
+        <section class="pane pane--held" data-pane="game" aria-label="The game">
+          <div class="pane__head">
+            <span class="pane__name">The kitchen</span>
+            <span class="pane__badge" data-on="Your keys move the chef"
+                  data-off="The chef is standing still">Your keys move the chef</span>
+            <span class="pane__hint"><kbd>Tab</kbd> to write a message</span>
+          </div>
+          <!-- The status line is what the study is telling the participant, so
+               it is amber: it is live, and it is not something to press. It is
+               above the board, because the score and the time left change what
+               somebody does next, and a number under the board is read after
+               the move it should have changed. It is drawn onto the game's own
+               surface, so it is in the render packet, in the record, and in a
+               replay. -->
+          <div class="hud">
+            <span>
+              <span class="hud__label">Delivered</span>
+              <span class="hud__value">4</span>
+            </span>
+            <span>
+              <span class="hud__label">Time left</span>
+              <span class="hud__value">0:47</span>
+            </span>
+          </div>
+          <div class="pane__body">
+            <div class="board">the game draws here</div>
+          </div>
+        </section>
+
+        <section class="pane" data-pane="chat" aria-label="The conversation">
+          <div class="pane__head">
+            <span class="pane__name">Talk to your partner</span>
+            <span class="pane__badge" data-on="Your keys write here"
+                  data-off="Not writing">Not writing</span>
+          </div>
+          <div class="pane__body">
+            <div role="log" aria-label="Conversation">
+              <div class="turn turn--them">
+                <div class="turn__who"><span class="turn__mark"></span>Them</div>
+                <div class="bubble">I will keep filling the pot. Can you take the dishes?</div>
+              </div>
+              <div class="turn turn--you">
+                <div class="turn__who"><span class="turn__mark"></span>You</div>
+                <div class="bubble">Yes. Leave the second pot to me as well.</div>
+              </div>
+              <div class="turn turn--them">
+                <div class="turn__who"><span class="turn__mark"></span>Them</div>
+                <div class="bubble"><span class="dots" role="status" aria-label="Waiting for a reply"><span></span><span></span><span></span></span></div>
+              </div>
+            </div>
+          </div>
+          <div class="pane__foot">
+            <form class="composer">
+              <label class="sr-only" for="msg">Your message</label>
+              <textarea id="msg" rows="1" placeholder="Write a message"></textarea>
+              <button type="submit" class="send" aria-label="Send" disabled>
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <path d="M8 13V3.5M8 3.5 3.8 7.7M8 3.5l4.2 4.2" stroke="currentColor"
+                        stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </button>
+            </form>
+          </div>
+        </section>
+      </div>
+    </div>
+    <script src="mock.js"></script>
+  </body>
+</html>

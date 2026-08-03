@@ -270,6 +270,13 @@ class PeerNode:
         if not self._engine.ended():
             packet = self._engine.submit_local(int(self._action()))
             await self._broadcast(encode_input(packet))
+        else:
+            # Nothing new is scheduled once the episode has ended, but this peer
+            # keeps repeating what it played until the barrier closes, so a lost
+            # tail input can still reach the peer that is waiting for it.
+            repeat = self._engine.resend_recent()
+            if repeat is not None:
+                await self._broadcast(encode_input(repeat))
         self._engine.advance()
         await self._gossip()
         await asyncio.sleep(0)
@@ -284,8 +291,8 @@ class PeerNode:
             await self._broadcast(encode_end(end_packet))
 
     def ready_to_finalize(self) -> bool:
-        """Return whether every peer's end frame has arrived, so finalize is ready."""
-        return self._engine.ended() and self._engine.all_ends_known()
+        """Say whether the barrier is agreed and every frame in it is confirmed."""
+        return self._engine.ended() and self._engine.ready_to_finalize()
 
     def finalize(self) -> None:
         """Close the episode on the shared minimum-end-frame barrier."""

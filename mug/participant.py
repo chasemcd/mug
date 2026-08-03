@@ -22,7 +22,15 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import json
-from collections.abc import Awaitable, Callable, Coroutine, Mapping, Sequence
+import logging
+from collections.abc import (
+    Awaitable,
+    Callable,
+    Coroutine,
+    Generator,
+    Mapping,
+    Sequence,
+)
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any, Protocol, TypeVar, cast
@@ -34,11 +42,14 @@ from mug.agents import (
     AgentGameSpec,
     HumanSeatSpec,
     MultiAgentEpisode,
+    SeatMemory,
     TurnBasedGameSpec,
     build_agent_episode,
     build_turnbased_episode,
+    warm_up_seats,
 )
 from mug.agents.generation import RecordedGeneration
+from mug.authoring import Message
 from mug.client import RealtimeCommand
 from mug.content import (
     AdvanceFlowCommand,
@@ -72,30 +83,50 @@ from mug.conversation.anchors import (
     verify_anchors,
 )
 from mug.conversation.room import ChatRoom, RoomChannel, RoomMember
+from mug.diagnostics import Diagnostics, NullDiagnostics
 from mug.game import RenderPacket
 from mug.game.aec import TurnBasedSummary, TurnStepInfo
 from mug.game.browser import (
     BrowserGameSpec,
     ClientEpisodeError,
-    capture_browser_episode,
     client_manifest,
-    parse_client_episode,
+    parse_client_part,
 )
 from mug.game.capture import capture_episode, recorded_trajectory
+from mug.game.capture_parts import (
+    PartOutOfOrder,
+    RunIdentity,
+    progress_aggregate_id,
+    read_progress,
+    record_part,
+)
 from mug.game.env import GymEnv
+from mug.game.keys import Bindings
 from mug.game.mesh_session import (
     MeshEpisode,
     MeshGameSpec,
     MeshSession,
     SeatWiring,
 )
-from mug.game.multiseat import MultiSeatEnv, MultiSeatStepInfo, MultiSeatSummary
+from mug.game.multiseat import (
+    MultiSeatEnv,
+    MultiSeatStepInfo,
+    MultiSeatSummary,
+    MultiStepResult,
+)
 from mug.game.p2p_room import P2PRoomError
 from mug.game.p2p_room_types import RoomEffect
-from mug.game.runtime import EpisodeSummary, InputState, run_episode
+from mug.game.runtime import (
+    EpisodeSummary,
+    InputState,
+    render_packet,
+    run_episode,
+    watched_state,
+)
 from mug.game.seams import SeatActionSource
 from mug.game.server_session import ServerEpisode, ServerSeat, ServerSeatSession
-from mug.game.spec import GameSpec
+from mug.game.spec import GameSpec, HudFn, RenderFn
+from mug.game.surface import Surface
 from mug.gateway import Gateway
 from mug.identity import EnrollCommand, LaunchTicket, enroll
 from mug.interactions import FormationResult, MeshFormationService
@@ -125,6 +156,7 @@ from mug.kernel import (
 )
 from mug.kernel.refs import DeploymentRevisionRef, StudyVersionRef
 from mug.nodes import ENDED, FRAME, INPUT, SEATED, Node, RemoteSeat, SeatRelay
+from mug.observability import log_line
 from mug.participant_chat import (
     ChatDurability,
     ChatSpec,
@@ -152,6 +184,7 @@ from mug.providers import ModelCallResult
 from mug.realtime import (
     Establish,
     FrameChannel,
+    OnClose,
     OnGame,
     OnMeasure,
     OnOpen,
@@ -161,7 +194,7 @@ from mug.realtime import (
     read_frames,
 )
 from mug.replay import ReplayBundle, build_decision_tape, build_replay_bundle
-from mug.replay.verify import verify_browser_episode
+from mug.replay.seal import SealOutcome, seal_run
 from mug.returns import ReturnClaims, sign_return_link, verify_return_link
 from mug.runtime import CommandContext, reject_command
 from mug.storage import ArtifactStore, Store, stage_artifact
@@ -314,6 +347,15 @@ def _queue(session: Session, delivery: dict[str, Any]) -> None:
         session.deliver(delivery)
         session.state["run_game"] = True
         return
+    if kind == "chat":
+        # A conversation owns the socket the way a game does, so it is routed on the
+        # same activity key. What is different is that it says what it is: the study
+        # wrote a conversation, the record says "chat", and the screen that renders it
+        # is asked for by name rather than inferred from a mode on a game.
+        session.state["game_activity_key"] = delivery.get("activity_key")
+        session.deliver(delivery)
+        session.state["run_game"] = True
+        return
     if kind == "game":
         activity_key = delivery.get("activity_key")
         session.state["game_activity_key"] = activity_key
@@ -328,6 +370,12 @@ def _queue(session: Session, delivery: dict[str, Any]) -> None:
         else:
             delivery = {**delivery, "mode": "server"}
         delivery = {**delivery, "countdown": _countdown(session)}
+        caption = _caption_at(session)
+        if caption is not None:
+            delivery = {**delivery, "caption": caption}
+        size = _size_at(session)
+        if size is not None:
+            delivery = {**delivery, "size": list(size)}
         composed = _composed_chat(session)
         if composed is not None:
             delivery = {**delivery, "chat": composed}
@@ -448,6 +496,31 @@ async def _close_lifecycle(
         store=store,
         left=left,
     )
+
+
+def _caption_at(session: Session) -> str | None:
+    """Return what the participant reads beside the game activity they are at.
+
+    A study that wrote none gives none, and the game stands on its own. This is
+    where the hard-coded line about arrow keys and a flag used to be: one study's
+    instructions, shipped to every study the platform ran.
+    """
+    key = session.state.get("game_activity_key")
+    if not isinstance(key, str):
+        return None
+    return _study_of(session).captions.get(key)
+
+
+def _size_at(session: Session) -> tuple[int, int] | None:
+    """Return how large the picture the game activity draws is, if the study said.
+
+    A drawing is relative, so it fills whatever it is given and only the study knows
+    how large that should be. With none said the screen keeps its own 600 by 400.
+    """
+    key = session.state.get("game_activity_key")
+    if not isinstance(key, str):
+        return None
+    return _study_of(session).sizes.get(key)
 
 
 def _rounds_at(session: Session) -> Rounds:
@@ -1376,6 +1449,55 @@ def build_establish(
     return establish
 
 
+def build_close(
+    gateway: Gateway, store: Store, browser: BrowserGameSpec | None
+) -> OnClose:
+    """Build the hook that seals a run the participant walked away from.
+
+    A browser game is reported in parts while it is played, and the last part is the
+    one that says the round ended. A participant who shuts the tab, loses their
+    network, or puts the machine to sleep never sends it -- so the run sits open with
+    everything they did already staged, and this is what turns that into a recorded
+    episode rather than nothing.
+
+    A study with no browser game has no such run and the hook does nothing, so it
+    costs one comparison per disconnect.
+
+    Sealing here is best effort by design. The connection has already gone, so there
+    is nobody to tell and nothing to retry into; what makes this safe rather than
+    lossy is that the parts are durable already and the sweep
+    (``mug.game.capture_parts.unsealed_runs``) seals anything this misses.
+    """
+
+    async def on_close(session: Session) -> None:
+        if browser is None:
+            return
+        manifest = _browser_manifest(session)
+        if manifest is None:
+            return
+        episode_id = cast("str", manifest.get("episode_id", ""))
+        progress = read_progress(store, episode_id) if episode_id else None
+        if progress is None or progress.sealed:
+            return
+        spec = _activity_spec(session)
+        outcome = await _seal_client_episode(
+            gateway,
+            store,
+            session,
+            spec if isinstance(spec, BrowserGameSpec) else browser,
+            episode_id,
+        )
+        log_line(
+            "browser.sealed_on_close",
+            episode_id=episode_id,
+            frames=outcome.frames,
+            recorded=outcome.recorded,
+            reason=outcome.reason or "",
+        )
+
+    return on_close
+
+
 def build_measure(gateway: Gateway, store: Store) -> OnMeasure:
     """Build the hook that screens one client quality frame.
 
@@ -1537,6 +1659,64 @@ async def _write_participant_state(
     return written.receipt
 
 
+def _run_identity(
+    session: Session, manifest: dict[str, Any], browser: BrowserGameSpec, data: Any
+) -> RunIdentity:
+    """Everything the seal will need, written where a later process can read it."""
+    return RunIdentity(
+        episode_id=cast("str", manifest["episode_id"]),
+        interaction_id=cast("str", manifest["interaction_id"]),
+        channel_key=browser.channel_key,
+        visit_id=cast("str", session.state["visit_id"]),
+        seat_key=_SEAT_KEY,
+        activity_key=_activity_key(session),
+        generation=_generation_of(data),
+    )
+
+
+async def _seal_client_episode(
+    gateway: Gateway,
+    store: Store,
+    session: Session,
+    browser: BrowserGameSpec,
+    episode_id: str,
+) -> SealOutcome:
+    """Close one reported run: assemble the parts, verify them, record the episode."""
+    progress = read_progress(store, episode_id)
+    if progress is None:
+        return SealOutcome(recorded=False, frames=0, closed=False, reason="no-parts")
+    return await seal_run(
+        progress,
+        spec=browser,
+        capture_context=gateway.mint(
+            _envelope(
+                "game.capture",
+                episode_id,
+                {"episode_id": episode_id},
+                _fresh_idem(gateway),
+            ),
+            principal=session.principal,
+            data_handling=_RESEARCH,
+        ),
+        sealed_context=gateway.mint(
+            _envelope(
+                "game.capture",
+                progress_aggregate_id(episode_id),
+                {"episode_id": episode_id, "sealed": True},
+                _fresh_idem(gateway),
+            ),
+            principal=session.principal,
+            data_handling=_RESEARCH,
+        ),
+        epoch_id=gateway.new_id("prodepoch"),
+        store=store,
+        artifacts=cast("ArtifactStore", store),
+        new_artifact_id=lambda: gateway.new_id("artifact"),
+        new_upload_id=lambda: gateway.new_id("upload"),
+        now=_instant,
+    )
+
+
 async def _capture_client_episode(
     gateway: Gateway,
     store: Store,
@@ -1545,71 +1725,94 @@ async def _capture_client_episode(
     data: dict[str, Any],
     idem: str,
 ) -> CommandReceipt:
-    """Validate and commit one client-reported episode, then advance the flow.
+    """Take one reported part of a run, and seal the run when the client closes it.
 
-    The run is checked against the game activity the session is at: its identity
-    and its specification. A study with a practice round and a real round reports
-    two runs over this one command, and each is captured under its own episode.
+    A browser game is written by the participant's own client and reported while it
+    is played. A part that is not the last is staged and acknowledged and the flow
+    stays where it is; the closing part seals the run, which is where the server
+    re-executes what arrived, matches every state hash, and commits the episode.
+
+    A client that reports the whole run in one command names no ``first_frame`` and
+    no ``final``, so it is one part that is also the last, and it behaves exactly as
+    it always did.
     """
     manifest = _browser_manifest(session) or {}
     activity_spec = _activity_spec(session)
     if isinstance(activity_spec, BrowserGameSpec):
         browser = activity_spec
     episode_id = cast("str", manifest["episode_id"])
-    visit_id = cast("str", session.state["visit_id"])
-    generation = _generation_of(data)
-    envelope = _envelope("game.capture", episode_id, {"episode_id": episode_id}, idem)
-    context = gateway.mint(
-        envelope, principal=session.principal, data_handling=_RESEARCH
+    run = _run_identity(session, manifest, browser, data)
+    part_context = gateway.mint(
+        _envelope(
+            "game.capture",
+            progress_aggregate_id(episode_id),
+            {"episode_id": episode_id},
+            idem,
+        ),
+        principal=session.principal,
+        data_handling=_RESEARCH,
     )
     try:
-        summary = parse_client_episode(
-            data.get("episode"),
+        part = parse_client_part(
+            data,
             expected_channel_key=browser.channel_key,
             expected_episode_id=episode_id,
-            seat_key=_SEAT_KEY,
         )
     except ClientEpisodeError:
         return reject_command(
-            context,
+            part_context,
             command=_CAPTURE_COMMAND,
             code="schema.validation_failed",
             category="validation",
-            message="the reported episode did not validate",
+            message="the reported part did not validate",
             retry="never",
         )
-    report = verify_browser_episode(browser, actions=_actions_of(data), summary=summary)
-    if report.verification == "deterministic" and not report.verified:
+    try:
+        receipt = await record_part(
+            part,
+            run=run,
+            context=part_context,
+            store=store,
+            artifacts=cast("ArtifactStore", store),
+            new_artifact_id=lambda: gateway.new_id("artifact"),
+            new_upload_id=lambda: gateway.new_id("upload"),
+            now=_instant,
+        )
+    except PartOutOfOrder as refusal:
         return reject_command(
-            context,
+            part_context,
+            command=_CAPTURE_COMMAND,
+            code="request.invalid",
+            category="validation",
+            message=str(refusal),
+            retry="never",
+        )
+    if not part.final:
+        # The round is still being played. The part is durable now, which is the
+        # whole point: what happens to the tab from here costs the tail and not the
+        # run. Nothing advances, because the participant is still in the game.
+        return receipt
+
+    outcome = await _seal_client_episode(gateway, store, session, browser, episode_id)
+    if not outcome.recorded:
+        return reject_command(
+            part_context,
             command=_CAPTURE_COMMAND,
             code="game.verification_failed",
             category="validation",
             message="the reported episode did not match the re-execution",
             retry="never",
         )
-    receipt = await capture_browser_episode(
-        # A browser reports digests and its own actions, never the values. The
-        # server's own re-execution is where they exist, so a verified run records
-        # the trajectory it verified against.
-        summary._replace(trajectory=report.trajectory),
-        visit_id=visit_id,
-        context=context,
-        epoch_id=gateway.new_id("prodepoch"),
-        generation=generation,
-        store=store,
-        verification=report.verification,
-        state_hash_chain_digest=report.state_hash_chain_digest,
-        **_recorder(gateway, store, _activity_key(session)),
-    )
-    if receipt.outcome != "accepted":
-        return receipt
+    sealed = outcome.receipt
+    assert sealed is not None
+    # The visit records the stream the *episode* landed on, not the stream the
+    # parts were reported on: the export follows it to find the run's boundary.
     _, delivery = await _advance(
-        gateway, store, session, {}, _fresh_idem(gateway), [context.stream_id]
+        gateway, store, session, {}, _fresh_idem(gateway), [outcome.stream_id or ""]
     )
     if delivery is not None:
         _queue(session, delivery)
-    return receipt
+    return sealed
 
 
 def _generation_of(data: dict[str, Any]) -> int:
@@ -1618,20 +1821,38 @@ def _generation_of(data: dict[str, Any]) -> int:
     return raw if isinstance(raw, int) and raw >= 1 else 1
 
 
-def _actions_of(data: dict[str, Any]) -> list[int]:
-    """Read the client action sequence the server re-executes to verify the run.
+async def _interval(
+    websocket: WebSocket,
+    rounds: Rounds,
+    index: int,
+    frames: FrameChannel | None,
+) -> bool:
+    """Show the between-rounds screen and wait for the participant to go on.
 
-    Only whole-number actions pass through; a bool is not an action. A missing or
-    malformed sequence yields no actions, so the verifier finds an action-count
-    mismatch and the run does not verify.
+    The interval is participant-paced rather than timed: a rest that ends while
+    someone is still reading is not a rest. Returns False when they left.
+
+    A composed activity keeps talking through it: only the game pane is
+    repainted, and the conversation goes on reading its own frames, which is
+    what "chat stays usable in an intermission" means in practice.
     """
-    raw = data.get("actions")
-    if not isinstance(raw, list):
-        return []
-    actions = cast("list[Any]", raw)
-    return [
-        item for item in actions if isinstance(item, int) and not isinstance(item, bool)
-    ]
+    try:
+        await websocket.send_json(
+            {
+                "type": "interval",
+                "markdown": rounds.between or "",
+                "round": index + 1,
+                "of": rounds.count,
+            }
+        )
+        while True:
+            frame = await _next(websocket, frames)
+            if frame is None:
+                return False
+            if frame.get("type") == "interval_done":
+                return True
+    except (WebSocketDisconnect, ValueError):
+        return False
 
 
 class _AnchorTape:
@@ -1884,39 +2105,6 @@ def build_on_game(
             captured.append(await _capture(session, summary, tape))
         return captured, reason
 
-    async def _interval(
-        websocket: WebSocket,
-        rounds: Rounds,
-        index: int,
-        frames: FrameChannel | None,
-    ) -> bool:
-        """Show the between-rounds screen and wait for the participant to go on.
-
-        The interval is participant-paced rather than timed: a rest that ends while
-        someone is still reading is not a rest. Returns False when they left.
-
-        A composed activity keeps talking through it: only the game pane is
-        repainted, and the conversation goes on reading its own frames, which is
-        what "chat stays usable in an intermission" means in practice.
-        """
-        try:
-            await websocket.send_json(
-                {
-                    "type": "interval",
-                    "markdown": rounds.between or "",
-                    "round": index + 1,
-                    "of": rounds.count,
-                }
-            )
-            while True:
-                frame = await _next(websocket, frames)
-                if frame is None:
-                    return False
-                if frame.get("type") == "interval_done":
-                    return True
-        except (WebSocketDisconnect, ValueError):
-            return False
-
     async def _capture(
         session: Session, summary: EpisodeSummary, tape: _AnchorTape | None
     ) -> str:
@@ -1956,7 +2144,11 @@ def build_on_game(
         # participant is in one sitting at one activity.
         env = GymEnv(spec.make_env)
         episode_id = gateway.new_id("episode")
-        inputs = InputState(spec.action_bindings, spec.default_action)
+        inputs = InputState(
+            spec.action_bindings,
+            spec.default_action,
+            mode=getattr(spec, "input_mode", "pressed_keys"),
+        )
         if tape is not None:
             tape.begin(episode_id)
 
@@ -1996,6 +2188,7 @@ def build_on_game(
                 fps=spec.fps,
                 max_steps=spec.max_steps,
                 countdown_seconds=spec.countdown_seconds,
+                hud=spec.hud,
             )
         finally:
             reader.cancel()
@@ -2778,7 +2971,11 @@ async def _play_mesh(
     if not isinstance(visit_id, str):
         return None
     spec = matchmaker.spec
-    inputs = InputState(spec.action_bindings, spec.default_action)
+    inputs = InputState(
+        spec.action_bindings,
+        spec.default_action,
+        mode=getattr(spec, "input_mode", "pressed_keys"),
+    )
 
     async def send(frame: dict[str, Any]) -> None:
         await websocket.send_json(frame)
@@ -2844,9 +3041,11 @@ class ServerGameSpec:
 
     ``make_env`` builds the one authoritative multi-seat environment the server
     steps. ``human_agent_id`` and ``human_seat_key`` place the participant's seat;
-    ``bots`` seat the local controllers beside them. ``action_bindings`` and
-    ``default_action`` map the human seat's held keys, the same seam the single-seat
-    loop uses. ``fps`` and ``max_steps`` shape the loop.
+    ``bots`` seat the local controllers beside them. ``render`` draws each stepped
+    frame for the person watching; a game with none draws nothing.
+    ``action_bindings`` and ``default_action`` map the human seat's held keys, the
+    same seam the single-seat loop uses. ``fps`` and ``max_steps`` shape the loop.
+    ``hud`` is the status line drawn over the frame for the person watching.
     """
 
     channel_key: str
@@ -2854,7 +3053,10 @@ class ServerGameSpec:
     human_agent_id: str
     human_seat_key: str
     bots: tuple[ServerBotSeat, ...]
-    action_bindings: dict[str, int] = field(default_factory=_no_bindings)
+    render: RenderFn | None = None
+    hud: HudFn | None = None
+    input_mode: str = "pressed_keys"
+    action_bindings: Bindings = field(default_factory=_no_bindings)
     default_action: int = 0
     fps: int = 30
     max_steps: int = 200
@@ -2904,7 +3106,11 @@ async def _play_server(
         return None
     interaction_id = gateway.new_id("interaction")
     episode_id = gateway.new_id("episode")
-    human_input = InputState(spec.action_bindings, spec.default_action)
+    human_input = InputState(
+        spec.action_bindings,
+        spec.default_action,
+        mode=getattr(spec, "input_mode", "pressed_keys"),
+    )
     reader = asyncio.create_task(_read_inputs_into(websocket, human_input))
 
     seats = [
@@ -2927,9 +3133,28 @@ async def _play_server(
         ],
     ]
 
+    surface = Surface()
+
     async def frame_sink(info: MultiSeatStepInfo) -> None:
         await websocket.send_json(
             {"type": "frame", "frame_number": info.frame, "actions": info.actions}
+        )
+        if spec.render is None:
+            return
+        packet = render_packet(
+            surface,
+            spec.render,
+            watched_state(info.result, spec.human_agent_id),
+            episode_id,
+            spec.human_seat_key,
+            info.frame,
+            spec.hud,
+        )
+        await websocket.send_json(
+            {
+                "type": "render",
+                "packet": packet.model_dump(mode="json", exclude_none=True),
+            }
         )
 
     server = ServerSeatSession(
@@ -2985,6 +3210,77 @@ async def _capture_server_episode(
 BundleSink = Callable[[ReplayBundle], Awaitable[None]]
 
 
+def warming(
+    gateway: Gateway,
+    store: Store,
+    specs: Sequence[AgentGameSpec],
+    diagnostics: Diagnostics | None = None,
+) -> Callable[[Session], None]:
+    """Return the hook that reaches this process's model seats, once, in the.
+
+    **When** it runs is the whole of what makes it worth running. Everything a
+    warm-up buys -- a model in the runner's memory, the fixed part of the study's
+    prompt already read, and the answer to "does this provider answer" -- is paid on
+    the first call somebody makes. Paid inside the round it is a partner frozen in a
+    running kitchen; paid when the participant arrives, minutes of consent form and
+    instructions before they reach a game, it is paid by nobody.
+
+    Measured on a local llama3.2: a warm-up in front of the round took the wait from
+    the round starting to the chef's first move from 3.1 s to 5.1 s, because it is
+    the same wait with another wait in front of it. Moved here it costs the
+    participant nothing and takes the first decision under 2 s.
+
+    It runs **once for the process**, because what it buys is the runner's and not a
+    participant's, and it is never awaited: a session must not wait on a model, and
+    a study whose provider is unreachable must still serve the participant the rest
+    of itself.
+    """
+    done = False
+
+    async def warm() -> None:
+        for spec in specs:
+            unreachable = await warm_up_seats(
+                spec,
+                store=store,
+                new_context=lambda aggregate_id: _service_context(
+                    gateway, str(aggregate_id)
+                ),
+                new_modelcall_id=lambda: gateway.new_id("modelcall"),
+                new_generation_id=lambda: gateway.new_id("generation"),
+                now=gateway.clock,
+                diagnostics=diagnostics,
+            )
+            if unreachable:
+                # It does not stop the study. A seat nobody can reach falls back
+                # exactly as it always did, and the participant plays a study with a
+                # quiet partner rather than no study at all -- but nothing is silent
+                # about it now, which is the whole difference.
+                log_line(
+                    "agents.unreachable",
+                    level=logging.WARNING,
+                    channel_key=spec.channel_key,
+                    seats=unreachable,
+                )
+
+    def on_session(_session: Session) -> None:
+        nonlocal done
+        if done or not specs:
+            return
+        done = True
+        # Detached on purpose, and the reference is dropped: a warm-up that fails
+        # must not reach a participant, and one that is waited for is a participant
+        # waiting on a model before they have seen the study at all.
+        task = asyncio.ensure_future(warm())
+        _warming.add(task)
+        task.add_done_callback(_warming.discard)
+
+    return on_session
+
+
+# The warm-ups in flight, held so nothing collects one mid-call.
+_warming: set[asyncio.Task[None]] = set()
+
+
 def build_agent_on_game(
     gateway: Gateway,
     store: Store,
@@ -2993,6 +3289,7 @@ def build_agent_on_game(
     on_bundle: BundleSink | None = None,
     conversations: Conversations | None = None,
     specs: Mapping[str, AgentGameSpec] | None = None,
+    diagnostics: Diagnostics | None = None,
 ) -> OnGame:
     """Build the game hook that runs a multi-seat episode over the socket.
 
@@ -3023,6 +3320,10 @@ def build_agent_on_game(
     activity itself (``Game("play", kitchen, seats={...})``). Each activity then has
     its own environment, its own seats, and its own rendezvous, because a practice
     round with one person and a real round with two are two seatings.
+
+    ``diagnostics`` is where a run says what it asked its model seats and what came
+    back, for a process started in debug mode. With none, nothing is written down and
+    nothing is served.
     """
     # The tables in play, one per interaction, so every connection at one game finds
     # the seats the others are already in.
@@ -3058,7 +3359,13 @@ def build_agent_on_game(
         """Return the table for one interaction, seating it the first time."""
         table = tables.get(interaction_id)
         if table is None:
-            table = _Table(interaction_id=interaction_id, size=len(at.human_seats))
+            table = _Table(
+                interaction_id=interaction_id,
+                size=len(at.human_seats),
+                render=at.render,
+                hud=at.hud,
+                diagnostics=diagnostics,
+            )
             tables[interaction_id] = table
         return table
 
@@ -3101,7 +3408,7 @@ def build_agent_on_game(
             )
             table = _table(place.interaction_id, at)
             seat = _seat_of(at, place.index)
-        stream_id = await _play_agents(
+        captured = await _play_agents(
             websocket, session, at, gateway, store, on_bundle, table, seat
         )
         # The seat is given up only by a connection that finished the run. One that
@@ -3109,7 +3416,7 @@ def build_agent_on_game(
         # the seat they already had rather than made to wait for a new group.
         if seating is not None and isinstance(visit_id, str):
             await seating.leave(visit_id, "completed")
-        return [stream_id] if stream_id is not None else []
+        return captured
 
     async def _watch_and_talk(
         websocket: WebSocket, session: Session, chat: ChatSpec
@@ -3158,7 +3465,7 @@ def build_agent_on_game(
             )
             seat = _seat_of(at, talk.seat_index if talk is not None else 0)
             try:
-                stream_id = await _play_agents(
+                played = await _play_agents(
                     websocket,
                     session,
                     at,
@@ -3180,7 +3487,7 @@ def build_agent_on_game(
                     streams = []
             if talk is not None and isinstance(visit_id, str):
                 await talk.leave(visit_id)
-            captured = [stream_id] if stream_id is not None else []
+            captured = list(played)
             if talk is not None:
                 captured.extend(talk.streams)
             return [*captured, *streams]
@@ -3284,35 +3591,137 @@ class _PlayingRoom:
         """Record that the interaction the game and conversation shared is over."""
         await self._matchmaker.leave(visit_id, "completed")
 
-    def anchor(self, tape: _AnchorTape) -> None:
-        """Have the tape note every message of this room, whoever said it.
+    @contextlib.contextmanager
+    def anchored(self, tape: _AnchorTape) -> Generator[None]:
+        """Have the tape note every message of this room, for one round only.
 
         A playing seat's words are placed in the run the same way a participant's
         are. Nothing about the anchor cares which of them said it, which is the
         point: the two are one conversation.
+
+        The tape names **this round's** episode while the room belongs to the whole
+        activity and outlives it, so the tape stops watching when the round ends. A
+        tape left behind would go on anchoring a later round's messages to a run
+        that had already been captured.
         """
         self._room.watch(tape.note)
+        try:
+            yield
+        finally:
+            self._room.unwatch(tape.note)
 
-    def feed(self, episode: MultiAgentEpisode) -> None:
-        """Give the playing seats every message they may see, as it is said.
+    def feed(self, spec: AgentGameSpec, table: _Table) -> None:
+        """Give the playing seats every message they may see, for the whole activity.
+
+        It is registered **once per table**, not once per round and not once per
+        connection, because those are the two ways of getting it wrong:
+
+        - once per round leaves the rest between rounds unheard. A participant who
+          types "you fetch the plates next time" while they are reading the
+          interval is saying the one thing the next round is about.
+        - once per round without ever stopping, or once per connection at a table
+          two people share, delivers each message as many times as there are
+          watchers -- and with the seats' transcript carried across rounds that is
+          not waste but corruption: the model reads a partner who says everything
+          twice, and no record anywhere contradicts it.
+
+        While a round is running the message goes to the episode, which records it
+        on every seat and wakes each one so it answers rather than waiting out its
+        cadence.
+
+        Between rounds there is no round to wake, and a partner that goes silent for
+        the whole rest is the one the participant most wants to talk to: the rest is
+        where "you fetch the plates next time" gets agreed. So the round that just
+        ended answers it. Its seats are the same seats, standing in the kitchen the
+        round left, and they take one turn each with nothing stepping.
+
+        Before the first round there is no such thing to answer with, so the message
+        goes straight into what the seats carry and the first prompt of the first
+        round reads it. Either way it lands in the same lists, which is why the seat
+        reads one conversation and not two.
 
         The room decides who may see what, so a private channel stays private: a
         seat is fed a message only when its own membership admits the channel it
         was said on. Reading is synchronous and touches no store, so it is safe on
         the room's own watcher.
         """
+        if table.listening:
+            return
+        table.listening = True
 
         def watch(message: ChatMessage) -> None:
             if message.channel_key != self._channel:
                 return
             if message.author_actor_id in self._seats:
                 return  # a seat is not told its own words
-            episode.post_message(
+            said = Message(
                 sender=message.author_actor_id,
                 text=self._room.text_of(message.message_id),
             )
+            running = table.episode
+            if running is not None:
+                table.diagnostics.note(
+                    "chat.to_seats", subject=self._channel, where="round"
+                )
+                running.post_message(sender=said.sender, text=said.text)
+                return
+            resting = table.rested
+            if resting is None:
+                # Nothing has run yet, so there is nothing to answer with. Which of
+                # the three ways a message reaches the seats it took is the whole
+                # question behind "I typed and nobody replied", and only this knows.
+                table.diagnostics.note(
+                    "chat.to_seats", subject=self._channel, where="before-the-first"
+                )
+                for seat in spec.seats:
+                    table.memory.chat_of(seat.agent_id).append(said)
+                return
+            table.diagnostics.note(
+                "chat.to_seats",
+                subject=self._channel,
+                where="rest",
+                already_answering=table.busy,
+            )
+            resting.post_message(sender=said.sender, text=said.text)
+            table.answering(lambda: self.answered(resting))
 
         self._room.watch(watch)
+
+    async def answered(self, resting: MultiAgentEpisode) -> None:
+        """Take one turn on a resting round's seats and publish what they say.
+
+        A model call is slow and a room watcher is not a place to wait, so this runs
+        as its own task. What it writes is what any turn writes -- a model call, and
+        a message for each seat that said something.
+        """
+        await resting.answer(lambda: self._new_id("modelcall"))
+        await self.publish(resting)
+
+    def remember_into(self, spec: AgentGameSpec, memory: SeatMemory) -> None:
+        """Fill a seat's carried transcript from what the room already holds.
+
+        A seat that has played no round of this activity has an empty transcript,
+        and the room may not be empty: an opening greeting is said before the first
+        frame, and one conversation placed on two activities carries the earlier
+        one's messages in. Without this the model would answer a greeting it had
+        never been told about.
+
+        It reads each seat's **own** view of the room, so a seat is primed with what
+        it was entitled to see and never with another channel's words.
+        """
+        for seat in spec.seats:
+            if memory.knows(seat.agent_id):
+                continue
+            carried = memory.chat_of(seat.agent_id)
+            for message in self._room.context_for(seat.actor_id, limit=_PRIMED):
+                if message.author_actor_id in self._seats:
+                    continue  # a seat is not reminded of its own words
+                carried.append(
+                    Message(
+                        sender=message.author_actor_id,
+                        text=self._room.text_of(message.message_id),
+                    )
+                )
 
     async def publish(self, episode: MultiAgentEpisode) -> None:
         """Say everything the seats have said, and record where each stream went."""
@@ -3345,9 +3754,49 @@ class _PlayingRoom:
 # episode with a silent seat is not a spin loop.
 _SAY_INTERVAL = 0.02
 
+# How much of a room a seat is reminded of when it joins an activity that is already
+# under way. It matches the context a model is given for one decision, because that
+# is what the reminder is for.
+_PRIMED = 20
+
 
 # Push one stepped frame to one connection.
 _Sink = Callable[[dict[str, Any]], Awaitable[None]]
+
+
+class _Watcher:
+    """One connection watching a shared run, and the scene it already holds.
+
+    The surface is *per connection and per episode*, and it has to be both.
+
+    Per connection, because every watcher sees the same board but each is told what
+    changed **since its own last frame**: a person who joined late or reconnected is
+    sent the whole scene and the others are not sent it again.
+
+    Per episode, because a surface is the memory of what the far end already holds,
+    and at the rest between two rounds the far end throws its drawing away and
+    builds a new one. A surface carried across that remembers a canvas that no
+    longer exists: it holds back every persistent object -- the whole room, in a
+    game whose room is drawn once -- and the next round opens with nothing on the
+    floor but the things that move. So the episode is held beside the surface, and
+    a frame of a new one is drawn on a surface that remembers nothing.
+    """
+
+    def __init__(self, send: _Sink, seat_key: str, agent_id: str) -> None:
+        self.send = send
+        self.seat_key = seat_key
+        self.agent_id = agent_id
+        self.surface = Surface()
+        # The episode this surface is the memory of. Nothing has been drawn on it
+        # yet, so the first frame of any episode is a keyframe.
+        self.drawing: str | None = None
+
+    def drawn_on(self, episode_id: str) -> Surface:
+        """Return the surface to draw one episode's frame on, forgetting an older."""
+        if self.drawing != episode_id:
+            self.surface.reset()
+            self.drawing = episode_id
+        return self.surface
 
 
 class _Table:
@@ -3370,40 +3819,140 @@ class _Table:
     away from the keyboard: the seat is still in the environment and does nothing.
     """
 
-    def __init__(self, *, interaction_id: str, size: int) -> None:
+    def __init__(
+        self,
+        *,
+        interaction_id: str,
+        size: int,
+        render: RenderFn | None = None,
+        hud: HudFn | None = None,
+        diagnostics: Diagnostics | None = None,
+    ) -> None:
         self.interaction_id = interaction_id
         self.size = size
+        self.render = render
+        self.hud = hud
+        # Where this table's seats say what they were asked and what came back. It
+        # belongs to the table for the same reason the run does: the rounds of one
+        # activity are one table's rounds, whichever connection claims each.
+        self.diagnostics: Diagnostics = diagnostics or NullDiagnostics()
         self.inputs: dict[str, InputState] = {}
+        self._watchers: list[_Watcher] = []
         self._sinks: list[_Sink] = []
-        self._full = asyncio.Event()
-        self._outcome: asyncio.Future[str | None] = (
-            asyncio.get_running_loop().create_future()
-        )
-        self._claimed = False
+        # One barrier, one claim, and one outcome **per round**. A study that plays
+        # a practice round and then the real one plays them at one table, and each
+        # round is its own run: its own environment, its own episode, and its own
+        # start once everybody is back from the rest between them.
+        self._full: dict[int, asyncio.Event] = {}
+        self._ready: dict[int, set[str]] = {}
+        self._outcomes: dict[int, asyncio.Future[str | None]] = {}
+        self._claimed: set[int] = set()
         # The detached run, held so nothing collects it while it is stepping.
         self.running: asyncio.Task[None] | None = None
-        if size <= 0:
-            self._full.set()
+        # What the model seats carry from one round into the next. It belongs to
+        # the table rather than to a connection, because the run does: the rounds
+        # of one activity are one table's rounds whichever connection claims each.
+        self.memory = SeatMemory()
+        # The round now running, so a message said while one is on reaches its
+        # seats and wakes them.
+        self.episode: MultiAgentEpisode | None = None
+        # The last round to have run, running or ended. Between rounds it is what
+        # answers: its seats are the same seats, standing where the round left them.
+        self.rested: MultiAgentEpisode | None = None
+        # Whether somebody is already feeding this table's seats. The feed belongs
+        # to the table, so the second connection to sit down does not add a second.
+        self.listening = False
+        # The turn the resting seats are taking now, held so nothing collects it,
+        # and whether somebody has said something since it started.
+        self._answering: asyncio.Task[None] | None = None
+        self._asked = False
 
     @property
     def shared(self) -> bool:
         """Return whether more than one person is seated at this table."""
         return self.size > 1
 
-    def sit(self, seat_key: str, inputs: InputState) -> None:
-        """Seat one person at one seat: the input that seat holds each frame."""
-        self.inputs[seat_key] = inputs
-        if len(self.inputs) >= self.size:
-            self._full.set()
+    def answering(self, turn: Callable[[], Coroutine[Any, Any, None]]) -> None:
+        """Have the resting seats answer, one turn at a time.
 
-    def watch(self, send: _Sink) -> None:
+        A turn is asked for from the room's own watcher, which is neither a place to
+        wait nor a place to raise: a model that fails to answer must not take the
+        conversation down with it. So it runs detached, and it is held until it is
+        done -- an unheld task is collected mid-call and the answer disappears.
+
+        **One at a time, and once more if anybody spoke.** Two turns over one seat
+        share its transcript and the words it is holding to say, so the second would
+        take the first one's message and publish it as its own answer. Somebody who
+        writes three lines quickly gets one answer to all three, then another turn
+        if they wrote again while it was thinking -- which is what a partner does.
+        """
+        self._asked = True
+        if self._answering is not None:
+            return
+        self._answering = asyncio.ensure_future(self._answer_while_asked(turn))
+
+    async def _answer_while_asked(
+        self, turn: Callable[[], Coroutine[Any, Any, None]]
+    ) -> None:
+        """Take turns until nobody has said anything new since the last one."""
+        try:
+            while self._asked:
+                self._asked = False
+                # A turn that failed is silence, and silence is an answer a seat is
+                # allowed to give. Nothing is put on the participant's screen for it.
+                with contextlib.suppress(Exception):
+                    await turn()
+        finally:
+            self._answering = None
+
+    @property
+    def busy(self) -> bool:
+        """Say whether a between-rounds turn is still running.
+
+        **The next round does not wait on it.** A participant who writes something
+        and presses continue must not hold a blank screen while a model finishes,
+        and a local model takes seconds. The round starts, and a turn still running
+        publishes when it is done: publishing goes to the **room**, which belongs to
+        the whole activity and outlives any round, so a late answer is a late
+        message and not a message in the wrong place.
+        """
+        return self._answering is not None
+
+    def _barrier(self, round_index: int) -> asyncio.Event:
+        """Return the event that says every seat is ready for one round."""
+        found = self._full.get(round_index)
+        if found is None:
+            found = asyncio.Event()
+            self._full[round_index] = found
+            self._ready.setdefault(round_index, set())
+            if self.size <= 0:
+                found.set()
+        return found
+
+    def sit(self, seat_key: str, inputs: InputState, round_index: int = 0) -> None:
+        """Seat one person for one round: the input that seat holds each frame."""
+        self.inputs[seat_key] = inputs
+        barrier = self._barrier(round_index)
+        self._ready[round_index].add(seat_key)
+        if len(self._ready[round_index]) >= self.size:
+            barrier.set()
+
+    def watch(self, send: _Sink, seat_key: str = "", agent_id: str = "") -> None:
         """Push the stepped frames to one more connection.
 
         Watching and playing are separate: a participant with no seat still sees
         the run, which is what an activity where the models play and a person reads
         along is.
+
+        ``seat_key`` is what the records call this seat and ``agent_id`` is the agent
+        the environment acts. The two differ where an environment numbers its agents,
+        so the observation is read by the second and the frame is named by the first.
+
+        The connection gets a surface of its own, so it is told what changed since
+        **its** last frame rather than since somebody else's.
         """
         self._sinks.append(send)
+        self._watchers.append(_Watcher(send, seat_key, agent_id))
 
     def stop(self, send: _Sink) -> None:
         """Stop pushing frames to a connection that has gone.
@@ -3414,16 +3963,17 @@ class _Table:
         """
         if send in self._sinks:
             self._sinks.remove(send)
+        self._watchers = [one for one in self._watchers if one.send is not send]
 
-    async def seated(self) -> None:
-        """Wait until every seat has somebody at it."""
-        await self._full.wait()
+    async def seated(self, round_index: int = 0) -> None:
+        """Wait until every seat has somebody at it, ready for that round."""
+        await self._barrier(round_index).wait()
 
-    def claim(self) -> bool:
-        """Return whether this connection is the one that runs the episode."""
-        if self._claimed:
+    def claim(self, round_index: int = 0) -> bool:
+        """Return whether this connection is the one that runs that round."""
+        if round_index in self._claimed:
             return False
-        self._claimed = True
+        self._claimed.add(round_index)
         return True
 
     async def push(self, frame: dict[str, Any]) -> None:
@@ -3434,23 +3984,66 @@ class _Table:
             except (WebSocketDisconnect, RuntimeError):
                 self.stop(send)
 
-    def settle(self, stream_id: str | None) -> None:
-        """Give every seat the one captured run they share."""
-        if not self._outcome.done():
-            self._outcome.set_result(stream_id)
+    async def draw(self, episode_id: str, frame: int, result: MultiStepResult) -> None:
+        """Draw one stepped frame for everybody still watching this run.
 
-    def fail(self, error: BaseException) -> None:
-        """Give every seat the failure that ended the run they shared."""
-        if not self._outcome.done():
-            self._outcome.set_exception(error)
+        Each watcher is drawn on its own surface, so what it is sent is what changed
+        for it. A game the study gave no drawing draws nothing and pushes nothing;
+        the stepped frame itself still goes out.
 
-    async def outcome(self) -> str | None:
-        """Wait for the run everybody at this table shares.
+        The surface is asked for **by episode**, so the first frame of each round is
+        a keyframe: the client mounts a new drawing for every round and a surface
+        that remembered the last one would hold back everything drawn once.
+        """
+        if self.render is None:
+            return
+        for watcher in list(self._watchers):
+            packet = render_packet(
+                watcher.drawn_on(episode_id),
+                self.render,
+                watched_state(result, watcher.agent_id),
+                episode_id,
+                watcher.seat_key or _SEAT_KEY,
+                frame,
+                self.hud,
+            )
+            try:
+                await watcher.send(
+                    {
+                        "type": "render",
+                        "packet": packet.model_dump(mode="json", exclude_none=True),
+                    }
+                )
+            except (WebSocketDisconnect, RuntimeError):
+                self.stop(watcher.send)
+
+    def _future(self, round_index: int) -> asyncio.Future[str | None]:
+        """Return the outcome every seat waits on for one round."""
+        found = self._outcomes.get(round_index)
+        if found is None:
+            found = asyncio.get_running_loop().create_future()
+            self._outcomes[round_index] = found
+        return found
+
+    def settle(self, stream_id: str | None, round_index: int = 0) -> None:
+        """Give every seat the captured run they share for that round."""
+        future = self._future(round_index)
+        if not future.done():
+            future.set_result(stream_id)
+
+    def fail(self, error: BaseException, round_index: int = 0) -> None:
+        """Give every seat the failure that ended the round they shared."""
+        future = self._future(round_index)
+        if not future.done():
+            future.set_exception(error)
+
+    async def outcome(self, round_index: int = 0) -> str | None:
+        """Wait for the run everybody at this table shares for that round.
 
         The wait is shielded, so one connection giving up does not cancel the run
         the others are still in.
         """
-        return await asyncio.shield(self._outcome)
+        return await asyncio.shield(self._future(round_index))
 
 
 async def _play_agents(
@@ -3464,8 +4057,8 @@ async def _play_agents(
     seat: HumanSeatSpec | None,
     talk: _PlayingRoom | None = None,
     game_frames: FrameChannel | None = None,
-) -> str | None:
-    """Sit this connection at its seat, wait for the run, and report what it captured.
+) -> list[str]:
+    """Sit this connection at its seat, play every round, and report what it captured.
 
     ``seat`` is the human seat this person plays, when the game has one for them. A
     reader task feeds that seat's held keys from the connection's input frames while
@@ -3475,8 +4068,8 @@ async def _play_agents(
     **The run is the table's, not this connection's.** Every seated connection waits
     for the same episode; exactly one of them starts it. So the several-people case
     and the one-person case are the same path, and neither has to know which it is.
-    Returns the captured episode stream id, or None when the connection carries no
-    visit to seat.
+    Returns one captured episode stream id per round this connection played, and
+    nothing at all when the connection carries no visit to seat.
 
     ``talk`` is the conversation this activity also carries. With one, the playing
     seats read what is said on the channels they are in and publish what they say
@@ -3484,30 +4077,90 @@ async def _play_agents(
     """
     visit_id = session.state.get("visit_id")
     if not isinstance(visit_id, str):
-        return None
+        return []
 
     async def send(frame: dict[str, Any]) -> None:
         await websocket.send_json(frame)
 
-    table.watch(send)
+    table.watch(
+        send,
+        seat.seat_key if seat is not None else "",
+        seat.agent_id if seat is not None else "",
+    )
+    rounds = _rounds_at(session)
+    captured: list[str] = []
+    try:
+        for index in range(rounds.count):
+            if index > 0 and not await _interval(websocket, rounds, index, game_frames):
+                # This participant left during the rest between rounds. What they
+                # played is already recorded, and the flow advances with it.
+                break
+            captured.extend(
+                await _one_round(
+                    websocket,
+                    session,
+                    spec,
+                    gateway,
+                    store,
+                    on_bundle,
+                    table,
+                    seat,
+                    talk,
+                    game_frames,
+                    index,
+                )
+            )
+        return captured
+    finally:
+        table.stop(send)
+
+
+async def _one_round(
+    websocket: WebSocket,
+    session: Session,
+    spec: AgentGameSpec,
+    gateway: Gateway,
+    store: Store,
+    on_bundle: BundleSink | None,
+    table: _Table,
+    seat: HumanSeatSpec | None,
+    talk: _PlayingRoom | None,
+    game_frames: FrameChannel | None,
+    index: int,
+) -> list[str]:
+    """Play one round at the table, and read this connection's input while it runs.
+
+    The input reader lives for the round rather than for the activity. Two readers
+    on one socket would race, and the frame that says the participant is ready for
+    the next round is the one that would be lost: the rest between two rounds is
+    read by the loop above, and nothing else may be reading while it is.
+    """
     reader: asyncio.Task[None] | None = None
     if seat is not None:
-        inputs = InputState(spec.action_bindings, spec.default_action)
+        # A key held when the last round ended is not held in the next one, so each
+        # round starts from an empty hand.
+        inputs = InputState(
+            spec.action_bindings,
+            spec.default_action,
+            mode=getattr(spec, "input_mode", "pressed_keys"),
+        )
         reader = asyncio.create_task(_read_inputs_into(websocket, inputs, game_frames))
-        table.sit(seat.seat_key, inputs)
+        table.sit(seat.seat_key, inputs, index)
     try:
-        await table.seated()
-        if table.claim():
-            running = _run_table(table, session, spec, gateway, store, on_bundle, talk)
+        await table.seated(index)
+        if table.claim(index):
+            running = _run_table(
+                table, session, spec, gateway, store, on_bundle, talk, index
+            )
             if table.shared:
                 # Several people are in it, so the run outlives whichever of them
                 # started it. The table holds the task, so nothing collects it.
                 table.running = asyncio.create_task(running)
             else:
                 await running
-        return await _watched(table, reader)
+        stream_id = await _watched(table, reader, index)
+        return [stream_id] if stream_id is not None else []
     finally:
-        table.stop(send)
         if reader is not None:
             reader.cancel()
             with contextlib.suppress(asyncio.CancelledError):
@@ -3523,7 +4176,9 @@ class _Gone(Exception):
     """
 
 
-async def _watched(table: _Table, reader: asyncio.Task[None] | None) -> str | None:
+async def _watched(
+    table: _Table, reader: asyncio.Task[None] | None, round_index: int = 0
+) -> str | None:
     """Wait for the shared run, unless this connection goes away first.
 
     A connection that has gone stops waiting at once: it holds no task for the rest
@@ -3533,7 +4188,7 @@ async def _watched(table: _Table, reader: asyncio.Task[None] | None) -> str | No
     itself is untouched -- the wait is shielded, so giving up on it is not ending
     it.
     """
-    waiting = asyncio.ensure_future(table.outcome())
+    waiting = asyncio.ensure_future(table.outcome(round_index))
     if reader is None:
         return await waiting
     done, _pending = await asyncio.wait(
@@ -3553,6 +4208,7 @@ async def _run_table(
     store: Store,
     on_bundle: BundleSink | None,
     talk: _PlayingRoom | None,
+    round_index: int = 0,
 ) -> None:
     """Step one table's environment to its end, capture the run, settle every seat.
 
@@ -3565,7 +4221,8 @@ async def _run_table(
     if talk is not None:
         tape = _AnchorTape()
         tape.begin(episode_id)
-        talk.anchor(tape)
+        talk.remember_into(spec, table.memory)
+        talk.feed(spec, table)
 
     async def frame_sink(info: MultiSeatStepInfo) -> None:
         if tape is not None:
@@ -3573,6 +4230,7 @@ async def _run_table(
         await table.push(
             {"type": "frame", "frame_number": info.frame, "actions": info.actions}
         )
+        await table.draw(episode_id, info.frame, info.result)
 
     episode = build_agent_episode(
         spec,
@@ -3585,23 +4243,48 @@ async def _run_table(
         episode_id=episode_id,
         human_sources=table.inputs,
         frame_sink=frame_sink,
+        memory=table.memory,
+        diagnostics=table.diagnostics,
+    )
+    table.diagnostics.note(
+        "round.start",
+        subject=table.interaction_id,
+        round=round_index + 1,
+        episode_id=episode_id,
+        model_seats=[one.seat_key for one in spec.seats],
+        human_seats=[one.seat_key for one in spec.human_seats],
+        bot_seats=[one.seat_key for one in spec.bots],
+        max_steps=spec.max_steps,
+        fps=spec.fps,
+        talking=talk is not None,
     )
     publisher: asyncio.Task[None] | None = None
-    if talk is not None:
-        talk.feed(episode)
-        publisher = asyncio.create_task(talk.pump(episode))
+    watching = (
+        talk.anchored(tape)
+        if talk is not None and tape is not None
+        else contextlib.nullcontext()
+    )
+    table.episode = episode
+    # And it is what answers once the round has ended: a round that has stopped
+    # stepping still holds the seats, their conversation, and the environment as
+    # they left it, which is everything a rest between rounds is talked about with.
+    table.rested = episode
     try:
-        try:
-            result = await episode.run()
-        finally:
-            if publisher is not None and talk is not None:
-                publisher.cancel()
-                with contextlib.suppress(asyncio.CancelledError):
-                    await publisher
-                # Whatever the last decisions said is published before the run is
-                # captured, so a message the model really produced is not lost to
-                # the end of the episode.
-                await talk.publish(episode)
+        with watching:
+            if talk is not None:
+                publisher = asyncio.create_task(talk.pump(episode))
+            try:
+                result = await episode.run()
+            finally:
+                table.episode = None
+                if publisher is not None and talk is not None:
+                    publisher.cancel()
+                    with contextlib.suppress(asyncio.CancelledError):
+                        await publisher
+                    # Whatever the last decisions said is published before the run
+                    # is captured, so a message the model really produced is not
+                    # lost to the end of the episode.
+                    await talk.publish(episode)
         stream_id = await _capture_multiseat(
             gateway, store, session, result.summary, tape
         )
@@ -3615,9 +4298,28 @@ async def _run_table(
             on_bundle,
         )
     except (Exception, asyncio.CancelledError) as error:
-        table.fail(error)
+        # A round that ended in a failure is the one a person most needs told. It
+        # reaches the seats through the outcome they wait on and nothing else says
+        # it out loud, so it is written down before it is handed over.
+        table.diagnostics.note(
+            "round.failed",
+            subject=table.interaction_id,
+            round=round_index + 1,
+            episode_id=episode_id,
+            error=type(error).__name__,
+            message=str(error),
+        )
+        table.fail(error, round_index)
     else:
-        table.settle(stream_id)
+        table.diagnostics.note(
+            "round.end",
+            subject=table.interaction_id,
+            round=round_index + 1,
+            episode_id=episode_id,
+            frames=result.summary.frames,
+            stream_id=stream_id,
+        )
+        table.settle(stream_id, round_index)
 
 
 async def _read_inputs_into(
@@ -3658,6 +4360,24 @@ def _agent_context(
         _fresh_idem(gateway),
     )
     return gateway.mint(envelope, principal=session.principal, data_handling=_RESEARCH)
+
+
+def _service_context(gateway: Gateway, aggregate_id: str) -> CommandContext:
+    """Mint a command context for work the **process** does, not a participant.
+
+    A warm-up is the deployment checking its own provider, so it is recorded under
+    the service principal rather than under whoever happened to connect first. A
+    participant did not ask for it and must not be named as having made it.
+    """
+    envelope = _envelope(
+        "agent.step",
+        aggregate_id,
+        {"aggregate_id": aggregate_id},
+        _fresh_idem(gateway),
+    )
+    return gateway.mint(
+        envelope, principal=_service_principal(gateway), data_handling=_RESEARCH
+    )
 
 
 async def _capture_multiseat(
@@ -3826,7 +4546,11 @@ async def _play_turnbased(
     human_source: InputState | None = None
     reader: asyncio.Task[None] | None = None
     if spec.human is not None:
-        human_source = InputState(spec.action_bindings, spec.default_action)
+        human_source = InputState(
+            spec.action_bindings,
+            spec.default_action,
+            mode=getattr(spec, "input_mode", "pressed_keys"),
+        )
         reader = asyncio.create_task(_read_inputs_into(websocket, human_source))
 
     async def frame_sink(info: TurnStepInfo) -> None:
@@ -3912,6 +4636,33 @@ def build_comparison_on_game(
         )
         if delivery is not None:
             _queue(session, delivery)
+
+    return on_game
+
+
+def build_routed_on_game(
+    by_activity: Mapping[str, OnGame], fallback: OnGame | None = None
+) -> OnGame:
+    """Route each game activity to the runtime that plays it.
+
+    One study may hold a practice round on the server and a real round with a model
+    partner, and those are two different runtimes. Until this existed the application
+    chose **one** runtime for the whole study from a chain of mutually exclusive
+    keywords, so a study with two environments could run only one of them and nothing
+    said which.
+
+    ``fallback`` is what an activity nobody resolved runs, which is how a study that
+    still mounts its game through a keyword keeps working beside one that names its
+    environments.
+    """
+
+    async def on_game(websocket: WebSocket, session: Session) -> None:
+        key = _activity_key(session)
+        found = by_activity.get(key) if key is not None else None
+        if found is None:
+            found = fallback
+        if found is not None:
+            await found(websocket, session)
 
     return on_game
 
@@ -4526,6 +5277,7 @@ class Conversations:
         store: Store,
         study: Study,
         *,
+        specs: Mapping[str, ChatSpec],
         study_version: StudyVersionRef | None = None,
     ) -> None:
         self._gateway = gateway
@@ -4533,14 +5285,15 @@ class Conversations:
         self._study = study
         self._study_version = study_version
         self._matchmakers: dict[str, ChatMatchmaker] = {}
+        # What the author wrote, already compiled, by activity key. It is compiled
+        # by the caller because compiling it is what ``mug.mounts`` does for every
+        # authored conversation, and that module is above this one.
+        self._specs = dict(specs)
 
     def spec_at(self, session: Session) -> ChatSpec | None:
         """Return the conversation the activity this session is at carries."""
         key = _activity_key(session)
-        if key is None:
-            return None
-        spec = self._study.chats.get(key)
-        return spec if isinstance(spec, ChatSpec) else None
+        return None if key is None else self._specs.get(key)
 
     def scope_at(self, session: Session) -> str | None:
         """Return the conversation this activity is part of, by the author's value."""
@@ -4605,6 +5358,7 @@ def build_chat_on_game(
     spec: ChatSpec,
     *,
     rendezvous: ChatMatchmaker | None = None,
+    diagnostics: Diagnostics | None = None,
 ) -> OnGame:
     """Build the activity hook that runs one chat conversation over the socket.
 
@@ -4641,6 +5395,7 @@ def build_chat_on_game(
                 durable=_chat_durability(gateway, store, session),
                 rendezvous=rendezvous,
                 gateway=gateway,
+                diagnostics=diagnostics,
             )
         except WebSocketDisconnect:
             reason = "abandoned"

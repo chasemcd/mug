@@ -136,8 +136,8 @@ def draw(replica):
             "color": "#f2f2f2",
             "x": 0.0,
             "y": 0.0,
-            "width": 1.0,
-            "height": 1.0,
+            "w": 1.0,
+            "h": 1.0,
         }
     ]
     token_x, token_y = replica.token
@@ -162,8 +162,8 @@ def draw(replica):
                 "color": _COLORS[index % len(_COLORS)],
                 "x": x * cell + cell * 0.15,
                 "y": y * cell + cell * 0.15,
-                "width": cell * 0.7,
-                "height": cell * 0.7,
+                "w": cell * 0.7,
+                "h": cell * 0.7,
             }
         )
     return commands

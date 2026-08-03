@@ -18,6 +18,7 @@
  * identity of a run does not depend on how a language writes a float.
  */
 
+import { Chord, resolveAction } from "./bindings.js";
 import { computeDigest, Digest, HashBytes } from '../kernel/index.js';
 import { P2PMeshHandoff } from './p2pEdge.js';
 import { MeshDataChannel } from './p2pRtc.js';
@@ -91,6 +92,8 @@ export interface MeshManifest {
   source_bundle: string;
   requires: string[];
   action_bindings: { [key: string]: number };
+  /** Chords: sequences of keys held together, each with the action it means. */
+  action_chords?: readonly Chord[];
   default_action: number;
   fps: number;
   countdown_seconds: number;
@@ -190,12 +193,12 @@ export function meshRunConfig(
 }
 
 function actionFor(manifest: MeshManifest, pressed: Set<string>): number {
-  for (const key of pressed) {
-    if (key in manifest.action_bindings) {
-      return manifest.action_bindings[key] as number;
-    }
-  }
-  return manifest.default_action;
+  return resolveAction(
+    pressed,
+    manifest.action_bindings,
+    manifest.default_action,
+    manifest.action_chords ?? [],
+  );
 }
 
 /** One peer's inbox: it holds messages until the driver exists to take them. */
@@ -258,6 +261,11 @@ export function createMeshExecutor(config: MeshExecutorConfig): {
   const inbox = new Inbox();
   let bound: ReadonlyMap<string, MeshDataChannel> | null = null;
   let running = false;
+  // How many times this peer rolled back and replayed. A poor connection is felt as
+  // correction, so the finish line says how much of it there was -- which is a fact
+  // about the participant's run, and the only way anything outside the engine can
+  // tell a mesh that corrected itself from one that never had to.
+  let corrections = 0;
   let resolveRun: (result: MeshRunResult) => void;
   let rejectRun: (error: Error) => void;
   const finished = new Promise<MeshRunResult>((resolve, reject) => {
@@ -349,12 +357,15 @@ export function createMeshExecutor(config: MeshExecutorConfig): {
       submitted = await handoff.submitCapture(digest, frameCount, payload, payloadDigest);
     }
     status('waiting for the other players...');
-    resolveRun({
+    const result: MeshRunResult = {
       trajectoryDigest: digest,
       frameCount,
       submittedCapture: submitted,
       rollbackCount: driver.rollbackCount(),
-    });
+    };
+    corrections = result.rollbackCount;
+    config.onFinished?.(result);
+    resolveRun(result);
   }
 
   function fail(error: Error): void {
@@ -385,7 +396,13 @@ export function createMeshExecutor(config: MeshExecutorConfig): {
       rejectRun(new Error('the peer mesh aborted: ' + abort.reason));
     },
     onMeshFinish: (finish: P2PMeshFinish): void => {
-      status('the peer game finished (' + String(finish.frame_count) + ' frames)');
+      status(
+        'the peer game finished (' +
+          String(finish.frame_count) +
+          ' frames, ' +
+          String(corrections) +
+          ' corrections)',
+      );
     },
     onConnectionLost: (): void => {
       rejectRun(new Error('the connection to the server was lost'));

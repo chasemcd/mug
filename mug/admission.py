@@ -58,6 +58,12 @@ class AdmissionPolicy:
     themselves are read by the server below it, whose own websocket message limit is
     the memory bound (``uvicorn --ws-max-size``); this cap keeps a frame no command
     can be inside from reaching the parser and the handlers.
+
+    The default suits every frame a client sends except one: a browser-run game is
+    reported in a single command carrying one transition per frame, which is larger
+    than the rest by orders of magnitude. A process that serves such a game must
+    raise this bound to hold the run it asks for; ``capture_frame_bytes`` says how
+    large that is.
     """
 
     max_sessions: int = 512
@@ -66,6 +72,29 @@ class AdmissionPolicy:
     max_frame_bytes: int = 64 * 1024
     max_pending_deliveries: int = 256
     at_capacity_retry_after_ms: int = 5_000
+
+
+# What one reported transition costs on the wire, and what the rest of the report
+# costs beside them. A transition is a fixed shape -- two identifiers, two digests,
+# a frame number, an authority and an instant -- which measures about 520 bytes of
+# json, with the frame's action and the partner's beside it. The allowance is double
+# that, so a longer identifier, a wider action, or a decision recorded against a
+# frame never puts an honest run over a bound meant to stop a dishonest one.
+CAPTURE_BYTES_PER_FRAME = 1024
+CAPTURE_ENVELOPE_BYTES = 8 * 1024
+
+
+def capture_frame_bytes(frames: int) -> int:
+    """Return the size the report of a run of this many frames can reach.
+
+    A browser-run game is written by the client and reported once, at the end, as
+    one command. So the size of the largest frame a study receives is a property of
+    the study: it follows from how long the game is allowed to run. A process that
+    derives its bound from that refuses no run it asked for, at any length; a
+    process that guesses a number refuses every game longer than the guess, and
+    refuses it at the end, after the participant has played the whole thing.
+    """
+    return CAPTURE_ENVELOPE_BYTES + max(0, frames) * CAPTURE_BYTES_PER_FRAME
 
 
 class SessionOverloaded(Exception):
@@ -212,10 +241,13 @@ class Admission:
 
 
 __all__ = [
+    "CAPTURE_BYTES_PER_FRAME",
+    "CAPTURE_ENVELOPE_BYTES",
     "Admission",
     "AdmissionPolicy",
     "Refusal",
     "SessionBudget",
     "SessionOverloaded",
     "TokenBucket",
+    "capture_frame_bytes",
 ]

@@ -4,11 +4,16 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Literal
 
 from mug.client.ice import IceGrant, IceServerConfig
-from mug.game.browser_mesh import BrowserMeshSpec, verify_mesh_capture
+from mug.game.browser_mesh import (
+    BrowserMeshSpec,
+    capture_timeout_for,
+    episode_seconds,
+    verify_mesh_capture,
+)
 from mug.game.p2p_capture import CaptureVerifier
 from mug.game.p2p_room_types import RoomEffect, RoomLimits
 from mug.kernel import Digest, PrincipalRef
@@ -57,12 +62,31 @@ class BrowserP2PConfig:
         limits = self.limits
         if not 1 <= limits.validation_timeout_seconds <= 60:
             raise ValueError("the validation timeout must be from 1 to 60 seconds")
-        if limits.capture_timeout_seconds <= 0:
-            raise ValueError("the capture timeout must be positive")
         if limits.max_signal_bytes > 65_536:
             raise ValueError("the signal limit exceeds the API-09 wire bound")
         if limits.max_capture_bytes > 1_048_576:
             raise ValueError("the capture limit exceeds the API-09 wire bound")
+        self._check_capture_timeout()
+
+    def _check_capture_timeout(self) -> None:
+        """Refuse a capture deadline this game could never finish inside.
+
+        A room that reaches its deadline aborts and discards the run, so a
+        deadline shorter than the episode does not shorten anything: it means the
+        game can never record a trajectory at all. Better to refuse the study
+        than to run it and collect nothing.
+        """
+        chosen = self.limits.capture_timeout_seconds
+        if chosen is None:
+            return
+        if chosen <= 0:
+            raise ValueError("the capture timeout must be positive")
+        if self.game is not None and chosen <= episode_seconds(self.game):
+            raise ValueError(
+                f"the capture timeout ({chosen:g}s) is shorter than the episode it "
+                f"must cover ({episode_seconds(self.game):g}s), so this game could "
+                "never record a run; leave it unset and the mount derives it"
+            )
 
     @property
     def capture_verifier(self) -> CaptureVerifier:
@@ -70,6 +94,21 @@ class BrowserP2PConfig:
         if self.verify_capture is not None:
             return self.verify_capture
         return verify_mesh_capture
+
+    @property
+    def room_limits(self) -> RoomLimits:
+        """Return the limits one room runs under, with its deadline resolved.
+
+        The capture deadline is the one limit that depends on what is played, so
+        it is derived here from this mount's own game rather than being a fixed
+        number an author has to know about and keep in step with ``max_steps``.
+        An author who named a deadline keeps it.
+        """
+        if self.limits.capture_timeout_seconds is not None or self.game is None:
+            return self.limits
+        return replace(
+            self.limits, capture_timeout_seconds=capture_timeout_for(self.game)
+        )
 
 
 @dataclass(frozen=True)

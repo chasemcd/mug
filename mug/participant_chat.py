@@ -55,16 +55,18 @@ from __future__ import annotations
 import asyncio
 import json
 from collections.abc import Awaitable, Callable, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from typing import Any, Literal, Protocol, cast
 
 from fastapi import WebSocket, WebSocketDisconnect
 
 from mug.agents import ChatAgent, ChatReply, ChatTurn, PendingReply
+from mug.agents.adapters import adapter_for
 from mug.agents.generation import record_reply
 from mug.agents.runtime import AgentIds, compile_agent
-from mug.authoring import Elicit, LLMAgent
+from mug.authoring import Elicit, History, LLMAgent, Message, Thoughts, Transcript
+from mug.content.seats import Model, agent_ids_for
 from mug.conversation import ChatMessage, TurnPolicy
 from mug.conversation.room import ChatRoom, RoomChannel, RoomMember
 from mug.conversation.transcript import (
@@ -82,6 +84,7 @@ from mug.conversation.transcript import (
     with_turn_begun,
     with_turn_ended,
 )
+from mug.diagnostics import Diagnostics
 from mug.gateway import Gateway
 from mug.interactions.types import ConnectionLease
 from mug.kernel import DataHandlingRef, PrincipalRef, VersionStamp
@@ -107,6 +110,8 @@ from mug.storage import ArtifactStore, Store, stage_artifact
 
 # Mint one runtime-occurrence id of the named kind (the gateway, injected).
 NewId = Callable[[str], str]
+# Derive the one id a kind and a seed always give (the gateway, injected).
+DeriveId = Callable[[str, str], str]
 # Read the conversation's next frame, or None once the participant went away. A
 # conversation that owns the socket reads it; one that shares it with a game reads
 # the channel the frame router fills.
@@ -188,6 +193,11 @@ def _free_turn_policy() -> TurnPolicy:
     )
 
 
+def _no_speakers() -> tuple[Model, ...]:
+    """Return the empty author-written speaker list, typed for the checker."""
+    return ()
+
+
 def _no_seats() -> tuple[ChatSeatSpec, ...]:
     """Return an empty, typed model-seat tuple for a spec's default."""
     return ()
@@ -225,6 +235,13 @@ class ChatSpec:
     must meet twice -- the assignment, the blinded handles, the display order, and
     which turns are elicited at all -- is derived rather than drawn.
 
+    ``speaker`` (or ``speakers``) is the author's spelling: a ``Model`` and nothing
+    else, exactly as a game activity's seating is written. The pinned build, the
+    recorded actor, and the provider adapter are all derived at the mount from the
+    conversation's own channel, so an author never writes an identifier. ``seat``
+    and ``seats`` are the compiled form the runtime reads, and a study may still
+    write them directly when it needs to pin a published build itself.
+
     ``placement`` is where the conversation sits when the activity is also a game:
     ``beside`` it (the default), ``below`` it, or in a ``drawer`` that opens over
     it. It is a design variable rather than decoration -- a transcript below the
@@ -250,10 +267,19 @@ class ChatSpec:
     render_reply: RenderReply | None = None
     normalize: Callable[[Output], Output] | None = None
     elicit_preference: Elicit | None = None
+    speaker: Model | None = None
+    speakers: tuple[Model, ...] = field(default_factory=_no_speakers)
 
     def __post_init__(self) -> None:
         if self.participants < 1:
             raise ValueError("a chat activity needs at least one participant")
+        if (self.speaker is not None or self.speakers) and (
+            self.seat is not None or self.seats
+        ):
+            raise ValueError(
+                "name the model seats once: 'speaker'/'speakers' (the author's "
+                "spelling) or 'seat'/'seats' (the compiled one)"
+            )
         if self.max_activations_per_turn < 1:
             raise ValueError("a chat turn must admit at least one model activation")
         declared = {channel.key for channel in self.room_channels}
@@ -393,19 +419,65 @@ def _role_of(message: ChatMessage, model_actors: frozenset[str]) -> str:
     return "assistant" if message.author_actor_id in model_actors else "user"
 
 
-def _default_compose(room: ChatRoom, model_actors: frozenset[str]) -> ComposeChat:
-    """Build the default prompt composer: the transcript, each line labelled."""
+def _transcript(room: ChatRoom, model_actors: frozenset[str]) -> ComposeChat:
+    """Build the plainest composer: the transcript, each line labelled.
+
+    This is what a seat sends when its agent writes no prompt of its own. The words
+    go under ``content``, which is where all three providers look for them.
+    """
 
     def compose(recent: list[ChatMessage]) -> Payload:
         return {
             "messages": [
                 {
                     "role": _role_of(message, model_actors),
-                    "text": room.text_of(message.message_id),
+                    "content": room.text_of(message.message_id),
                 }
                 for message in recent
             ]
         }
+
+    return compose
+
+
+def _default_compose(
+    room: ChatRoom, model_actors: frozenset[str], seat: ChatSeatSpec
+) -> ComposeChat:
+    """Build one seat's prompt composer from the agent the author wrote.
+
+    ``LLMAgent.get_prompt`` is where an author says what their model is for, and it
+    says the same thing whether the model plays a game or talks: *this is the whole
+    prompt, and MUG sends exactly this string*. So a conversation asks for it the
+    same way an episode does, and hands it over as the one message the provider
+    reads. Before this the mount sent a bare transcript instead, and every
+    instruction an author had written was dropped on the way to the provider.
+
+    A conversation has no environment and no step history, so ``env`` is None and
+    ``history`` is empty; ``chat`` is the conversation so far, which is what a
+    conversational agent reads. An agent that writes no prompt gets the labelled
+    transcript, so a study whose model needs no instructions still talks.
+    """
+    plain = _transcript(room, model_actors)
+    agent = seat.agent
+
+    def compose(recent: list[ChatMessage]) -> Payload:
+        said = Transcript(
+            [
+                Message(
+                    sender=_role_of(message, model_actors),
+                    text=room.text_of(message.message_id),
+                )
+                for message in recent
+            ]
+        )
+        try:
+            prompt = agent.get_prompt(None, seat.actor_id, History(), said, Thoughts())
+        except NotImplementedError:
+            return plain(recent)
+        payload: dict[str, Any] = {"messages": [{"role": "user", "content": prompt}]}
+        if agent.temperature is not None:
+            payload["temperature"] = agent.temperature
+        return payload
 
     return compose
 
@@ -417,17 +489,22 @@ def _build_agents(
     store: Store,
     new_id: NewId,
     now: Callable[[], datetime],
+    diagnostics: Diagnostics | None = None,
 ) -> dict[str, ChatAgent]:
     """Compose one agent per model seat, each on the channel it speaks in."""
     model_actors = frozenset(seat.actor_id for seat in spec.model_seats)
-    compose = spec.compose or _default_compose(room, model_actors)
     agents: dict[str, ChatAgent] = {}
     for seat in spec.model_seats:
+        # Each seat composes with its own agent's prompt, because two models in one
+        # room are two different things to say. A study that wrote its own composer
+        # keeps it, and it is then the same composer for every seat.
+        compose = spec.compose or _default_compose(room, model_actors, seat)
         provider = ModelProvider(
             store=store,
             adapter=seat.adapter,
             now=now,
             new_generation_id=lambda: new_id("generation"),
+            diagnostics=diagnostics,
         )
         agents[seat.actor_id] = ChatAgent(
             agent_version=compile_agent(seat.agent, ids=seat.ids),
@@ -614,6 +691,38 @@ def _activated(
     return eligible
 
 
+@dataclass(frozen=True)
+class _Answered:
+    """What one turn produced, and whether anything was asked to produce it.
+
+    A conversation is silent for two very different reasons. Under a mention policy
+    nobody was named, so silence is the study working. Or a model was asked and the
+    provider errored, refused, or timed out, so silence is the study broken. They
+    look identical to the participant -- an empty screen -- so the mount has to tell
+    them apart and say so.
+    """
+
+    published: list[tuple[ChatSeatSpec, ChatReply]]
+    asked: bool
+
+
+async def _notice(websocket: WebSocket, code: str, message: str) -> None:
+    """Tell the participant that a reply they are waiting for is not coming.
+
+    Without this a provider fault is an empty screen for the rest of the activity:
+    the participant waits, types again, waits again, and the study records a
+    conversation nobody could have had. A wrong model name and a missing credential
+    both land here.
+    """
+    await websocket.send_json({"type": "chat_notice", "code": code, "message": message})
+
+
+_NO_REPLY = (
+    "The assistant could not reply. Please try again, and tell the researcher if"
+    " this keeps happening."
+)
+
+
 def _turn_ids(new_id: NewId) -> ChatTurn:
     """Mint the identifiers one chat turn writes under."""
     return ChatTurn(
@@ -655,7 +764,7 @@ async def _take_turns(
     channel_key: str,
     prompt_text: str,
     caused_by: str | None = None,
-) -> list[tuple[ChatSeatSpec, ChatReply]]:
+) -> _Answered:
     """Give every activated seat one turn, and publish the replies in seat order.
 
     The calls run at the same time and the publications run one after another. That
@@ -669,7 +778,7 @@ async def _take_turns(
     """
     seats = _activated(spec, channel_key=channel_key, prompt_text=prompt_text)
     if not seats:
-        return []
+        return _Answered(published=[], asked=False)
     turns = [_turn_ids(new_id) for _ in seats]
     pending = await asyncio.gather(
         *(
@@ -695,7 +804,7 @@ async def _take_turns(
         run.room.adopt(reply.message, render(reply.output))
         run.capture(reply.stream_id)
         published.append((seat, reply))
-    return published
+    return _Answered(published=published, asked=True)
 
 
 # -- the elicited turn ------------------------------------------------------------
@@ -902,6 +1011,10 @@ async def _elicit_turn(
         prompt_text=prompt_text,
     )
     if not written:
+        # Every candidate call failed, so this turn has no reply of any kind. The
+        # elicited path is the one a participant waits longest on, so silence here
+        # is the least readable of all.
+        await _notice(websocket, "no-reply", _NO_REPLY)
         return True
     if not await _may_publish(
         run, durable, visit_id=visit_id, store=store, new_context=new_context,
@@ -917,8 +1030,9 @@ async def _elicit_turn(
         caused_by=caused_by,
     )
     if not published:
+        await _notice(websocket, "no-reply", _NO_REPLY)
         return True
-    by_key = {candidate.key: (reply, candidate) for _, reply, candidate in published}
+    by_key ={candidate.key: (reply, candidate) for _, reply, candidate in published}
     elicitation = await open_elicitation(
         gateway=gateway,
         store=store,
@@ -1226,6 +1340,7 @@ async def run_chat_activity(
     rendezvous: ChatRendezvous | None = None,
     frames: FrameChannel | None = None,
     gateway: Gateway | None = None,
+    diagnostics: Diagnostics | None = None,
 ) -> list[str]:
     """Own the socket for one chat activity and return the streams it recorded.
 
@@ -1264,7 +1379,14 @@ async def run_chat_activity(
     enrollment_id = session.state.get("enrollment_id")
     run = _ChatRun(
         seat=seat,
-        agents=_build_agents(spec, seat.room, store=store, new_id=new_id, now=now),
+        agents=_build_agents(
+            spec,
+            seat.room,
+            store=store,
+            new_id=new_id,
+            now=now,
+            diagnostics=diagnostics,
+        ),
         enrollment_id=enrollment_id if isinstance(enrollment_id, str) else None,
     )
     visible = seat.room.visible_channels(run.participant_actor_id)
@@ -1461,7 +1583,12 @@ async def _converse(
             prompt_text=text,
             caused_by=said.event_id,
         )
-        if not answered:
+        if not answered.published:
+            # A seat that was asked and said nothing is a provider fault, and the
+            # participant is told. A seat that was never asked is the study's own
+            # rule working, and there is nothing to say.
+            if answered.asked:
+                await _notice(websocket, "no-reply", _NO_REPLY)
             await _end(
                 run, durable, visit_id=visit_id, store=store, new_context=new_context
             )
@@ -1478,7 +1605,7 @@ async def _converse(
             # recorded as discarded and shown to nobody: publishing them would put
             # an answer to a question this conversation has moved past into it.
             continue
-        for seat, reply in answered:
+        for seat, reply in answered.published:
             await run.room.deliver(
                 reply.message, new_context=new_context, new_id=new_id
             )
@@ -1613,3 +1740,43 @@ __all__ = [
     "RoomSeat",
     "run_chat_activity",
 ]
+
+
+def with_speakers(spec: ChatSpec, derived_id: DeriveId) -> ChatSpec:
+    """Compile the author's ``Model`` speakers into the seats the runtime reads.
+
+    A model that only talks is the same kind of seat as one that plays a game, so
+    it is written the same way and its identifiers are derived the same way: from
+    the conversation's channel and the agent's own key, through the gateway. Two
+    processes over one ledger therefore compile the same seats, and a replay names
+    what the run named.
+
+    A study that wrote no speakers is returned unchanged, so every mount that
+    predates this runs exactly as it did.
+    """
+    written = ((spec.speaker,) if spec.speaker is not None else ()) + spec.speakers
+    if not written:
+        return spec
+    seats: list[ChatSeatSpec] = []
+    for model in written:
+        key = model.key or _speaker_key(type(model.agent).__name__)
+        scope = f"{spec.channel_key}:{key}"
+        seats.append(
+            ChatSeatSpec(
+                agent=model.agent,
+                adapter=model.adapter or adapter_for(model.agent.provider.value),
+                ids=agent_ids_for(model.agent, key, scope, derived_id),
+                actor_id=derived_id("actor", scope),
+                resolve_secret=model.resolve_secret,
+            )
+        )
+    return replace(spec, seat=None, seats=tuple(seats), speaker=None, speakers=())
+
+
+def _speaker_key(name: str) -> str:
+    """Return one authoring key read from a class name, or a safe fallback."""
+    folded = "".join(
+        character if character.isalnum() else "-" for character in name
+    ).strip("-").lower()
+    cleaned = "-".join(part for part in folded.split("-") if part)
+    return cleaned or "speaker"

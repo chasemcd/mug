@@ -46,7 +46,7 @@ from typing import Any, NamedTuple, Protocol, cast
 
 import numpy as np
 
-from mug.game.seams import Clock, SeatActionSource
+from mug.game.seams import Clock, SeatActionSource, what_a_seat_reads
 from mug.game.trajectory import TrajectoryFrame
 from mug.game.types import EpisodeBoundary, GameTransition
 from mug.kernel import compute_digest
@@ -164,6 +164,15 @@ class AecEnv:
         self._seed = seed
         self._agent_ids: tuple[str, ...] = ()
         self._terminated_any = False
+
+    @property
+    def env(self) -> Any:
+        """Return the environment itself, for a seat that reads more than a turn.
+
+        A planning seat needs the board and not only its own observation, and the same
+        object an LLM controller reads for its text view is the object here.
+        """
+        return self._env
 
     def reset(self) -> TurnState:
         """Reset the environment and land on the first live seat's turn."""
@@ -326,7 +335,11 @@ async def run_turnbased_episode(
         agent = state.agent
         if on_turn is not None:
             await on_turn(state)
-        action = int(sources[agent].decide(state.observation))
+        action = int(
+            sources[agent].decide(
+                what_a_seat_reads(env, sources[agent], agent, state.observation)
+            )
+        )
         state = env.step(action)
         frame += 1
         transitions.append(

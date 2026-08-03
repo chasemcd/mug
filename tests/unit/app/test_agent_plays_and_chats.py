@@ -27,16 +27,19 @@ from starlette.testclient import WebSocketTestSession
 
 from mug.agents import AgentGameSpec, AgentIds, AgentSeatSpec
 from mug.app import build_study_app
-from mug.authoring import Chat, Fallback, History, LLMAgent, Provider, Thoughts
+from mug.authoring import Fallback, History, LLMAgent, Provider, Thoughts, Transcript
 from mug.content import Game, Page, Study
 from mug.conversation.anchors import read_anchors
 from mug.game.multiseat import MultiStepResult
 from mug.gateway import Gateway
-from mug.participant_chat import ChatChannel, ChatSpec
+from mug.participant_chat import ChatChannel
 from mug.providers import ModelCall, ModelCompletion, Usage
 from mug.storage import InMemoryStore, Store
+from tests.support.agents import warmed, warming
+from tests.support.chat import written_chat
 
 _UUID = "019b6000-0000-7000-8000-{:012x}"
+
 _AGENTS = ("north",)
 _PARTNER_ACTOR = "actor_" + _UUID.format(0x800)
 _EPISODE_LEN = 6
@@ -89,7 +92,7 @@ class _Partner(LLMAgent):
         env: object,
         agent_id: str,
         history: History,
-        chat: Chat,
+        chat: Transcript,
         thoughts: Thoughts,
     ) -> str:
         heard = "; ".join(message.text for message in chat.last(5))
@@ -111,6 +114,8 @@ class _Adapter:
         self.prompts: list[str] = []
 
     async def __call__(self, call: ModelCall) -> ModelCompletion:
+        if warming(call):
+            return warmed()
         payload: Any = call.payload
         self.prompts.append(payload["messages"][0]["content"])
         # It says something only on its first decision, so the test can count the
@@ -159,7 +164,7 @@ def _spec(adapter: _Adapter) -> AgentGameSpec:
 def _study() -> Study:
     """A study whose one activity is an agent game with a conversation beside it."""
     return Study(
-        Game("play", chat=ChatSpec(channel_key="talk")),
+        Game("play", chat=written_chat("talk")),
         Page("debrief", "# Thanks"),
     )
 
@@ -420,8 +425,8 @@ def test_a_playing_seat_is_not_told_a_channel_it_is_not_in() -> None:
     study = Study(
         Game(
             "play",
-            chat=ChatSpec(
-                channel_key="talk",
+            chat=written_chat(
+                "talk",
                 channels=(
                     ChatChannel(key="talk"),
                     ChatChannel(key="aside", visibility="private"),

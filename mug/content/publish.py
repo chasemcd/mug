@@ -116,6 +116,7 @@ _ACTIVITY_CAPABILITY = {
     "form": "mug.activity.form.v1",
     "content": "mug.activity.content.v1",
     "game": "mug.activity.game.v1",
+    "chat": "mug.activity.chat.v1",
     "comparison": "mug.activity.comparison.v1",
 }
 
@@ -198,13 +199,22 @@ def _assets_of(study: Study) -> list[dict[str, Any]]:
     study, and a version that ignored the file would claim otherwise. The bytes
     themselves are addressed by digest at deployment; what the version binds is
     what was declared.
+
+    The frames are part of it for the same reason, and they are the sharper case: a
+    sheet re-packed with one more sprite has the same name and the same path, and every
+    drawing that names a frame after the change now draws something else. They are read
+    into the asset when the study is built (``Asset.resolved``), so what is bound here
+    is what a frame name actually meant.
     """
     return [
         {
             "name": asset.name,
             "path": asset.path,
             "media_type": asset.resolved_media_type(),
-            "frames": [frame.as_json() for frame in asset.frames],
+            "frames": {
+                frame: rectangle.as_json()
+                for frame, rectangle in sorted(asset.frames.items())
+            },
         }
         for asset in study.assets
     ]

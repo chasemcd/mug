@@ -102,6 +102,10 @@ def ts_a11y_server_url(tmp_path: Path) -> Iterator[str]:
     if not _BOOTSTRAP.exists():
         pytest.skip("ts/dist-web is not built; run `npm run build:web` in ts/")
     shutil.copy(_SHELL, tmp_path / "index.html")
+    shutil.copy(
+        _SHELL.parents[3] / "mug" / "webclient" / "app.css",
+        tmp_path / "app.css",
+    )
     shutil.copytree(_DIST_WEB / "client", tmp_path / "client")
     shutil.copytree(_DIST_WEB / "kernel", tmp_path / "kernel")
     yield from _serve(tmp_path)
@@ -129,9 +133,13 @@ def _walk_the_study_with_the_keyboard(page: Page, url: str) -> None:
     expect(mood).to_be_visible()
     expect(page.get_by_label("Anything you want to tell us?")).to_be_visible()
 
-    # Answer with the keyboard only.
-    page.get_by_role("radio", name="yes").check()
-    page.get_by_role("radio", name="4").check()
+    # Answer with the keyboard only, which is what this test claims to prove.
+    # A radio is chosen by focusing it and pressing space; ``check()`` clicks,
+    # so it proved the mouse worked and said it proved the keyboard did.
+    for name in ("yes", "4"):
+        page.get_by_role("radio", name=name).focus()
+        page.keyboard.press("Space")
+        expect(page.get_by_role("radio", name=name)).to_be_checked()
     page.get_by_label("Anything you want to tell us?").fill("it was clear")
     page.get_by_role("button", name="Continue").press("Enter")
 

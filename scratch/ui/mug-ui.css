@@ -1,0 +1,1051 @@
+/* MUG participant interface -- a proposed design language.
+ *
+ * These are mock-ups. No file here is wired into the platform.
+ *
+ * The rules this design keeps:
+ *  1. The screen never says whether the other party is a person or a model.
+ *     Only the study knows that, and only the study may say it. So there is no
+ *     robot icon, no "Assistant", and no brand mark on a reply.
+ *  2. Two things a participant is asked to compare must look the same. A card
+ *     that is wider, brighter, or first in a way the eye reads as "better" is a
+ *     measurement error, not a style choice.
+ *  3. Every control keeps a visible focus ring. A game pane and a chat pane are
+ *     changed with the Tab key, so a participant who can not see the focus can
+ *     not play.
+ *
+ * These documents use ASD-STE100 Simplified Technical English.
+ */
+
+/* -- tokens ------------------------------------------------------------- */
+
+:root {
+  color-scheme: light dark;
+
+  --paper: #fbfaf8;
+  --surface: #ffffff;
+  --surface-sunk: #f4f2ee;
+  --ink: #1a1a19;
+  --ink-muted: #6b6862;
+  --ink-faint: #97928a;
+  --line: #e7e3db;
+  --line-strong: #d6d0c5;
+
+  --accent: #1f6f6b;
+  --accent-hover: #185b58;
+  --accent-ink: #ffffff;
+  --accent-soft: #edf5f4;
+  --accent-line: #bcd9d6;
+
+  --warn: #9a5b16;
+  --warn-soft: #fdf3e6;
+
+  --radius-lg: 14px;
+  --radius: 10px;
+  --radius-sm: 7px;
+
+  --shadow-sm: 0 1px 2px rgba(26, 26, 25, 0.05);
+  --shadow: 0 1px 2px rgba(26, 26, 25, 0.04), 0 10px 28px -16px rgba(26, 26, 25, 0.22);
+  --shadow-lift: 0 2px 4px rgba(26, 26, 25, 0.05), 0 18px 40px -20px rgba(26, 26, 25, 0.3);
+
+  --font: ui-sans-serif, -apple-system, "Segoe UI", Inter, Roboto, "Helvetica Neue",
+    Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+
+  --thread: 46rem;
+}
+
+:root[data-theme="dark"] {
+  --paper: #17191b;
+  --surface: #1d2023;
+  --surface-sunk: #202427;
+  --ink: #e9e7e3;
+  --ink-muted: #9b968e;
+  --ink-faint: #78736c;
+  --line: #2c3134;
+  --line-strong: #3a4044;
+
+  --accent: #5cb3aa;
+  --accent-hover: #74c4bb;
+  --accent-ink: #10221f;
+  --accent-soft: #16302d;
+  --accent-line: #2b524e;
+
+  --warn: #d79a52;
+  --warn-soft: #2c2417;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 28px -16px rgba(0, 0, 0, 0.7);
+  --shadow-lift: 0 2px 4px rgba(0, 0, 0, 0.3), 0 18px 40px -20px rgba(0, 0, 0, 0.8);
+}
+
+/* -- base --------------------------------------------------------------- */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font);
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--ink);
+  background: var(--paper);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  line-height: 1.3;
+  letter-spacing: -0.011em;
+  font-weight: 600;
+}
+
+h1 {
+  font-size: 1.5rem;
+}
+h2 {
+  font-size: 1.25rem;
+}
+h3 {
+  font-size: 1rem;
+}
+
+p {
+  margin: 0 0 0.9em;
+}
+
+p:last-child {
+  margin-bottom: 0;
+}
+
+a {
+  color: var(--accent);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* -- application frame -------------------------------------------------- */
+
+.app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.7rem 1.25rem;
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface) 85%, transparent);
+  backdrop-filter: saturate(1.4) blur(10px);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.topbar__title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: -0.006em;
+}
+
+.topbar__sub {
+  font-size: 0.8125rem;
+  color: var(--ink-muted);
+}
+
+.topbar__spacer {
+  flex: 1;
+}
+
+/* The study step, as a row of marks. It says where the participant is without
+ * promising a time, which no study can honestly give. */
+.steps {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.steps__mark {
+  width: 22px;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--line-strong);
+}
+
+.steps__mark--done {
+  background: var(--accent);
+  opacity: 0.45;
+}
+
+.steps__mark--now {
+  background: var(--accent);
+  width: 34px;
+}
+
+.link-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8125rem;
+  color: var(--ink-muted);
+}
+
+.link-state::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--accent);
+}
+
+.link-state--weak::before {
+  background: var(--warn);
+}
+
+.link-state--lost::before {
+  background: var(--ink-faint);
+}
+
+/* -- buttons ------------------------------------------------------------ */
+
+.btn {
+  font: inherit;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--ink);
+  padding: 0.5rem 0.9rem;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease, transform 0.06s ease;
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--surface-sunk);
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(0.5px);
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn--primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+.btn--primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+.btn--ghost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--ink-muted);
+}
+
+.btn--ghost:hover:not(:disabled) {
+  background: var(--surface-sunk);
+  color: var(--ink);
+}
+
+.btn--small {
+  font-size: 0.8125rem;
+  padding: 0.32rem 0.65rem;
+}
+
+.btn--wide {
+  width: 100%;
+  justify-content: center;
+}
+
+/* -- segmented control (channels, and the mock-up switches) ------------- */
+
+.segmented {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--surface-sunk);
+  border: 1px solid var(--line);
+}
+
+.segmented button {
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  border: 0;
+  background: transparent;
+  color: var(--ink-muted);
+  padding: 0.28rem 0.8rem;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.segmented button[aria-selected="true"],
+.segmented button[aria-pressed="true"] {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-sm);
+}
+
+/* -- the conversation --------------------------------------------------- */
+
+.thread-area {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.5rem 1.25rem 0;
+  scrollbar-gutter: stable;
+}
+
+.thread {
+  max-width: var(--thread);
+  margin: 0 auto;
+  padding-bottom: 1.5rem;
+}
+
+.turn {
+  display: flex;
+  gap: 0.85rem;
+  margin-bottom: 1.75rem;
+}
+
+.turn__who {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: var(--surface-sunk);
+  border: 1px solid var(--line);
+  color: var(--ink-muted);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  display: grid;
+  place-items: center;
+  margin-top: 1px;
+  user-select: none;
+}
+
+.turn--you .turn__who {
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
+  color: var(--accent);
+}
+
+.turn__body {
+  min-width: 0;
+  flex: 1;
+}
+
+.turn__name {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--ink-muted);
+  margin-bottom: 0.2rem;
+  letter-spacing: 0.01em;
+}
+
+.turn__text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* The other reading of a thread: what the participant said is a filled card,
+ * and the reply is the page. Switch with the control at the top right. */
+[data-thread="bubble"] .turn--you {
+  flex-direction: row-reverse;
+}
+
+[data-thread="bubble"] .turn--you .turn__name {
+  text-align: right;
+}
+
+[data-thread="bubble"] .turn--you .turn__text {
+  display: inline-block;
+  max-width: 85%;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-line);
+  padding: 0.55rem 0.85rem;
+  border-radius: var(--radius) var(--radius-sm) var(--radius) var(--radius);
+  text-align: left;
+}
+
+[data-thread="bubble"] .turn--you .turn__body {
+  text-align: right;
+}
+
+/* What stands where a reply is going to be. A pane that shows nothing while a
+ * model thinks reads as a broken study, not a slow one. */
+.thinking {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  height: 1.6em;
+}
+
+.thinking span {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--ink-faint);
+  animation: pulse 1.3s ease-in-out infinite;
+}
+
+.thinking span:nth-child(2) {
+  animation-delay: 0.16s;
+}
+
+.thinking span:nth-child(3) {
+  animation-delay: 0.32s;
+}
+
+@keyframes pulse {
+  0%,
+  60%,
+  100% {
+    opacity: 0.25;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 0.9;
+    transform: translateY(-2px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .thinking span {
+    animation: none;
+    opacity: 0.5;
+  }
+}
+
+/* A reply that is not coming. */
+.notice {
+  max-width: var(--thread);
+  margin: 0 auto 1.75rem;
+  padding: 0.6rem 0.85rem;
+  border-left: 3px solid var(--warn);
+  background: var(--warn-soft);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  color: var(--ink);
+  font-size: 0.875rem;
+}
+
+/* -- the composer ------------------------------------------------------- */
+
+.composer-dock {
+  position: sticky;
+  bottom: 0;
+  padding: 0.5rem 1.25rem 1.1rem;
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--paper) 0%, transparent),
+    var(--paper) 42%
+  );
+}
+
+.composer {
+  max-width: var(--thread);
+  margin: 0 auto;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  padding: 0.6rem 0.6rem 0.55rem 0.9rem;
+  display: flex;
+  align-items: flex-end;
+  gap: 0.6rem;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.composer:focus-within {
+  border-color: var(--accent);
+  box-shadow: var(--shadow), 0 0 0 3px var(--accent-soft);
+}
+
+.composer textarea {
+  flex: 1;
+  border: 0;
+  outline: 0;
+  resize: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: 1.55;
+  max-height: 11rem;
+  padding: 0.25rem 0;
+}
+
+.composer textarea::placeholder {
+  color: var(--ink-faint);
+}
+
+.composer__send {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  border: 0;
+  background: var(--accent);
+  color: var(--accent-ink);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.composer__send:disabled {
+  background: var(--line-strong);
+  color: var(--ink-faint);
+  cursor: not-allowed;
+}
+
+.composer-hint {
+  max-width: var(--thread);
+  margin: 0.45rem auto 0;
+  font-size: 0.75rem;
+  color: var(--ink-faint);
+  display: flex;
+  gap: 0.75rem;
+}
+
+kbd {
+  font-family: var(--font);
+  font-size: 0.6875rem;
+  border: 1px solid var(--line-strong);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: 0 0.28rem;
+  color: var(--ink-muted);
+  background: var(--surface);
+}
+
+/* -- the judgement: two things that must look the same ------------------ */
+
+.elicit {
+  max-width: min(58rem, 100%);
+  margin: 0 auto 1.75rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.elicit__head {
+  padding: 0.9rem 1.1rem;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+}
+
+.elicit__ask {
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.elicit__note {
+  font-size: 0.8125rem;
+  color: var(--ink-muted);
+  margin-left: auto;
+}
+
+/* The grid is the guard: one track sizing rule for both, so neither can be
+ * wider, and no rule anywhere styles "the first one". */
+.options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--line);
+}
+
+.option {
+  background: var(--surface);
+  padding: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.option__tag {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.option__text {
+  flex: 1;
+  white-space: pre-wrap;
+  font-size: 0.9375rem;
+}
+
+.option__stats {
+  display: flex;
+  gap: 1.25rem;
+  padding: 0.7rem 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.stat__value {
+  font-size: 1.05rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat__label {
+  font-size: 0.75rem;
+  color: var(--ink-muted);
+}
+
+.option .btn {
+  width: 100%;
+}
+
+/* -- axes --------------------------------------------------------------- */
+
+.axes {
+  border-top: 1px solid var(--line);
+  padding: 1.1rem;
+  display: grid;
+  gap: 1.35rem;
+}
+
+.axis__ask {
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin-bottom: 0.55rem;
+}
+
+/* An axis is a row of marks, not a slider.
+ *
+ * A slider between two replies has to start somewhere, and wherever it starts
+ * it draws a filled bar to one side. At the middle it reads as a small
+ * preference for the left one before the participant has touched it -- and
+ * worse, a participant who does not touch it at all still sends the middle
+ * value, so the study records a tie that nobody gave. A row of marks starts
+ * with nothing chosen, and "nothing chosen" can be asked for again. */
+.axis__marks {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.axis__row {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 4px;
+}
+
+.axis__row label {
+  display: grid;
+  place-items: center;
+  padding: 0.55rem 0.25rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  background: var(--surface);
+  color: var(--ink-faint);
+  font-size: 0.75rem;
+}
+
+.axis__row label:hover {
+  background: var(--surface-sunk);
+}
+
+.axis__row label:has(input:checked) {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+.axis__row label:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.axis__row input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* The middle of a comparison axis is "the same", and it is marked as such so
+ * it is chosen on purpose rather than landed on. */
+.axis__row label[data-middle] {
+  border-style: dashed;
+}
+
+/* A comparison mark carries no number, because a number on a comparison invites
+ * a participant to read it as an amount. It carries a dot, which says only
+ * "this one". */
+.axis__row--dots label::after {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.35;
+}
+
+.axis__row--dots label:has(input:checked)::after {
+  opacity: 1;
+}
+
+.axis__ends {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.75rem;
+  color: var(--ink-muted);
+}
+
+.axis__ends span:nth-child(2) {
+  text-align: center;
+}
+
+.axis__each {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.25rem;
+}
+
+.axis__each-one {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.axis__each-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+
+.elicit__foot {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.85rem 1.1rem;
+  border-top: 1px solid var(--line);
+  background: var(--surface-sunk);
+}
+
+.elicit__foot .spacer {
+  flex: 1;
+}
+
+/* -- reading pages and forms -------------------------------------------- */
+
+.sheet {
+  max-width: 42rem;
+  margin: 0 auto;
+  padding: 2.5rem 1.25rem 3rem;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: 1.5rem;
+}
+
+.field {
+  padding: 1.15rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.field:last-of-type {
+  border-bottom: 0;
+}
+
+.field__label {
+  display: block;
+  font-weight: 500;
+  margin-bottom: 0.6rem;
+}
+
+.field__hint {
+  font-size: 0.8125rem;
+  color: var(--ink-muted);
+  margin: -0.35rem 0 0.6rem;
+}
+
+.field input[type="text"],
+.field textarea {
+  width: 100%;
+  font: inherit;
+  color: inherit;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  padding: 0.55rem 0.7rem;
+}
+
+.field input[type="text"]:focus,
+.field textarea:focus {
+  outline: 0;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+/* A scale is one row of marks, not a row of loose radio dots. The end words
+ * are always shown: "1 to 7" means nothing on its own. */
+.scale {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.scale__row {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 4px;
+}
+
+.scale__row label {
+  display: grid;
+  place-items: center;
+  gap: 0.15rem;
+  padding: 0.5rem 0.25rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 0.8125rem;
+  color: var(--ink-muted);
+  background: var(--surface);
+}
+
+.scale__row input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.scale__row label:hover {
+  background: var(--surface-sunk);
+}
+
+.scale__row input:checked + span {
+  color: var(--accent-ink);
+}
+
+.scale__row label:has(input:checked) {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+.scale__row label:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.scale__ends {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: var(--ink-muted);
+}
+
+.choices {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.choices label {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.choices label:hover {
+  background: var(--surface-sunk);
+}
+
+.choices label:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.choices input {
+  accent-color: var(--accent);
+}
+
+.prose h2 {
+  margin: 1.75rem 0 0.6rem;
+}
+
+.prose h2:first-child {
+  margin-top: 0;
+}
+
+.prose ul {
+  margin: 0 0 1em;
+  padding-left: 1.2rem;
+}
+
+.prose li {
+  margin-bottom: 0.35em;
+}
+
+.prose img {
+  max-width: 100%;
+  border-radius: var(--radius-sm);
+}
+
+.actions {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  margin-top: 1.5rem;
+}
+
+/* -- a game beside a conversation --------------------------------------- */
+
+.panes {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(20rem, 24rem);
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  align-items: stretch;
+  flex: 1;
+  min-height: 0;
+}
+
+.pane {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* Which pane the keys go to. The old client drew a blue outline and said
+ * nothing; a participant who presses a key and sees no chef move needs to be
+ * told where the key went. */
+.pane--held {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.pane__head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.55rem 0.85rem;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.pane__badge {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: var(--surface-sunk);
+  color: var(--ink-faint);
+  border: 1px solid var(--line);
+}
+
+.pane--held .pane__badge {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+}
+
+.pane__body {
+  padding: 0.85rem;
+  overflow-y: auto;
+  min-height: 0;
+  flex: 1;
+}
+
+.hud {
+  display: flex;
+  gap: 1.5rem;
+  padding: 0.5rem 0.85rem;
+  border-top: 1px solid var(--line);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.8125rem;
+}
+
+.hud__label {
+  color: var(--ink-muted);
+}
+
+@media (max-width: 60rem) {
+  .panes {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .options {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .axis__each {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* -- the mock-up bar (not part of the design) --------------------------- */
+
+.mock {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.4rem 1.25rem;
+  background: var(--surface-sunk);
+  border-bottom: 1px solid var(--line);
+  font-size: 0.75rem;
+  color: var(--ink-muted);
+}
+
+.mock strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.mock .spacer {
+  flex: 1;
+}

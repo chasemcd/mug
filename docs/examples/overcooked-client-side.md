@@ -12,7 +12,7 @@ Two human participants collaborate as chefs across the five classic Overcooked k
 
 For a simpler P2P walkthrough with the full GGPO explanation, see [Quick Start: Multiplayer](../getting-started/quick-start-multiplayer.md). For a version where the environment runs on the server instead, see the [Running server-authoritative instead](#running-server-authoritative-instead) section at the bottom.
 
-See [Examples](index.md) for install and run instructions. This example also requires the [CoGrid Overcooked environment](https://github.com/chasemcd/cogrid), which we install in the user's browser (install locally with `pip install cogrid==0.2.1` if you want to run the environment outside the experiment).
+See [Examples](index.md) for install and run instructions. This example also requires the [CoGrid Overcooked environment](https://github.com/chasemcd/cogrid), which we install in the user's browser (install locally with `pip install cogrid==0.3.2` if you want to run the environment outside the experiment).
 
 ## File Structure
 
@@ -115,7 +115,7 @@ def _build_human_human_scene(layout_name, cols, rows, label):
             environment_initialization_code=overcooked_utils.make_hh_env_init_code(
                 layout_name, cols, rows
             ),
-            packages_to_install=["numpy", "cogrid==0.2.1", "opencv-python"],
+            packages_to_install=["numpy", "cogrid==0.3.2", "opencv-python"],
         )
         .multiplayer(
             input_delay=3,
