@@ -63,11 +63,16 @@ If you use MUG in your research, please cite:
 
 ```bibtex
 @article{mcdonald2026cogrid,
-  title={CoGrid \& the Multi-User Gymnasium: A Framework for Multi-Agent Experimentation},
+  title={CoGrid \& the Multi-User Gymnasium: A framework for multi-agent experimentation},
   author={McDonald, Chase and Gonzalez, Cleotilde},
-  journal={arXiv preprint arXiv:2604.15044},
-  year={2026}
+  journal={Behavior Research Methods},
+  volume={58},
+  number={11},
+  pages={295},
+  year={2026},
+  publisher={Springer}
 }
+
 ```
 
 ## MUG in the Wild
